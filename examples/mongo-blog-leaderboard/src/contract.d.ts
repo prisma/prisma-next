@@ -38,47 +38,51 @@ export type AddressInput = {
   readonly country: CodecTypes['mongo/string@1']['input'];
 };
 export type FieldOutputTypes = {
-  readonly Article: { readonly summary: CodecTypes['mongo/string@1']['output'] };
-  readonly Post: {
-    readonly _id: CodecTypes['mongo/objectId@1']['output'];
-    readonly title: CodecTypes['mongo/string@1']['output'];
-    readonly content: CodecTypes['mongo/string@1']['output'];
-    readonly kind: CodecTypes['mongo/string@1']['output'];
-    readonly authorId: CodecTypes['mongo/objectId@1']['output'];
-    readonly createdAt: CodecTypes['mongo/date@1']['output'];
-  };
-  readonly Tutorial: {
-    readonly difficulty: CodecTypes['mongo/string@1']['output'];
-    readonly duration: CodecTypes['mongo/int32@1']['output'];
-  };
-  readonly User: {
-    readonly _id: CodecTypes['mongo/objectId@1']['output'];
-    readonly name: CodecTypes['mongo/string@1']['output'];
-    readonly email: CodecTypes['mongo/string@1']['output'];
-    readonly bio: CodecTypes['mongo/string@1']['output'] | null;
-    readonly address: AddressOutput | null;
+  readonly __unbound__: {
+    readonly Article: { readonly summary: CodecTypes['mongo/string@1']['output'] };
+    readonly Post: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly title: CodecTypes['mongo/string@1']['output'];
+      readonly content: CodecTypes['mongo/string@1']['output'];
+      readonly kind: CodecTypes['mongo/string@1']['output'];
+      readonly authorId: CodecTypes['mongo/objectId@1']['output'];
+      readonly createdAt: CodecTypes['mongo/date@1']['output'];
+    };
+    readonly Tutorial: {
+      readonly difficulty: CodecTypes['mongo/string@1']['output'];
+      readonly duration: CodecTypes['mongo/int32@1']['output'];
+    };
+    readonly User: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly name: CodecTypes['mongo/string@1']['output'];
+      readonly email: CodecTypes['mongo/string@1']['output'];
+      readonly bio: CodecTypes['mongo/string@1']['output'] | null;
+      readonly address: AddressOutput | null;
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly Article: { readonly summary: CodecTypes['mongo/string@1']['input'] };
-  readonly Post: {
-    readonly _id: CodecTypes['mongo/objectId@1']['input'];
-    readonly title: CodecTypes['mongo/string@1']['input'];
-    readonly content: CodecTypes['mongo/string@1']['input'];
-    readonly kind: CodecTypes['mongo/string@1']['input'];
-    readonly authorId: CodecTypes['mongo/objectId@1']['input'];
-    readonly createdAt: CodecTypes['mongo/date@1']['input'];
-  };
-  readonly Tutorial: {
-    readonly difficulty: CodecTypes['mongo/string@1']['input'];
-    readonly duration: CodecTypes['mongo/int32@1']['input'];
-  };
-  readonly User: {
-    readonly _id: CodecTypes['mongo/objectId@1']['input'];
-    readonly name: CodecTypes['mongo/string@1']['input'];
-    readonly email: CodecTypes['mongo/string@1']['input'];
-    readonly bio: CodecTypes['mongo/string@1']['input'] | null;
-    readonly address: AddressInput | null;
+  readonly __unbound__: {
+    readonly Article: { readonly summary: CodecTypes['mongo/string@1']['input'] };
+    readonly Post: {
+      readonly _id: CodecTypes['mongo/objectId@1']['input'];
+      readonly title: CodecTypes['mongo/string@1']['input'];
+      readonly content: CodecTypes['mongo/string@1']['input'];
+      readonly kind: CodecTypes['mongo/string@1']['input'];
+      readonly authorId: CodecTypes['mongo/objectId@1']['input'];
+      readonly createdAt: CodecTypes['mongo/date@1']['input'];
+    };
+    readonly Tutorial: {
+      readonly difficulty: CodecTypes['mongo/string@1']['input'];
+      readonly duration: CodecTypes['mongo/int32@1']['input'];
+    };
+    readonly User: {
+      readonly _id: CodecTypes['mongo/objectId@1']['input'];
+      readonly name: CodecTypes['mongo/string@1']['input'];
+      readonly email: CodecTypes['mongo/string@1']['input'];
+      readonly bio: CodecTypes['mongo/string@1']['input'] | null;
+      readonly address: AddressInput | null;
+    };
   };
 };
 export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>;

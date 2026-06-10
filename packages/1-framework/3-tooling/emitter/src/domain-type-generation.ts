@@ -443,6 +443,44 @@ export function generateBothFieldTypesMaps(
   };
 }
 
+/**
+ * Builds the output/input field type maps nested by namespace coordinate —
+ * `{ [ns]: { [model]: { [field]: <refined-type> } } }` — mirroring how
+ * `domain.namespaces[ns]` is emitted. Each namespace's per-model map reuses
+ * {@link generateBothFieldTypesMaps} (and its `renderOutputTypeFor` typeParam
+ * refinement), so a parameterized column keeps its refined output type under
+ * its own namespace and same-named models across namespaces stay distinct.
+ */
+export function generateFieldTypesMapsByNamespace(
+  namespaceModels: ReadonlyArray<readonly [string, Record<string, ContractModel>]>,
+  codecLookup?: CodecLookup,
+  resolveFieldTypeParams?: FieldTypeParamsResolver,
+  resolveEnumValues?: EnumValuesResolver,
+): ResolvedFieldType {
+  if (namespaceModels.length === 0) {
+    return { output: 'Record<string, never>', input: 'Record<string, never>' };
+  }
+
+  const outputNamespaceEntries: string[] = [];
+  const inputNamespaceEntries: string[] = [];
+  for (const [nsId, models] of namespaceModels) {
+    const inner = generateBothFieldTypesMaps(
+      models,
+      codecLookup,
+      resolveFieldTypeParams,
+      resolveEnumValues,
+    );
+    const nsKey = `readonly ${serializeObjectKey(nsId)}`;
+    outputNamespaceEntries.push(`${nsKey}: ${inner.output}`);
+    inputNamespaceEntries.push(`${nsKey}: ${inner.input}`);
+  }
+
+  return {
+    output: `{ ${outputNamespaceEntries.join('; ')} }`,
+    input: `{ ${inputNamespaceEntries.join('; ')} }`,
+  };
+}
+
 export function generateFieldOutputTypesMap(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,

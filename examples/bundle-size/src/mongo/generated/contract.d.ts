@@ -26,10 +26,14 @@ export type ProfileHash =
 export type CodecTypes = MongoCodecTypes;
 
 export type FieldOutputTypes = {
-  readonly Note: { readonly _id: CodecTypes['mongo/objectId@1']['output'] };
+  readonly __unbound__: {
+    readonly Note: { readonly _id: CodecTypes['mongo/objectId@1']['output'] };
+  };
 };
 export type FieldInputTypes = {
-  readonly Note: { readonly _id: CodecTypes['mongo/objectId@1']['input'] };
+  readonly __unbound__: {
+    readonly Note: { readonly _id: CodecTypes['mongo/objectId@1']['input'] };
+  };
 };
 export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>;
 
