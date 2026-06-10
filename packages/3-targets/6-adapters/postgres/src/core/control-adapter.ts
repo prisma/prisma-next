@@ -1405,6 +1405,8 @@ function extractQuotedLiterals(listBody: string): readonly string[] | undefined 
   const pattern = /'((?:[^'\\]|\\.|'')*)'/g;
   const values = [...listBody.matchAll(pattern)].map((m) => (m[1] ?? '').replace(/''/g, "'"));
   return values.length > 0 ? values : undefined;
+}
+
 // ---------------------------------------------------------------------------
 // pgRenderDdlExecuteRequest — independent DDL walker for lowerToExecuteRequest
 // ---------------------------------------------------------------------------
