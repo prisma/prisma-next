@@ -85,13 +85,28 @@ export class Cursor {
     }
   }
 
-  mark(): DiagnosticMark {
+  /**
+   * The absolute span of the significant token `lookahead` positions ahead of
+   * the cursor (trivia skipped), captured eagerly so it stays valid after the
+   * cursor advances. `mark(0)` is the next significant token; `mark(1)` is the
+   * one after it. The offset accumulates the length of every intervening token,
+   * trivia included, so the span lines up with the source exactly as the
+   * matching {@link peekToken} would read it.
+   */
+  mark(lookahead = 0): DiagnosticMark {
     let rawIndex = 0;
     let offset = this.#offset;
+    let remaining = lookahead;
     for (;;) {
       const token = this.#tokenizer.peek(rawIndex);
-      if (token.kind === 'Eof' || !TRIVIA_KINDS.has(token.kind)) {
+      if (token.kind === 'Eof') {
         return { offset, length: token.text.length };
+      }
+      if (!TRIVIA_KINDS.has(token.kind) && remaining === 0) {
+        return { offset, length: token.text.length };
+      }
+      if (!TRIVIA_KINDS.has(token.kind)) {
+        remaining--;
       }
       offset += token.text.length;
       rawIndex++;

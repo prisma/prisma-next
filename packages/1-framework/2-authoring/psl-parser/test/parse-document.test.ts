@@ -633,7 +633,7 @@ describe('ordered-alternative parsers are no-ops on non-match', () => {
   });
 
   it('parseNamespace rejects a non-namespace keyword without consuming', () => {
-    expectNoOpReject('model User {', (cursor) => parseNamespace(cursor, false));
+    expectNoOpReject('model User {', parseNamespace);
   });
 
   it('parseCompositeType rejects a non-type keyword without consuming', () => {
@@ -641,7 +641,7 @@ describe('ordered-alternative parsers are no-ops on non-match', () => {
   });
 
   it('parseTypesBlock rejects a non-types keyword without consuming', () => {
-    expectNoOpReject('model User {', (cursor) => parseTypesBlock(cursor, false));
+    expectNoOpReject('model User {', parseTypesBlock);
   });
 
   it('parseGenericBlock rejects a reserved keyword so it falls through to recovery', () => {
@@ -666,5 +666,17 @@ describe('ordered-alternative parsers are no-ops on non-match', () => {
 
   it('parseKeyValue rejects a non-identifier entry without consuming', () => {
     expectNoOpReject('42', parseKeyValue);
+  });
+});
+
+describe('Cursor.mark lookahead', () => {
+  it('mark(0) spans the next significant token, skipping leading trivia', () => {
+    const cursor = new Cursor('  namespace Foo {');
+    expect(cursor.mark()).toEqual({ offset: 2, length: 'namespace'.length });
+  });
+
+  it('mark(1) spans the significant token after the next, trivia included in the offset', () => {
+    const cursor = new Cursor('namespace Foo {');
+    expect(cursor.mark(1)).toEqual({ offset: 'namespace '.length, length: 'Foo'.length });
   });
 });
