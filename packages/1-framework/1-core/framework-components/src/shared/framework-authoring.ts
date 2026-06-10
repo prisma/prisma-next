@@ -196,6 +196,19 @@ export interface AuthoringPslBlockDescriptor {
    * member names), not a fixed set.
    */
   readonly allowAdditionalParameters?: boolean;
+  /**
+   * When `true`, this block is lowered by the interpreter (e.g. via a
+   * parallel `processXxx` path like `processEnum2Declarations`) rather than
+   * by an `entityTypes` factory. No matching `entityType` entry is required
+   * for the discriminator.
+   *
+   * The one-directional rule ("every block needs a factory") only holds for
+   * blocks whose lowering goes through the factory dispatch. Interpreter-
+   * lowered blocks register a descriptor so the parser can recognise the
+   * keyword and emit the correct extension-block AST node, but the factory
+   * machinery is never invoked — there is nothing to wire up.
+   */
+  readonly interpreterLowered?: boolean;
 }
 
 export type AuthoringPslBlockDescriptorNamespace = {
@@ -514,22 +527,62 @@ function assertUniqueDiscriminators(entries: readonly AuthoringLeafEntry[], labe
   }
 }
 
+interface PslBlockLeafEntry extends AuthoringLeafEntry {
+  readonly interpreterLowered: boolean;
+}
+
+function collectPslBlockLeafEntries(
+  namespace: Readonly<Record<string, unknown>>,
+  path: readonly string[] = [],
+): PslBlockLeafEntry[] {
+  const entries: PslBlockLeafEntry[] = [];
+  for (const [key, value] of Object.entries(namespace)) {
+    const currentPath = [...path, key];
+    if (isAuthoringPslBlockDescriptor(value)) {
+      entries.push({
+        path: currentPath.join('.'),
+        discriminator: value.discriminator,
+        interpreterLowered: value.interpreterLowered === true,
+      });
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const record = blindCast<
+        Readonly<Record<string, unknown>>,
+        'walker descends into psl block namespace'
+      >(value);
+      const hasKind = record['kind'] === 'pslBlock';
+      const hasKeyword = typeof record['keyword'] === 'string';
+      const hasDiscriminator = typeof record['discriminator'] === 'string';
+      if (hasKind || (hasKeyword && hasDiscriminator)) {
+        throw new Error(
+          `Malformed authoring pslBlock contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/keyword/discriminator) but does not satisfy the pslBlock descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
+        );
+      }
+      entries.push(...collectPslBlockLeafEntries(record, currentPath));
+    }
+  }
+  return entries;
+}
+
 /**
  * Every `pslBlockDescriptors` entry needs a matching `entityTypes` factory
- * (same discriminator): the parser would otherwise produce an AST node
- * nothing can lower to an IR class instance. The link is one-directional
- * — an `entityTypes` factory may stand alone (e.g. `enum`, reachable from
- * the TypeScript builder without any PSL block).
+ * (same discriminator), unless the block sets `interpreterLowered: true`.
+ *
+ * The rule is one-directional in both senses:
+ * - An `entityTypes` factory may stand alone (e.g. `enum`, reachable from the
+ *   TypeScript builder without any PSL block).
+ * - A `pslBlockDescriptors` entry with `interpreterLowered: true` may stand
+ *   alone. These blocks are lowered by a dedicated interpreter path (e.g.
+ *   `processEnum2Declarations`) rather than through the factory dispatch. The
+ *   descriptor exists so the parser recognises the keyword; no factory is wired
+ *   because the factory machinery is never invoked on this path.
  */
 function assertPslBlocksHaveFactories(
   entityTypeNamespace: AuthoringEntityTypeNamespace,
   pslBlockNamespace: AuthoringPslBlockDescriptorNamespace,
 ): void {
-  const blockEntries = collectAuthoringLeafDiscriminators(
-    pslBlockNamespace,
-    isAuthoringPslBlockDescriptor,
-    'pslBlock',
-  );
+  const blockEntries = collectPslBlockLeafEntries(pslBlockNamespace);
   const entityEntries = collectAuthoringLeafDiscriminators(
     entityTypeNamespace,
     isAuthoringEntityTypeDescriptor,
@@ -542,6 +595,7 @@ function assertPslBlocksHaveFactories(
   const entityDiscriminators = new Set(entityEntries.map((entry) => entry.discriminator));
 
   for (const block of blockEntries) {
+    if (block.interpreterLowered) continue;
     if (!entityDiscriminators.has(block.discriminator)) {
       throw new Error(
         `Incomplete extension contribution: pslBlock helper "${block.path}" registers discriminator "${block.discriminator}" but no entityType contribution shares that discriminator. An extension-contributed PSL block requires a matching entityType factory so the parsed AST node can lower to an IR class instance; add an entityType helper with discriminator "${block.discriminator}".`,
