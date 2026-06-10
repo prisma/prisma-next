@@ -743,7 +743,7 @@ describe('TypesBlockAst', () => {
   function buildTypesBlock() {
     const b = new GreenNodeBuilder();
     b.startNode('TypesBlock');
-    b.token('Ident', 'type');
+    b.token('Ident', 'types');
     b.token('Whitespace', ' ');
     b.token('LBrace', '{');
     b.token('Newline', '\n');
@@ -767,7 +767,7 @@ describe('TypesBlockAst', () => {
   it('exposes keyword, braces', () => {
     const root = createSyntaxTree(buildTypesBlock());
     const decl = TypesBlockAst.cast(root)!;
-    expect(decl.keyword()?.text).toBe('type');
+    expect(decl.keyword()?.text).toBe('types');
     expect(decl.lbrace()?.text).toBe('{');
     expect(decl.rbrace()?.text).toBe('}');
   });

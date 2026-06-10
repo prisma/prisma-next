@@ -443,6 +443,7 @@ const RESERVED_BLOCK_KEYWORDS: ReadonlySet<string> = new Set([
   'enum',
   'namespace',
   'type',
+  'types',
 ]);
 
 function keywordIs(cursor: Cursor, keyword: string): boolean {
@@ -465,7 +466,8 @@ function parseDeclaration(cursor: Cursor, insideNamespace: boolean): void {
     parseModel(cursor) ??
     parseEnum(cursor) ??
     parseNamespace(cursor, insideNamespace) ??
-    parseTypeDeclaration(cursor, insideNamespace) ??
+    parseCompositeType(cursor) ??
+    parseTypesBlock(cursor, insideNamespace) ??
     parseGenericBlock(cursor);
   if (!node) {
     parseUnsupportedTopLevel(cursor);
@@ -543,7 +545,7 @@ export function parseEnum(cursor: Cursor): GreenNode | undefined {
  * Matches any unreserved leading `Ident` as a generic block declaration: `kw {`
  * (anonymous), `kw Ident {` (named), or — when no opening brace follows — a
  * malformed custom declaration. Excluding the reserved keywords (`model`/`enum`/
- * `namespace`/`type`) keeps a malformed reserved block (e.g. `model {` with no
+ * `namespace`/`type`/`types`) keeps a malformed reserved block (e.g. `model {` with no
  * name) routed to its dedicated parser. The keyword set for generic blocks is
  * open (extension-contributed), so a bare identifier with no brace (e.g. `oops`)
  * is treated as a custom declaration the author has not finished — committing a
@@ -606,22 +608,25 @@ export function parseNamespace(cursor: Cursor, insideNamespace: boolean): GreenN
 }
 
 /**
- * Parses a `type` declaration. The keyword commits the declaration to one of two
- * kinds, disambiguated by the next significant token: a following `Ident` is a
- * composite type (`type Name { … }`), anything else is a `types` block
- * (`type { … }`). Either branch commits the kind on the keyword — a missing
- * brace (or, for the composite branch, a present name with no brace) yields a
- * `PSL_INVALID_DECLARATION`, not an unsupported-declaration. The `types` branch
- * preserves the document-top-level constraint.
+ * Parses a composite type declaration (`type Name { … }`). The `type` keyword
+ * commits the kind; the members are model-style fields. A missing name yields
+ * `Expected a name after "type"` and a missing brace (name present) yields
+ * `Expected "{" to open the "type" block`, both via `finishReservedHeader`.
  */
-export function parseTypeDeclaration(
-  cursor: Cursor,
-  insideNamespace: boolean,
-): GreenNode | undefined {
+export function parseCompositeType(cursor: Cursor): GreenNode | undefined {
   if (!keywordIs(cursor, 'type')) return undefined;
-  if (cursor.peekKind(1) === 'Ident') {
-    return parseReservedBlock(cursor, 'type', 'CompositeTypeDeclaration', parseModelMember);
-  }
+  return parseReservedBlock(cursor, 'type', 'CompositeTypeDeclaration', parseModelMember);
+}
+
+/**
+ * Parses a `types { … }` block (plural keyword, no name). The keyword commits
+ * the kind; members are named-type declarations (`Name = Type`). A `types` block
+ * is only valid at the document top level — nested in a namespace it is flagged
+ * `PSL_INVALID_NAMESPACE_BLOCK` while still committing the node. A missing brace
+ * yields `Expected "{" to open the "types" block`, anchored after the keyword.
+ */
+export function parseTypesBlock(cursor: Cursor, insideNamespace: boolean): GreenNode | undefined {
+  if (!keywordIs(cursor, 'types')) return undefined;
   const keywordMark = cursor.mark();
   cursor.startNode('TypesBlock');
   if (insideNamespace) {
@@ -631,14 +636,14 @@ export function parseTypeDeclaration(
       keywordMark,
     );
   }
-  cursor.bump(); // type
+  cursor.bump(); // types
   if (cursor.peekKind() === 'LBrace') {
     parseBlockBody(cursor, parseNamedTypeMember);
   } else {
     cursor.diagnostic(
       'PSL_INVALID_DECLARATION',
-      'Expected "{" to open the "type" block',
-      keywordMark,
+      'Expected "{" to open the "types" block',
+      cursor.markAfterLastToken(),
     );
     cursor.recoverToSyncPoint();
   }
