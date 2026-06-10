@@ -2,7 +2,7 @@ import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import { sqliteTable, text } from '@prisma-next/target-sqlite/contract-free';
+import { jsonText, sqliteTable, text } from '@prisma-next/target-sqlite/contract-free';
 import { SqliteCreateTable } from '@prisma-next/target-sqlite/ddl';
 import { describe, expect, it } from 'vitest';
 import { SqliteControlAdapter } from '../src/core/control-adapter';
@@ -211,6 +211,11 @@ const testTable = sqliteTable('things', {
   name: text(),
 });
 
+const jsonTable = sqliteTable('json_things', {
+  meta: jsonText(),
+  name: text(),
+});
+
 describe('SqliteControlAdapter.lowerToExecuteRequest — query branch encoding', () => {
   it('codec-encodes a literal param bound to a transforming-codec column', async () => {
     const ast = testTable.select(testTable.label).where(testTable.label.eq('plaintext')).build();
@@ -232,5 +237,15 @@ describe('SqliteControlAdapter.lowerToExecuteRequest — query branch encoding',
     const result = await adapter.lowerToExecuteRequest(ast, ctx);
     expect(result).toHaveProperty('sql');
     expect(result.params).toContain('value');
+  });
+
+  it('lowerToExecuteRequest encodes a jsonText param end-to-end via CONTROL_CODECS', async () => {
+    const ast = jsonTable
+      .select(jsonTable.name)
+      .where(jsonTable.meta.eq({ key: 'val' }))
+      .build();
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
+    expect(result.params).toContain('{"key":"val"}');
+    expect(result.params).not.toContainEqual({ key: 'val' });
   });
 });

@@ -2,7 +2,7 @@ import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import { pgTable, text } from '@prisma-next/target-postgres/contract-free';
+import { jsonb, pgTable, text } from '@prisma-next/target-postgres/contract-free';
 import { PostgresCreateTable } from '@prisma-next/target-postgres/ddl';
 import { describe, expect, it } from 'vitest';
 import { PostgresControlAdapter } from '../src/core/control-adapter';
@@ -213,6 +213,14 @@ const testTable = pgTable(
   },
 );
 
+const jsonbTable = pgTable(
+  { name: 'json_things' },
+  {
+    meta: jsonb(),
+    name: text(),
+  },
+);
+
 const codecAdapter = new PostgresControlAdapter(transformingLookup);
 
 describe('PostgresControlAdapter.lowerToExecuteRequest — query branch encoding', () => {
@@ -236,5 +244,15 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — query branch encoding
     const result = await adapter.lowerToExecuteRequest(ast, ctx);
     expect(result).toHaveProperty('sql');
     expect(result.params).toContain('value');
+  });
+
+  it('lowerToExecuteRequest encodes a jsonb param end-to-end via CONTROL_CODECS', async () => {
+    const ast = jsonbTable
+      .select(jsonbTable.name)
+      .where(jsonbTable.meta.eq({ key: 'val' }))
+      .build();
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
+    expect(result.params).toContain('{"key":"val"}');
+    expect(result.params).not.toContainEqual({ key: 'val' });
   });
 });
