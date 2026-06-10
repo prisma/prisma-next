@@ -1,5 +1,6 @@
-import type { Contract, ContractEnum, JsonValue } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from './contract-types';
+import type { ContractEnum } from './domain-types';
+import type { JsonValue } from './types';
 
 /**
  * Runtime view of a domain enum, built at the client from the emitted
@@ -7,9 +8,9 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
  *
  * This deliberately mirrors the accessor shape of the authoring-time
  * `EnumTypeHandle` (in `contract-ts`) rather than reusing it: that handle carries
- * the literal value generics and lives in the authoring layer, which the runtime
- * orm-client cannot depend on. The two are the same surface seen from the two
- * planes — authoring (typed) and runtime (validated JSON).
+ * the literal value generics and lives in the authoring layer, which the
+ * foundation layer cannot depend on. The two are the same surface seen from the
+ * two planes — authoring (typed) and runtime (validated JSON).
  */
 export interface EnumAccessor {
   readonly values: readonly JsonValue[];
@@ -160,13 +161,13 @@ type NamespaceEnumEntries<TNamespace> = TNamespace extends {
 // (the IR's `domain.namespaces[ns].enum`), so the same enum name in two
 // namespaces resolves to each namespace's own accessor.
 export type NamespaceEnumAccessors<
-  TContract extends Contract<SqlStorage>,
+  TContract extends Contract,
   NsId extends keyof TContract['domain']['namespaces'],
 > = EnumEntriesToAccessors<NamespaceEnumEntries<TContract['domain']['namespaces'][NsId]>> &
   BuiltEnumAccessorsOf<TContract>;
 
 // The lane-agnostic enum surface exposed on the `db.enums` facade member: a
 // namespace-keyed map projected per target exactly like `db.sql` / `db.orm`.
-export type NamespacedEnums<TContract extends Contract<SqlStorage>> = {
+export type NamespacedEnums<TContract extends Contract> = {
   readonly [Ns in keyof TContract['domain']['namespaces']]: NamespaceEnumAccessors<TContract, Ns>;
 };

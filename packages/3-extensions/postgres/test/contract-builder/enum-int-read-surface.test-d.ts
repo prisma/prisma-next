@@ -20,8 +20,9 @@
 // inline `defineContract` runs `buildContract` at runtime to produce the typed
 // value but does NOT emit/migrate, so the numeric guard never fires.
 
+import type { NamespacedEnums } from '@prisma-next/contract/enum-accessor';
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { CreateInput, DefaultModelRow, NamespacedEnums } from '@prisma-next/sql-orm-client';
+import type { CreateInput, DefaultModelRow } from '@prisma-next/sql-orm-client';
 import { expectTypeOf, test } from 'vitest';
 import { defineContract, enumType, member } from '../../src/exports/contract-builder';
 
