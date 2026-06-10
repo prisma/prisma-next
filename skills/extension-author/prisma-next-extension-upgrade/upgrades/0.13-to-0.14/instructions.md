@@ -23,8 +23,8 @@ changes:
     summary: |
       `createRuntime` is removed from `@prisma-next/sql-runtime`. Extension code that
       constructed a runtime via `createRuntime(...)` must switch to the target class
-      constructor directly: `new PostgresRuntime({...})` from
-      `@prisma-next/postgres/runtime`, or `new SqliteRuntime({...})` from
+      constructor directly: `new PostgresRuntimeImpl({...})` from
+      `@prisma-next/postgres/runtime`, or `new SqliteRuntimeImpl({...})` from
       `@prisma-next/sqlite/runtime`. Pass the same options minus the `stackInstance`
       unpacking — supply `adapter` directly instead of `stackInstance.adapter`.
     detection:
@@ -80,12 +80,12 @@ import { createRuntime } from '@prisma-next/sql-runtime';
 const runtime = createRuntime({ stackInstance, context, driver, ...opts });
 
 // After — Postgres
-import { PostgresRuntime } from '@prisma-next/postgres/runtime';
-const runtime = new PostgresRuntime({ adapter: stackInstance.adapter, context, driver, ...opts });
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
+const runtime = new PostgresRuntimeImpl({ adapter: stackInstance.adapter, context, driver, ...opts });
 
 // After — SQLite
-import { SqliteRuntime } from '@prisma-next/sqlite/runtime';
-const runtime = new SqliteRuntime({ adapter: stackInstance.adapter, context, driver, ...opts });
+import { SqliteRuntimeImpl } from '@prisma-next/sqlite/runtime';
+const runtime = new SqliteRuntimeImpl({ adapter: stackInstance.adapter, context, driver, ...opts });
 ```
 
-The options are identical except `stackInstance` is no longer passed: supply `adapter` from `stackInstance.adapter` directly.
+The options are identical except `stackInstance` is no longer passed: supply `adapter` from `stackInstance.adapter` directly. Depend on the bare-name interfaces (`PostgresRuntime`, `SqliteRuntime`) for type annotations, not the `Impl` classes.

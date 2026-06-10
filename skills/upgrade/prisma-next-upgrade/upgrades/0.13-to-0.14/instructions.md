@@ -22,20 +22,27 @@ changes:
         - "db.sql."
         - "db.orm."
       anyMatch: true
-  - id: sql-runtime-abstract-subclass-seam
+  - id: sql-runtime-base-class-naming
     summary: |
-      `@prisma-next/sql-runtime` now exports `abstract class SqlRuntime` — the
-      family-layer subclass seam for target runtimes (e.g. a future
-      `PostgresRuntime`). This is additive: `createRuntime` and the target
-      factories are unchanged and still return the `Runtime` interface, and the
-      class was previously package-private so no existing code can reference it.
-      No action required.
+      `@prisma-next/sql-runtime` now exports `abstract class SqlRuntimeBase` (previously
+      `SqlRuntime`) — the family-layer subclass seam. Target classes are now named with
+      `Impl` suffix: `PostgresRuntimeImpl` and `SqliteRuntimeImpl`. The bare names
+      `PostgresRuntime` and `SqliteRuntime` are now interfaces — the correct types to
+      depend on in extension and app code. App code using the facade factories
+      (`postgres(...)`, `sqlite(...)`) is unaffected.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "SqlRuntime"
+        - "PostgresRuntime"
+        - "SqliteRuntime"
+      anyMatch: true
   - id: create-runtime-removed
     summary: |
       `createRuntime` is removed from `@prisma-next/sql-runtime`. Use the target
       factory (`postgres(...)` / `sqlite(...)`) or construct the target class
-      directly: `new PostgresRuntime({...})` from `@prisma-next/postgres/runtime`,
-      `new SqliteRuntime({...})` from `@prisma-next/sqlite/runtime`. App code
+      directly: `new PostgresRuntimeImpl({...})` from `@prisma-next/postgres/runtime`,
+      `new SqliteRuntimeImpl({...})` from `@prisma-next/sqlite/runtime`. App code
       using the facade factories (`postgres(...)`, `sqlite(...)`) is unaffected.
     detection:
       glob: "**/*.{ts,tsx}"
@@ -80,9 +87,33 @@ There is no codemod, because the correct namespace is the one each table or mode
 
 After migrating, run your project's `pnpm typecheck` (or equivalent) — a missed site is a compile error (`Property '<table>' does not exist on type 'Db<…>'`), so the type checker pins every remaining flat access for you.
 
-## `sql-runtime-abstract-subclass-seam`
+## `sql-runtime-base-class-naming`
 
-`@prisma-next/sql-runtime` now exports `abstract class SqlRuntime`, the family-layer base for building target runtimes by subclassing. This is purely additive surface: the class was previously package-private, and app code continues to consume the `Runtime` interface the target factories return. **No action required.**
+The SQL runtime class hierarchy now follows the repo naming convention:
+
+- `SqlRuntime` (previously exported) → now `SqlRuntimeBase` (abstract family base)
+- `PostgresRuntime` (previously a class) → now an **interface** (the type to depend on); the concrete class is `PostgresRuntimeImpl`
+- `SqliteRuntime` (previously a class) → now an **interface** (the type to depend on); the concrete class is `SqliteRuntimeImpl`
+
+App code using the facade factories (`postgres(...)`, `sqlite(...)`) is unaffected — those return `Runtime` / the interface. Only code that referenced the class names directly needs to change:
+
+```ts
+// Before — referencing the class as a type
+import { PostgresRuntime } from '@prisma-next/postgres/runtime';
+function takesRuntime(r: PostgresRuntime) { ... }
+
+// After — use the interface (same import path)
+import type { PostgresRuntime } from '@prisma-next/postgres/runtime';
+function takesRuntime(r: PostgresRuntime) { ... }
+
+// Before — subclassing
+import { PostgresRuntime } from '@prisma-next/postgres/runtime';
+class MyRuntime extends PostgresRuntime { ... }
+
+// After — subclass the Impl
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
+class MyRuntime extends PostgresRuntimeImpl { ... }
+```
 
 ## `create-runtime-removed`
 
@@ -101,8 +132,8 @@ const db = postgres({ contract, ...opts });
 // runtime is accessed via db.connect() / db.runtime() etc.
 
 // Or construct the target class directly (for advanced/test use)
-import { PostgresRuntime } from '@prisma-next/postgres/runtime';
-const runtime = new PostgresRuntime({ adapter: stackInstance.adapter, context, driver, ...opts });
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
+const runtime = new PostgresRuntimeImpl({ adapter: stackInstance.adapter, context, driver, ...opts });
 ```
 
 The constructor options are identical to what `createRuntime` accepted, except `stackInstance` is not taken: pass `adapter` from `stackInstance.adapter` directly.

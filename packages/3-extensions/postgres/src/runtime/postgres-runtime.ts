@@ -1,12 +1,12 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { SqlRuntime } from '@prisma-next/sql-runtime';
+import { type Runtime, SqlRuntimeBase } from '@prisma-next/sql-runtime';
 
 /**
- * Postgres target runtime. Extension authors subclass this to add
- * Postgres-specific capabilities; app code uses the `Runtime` interface
- * returned by `postgres()`, not this class.
+ * Postgres target runtime. The named dependency surface; the class `PostgresRuntimeImpl` is exported solely as an extension seam.
  */
-export class PostgresRuntime<
+export interface PostgresRuntime extends Runtime {}
+
+export class PostgresRuntimeImpl<
   TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
-> extends SqlRuntime<TContract> {}
+> extends SqlRuntimeBase<TContract> {}

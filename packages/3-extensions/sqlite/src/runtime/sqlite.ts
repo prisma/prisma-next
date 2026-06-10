@@ -34,7 +34,7 @@ import sqliteTarget from '@prisma-next/target-sqlite/runtime';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';
-import { SqliteRuntime } from './sqlite-runtime';
+import { SqliteRuntimeImpl } from './sqlite-runtime';
 
 export type SqliteTargetId = 'sqlite';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
@@ -193,7 +193,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
       void connectDriver(binding).catch(() => undefined);
     }
 
-    runtimeInstance = new SqliteRuntime({
+    runtimeInstance = new SqliteRuntimeImpl({
       context,
       adapter: stackInstance.adapter,
       driver,

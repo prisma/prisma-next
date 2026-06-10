@@ -1,12 +1,12 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { SqlRuntime } from '@prisma-next/sql-runtime';
+import { type Runtime, SqlRuntimeBase } from '@prisma-next/sql-runtime';
 
 /**
- * SQLite target runtime. Extension authors subclass this to add
- * SQLite-specific capabilities; app code uses the `Runtime` interface
- * returned by `sqlite()`, not this class.
+ * SQLite target runtime. The named dependency surface; the class `SqliteRuntimeImpl` is exported solely as an extension seam.
  */
-export class SqliteRuntime<
+export interface SqliteRuntime extends Runtime {}
+
+export class SqliteRuntimeImpl<
   TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
-> extends SqlRuntime<TContract> {}
+> extends SqlRuntimeBase<TContract> {}

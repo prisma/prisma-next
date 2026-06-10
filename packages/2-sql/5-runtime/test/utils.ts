@@ -49,7 +49,7 @@ import type {
   SqlRuntimeExtensionDescriptor,
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
-import { type Runtime, type RuntimeOptions, SqlRuntime } from '../src/sql-runtime';
+import { type Runtime, type RuntimeOptions, SqlRuntimeBase } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
 
 function createTestMutationDefaultGenerators() {
@@ -60,7 +60,7 @@ function createTestMutationDefaultGenerators() {
   }));
 }
 
-class TestSqlRuntime extends SqlRuntime {}
+class TestSqlRuntime extends SqlRuntimeBase {}
 
 type CreateTestRuntimeOptions<TContract extends Contract<SqlStorage>> = Omit<
   RuntimeOptions<TContract>,
@@ -72,7 +72,7 @@ type CreateTestRuntimeOptions<TContract extends Contract<SqlStorage>> = Omit<
 /**
  * Test-only concrete runtime. Unpacks `stackInstance.adapter` and forwards
  * the rest into `TestSqlRuntime`, a trivial concrete leaf of the abstract
- * `SqlRuntime`.
+ * `SqlRuntimeBase`.
  */
 export function createTestRuntime<TContract extends Contract<SqlStorage>>(
   options: CreateTestRuntimeOptions<TContract>,

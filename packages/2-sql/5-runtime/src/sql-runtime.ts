@@ -143,10 +143,10 @@ const noopLog: Log = { info: noopLogSink, warn: noopLogSink, error: noopLogSink 
 
 /**
  * Abstract family-layer base for SQL runtimes. Subclass to build a target runtime
- * (e.g. `PostgresRuntime`); app code should consume the `Runtime` interface returned
+ * (e.g. `PostgresRuntimeImpl`); app code should consume the `Runtime` interface returned
  * by the target factories, never this class directly.
  */
-export abstract class SqlRuntime<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
+export abstract class SqlRuntimeBase<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
   extends RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>
   implements Runtime
 {

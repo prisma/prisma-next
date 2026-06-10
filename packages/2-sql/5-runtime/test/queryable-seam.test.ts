@@ -25,7 +25,7 @@ import type {
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import type { RuntimeOptions } from '../src/sql-runtime';
-import { SqlRuntime } from '../src/sql-runtime';
+import { SqlRuntimeBase } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
 import { descriptorsFromCodecs, stubAst } from './utils';
 
@@ -152,14 +152,14 @@ function createTestAdapterDescriptor(
 /**
  * Test-local concrete subclass exposing the protected seams under public names.
  */
-class TestRuntime extends SqlRuntime {
+class TestRuntime extends SqlRuntimeBase {
   acquireRawConn(): Promise<SqlConnection> {
     return this.acquireRawConnection();
   }
 
   runAgainstQueryable<Row>(
-    plan: Parameters<SqlRuntime['executeAgainstQueryable']>[0],
-    queryable: Parameters<SqlRuntime['executeAgainstQueryable']>[1],
+    plan: Parameters<SqlRuntimeBase['executeAgainstQueryable']>[0],
+    queryable: Parameters<SqlRuntimeBase['executeAgainstQueryable']>[1],
     options?: RuntimeExecuteOptions,
   ) {
     return this.executeAgainstQueryable<Row>(plan, queryable, options);

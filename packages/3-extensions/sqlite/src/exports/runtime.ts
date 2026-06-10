@@ -8,4 +8,5 @@ export type {
   SqliteTargetId,
 } from '../runtime/sqlite';
 export { default } from '../runtime/sqlite';
-export { SqliteRuntime } from '../runtime/sqlite-runtime';
+export type { SqliteRuntime } from '../runtime/sqlite-runtime';
+export { SqliteRuntimeImpl } from '../runtime/sqlite-runtime';

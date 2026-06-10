@@ -20,7 +20,7 @@ import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-
 import { ifDefined } from '@prisma-next/utils/defined';
 import { Client } from 'pg';
 import type { PostgresTargetId } from './postgres';
-import { PostgresRuntime } from './postgres-runtime';
+import { PostgresRuntimeImpl } from './postgres-runtime';
 
 export type PostgresServerlessCursorOptions = NonNullable<PostgresDriverCreateOptions['cursor']>;
 
@@ -153,7 +153,7 @@ export default function postgresServerless<TContract extends Contract<SqlStorage
 
       let runtime: Runtime;
       try {
-        runtime = new PostgresRuntime({
+        runtime = new PostgresRuntimeImpl({
           context,
           adapter: stackInstance.adapter,
           driver,
