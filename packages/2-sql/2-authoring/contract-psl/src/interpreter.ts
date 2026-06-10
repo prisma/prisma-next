@@ -26,12 +26,13 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
+import { namespacePslExtensionBlocks } from '@prisma-next/framework-components/psl-ast';
 import type {
   ParsePslDocumentResult,
   PslAttribute,
   PslCompositeType,
   PslEnum,
-  PslEnum2,
+  PslExtensionBlock,
   PslField,
   PslModel,
   PslNamedTypeDeclaration,
@@ -64,7 +65,6 @@ import {
   getAttribute,
   getNamedArgument,
   getPositionalArgument,
-  getPositionalArgumentEntry,
   mapFieldNamesToColumns,
   parseAttributeFieldList,
   parseConstraintMapArgument,
@@ -383,10 +383,8 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
 }
 
 interface ProcessEnum2DeclarationsInput {
-  readonly enum2s: readonly PslEnum2[];
+  readonly enum2Blocks: readonly PslExtensionBlock[];
   readonly sourceId: string;
-  readonly enum2EntityDescriptor: AuthoringEntityTypeDescriptor | undefined;
-  readonly entityContext: AuthoringEntityContext;
   readonly codecLookup: CodecLookup | undefined;
   readonly diagnostics: ContractSourceDiagnostic[];
 }
@@ -398,24 +396,12 @@ function processEnum2Declarations(input: ProcessEnum2DeclarationsInput): {
   const enumHandles: Record<string, EnumTypeHandle> = {};
   const enumTypeDescriptors = new Map<string, ColumnDescriptor>();
 
-  if (input.enum2s.length === 0) {
+  if (input.enum2Blocks.length === 0) {
     return { enumHandles, enumTypeDescriptors };
   }
 
-  if (!input.enum2EntityDescriptor) {
-    for (const decl of input.enum2s) {
-      input.diagnostics.push({
-        code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
-        message: `enum2 "${decl.name}" requires the active target pack to contribute an enum2 entity-type helper`,
-        sourceId: input.sourceId,
-        span: decl.span,
-      });
-    }
-    return { enumHandles, enumTypeDescriptors };
-  }
-
-  for (const decl of input.enum2s) {
-    const typeAttr = getAttribute(decl.attributes, 'type');
+  for (const decl of input.enum2Blocks) {
+    const typeAttr = decl.blockAttributes.find((a) => a.name === 'type');
     if (!typeAttr) {
       input.diagnostics.push({
         code: 'PSL_ENUM2_MISSING_TYPE',
@@ -426,7 +412,7 @@ function processEnum2Declarations(input: ProcessEnum2DeclarationsInput): {
       continue;
     }
 
-    const rawCodecArg = getPositionalArgument(typeAttr);
+    const rawCodecArg = typeAttr.args[0]?.value;
     const codecId = rawCodecArg !== undefined ? parseQuotedStringLiteral(rawCodecArg) : undefined;
     if (!codecId) {
       input.diagnostics.push({
@@ -440,64 +426,51 @@ function processEnum2Declarations(input: ProcessEnum2DeclarationsInput): {
 
     const nativeType = input.codecLookup?.targetTypesFor(codecId)?.[0];
     if (nativeType === undefined) {
-      const typeArgEntry = getPositionalArgumentEntry(typeAttr);
+      const typeArgSpan = typeAttr.args[0]?.span ?? typeAttr.span;
       input.diagnostics.push({
         code: 'PSL_EXTENSION_INVALID_VALUE',
         message: `enum2 "${decl.name}" @@type references unknown codec "${codecId}"`,
         sourceId: input.sourceId,
-        span: typeArgEntry?.span ?? typeAttr.span,
+        span: typeArgSpan,
       });
       continue;
     }
 
     const codec = input.codecLookup?.get(codecId);
 
-    const seenNames = new Set<string>();
     const seenValues = new Set<string>();
     const members: { name: string; value: unknown }[] = [];
     let memberError = false;
 
-    for (const member of decl.values) {
-      if (seenNames.has(member.name)) {
-        input.diagnostics.push({
-          code: 'PSL_ENUM2_DUPLICATE_MEMBER_NAME',
-          message: `enum2 "${decl.name}": duplicate member name "${member.name}"`,
-          sourceId: input.sourceId,
-          span: member.span,
-        });
-        memberError = true;
-        continue;
-      }
-      seenNames.add(member.name);
-
+    for (const [memberName, paramValue] of Object.entries(decl.parameters)) {
       let value: unknown;
-      if (member.rawValue === undefined) {
+      if (paramValue.kind === 'bare') {
         if (codec !== undefined) {
           try {
-            value = codec.decodeJson(member.name);
+            value = codec.decodeJson(memberName);
           } catch {
             input.diagnostics.push({
               code: 'PSL_ENUM2_BARE_MEMBER_NON_STRING_CODEC',
-              message: `enum2 "${decl.name}" member "${member.name}" has no value and codec "${codecId}" does not accept a bare name as input`,
+              message: `enum2 "${decl.name}" member "${memberName}" has no value and codec "${codecId}" does not accept a bare name as input`,
               sourceId: input.sourceId,
-              span: member.span,
+              span: paramValue.span,
             });
             memberError = true;
             continue;
           }
         } else {
-          value = member.name;
+          value = memberName;
         }
-      } else {
+      } else if (paramValue.kind === 'value') {
         let jsonValue: unknown;
         try {
-          jsonValue = JSON.parse(member.rawValue);
+          jsonValue = JSON.parse(paramValue.raw);
         } catch {
           input.diagnostics.push({
             code: 'PSL_EXTENSION_INVALID_VALUE',
-            message: `enum2 "${decl.name}" member "${member.name}" value "${member.rawValue}" is not valid JSON`,
+            message: `enum2 "${decl.name}" member "${memberName}" value "${paramValue.raw}" is not valid JSON`,
             sourceId: input.sourceId,
-            span: member.span,
+            span: paramValue.span,
           });
           memberError = true;
           continue;
@@ -512,9 +485,9 @@ function processEnum2Declarations(input: ProcessEnum2DeclarationsInput): {
             const reason = err instanceof Error ? err.message : String(err);
             input.diagnostics.push({
               code: 'PSL_EXTENSION_INVALID_VALUE',
-              message: `enum2 "${decl.name}" member "${member.name}" was rejected by codec "${codecId}": ${reason}`,
+              message: `enum2 "${decl.name}" member "${memberName}" was rejected by codec "${codecId}": ${reason}`,
               sourceId: input.sourceId,
-              span: member.span,
+              span: paramValue.span,
             });
             memberError = true;
             continue;
@@ -522,6 +495,8 @@ function processEnum2Declarations(input: ProcessEnum2DeclarationsInput): {
         } else {
           value = jsonValue;
         }
+      } else {
+        continue;
       }
 
       const valueKey = String(value);
@@ -530,13 +505,13 @@ function processEnum2Declarations(input: ProcessEnum2DeclarationsInput): {
           code: 'PSL_ENUM2_DUPLICATE_MEMBER_VALUE',
           message: `enum2 "${decl.name}": duplicate member value "${valueKey}"`,
           sourceId: input.sourceId,
-          span: member.span,
+          span: paramValue.span,
         });
         memberError = true;
         continue;
       }
       seenValues.add(valueKey);
-      members.push({ name: member.name, value });
+      members.push({ name: memberName, value });
     }
 
     if (memberError) continue;
@@ -2205,10 +2180,12 @@ export function interpretPslDocumentToSqlContract(
 
   const topLevelEnum2s = input.document.ast.namespaces
     .filter((ns) => ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME)
-    .flatMap((ns) => ns.enum2s);
+    .flatMap((ns) => namespacePslExtensionBlocks(ns).filter((b) => b.kind === 'enum2'));
   for (const ns of input.document.ast.namespaces) {
-    if (ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME || ns.enum2s.length === 0) continue;
-    for (const decl of ns.enum2s) {
+    if (ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME) continue;
+    const nsEnum2s = namespacePslExtensionBlocks(ns).filter((b) => b.kind === 'enum2');
+    if (nsEnum2s.length === 0) continue;
+    for (const decl of nsEnum2s) {
       diagnostics.push({
         code: 'PSL_ENUM2_NAMESPACE_NOT_SUPPORTED',
         message: `enum2 "${decl.name}" inside namespace "${ns.name}" is not supported; declare enum2 at the top level`,
@@ -2218,12 +2195,9 @@ export function interpretPslDocumentToSqlContract(
     }
   }
 
-  const enum2EntityDescriptor = getAuthoringEntity(input.authoringContributions, ['enum2']);
   const enum2Result = processEnum2Declarations({
-    enum2s: topLevelEnum2s,
+    enum2Blocks: topLevelEnum2s,
     sourceId,
-    enum2EntityDescriptor,
-    entityContext: enumEntityContext,
     codecLookup: input.codecLookup,
     diagnostics,
   });

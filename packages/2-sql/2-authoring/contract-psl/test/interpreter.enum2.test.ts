@@ -1,5 +1,4 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -63,37 +62,39 @@ const testCodecLookup: CodecLookup = {
   renderOutputTypeFor: () => undefined,
 };
 
-// ---------------------------------------------------------------------------
-// enum2-aware entity contributions: factory constructs an EnumTypeHandle
-// ---------------------------------------------------------------------------
+const enum2PslBlockDescriptor = {
+  kind: 'pslBlock' as const,
+  keyword: 'enum2',
+  discriminator: 'enum2',
+  name: { required: true },
+  parameters: {},
+  allowAdditionalParameters: true,
+};
 
-const enum2EntityContributions = {
-  ...testEnumEntityContributions,
-  enum2: {
-    kind: 'entity' as const,
-    discriminator: 'enum2',
-    output: {
-      factory: (_input: never): null => null,
-    },
-  },
-} satisfies AuthoringContributions['entityTypes'];
-
-const authoringContributions: AuthoringContributions = {
-  entityTypes: enum2EntityContributions,
+const authoringContributions = {
+  entityTypes: testEnumEntityContributions,
   field: {},
   type: {},
+  pslBlockDescriptors: { enum2: enum2PslBlockDescriptor },
 };
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
 
 function interpret(schema: string, overrides?: Partial<InterpretPslDocumentToSqlContractInput>) {
+  const contributions = overrides?.authoringContributions ?? authoringContributions;
+  const descriptors = contributions.pslBlockDescriptors;
+  const document = parsePslDocument({
+    schema,
+    sourceId: 'schema.prisma',
+    ...(descriptors !== undefined ? { pslBlockDescriptors: descriptors } : {}),
+  });
   return interpretPslDocumentToSqlContract({
-    document: parsePslDocument({ schema, sourceId: 'schema.prisma' }),
+    document,
     target: postgresTarget,
     scalarTypeDescriptors: postgresScalarTypeDescriptors,
     composedExtensionContracts: new Map(),
     controlMutationDefaults: builtinControlMutationDefaults,
-    authoringContributions,
+    authoringContributions: contributions,
     codecLookup: testCodecLookup,
     ...overrides,
   });
@@ -263,7 +264,7 @@ model Post { id Int @id }
     );
   });
 
-  it('duplicate member names emits diagnostic', () => {
+  it('duplicate member names emits PSL_EXTENSION_DUPLICATE_PARAMETER from the parser', () => {
     const result = interpret(`
 enum2 Priority {
   @@type("pg/text@1")
@@ -276,7 +277,7 @@ model Post { id Int @id }
     if (result.ok) return;
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: 'PSL_ENUM2_DUPLICATE_MEMBER_NAME' }),
+        expect.objectContaining({ code: 'PSL_EXTENSION_DUPLICATE_PARAMETER' }),
       ]),
     );
   });
@@ -336,7 +337,7 @@ namespace public {
     );
   });
 
-  it('contributions without entityTypes.enum2 emits diagnostic', () => {
+  it('missing pslBlockDescriptors means enum2 is treated as unknown top-level block', () => {
     const result = interpret(
       `
 enum2 Priority {
@@ -357,7 +358,7 @@ model Post { id Int @id }
     if (result.ok) return;
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE' }),
+        expect.objectContaining({ code: 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK' }),
       ]),
     );
   });
