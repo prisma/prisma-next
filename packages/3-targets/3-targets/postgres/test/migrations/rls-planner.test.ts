@@ -1,10 +1,10 @@
 /**
- * Snapshot test: a contract with one table and one RLS policy, against an
- * empty introspected schema, produces an ordered plan: CREATE TABLE first,
- * then ENABLE ROW LEVEL SECURITY, then CREATE POLICY.
- *
- * The RLS calls are produced by the diffNodes path in planSql(), not by
- * mapIssueToCall().
+ * Unit tests for the RLS planner diff path in planSql():
+ * - Fresh contract → CREATE TABLE + ENABLE RLS + CREATE POLICY ordering
+ * - Edit (same-prefix, different hash) → CREATE new + DROP old
+ * - Different-prefix actual policy → not dropped
+ * - Two same-prefix policies both in contract → neither dropped
+ * - F06: additive-only policy filters the replace-drop but keeps create/enable
  */
 
 import type { Contract } from '@prisma-next/contract/types';
@@ -211,3 +211,267 @@ describe('RLS planner diff-wiring', () => {
     expect(opIds.some((id) => id.startsWith('rowLevelSecurity.'))).toBe(false);
   });
 });
+
+describe('RLS planner same-prefix replace', () => {
+  // Contract has p_read_NEW; DB has p_read_OLD (same prefix, different hash).
+  // Edit case: plan must contain a CREATE for NEW and a DROP for OLD.
+  it('emits CREATE new + DROP old when same-prefix policy is superseded', () => {
+    const newPolicy = new PostgresRlsPolicy({
+      name: 'p_read_11111111',
+      prefix: 'p_read',
+      tableName: TABLE_NAME,
+      namespaceId: SCHEMA_NAME,
+      operation: 'select',
+      roles: ['authenticated'],
+      using: '(auth.uid() = user_id)',
+      permissive: true,
+    });
+
+    const contract = buildContractWith([newPolicy]);
+    const planner = createPostgresMigrationPlanner(stubLowerer);
+
+    const oldPolicy = new PostgresRlsPolicy({
+      name: 'p_read_00000000',
+      prefix: 'p_read',
+      tableName: TABLE_NAME,
+      namespaceId: SCHEMA_NAME,
+      operation: 'select',
+      roles: ['authenticated'],
+      using: '(auth.uid() = old_user_id)',
+      permissive: true,
+    });
+
+    const schema = schemaWith([oldPolicy], true);
+    const DB_UPDATE_POLICY = {
+      allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
+    };
+
+    const result = planner.plan({
+      contract,
+      schema,
+      policy: DB_UPDATE_POLICY,
+      fromContract: null,
+      frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') return;
+
+    const opIds = result.plan.operations.map((op) => op.id);
+    expect(opIds).toContain(`rlsPolicy.${TABLE_NAME}.p_read_11111111`);
+    expect(opIds).toContain(`rlsPolicy.${TABLE_NAME}.p_read_00000000.drop`);
+  });
+
+  it('does not drop a different-prefix actual policy when creating a new one', () => {
+    const newPolicy = new PostgresRlsPolicy({
+      name: 'p_read_11111111',
+      prefix: 'p_read',
+      tableName: TABLE_NAME,
+      namespaceId: SCHEMA_NAME,
+      operation: 'select',
+      roles: ['authenticated'],
+      using: '(auth.uid() = user_id)',
+      permissive: true,
+    });
+
+    const contract = buildContractWith([newPolicy]);
+    const planner = createPostgresMigrationPlanner(stubLowerer);
+
+    const externalPolicy = new PostgresRlsPolicy({
+      name: 'other_aaaabbbb',
+      prefix: 'other',
+      tableName: TABLE_NAME,
+      namespaceId: SCHEMA_NAME,
+      operation: 'select',
+      roles: ['authenticated'],
+      using: 'true',
+      permissive: true,
+    });
+
+    const schema = schemaWith([externalPolicy], true);
+    const DB_UPDATE_POLICY = {
+      allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
+    };
+
+    const result = planner.plan({
+      contract,
+      schema,
+      policy: DB_UPDATE_POLICY,
+      fromContract: null,
+      frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') return;
+
+    const opIds = result.plan.operations.map((op) => op.id);
+    expect(opIds).toContain(`rlsPolicy.${TABLE_NAME}.p_read_11111111`);
+    expect(opIds).not.toContain(`rlsPolicy.${TABLE_NAME}.other_aaaabbbb.drop`);
+  });
+
+  it('does not drop either policy when two same-prefix policies are both in the contract', () => {
+    const policyA = new PostgresRlsPolicy({
+      name: 'p_read_aaaaaaaa',
+      prefix: 'p_read',
+      tableName: TABLE_NAME,
+      namespaceId: SCHEMA_NAME,
+      operation: 'select',
+      roles: ['authenticated'],
+      using: '(auth.uid() = user_id)',
+      permissive: true,
+    });
+    const policyB = new PostgresRlsPolicy({
+      name: 'p_read_bbbbbbbb',
+      prefix: 'p_read',
+      tableName: TABLE_NAME,
+      namespaceId: SCHEMA_NAME,
+      operation: 'select',
+      roles: ['service_role'],
+      using: 'true',
+      permissive: true,
+    });
+
+    const contract = buildContractWith([policyA, policyB]);
+    const planner = createPostgresMigrationPlanner(stubLowerer);
+
+    // Both in contract and both already in DB — diffNodes sees them as present; no diff calls.
+    const schema = schemaWith([policyA, policyB], true);
+    const DB_UPDATE_POLICY = {
+      allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
+    };
+
+    const result = planner.plan({
+      contract,
+      schema,
+      policy: DB_UPDATE_POLICY,
+      fromContract: null,
+      frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') return;
+
+    const dropIds = result.plan.operations.map((op) => op.id).filter((id) => id.endsWith('.drop'));
+    expect(dropIds).toHaveLength(0);
+  });
+
+  it('F06: additive-only policy passes create/enable but filters the replace-drop', () => {
+    const newPolicy = new PostgresRlsPolicy({
+      name: 'p_read_11111111',
+      prefix: 'p_read',
+      tableName: TABLE_NAME,
+      namespaceId: SCHEMA_NAME,
+      operation: 'select',
+      roles: ['authenticated'],
+      using: '(auth.uid() = user_id)',
+      permissive: true,
+    });
+
+    const contract = buildContractWith([newPolicy]);
+    const planner = createPostgresMigrationPlanner(stubLowerer);
+
+    const oldPolicy = new PostgresRlsPolicy({
+      name: 'p_read_00000000',
+      prefix: 'p_read',
+      tableName: TABLE_NAME,
+      namespaceId: SCHEMA_NAME,
+      operation: 'select',
+      roles: ['authenticated'],
+      using: '(auth.uid() = old_user_id)',
+      permissive: true,
+    });
+
+    const schema = schemaWith([oldPolicy], true);
+
+    // INIT_ADDITIVE_POLICY allows only 'additive' — the drop is 'destructive'.
+    const result = planner.plan({
+      contract,
+      schema,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') return;
+
+    const opIds = result.plan.operations.map((op) => op.id);
+    // CREATE new: additive — allowed
+    expect(opIds).toContain(`rlsPolicy.${TABLE_NAME}.p_read_11111111`);
+    // DROP old: destructive — filtered
+    expect(opIds).not.toContain(`rlsPolicy.${TABLE_NAME}.p_read_00000000.drop`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test helpers
+// ---------------------------------------------------------------------------
+
+function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<SqlStorage> {
+  const rlsPolicy: Record<string, PostgresRlsPolicy> = {};
+  for (const p of policies) {
+    rlsPolicy[p.name] = p;
+  }
+
+  const schema = new PostgresSchema({
+    id: SCHEMA_NAME,
+    entries: {
+      table: {
+        [TABLE_NAME]: new StorageTable({
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        }),
+      },
+      type: {},
+      rlsPolicy,
+    },
+  });
+
+  return {
+    target: 'postgres',
+    targetFamily: 'sql',
+    profileHash: profileHash('sha256:rls-planner-replace-test'),
+    storage: new SqlStorage({
+      storageHash: coreHash('sha256:rls-planner-replace-test'),
+      namespaces: { [SCHEMA_NAME]: schema },
+    }),
+    roots: {},
+    domain: applicationDomainOf({ models: {} }),
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+  };
+}
+
+function schemaWith(policies: readonly PostgresRlsPolicy[], rlsEnabled: boolean) {
+  return {
+    tables: {
+      [TABLE_NAME]: {
+        name: TABLE_NAME,
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+        },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      },
+    },
+    annotations: {
+      pg: {
+        rlsPolicies: policies,
+        ...(rlsEnabled ? { rlsEnabledByTable: { [TABLE_NAME]: true } } : {}),
+      },
+    },
+  };
+}

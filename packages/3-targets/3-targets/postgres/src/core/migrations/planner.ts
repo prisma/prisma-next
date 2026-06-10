@@ -44,6 +44,7 @@ import {
 import { planIssues } from './issue-planner';
 import {
   CreatePostgresRlsPolicyCall,
+  DropPostgresRlsPolicyCall,
   EnableRowLevelSecurityCall,
   type PostgresOpFactoryCall,
 } from './op-factory-call';
@@ -88,6 +89,20 @@ function readExpectedRlsPolicies(contract: Contract<SqlStorage>): readonly Postg
  *
  * One `EnableRowLevelSecurityCall` is emitted per table the first time a
  * missing policy references it and RLS is not already enabled on that table.
+ *
+ * For each missing policy being created, also emits a `DropPostgresRlsPolicyCall`
+ * for any actual policy on the same `(namespaceId, tableName)` that shares the
+ * same prefix, has a different wire name, and is not in the expected set. This
+ * handles the edit-trap: a policy that was renamed (new content hash) gets its
+ * old version dropped rather than left as a stale duplicate.
+ *
+ * Different-prefix policies are never touched here — they are external policies
+ * and their lifecycle is slice 2.
+ *
+ * Matcher used: `actual.prefix === policy.prefix`. The control adapter derives
+ * `prefix` from the wire name by stripping the content-hash suffix, so this
+ * field is reliably populated for real introspection. In unit tests, `prefix`
+ * is set explicitly on the `PostgresRlsPolicy` constructor.
  */
 function buildRlsDiffCalls(
   contract: Contract<SqlStorage>,
@@ -103,6 +118,9 @@ function buildRlsDiffCalls(
 
   const calls: PostgresOpFactoryCall[] = [];
   const rlsEnabledEmitted = new Set<string>();
+  const droppedActualNames = new Set<string>();
+
+  const expectedNames = new Set(expectedPolicies.map((p) => p.name));
 
   for (const issue of issues) {
     if (issue.outcome !== 'missing') continue;
@@ -119,6 +137,22 @@ function buildRlsDiffCalls(
     }
 
     calls.push(new CreatePostgresRlsPolicyCall(schemaName, policy.tableName, policy));
+
+    // Emit a drop for every actual policy on the same table that shares this
+    // prefix but has a different wire name and is not in the expected set.
+    for (const actual of actualPolicies) {
+      if (
+        actual.prefix === policy.prefix &&
+        actual.namespaceId === policy.namespaceId &&
+        actual.tableName === policy.tableName &&
+        actual.name !== policy.name &&
+        !expectedNames.has(actual.name) &&
+        !droppedActualNames.has(actual.name)
+      ) {
+        droppedActualNames.add(actual.name);
+        calls.push(new DropPostgresRlsPolicyCall(schemaName, actual.tableName, actual.name));
+      }
+    }
   }
 
   return calls;

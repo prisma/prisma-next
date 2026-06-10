@@ -774,6 +774,8 @@ function classifyCall(call: PostgresOpFactoryCall): CallCategory {
       return 'rlsEnable';
     case 'createRlsPolicy':
       return 'rlsPolicy';
+    case 'dropRlsPolicy':
+      return 'drop';
     case 'addColumn':
       return 'column';
     case 'alterColumnType':
@@ -962,6 +964,10 @@ export function planIssues(
   let gatedDefault = defaultCalls;
   let gatedRecipe = recipeCalls;
   let gatedBucketable = bucketablePatternCalls;
+  // Extra calls (e.g. same-prefix replace-drop) are filtered silently when
+  // disallowed: they are best-effort cleanup and do not cause a hard failure.
+  // The schema drifts (old + new coexist) and verify-drift catches it.
+  let gatedExtra = (options.extraBucketableCalls ?? []) as PostgresOpFactoryCall[];
   if (policyProvided) {
     const keepIfAllowed = (bucket: PostgresOpFactoryCall[]) => (call: PostgresOpFactoryCall) => {
       if (allowed.includes(call.operationClass)) {
@@ -979,6 +985,7 @@ export function planIssues(
     gatedDefault = gatedDefaultBucket;
     gatedRecipe = gatedRecipeBucket;
     gatedBucketable = gatedBucketableBucket;
+    gatedExtra = gatedExtra.filter((call) => allowed.includes(call.operationClass));
   }
 
   if (conflicts.length > 0) {
@@ -993,8 +1000,8 @@ export function planIssues(
   // individually classifiable calls that slot into DDL buckets alongside
   // default-mapped calls. Extra calls (e.g. RLS diff calls from planSql)
   // are merged here so they sort into the same dependency-order buckets.
-  const extra = options.extraBucketableCalls ?? [];
-  const combinedBucketable = [...gatedDefault, ...gatedBucketable, ...extra];
+  // `gatedExtra` has already been filtered by the operation-class policy above.
+  const combinedBucketable = [...gatedDefault, ...gatedBucketable, ...gatedExtra];
   const byCategory = (cat: CallCategory) =>
     combinedBucketable.filter((c) => classifyCall(c) === cat);
 
