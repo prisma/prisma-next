@@ -1,59 +1,158 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type {
-  AsyncIterableResult,
-  RuntimeExecuteOptions,
-} from '@prisma-next/framework-components/runtime';
-import { PostgresRuntime } from '@prisma-next/postgres/runtime';
+import type { RuntimeExecuteOptions } from '@prisma-next/framework-components/runtime';
+import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
+import { type PostgresRuntime, PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import type { RawSessionConnection, TransactionContext } from '@prisma-next/sql-runtime';
+import type {
+  PreparedStatement,
+  PreparedStatementImpl,
+  RuntimeConnection,
+  RuntimeTransaction,
+} from '@prisma-next/sql-runtime';
+
+export interface SupabaseRuntime extends PostgresRuntime {}
 
 export interface SupabaseRoleBinding {
+  // TODO(TML-2501): role names move to the Supabase extension contract (roles as first-class IR) when postgres-rls lands.
   readonly role: 'anon' | 'authenticated' | 'service_role';
   readonly claims?: Record<string, unknown>;
 }
 
 /**
- * Supabase runtime. Extends `PostgresRuntime` with role-scoped execute methods
- * that apply a Postgres role and JWT claims via `set_config()` below the user
- * middleware chain.
- *
- * App code should use the `supabase()` factory; this class is for extension
- * authors who need to subclass further.
+ * A connection with a Supabase role already bound via session-scoped set_config.
+ * Implements `RuntimeConnection` so it plugs into ORM scope machinery and `withTransaction`.
  */
-export class SupabaseRuntime<
+export interface RoleSession extends RuntimeConnection {}
+
+export class SupabaseRuntimeImpl<
   TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
-> extends PostgresRuntime<TContract> {
+> extends PostgresRuntimeImpl<TContract> {
+  /**
+   * Opens a raw connection and applies role + JWT claims via session-scoped set_config.
+   * On bind failure, destroys the connection before rethrowing — no leaked connections.
+   * Not on the `SupabaseRuntime` interface; consumed by the facade, not by app code.
+   */
+  async openRoleSession(binding: SupabaseRoleBinding): Promise<RoleSession> {
+    const conn = await this.acquireRawConnection();
+
+    try {
+      await conn.query('SELECT set_config($1, $2, false)', ['role', binding.role]);
+      await conn.query('SELECT set_config($1, $2, false)', [
+        'request.jwt.claims',
+        JSON.stringify(binding.claims ?? {}),
+      ]);
+    } catch (err) {
+      await conn.destroy(err).catch(() => undefined);
+      throw err;
+    }
+
+    const self = this;
+
+    const session: RoleSession = {
+      execute<Row>(
+        plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
+        options?: RuntimeExecuteOptions,
+      ): AsyncIterableResult<Row> {
+        return self.executeAgainstQueryable<Row>(plan, conn, { ...options, scope: 'connection' });
+      },
+
+      executePrepared<Params, Row>(
+        ps: PreparedStatement<Params, Row>,
+        params: Params,
+        options?: RuntimeExecuteOptions,
+      ): AsyncIterableResult<Row> {
+        return self.executePreparedAgainstQueryable(
+          ps as PreparedStatementImpl<Params, Row>,
+          params as Record<string, unknown>,
+          conn,
+          { ...options, scope: 'connection' },
+        );
+      },
+
+      async transaction(): Promise<RuntimeTransaction> {
+        const tx = await conn.beginTransaction();
+        return {
+          async commit(): Promise<void> {
+            await tx.commit();
+          },
+          async rollback(): Promise<void> {
+            await tx.rollback();
+          },
+          execute<Row>(
+            plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
+            options?: RuntimeExecuteOptions,
+          ): AsyncIterableResult<Row> {
+            return self.executeAgainstQueryable<Row>(plan, tx, {
+              ...options,
+              scope: 'transaction',
+            });
+          },
+          executePrepared<Params, Row>(
+            ps: PreparedStatement<Params, Row>,
+            params: Params,
+            options?: RuntimeExecuteOptions,
+          ): AsyncIterableResult<Row> {
+            return self.executePreparedAgainstQueryable(
+              ps as PreparedStatementImpl<Params, Row>,
+              params as Record<string, unknown>,
+              tx,
+              { ...options, scope: 'transaction' },
+            );
+          },
+        };
+      },
+
+      /**
+       * Resets all session-local config then releases the connection back to the pool.
+       * If RESET ALL fails, destroys the connection instead — pool-poisoning guarantee.
+       */
+      async release(): Promise<void> {
+        try {
+          await conn.query('RESET ALL');
+          await conn.release();
+        } catch (resetError) {
+          await conn.destroy(resetError).catch(() => undefined);
+        }
+      },
+
+      async destroy(reason?: unknown): Promise<void> {
+        await conn.destroy(reason);
+      },
+    };
+
+    return session;
+  }
+
+  /**
+   * Opens a role session, executes the plan, then releases after the stream drains.
+   * On mid-stream error, destroys the session instead of releasing.
+   */
   executeWithRole<Row>(
     plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
     binding: SupabaseRoleBinding,
     options?: RuntimeExecuteOptions,
   ): AsyncIterableResult<Row> {
-    return this.executeWithSessionBootstrap(
-      plan,
-      (conn: RawSessionConnection) => this.applyRoleBinding(conn, binding),
-      options,
-    );
-  }
+    const self = this;
 
-  executeRoleTransaction<R>(
-    binding: SupabaseRoleBinding,
-    fn: (tx: TransactionContext) => PromiseLike<R>,
-  ): Promise<R> {
-    return this.executeTransactionWithBootstrap(
-      (conn: RawSessionConnection) => this.applyRoleBinding(conn, binding),
-      fn,
-    );
-  }
+    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
+      const session = await self.openRoleSession(binding);
+      let errored = false;
+      try {
+        for await (const row of session.execute(plan, options)) {
+          yield row;
+        }
+      } catch (err) {
+        errored = true;
+        await session.destroy(err).catch(() => undefined);
+        throw err;
+      } finally {
+        if (!errored) {
+          await session.release();
+        }
+      }
+    };
 
-  private async applyRoleBinding(
-    conn: RawSessionConnection,
-    binding: SupabaseRoleBinding,
-  ): Promise<void> {
-    await conn.query('SELECT set_config($1, $2, true)', ['role', binding.role]);
-    await conn.query('SELECT set_config($1, $2, true)', [
-      'request.jwt.claims',
-      JSON.stringify(binding.claims ?? {}),
-    ]);
+    return new AsyncIterableResult(generator());
   }
 }

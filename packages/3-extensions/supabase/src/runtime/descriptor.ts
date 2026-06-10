@@ -1,4 +1,5 @@
 import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
+import packageJson from '../../package.json' with { type: 'json' };
 
 /**
  * Runtime extension descriptor for the Supabase pack. Satisfies the runtime
@@ -8,7 +9,7 @@ import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
 export const supabaseRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   kind: 'extension' as const,
   id: 'supabase',
-  version: '0.12.0',
+  version: packageJson.version,
   familyId: 'sql' as const,
   targetId: 'postgres' as const,
   codecs: () => [],

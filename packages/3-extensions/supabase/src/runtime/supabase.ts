@@ -21,7 +21,11 @@ import type {
   TransactionContext,
   VerifyMarkerOption,
 } from '@prisma-next/sql-runtime';
-import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
+import {
+  createExecutionContext,
+  createSqlExecutionStack,
+  withTransaction,
+} from '@prisma-next/sql-runtime';
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -29,8 +33,8 @@ import { createRemoteJWKSet, type JWTVerifyResult, jwtVerify } from 'jose';
 import type { Client } from 'pg';
 import { Pool } from 'pg';
 import { supabaseRuntimeDescriptor } from './descriptor';
-import type { SupabaseRoleBinding } from './supabase-runtime';
-import { SupabaseRuntime } from './supabase-runtime';
+import type { SupabaseRoleBinding, SupabaseRuntime } from './supabase-runtime';
+import { SupabaseRuntimeImpl } from './supabase-runtime';
 
 export type SupabaseTargetId = 'postgres';
 
@@ -230,7 +234,7 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
     await driver.connect({ kind: 'pgPool', pool: poolEntry.pool });
   }
 
-  const runtime = new SupabaseRuntime({
+  const runtime: SupabaseRuntime & SupabaseRuntimeImpl<TContract> = new SupabaseRuntimeImpl({
     context,
     adapter: stackInstance.adapter,
     driver,
@@ -254,13 +258,12 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
     const roleSql: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
     const roleOrm: OrmClient<TContract> = ormBuilder({
       runtime: {
-        // No connection() on this shim: acquireRuntimeScope then scopes every
-        // ORM operation (mutations and include reads) to this executor, so
-        // every statement runs role-bound. Exposing the raw connection here
-        // would let ORM scopes bypass the role binding.
         execute(plan) {
           return runtime.executeWithRole(plan, binding);
         },
+        // connection() returns a role session; this is the enforcement path for ORM scope
+        // operations (mutations, includes) — every statement runs role-bound.
+        connection: () => runtime.openRoleSession(binding),
       },
       context,
     });
@@ -276,7 +279,7 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
         return runtime.executeWithRole<Row>(plan, binding, execOptions);
       },
       transaction<R>(fn: (tx: TransactionContext) => PromiseLike<R>): Promise<R> {
-        return runtime.executeRoleTransaction(binding, fn);
+        return withTransaction({ connection: () => runtime.openRoleSession(binding) }, fn);
       },
     };
   }

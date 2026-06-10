@@ -11,5 +11,9 @@ export type {
   SupabaseTargetId,
 } from '../runtime/supabase';
 export { default as supabase, InvalidJwtError, SupabaseConfigError } from '../runtime/supabase';
-export type { SupabaseRoleBinding } from '../runtime/supabase-runtime';
-export { SupabaseRuntime } from '../runtime/supabase-runtime';
+export type {
+  RoleSession,
+  SupabaseRoleBinding,
+  SupabaseRuntime,
+} from '../runtime/supabase-runtime';
+export { SupabaseRuntimeImpl } from '../runtime/supabase-runtime';

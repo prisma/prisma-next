@@ -751,8 +751,13 @@ function transactionClosedError(): Error {
   );
 }
 
+/** Minimal structural type `withTransaction` depends on — anything that can open a connection. */
+export interface ConnectionProvider {
+  connection(): Promise<RuntimeConnection>;
+}
+
 export async function withTransaction<R>(
-  runtime: Runtime,
+  runtime: ConnectionProvider,
   fn: (tx: TransactionContext) => PromiseLike<R>,
 ): Promise<R> {
   const connection = await runtime.connection();

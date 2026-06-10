@@ -16,6 +16,10 @@ export { budgets } from '../middleware/budgets';
 export type { LintsOptions } from '../middleware/lints';
 export { lints } from '../middleware/lints';
 export type { SqlMiddleware, SqlMiddlewareContext } from '../middleware/sql-middleware';
+export {
+  PreparedStatementImpl,
+  type PreparedStatementInternals,
+} from '../prepared/prepared-statement';
 export type {
   BindSiteParams,
   Declaration,
@@ -54,6 +58,7 @@ export {
   createSqlExecutionStack,
 } from '../sql-context';
 export type {
+  ConnectionProvider,
   Runtime,
   RuntimeConnection,
   RuntimeQueryable,
