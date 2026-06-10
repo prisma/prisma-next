@@ -14,21 +14,25 @@ import type {
   SqliteDdlNode,
   SqliteDdlVisitor,
 } from '@prisma-next/target-sqlite/ddl';
-import { escapeLiteral } from '@prisma-next/target-sqlite/sql-utils';
+import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
 import type { SqliteLoweredStatement } from './types';
 
+function quoteQualifiedIdentifier(name: string): string {
+  return name.split('.').map(quoteIdentifier).join('.');
+}
+
 function renderPrimaryKeyConstraint(constraint: PrimaryKeyConstraint): string {
-  const cols = constraint.columns.join(', ');
+  const cols = constraint.columns.map(quoteIdentifier).join(', ');
   if (constraint.name !== undefined) {
-    return `CONSTRAINT ${constraint.name} PRIMARY KEY (${cols})`;
+    return `CONSTRAINT ${quoteIdentifier(constraint.name)} PRIMARY KEY (${cols})`;
   }
   return `PRIMARY KEY (${cols})`;
 }
 
 function renderForeignKeyConstraint(constraint: ForeignKeyConstraint): string {
-  const cols = constraint.columns.join(', ');
-  const refCols = constraint.refColumns.join(', ');
-  let sql = `FOREIGN KEY (${cols}) REFERENCES ${constraint.refTable} (${refCols})`;
+  const cols = constraint.columns.map(quoteIdentifier).join(', ');
+  const refCols = constraint.refColumns.map(quoteIdentifier).join(', ');
+  let sql = `FOREIGN KEY (${cols}) REFERENCES ${quoteQualifiedIdentifier(constraint.refTable)} (${refCols})`;
   if (constraint.onDelete !== undefined) {
     sql += ` ON DELETE ${REFERENTIAL_ACTION_SQL[constraint.onDelete]}`;
   }
@@ -36,15 +40,15 @@ function renderForeignKeyConstraint(constraint: ForeignKeyConstraint): string {
     sql += ` ON UPDATE ${REFERENTIAL_ACTION_SQL[constraint.onUpdate]}`;
   }
   if (constraint.name !== undefined) {
-    sql = `CONSTRAINT ${constraint.name} ${sql}`;
+    sql = `CONSTRAINT ${quoteIdentifier(constraint.name)} ${sql}`;
   }
   return sql;
 }
 
 function renderUniqueConstraint(constraint: UniqueConstraint): string {
-  const cols = constraint.columns.join(', ');
+  const cols = constraint.columns.map(quoteIdentifier).join(', ');
   if (constraint.name !== undefined) {
-    return `CONSTRAINT ${constraint.name} UNIQUE (${cols})`;
+    return `CONSTRAINT ${quoteIdentifier(constraint.name)} UNIQUE (${cols})`;
   }
   return `UNIQUE (${cols})`;
 }
@@ -63,12 +67,12 @@ function renderTableConstraint(constraint: DdlTableConstraint): string {
 class SqliteDdlVisitorImpl implements SqliteDdlVisitor<string> {
   createTable(node: SqliteCreateTable): string {
     const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
-    const tableRef = node.table;
+    const tableRef = quoteIdentifier(node.table);
     const columnDefs = node.columns.map((column) => renderColumn(column));
     const constraintDefs =
       node.constraints !== undefined ? node.constraints.map(renderTableConstraint) : [];
-    const allDefs = [...columnDefs, ...constraintDefs].join(',\n    ');
-    return `CREATE TABLE ${ifNotExists}${tableRef} (\n    ${allDefs}\n  )`;
+    const allDefs = [...columnDefs, ...constraintDefs].join(',\n  ');
+    return `CREATE TABLE ${ifNotExists}${tableRef} (\n  ${allDefs}\n)`;
   }
 }
 
@@ -78,30 +82,49 @@ const defaultVisitor: DdlColumnDefaultVisitor<string> = {
   // Postgres renderer, which uses ctx.nativeType to emit JSON casts.
   literal(node: LiteralColumnDefault, _ctx): string {
     const { value } = node;
+    if (value instanceof Date) {
+      return `DEFAULT '${escapeLiteral(value.toISOString())}'`;
+    }
     if (typeof value === 'string') {
       return `DEFAULT '${escapeLiteral(value)}'`;
     }
-    if (typeof value === 'number' || typeof value === 'boolean') {
+    if (typeof value === 'number') {
+      return `DEFAULT ${String(value)}`;
+    }
+    if (typeof value === 'boolean') {
+      // SQLite has no boolean type; store as 0/1 to match the pre-slice format.
+      return `DEFAULT ${value ? '1' : '0'}`;
+    }
+    if (typeof value === 'bigint') {
+      // Defensive: bigint is not in ColumnDefaultLiteralInputValue but guard
+      // against JSON.stringify throwing if one ever reaches this path.
       return `DEFAULT ${String(value)}`;
     }
     if (value === null) {
       return 'DEFAULT NULL';
     }
-    return `DEFAULT '${JSON.stringify(value)}'`;
+    return `DEFAULT '${escapeLiteral(JSON.stringify(value))}'`;
   },
   function(node: FunctionColumnDefault, _ctx): string {
     if (node.expression === 'autoincrement()') {
       return '';
     }
+    if (node.expression === 'now()') return "DEFAULT (datetime('now'))";
     return `DEFAULT (${node.expression})`;
   },
 };
 
 function renderColumn(column: DdlColumn): string {
+  // The `tableToDdlParts` helper in issue-planner.ts encodes the
+  // `INTEGER PRIMARY KEY AUTOINCREMENT` inline column definition directly into
+  // `DdlColumn.type` (rather than setting a column-level flag) because
+  // `DdlColumn` has no SQLite-specific autoincrement field. Both sites must
+  // stay in sync: when one changes the encoded string the other must change
+  // the detection. The structural fix is tracked in TML-2866.
   if (column.type.includes('AUTOINCREMENT')) {
-    return `${column.name} ${column.type}`;
+    return `${quoteIdentifier(column.name)} ${column.type}`;
   }
-  const parts = [column.name, column.type];
+  const parts = [quoteIdentifier(column.name), column.type];
   if (column.notNull) {
     parts.push('NOT NULL');
   }

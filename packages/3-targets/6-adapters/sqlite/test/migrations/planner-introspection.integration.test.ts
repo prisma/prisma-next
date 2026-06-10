@@ -99,7 +99,7 @@ describe('SQLite planner + introspection round-trip', () => {
     const driver = createMemoryDriver();
     try {
       const adapter = new SqliteControlAdapter();
-      const planner = createSqliteMigrationPlanner();
+      const planner = createSqliteMigrationPlanner(adapter);
 
       const contract = makeContract({
         users: makeTable({
@@ -164,7 +164,7 @@ describe('SQLite planner + introspection round-trip', () => {
   it('handles AUTOINCREMENT with INTEGER PRIMARY KEY', async () => {
     const driver = createMemoryDriver();
     try {
-      const planner = createSqliteMigrationPlanner();
+      const planner = createSqliteMigrationPlanner(new SqliteControlAdapter());
 
       const contract = makeContract({
         items: makeTable({
@@ -210,7 +210,7 @@ describe('SQLite planner + introspection round-trip', () => {
   it('handles foreign key constraints in CREATE TABLE', async () => {
     const driver = createMemoryDriver();
     try {
-      const planner = createSqliteMigrationPlanner();
+      const planner = createSqliteMigrationPlanner(new SqliteControlAdapter());
 
       const contract = makeContract({
         authors: makeTable({

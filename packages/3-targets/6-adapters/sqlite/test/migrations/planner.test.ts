@@ -10,6 +10,7 @@ import {
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createSqliteAdapter } from '../../src/core/adapter';
 
 function makeColumn(overrides: Partial<StorageColumn> = {}): StorageColumn {
   return {
@@ -55,7 +56,7 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
 const emptySchema = { tables: {} };
 
 describe('SQLite migration planner', () => {
-  const planner = createSqliteMigrationPlanner();
+  const planner = createSqliteMigrationPlanner(createSqliteAdapter());
 
   it('plans CREATE TABLE for new table', () => {
     const contract = makeContract({
