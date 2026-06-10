@@ -175,9 +175,6 @@ export class Cursor {
   }
 }
 
-const INVALID_QUALIFIED_TYPE = 'PSL_INVALID_QUALIFIED_TYPE';
-const INVALID_ATTRIBUTE_SYNTAX = 'PSL_INVALID_ATTRIBUTE_SYNTAX';
-
 function parseIdentifier(cursor: Cursor): void {
   cursor.startNode('Identifier');
   cursor.bump();
@@ -305,14 +302,14 @@ export function parseAttribute(cursor: Cursor): GreenNode {
         parseIdentifier(cursor);
       } else {
         cursor.diagnostic(
-          INVALID_ATTRIBUTE_SYNTAX,
+          'PSL_INVALID_ATTRIBUTE_SYNTAX',
           'Attribute name expected after "."',
           cursor.mark(),
         );
       }
     }
   } else {
-    cursor.diagnostic(INVALID_ATTRIBUTE_SYNTAX, 'Attribute name expected', attributeMark);
+    cursor.diagnostic('PSL_INVALID_ATTRIBUTE_SYNTAX', 'Attribute name expected', attributeMark);
   }
   if (cursor.peekKind() === 'LParen') {
     parseAttributeArgList(cursor);
@@ -356,7 +353,7 @@ function parseQualifierSegments(cursor: Cursor, separator: 'Colon' | 'Dot'): voi
     cursor.bump(); // separator
     if (seen > 1) {
       cursor.diagnostic(
-        INVALID_QUALIFIED_TYPE,
+        'PSL_INVALID_QUALIFIED_TYPE',
         'Qualified type reference has too many segments',
         separatorMark,
       );
@@ -366,14 +363,6 @@ function parseQualifierSegments(cursor: Cursor, separator: 'Colon' | 'Dot'): voi
     }
   }
 }
-
-const UNTERMINATED_BLOCK = 'PSL_UNTERMINATED_BLOCK';
-const UNSUPPORTED_TOP_LEVEL_BLOCK = 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK';
-const INVALID_NAMESPACE_BLOCK = 'PSL_INVALID_NAMESPACE_BLOCK';
-const INVALID_MODEL_MEMBER = 'PSL_INVALID_MODEL_MEMBER';
-const INVALID_ENUM_MEMBER = 'PSL_INVALID_ENUM_MEMBER';
-const INVALID_TYPES_MEMBER = 'PSL_INVALID_TYPES_MEMBER';
-const INVALID_EXTENSION_BLOCK_MEMBER = 'PSL_INVALID_EXTENSION_BLOCK_MEMBER';
 
 type MemberParser = (cursor: Cursor) => void;
 
@@ -512,13 +501,13 @@ export function parseNamespace(
   }
   if (insideNamespace) {
     cursor.diagnostic(
-      INVALID_NAMESPACE_BLOCK,
+      'PSL_INVALID_NAMESPACE_BLOCK',
       `Recursive "namespace ${name}" block is not allowed; namespace blocks may not nest`,
       keywordMark,
     );
   } else if (name === UNSPECIFIED_PSL_NAMESPACE_ID) {
     cursor.diagnostic(
-      INVALID_NAMESPACE_BLOCK,
+      'PSL_INVALID_NAMESPACE_BLOCK',
       `Namespace name "${UNSPECIFIED_PSL_NAMESPACE_ID}" is reserved for the parser-synthesised bucket for top-level declarations`,
       keywordMark,
     );
@@ -537,13 +526,13 @@ export function parseTypesBlock(
   cursor.startNode('TypesBlock');
   if (insideNamespace) {
     cursor.diagnostic(
-      INVALID_NAMESPACE_BLOCK,
+      'PSL_INVALID_NAMESPACE_BLOCK',
       '`types` blocks must be declared at the document top level, not inside a namespace block',
       keywordMark,
     );
   } else if (state.topLevelTypesSeen) {
     cursor.diagnostic(
-      INVALID_TYPES_MEMBER,
+      'PSL_INVALID_TYPES_MEMBER',
       'Only one top-level `types` block is allowed per document',
       keywordMark,
     );
@@ -572,7 +561,7 @@ function parseBlockBody(cursor: Cursor, parseMember: MemberParser): void {
   if (cursor.peekKind() === 'RBrace') {
     cursor.bump();
   } else {
-    cursor.diagnostic(UNTERMINATED_BLOCK, 'Unterminated block declaration', braceMark);
+    cursor.diagnostic('PSL_UNTERMINATED_BLOCK', 'Unterminated block declaration', braceMark);
   }
 }
 
@@ -582,7 +571,7 @@ function parseUnsupportedTopLevel(cursor: Cursor): void {
     cursor.peekKind(1) === 'LBrace'
       ? `Unsupported top-level block "${offending}"`
       : `Unsupported top-level declaration "${offending}"`;
-  cursor.diagnostic(UNSUPPORTED_TOP_LEVEL_BLOCK, message, cursor.mark());
+  cursor.diagnostic('PSL_UNSUPPORTED_TOP_LEVEL_BLOCK', message, cursor.mark());
   cursor.bump();
   cursor.recoverToSyncPoint();
 }
@@ -603,7 +592,7 @@ function parseModelMember(cursor: Cursor): void {
   if (!node) {
     invalidMember(
       cursor,
-      INVALID_MODEL_MEMBER,
+      'PSL_INVALID_MODEL_MEMBER',
       `Invalid model member declaration "${cursor.peekToken().text}"`,
     );
   }
@@ -614,7 +603,7 @@ function parseEnumMember(cursor: Cursor): void {
   if (!node) {
     invalidMember(
       cursor,
-      INVALID_ENUM_MEMBER,
+      'PSL_INVALID_ENUM_MEMBER',
       `Invalid enum value declaration "${cursor.peekToken().text}"`,
     );
   }
@@ -625,7 +614,7 @@ function parseNamedTypeMember(cursor: Cursor): void {
   if (!node) {
     invalidMember(
       cursor,
-      INVALID_TYPES_MEMBER,
+      'PSL_INVALID_TYPES_MEMBER',
       `Invalid types declaration "${cursor.peekToken().text}"`,
     );
   }
@@ -634,7 +623,7 @@ function parseNamedTypeMember(cursor: Cursor): void {
 function parseKeyValueMember(cursor: Cursor): void {
   const node = parseKeyValue(cursor);
   if (!node) {
-    invalidMember(cursor, INVALID_EXTENSION_BLOCK_MEMBER, 'Invalid block entry');
+    invalidMember(cursor, 'PSL_INVALID_EXTENSION_BLOCK_MEMBER', 'Invalid block entry');
   }
 }
 
