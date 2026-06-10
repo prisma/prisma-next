@@ -50,6 +50,8 @@ test/**/fixtures/generated/
 !test/e2e/framework/test/sqlite/fixtures/generated/**
 !test/integration/test/mongo/fixtures/generated/
 !test/integration/test/mongo/fixtures/generated/**
+!test/integration/test/namespaced-accessors/fixtures/generated/
+!test/integration/test/namespaced-accessors/fixtures/generated/**
 
 # Ignore everything under `.agents/` except the canonical rules home.
 # The `.cursor/rules` and `.claude/rules` presentation trees are git-ignored
