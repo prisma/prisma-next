@@ -24,9 +24,8 @@ import type {
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
-import { createRuntime } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs } from './utils';
+import { createTestRuntime as createRuntime, descriptorsFromCodecs } from './utils';
 
 /**
  * Pins the per-result-kind branches of `verifyMarker` in `sql-runtime.ts`: absent marker

@@ -54,11 +54,10 @@ export {
   createSqlExecutionStack,
 } from '../sql-context';
 export type {
-  CreateRuntimeOptions,
   Runtime,
   RuntimeConnection,
   RuntimeQueryable,
   RuntimeTransaction,
   TransactionContext,
 } from '../sql-runtime';
-export { createRuntime, SqlRuntime, withTransaction } from '../sql-runtime';
+export { SqlRuntime, withTransaction } from '../sql-runtime';

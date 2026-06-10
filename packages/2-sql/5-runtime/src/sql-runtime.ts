@@ -1,8 +1,4 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type {
-  ExecutionStackInstance,
-  RuntimeDriverInstance,
-} from '@prisma-next/framework-components/execution';
 import {
   AsyncIterableResult,
   checkAborted,
@@ -64,11 +60,7 @@ import type {
   TelemetryOutcome,
   VerifyMarkerOption,
 } from './runtime-spi';
-import type {
-  ExecutionContext,
-  SqlRuntimeAdapterInstance,
-  SqlRuntimeExtensionInstance,
-} from './sql-context';
+import type { ExecutionContext } from './sql-context';
 import { SqlFamilyAdapter } from './sql-family-adapter';
 
 export type Log = RuntimeLog;
@@ -87,25 +79,6 @@ export interface RawSessionConnection {
 export interface RuntimeOptions<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> {
   readonly context: ExecutionContext<TContract>;
   readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
-  readonly driver: SqlDriver<unknown>;
-  readonly verifyMarker?: VerifyMarkerOption;
-  readonly middleware?: readonly SqlMiddleware[];
-  readonly mode?: 'strict' | 'permissive';
-  readonly log?: Log;
-}
-
-export interface CreateRuntimeOptions<
-  TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
-  TTargetId extends string = string,
-> {
-  readonly stackInstance: ExecutionStackInstance<
-    'sql',
-    TTargetId,
-    SqlRuntimeAdapterInstance<TTargetId>,
-    RuntimeDriverInstance<'sql', TTargetId>,
-    SqlRuntimeExtensionInstance<TTargetId>
-  >;
-  readonly context: ExecutionContext<TContract>;
   readonly driver: SqlDriver<unknown>;
   readonly verifyMarker?: VerifyMarkerOption;
   readonly middleware?: readonly SqlMiddleware[];
@@ -181,7 +154,7 @@ const noopLog: Log = { info: noopLogSink, warn: noopLogSink, error: noopLogSink 
 /**
  * Abstract family-layer base for SQL runtimes. Subclass to build a target runtime
  * (e.g. `PostgresRuntime`); app code should consume the `Runtime` interface returned
- * by `createRuntime` and the target factories, never this class.
+ * by the target factories, never this class directly.
  */
 export abstract class SqlRuntime<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
   extends RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>
@@ -826,10 +799,6 @@ export abstract class SqlRuntime<TContract extends Contract<SqlStorage> = Contra
   }
 }
 
-class DefaultSqlRuntime<
-  TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
-> extends SqlRuntime<TContract> {}
-
 function transactionClosedError(): Error {
   return runtimeError(
     'RUNTIME.TRANSACTION_CLOSED',
@@ -943,20 +912,4 @@ export async function withTransaction<R>(
       await connection.release();
     }
   }
-}
-
-export function createRuntime<TContract extends Contract<SqlStorage>, TTargetId extends string>(
-  options: CreateRuntimeOptions<TContract, TTargetId>,
-): Runtime {
-  const { stackInstance, context, driver, verifyMarker, middleware, mode, log } = options;
-
-  return new DefaultSqlRuntime({
-    context,
-    adapter: stackInstance.adapter,
-    driver,
-    ...ifDefined('verifyMarker', verifyMarker),
-    ...ifDefined('middleware', middleware),
-    ...ifDefined('mode', mode),
-    ...ifDefined('log', log),
-  });
 }

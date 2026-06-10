@@ -8,3 +8,4 @@ export type {
   SqliteTargetId,
 } from '../runtime/sqlite';
 export { default } from '../runtime/sqlite';
+export { SqliteRuntime } from '../runtime/sqlite-runtime';

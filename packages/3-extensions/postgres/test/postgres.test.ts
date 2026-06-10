@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   instantiateExecutionStack: vi.fn(),
-  createRuntime: vi.fn(),
+  PostgresRuntime: vi.fn(),
+  runtimeInstances: [] as unknown[],
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
   withTransaction: vi.fn(),
@@ -24,8 +25,20 @@ vi.mock('@prisma-next/framework-components/execution', () => ({
 vi.mock('@prisma-next/sql-runtime', () => ({
   createExecutionContext: mocks.createExecutionContext,
   createSqlExecutionStack: mocks.createSqlExecutionStack,
-  createRuntime: mocks.createRuntime,
   withTransaction: mocks.withTransaction,
+}));
+
+vi.mock('../src/runtime/postgres-runtime', () => ({
+  // Delegating mock: the spy is invoked as a plain function (so per-test
+  // mockReturnValue/mockImplementation work), its return value becomes the
+  // instance shape, and every constructed instance is registered for
+  // identity assertions.
+  PostgresRuntime: class {
+    constructor(options: unknown) {
+      Object.assign(this, mocks.PostgresRuntime(options));
+      mocks.runtimeInstances.push(this);
+    }
+  },
 }));
 
 vi.mock('@prisma-next/sql-builder/runtime', () => ({
@@ -73,7 +86,8 @@ const contract = createContract<SqlStorage>();
 describe('postgres', () => {
   beforeEach(() => {
     mocks.instantiateExecutionStack.mockReset();
-    mocks.createRuntime.mockReset();
+    mocks.PostgresRuntime.mockReset();
+    mocks.runtimeInstances.length = 0;
     mocks.createExecutionContext.mockReset();
     mocks.createSqlExecutionStack.mockReset();
     mocks.withTransaction.mockReset();
@@ -103,7 +117,7 @@ describe('postgres', () => {
     mocks.instantiateExecutionStack.mockReturnValue({ adapter: {} });
     mocks.driverConnect.mockResolvedValue(undefined);
     mocks.driverCreate.mockReturnValue({ id: 'driver-instance', connect: mocks.driverConnect });
-    mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
+    mocks.PostgresRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.deserializeContract.mockReturnValue(contract);
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
     mocks.orm.mockReturnValue({ lane: 'orm' });
@@ -158,13 +172,13 @@ describe('postgres', () => {
     expect(db.sql).toEqual({ lane: 'sql' });
 
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
-    expect(mocks.createRuntime).not.toHaveBeenCalled();
+    expect(mocks.PostgresRuntime).not.toHaveBeenCalled();
     expect(mocks.poolCtor).not.toHaveBeenCalled();
 
     // accessing runtime() triggers lazy creation
     db.runtime();
     expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
-    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+    expect(mocks.PostgresRuntime).toHaveBeenCalledTimes(1);
     expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
   });
 
@@ -179,7 +193,7 @@ describe('postgres', () => {
 
     expect(first).toBe(second);
     expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
-    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+    expect(mocks.PostgresRuntime).toHaveBeenCalledTimes(1);
   });
 
   it('throws for multiple binding inputs during client construction', () => {
@@ -191,7 +205,7 @@ describe('postgres', () => {
       } as unknown as Parameters<typeof postgres<typeof contract>>[0]),
     ).toThrow('Provide one binding input');
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
-    expect(mocks.createRuntime).not.toHaveBeenCalled();
+    expect(mocks.PostgresRuntime).not.toHaveBeenCalled();
     expect(mocks.poolCtor).not.toHaveBeenCalled();
   });
 
@@ -203,7 +217,7 @@ describe('postgres', () => {
     db.runtime();
 
     expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
-    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+    expect(mocks.PostgresRuntime).toHaveBeenCalledTimes(1);
     expect(mocks.driverConnect).not.toHaveBeenCalled();
     expect(mocks.poolCtor).not.toHaveBeenCalled();
   });
@@ -450,7 +464,7 @@ describe('postgres', () => {
 
     expect(mocks.withTransaction).toHaveBeenCalledOnce();
     expect(mocks.withTransaction).toHaveBeenCalledWith(
-      mocks.createRuntime.mock.results[0]?.value,
+      mocks.runtimeInstances[0],
       expect.any(Function),
     );
     expect(result).toBe('tx-value');
@@ -511,11 +525,11 @@ describe('postgres', () => {
     });
 
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
-    expect(mocks.createRuntime).not.toHaveBeenCalled();
+    expect(mocks.PostgresRuntime).not.toHaveBeenCalled();
 
     await db.transaction(async () => 'value');
 
     expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
-    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+    expect(mocks.PostgresRuntime).toHaveBeenCalledTimes(1);
   });
 });

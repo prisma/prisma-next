@@ -28,9 +28,8 @@ import type {
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
-import { createRuntime } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs, stubAst } from './utils';
+import { createTestRuntime as createRuntime, descriptorsFromCodecs, stubAst } from './utils';
 
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',

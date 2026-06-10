@@ -3,13 +3,10 @@ import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { PostgresRuntime } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { Log } from '@prisma-next/sql-runtime';
-import {
-  createExecutionContext,
-  createRuntime,
-  createSqlExecutionStack,
-} from '@prisma-next/sql-runtime';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { Client } from 'pg';
@@ -77,9 +74,9 @@ describe('runtime verify-marker: missing marker table', {
     const client = new Client({ connectionString });
     await driver.connect({ kind: 'pgClient', client });
 
-    const runtime = createRuntime({
-      stackInstance,
+    const runtime = new PostgresRuntime({
       context,
+      adapter: stackInstance.adapter,
       driver,
       log,
     });

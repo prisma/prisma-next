@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   instantiateExecutionStack: vi.fn(),
-  createRuntime: vi.fn(),
+  SqliteRuntime: vi.fn(),
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
   sqlBuilder: vi.fn(),
@@ -21,8 +21,11 @@ vi.mock('@prisma-next/framework-components/execution', () => ({
 vi.mock('@prisma-next/sql-runtime', () => ({
   createExecutionContext: mocks.createExecutionContext,
   createSqlExecutionStack: mocks.createSqlExecutionStack,
-  createRuntime: mocks.createRuntime,
   withTransaction: vi.fn(),
+}));
+
+vi.mock('../src/runtime/sqlite-runtime', () => ({
+  SqliteRuntime: mocks.SqliteRuntime,
 }));
 
 vi.mock('@prisma-next/sql-builder/runtime', () => ({
@@ -60,7 +63,7 @@ const contract = createContract<SqlStorage>();
 describe('sqlite close()', () => {
   beforeEach(() => {
     mocks.instantiateExecutionStack.mockReset();
-    mocks.createRuntime.mockReset();
+    mocks.SqliteRuntime.mockReset();
     mocks.createExecutionContext.mockReset();
     mocks.createSqlExecutionStack.mockReset();
     mocks.driverCreate.mockReset();
@@ -93,7 +96,7 @@ describe('sqlite close()', () => {
       connect: mocks.driverConnect,
       close: mocks.driverClose,
     });
-    mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
+    mocks.SqliteRuntime.mockImplementation(() => ({ id: 'runtime-instance' }));
     mocks.deserializeContract.mockReturnValue(contract);
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
   });

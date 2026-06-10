@@ -13,6 +13,7 @@ import type {
   RuntimeMiddlewareContext,
 } from '@prisma-next/framework-components/runtime';
 import { cacheAnnotation, createCacheMiddleware } from '@prisma-next/middleware-cache';
+import { PostgresRuntime } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import {
   AndExpr,
@@ -24,7 +25,6 @@ import {
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
   createExecutionContext,
-  createRuntime,
   createSqlExecutionStack,
   type Runtime,
   type SqlMiddleware,
@@ -194,9 +194,9 @@ describe('integration: middleware-cache against real Postgres', {
   });
 
   function buildRuntime(middleware: SqlMiddleware[]): Runtime {
-    return createRuntime({
-      stackInstance,
+    return new PostgresRuntime({
       context,
+      adapter: stackInstance.adapter,
       driver,
       middleware,
     });

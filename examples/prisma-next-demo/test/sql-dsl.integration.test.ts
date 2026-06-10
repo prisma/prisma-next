@@ -7,9 +7,10 @@
  */
 
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { PostgresRuntime } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
-import { type CreateRuntimeOptions, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
+import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
@@ -22,9 +23,7 @@ const { contract } = context;
 const executionStack = db.stack;
 
 async function createTestDriver(connectionString: string) {
-  const stackInstance = instantiateExecutionStack(
-    executionStack,
-  ) as CreateRuntimeOptions['stackInstance'];
+  const stackInstance = instantiateExecutionStack(executionStack);
   const driver = stackInstance.driver as unknown as SqlDriver<unknown>;
   if (!driver) {
     throw new Error('Driver descriptor missing from execution stack');
@@ -41,9 +40,9 @@ async function createTestDriver(connectionString: string) {
 
 async function getRuntime(connectionString: string): Promise<Runtime> {
   const { stackInstance, driver } = await createTestDriver(connectionString);
-  return createRuntime({
-    stackInstance,
+  return new PostgresRuntime({
     context,
+    adapter: stackInstance.adapter,
     driver,
   });
 }

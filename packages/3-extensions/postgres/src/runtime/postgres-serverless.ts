@@ -15,16 +15,12 @@ import type {
   SqlRuntimeExtensionDescriptor,
   VerifyMarkerOption,
 } from '@prisma-next/sql-runtime';
-import {
-  createExecutionContext,
-  createRuntime,
-  createSqlExecutionStack,
-} from '@prisma-next/sql-runtime';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { Client } from 'pg';
-
 import type { PostgresTargetId } from './postgres';
+import { PostgresRuntime } from './postgres-runtime';
 
 export type PostgresServerlessCursorOptions = NonNullable<PostgresDriverCreateOptions['cursor']>;
 
@@ -157,9 +153,9 @@ export default function postgresServerless<TContract extends Contract<SqlStorage
 
       let runtime: Runtime;
       try {
-        runtime = createRuntime({
-          stackInstance,
+        runtime = new PostgresRuntime({
           context,
+          adapter: stackInstance.adapter,
           driver,
           ...ifDefined('verifyMarker', options.verifyMarker),
           ...ifDefined('middleware', options.middleware),

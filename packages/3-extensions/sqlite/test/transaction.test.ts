@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   instantiateExecutionStack: vi.fn(),
-  createRuntime: vi.fn(),
+  SqliteRuntime: vi.fn(),
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
   withTransaction: vi.fn(),
@@ -24,8 +24,11 @@ vi.mock('@prisma-next/framework-components/execution', () => ({
 vi.mock('@prisma-next/sql-runtime', () => ({
   createExecutionContext: mocks.createExecutionContext,
   createSqlExecutionStack: mocks.createSqlExecutionStack,
-  createRuntime: mocks.createRuntime,
   withTransaction: mocks.withTransaction,
+}));
+
+vi.mock('../src/runtime/sqlite-runtime', () => ({
+  SqliteRuntime: mocks.SqliteRuntime,
 }));
 
 vi.mock('@prisma-next/sql-builder/runtime', () => ({
@@ -63,7 +66,7 @@ const contract = createContract<SqlStorage>();
 describe('sqlite transaction()', () => {
   beforeEach(() => {
     mocks.instantiateExecutionStack.mockReset();
-    mocks.createRuntime.mockReset();
+    mocks.SqliteRuntime.mockReset();
     mocks.createExecutionContext.mockReset();
     mocks.createSqlExecutionStack.mockReset();
     mocks.withTransaction.mockReset();
@@ -98,7 +101,7 @@ describe('sqlite transaction()', () => {
       connect: mocks.driverConnect,
       close: mocks.driverClose,
     });
-    mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
+    mocks.SqliteRuntime.mockImplementation(() => ({ id: 'runtime-instance' }));
     mocks.deserializeContract.mockReturnValue(contract);
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
     mocks.orm.mockReturnValue({ lane: 'orm' });
@@ -123,7 +126,7 @@ describe('sqlite transaction()', () => {
 
     expect(mocks.withTransaction).toHaveBeenCalledOnce();
     expect(mocks.withTransaction).toHaveBeenCalledWith(
-      mocks.createRuntime.mock.results[0]?.value,
+      mocks.SqliteRuntime.mock.results[0]?.value,
       expect.any(Function),
     );
     expect(result).toBe('tx-value');
@@ -184,12 +187,12 @@ describe('sqlite transaction()', () => {
     });
 
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
-    expect(mocks.createRuntime).not.toHaveBeenCalled();
+    expect(mocks.SqliteRuntime).not.toHaveBeenCalled();
 
     await db.transaction(async () => 'value');
 
     expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
-    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+    expect(mocks.SqliteRuntime).toHaveBeenCalledTimes(1);
   });
 
   it('transaction() rejects with "SQLite client is closed" after close()', async () => {

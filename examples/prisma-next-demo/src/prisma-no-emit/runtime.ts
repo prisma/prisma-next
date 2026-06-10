@@ -1,6 +1,7 @@
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { createCacheMiddleware } from '@prisma-next/middleware-cache';
-import { budgets, createRuntime, type Runtime, type SqlMiddleware } from '@prisma-next/sql-runtime';
+import { PostgresRuntime } from '@prisma-next/postgres/runtime';
+import { budgets, type Runtime, type SqlMiddleware } from '@prisma-next/sql-runtime';
 import { Pool } from 'pg';
 import { context, stack } from './context';
 
@@ -32,9 +33,9 @@ export async function getRuntime(
     throw error;
   }
 
-  return createRuntime({
-    stackInstance,
+  return new PostgresRuntime({
     context,
+    adapter: stackInstance.adapter,
     driver,
     middleware,
   });

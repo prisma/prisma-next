@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   instantiateExecutionStack: vi.fn(),
-  createRuntime: vi.fn(),
+  PostgresRuntime: vi.fn(),
+  runtimeInstances: [] as unknown[],
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
   withTransaction: vi.fn(),
@@ -23,8 +24,20 @@ vi.mock('@prisma-next/framework-components/execution', () => ({
 vi.mock('@prisma-next/sql-runtime', () => ({
   createExecutionContext: mocks.createExecutionContext,
   createSqlExecutionStack: mocks.createSqlExecutionStack,
-  createRuntime: mocks.createRuntime,
   withTransaction: mocks.withTransaction,
+}));
+
+vi.mock('../src/runtime/postgres-runtime', () => ({
+  // Delegating mock: the spy is invoked as a plain function (so per-test
+  // mockReturnValue/mockImplementation work), its return value becomes the
+  // instance shape, and every constructed instance is registered for
+  // identity assertions.
+  PostgresRuntime: class {
+    constructor(options: unknown) {
+      Object.assign(this, mocks.PostgresRuntime(options));
+      mocks.runtimeInstances.push(this);
+    }
+  },
 }));
 
 vi.mock('@prisma-next/sql-builder/runtime', () => ({
@@ -74,7 +87,8 @@ const contract = createContract<SqlStorage>();
 describe('postgres close()', () => {
   beforeEach(() => {
     mocks.instantiateExecutionStack.mockReset();
-    mocks.createRuntime.mockReset();
+    mocks.PostgresRuntime.mockReset();
+    mocks.runtimeInstances.length = 0;
     mocks.createExecutionContext.mockReset();
     mocks.createSqlExecutionStack.mockReset();
     mocks.withTransaction.mockReset();
@@ -104,7 +118,7 @@ describe('postgres close()', () => {
     mocks.instantiateExecutionStack.mockReturnValue({ adapter: {} });
     mocks.driverConnect.mockResolvedValue(undefined);
     mocks.driverCreate.mockReturnValue({ id: 'driver-instance', connect: mocks.driverConnect });
-    mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
+    mocks.PostgresRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.deserializeContract.mockReturnValue(contract);
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
     mocks.poolEnd.mockResolvedValue(undefined);

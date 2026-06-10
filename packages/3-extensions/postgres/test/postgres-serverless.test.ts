@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   instantiateExecutionStack: vi.fn(),
-  createRuntime: vi.fn(),
+  PostgresRuntime: vi.fn(),
+  runtimeInstances: [] as unknown[],
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
   sqlBuilder: vi.fn(),
@@ -25,7 +26,19 @@ vi.mock('@prisma-next/framework-components/execution', () => ({
 vi.mock('@prisma-next/sql-runtime', () => ({
   createExecutionContext: mocks.createExecutionContext,
   createSqlExecutionStack: mocks.createSqlExecutionStack,
-  createRuntime: mocks.createRuntime,
+}));
+
+vi.mock('../src/runtime/postgres-runtime', () => ({
+  // Delegating mock: the spy is invoked as a plain function (so per-test
+  // mockReturnValue/mockImplementation work), its return value becomes the
+  // instance shape, and every constructed instance is registered for
+  // identity assertions.
+  PostgresRuntime: class {
+    constructor(options: unknown) {
+      Object.assign(this, mocks.PostgresRuntime(options));
+      mocks.runtimeInstances.push(this);
+    }
+  },
 }));
 
 vi.mock('@prisma-next/sql-builder/runtime', () => ({
@@ -73,7 +86,8 @@ const contract = createContract<SqlStorage>();
 describe('postgresServerless', () => {
   beforeEach(() => {
     mocks.instantiateExecutionStack.mockReset();
-    mocks.createRuntime.mockReset();
+    mocks.PostgresRuntime.mockReset();
+    mocks.runtimeInstances.length = 0;
     mocks.createExecutionContext.mockReset();
     mocks.createSqlExecutionStack.mockReset();
     mocks.driverCreate.mockReset();
@@ -110,10 +124,7 @@ describe('postgresServerless', () => {
       close: mocks.driverClose,
     });
     mocks.runtimeClose.mockResolvedValue(undefined);
-    mocks.createRuntime.mockImplementation(() => ({
-      id: 'runtime-instance',
-      close: mocks.runtimeClose,
-    }));
+    mocks.PostgresRuntime.mockReturnValue({ id: 'runtime-instance', close: mocks.runtimeClose });
     mocks.deserializeContract.mockReturnValue(contract);
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
   });
@@ -143,7 +154,7 @@ describe('postgresServerless', () => {
     postgresServerless({ contract });
 
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
-    expect(mocks.createRuntime).not.toHaveBeenCalled();
+    expect(mocks.PostgresRuntime).not.toHaveBeenCalled();
     expect(mocks.driverCreate).not.toHaveBeenCalled();
     expect(mocks.clientCtor).not.toHaveBeenCalled();
     expect(mocks.poolCtor).not.toHaveBeenCalled();
@@ -165,7 +176,7 @@ describe('postgresServerless', () => {
       kind: 'pgClient',
       client: expect.any(Client),
     });
-    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+    expect(mocks.PostgresRuntime).toHaveBeenCalledTimes(1);
     expect(runtime).toBeDefined();
   });
 
@@ -198,10 +209,10 @@ describe('postgresServerless', () => {
       { id: 'runtime-2', close: mocks.runtimeClose },
     ];
     let call = 0;
-    mocks.createRuntime.mockImplementation(() => {
+    mocks.PostgresRuntime.mockImplementation(() => {
       const r = runtimes[call];
       call++;
-      if (!r) throw new Error('unexpected createRuntime call');
+      if (!r) throw new Error('unexpected PostgresRuntime constructor call');
       return r;
     });
 
@@ -213,12 +224,12 @@ describe('postgresServerless', () => {
     expect(mocks.clientCtor).toHaveBeenCalledTimes(2);
     expect(mocks.driverCreate).toHaveBeenCalledTimes(2);
     expect(mocks.driverConnect).toHaveBeenCalledTimes(2);
-    expect(mocks.createRuntime).toHaveBeenCalledTimes(2);
+    expect(mocks.PostgresRuntime).toHaveBeenCalledTimes(2);
   });
 
-  it('closes the driver if createRuntime throws after connect() resolved', async () => {
-    const failure = new Error('createRuntime boom');
-    mocks.createRuntime.mockImplementation(() => {
+  it('closes the driver if PostgresRuntime constructor throws after connect() resolved', async () => {
+    const failure = new Error('PostgresRuntime boom');
+    mocks.PostgresRuntime.mockImplementation(() => {
       throw failure;
     });
 
@@ -231,8 +242,8 @@ describe('postgresServerless', () => {
   });
 
   it('rethrows the original error even when driver.close itself fails during cleanup', async () => {
-    const failure = new Error('createRuntime boom');
-    mocks.createRuntime.mockImplementation(() => {
+    const failure = new Error('PostgresRuntime boom');
+    mocks.PostgresRuntime.mockImplementation(() => {
       throw failure;
     });
     mocks.driverClose.mockRejectedValue(new Error('close boom'));
@@ -291,26 +302,26 @@ describe('postgresServerless', () => {
     expect(mocks.createSqlExecutionStack).toHaveBeenCalledWith(
       expect.objectContaining({ extensionPacks: [extension] }),
     );
-    expect(mocks.createRuntime).toHaveBeenCalledWith(expect.objectContaining({ middleware }));
+    expect(mocks.PostgresRuntime).toHaveBeenCalledWith(expect.objectContaining({ middleware }));
   });
 
-  it('forwards verifyMarker option to createRuntime', async () => {
+  it('forwards verifyMarker option to PostgresRuntime constructor', async () => {
     const db = postgresServerless({ contract, verifyMarker: false });
 
     await db.connect({ url: 'postgres://localhost:5432/db' });
 
-    expect(mocks.createRuntime).toHaveBeenCalledWith(
+    expect(mocks.PostgresRuntime).toHaveBeenCalledWith(
       expect.objectContaining({ verifyMarker: false }),
     );
   });
 
-  it('omits verifyMarker from createRuntime when not provided (runtime default applies)', async () => {
+  it('omits verifyMarker from PostgresRuntime constructor when not provided (runtime default applies)', async () => {
     const db = postgresServerless({ contract });
 
     await db.connect({ url: 'postgres://localhost:5432/db' });
 
-    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
-    const callArg = mocks.createRuntime.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(mocks.PostgresRuntime).toHaveBeenCalledTimes(1);
+    const callArg = mocks.PostgresRuntime.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(callArg).not.toHaveProperty('verifyMarker');
   });
 

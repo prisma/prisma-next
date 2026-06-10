@@ -19,6 +19,18 @@ changes:
         - "@prisma-next/sql-builder"
         - "@prisma-next/sql-orm-client"
       anyMatch: true
+  - id: create-runtime-removed
+    summary: |
+      `createRuntime` is removed from `@prisma-next/sql-runtime`. Extension code that
+      constructed a runtime via `createRuntime(...)` must switch to the target class
+      constructor directly: `new PostgresRuntime({...})` from
+      `@prisma-next/postgres/runtime`, or `new SqliteRuntime({...})` from
+      `@prisma-next/sqlite/runtime`. Pass the same options minus the `stackInstance`
+      unpacking — supply `adapter` directly instead of `stackInstance.adapter`.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "createRuntime"
 ---
 
 <!--
@@ -57,3 +69,23 @@ For an unbound contract (e.g. SQLite, or any target whose entities live in the l
 ### Validation
 
 This is a type-level change — `pnpm typecheck` (or `pnpm build`) pinpoints every remaining flat access as a compile error (`Property '<table>' does not exist on type 'Db<…>'`). Fix each by inserting the namespace segment, then run your extension's standard `pnpm test`.
+
+## `create-runtime-removed`
+
+`createRuntime` is removed from `@prisma-next/sql-runtime`. Construct the target runtime class directly instead.
+
+```ts
+// Before
+import { createRuntime } from '@prisma-next/sql-runtime';
+const runtime = createRuntime({ stackInstance, context, driver, ...opts });
+
+// After — Postgres
+import { PostgresRuntime } from '@prisma-next/postgres/runtime';
+const runtime = new PostgresRuntime({ adapter: stackInstance.adapter, context, driver, ...opts });
+
+// After — SQLite
+import { SqliteRuntime } from '@prisma-next/sqlite/runtime';
+const runtime = new SqliteRuntime({ adapter: stackInstance.adapter, context, driver, ...opts });
+```
+
+The options are identical except `stackInstance` is no longer passed: supply `adapter` from `stackInstance.adapter` directly.

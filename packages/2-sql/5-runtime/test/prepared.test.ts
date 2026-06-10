@@ -18,8 +18,8 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it, vi } from 'vitest';
 import type { SqlMiddleware } from '../src/middleware/sql-middleware';
 import { createSqlExecutionStack } from '../src/sql-context';
-import { createRuntime } from '../src/sql-runtime';
 import {
+  createTestRuntime as createRuntime,
   createStubAdapter,
   createTestAdapterDescriptor,
   createTestContext,
