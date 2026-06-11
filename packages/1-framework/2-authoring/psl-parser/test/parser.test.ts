@@ -2,7 +2,6 @@ import type { AuthoringPslBlockDescriptor } from '@prisma-next/framework-compone
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import {
   flatPslCompositeTypes,
-  flatPslEnums,
   flatPslModels,
   namespacePslExtensionBlocks,
 } from '@prisma-next/framework-components/psl-ast';
@@ -10,79 +9,6 @@ import { describe, expect, it } from 'vitest';
 import { parsePslDocument } from '../src/parser';
 
 describe('parsePslDocument', () => {
-  it.skip('parses representative v1 schema with generic attributes and spans', () => {
-    // TODO(TML-2853-D2): native enum syntax (`enum Role { USER ADMIN }`) is now
-    // parsed as an extension block; update this test to use the new form.
-    const schema = `
-types {
-  Email = String @db.VarChar(191)
-}
-
-enum Role {
-  USER
-  ADMIN
-}
-
-model User {
-  id Int @id @default(autoincrement())
-  email Email @unique
-  role Role
-  posts Post[]
-}
-
-model Post {
-  id Int @id @default(autoincrement())
-  userId Int
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: SetNull)
-  createdAt DateTime @default(now())
-  published Boolean @default(true)
-  @@index([userId])
-}
-`;
-
-    const result = parsePslDocument({
-      schema,
-      sourceId: 'schema.prisma',
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.diagnostics).toEqual([]);
-    expect(flatPslModels(result.ast)).toHaveLength(2);
-    expect(flatPslEnums(result.ast)).toHaveLength(1);
-    expect(result.ast.types?.declarations).toHaveLength(1);
-    expect(result.ast.span.start.line).toBe(1);
-    expect(result.ast.span.end.line).toBeGreaterThan(1);
-
-    const userModel = flatPslModels(result.ast).find((model) => model.name === 'User');
-    expect(userModel).toBeDefined();
-    const emailField = userModel?.fields.find((field) => field.name === 'email');
-    expect(emailField?.typeRef).toBe('Email');
-    const namedType = result.ast.types?.declarations[0];
-    expect(namedType?.attributes[0]).toMatchObject({
-      kind: 'attribute',
-      target: 'namedType',
-      name: 'db.VarChar',
-      args: [{ kind: 'positional', value: '191' }],
-    });
-
-    const postModel = flatPslModels(result.ast).find((model) => model.name === 'Post');
-    const relationField = postModel?.fields.find((field) => field.name === 'user');
-    const relationAttribute = relationField?.attributes.find(
-      (attribute) => attribute.name === 'relation',
-    );
-    expect(relationAttribute).toMatchObject({
-      kind: 'attribute',
-      target: 'field',
-      name: 'relation',
-      args: [
-        { kind: 'named', name: 'fields', value: '[userId]' },
-        { kind: 'named', name: 'references', value: '[id]' },
-        { kind: 'named', name: 'onDelete', value: 'Cascade' },
-        { kind: 'named', name: 'onUpdate', value: 'SetNull' },
-      ],
-    });
-  });
-
   it('parses namespaced parameterized attributes generically', () => {
     const schema = `
 types {
@@ -380,74 +306,6 @@ model Account {
       name: 'map',
       args: [{ kind: 'positional', value: '"app_accounts"' }],
     });
-  });
-
-  it.skip('parses enum @@map through generic attributes', () => {
-    // TODO(TML-2853-D2): native `@@map` on enum blocks is gone; `enum` now uses
-    // the domain-concept extension-block form. These tests cover deleted behavior.
-    const schema = `
-enum UserRole {
-  USER
-  ADMIN
-  @@map("user_role")
-}
-`;
-
-    const result = parsePslDocument({
-      schema,
-      sourceId: 'schema.prisma',
-    });
-
-    expect(result.ok).toBe(true);
-    const userRole = flatPslEnums(result.ast).find((enumBlock) => enumBlock.name === 'UserRole');
-    expect(userRole?.attributes.find((attribute) => attribute.name === 'map')).toMatchObject({
-      kind: 'attribute',
-      target: 'enum',
-      name: 'map',
-      args: [{ kind: 'positional', value: '"user_role"' }],
-    });
-  });
-
-  it.skip('captures per-member @map storage labels', () => {
-    // TODO(TML-2853-D2): native per-member `@map` is gone; `enum` now uses the
-    // domain-concept extension-block form (= value). These tests cover deleted behavior.
-    const schema = `
-enum Status {
-  inProgress @map("in-progress")
-  _enum @map("enum")
-  done
-}
-`;
-
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
-    expect(result.ok).toBe(true);
-    const status = flatPslEnums(result.ast).find((e) => e.name === 'Status');
-    expect(status?.values.map((v) => ({ name: v.name, mapName: v.mapName }))).toEqual([
-      { name: 'inProgress', mapName: 'in-progress' },
-      { name: '_enum', mapName: 'enum' },
-      { name: 'done', mapName: undefined },
-    ]);
-  });
-
-  it.skip('decodes PSL escape sequences in per-member @map storage labels', () => {
-    // TODO(TML-2853-D2): native per-member `@map` is gone; `enum` now uses the
-    // domain-concept extension-block form (= value). These tests cover deleted behavior.
-    const schema = `
-enum Quoted {
-  hasQuote @map("with \\"quote\\"")
-  hasBackslash @map("with \\\\back")
-  hasNewline @map("line1\\nline2")
-}
-`;
-
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
-    expect(result.ok).toBe(true);
-    const quoted = flatPslEnums(result.ast).find((e) => e.name === 'Quoted');
-    expect(quoted?.values.map((v) => v.mapName)).toEqual([
-      'with "quote"',
-      'with \\back',
-      'line1\nline2',
-    ]);
   });
 
   it('returns diagnostics for malformed attribute syntax', () => {
@@ -818,46 +676,6 @@ model User {
       ]),
     );
   });
-
-  it.skip('returns diagnostics when named types collide with enum names', () => {
-    // TODO(TML-2853-D2): native enum collision detection in the types block
-    // relied on native PslEnum parse. With native parse deleted, `enum Role {}`
-    // without a descriptor produces PSL_UNSUPPORTED_TOP_LEVEL_BLOCK and no
-    // collision is emitted. Revisit when D2 cleans up the types-collision path.
-    const schema = `
-types {
-  Role = String
-}
-
-enum Role {
-  USER
-  ADMIN
-}
-
-model User {
-  id Int @id
-  role Role
-}
-`;
-
-    const result = parsePslDocument({
-      schema,
-      sourceId: 'schema.prisma',
-    });
-
-    expect(result.ok).toBe(false);
-    const messages = result.diagnostics
-      .filter((entry) => entry.code === 'PSL_INVALID_TYPES_MEMBER')
-      .map((entry) => entry.message);
-    expect(messages).toEqual(
-      expect.arrayContaining([expect.stringContaining('conflicts with enum name "Role"')]),
-    );
-
-    const userModel = flatPslModels(result.ast).find((model) => model.name === 'User');
-    const roleField = userModel?.fields.find((field) => field.name === 'role');
-    expect(roleField?.typeName).toBe('Role');
-    expect(roleField?.typeRef).toBeUndefined();
-  });
 });
 
 describe('composite type blocks', () => {
@@ -953,11 +771,7 @@ type Address {
   });
 
   describe('namespace blocks', () => {
-    it.skip('parses a named namespace block and routes declarations into its bucket', () => {
-      // TODO(TML-2853-D2): test uses native `enum Role { ADMIN MEMBER }` inside
-      // a namespace block. Native enum parse is deleted in D1; without a descriptor,
-      // the enum block produces PSL_UNSUPPORTED_TOP_LEVEL_BLOCK, not a PslEnum.
-      // Remove the enum lines (or convert to extension-block form) in D2.
+    it('parses a named namespace block and routes declarations into its bucket', () => {
       const schema = `
 model TopLevel {
   id Int @id
@@ -966,11 +780,6 @@ model TopLevel {
 namespace auth {
   model User {
     id Int @id
-  }
-
-  enum Role {
-    ADMIN
-    MEMBER
   }
 }
 `;
@@ -981,11 +790,9 @@ namespace auth {
 
       const top = result.ast.namespaces.find((ns) => ns.name === '__unspecified__');
       expect(top?.models.map((m) => m.name)).toEqual(['TopLevel']);
-      expect(top?.enums).toEqual([]);
 
       const auth = result.ast.namespaces.find((ns) => ns.name === 'auth');
       expect(auth?.models.map((m) => m.name)).toEqual(['User']);
-      expect(auth?.enums.map((e) => e.name)).toEqual(['Role']);
     });
 
     it('drops the synthesised __unspecified__ bucket when every declaration is namespaced', () => {
@@ -1001,10 +808,7 @@ namespace auth {
       expect(result.ast.namespaces.map((ns) => ns.name)).toEqual(['auth']);
     });
 
-    it.skip('reopens and merges multiple namespace blocks with the same name', () => {
-      // TODO(TML-2853-D2): test uses native `enum Role { ADMIN MEMBER }` in
-      // a re-opened namespace block. Native enum parse is deleted in D1. Convert
-      // to extension-block form or drop the enum lines in D2.
+    it('reopens and merges multiple namespace blocks with the same name', () => {
       const schema = `
 namespace auth {
   model User {
@@ -1013,9 +817,8 @@ namespace auth {
 }
 
 namespace auth {
-  enum Role {
-    ADMIN
-    MEMBER
+  model Post {
+    id Int @id
   }
 }
 `;
@@ -1025,8 +828,7 @@ namespace auth {
       expect(result.ast.namespaces).toHaveLength(1);
       const auth = result.ast.namespaces[0]!;
       expect(auth.name).toBe('auth');
-      expect(auth.models.map((m) => m.name)).toEqual(['User']);
-      expect(auth.enums.map((e) => e.name)).toEqual(['Role']);
+      expect(auth.models.map((m) => m.name)).toEqual(['User', 'Post']);
     });
 
     it('rejects a recursive namespace block as a parse diagnostic', () => {
@@ -1347,34 +1149,6 @@ policy_select ReadPosts {
       expect(nsExtBlocks2).toHaveLength(1);
       expect(nsExtBlocks2[0]?.kind).toBe('test-policy-select');
       expect(nsExtBlocks2[0]?.name).toBe('ReadPosts');
-    });
-
-    it.skip('built-in block parsing is unchanged when pslBlockDescriptors is provided', () => {
-      // TODO(TML-2853-D2): native enum syntax (`enum Role { ... }`) is no longer
-      // built-in — `enum` is now an extension-block keyword. Without a registered
-      // `enum` descriptor, this schema produces a diagnostic. Update once D2 is done.
-      const schema = `
-model User {
-  id Int @id
-  email String @unique
-}
-
-enum Role {
-  ADMIN
-  EDITOR
-}
-`;
-      const result = parsePslDocument({
-        schema,
-        sourceId: 'schema.prisma',
-        pslBlockDescriptors: { policy_select: policySelectDescriptor },
-      });
-
-      expect(result.ok).toBe(true);
-      expect(result.diagnostics).toEqual([]);
-      expect(flatPslModels(result.ast)).toHaveLength(1);
-      expect(flatPslEnums(result.ast)).toHaveLength(1);
-      expect(namespacePslExtensionBlocks(result.ast.namespaces[0]!)).toHaveLength(0);
     });
 
     it('lands extension blocks in the namespace extensionBlocks slot in source order', () => {

@@ -358,7 +358,7 @@ describe('printPsl', () => {
     `);
   });
 
-  it('throws when a model and enum normalize to the same top-level name', () => {
+  it('throws a native-enum diagnostic when a pg/enum@1 annotation is present alongside a table', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {
         user_role: {
@@ -387,13 +387,12 @@ describe('printPsl', () => {
       },
     };
 
-    expect(() => printPslFromSql(schemaIR)).toThrowErrorMatchingInlineSnapshot(`
-      [Error: PSL top-level name collisions detected:
-      - identifier "UserRole" from table "user_role" collides with enum type "user_role"]
-    `);
+    expect(() => printPslFromSql(schemaIR)).toThrow(
+      /contract infer:.*native Postgres enum type.*user_role.*not adoptable/i,
+    );
   });
 
-  it('throws when enum names collide after normalization', () => {
+  it('throws a native-enum diagnostic when multiple pg/enum@1 annotations normalize to the same name', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {},
       annotations: {
@@ -416,9 +415,8 @@ describe('printPsl', () => {
       },
     };
 
-    expect(() => printPslFromSql(schemaIR)).toThrowErrorMatchingInlineSnapshot(`
-      [Error: PSL enum name collisions detected:
-      - enum "UserRole" from enum types "user_role", "UserRole"]
-    `);
+    expect(() => printPslFromSql(schemaIR)).toThrow(
+      /contract infer:.*native Postgres enum type.*not adoptable/i,
+    );
   });
 });

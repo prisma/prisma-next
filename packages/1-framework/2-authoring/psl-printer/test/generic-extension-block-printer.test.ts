@@ -27,7 +27,6 @@ import {
   extractCodecLookup,
 } from '@prisma-next/framework-components/control';
 import type {
-  PslEnum,
   PslExtensionBlock,
   PslExtensionBlockParamList,
   PslExtensionBlockParamOption,
@@ -103,11 +102,11 @@ const STUB_SPAN = {
   end: { offset: 1, line: 1, column: 2 },
 } as const;
 
-function makeNs(models: PslModel[], enums: PslEnum[], extensionBlocks: PslExtensionBlock[]) {
+function makeNs(models: PslModel[], extensionBlocks: PslExtensionBlock[]) {
   return makePslNamespace({
     kind: 'namespace',
     name: UNSPECIFIED_PSL_NAMESPACE_ID,
-    entries: makePslNamespaceEntries(models, enums, [], extensionBlocks),
+    entries: makePslNamespaceEntries(models, [], extensionBlocks),
     span: STUB_SPAN,
   });
 }
@@ -150,7 +149,7 @@ describe('generic extension-block printer (P2)', () => {
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [makeNs([], [], [block])],
+        namespaces: [makeNs([], [block])],
         span: STUB_SPAN,
       };
 
@@ -181,7 +180,7 @@ describe('generic extension-block printer (P2)', () => {
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [makeNs([], [], [block])],
+        namespaces: [makeNs([], [block])],
         span: STUB_SPAN,
       };
 
@@ -259,7 +258,7 @@ describe('generic extension-block printer (P2)', () => {
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [makeNs([], [], [block])],
+        namespaces: [makeNs([], [block])],
         span: STUB_SPAN,
       };
       return printPslFromAst(ast, {
@@ -291,7 +290,7 @@ describe('generic extension-block printer (P2)', () => {
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [makeNs([], [], [block])],
+        namespaces: [makeNs([], [block])],
         span: STUB_SPAN,
       };
       const emptyCodecLookup = extractCodecLookup([]);
@@ -324,7 +323,7 @@ describe('generic extension-block printer (P2)', () => {
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [makeNs([], [], [block])],
+        namespaces: [makeNs([], [block])],
         span: STUB_SPAN,
       };
 
@@ -355,7 +354,7 @@ describe('generic extension-block printer (P2)', () => {
       return {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [makeNs([], [], [block])],
+        namespaces: [makeNs([], [block])],
         span: STUB_SPAN,
       };
     }
@@ -423,7 +422,7 @@ describe('generic extension-block printer (P2)', () => {
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [makeNs([], [], [block])],
+        namespaces: [makeNs([], [block])],
         span: STUB_SPAN,
       };
 
@@ -469,52 +468,13 @@ describe('generic extension-block printer (P2)', () => {
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [makeNs(models, [], [])],
+        namespaces: [makeNs(models, [])],
         span: STUB_SPAN,
       };
 
       const output = printPslFromAst(ast);
       expect(output).toContain('model Post {');
       expect(output).toContain('id Int @id');
-    });
-
-    it.skip('prints an enum with values unchanged', () => {
-      // TODO(TML-2853-D2): native PslEnum type is going away; printer no longer serializes enum blocks.
-      const enums: PslEnum[] = [
-        {
-          kind: 'enum',
-          name: 'Role',
-          values: [
-            {
-              kind: 'enumValue',
-              name: 'ADMIN',
-              span: STUB_SPAN,
-              attributes: [],
-              mapName: undefined,
-            },
-            {
-              kind: 'enumValue',
-              name: 'USER',
-              span: STUB_SPAN,
-              attributes: [],
-              mapName: undefined,
-            },
-          ],
-          attributes: [],
-          span: STUB_SPAN,
-        },
-      ];
-      const ast = {
-        kind: 'document' as const,
-        sourceId: 'test',
-        namespaces: [makeNs([], enums, [])],
-        span: STUB_SPAN,
-      };
-
-      const output = printPslFromAst(ast);
-      expect(output).toContain('enum Role {');
-      expect(output).toContain('ADMIN');
-      expect(output).toContain('USER');
     });
   });
 });

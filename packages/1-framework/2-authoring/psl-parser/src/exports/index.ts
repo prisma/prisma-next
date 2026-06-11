@@ -34,7 +34,6 @@ export type {
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
 export {
-  flatPslEnums,
   flatPslModels,
   namespacePslExtensionBlocks,
 } from '@prisma-next/framework-components/psl-ast';

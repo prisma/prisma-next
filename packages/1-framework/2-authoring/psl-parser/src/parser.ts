@@ -334,12 +334,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       makePslNamespace({
         kind: 'namespace',
         name,
-        entries: makePslNamespaceEntries(
-          normalizedModels,
-          [],
-          acc.compositeTypes,
-          acc.extensionBlocks,
-        ),
+        entries: makePslNamespaceEntries(normalizedModels, acc.compositeTypes, acc.extensionBlocks),
         span: acc.span ?? documentSpan,
       }),
     );

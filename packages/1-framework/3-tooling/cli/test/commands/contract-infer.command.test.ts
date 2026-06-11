@@ -62,7 +62,7 @@ function buildSyntheticUserAst(): PslDocumentAst {
       makePslNamespace({
         kind: 'namespace',
         name: UNSPECIFIED_PSL_NAMESPACE_ID,
-        entries: makePslNamespaceEntries([userModel], [], [], []),
+        entries: makePslNamespaceEntries([userModel], [], []),
         span: SYNTHETIC_SPAN,
       }),
     ],
@@ -361,7 +361,7 @@ describe('createContractInferCommand', () => {
         makePslNamespace({
           kind: 'namespace',
           name: UNSPECIFIED_PSL_NAMESPACE_ID,
-          entries: makePslNamespaceEntries([], [], [], [policySelectBlock]),
+          entries: makePslNamespaceEntries([], [], [policySelectBlock]),
           span: SYNTHETIC_SPAN,
         }),
       ],

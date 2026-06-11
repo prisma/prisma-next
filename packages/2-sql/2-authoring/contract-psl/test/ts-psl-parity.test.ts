@@ -337,12 +337,6 @@ function buildPostgresTimestampTsContract() {
 }
 
 describe('TS and PSL authoring parity', () => {
-  it.skip('lowers the same representative contract to identical output', () => {
-    // TODO(TML-2853-D2): representativePslSchema uses native `enum Role { USER ADMIN }`
-    // syntax. Both the PSL and TS authoring paths for native enums are being deleted.
-    // Rewrite this test for the domain-concept form (enumType + member) in D2.
-  });
-
   it('keeps the contract DSL within the terseness threshold for the same contract', () => {
     const pslLines = countSemanticLines(representativePslSchema);
     const tsLines = countSemanticLines(representativeTsAuthoring);
