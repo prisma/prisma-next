@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { postgresAdapterDescriptorMeta } from '../src/core/descriptor-meta';
 
+const storage = postgresAdapterDescriptorMeta.types.storage;
+
 type ExpandFn = (input: { nativeType: string; typeParams?: Record<string, unknown> }) => string;
 type HooksMap = Record<string, { expandNativeType: ExpandFn }>;
 
@@ -161,5 +163,35 @@ describe('expandNativeType hooks via descriptor-meta', () => {
         expand({ nativeType: 'numeric', typeParams: { precision: 10, scale: 1.5 } }),
       ).toThrow('Invalid "scale" type parameter');
     });
+  });
+
+  describe('identityHooks', () => {
+    const identityCodecIds = ['pg/json@1', 'pg/jsonb@1', 'pg/bytea@1', 'pg/uuid@1'] as const;
+
+    for (const codecId of identityCodecIds) {
+      it(`${codecId} returns nativeType unchanged`, () => {
+        const expand = hooks[codecId]!.expandNativeType;
+        expect(expand({ nativeType: 'uuid' })).toBe('uuid');
+        expect(expand({ nativeType: 'uuid', typeParams: {} })).toBe('uuid');
+      });
+    }
+  });
+});
+
+describe('storage entries', () => {
+  it('includes pg/uuid@1 with nativeType uuid', () => {
+    expect(storage).toEqual(
+      expect.arrayContaining([
+        { typeId: 'pg/uuid@1', familyId: 'sql', targetId: 'postgres', nativeType: 'uuid' },
+      ]),
+    );
+  });
+
+  it('includes pg/bytea@1 with nativeType bytea', () => {
+    expect(storage).toEqual(
+      expect.arrayContaining([
+        { typeId: 'pg/bytea@1', familyId: 'sql', targetId: 'postgres', nativeType: 'bytea' },
+      ]),
+    );
   });
 });

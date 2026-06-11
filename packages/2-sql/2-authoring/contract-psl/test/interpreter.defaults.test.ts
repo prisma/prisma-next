@@ -121,6 +121,73 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     });
   });
 
+  it('accepts uuid() and uuid(7) defaults on @db.Uuid columns', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  UuidNativeId = String @db.Uuid
+}
+
+model UuidNative {
+  idV4 UuidNativeId @id @default(uuid())
+  idV7 UuidNativeId @default(uuid(7))
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.execution).toMatchObject({
+      mutations: {
+        defaults: expect.arrayContaining([
+          {
+            ref: { table: 'uuidNative', column: 'idV4' },
+            onCreate: { kind: 'generator', id: 'uuidv4' },
+          },
+          {
+            ref: { table: 'uuidNative', column: 'idV7' },
+            onCreate: { kind: 'generator', id: 'uuidv7' },
+          },
+        ]),
+      },
+    });
+  });
+
+  it('rejects non-uuid generators on @db.Uuid columns with PSL_INVALID_DEFAULT_APPLICABILITY', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  UuidNativeId = String @db.Uuid
+}
+
+model UuidNativeBad {
+  id UuidNativeId @id @default(nanoid())
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+          sourceId: 'schema.prisma',
+          message: expect.stringContaining('nanoid'),
+        }),
+      ]),
+    );
+  });
+
   it('returns diagnostics for unsupported default functions and invalid arguments', () => {
     const document = parsePslDocument({
       schema: `model InvalidDefaults {

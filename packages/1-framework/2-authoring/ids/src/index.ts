@@ -57,14 +57,14 @@ const builtinGeneratorMetadataById = {
     resolveGeneratedColumnDescriptor: resolveNanoidColumnDescriptor,
   },
   uuidv7: {
-    applicableCodecIds: ['pg/text@1', 'sql/char@1'],
+    applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'],
     generatedColumnDescriptor: {
       type: { codecId: 'sql/char@1', nativeType: 'character' },
       typeParams: { length: 36 },
     },
   },
   uuidv4: {
-    applicableCodecIds: ['pg/text@1', 'sql/char@1'],
+    applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'],
     generatedColumnDescriptor: {
       type: { codecId: 'sql/char@1', nativeType: 'character' },
       typeParams: { length: 36 },

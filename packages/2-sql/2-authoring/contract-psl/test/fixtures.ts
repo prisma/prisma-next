@@ -438,7 +438,7 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
     generatorDescriptors: [
       {
         id: 'uuidv4',
-        applicableCodecIds: ['pg/text@1', 'sql/char@1'],
+        applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'],
         resolveGeneratedColumnDescriptor: ({ generated }) =>
           generated.kind === 'generator' && generated.id === 'uuidv4'
             ? { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 36 } }
@@ -446,7 +446,7 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
       },
       {
         id: 'uuidv7',
-        applicableCodecIds: ['pg/text@1', 'sql/char@1'],
+        applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'],
         resolveGeneratedColumnDescriptor: ({ generated }) =>
           generated.kind === 'generator' && generated.id === 'uuidv7'
             ? { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 36 } }
