@@ -7,7 +7,7 @@ export const sqlFamilyPslBlockDescriptors = {
     discriminator: 'enum2',
     name: { required: true },
     parameters: {},
-    allowAdditionalParameters: true,
+    variadicParameters: true,
     interpreterLowered: true,
   },
 } as const satisfies AuthoringPslBlockDescriptorNamespace;

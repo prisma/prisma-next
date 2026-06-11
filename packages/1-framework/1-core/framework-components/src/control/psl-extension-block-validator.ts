@@ -107,7 +107,7 @@ export function validateExtensionBlock(
   const nodeKeys = new Set(Object.keys(node.parameters));
 
   // 1. Unknown parameters — keys in the node not in the descriptor.
-  if (!descriptor.allowAdditionalParameters) {
+  if (!descriptor.variadicParameters) {
     for (const key of nodeKeys) {
       if (!descriptorKeys.has(key)) {
         const captured = node.parameters[key];

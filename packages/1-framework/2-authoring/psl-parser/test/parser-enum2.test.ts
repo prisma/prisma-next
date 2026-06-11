@@ -13,7 +13,7 @@ const enum2Descriptor = {
   discriminator: 'enum2',
   name: { required: true },
   parameters: {},
-  allowAdditionalParameters: true,
+  variadicParameters: true,
 };
 
 const pslBlockDescriptors = { enum2: enum2Descriptor };
@@ -278,6 +278,34 @@ enum2 Priority {
     );
     const priority = flatEnum2s(result.ast.namespaces)[0];
     expect(priority?.parameters['Low']).toMatchObject({ kind: 'value', raw: '"low"' });
+  });
+
+  it('emits PSL_INVALID_EXTENSION_BLOCK_MEMBER when a declared parameter is used bare (without = value)', () => {
+    const descriptorWithDeclaredParam = {
+      kind: 'pslBlock' as const,
+      keyword: 'enum2',
+      discriminator: 'enum2',
+      name: { required: true },
+      parameters: { type: { kind: 'value' as const, required: true } },
+      variadicParameters: true,
+    };
+    const schema = `
+enum2 Priority {
+  type
+  Low = "low"
+}
+`;
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+      pslBlockDescriptors: { enum2: descriptorWithDeclaredParam },
+    });
+
+    expect(result.diagnostics.some((d) => d.code === 'PSL_INVALID_EXTENSION_BLOCK_MEMBER')).toBe(
+      true,
+    );
+    const priority = flatEnum2s(result.ast.namespaces)[0];
+    expect(priority?.parameters['type']).toBeUndefined();
   });
 
   it('emits PSL_UNSUPPORTED_TOP_LEVEL_BLOCK when pslBlockDescriptors is omitted', () => {

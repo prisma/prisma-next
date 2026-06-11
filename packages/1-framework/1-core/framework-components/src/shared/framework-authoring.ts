@@ -187,15 +187,20 @@ export interface AuthoringPslBlockDescriptor {
   readonly name: { readonly required: boolean };
   readonly parameters: Record<string, PslBlockParam>;
   /**
-   * When `true`, the generic validator does not emit
-   * `PSL_EXTENSION_UNKNOWN_PARAMETER` for keys absent from `parameters`.
-   * Unknown parameters are still captured as raw-value stubs by the parser
-   * — the consuming interpreter is responsible for validating them.
+   * When `true`, the block body accepts a variadic tail of parameters beyond
+   * the declared set. The block body may contain: fields (model-style),
+   * `key = value` parameters, and `@@` attributes. With `variadicParameters`,
+   * bare identifiers (keys without a `= value`) and undeclared `key = value`
+   * pairs flow into the variadic tail — their semantics belong to the
+   * lowering, not the parser.
    *
-   * Use this for blocks whose parameter keys are user-defined (e.g. enum
-   * member names), not a fixed set.
+   * A key that IS declared in `parameters` must still be supplied as
+   * `key = value`; a bare occurrence of a declared key is a diagnostic.
+   *
+   * When `false` (default), the validator emits `PSL_EXTENSION_UNKNOWN_PARAMETER`
+   * for keys absent from `parameters`.
    */
-  readonly allowAdditionalParameters?: boolean;
+  readonly variadicParameters?: boolean;
   /**
    * When `true`, this block is lowered by the interpreter (e.g. via a
    * parallel `processXxx` path like `processEnum2Declarations`) rather than

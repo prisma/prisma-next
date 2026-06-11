@@ -1661,7 +1661,9 @@ function parseExtensionBlock(
 
     const bareMatch = line.match(/^([A-Za-z_]\w*)$/);
     if (bareMatch) {
-      if (!descriptor.allowAdditionalParameters) {
+      const key = bareMatch[1] ?? '';
+
+      if (!descriptor.variadicParameters) {
         pushDiagnostic(context, {
           code: 'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
           message: `Invalid extension block body line "${line}"; expected "key = value" or "@@attribute"`,
@@ -1670,7 +1672,14 @@ function parseExtensionBlock(
         continue;
       }
 
-      const key = bareMatch[1] ?? '';
+      if (Object.hasOwn(descriptor.parameters, key)) {
+        pushDiagnostic(context, {
+          code: 'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
+          message: `Parameter "${key}" in "${descriptor.keyword}" block "${blockName}" is declared in the descriptor and must be supplied as "${key} = value"`,
+          span: createTrimmedLineSpan(context, lineIndex),
+        });
+        continue;
+      }
 
       if (Object.hasOwn(parameters, key)) {
         pushDiagnostic(context, {
@@ -1702,8 +1711,10 @@ function parseExtensionBlock(
 }
 
 /**
- * Parses a `@@name(args…)` block-attribute line inside an extension block.
- * Returns undefined (and emits a diagnostic) on malformed syntax.
+ * Parses a `@@name(args…)` block-attribute line inside an extension block
+ * using the shared block-attribute tokeniser (`extractAttributeTokensWithSpans`
+ * + `parseAttributeToken`).  Returns undefined (and emits a diagnostic) on
+ * malformed syntax.
  */
 function parseExtensionBlockAttribute(
   context: ParserContext,
@@ -1711,14 +1722,10 @@ function parseExtensionBlockAttribute(
   lineIndex: number,
 ): PslExtensionBlockAttribute | undefined {
   const rawLine = context.lines[lineIndex] ?? '';
-  const atCol = firstNonWhitespaceColumn(rawLine);
+  const startCol = firstNonWhitespaceColumn(rawLine);
 
-  const body = line.slice(2);
-  const openParen = body.indexOf('(');
-  const closeParen = body.lastIndexOf(')');
-
-  const name = (openParen >= 0 ? body.slice(0, openParen) : body).trim();
-  if (!/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name)) {
+  const tokenParse = extractAttributeTokensWithSpans(context, lineIndex, line, startCol);
+  if (!tokenParse.ok || tokenParse.tokens.length !== 1) {
     pushDiagnostic(context, {
       code: 'PSL_INVALID_EXTENSION_BLOCK_ATTRIBUTE',
       message: `Invalid extension block attribute "${line}"`,
@@ -1726,45 +1733,23 @@ function parseExtensionBlockAttribute(
     });
     return undefined;
   }
-
-  const args: PslExtensionBlockAttributeArg[] = [];
-
-  if (openParen >= 0) {
-    if (closeParen < openParen || closeParen !== body.length - 1) {
-      pushDiagnostic(context, {
-        code: 'PSL_INVALID_EXTENSION_BLOCK_ATTRIBUTE',
-        message: `Invalid extension block attribute "${line}"`,
-        span: createTrimmedLineSpan(context, lineIndex),
-      });
-      return undefined;
-    }
-    const argsInner = body.slice(openParen + 1, closeParen);
-    const argsRaw = argsInner.trim();
-    if (argsRaw.length > 0) {
-      const leadingWs = argsInner.length - argsInner.trimStart().length;
-      for (const segment of splitTopLevelSegments(argsRaw, ',')) {
-        const argText = segment.value.trim();
-        if (argText.length > 0) {
-          const argLeadingWs = segment.value.length - segment.value.trimStart().length;
-          const argStart = atCol + 2 + openParen + 1 + leadingWs + segment.start + argLeadingWs;
-          const argEnd = argStart + argText.length;
-          args.push({
-            kind: 'positional',
-            value: argText,
-            span: createInlineSpan(context, lineIndex, argStart, argEnd),
-          });
-        }
-      }
-    }
+  const token = tokenParse.tokens[0];
+  if (!token) {
+    return undefined;
   }
-
-  const attrStart = atCol;
-  const attrEnd = atCol + line.length;
-  return {
-    name,
-    args,
-    span: createInlineSpan(context, lineIndex, attrStart, attrEnd),
-  };
+  const parsed = parseAttributeToken(context, {
+    token: token.text,
+    target: 'model',
+    lineIndex,
+    span: token.span,
+  });
+  if (!parsed) {
+    return undefined;
+  }
+  const args: PslExtensionBlockAttributeArg[] = parsed.args
+    .filter((a): a is PslAttributeArgument & { kind: 'positional' } => a.kind === 'positional')
+    .map((a) => ({ kind: 'positional' as const, value: a.value, span: a.span }));
+  return { name: parsed.name, args, span: parsed.span };
 }
 
 /**

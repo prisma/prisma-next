@@ -68,7 +68,7 @@ const enum2PslBlockDescriptor = {
   discriminator: 'enum2',
   name: { required: true },
   parameters: {},
-  allowAdditionalParameters: true,
+  variadicParameters: true,
 };
 
 const authoringContributions = {
