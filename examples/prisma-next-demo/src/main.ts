@@ -508,9 +508,16 @@ async function main() {
     } else if (cmd === 'enum-priority-filter') {
       const [memberName, limitStr] = args;
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
-      const member = (memberName ?? 'Low') as 'Low' | 'High' | 'Urgent';
-      const posts = await getPostsByPriorityMember(member, limit);
-      console.log(`Posts with priority=${member} (${posts.length} rows):`);
+      const priorityEnum = getPriorityEnumFromEmit();
+      const requested = memberName ?? 'Low';
+      if (!priorityEnum.names.includes(requested)) {
+        console.error(
+          `Unknown Priority member "${requested}" — expected one of: ${priorityEnum.names.join(', ')}`,
+        );
+        process.exit(1);
+      }
+      const posts = await getPostsByPriorityMember(requested, limit);
+      console.log(`Posts with priority=${requested} (${posts.length} rows):`);
       console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'guardrail-delete') {
       console.log('Running DELETE without WHERE to demonstrate AST-based lint guardrail...');

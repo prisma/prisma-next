@@ -82,7 +82,7 @@ export const sqlFamilyEnum2EntityDescriptor = {
         let value: unknown;
         if (paramValue.kind === 'bare') {
           try {
-            value = codec.decodeJson(memberName as unknown as JsonValue);
+            value = codec.decodeJson(memberName);
           } catch {
             diagnostics?.push({
               code: 'PSL_ENUM2_BARE_MEMBER_NON_STRING_CODEC',
