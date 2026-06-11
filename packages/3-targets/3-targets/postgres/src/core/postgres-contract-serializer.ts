@@ -20,7 +20,7 @@ import {
   type SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { PostgresEnumTypeSchema } from '@prisma-next/sql-contract/validators';
-import { blindCast } from '@prisma-next/utils/casts';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { Type } from 'arktype';
 import { postgresAuthoringEntityTypes } from './authoring';
@@ -76,7 +76,7 @@ function collectStorageTypesHydrators(
 const POSTGRES_VALIDATOR_REGISTRY: ReadonlyMap<string, Type<unknown>> = new Map<
   string,
   Type<unknown>
->([['type', PostgresEnumTypeSchema as Type<unknown>]]);
+>([['type', castAs<Type<unknown>>(PostgresEnumTypeSchema)]]);
 
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   private readonly enumFactory: SqlEntityHydrationFactory | undefined;
@@ -95,12 +95,13 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
         return {};
       }
-      const { enumFactory } = this;
       return Object.fromEntries(
-        Object.entries(innerMap as Record<string, unknown>).map(([name, entry]) => [
+        Object.entries(
+          blindCast<Record<string, unknown>, 'checked object, non-null, non-array above'>(innerMap),
+        ).map(([name, entry]) => [
           name,
           blindCast<PostgresEnumType, 'postgres-enum factory returns PostgresEnumType'>(
-            enumFactory !== undefined ? enumFactory(entry) : entry,
+            this.enumFactory !== undefined ? this.enumFactory(entry) : entry,
           ),
         ]),
       );
@@ -121,7 +122,10 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
 
-    const typeSlot = entries['type'] as Record<string, PostgresEnumType> | undefined;
+    const typeSlot = blindCast<
+      Record<string, PostgresEnumType> | undefined,
+      'hydrateEntriesKind populates entries[type] with PostgresEnumType instances'
+    >(entries['type']);
     const valueSetSlot = entries['valueSet'];
     const hasValueSets = valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0;
     const tableSlot = entries['table'] ?? {};

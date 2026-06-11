@@ -7,7 +7,7 @@ import {
 } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { blindCast } from '@prisma-next/utils/casts';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
 import { buildSqlNamespaceMap } from './ir/build-sql-namespace';
@@ -241,8 +241,8 @@ const StorageTableSchema = type({
 export { PostgresEnumTypeSchema };
 
 const BUILTIN_ENTRY_SCHEMAS: ReadonlyMap<string, Type<unknown>> = new Map<string, Type<unknown>>([
-  ['table', StorageTableSchema as Type<unknown>],
-  ['valueSet', StorageValueSetSchema as Type<unknown>],
+  ['table', castAs<Type<unknown>>(StorageTableSchema)],
+  ['valueSet', castAs<Type<unknown>>(StorageValueSetSchema)],
 ]);
 
 /**
@@ -266,7 +266,10 @@ export function createNamespaceEntrySchema(
       if (typeof rawEntries !== 'object' || rawEntries === null || Array.isArray(rawEntries)) {
         return ctx.mustBe('an object');
       }
-      const entries = rawEntries as Record<string, unknown>;
+      const entries = blindCast<
+        Record<string, unknown>,
+        'checked object, non-null, non-array above'
+      >(rawEntries);
       for (const [key, innerMap] of Object.entries(entries)) {
         const entrySchema = BUILTIN_ENTRY_SCHEMAS.get(key) ?? registry.get(key);
         if (entrySchema === undefined) {
@@ -275,7 +278,9 @@ export function createNamespaceEntrySchema(
         if (typeof innerMap !== 'object' || innerMap === null || Array.isArray(innerMap)) {
           return ctx.reject({ expected: `entries["${key}"] must be an object` });
         }
-        for (const [, value] of Object.entries(innerMap as Record<string, unknown>)) {
+        for (const [, value] of Object.entries(
+          blindCast<Record<string, unknown>, 'checked object, non-null, non-array above'>(innerMap),
+        )) {
           const parsed = entrySchema(value);
           if (parsed instanceof type.errors) {
             return ctx.reject({ expected: parsed.summary });
