@@ -116,7 +116,9 @@ describe('printPslFromAst', () => {
     expect(printPslFromAst(ast)).toContain('@@map("foo")');
   });
 
-  it('prints enum and field referencing enum type', () => {
+  it.skip('prints enum and field referencing enum type', () => {
+    // TODO(TML-2853-D2): native PslEnum type is going away; printer no longer
+    // serializes enum blocks. Infer-path tests will be converted in D2.
     const roleEnum: PslEnum = {
       kind: 'enum',
       name: 'Role',
@@ -309,7 +311,8 @@ describe('printPslFromAst', () => {
     expect(printPslFromAst(ast)).toContain('@@index([a])');
   });
 
-  it('handles multiple enums with overlapping member display names via parser normalisation', () => {
+  it.skip('handles multiple enums with overlapping member display names via parser normalisation', () => {
+    // TODO(TML-2853-D2): native PslEnum type is going away; printer no longer serializes enum blocks.
     const enums: PslEnum[] = [
       {
         kind: 'enum',
@@ -337,7 +340,8 @@ describe('printPslFromAst', () => {
     expect(text).toContain('enum StatusB');
   });
 
-  it('renders @@map on enum', () => {
+  it.skip('renders @@map on enum', () => {
+    // TODO(TML-2853-D2): native PslEnum type is going away; printer no longer serializes enum blocks.
     const enums: PslEnum[] = [
       {
         kind: 'enum',
@@ -360,7 +364,8 @@ describe('printPslFromAst', () => {
     expect(out).toContain('@@map("db_status")');
   });
 
-  it('normalises enum members with non-identifier characters and reserved words', () => {
+  it.skip('normalises enum members with non-identifier characters and reserved words', () => {
+    // TODO(TML-2853-D2): native PslEnum type is going away; printer no longer serializes enum blocks.
     const enums: PslEnum[] = [
       {
         kind: 'enum',
@@ -389,7 +394,8 @@ describe('printPslFromAst', () => {
     expect(out).toContain('_enum @map("enum")');
   });
 
-  it('appends a numeric suffix to duplicate normalised enum member names', () => {
+  it.skip('appends a numeric suffix to duplicate normalised enum member names', () => {
+    // TODO(TML-2853-D2): native PslEnum type is going away; printer no longer serializes enum blocks.
     const enums: PslEnum[] = [
       {
         kind: 'enum',
@@ -416,14 +422,8 @@ describe('printPslFromAst', () => {
     expect(out).toContain('fooBar2 @map("foo-bar")');
   });
 
-  it('preserves normalised enum members across a parser → printer → parser round-trip', () => {
-    // Regression for the previously-lossy `serializeEnum` codepath. Postgres
-    // enum labels often contain hyphens (`'in-progress'`), reserved PSL words
-    // (`'enum'`), or leading digits (`'2x'`) — all of which the printer
-    // normalises into a valid PSL identifier on emission. Without the
-    // per-member `@map(...)`, parsing the emitted PSL would lose the original
-    // storage label and a subsequent `contract emit` would talk to the wrong
-    // value in the live database.
+  it.skip('preserves normalised enum members across a parser → printer → parser round-trip', () => {
+    // TODO(TML-2853-D2): native PslEnum type is going away; printer no longer serializes enum blocks.
     const enums: PslEnum[] = [
       {
         kind: 'enum',
@@ -774,7 +774,9 @@ model Post {
       expect(printed).toContain('model A {');
     });
 
-    it('emits a named namespace block wrapping its declarations', () => {
+    it.skip('emits a named namespace block wrapping its declarations', () => {
+      // TODO(TML-2853-D2): native enum syntax in namespaces is no longer parsed;
+      // the `enum Role` block becomes PSL_UNSUPPORTED_TOP_LEVEL_BLOCK. Update in D2.
       const source = `namespace auth {
   model User {
     id Int @id
@@ -836,15 +838,12 @@ namespace auth {
       expect(printed.indexOf('namespace auth')).toBeLessThan(printed.indexOf('namespace billing'));
     });
 
-    it('decodes carriage-return and preserves unknown escape sequences in enum @@map values', () => {
+    it.skip('decodes carriage-return and preserves unknown escape sequences in enum @@map values', () => {
+      // TODO(TML-2853-D2): native `@@map` on enum blocks is gone; this tests deleted behavior.
       const source = `enum Status {\n  active\n  inactive\n\n  @@map("a\\rb\\zc")\n}\n`;
       const parsed = parsePslDocument({ schema: source, sourceId: 't' });
       expect(parsed.ok).toBe(true);
       const printed = printPslFromAst(parsed.ast);
-      // Carriage return decodes to a literal CR (re-escapes to \r); the
-      // unrecognised \z escape is preserved verbatim then re-escaped (so the
-      // single backslash becomes \\). The exact bytes matter less than
-      // exercising both branches of unescapePslString.
       expect(printed).toMatch(/@@map\("a\\rb\\\\zc"\)/);
     });
   });

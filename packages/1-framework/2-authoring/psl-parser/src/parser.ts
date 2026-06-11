@@ -14,8 +14,6 @@ import type {
   PslDiagnostic,
   PslDiagnosticCode,
   PslDocumentAst,
-  PslEnum,
-  PslEnumValue,
   PslExtensionBlock,
   PslExtensionBlockAttribute,
   PslExtensionBlockAttributeArg,
@@ -82,7 +80,6 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
   interface NamespaceAccumulator {
     name: string;
     models: PslModel[];
-    enums: PslEnum[];
     compositeTypes: PslCompositeType[];
     extensionBlocks: PslExtensionBlock[];
     span: PslSpan | undefined;
@@ -99,7 +96,6 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       acc = {
         name,
         models: [],
-        enums: [],
         compositeTypes: [],
         extensionBlocks: [],
         span: spanIfNew,
@@ -142,21 +138,6 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
             createTrimmedLineSpan(context, lineIndex),
           );
           acc.models.push(parseModelBlock(context, name, bounds));
-        }
-        lineIndex = bounds.endLine + 1;
-        continue;
-      }
-
-      const enumMatch = line.match(/^enum\s+([A-Za-z_]\w*)\s*\{$/);
-      if (enumMatch) {
-        const bounds = findBlockBounds(context, lineIndex);
-        const name = enumMatch[1] ?? '';
-        if (name.length > 0) {
-          const acc = getOrCreateNamespace(
-            currentNamespaceName,
-            createTrimmedLineSpan(context, lineIndex),
-          );
-          acc.enums.push(parseEnumBlock(context, name, bounds));
         }
         lineIndex = bounds.endLine + 1;
         continue;
@@ -268,15 +249,13 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
 
   // Named-type validation: types are document-scoped (one block, outside any
   // namespace), so collision checks compare named-type names against every
-  // model/enum/composite-type in every namespace.
+  // model/composite-type in every namespace.
   const allModels: PslModel[] = [];
-  const allEnums: PslEnum[] = [];
   const allCompositeTypes: PslCompositeType[] = [];
   for (const name of namespaceOrder) {
     const acc = namespacesByName.get(name);
     if (!acc) continue;
     allModels.push(...acc.models);
-    allEnums.push(...acc.enums);
     allCompositeTypes.push(...acc.compositeTypes);
   }
 
@@ -284,7 +263,6 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     (typesBlock?.declarations ?? []).map((declaration) => declaration.name),
   );
   const modelNames = new Set(allModels.map((model) => model.name));
-  const enumNames = new Set(allEnums.map((enumBlock) => enumBlock.name));
   const compositeTypeNames = new Set(allCompositeTypes.map((ct) => ct.name));
   for (const declaration of typesBlock?.declarations ?? []) {
     if (SCALAR_TYPES.has(declaration.name)) {
@@ -299,14 +277,6 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       pushDiagnostic(context, {
         code: 'PSL_INVALID_TYPES_MEMBER',
         message: `Named type "${declaration.name}" conflicts with model name "${declaration.name}"`,
-        span: declaration.span,
-      });
-      continue;
-    }
-    if (enumNames.has(declaration.name)) {
-      pushDiagnostic(context, {
-        code: 'PSL_INVALID_TYPES_MEMBER',
-        message: `Named type "${declaration.name}" conflicts with enum name "${declaration.name}"`,
         span: declaration.span,
       });
     }
@@ -332,7 +302,6 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     if (
       name === UNSPECIFIED_PSL_NAMESPACE_ID &&
       acc.models.length === 0 &&
-      acc.enums.length === 0 &&
       acc.compositeTypes.length === 0 &&
       acc.extensionBlocks.length === 0
     ) {
@@ -350,7 +319,6 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
         if (
           hasRelationAttribute ||
           modelNames.has(field.typeName) ||
-          enumNames.has(field.typeName) ||
           compositeTypeNames.has(field.typeName) ||
           SCALAR_TYPES.has(field.typeName)
         ) {
@@ -368,7 +336,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
         name,
         entries: makePslNamespaceEntries(
           normalizedModels,
-          acc.enums,
+          [],
           acc.compositeTypes,
           acc.extensionBlocks,
         ),
@@ -502,89 +470,6 @@ function parseCompositeTypeBlock(
     attributes,
     span: createLineRangeSpan(context, bounds.startLine, bounds.endLine),
   };
-}
-
-function parseEnumBlock(context: ParserContext, name: string, bounds: BlockBounds): PslEnum {
-  const values: PslEnumValue[] = [];
-  const attributes: PslAttribute[] = [];
-
-  for (let lineIndex = bounds.startLine + 1; lineIndex < bounds.endLine; lineIndex += 1) {
-    const raw = context.lines[lineIndex] ?? '';
-    const line = stripInlineComment(raw).trim();
-    if (line.length === 0) {
-      continue;
-    }
-
-    if (line.startsWith('@@')) {
-      const attribute = parseEnumAttribute(context, line, lineIndex);
-      if (attribute) {
-        attributes.push(attribute);
-      }
-      continue;
-    }
-
-    // An enum member line is the bare member identifier, optionally followed
-    // by a `@map("storage-label")` attribute. The map attribute lets the
-    // printer round-trip enum values whose original storage label is not a
-    // valid PSL identifier (e.g. PostgreSQL enum labels with hyphens).
-    const valueMatch = line.match(/^([A-Za-z_]\w*)(?:\s+@map\(\s*"((?:[^"\\]|\\.)*)"\s*\))?$/);
-    if (!valueMatch) {
-      pushDiagnostic(context, {
-        code: 'PSL_INVALID_ENUM_MEMBER',
-        message: `Invalid enum value declaration "${line}"`,
-        span: createTrimmedLineSpan(context, lineIndex),
-      });
-      continue;
-    }
-
-    const mapName = valueMatch[2] !== undefined ? unescapePslString(valueMatch[2]) : undefined;
-
-    values.push({
-      kind: 'enumValue',
-      name: valueMatch[1] ?? '',
-      ...(mapName !== undefined ? { mapName } : {}),
-      span: createTrimmedLineSpan(context, lineIndex),
-    });
-  }
-
-  return {
-    kind: 'enum',
-    name,
-    values,
-    attributes,
-    span: createLineRangeSpan(context, bounds.startLine, bounds.endLine),
-  };
-}
-
-/**
- * Decode PSL escape sequences (`\\`, `\"`, `\'`, `\n`, `\r`) inside a
- * quoted-literal body. The argument is the body of the literal with the
- * surrounding quotes already stripped by the caller. Mirrors the inverse
- * helper in `@prisma-next/psl-printer`'s `escapePslString` so a string
- * round-trips parser → printer → parser unchanged.
- */
-function unescapePslString(value: string): string {
-  let result = '';
-  for (let i = 0; i < value.length; i++) {
-    const ch = value.charCodeAt(i);
-    if (ch !== 0x5c /* '\\' */ || i + 1 >= value.length) {
-      result += value[i];
-      continue;
-    }
-    const next = value[i + 1];
-    if (next === '\\' || next === '"' || next === "'") {
-      result += next;
-    } else if (next === 'n') {
-      result += '\n';
-    } else if (next === 'r') {
-      result += '\r';
-    } else {
-      result += '\\';
-      result += next;
-    }
-    i++;
-  }
-  return result;
 }
 
 function parseTypesBlock(context: ParserContext, bounds: BlockBounds): PslTypesBlock {
@@ -792,50 +677,6 @@ function parseModelAttribute(
     lineIndex,
     span: token.span,
   });
-}
-
-function parseEnumAttribute(
-  context: ParserContext,
-  line: string,
-  lineIndex: number,
-): PslAttribute | undefined {
-  const rawLine = context.lines[lineIndex] ?? '';
-  const tokenParse = extractAttributeTokensWithSpans(
-    context,
-    lineIndex,
-    line,
-    firstNonWhitespaceColumn(rawLine),
-  );
-  if (!tokenParse.ok || tokenParse.tokens.length !== 1) {
-    pushDiagnostic(context, {
-      code: 'PSL_INVALID_ENUM_MEMBER',
-      message: `Invalid enum value declaration "${line}"`,
-      span: createTrimmedLineSpan(context, lineIndex),
-    });
-    return undefined;
-  }
-  const token = tokenParse.tokens[0];
-  if (!token) {
-    return undefined;
-  }
-  const parsed = parseAttributeToken(context, {
-    token: token.text,
-    target: 'enum',
-    lineIndex,
-    span: token.span,
-  });
-  if (!parsed) {
-    return undefined;
-  }
-  if (parsed.name !== 'map') {
-    pushDiagnostic(context, {
-      code: 'PSL_INVALID_ENUM_MEMBER',
-      message: `Invalid enum value declaration "${line}"`,
-      span: createTrimmedLineSpan(context, lineIndex),
-    });
-    return undefined;
-  }
-  return parsed;
 }
 
 function parseField(context: ParserContext, line: string, lineIndex: number): PslField | undefined {

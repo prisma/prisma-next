@@ -11,14 +11,15 @@ const Priority = enumType(
   member('Urgent', 'urgent'),
 );
 
+const UserType = enumType('user_type', pgText, member('admin', 'admin'), member('user', 'user'));
+
 export const contract = defineContract(
   {
     extensionPacks: { pgvector },
   },
-  ({ enum: enumEntity, field, model, type }) => {
+  ({ field, model, type }) => {
     const types = {
       Embedding1536: type.pgvector.Vector(1536),
-      user_type: enumEntity({ name: 'user_type', values: ['admin', 'user'] as const }),
     } as const;
 
     const User = model('User', {
@@ -27,7 +28,7 @@ export const contract = defineContract(
         email: field.text(),
         createdAt: field.temporal.createdAt(),
         updatedAt: field.temporal.updatedAt(),
-        kind: field.namedType(types.user_type),
+        kind: field.namedType(UserType),
         address: field.json().optional(),
       },
     });
@@ -45,7 +46,7 @@ export const contract = defineContract(
     });
 
     return {
-      enums: { Priority },
+      enums: { Priority, user_type: UserType },
       types,
       models: {
         User: User.relations({

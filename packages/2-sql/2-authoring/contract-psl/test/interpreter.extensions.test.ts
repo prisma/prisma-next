@@ -138,7 +138,8 @@ model Document {
     });
   });
 
-  it('instantiates enum and pgvector descriptors from shared authoring contributions', () => {
+  it.skip('instantiates enum and pgvector descriptors from shared authoring contributions', () => {
+    // TODO(TML-2853-D2): uses native enum syntax (`enum Role { USER ADMIN }`); deleted in D1.
     const document = parsePslDocument({
       schema: `enum Role {
   USER

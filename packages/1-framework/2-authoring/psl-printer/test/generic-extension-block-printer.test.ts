@@ -478,7 +478,8 @@ describe('generic extension-block printer (P2)', () => {
       expect(output).toContain('id Int @id');
     });
 
-    it('prints an enum with values unchanged', () => {
+    it.skip('prints an enum with values unchanged', () => {
+      // TODO(TML-2853-D2): native PslEnum type is going away; printer no longer serializes enum blocks.
       const enums: PslEnum[] = [
         {
           kind: 'enum',

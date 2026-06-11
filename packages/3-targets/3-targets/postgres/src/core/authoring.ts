@@ -12,21 +12,16 @@ export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespa
 
 /**
  * Entity type contributions surface as top-level helpers on the
- * composed-helpers shape (e.g. `helpers.enum({...})`), flattened
+ * composed-helpers shape (e.g. `helpers.enumEntity({...})`), flattened
  * alongside the built-in `model` / `rel` helpers. Pack contributions
  * still ship via the contribution data structure
  * `authoring.entityTypes.<name>`; the composed-helpers template
  * performs the rename in the type system.
  *
- * `enum` is the first real consumer of the entities-namespace mechanism:
- * the factory constructs a `PostgresEnumType` IR-class instance from
- * the user-supplied input. Both authoring runtimes (TS DSL and PSL)
- * dispatch through this single contribution — PSL `enum Status { … }`
- * declarations are lowered by the interpreter into a factory call
- * with the parsed name + value list; TS DSL `helpers.enum({...})`
- * resolves through the same path. Removing this contribution makes
- * both surfaces fail with a "no entity helper named `enum`" type
- * error at the contract-definition site.
+ * `enumEntity` is the native-postgres enum builder (CREATE TYPE … AS ENUM).
+ * It is renamed from `enum` in D1 (TML-2853) because the SQL family now
+ * claims `enum` for the domain-concept enum type (enumType/pg-text@1 form).
+ * This native helper and its `PostgresEnumType` backing are deleted in D2.
  */
 /**
  * The factory constructs a `PostgresEnumType` instance natively — the
@@ -41,7 +36,7 @@ export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespa
  * separable refinement and lives outside this PR.
  */
 export const postgresAuthoringEntityTypes = {
-  enum: {
+  enumEntity: {
     kind: 'entity',
     discriminator: 'postgres-enum',
     validatorSchema: PostgresEnumTypeSchema,

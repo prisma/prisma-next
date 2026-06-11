@@ -36,7 +36,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:372f890816e6e404f2365d11fca59175fa4e79ba84125ab08ca71c4561cf4581'>;
+  StorageHashBase<'sha256:1a02eed4ad52f589641c1e16b929427e1060acc6bc1e9cc4e3b6e663523f88b4'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e'>;
 export type ProfileHash =
@@ -127,7 +127,7 @@ export type FieldInputTypes = {
     readonly email: CodecTypes['pg/text@1']['input'];
     readonly displayName: CodecTypes['pg/text@1']['input'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
-    readonly kind: CodecTypes['pg/enum@1']['input'];
+    readonly kind: 'admin' | 'user';
     readonly address: AddressInput | null;
   };
 };
@@ -379,10 +379,9 @@ type ContractBase = Omit<
                     readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
                   };
                   readonly kind: {
-                    readonly nativeType: 'user_type';
-                    readonly codecId: 'pg/enum@1';
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
                     readonly nullable: false;
-                    readonly typeRef: 'user_type';
                   };
                   readonly address: {
                     readonly nativeType: 'jsonb';
@@ -396,15 +395,7 @@ type ContractBase = Omit<
                 foreignKeys: readonly [];
               };
             };
-            readonly type: {
-              readonly user_type: {
-                readonly kind: 'postgres-enum';
-                readonly name: 'user_type';
-                readonly nativeType: 'user_type';
-                readonly codecId: 'pg/enum@1';
-                readonly values: readonly ['admin', 'user'];
-              };
-            };
+            readonly type: Record<string, never>;
           };
         };
       };
@@ -605,7 +596,7 @@ type ContractBase = Omit<
           };
           readonly kind: {
             readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/enum@1' };
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
           };
           readonly address: {
             readonly nullable: true;
@@ -844,7 +835,7 @@ type ContractBase = Omit<
               };
               readonly kind: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/enum@1' };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly address: {
                 readonly nullable: true;
@@ -906,6 +897,13 @@ type ContractBase = Omit<
           };
         };
         readonly enum: {
+          readonly user_type: {
+            readonly codecId: 'pg/text@1';
+            readonly members: readonly [
+              { readonly name: 'admin'; readonly value: 'admin' },
+              { readonly name: 'user'; readonly value: 'user' },
+            ];
+          };
           readonly Priority: {
             readonly codecId: 'pg/text@1';
             readonly members: readonly [

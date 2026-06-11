@@ -195,16 +195,10 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
         pgvector: pgvectorPack,
       },
     },
-    ({ enum: enumEntity, type, field, model }) => {
-      // `enum` preserves runtime semantics, but its declarative
-      // type-narrowing (literal tuple capture for `values`) is
-      // constrained by the family-shared
-      // `EntityHelperFunction<Descriptor>` shape — the helper signature
-      // bakes in the descriptor-level factory generic-defaults
-      // (`string` / `readonly string[]`) instead of forwarding fresh
-      // generics. Sharpening `EntityHelperFunction` to forward
-      // descriptor-level generics is a separable cross-family
-      // entities-mechanism refinement and is not gated by M4.
+    ({ enumEntity, type, field, model }) => {
+      // `enumEntity` is the postgres-native enum builder (CREATE TYPE … AS ENUM).
+      // Renamed from `enum` in D1 (TML-2853) because `enum` is now the domain
+      // concept (SQL family). Deleted in D2 along with PostgresEnumType.
       const Role = enumEntity({ name: 'role', values: ['USER', 'ADMIN'] as const });
       const Embedding = type.pgvector.Vector(1536);
 
@@ -275,7 +269,7 @@ test('integrated callback authoring hides extension namespaces when packs are ab
       family: sqlFamilyPack,
       target: postgresPack,
     },
-    ({ enum: enumEntity, type }) => {
+    ({ enumEntity, type }) => {
       enumEntity({ name: 'role', values: ['USER'] as const });
 
       if (typecheckOnly) {
