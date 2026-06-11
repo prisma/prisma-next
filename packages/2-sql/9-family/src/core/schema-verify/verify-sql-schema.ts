@@ -487,10 +487,10 @@ function verifySchemaTables(options: {
 
   if (strict) {
     for (const tableName of Object.keys(schemaTables)) {
-      const claimed = namespaceIds.some((namespaceId) => {
-        const ns = contract.storage.namespaces[namespaceId];
-        return ns !== undefined && (ns.entries.table ?? {})[tableName] !== undefined;
-      });
+      const claimed = namespaceIds.some(
+        (namespaceId) =>
+          contract.storage.namespaces[namespaceId]?.entries.table?.[tableName] !== undefined,
+      );
       if (!claimed) {
         const extraTableControlPolicy = effectiveControlPolicy(undefined, contractDefaultControl);
         const issue: SchemaIssue = {
