@@ -51,9 +51,17 @@ export class SqliteDatabase extends NamespaceBase {
       if (kind === 'table') {
         const tableMap: Record<string, StorageTable> = {};
         for (const [name, v] of Object.entries(
-          rawMap as Record<string, StorageTable | StorageTableInput>,
+          blindCast<
+            Record<string, StorageTable | StorageTableInput>,
+            'entries[table] holds StorageTable or StorageTableInput by construction'
+          >(rawMap),
         )) {
-          tableMap[name] = v instanceof StorageTable ? v : new StorageTable(v as StorageTableInput);
+          tableMap[name] =
+            v instanceof StorageTable
+              ? v
+              : new StorageTable(
+                  blindCast<StorageTableInput, 'table entry is StorageTableInput'>(v),
+                );
         }
         builtEntries['table'] = Object.freeze(tableMap);
       } else {

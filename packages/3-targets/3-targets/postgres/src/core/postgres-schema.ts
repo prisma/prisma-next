@@ -103,7 +103,12 @@ export class PostgresSchema extends NamespaceBase {
           vsMap[name] =
             v instanceof StorageValueSet
               ? v
-              : new StorageValueSet({ kind: 'valueSet', values: v.values });
+              : new StorageValueSet(
+                  blindCast<
+                    StorageValueSetInput,
+                    'valueSet entry is StorageValueSetInput by construction'
+                  >(v),
+                );
         }
         builtEntries['valueSet'] = Object.freeze(vsMap);
       } else {
@@ -291,7 +296,10 @@ export function postgresCreateNamespace(
     id: input.id,
     entries: {
       table: inputTable,
-      type: (enumTypes ?? {}) as Record<string, PostgresEnumTypeInput>,
+      type: blindCast<
+        Record<string, PostgresEnumTypeInput>,
+        'enumTypes values are PostgresEnumTypeInput by construction'
+      >(enumTypes ?? {}),
       ...(inputValueSet !== undefined ? { valueSet: inputValueSet } : {}),
     },
   };
