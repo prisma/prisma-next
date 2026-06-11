@@ -721,7 +721,7 @@ function createAdapterHooksComponent(): TargetBoundComponentDescriptor<'sql', st
         controlPlaneHooks: {
           'sql/char@1': parameterizedTypeHooks,
           'pg/timestamptz@1': parameterizedTypeHooks,
-          'pg/enum@1': enumHooks,
+          'app/test-type@1': enumHooks,
         },
       },
     },
@@ -744,7 +744,7 @@ const DEMO_BASE_TABLES = {
       }),
       kind: col({
         nativeType: 'user_type',
-        codecId: 'pg/enum@1',
+        codecId: 'app/test-type@1',
         typeRef: 'user_type',
       }),
     },
@@ -801,7 +801,7 @@ const DEMO_BASE_STORAGE: SqlStorageInput = {
   types: {
     user_type: {
       kind: 'codec-instance',
-      codecId: 'pg/enum@1',
+      codecId: 'app/test-type@1',
       nativeType: 'user_type',
       typeParams: { values: ['admin', 'user'] },
     },
@@ -939,7 +939,7 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
     const storageTypes = pgAnnotations?.['storageTypes'] as Record<string, unknown> | undefined;
     expect(storageTypes).toBeDefined();
     expect(storageTypes?.['user_type']).toMatchObject({
-      codecId: 'pg/enum@1',
+      codecId: 'app/test-type@1',
       nativeType: 'user_type',
     });
   });

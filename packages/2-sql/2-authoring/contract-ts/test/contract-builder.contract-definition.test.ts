@@ -23,7 +23,7 @@ describe('shared contract definition lowering', () => {
       storageTypes: {
         Role: {
           kind: 'codec-instance',
-          codecId: 'pg/enum@1',
+          codecId: 'app/test-enum@1',
           nativeType: 'role',
           typeParams: { values: ['USER', 'ADMIN'] },
         },
@@ -48,7 +48,7 @@ describe('shared contract definition lowering', () => {
               fieldName: 'role',
               columnName: 'role',
               descriptor: {
-                codecId: 'pg/enum@1',
+                codecId: 'app/test-enum@1',
                 nativeType: 'role',
                 typeRef: 'Role',
               },
@@ -143,7 +143,7 @@ describe('shared contract definition lowering', () => {
 
     expect(documentScopedTypes(contract)?.['Role']).toEqual({
       kind: 'codec-instance',
-      codecId: 'pg/enum@1',
+      codecId: 'app/test-enum@1',
       nativeType: 'role',
       typeParams: { values: ['USER', 'ADMIN'] },
     });

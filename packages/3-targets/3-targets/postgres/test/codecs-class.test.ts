@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
-  PG_ENUM_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
   PG_FLOAT8_CODEC_ID,
   PG_INT2_CODEC_ID,
@@ -23,7 +22,6 @@ import {
 import {
   pgBitDescriptor,
   pgBoolDescriptor,
-  pgEnumDescriptor,
   pgFloat4Descriptor,
   pgFloat8Descriptor,
   pgInt2Descriptor,
@@ -290,25 +288,6 @@ describe('codecs-class', () => {
     });
   });
 
-  describe('pg/enum@1', () => {
-    const codec = pgEnumDescriptor.factory({ values: ['red', 'green', 'blue'] })(instanceCtx);
-
-    it('id proxies through the descriptor', () => {
-      expect(codec.id).toBe(PG_ENUM_CODEC_ID);
-    });
-
-    it('round-trips string variants verbatim', async () => {
-      expect(await codec.encode('red', callCtx)).toBe('red');
-      expect(await codec.decode('green', callCtx)).toBe('green');
-    });
-
-    it("renderOutputType returns 'a' | 'b' | 'c' literal union", () => {
-      expect(pgEnumDescriptor.renderOutputType?.({ values: ['red', 'green', 'blue'] })).toBe(
-        "'red' | 'green' | 'blue'",
-      );
-    });
-  });
-
   describe('pg/json@1', () => {
     const codec = pgJsonDescriptor.factory()(instanceCtx);
 
@@ -385,7 +364,6 @@ describe('codecs-class', () => {
       expect(pgBitDescriptor.codecId).toBe(PG_BIT_CODEC_ID);
       expect(pgVarbitDescriptor.codecId).toBe(PG_VARBIT_CODEC_ID);
       expect(pgIntervalDescriptor.codecId).toBe(PG_INTERVAL_CODEC_ID);
-      expect(pgEnumDescriptor.codecId).toBe(PG_ENUM_CODEC_ID);
       expect(pgJsonDescriptor.codecId).toBe(PG_JSON_CODEC_ID);
       expect(pgJsonbDescriptor.codecId).toBe(PG_JSONB_CODEC_ID);
       expect(pgUuidDescriptor.codecId).toBe(PG_UUID_CODEC_ID);
