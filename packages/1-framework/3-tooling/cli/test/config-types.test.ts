@@ -210,6 +210,7 @@ describe('defineConfig', () => {
       authoringContributions: { field: {}, type: {}, entityTypes: {}, pslBlockDescriptors: {} },
       codecLookup: {
         get: () => undefined,
+        getForRef: () => undefined,
         targetTypesFor: () => undefined,
         metaFor: () => undefined,
         renderOutputTypeFor: () => undefined,

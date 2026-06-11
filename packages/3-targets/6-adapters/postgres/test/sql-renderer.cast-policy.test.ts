@@ -20,6 +20,7 @@ import { defineTestCodec } from './test-codec';
 
 const emptyLookup: CodecLookup = {
   get: () => undefined,
+  getForRef: () => undefined,
   targetTypesFor: () => undefined,
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,
@@ -39,6 +40,7 @@ function lookupOf(
 ): CodecLookup {
   return {
     get: (id) => byId[id]?.codec as Codec | undefined,
+    getForRef: () => undefined,
     targetTypesFor: (id) => byId[id]?.metadata?.targetTypes,
     metaFor: (id) => byId[id]?.metadata?.meta,
     renderOutputTypeFor: (id, params) => byId[id]?.metadata?.renderOutputType?.(params),
@@ -158,6 +160,7 @@ describe('renderLoweredSql cast policy', () => {
   it('uses descriptor metadata when a parameterized codec has no id-keyed representative', () => {
     const lookup: CodecLookup = {
       get: () => undefined,
+      getForRef: () => undefined,
       targetTypesFor: (id) => (id === 'arktype/json@1' ? ['jsonb'] : undefined),
       metaFor: (id) =>
         id === 'arktype/json@1'

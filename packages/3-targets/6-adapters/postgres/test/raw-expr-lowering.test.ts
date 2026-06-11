@@ -18,6 +18,7 @@ import type { PostgresContract } from '../src/core/types';
 // in the inferrable set) so the Postgres renderer emits plain $N without a cast.
 const testLookup: CodecLookup = {
   get: () => undefined,
+  getForRef: () => undefined,
   targetTypesFor: (id) => (id === 'pg/int4@1' ? ['int4'] : undefined),
   metaFor: (id) =>
     id === 'pg/int4@1' ? { db: { sql: { postgres: { nativeType: 'integer' } } } } : undefined,
@@ -27,6 +28,7 @@ const testLookup: CodecLookup = {
 // Lookup with no registered codecs — used for tests that contain no ParamRef elements.
 const emptyLookup: CodecLookup = {
   get: () => undefined,
+  getForRef: () => undefined,
   targetTypesFor: () => undefined,
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,

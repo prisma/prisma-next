@@ -15,8 +15,8 @@ const sqliteAdapterDescriptor: SqlControlAdapterDescriptor<'sqlite'> = {
     defaultFunctionRegistry: createSqliteDefaultFunctionRegistry(),
     generatorDescriptors: createSqliteMutationDefaultGeneratorDescriptors(),
   },
-  create(): SqlControlAdapter<'sqlite'> {
-    return new SqliteControlAdapter();
+  create(stack): SqlControlAdapter<'sqlite'> {
+    return new SqliteControlAdapter(stack.codecLookup);
   },
 };
 

@@ -1,9 +1,22 @@
-import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import type { Codec, CodecDescriptor, CodecLookup } from '@prisma-next/framework-components/codec';
+import {
+  CodecDescriptorImpl,
+  emptyCodecLookup,
+  voidParamsSchema,
+} from '@prisma-next/framework-components/codec';
+import { extractCodecLookup } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  buildSqlNamespace,
+  SqlStorage,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
 import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
+import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
 import { jsonText, sqliteTable, text } from '@prisma-next/target-sqlite/contract-free';
 import { SqliteCreateTable } from '@prisma-next/target-sqlite/ddl';
+import { createContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { SqliteControlAdapter } from '../src/core/control-adapter';
 import { encodeControlQueryParams } from '../src/core/control-codecs';
@@ -247,5 +260,89 @@ describe('SqliteControlAdapter.lowerToExecuteRequest — query branch encoding',
     const result = await adapter.lowerToExecuteRequest(ast, ctx);
     expect(result.params).toContain('{"key":"val"}');
     expect(result.params).not.toContainEqual({ key: 'val' });
+  });
+});
+
+const EXT_CODEC_ID = 'test/ext-transform@1';
+
+class ExtTransformDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = EXT_CODEC_ID;
+  override readonly traits = [] as const;
+  override readonly targetTypes = ['TEXT'] as const;
+  override readonly paramsSchema = voidParamsSchema;
+  override factory(): (ctx: object) => Codec {
+    return () =>
+      ({
+        id: EXT_CODEC_ID,
+        encode: async (value: unknown) => `ENC:${String(value).toUpperCase()}`,
+        decode: async (wire: unknown) => wire,
+        encodeJson: (v: unknown) => v as never,
+        decodeJson: (v: unknown) => v as never,
+      }) as unknown as Codec;
+  }
+}
+
+const extTransformDescriptor = new ExtTransformDescriptor();
+
+function buildExtContractAndTable() {
+  const tableColumns: StorageTableInput['columns'] = {
+    label: { codecId: EXT_CODEC_ID, nativeType: 'TEXT', nullable: false },
+    name: { codecId: 'sqlite/text@1', nativeType: 'TEXT', nullable: true },
+  };
+  const ns = buildSqlNamespace({
+    id: UNBOUND_NAMESPACE_ID,
+    entries: {
+      table: {
+        things: {
+          columns: tableColumns,
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    },
+  });
+  const contract = createContract<SqliteContract['storage']>({
+    storage: new SqlStorage({
+      storageHash: 'sha256:test' as SqlStorage['storageHash'],
+      namespaces: { [UNBOUND_NAMESPACE_ID]: ns },
+    }),
+  }) as SqliteContract;
+
+  const table = sqliteTable('things', {
+    label: { codecId: EXT_CODEC_ID, nullable: false },
+    name: text(),
+  });
+  return { contract, table };
+}
+
+describe('SqliteControlAdapter.lowerToExecuteRequest — extension codec end-to-end', () => {
+  const extDescriptors = [
+    ...Array.from(sqliteCodecRegistry.values()),
+    extTransformDescriptor as unknown as CodecDescriptor<unknown>,
+  ];
+  const extCodecLookup = extractCodecLookup([
+    { id: 'ext-test-codecs', types: { codecTypes: { codecDescriptors: extDescriptors } } },
+  ]);
+
+  it('encodes a query param through an extension codec when the adapter receives the descriptor', async () => {
+    const { contract, table } = buildExtContractAndTable();
+    const extAdapter = new SqliteControlAdapter(extCodecLookup);
+
+    const ast = table.select(table.label).where(table.label.eq('plaintext')).build();
+    const result = await extAdapter.lowerToExecuteRequest(ast, { contract });
+
+    expect(result.params).toContain('ENC:PLAINTEXT');
+    expect(result.params).not.toContain('plaintext');
+  });
+
+  it('throws when a contract column references a codec absent from the adapter lookup', async () => {
+    const { contract, table } = buildExtContractAndTable();
+    const noExtAdapter = new SqliteControlAdapter();
+
+    const ast = table.select(table.label).where(table.label.eq('plaintext')).build();
+    await expect(noExtAdapter.lowerToExecuteRequest(ast, { contract })).rejects.toThrow(
+      /CODEC_DESCRIPTOR_MISSING|No codec descriptor registered/,
+    );
   });
 });

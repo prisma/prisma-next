@@ -1195,6 +1195,7 @@ model Post {
     };
     const stubSqlExpressionCodecLookup: CodecLookup = {
       get: (id) => (id === 'sql-expression' ? stubSqlExpressionCodec : undefined),
+      getForRef: () => undefined,
       targetTypesFor: () => undefined,
       metaFor: () => undefined,
       renderOutputTypeFor: () => undefined,

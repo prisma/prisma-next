@@ -18,6 +18,7 @@ function vectorCodecLookup(): CodecLookup {
   } as ReturnType<CodecLookup['get']>;
   return {
     get: (id) => (id === 'pg/vector@1' ? vectorCodec : undefined),
+    getForRef: () => undefined,
     targetTypesFor: (id) => (id === 'pg/vector@1' ? ['vector'] : undefined),
     metaFor: () => undefined,
     renderOutputTypeFor: (id, params) =>

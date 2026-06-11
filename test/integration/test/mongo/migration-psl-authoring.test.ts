@@ -55,6 +55,8 @@ const mongoCodecLookup: CodecLookup = {
       decodeJson: (v: JsonValue) => v,
     };
   },
+  getForRef: () => undefined,
+
   targetTypesFor(id: string) {
     const bsonType = bsonTypesByCodecId[id];
     return bsonType ? [bsonType] : undefined;

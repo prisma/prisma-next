@@ -640,6 +640,7 @@ model Document {
         codecLookup: {
           get: (id: string) =>
             id === 'pg/int4@1' ? createPostgresTestContext().codecLookup.get(id) : undefined,
+          getForRef: () => undefined,
           targetTypesFor: (id: string) =>
             id === 'pg/int4@1'
               ? createPostgresTestContext().codecLookup.targetTypesFor(id)

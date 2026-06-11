@@ -1,5 +1,6 @@
 import { blindCast } from '@prisma-next/utils/casts';
 import type { Codec } from '../shared/codec';
+import type { AnyCodecDescriptor } from '../shared/codec-descriptor';
 import type { CodecLookup, CodecMeta } from '../shared/codec-types';
 import type {
   AuthoringContributions,
@@ -22,6 +23,7 @@ import type {
   ControlMutationDefaults,
   MutationDefaultGeneratorDescriptor,
 } from '../shared/mutation-default-types';
+import { materializeCodec } from '../shared/resolve-codec';
 import type { TypesImportSpec } from '../shared/types-import-spec';
 import type {
   ControlAdapterDescriptor,
@@ -296,6 +298,7 @@ export function extractCodecLookup(
   descriptors: ReadonlyArray<Pick<ComponentMetadata & { id: string }, 'types' | 'id'>>,
 ): CodecLookup {
   const byId = new Map<string, Codec>();
+  const descriptorsById = new Map<string, AnyCodecDescriptor>();
   const targetTypesById = new Map<string, readonly string[]>();
   const metaById = new Map<string, CodecMeta>();
   const renderersById = new Map<string, (params: Record<string, unknown>) => string | undefined>();
@@ -313,6 +316,7 @@ export function extractCodecLookup(
         entityOwnershipLabel: 'codec descriptor provider',
       });
       owners.set(codecDescriptor.codecId, descriptorId);
+      descriptorsById.set(codecDescriptor.codecId, codecDescriptor);
       if (Array.isArray(codecDescriptor.targetTypes)) {
         targetTypesById.set(codecDescriptor.codecId, codecDescriptor.targetTypes);
       }
@@ -348,6 +352,12 @@ export function extractCodecLookup(
   }
   return {
     get: (id) => byId.get(id),
+    getForRef(id, typeParams) {
+      const d = descriptorsById.get(id);
+      if (d === undefined) return undefined;
+      const ref = typeParams !== undefined ? { codecId: id, typeParams } : { codecId: id };
+      return materializeCodec(d, ref, { name: `<ref:${id}>` });
+    },
     targetTypesFor: (id) => targetTypesById.get(id),
     metaFor: (id) => metaById.get(id),
     renderOutputTypeFor: (id, params) => renderersById.get(id)?.(params),

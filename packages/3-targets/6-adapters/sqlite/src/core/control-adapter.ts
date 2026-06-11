@@ -4,12 +4,14 @@ import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter'
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { APP_SPACE_ID, extractCodecLookup } from '@prisma-next/framework-components/control';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   CodecRef,
+  ContractCodecRegistry,
   DdlColumn,
   DdlNode,
   DdlTableConstraint,
@@ -127,11 +129,6 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
 
   private readonly codecLookup: CodecLookup;
 
-  /**
-   * @param codecLookup - Codec lookup used to resolve codecs for DDL literal-default encoding.
-   *   Defaults to a SQLite-builtins-only lookup when omitted. Stack-aware callers supply
-   *   `stack.codecLookup` so extension codecs are visible to the DDL walker.
-   */
   constructor(codecLookup?: CodecLookup) {
     this.codecLookup = codecLookup ?? createSqliteBuiltinCodecLookup();
   }
@@ -181,11 +178,26 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
         this.codecLookup,
       );
     }
-    const lowered = renderLoweredSql(
-      ast,
-      blindCast<SqliteContract, 'Caller must supply matching contract'>(context?.contract),
+    const contract = blindCast<SqliteContract, 'Caller must supply matching contract'>(
+      context?.contract,
     );
-    const params = await encodeControlQueryParams(lowered, ast);
+    const lowered = renderLoweredSql(ast, contract);
+    const lookup = this.codecLookup;
+    const codecRegistry: ContractCodecRegistry = {
+      forColumn: () => undefined,
+      forCodecRef(ref) {
+        const codec = lookup.getForRef(ref.codecId, ref.typeParams);
+        if (codec === undefined) {
+          throw runtimeError(
+            'RUNTIME.CODEC_DESCRIPTOR_MISSING',
+            `No codec descriptor registered for codecId '${ref.codecId}'.`,
+            { codecId: ref.codecId },
+          );
+        }
+        return codec;
+      },
+    };
+    const params = await encodeControlQueryParams(lowered, ast, codecRegistry);
     return { sql: lowered.sql, params };
   }
 

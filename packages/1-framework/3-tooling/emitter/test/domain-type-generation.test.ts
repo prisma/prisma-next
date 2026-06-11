@@ -904,6 +904,7 @@ function stubCodec(overrides: Partial<CodecStub> & { id: string }): CodecStub {
 function stubCodecLookup(codecs: Record<string, CodecStub>): CodecLookup {
   return {
     get: (id) => codecs[id],
+    getForRef: () => undefined,
     targetTypesFor: (id) => codecs[id]?.targetTypes,
     metaFor: () => undefined,
     renderOutputTypeFor: (id, params) => codecs[id]?.renderOutputType?.(params),
