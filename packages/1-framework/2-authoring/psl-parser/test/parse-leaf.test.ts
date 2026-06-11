@@ -556,6 +556,46 @@ describe('argument-position object literal', () => {
       "
     `);
   });
+
+  it('flags a string-literal key as invalid but recovers a terminated, round-tripping object', () => {
+    const source = '{ "k": 1 }';
+    const { node, diagnostics, cursor } = parse(source, parseAttributeArg);
+    expect(greenText(node)).toBe(source); // round-trip holds, object terminated
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
+    expect(diagnostics[0]!.message).toBe('Object literal keys must be identifiers');
+    expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
+      "
+      { "k": 1 }
+        ~~~
+      "
+    `);
+  });
+
+  it('flags only the string-literal key in a mixed object and parses the rest', () => {
+    const source = '{ a: 1, "k": 2 }';
+    const { node, diagnostics, cursor } = parse(source, parseAttributeArg);
+    expect(greenText(node)).toBe(source); // round-trip holds
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
+    expect(diagnostics[0]!.message).toBe('Object literal keys must be identifiers');
+    expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
+      "
+      { a: 1, "k": 2 }
+              ~~~
+      "
+    `);
+
+    const obj = AttributeArgAst.cast(createSyntaxTree(node))!.value();
+    expect(obj).toBeInstanceOf(ObjectLiteralExprAst);
+    if (obj instanceof ObjectLiteralExprAst) {
+      const fields = Array.from(obj.fields());
+      expect(fields).toHaveLength(2);
+      expect(fields[0]!.key()?.token()?.text).toBe('a');
+      expect(fields[0]!.value()).toBeInstanceOf(NumberLiteralExprAst);
+      expect(fields[1]!.value()).toBeInstanceOf(NumberLiteralExprAst);
+    }
+  });
 });
 
 function expectNoOpReject(source: string, run: (cursor: Cursor) => GreenNode | undefined): void {

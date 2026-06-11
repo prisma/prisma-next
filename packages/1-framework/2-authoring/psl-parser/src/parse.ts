@@ -262,7 +262,11 @@ export function parseObjectLiteralExpr(cursor: Cursor): GreenNode | undefined {
     parseObjectField(cursor);
     if (cursor.peekKind() === 'Comma') {
       cursor.bump();
-    } else {
+    } else if (cursor.peekKind() !== 'Ident') {
+      // A following identifier key re-enters the loop, so a missing comma
+      // between fields is tolerated in recovery (the next parseObjectField
+      // consumes the key, ≥1 token, guaranteeing progress). Anything else
+      // terminates the field list.
       break;
     }
   }
@@ -276,11 +280,19 @@ export function parseObjectLiteralExpr(cursor: Cursor): GreenNode | undefined {
 
 export function parseObjectField(cursor: Cursor): GreenNode {
   cursor.startNode('ObjectField');
+  const keyMark = cursor.mark();
   const keyText = cursor.peekToken().text;
   if (cursor.peekKind() === 'Ident') {
-    parseIdentifier(cursor); // identifier key
+    parseIdentifier(cursor); // identifier key — the only valid key
   } else if (cursor.peekKind() === 'StringLiteral') {
-    parseStringLiteralExpr(cursor); // string key
+    // String keys are not valid PSL. Flag the key, then still consume it so the
+    // field stays structured and the object/enclosing block don't desync (F04).
+    cursor.diagnostic(
+      'PSL_INVALID_OBJECT_LITERAL',
+      'Object literal keys must be identifiers',
+      keyMark,
+    );
+    parseStringLiteralExpr(cursor);
   }
   if (cursor.peekKind() === 'Colon') {
     cursor.bump(); // Colon
@@ -289,12 +301,11 @@ export function parseObjectField(cursor: Cursor): GreenNode {
       cursor.diagnostic('PSL_INVALID_OBJECT_LITERAL', 'Expected a value after ":"', cursor.mark());
     }
   } else {
-    cursor.diagnostic(
-      'PSL_INVALID_OBJECT_LITERAL',
-      `Expected ":" after "${keyText}"`,
-      cursor.mark(),
-    );
-    parseExpression(cursor); // best-effort: consume a value if one follows
+    cursor.diagnostic('PSL_INVALID_OBJECT_LITERAL', `Expected ":" after "${keyText}"`, keyMark);
+    const followsWithKey = cursor.peekKind() === 'Ident' && cursor.peekKind(1) === 'Colon';
+    if (!followsWithKey) {
+      parseExpression(cursor); // best-effort: consume a value if one follows
+    }
   }
   return cursor.finishNode();
 }

@@ -27,7 +27,7 @@ import {
 } from '../src/syntax/ast/declarations';
 import { ObjectLiteralExprAst } from '../src/syntax/ast/expressions';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
-import { printTree } from './support';
+import { highlight, printTree } from './support';
 
 function greenText(element: GreenElement): string {
   if (element.type === 'token') return element.text;
@@ -492,6 +492,117 @@ describe('parse() round-trips lossless schemas', () => {
     expect(model.name()?.token()?.text).toBe('用户');
     const fields = Array.from(model.fields());
     expect(fields.map((f) => f.name()?.token()?.text)).toEqual(['имя', 'café']);
+  });
+});
+
+// F04 (review finding, fixed). A missing `:` inside an object literal must not
+// swallow the next field's key as this field's value: the field loop re-enters
+// on a following field-start (not just a comma) and the missing-colon branch
+// returns key-only when a real key (`<ident> :`) follows. So `{ a b: 1 }`
+// recovers exactly like `{ a, b: 1 }` — one diagnostic, two fields, the object
+// stays terminated, and the enclosing block is intact.
+describe('parse() object-literal missing-colon recovery', () => {
+  it('recovers a following field after a missing colon without corrupting the enclosing block', () => {
+    const source = 'datasource db {\n  x = { a b: 1 }\n}';
+    const result = parse(source);
+    expect(greenText(result.document.syntax.green)).toBe(source); // round-trip holds
+    // One diagnostic from one missing colon: the colon error on `a`.
+    expect(result.diagnostics.map((d) => d.code)).toEqual(['PSL_INVALID_OBJECT_LITERAL']);
+    const [diagnostic] = result.diagnostics;
+    expect(diagnostic!.message).toBe('Expected ":" after "a"');
+    expect(highlight(result.sourceFile, diagnostic!.range)).toMatchInlineSnapshot(`
+      "
+      datasource db {
+        x = { a b: 1 }
+              ~
+      }
+      "
+    `);
+
+    // The enclosing datasource block stays intact: one declaration, a block.
+    const decls = Array.from(result.document.declarations());
+    expect(decls).toHaveLength(1);
+    expect(decls[0]).toBeInstanceOf(BlockDeclarationAst);
+
+    // The object literal has two fields (`a` key-only, `b` = 1) and a closing brace.
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        BlockDeclaration
+          Ident "datasource"
+          Whitespace " "
+          Identifier
+            Ident "db"
+          Whitespace " "
+          LBrace "{"
+          Newline "\\n"
+          Whitespace "  "
+          KeyValuePair
+            Identifier
+              Ident "x"
+            Whitespace " "
+            Equals "="
+            Whitespace " "
+            ObjectLiteralExpr
+              LBrace "{"
+              Whitespace " "
+              ObjectField
+                Identifier
+                  Ident "a"
+              Whitespace " "
+              ObjectField
+                Identifier
+                  Ident "b"
+                Colon ":"
+                Whitespace " "
+                NumberLiteralExpr
+                  NumberLiteral "1"
+              Whitespace " "
+              RBrace "}"
+          Newline "\\n"
+          RBrace "}""
+    `);
+  });
+
+  it('recovers cleanly when a comma delimits the malformed field (contrast)', () => {
+    const source = 'datasource db {\n  x = { a, b: 1 }\n}';
+    const result = parse(source);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+    // With the fix, `{ a b: 1 }` and `{ a, b: 1 }` recover to near-identical trees
+    // (the comma is the only token difference): one diagnostic, `b: 1` a proper field.
+    expect(result.diagnostics.map((d) => d.code)).toEqual(['PSL_INVALID_OBJECT_LITERAL']);
+    const [diagnostic] = result.diagnostics;
+    expect(diagnostic!.message).toBe('Expected ":" after "a"');
+    expect(highlight(result.sourceFile, diagnostic!.range)).toMatchInlineSnapshot(`
+      "
+      datasource db {
+        x = { a, b: 1 }
+              ~
+      }
+      "
+    `);
+  });
+
+  it('flags a string-literal key inside a block without corrupting the enclosing block', () => {
+    const source = 'datasource db {\n  x = { a: 1, "k": 2 }\n}';
+    const result = parse(source);
+    expect(greenText(result.document.syntax.green)).toBe(source); // round-trip holds
+    // Exactly one diagnostic, flagging the string key — no cascade into the block.
+    expect(result.diagnostics.map((d) => d.code)).toEqual(['PSL_INVALID_OBJECT_LITERAL']);
+    const [diagnostic] = result.diagnostics;
+    expect(diagnostic!.message).toBe('Object literal keys must be identifiers');
+    expect(highlight(result.sourceFile, diagnostic!.range)).toMatchInlineSnapshot(`
+      "
+      datasource db {
+        x = { a: 1, "k": 2 }
+                    ~~~
+      }
+      "
+    `);
+
+    // The enclosing datasource block stays intact: one declaration, a block.
+    const decls = Array.from(result.document.declarations());
+    expect(decls).toHaveLength(1);
+    expect(decls[0]).toBeInstanceOf(BlockDeclarationAst);
   });
 });
 
