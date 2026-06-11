@@ -799,9 +799,9 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
       }
 
       const storageTable = model.storage.table;
-      const rawTable = namespaceTables(contract.storage.namespaces[storageNamespaceId]!)[
-        storageTable
-      ];
+      const storageNs = contract.storage.namespaces[storageNamespaceId];
+      const rawTable =
+        storageNs !== undefined ? namespaceTables(storageNs)[storageTable] : undefined;
       if (rawTable === undefined) {
         throw new ContractValidationError(
           `Model "${qualifiedName}" references non-existent table "${storageNamespaceId}.${storageTable}"`,

@@ -55,7 +55,6 @@ function installNamespacedTableDeletionRace(ir: Contract, tableName: string): vo
     },
   });
 
-  // biome-ignore lint/performance/noDelete: test helper simulates a race condition deletion
   delete originalStorage.namespaces[UNBOUND_NAMESPACE_ID]!.entries['table']![tableName];
   tableDeleted = true;
   (ir as { storage: unknown }).storage = proxiedStorage;
