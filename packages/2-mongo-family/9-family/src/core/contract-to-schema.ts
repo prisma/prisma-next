@@ -1,9 +1,10 @@
-import type {
-  MongoCollection,
-  MongoCollectionOptions,
-  MongoContract,
-  MongoIndex,
-  MongoValidator,
+import {
+  type MongoCollection,
+  type MongoCollectionOptions,
+  type MongoContract,
+  type MongoIndex,
+  type MongoValidator,
+  namespaceCollections,
 } from '@prisma-next/mongo-contract';
 import {
   MongoSchemaCollection,
@@ -78,7 +79,7 @@ export function contractToMongoSchemaIR(contract: MongoContract | null): MongoSc
 
   const collections: MongoSchemaCollection[] = [];
   for (const ns of Object.values(contract.storage.namespaces)) {
-    for (const [name, def] of Object.entries(ns.entries.collection)) {
+    for (const [name, def] of Object.entries(namespaceCollections(ns))) {
       collections.push(convertCollection(name, def));
     }
   }

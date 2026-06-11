@@ -6,7 +6,11 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { VERIFY_CODE_SCHEMA_FAILURE } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { MongoCollection, MongoContract } from '@prisma-next/mongo-contract';
+import {
+  type MongoCollection,
+  type MongoContract,
+  namespaceCollections,
+} from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { contractToMongoSchemaIR } from '../contract-to-schema';
@@ -71,7 +75,9 @@ function resolveMongoCollectionControlPolicy(
   contract: MongoContract,
 ): (collectionName: string) => ControlPolicy {
   const namespace = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
-  const collections: Record<string, MongoCollection> = namespace?.entries.collection ?? {};
+  const collections: Record<string, MongoCollection> = namespace
+    ? namespaceCollections(namespace)
+    : {};
   const defaultControlPolicy = contract.defaultControlPolicy;
   return (collectionName: string) =>
     effectiveControlPolicy(collections[collectionName]?.control, defaultControlPolicy);

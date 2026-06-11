@@ -3,6 +3,7 @@ import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-
 import type { ValidationContext } from '@prisma-next/framework-components/emission';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import type { MongoCollection, MongoStorage } from '@prisma-next/mongo-contract';
+import { namespaceCollections } from '@prisma-next/mongo-contract';
 
 const MONGO_NAMESPACE_KIND_FALLBACK = 'mongo-namespace' as const;
 
@@ -17,7 +18,7 @@ function mongoNamespaceSerializedKind(ns: Namespace): string {
 function assertUniqueMongoCollectionNames(storage: MongoStorage): void {
   const seen = new Map<string, string>();
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    for (const coll of Object.keys(ns.entries.collection)) {
+    for (const coll of Object.keys(namespaceCollections(ns))) {
       const existing = seen.get(coll);
       if (existing !== undefined && existing !== namespaceId) {
         throw new Error(
@@ -61,7 +62,7 @@ function generateMongoNamespacesType(namespaces: MongoStorage['namespaces']): st
   }
   const parts: string[] = [];
   for (const [name, ns] of sorted) {
-    const collectionsType = generateMongoNamespaceCollectionsType(ns.entries.collection);
+    const collectionsType = generateMongoNamespaceCollectionsType(namespaceCollections(ns));
     parts.push(
       `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; ${mongoNamespaceSerializedKind(ns)}; readonly entries: { readonly collection: ${collectionsType} } }`,
     );
@@ -131,7 +132,7 @@ export const mongoEmission = {
 
     const collectionNames = new Set<string>();
     for (const ns of Object.values(storage.namespaces)) {
-      for (const c of Object.keys(ns.entries.collection)) {
+      for (const c of Object.keys(namespaceCollections(ns))) {
         collectionNames.add(c);
       }
     }

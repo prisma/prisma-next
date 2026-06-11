@@ -8,7 +8,7 @@ import {
 } from '@prisma-next/family-mongo/control';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { MongoContract } from '@prisma-next/mongo-contract';
+import { type MongoContract, namespaceCollections } from '@prisma-next/mongo-contract';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import { parsePslDocument } from '@prisma-next/psl-parser';
@@ -243,7 +243,8 @@ describe('PSL authoring → migration E2E', { timeout: timeouts.spinUpMongoMemor
       }
     `);
 
-    const postColl = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.entries.collection['post'];
+    const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    const postColl = ns ? namespaceCollections(ns)['post'] : undefined;
     expect(postColl?.indexes).toBeDefined();
     expect(postColl?.validator).toBeDefined();
 

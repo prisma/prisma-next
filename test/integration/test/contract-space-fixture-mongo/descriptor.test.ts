@@ -1,4 +1,5 @@
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import { namespaceCollections } from '@prisma-next/mongo-contract';
 import { describe, expect, it } from 'vitest';
 import {
   MONGO_TEST_BASELINE_INVARIANT_ID,
@@ -23,7 +24,7 @@ describe('test-mongo-contract-space fixture descriptor', () => {
     const space = mongoTestContractSpaceExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
     const ns = space!.contractJson.storage.namespaces['__unbound__'];
-    expect(Object.keys(ns!.entries.collection)).toEqual([MONGO_TEST_COLLECTION]);
+    expect(Object.keys(namespaceCollections(ns!))).toEqual([MONGO_TEST_COLLECTION]);
   });
 
   it('declares one unique index and one strict validator on the test collection', () => {
@@ -31,7 +32,7 @@ describe('test-mongo-contract-space fixture descriptor', () => {
       mongoTestContractSpaceExtensionDescriptor.contractSpace!.contractJson.storage.namespaces[
         '__unbound__'
       ];
-    const collection = ns!.entries.collection[MONGO_TEST_COLLECTION];
+    const collection = namespaceCollections(ns!)[MONGO_TEST_COLLECTION];
     expect(collection).toBeDefined();
     expect(collection!.indexes).toHaveLength(1);
     expect(collection!.indexes![0]).toMatchObject({ unique: true });

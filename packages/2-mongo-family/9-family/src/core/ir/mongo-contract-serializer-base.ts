@@ -6,6 +6,7 @@ import {
   type MongoCollectionInput,
   type MongoContract,
   MongoContractSchema,
+  namespaceCollections,
   validateMongoStorage,
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
@@ -123,7 +124,7 @@ export abstract class MongoContractSerializerBase<TContract>
     const rawNamespaces = contract.storage.namespaces;
     const hydratedNamespaces = Object.fromEntries(
       Object.entries(rawNamespaces).map(([nsId, nsEnvelope]) => {
-        const rawCollections = nsEnvelope.entries.collection;
+        const rawCollections = namespaceCollections(nsEnvelope);
         const hydratedCollections = Object.fromEntries(
           Object.entries(rawCollections).map(([name, raw]) => [
             name,
