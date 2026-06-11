@@ -119,7 +119,7 @@ withTempDir(({ createTempDir }) => {
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
-import { Migration, MigrationCLI, addColumn, setNotNull } from '@prisma-next/postgres/migration';
+import { Migration, MigrationCLI, col, setNotNull } from '@prisma-next/postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import endContractJson from './end-contract.json' with { type: 'json' };
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
@@ -140,7 +140,7 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      addColumn('public', 'user', { name: 'name', typeSql: 'text', defaultSql: null, nullable: true }),
+      this.addColumn({ schema: 'public', table: 'user', column: col('name', 'text') }),
       this.dataTransform(endContract, 'backfill-user-name', {
         check: () => db.public.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1),
         run: () => db.public.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null)),

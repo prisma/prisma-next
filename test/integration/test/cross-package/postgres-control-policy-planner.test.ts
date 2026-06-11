@@ -248,7 +248,7 @@ describe('PostgresMigrationPlanner.plan tolerated vs managed add-column', async 
     id: { name: 'id', nativeType: 'text', nullable: false },
   });
 
-  function planAddColumn(control: 'managed' | 'tolerated') {
+  async function planAddColumn(control: 'managed' | 'tolerated') {
     const contract = makeContract({
       users: {
         control,
@@ -269,17 +269,17 @@ describe('PostgresMigrationPlanner.plan tolerated vs managed add-column', async 
     });
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') throw new Error('expected planner success');
-    return result.plan;
+    return await Promise.all(result.plan.operations);
   }
 
   it('suppresses a tolerated table add-column', async () => {
-    const plan = planAddColumn('tolerated');
-    expect(plan.operations).toHaveLength(0);
+    const operations = await planAddColumn('tolerated');
+    expect(operations).toHaveLength(0);
   });
 
   it('emits the add-column when the same table is managed', async () => {
-    const plan = planAddColumn('managed');
-    expect(plan.operations).toEqual(
+    const operations = await planAddColumn('managed');
+    expect(operations).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'column.users.email', operationClass: 'additive' }),
       ]),
