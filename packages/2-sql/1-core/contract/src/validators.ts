@@ -77,20 +77,20 @@ const ExecutionSchema = type({
   },
 });
 
-const ValueSetRefSchema = type({
-  plane: "'domain' | 'storage'",
+const StorageValueSetRefSchema = type({
+  plane: "'storage'",
   namespaceId: 'string',
-  entityKind: "'enum' | 'valueSet'",
+  entityKind: "'valueSet'",
   entityName: 'string',
   'spaceId?': 'string',
-}).narrow((ref, ctx) => {
-  const expectedPlane = ref.entityKind === 'enum' ? 'domain' : 'storage';
-  if (ref.plane !== expectedPlane) {
-    return ctx.mustBe(
-      `a ref with plane '${expectedPlane}' when entityKind is '${ref.entityKind}' (got plane '${ref.plane}')`,
-    );
-  }
-  return true;
+});
+
+const DomainEnumRefSchema = type({
+  plane: "'domain'",
+  namespaceId: 'string',
+  entityKind: "'enum'",
+  entityName: 'string',
+  'spaceId?': 'string',
 });
 
 const StorageColumnSchema = type({
@@ -102,7 +102,7 @@ const StorageColumnSchema = type({
   'typeRef?': 'string',
   'default?': ColumnDefaultSchema,
   'control?': ControlPolicySchema,
-  'valueSet?': ValueSetRefSchema,
+  'valueSet?': StorageValueSetRefSchema,
 }).narrow((col, ctx) => {
   if (col.typeParams !== undefined && col.typeRef !== undefined) {
     return ctx.mustBe('a column with either typeParams or typeRef, not both');
@@ -218,7 +218,7 @@ export const CheckConstraintSchema = type({
   '+': 'reject',
   name: 'string',
   column: 'string',
-  valueSet: ValueSetRefSchema,
+  valueSet: StorageValueSetRefSchema,
 });
 
 const StorageTableSchema = type({
@@ -413,7 +413,7 @@ const ModelFieldSchema = type({
   type: ContractFieldTypeSchema,
   'many?': 'true',
   'dict?': 'true',
-  'valueSet?': ValueSetRefSchema,
+  'valueSet?': DomainEnumRefSchema,
 });
 
 const ModelStorageFieldSchema = type({

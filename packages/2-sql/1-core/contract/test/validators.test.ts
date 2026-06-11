@@ -1276,7 +1276,7 @@ describe('SQL contract validators', () => {
     });
   });
 
-  describe('ValueSetRef plane-consistency assertion', () => {
+  describe('ValueSetRef call-site-narrowed schemas', () => {
     const storageSchema = createSqlStorageSchema();
 
     function makeStorageWithCheckRef(ref: Record<string, unknown>) {
@@ -1301,7 +1301,7 @@ describe('SQL contract validators', () => {
       };
     }
 
-    it('accepts a storage ref where plane matches entityKind', () => {
+    it('accepts a storage check ref with plane:storage + entityKind:valueSet', () => {
       const result = storageSchema(
         makeStorageWithCheckRef({
           plane: 'storage',
@@ -1313,7 +1313,19 @@ describe('SQL contract validators', () => {
       expect(result).not.toBeInstanceOf(type.errors);
     });
 
-    it('rejects a storage ref where plane contradicts entityKind', () => {
+    it('rejects a storage check ref with plane:domain + entityKind:enum', () => {
+      const result = storageSchema(
+        makeStorageWithCheckRef({
+          plane: 'domain',
+          entityKind: 'enum',
+          namespaceId: 'public',
+          entityName: 'Role',
+        }),
+      );
+      expect(result).toBeInstanceOf(type.errors);
+    });
+
+    it('rejects a storage check ref with plane:domain + entityKind:valueSet', () => {
       const result = storageSchema(
         makeStorageWithCheckRef({
           plane: 'domain',
@@ -1323,6 +1335,47 @@ describe('SQL contract validators', () => {
         }),
       );
       expect(result).toBeInstanceOf(type.errors);
+    });
+
+    it('accepts a domain field ref with plane:domain + entityKind:enum', () => {
+      const result = validateModel({
+        fields: {
+          role: {
+            nullable: false,
+            type: { kind: 'scalar', codecId: 'pg/text@1' },
+            valueSet: {
+              plane: 'domain',
+              entityKind: 'enum',
+              namespaceId: 'public',
+              entityName: 'Role',
+            },
+          },
+        },
+        relations: {},
+        storage: { table: 'user', namespaceId: 'public', fields: { role: { column: 'role' } } },
+      });
+      expect(result).toBeDefined();
+    });
+
+    it('rejects a domain field ref with plane:storage + entityKind:valueSet', () => {
+      expect(() =>
+        validateModel({
+          fields: {
+            role: {
+              nullable: false,
+              type: { kind: 'scalar', codecId: 'pg/text@1' },
+              valueSet: {
+                plane: 'storage',
+                entityKind: 'valueSet',
+                namespaceId: 'public',
+                entityName: 'Role',
+              },
+            },
+          },
+          relations: {},
+          storage: { table: 'user', namespaceId: 'public', fields: { role: { column: 'role' } } },
+        }),
+      ).toThrow();
     });
 
     it('StorageValueSetSchema accepts kind valueSet', () => {
