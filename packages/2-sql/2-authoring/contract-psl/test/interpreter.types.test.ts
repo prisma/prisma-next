@@ -3,7 +3,6 @@ import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
-  buildEnumCapturingFactory,
   createBuiltinLikeControlMutationDefaults,
   documentScopedTypes,
   postgresScalarTypeDescriptors,
@@ -131,86 +130,6 @@ model Event {
     expect(result.value.roots).toEqual({ event: crossRef('Event', 'public') });
   });
 
-  it.skip('preserves enum native type names from @@map instead of lowercasing declarations', () => {
-    // TODO(TML-2853-D2): uses native enum syntax (`enum UserRole { USER ADMIN @@map(...) }`);
-    // native enum parse deleted in D1.
-    const document = parsePslDocument({
-      schema: `enum UserRole {
-  USER
-  ADMIN
-  @@map("user_role")
-}
-
-enum Role {
-  OWNER
-}
-
-model User {
-  id Int @id
-  role UserRole
-  legacyRole Role
-}
-`,
-      sourceId: 'schema.prisma',
-    });
-
-    const { createNamespace, capturedEnumTypes } = buildEnumCapturingFactory();
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      createNamespace,
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    expect(capturedEnumTypes['public']).toMatchObject({
-      UserRole: {
-        kind: 'postgres-enum',
-        name: 'UserRole',
-        nativeType: 'user_role',
-        values: ['USER', 'ADMIN'],
-      },
-      Role: {
-        kind: 'postgres-enum',
-        name: 'Role',
-        nativeType: 'Role',
-        values: ['OWNER'],
-      },
-    });
-
-    expect(result.value.storage).toMatchObject({
-      namespaces: {
-        public: {
-          id: 'public',
-          entries: {
-            table: {
-              user: {
-                columns: {
-                  id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                  role: {
-                    codecId: 'test/enum@1',
-                    nativeType: 'user_role',
-                    nullable: false,
-                    typeRef: 'UserRole',
-                  },
-                  legacyRole: {
-                    codecId: 'test/enum@1',
-                    nativeType: 'Role',
-                    nullable: false,
-                    typeRef: 'Role',
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-    expect(result.value.roots).toEqual({ user: crossRef('User', 'public') });
-  });
-
   it('lowers additional Postgres native type attributes on named types', () => {
     const document = parsePslDocument({
       schema: `types {
@@ -313,75 +232,5 @@ model Event {
       },
     });
     expect(result.value.roots).toEqual({ event: crossRef('Event', 'public') });
-  });
-
-  it.skip('lowers a top-level enum into the public namespace enum slot', () => {
-    // TODO(TML-2853-D2): uses native enum syntax; deleted in D1.
-    const document = parsePslDocument({
-      schema: `enum UserRole {
-  ADMIN
-  USER
-}
-
-model Account {
-  id   Int      @id
-  role UserRole
-}
-`,
-      sourceId: 'schema.prisma',
-    });
-
-    const { createNamespace, capturedEnumTypes } = buildEnumCapturingFactory();
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      createNamespace,
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    expect(capturedEnumTypes['public']).toMatchObject({
-      UserRole: { kind: 'postgres-enum', values: ['ADMIN', 'USER'] },
-    });
-    expect(capturedEnumTypes['auth']).toBeUndefined();
-    expect(result.value.storage.namespaces['public']).toBeDefined();
-  });
-
-  it.skip('lowers a namespace-scoped enum into storage.namespaces[nsId].entries.type', () => {
-    // TODO(TML-2853-D2): uses native enum syntax inside namespace; deleted in D1.
-    const document = parsePslDocument({
-      schema: `namespace auth {
-  enum user_type {
-    admin
-    user
-  }
-
-  model User {
-    id       Int       @id
-    userType user_type
-  }
-}
-`,
-      sourceId: 'schema.prisma',
-    });
-
-    const { createNamespace, capturedEnumTypes } = buildEnumCapturingFactory();
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      createNamespace,
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    expect(capturedEnumTypes['auth']).toMatchObject({
-      user_type: { kind: 'postgres-enum', values: ['admin', 'user'] },
-    });
-    expect(capturedEnumTypes['public']).toBeUndefined();
-    expect(result.value.storage.namespaces['auth']).toBeDefined();
   });
 });
