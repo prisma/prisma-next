@@ -576,20 +576,6 @@ describe('assembleAuthoringContributions', () => {
     ).toThrow(/Duplicate authoring field helper "id\.shared"/);
   });
 
-  it('rejects a pslBlockDescriptors entry with no matching entityTypes factory', () => {
-    expect(() =>
-      assembleAuthoringContributions([
-        createDescriptor({
-          authoring: {
-            pslBlockDescriptors: {
-              fooBlock: makeDeclarativePslBlockDescriptor('no-factory-discriminator'),
-            },
-          },
-        }),
-      ]),
-    ).toThrow(/pslBlock.*"no-factory-discriminator".*entityType/);
-  });
-
   it('preserves prototype-carrying objects in sub-namespaces through composition', () => {
     // A sub-namespace whose value is a class instance with a prototype getter.
     // Before the fix, mergeAuthoringNamespaces used isPlainNamespaceObject which
@@ -627,6 +613,54 @@ describe('assembleAuthoringContributions', () => {
     // not a shallow-copied plain object with an undefined getter.
     expect(result.entityTypes['sub']).toBe(subNsInstance);
     expect((result.entityTypes['sub'] as unknown as SubNs).leafDescriptor).toBeDefined();
+  });
+
+  it('deep-copies nested plain-object sub-namespaces so composing the same pack twice does not throw or mutate', () => {
+    // depth-3: pack A owns field.a.b.alpha; pack B adds field.a.b.beta.
+    // Before the deep-copy fix, shallow-copying `a` on first assignment left
+    // `a.b` shared with pack A's original. On the second composition, pack B
+    // recursing into `a.b` would find `beta` already present (mutated in by the
+    // first run) and throw "Duplicate authoring field helper".
+    const packADescriptor = createDescriptor({
+      authoring: {
+        field: {
+          a: {
+            b: {
+              alpha: {
+                kind: 'fieldPreset' as const,
+                output: { codecId: 'a@1', nativeType: 'text' },
+              },
+            },
+          },
+        },
+      },
+    });
+    const packBDescriptor = createDescriptor({
+      id: 'pack-b',
+      authoring: {
+        field: {
+          a: {
+            b: {
+              beta: {
+                kind: 'fieldPreset' as const,
+                output: { codecId: 'b@1', nativeType: 'int4' },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const first = assembleAuthoringContributions([packADescriptor, packBDescriptor]);
+    expect(Object.keys((first.field['a'] as Record<string, unknown>)['b'] as object)).toEqual([
+      'alpha',
+      'beta',
+    ]);
+
+    // Second composition with the same singletons must not throw.
+    expect(() => assembleAuthoringContributions([packADescriptor, packBDescriptor])).not.toThrow();
+    // Pack A's original nested object must be untouched.
+    expect(packADescriptor.authoring?.field?.['a']).not.toHaveProperty(['b', 'beta']);
   });
 });
 

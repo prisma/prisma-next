@@ -366,15 +366,29 @@ export function hasRegisteredFieldNamespace(
   return !isAuthoringFieldPresetDescriptor(contributions.field[namespace]);
 }
 
-function isPlainNamespaceObject(value: unknown): value is Record<string, unknown> {
+function isCopyableNamespaceObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value) as unknown;
   return proto === Object.prototype || proto === null;
 }
 
+function deepCopyNamespace(
+  source: Record<string, unknown>,
+  isLeafDescriptor: (value: unknown) => boolean,
+): Record<string, unknown> {
+  const copy: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(source)) {
+    copy[key] =
+      isCopyableNamespaceObject(value) && !isLeafDescriptor(value)
+        ? deepCopyNamespace(value, isLeafDescriptor)
+        : value;
+  }
+  return copy;
+}
+
 /**
  * Merges `source` into `target` recursively at the descriptor-namespace
- * level. `leafGuard` decides which values are descriptors (terminal
+ * level. `isLeafDescriptor` decides which values are descriptors (terminal
  * merge points; same-path registrations across components are reported
  * as duplicates) versus sub-namespaces (recursion targets).
  *
@@ -394,7 +408,7 @@ export function mergeAuthoringNamespaces(
   target: Record<string, unknown>,
   source: Record<string, unknown>,
   path: readonly string[],
-  leafGuard: (value: unknown) => boolean,
+  isLeafDescriptor: (value: unknown) => boolean,
   label: string,
 ): void {
   const assertSafePath = (currentPath: readonly string[]) => {
@@ -415,19 +429,19 @@ export function mergeAuthoringNamespaces(
     const existingValue = hasExistingValue ? target[key] : undefined;
 
     if (!hasExistingValue) {
-      // Copy sub-namespace objects instead of assigning the reference so
-      // subsequent merges don't mutate objects owned by source packs.
-      // Leaf descriptors (checked by leafGuard) are immutable values; only
-      // sub-namespaces need copying.
+      // Deep-copy plain-object sub-namespaces so subsequent merges don't mutate
+      // objects owned by source packs. Leaf descriptors and class instances are
+      // passed by reference — leaves are identity values; class instances carry
+      // prototype getters that spread would destroy.
       target[key] =
-        isPlainNamespaceObject(sourceValue) && !leafGuard(sourceValue)
-          ? { ...sourceValue }
+        isCopyableNamespaceObject(sourceValue) && !isLeafDescriptor(sourceValue)
+          ? deepCopyNamespace(sourceValue, isLeafDescriptor)
           : sourceValue;
       continue;
     }
 
-    const existingIsLeaf = leafGuard(existingValue);
-    const sourceIsLeaf = leafGuard(sourceValue);
+    const existingIsLeaf = isLeafDescriptor(existingValue);
+    const sourceIsLeaf = isLeafDescriptor(sourceValue);
 
     if (existingIsLeaf || sourceIsLeaf) {
       throw new Error(
@@ -435,13 +449,13 @@ export function mergeAuthoringNamespaces(
       );
     }
 
-    if (!isPlainNamespaceObject(existingValue) || !isPlainNamespaceObject(sourceValue)) {
+    if (!isCopyableNamespaceObject(existingValue) || !isCopyableNamespaceObject(sourceValue)) {
       throw new Error(
         `Invalid authoring ${label} helper "${currentPath.join('.')}". Expected a sub-namespace object or a recognized descriptor; received a malformed value.`,
       );
     }
 
-    mergeAuthoringNamespaces(existingValue, sourceValue, currentPath, leafGuard, label);
+    mergeAuthoringNamespaces(existingValue, sourceValue, currentPath, isLeafDescriptor, label);
   }
 }
 
