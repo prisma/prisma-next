@@ -147,7 +147,10 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
         'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecuteRequest().',
       );
     }
-    return renderLoweredSql(ast, context.contract as SqliteContract);
+    return renderLoweredSql(
+      ast,
+      blindCast<SqliteContract, 'caller must supply a matching SqliteContract'>(context.contract),
+    );
   }
 
   /**

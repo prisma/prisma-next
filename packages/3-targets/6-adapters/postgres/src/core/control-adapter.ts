@@ -165,7 +165,13 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecuteRequest().',
       );
     }
-    return renderLoweredSql(ast, context.contract as PostgresContract, this.codecRegistry);
+    return renderLoweredSql(
+      ast,
+      blindCast<PostgresContract, 'caller must supply a matching PostgresContract'>(
+        context.contract,
+      ),
+      this.codecRegistry,
+    );
   }
 
   /**

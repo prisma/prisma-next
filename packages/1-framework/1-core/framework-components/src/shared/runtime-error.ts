@@ -26,19 +26,14 @@ export function runtimeError(
   message: string,
   details?: Record<string, unknown>,
 ): RuntimeErrorEnvelope {
-  const error = new Error(message) as RuntimeErrorEnvelope;
-  Object.defineProperty(error, 'name', {
-    value: 'RuntimeError',
-    configurable: true,
-  });
-
-  return Object.assign(error, {
+  const error = Object.assign(new Error(message), {
     code,
     category: resolveCategory(code),
     severity: 'error' as const,
-    message,
-    details,
+    ...(details !== undefined ? { details } : {}),
   });
+  Object.defineProperty(error, 'name', { value: 'RuntimeError', configurable: true });
+  return error;
 }
 
 function resolveCategory(code: string): RuntimeErrorEnvelope['category'] {
