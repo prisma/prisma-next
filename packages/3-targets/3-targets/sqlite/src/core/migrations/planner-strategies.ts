@@ -63,9 +63,7 @@ export function tableAt(
   tableName: string,
 ): StorageTable | undefined {
   const ns = storage.namespaces[namespaceId];
-  return ns !== undefined
-    ? (namespaceTables(ns)[tableName] as StorageTable | undefined)
-    : undefined;
+  return ns !== undefined ? namespaceTables(ns)[tableName] : undefined;
 }
 
 /**
