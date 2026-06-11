@@ -102,6 +102,16 @@ describe('MongoTargetContractSerializer', () => {
     expect(() => serializer.deserializeContract(bad)).toThrow();
   });
 
+  it('fails closed at hydration: an unregistered entries kind throws naming the kind', () => {
+    const serializer = new MongoTargetContractSerializer();
+    const json = makeValidContractJson();
+    const ns = json.storage.namespaces[UNBOUND_NAMESPACE_ID] as {
+      entries: Record<string, unknown>;
+    };
+    ns.entries['bogus'] = { Foo: {} };
+    expect(() => serializer.deserializeContract(json)).toThrow(/bogus/);
+  });
+
   it('serializeContract emits canonical nested namespaces on disk', () => {
     const serializer = new MongoTargetContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());

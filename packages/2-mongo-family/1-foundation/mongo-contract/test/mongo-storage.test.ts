@@ -88,4 +88,13 @@ describe('MongoStorage', () => {
     });
     expect(storage.namespaces[UNBOUND_NAMESPACE_ID]).toBe(MongoUnboundNamespace.instance);
   });
+
+  it('buildMongoNamespace with unbound id and only an unknown kind throws instead of returning the unbound singleton', () => {
+    expect(() =>
+      buildMongoNamespace({
+        id: UNBOUND_NAMESPACE_ID,
+        entries: { bogus: {} } as never,
+      }),
+    ).toThrow(/unknown entity kind/);
+  });
 });

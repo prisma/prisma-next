@@ -290,17 +290,15 @@ export function postgresCreateNamespace(
   input: SqlNamespaceTablesInput,
   enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
 ): PostgresSchema {
-  const inputTable = input.entries['table'] ?? {};
-  const inputValueSet = input.entries['valueSet'];
   const schemaInput: PostgresSchemaInput = {
     id: input.id,
     entries: {
-      table: inputTable,
+      ...input.entries,
+      table: input.entries['table'] ?? {},
       type: blindCast<
         Record<string, PostgresEnumTypeInput>,
         'enumTypes values are PostgresEnumTypeInput by construction'
       >(enumTypes ?? {}),
-      ...(inputValueSet !== undefined ? { valueSet: inputValueSet } : {}),
     },
   };
   if (input.id === UNBOUND_NAMESPACE_ID) {

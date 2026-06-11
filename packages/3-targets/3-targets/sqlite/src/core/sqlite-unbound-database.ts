@@ -136,7 +136,8 @@ export function buildSqliteNamespace(
   }
   const tableKind = input.entries['table'];
   const tableCount = tableKind !== undefined ? Object.keys(tableKind).length : 0;
-  if (tableCount === 0) {
+  const hasOnlyKnownKinds = Object.keys(input.entries).every((kind) => kind === 'table');
+  if (hasOnlyKnownKinds && tableCount === 0) {
     return castAs<SqliteUnboundDatabase>(SqliteUnboundDatabase.instance);
   }
   return new SqliteDatabase({ id: input.id, entries: input.entries });

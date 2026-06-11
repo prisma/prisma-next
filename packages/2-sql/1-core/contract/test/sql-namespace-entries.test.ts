@@ -140,6 +140,15 @@ describe('SqlBoundNamespace — entries open dictionary', () => {
     ).toThrow(/unknown entity kind/);
   });
 
+  it('unbound id with only an unknown kind throws instead of returning the unbound singleton', () => {
+    expect(() =>
+      buildSqlNamespace({
+        id: UNBOUND_NAMESPACE_ID,
+        entries: { bogus: {} } as never,
+      }),
+    ).toThrow(/unknown entity kind/);
+  });
+
   it('entries[kind][name] resolves the same as the getter[name]', () => {
     const ns = buildSqlNamespace({
       id: 'app',

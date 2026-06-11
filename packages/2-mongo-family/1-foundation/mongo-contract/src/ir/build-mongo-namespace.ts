@@ -31,6 +31,13 @@ class MongoBoundNamespace extends NamespaceBase {
   readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
   static fromCollectionsInput(input: MongoNamespaceCollectionsInput): MongoNamespace {
+    for (const kind of Object.keys(input.entries)) {
+      if (kind !== 'collection') {
+        throw new Error(
+          `buildMongoNamespace: unknown entity kind "${kind}" in entries; expected "collection"`,
+        );
+      }
+    }
     const collectionMap = input.entries['collection'];
     const collectionCount = collectionMap !== undefined ? Object.keys(collectionMap).length : 0;
     if (input.id === UNBOUND_NAMESPACE_ID && collectionCount === 0) {

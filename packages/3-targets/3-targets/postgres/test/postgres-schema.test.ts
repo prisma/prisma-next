@@ -137,6 +137,12 @@ describe('postgresCreateNamespace factory', () => {
     expect(auth.id).toBe('auth');
     expect(billing.id).toBe('billing');
   });
+
+  it('forwards an unknown entries kind to the constructor, which throws naming the kind', () => {
+    expect(() =>
+      postgresCreateNamespace({ id: 'auth', entries: { table: {}, bogus: {} } as never }),
+    ).toThrow(/unknown entity kind/);
+  });
 });
 
 describe('PostgresSchema — entries open dictionary', () => {

@@ -118,12 +118,20 @@ export abstract class MongoContractSerializerBase<TContract>
    * Walk a structurally-validated Mongo contract and convert each
    * `storage.namespaces[nsId].entries.collection[collectionName]` entry from plain
    * data into `MongoCollection` IR-class instances. Idempotent: already-class
-   * instances pass through unchanged.
+   * instances pass through unchanged. Fails closed: an entries key other
+   * than `collection` throws naming the kind — never silently dropped.
    */
   protected hydrateMongoContract(contract: MongoContract): MongoContract {
     const rawNamespaces = contract.storage.namespaces;
     const hydratedNamespaces = Object.fromEntries(
       Object.entries(rawNamespaces).map(([nsId, nsEnvelope]) => {
+        for (const kind of Object.keys(nsEnvelope.entries)) {
+          if (kind !== 'collection') {
+            throw new Error(
+              `Unknown entries key "${kind}" in namespace "${nsId}"; no hydration factory registered for this entity kind`,
+            );
+          }
+        }
         const rawCollections = namespaceCollections(nsEnvelope);
         const hydratedCollections = Object.fromEntries(
           Object.entries(rawCollections).map(([name, raw]) => [

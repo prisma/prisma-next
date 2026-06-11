@@ -30,6 +30,14 @@ class SqlBoundNamespace extends NamespaceBase {
   readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
   static fromTablesInput(input: SqlNamespaceTablesInput): SqlNamespace {
+    const unknownKinds = Object.keys(input.entries).filter(
+      (kind) => kind !== 'table' && kind !== 'valueSet',
+    );
+    if (unknownKinds.length > 0) {
+      throw new Error(
+        `buildSqlNamespace: unknown entity kind(s) ${unknownKinds.map((k) => JSON.stringify(k)).join(', ')} in entries; expected "table" or "valueSet"`,
+      );
+    }
     const tableKind = input.entries['table'];
     const tableCount = tableKind !== undefined ? Object.keys(tableKind).length : 0;
     const valueSetKind = input.entries['valueSet'];

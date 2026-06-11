@@ -65,6 +65,12 @@ describe('sqliteCreateNamespace factory', () => {
       /SQLite has no schema concept/,
     );
   });
+
+  it('unknown kind with zero tables throws instead of returning the unbound singleton', () => {
+    expect(() =>
+      sqliteCreateNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { bogus: {} } as never }),
+    ).toThrow(/unknown entity kind/);
+  });
 });
 
 describe('SqliteDatabase — entries open dictionary', () => {
