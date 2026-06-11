@@ -16,6 +16,7 @@ import {
   type SqlStorage,
   type StorageTable,
   type StorageTypeInstance,
+  storageTableAt,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 
@@ -110,8 +111,7 @@ export const sqlEmission = {
         }
 
         const tableName = model.storage.table;
-        const nsForTable = storage.namespaces[namespaceId];
-        const table = nsForTable !== undefined ? nsForTable.entries.table?.[tableName] : undefined;
+        const table = storageTableAt(storage, namespaceId, tableName);
         if (!table) {
           throw new Error(
             `Model "${qualifiedName}" references non-existent table "${namespaceId}.${tableName}"`,
@@ -204,9 +204,11 @@ export const sqlEmission = {
             }
           }
 
-          const fkTargetNs = storage.namespaces[fk.target.namespaceId];
-          const referencedTable =
-            fkTargetNs !== undefined ? fkTargetNs.entries.table?.[fk.target.tableName] : undefined;
+          const referencedTable = storageTableAt(
+            storage,
+            fk.target.namespaceId,
+            fk.target.tableName,
+          );
           if (!referencedTable) {
             throw new Error(
               `Table "${tableName}" foreignKey references non-existent table "${fk.target.tableName}" in namespace "${fk.target.namespaceId}"`,
@@ -279,8 +281,7 @@ export const sqlEmission = {
     const storageNamespaceId = sqlModel.storage.namespaceId;
     if (!storageNamespaceId) return undefined;
 
-    const tableNs = storage.namespaces[storageNamespaceId];
-    const table = tableNs !== undefined ? tableNs.entries.table?.[tableName] : undefined;
+    const table = storageTableAt(storage, storageNamespaceId, tableName);
     if (!table) return undefined;
 
     const column = table.columns[storageField.column];

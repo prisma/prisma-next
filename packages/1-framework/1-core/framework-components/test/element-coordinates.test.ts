@@ -1,7 +1,7 @@
 import type { StorageBase } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
-import { type EntityCoordinate, elementCoordinates } from '../src/ir/storage';
+import { type EntityCoordinate, elementCoordinates, entityAt } from '../src/ir/storage';
 
 function assertStoragePlaneCoordinates(coordinates: EntityCoordinate[]): void {
   expect(coordinates.length).toBeGreaterThan(0);
@@ -61,5 +61,59 @@ describe('elementCoordinates', () => {
     expect(coordinates.some((c) => c.entityKind === 'id')).toBe(false);
     expect(coordinates.some((c) => c.entityKind === 'skippedNull')).toBe(false);
     expect(coordinates.some((c) => c.entityKind === 'skippedScalar')).toBe(false);
+  });
+});
+
+describe('entityAt', () => {
+  const storage = blindCast<Pick<StorageBase, 'namespaces'>, 'synthetic storage fixture'>({
+    namespaces: {
+      public: {
+        id: 'public',
+        entries: { table: { users: { name: 'users' }, posts: { name: 'posts' } } },
+      },
+      auth: {
+        id: 'auth',
+        entries: {
+          table: { identities: { name: 'identities' } },
+          valueSet: { Role: { name: 'Role' } },
+        },
+      },
+    },
+  });
+
+  it('resolves a known coordinate', () => {
+    const entity = entityAt(storage, {
+      namespaceId: 'public',
+      entityKind: 'table',
+      entityName: 'users',
+    });
+    expect(entity).toEqual({ name: 'users' });
+  });
+
+  it('resolves across kinds', () => {
+    const entity = entityAt(storage, {
+      namespaceId: 'auth',
+      entityKind: 'valueSet',
+      entityName: 'Role',
+    });
+    expect(entity).toEqual({ name: 'Role' });
+  });
+
+  it('returns undefined for unknown namespace', () => {
+    expect(
+      entityAt(storage, { namespaceId: 'missing', entityKind: 'table', entityName: 'users' }),
+    ).toBeUndefined();
+  });
+
+  it('returns undefined for unknown entityKind', () => {
+    expect(
+      entityAt(storage, { namespaceId: 'public', entityKind: 'collection', entityName: 'users' }),
+    ).toBeUndefined();
+  });
+
+  it('returns undefined for unknown entityName', () => {
+    expect(
+      entityAt(storage, { namespaceId: 'public', entityKind: 'table', entityName: 'missing' }),
+    ).toBeUndefined();
   });
 });

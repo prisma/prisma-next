@@ -52,6 +52,24 @@ export function* elementCoordinates(
 }
 
 /**
+ * Looks up a single entity in a `Storage`-shaped value by its full coordinate.
+ * Returns `undefined` if the namespace, entity kind, or entity name is absent.
+ * Generic/walker code that needs a typed result should cast after calling this.
+ */
+export function entityAt(
+  storage: Pick<StorageBase, 'namespaces'>,
+  coord: Pick<EntityCoordinate, 'namespaceId' | 'entityKind' | 'entityName'>,
+): unknown {
+  const ns = storage.namespaces[coord.namespaceId];
+  if (ns === undefined) return undefined;
+  const entries = ns.entries;
+  if (entries === null || typeof entries !== 'object') return undefined;
+  const kindMap = (entries as Record<string, unknown>)[coord.entityKind];
+  if (kindMap === null || typeof kindMap !== 'object') return undefined;
+  return (kindMap as Record<string, unknown>)[coord.entityName];
+}
+
+/**
  * Framework-level promise that every Contract IR / Schema IR carries a
  * collection of namespaces keyed by namespace id. Family storage
  * concretions (`SqlStorage`, `MongoStorage`) refine the shape with
