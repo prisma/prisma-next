@@ -64,7 +64,7 @@ export class SqlUnboundNamespace extends NamespaceBase {
     return blindCast<
       Readonly<Record<string, StorageTable>>,
       'entries[table] holds only StorageTable by construction'
-    >(this.entries['table'] ?? FROZEN_EMPTY_TABLE);
+    >(this.entries['table']);
   }
 
   qualifyTable(tableName: string): string {
