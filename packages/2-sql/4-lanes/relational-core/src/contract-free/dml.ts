@@ -1,6 +1,7 @@
 export {
   CfConflictClause,
   CfExpr,
+  CfExprSelectQuery,
   CfInsertQuery,
   CfSelectQuery,
   CfUpdateQuery,
@@ -9,7 +10,9 @@ export {
   type ColumnDescriptor,
   type ColumnProxy,
   type ColumnSchema,
+  cfExpr,
   type ExcludedProxy,
+  exprSelect,
   type TableHandle,
   type TableInsertRow,
   type TableSetValues,

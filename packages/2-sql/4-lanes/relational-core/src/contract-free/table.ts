@@ -1,12 +1,16 @@
 import { blindCast } from '@prisma-next/utils/casts';
 import {
+  AggregateExpr,
   AndExpr,
   type AnyExpression,
+  type AnyFromSource,
   BinaryExpr,
   ColumnRef,
+  IdentifierRef,
   InsertAst,
   InsertOnConflict,
   type InsertValue,
+  LiteralExpr,
   NullCheckExpr,
   OrderByItem,
   OrExpr,
@@ -43,6 +47,77 @@ export class CfExpr {
   not(): CfExpr {
     return new CfExpr(this.ast.not());
   }
+
+  isNull(): CfExpr {
+    return new CfExpr(NullCheckExpr.isNull(this.ast));
+  }
+
+  isNotNull(): CfExpr {
+    return new CfExpr(NullCheckExpr.isNotNull(this.ast));
+  }
+
+  eqLit(value: number | string | boolean): CfExpr {
+    return new CfExpr(BinaryExpr.eq(this.ast, LiteralExpr.of(value)));
+  }
+
+  gtLit(value: number | string | boolean): CfExpr {
+    return new CfExpr(BinaryExpr.gt(this.ast, LiteralExpr.of(value)));
+  }
+
+  eqParam(value: unknown, codecId: string): CfExpr {
+    return new CfExpr(BinaryExpr.eq(this.ast, ParamRef.of(value, { codec: { codecId } })));
+  }
+}
+
+export const cfExpr = {
+  countStar(): CfExpr {
+    return new CfExpr(AggregateExpr.count());
+  },
+  lit(value: number | string | boolean): CfExpr {
+    return new CfExpr(LiteralExpr.of(value));
+  },
+  identifierRef(name: string): CfExpr {
+    return new CfExpr(IdentifierRef.of(name));
+  },
+  param(value: unknown, codecId: string): CfExpr {
+    return new CfExpr(ParamRef.of(value, { codec: { codecId } }));
+  },
+};
+
+export class CfExprSelectQuery {
+  constructor(
+    private readonly src: AnyFromSource | undefined,
+    private readonly projectionItems: ReadonlyArray<ProjectionItem>,
+    private readonly whereExpr: CfExpr | undefined,
+  ) {}
+
+  from(source: AnyFromSource): CfExprSelectQuery {
+    return new CfExprSelectQuery(source, this.projectionItems, this.whereExpr);
+  }
+
+  project(alias: string, expr: CfExpr): CfExprSelectQuery {
+    return new CfExprSelectQuery(
+      this.src,
+      [...this.projectionItems, ProjectionItem.of(alias, expr.ast)],
+      this.whereExpr,
+    );
+  }
+
+  where(expr: CfExpr): CfExprSelectQuery {
+    return new CfExprSelectQuery(this.src, this.projectionItems, expr);
+  }
+
+  build(): SelectAst {
+    const base =
+      this.src !== undefined
+        ? SelectAst.from(this.src).withProjection(this.projectionItems)
+        : SelectAst.noFrom().withProjection(this.projectionItems);
+    return this.whereExpr !== undefined ? base.withWhere(this.whereExpr.ast) : base;
+  }
+}
+
+export function exprSelect(): CfExprSelectQuery {
+  return new CfExprSelectQuery(undefined, [], undefined);
 }
 
 /**

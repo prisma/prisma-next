@@ -25,12 +25,15 @@ function hasAggregateWithoutGroupBy(ast: SelectAst): boolean {
   return ast.projection.some((item) => item.expr.kind === 'aggregate');
 }
 
-function primaryTableFromAst(ast: SelectAst): string {
+function primaryTableFromAst(ast: SelectAst): string | undefined {
+  if (ast.from === undefined) return undefined;
   switch (ast.from.kind) {
     case 'table-source':
       return ast.from.name;
     case 'derived-table-source':
       return ast.from.alias;
+    case 'function-source':
+      return ast.from.fn;
     // v8 ignore next 4
     default:
       throw new Error(
@@ -49,7 +52,9 @@ function estimateRowsFromAst(
     return 1;
   }
 
-  const tableEstimate = tableRows[primaryTableFromAst(ast)] ?? defaultTableRows;
+  const primaryTable = primaryTableFromAst(ast);
+  const tableEstimate =
+    (primaryTable !== undefined ? tableRows[primaryTable] : undefined) ?? defaultTableRows;
 
   if (typeof ast.limit === 'number') {
     return Math.min(ast.limit, tableEstimate);

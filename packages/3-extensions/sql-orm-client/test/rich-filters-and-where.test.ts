@@ -50,7 +50,7 @@ describe('SQL ORM rich AST filters', () => {
     expect(postsFilter?.kind).toBe('exists');
     const exists = postsFilter as ExistsExpr;
     expect(exists.subquery.kind).toBe('select');
-    expect(exists.subquery.from.kind).toBe('table-source');
+    expect(exists.subquery.from?.kind).toBe('table-source');
     expect(exists.subquery.where?.kind).toBe('and');
   });
 

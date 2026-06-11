@@ -54,7 +54,7 @@ describe('SQL ORM rich AST query plans', () => {
     const postsProjection = ast.projection.find((item) => item.alias === 'posts');
     expect(postsProjection?.expr.kind).toBe('subquery');
     const aggregateQuery = (postsProjection?.expr as SubqueryExpr).query;
-    expect(aggregateQuery.from.kind).toBe('derived-table-source');
+    expect(aggregateQuery.from?.kind).toBe('derived-table-source');
 
     const rowsQuery = (aggregateQuery.from as DerivedTableSource).query;
     expect(rowsQuery.where?.kind).toBe('and');

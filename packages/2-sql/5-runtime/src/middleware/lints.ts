@@ -34,6 +34,8 @@ function getFromSourceTableDetail(source: AnyFromSource): string | undefined {
       return source.name;
     case 'derived-table-source':
       return source.alias;
+    case 'function-source':
+      return source.fn;
     // v8 ignore next 4
     default:
       throw new Error(
@@ -72,7 +74,7 @@ function evaluateAstLints(ast: AnyQueryAst): LintFinding[] {
 
     case 'select':
       if (ast.limit === undefined) {
-        const table = getFromSourceTableDetail(ast.from);
+        const table = ast.from !== undefined ? getFromSourceTableDetail(ast.from) : undefined;
         findings.push({
           code: 'LINT.NO_LIMIT',
           severity: 'warn',

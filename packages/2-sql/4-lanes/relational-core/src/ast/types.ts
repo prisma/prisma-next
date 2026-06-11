@@ -378,6 +378,35 @@ export class DerivedTableSource extends FromSource {
   }
 }
 
+export class FunctionSource extends FromSource {
+  readonly kind = 'function-source' as const;
+  readonly fn: string;
+  readonly args: ReadonlyArray<AnyExpression>;
+  readonly alias: string | undefined;
+
+  protected constructor(fn: string, args: ReadonlyArray<AnyExpression>, alias?: string) {
+    super();
+    this.fn = fn;
+    this.args = frozenArrayCopy(args);
+    this.alias = alias;
+    this.freeze();
+  }
+
+  static of(fn: string, args: ReadonlyArray<AnyExpression>, alias?: string): FunctionSource {
+    return new FunctionSource(fn, args, alias);
+  }
+
+  override rewrite(rewriter: AstRewriter): AnyFromSource {
+    const rewrittenArgs = this.args.map((arg) => rewriteComparable(arg, rewriter));
+    if (rewrittenArgs.every((arg, i) => arg === this.args[i])) return this;
+    return new FunctionSource(this.fn, rewrittenArgs, this.alias);
+  }
+
+  override toFromSource(): AnyFromSource {
+    return this;
+  }
+}
+
 export class ColumnRef extends Expression {
   readonly kind = 'column-ref' as const;
   readonly table: string;
@@ -1299,7 +1328,7 @@ export class ProjectionItem extends AstNode {
 export type LimitOffsetValue = number | AnyExpression;
 
 export interface SelectAstOptions {
-  readonly from: AnyFromSource;
+  readonly from?: AnyFromSource;
   readonly joins: ReadonlyArray<JoinAst> | undefined;
   readonly projection: ReadonlyArray<ProjectionItem>;
   readonly where: AnyExpression | undefined;
@@ -1315,7 +1344,7 @@ export interface SelectAstOptions {
 
 export class SelectAst extends QueryAst {
   readonly kind = 'select' as const;
-  readonly from: AnyFromSource;
+  readonly from: AnyFromSource | undefined;
   readonly joins: ReadonlyArray<JoinAst> | undefined;
   readonly projection: ReadonlyArray<ProjectionItem>;
   readonly where: AnyExpression | undefined;
@@ -1368,79 +1397,113 @@ export class SelectAst extends QueryAst {
     });
   }
 
+  static noFrom(): SelectAst {
+    return new SelectAst({
+      joins: undefined,
+      projection: [],
+      where: undefined,
+      orderBy: undefined,
+      distinct: undefined,
+      distinctOn: undefined,
+      groupBy: undefined,
+      having: undefined,
+      limit: undefined,
+      offset: undefined,
+      selectAllIntent: undefined,
+    });
+  }
+
+  private toOptions(): SelectAstOptions {
+    return {
+      ...(this.from !== undefined ? { from: this.from } : {}),
+      joins: this.joins,
+      projection: this.projection,
+      where: this.where,
+      orderBy: this.orderBy,
+      distinct: this.distinct,
+      distinctOn: this.distinctOn,
+      groupBy: this.groupBy,
+      having: this.having,
+      limit: this.limit,
+      offset: this.offset,
+      selectAllIntent: this.selectAllIntent,
+    };
+  }
+
   withFrom(from: AnyFromSource): SelectAst {
-    return new SelectAst({ ...this, from });
+    return new SelectAst({ ...this.toOptions(), from });
   }
 
   withJoins(joins: ReadonlyArray<JoinAst>): SelectAst {
     return new SelectAst({
-      ...this,
+      ...this.toOptions(),
       joins: joins.length > 0 ? joins : undefined,
     });
   }
 
   withProjection(projection: ReadonlyArray<ProjectionItem>): SelectAst {
-    return new SelectAst({ ...this, projection });
+    return new SelectAst({ ...this.toOptions(), projection });
   }
 
   addProjection(alias: string, expr: ProjectionExpr): SelectAst {
     return new SelectAst({
-      ...this,
+      ...this.toOptions(),
       projection: [...this.projection, new ProjectionItem(alias, expr)],
     });
   }
 
   withWhere(where: AnyExpression | undefined): SelectAst {
-    return new SelectAst({ ...this, where });
+    return new SelectAst({ ...this.toOptions(), where });
   }
 
   withOrderBy(orderBy: ReadonlyArray<OrderByItem>): SelectAst {
     return new SelectAst({
-      ...this,
+      ...this.toOptions(),
       orderBy: orderBy.length > 0 ? orderBy : undefined,
     });
   }
 
   withDistinct(enabled = true): SelectAst {
     return new SelectAst({
-      ...this,
+      ...this.toOptions(),
       distinct: enabled ? true : undefined,
     });
   }
 
   withDistinctOn(distinctOn: ReadonlyArray<AnyExpression>): SelectAst {
     return new SelectAst({
-      ...this,
+      ...this.toOptions(),
       distinctOn: distinctOn.length > 0 ? distinctOn : undefined,
     });
   }
 
   withGroupBy(groupBy: ReadonlyArray<AnyExpression>): SelectAst {
     return new SelectAst({
-      ...this,
+      ...this.toOptions(),
       groupBy: groupBy.length > 0 ? groupBy : undefined,
     });
   }
 
   withHaving(having: AnyExpression | undefined): SelectAst {
-    return new SelectAst({ ...this, having });
+    return new SelectAst({ ...this.toOptions(), having });
   }
 
   withLimit(limit: LimitOffsetValue | undefined): SelectAst {
-    return new SelectAst({ ...this, limit });
+    return new SelectAst({ ...this.toOptions(), limit });
   }
 
   withOffset(offset: LimitOffsetValue | undefined): SelectAst {
-    return new SelectAst({ ...this, offset });
+    return new SelectAst({ ...this.toOptions(), offset });
   }
 
   withSelectAllIntent(selectAllIntent: { readonly table?: string } | undefined): SelectAst {
-    return new SelectAst({ ...this, selectAllIntent });
+    return new SelectAst({ ...this.toOptions(), selectAllIntent });
   }
 
   rewrite(rewriter: AstRewriter): SelectAst {
+    const rewrittenFrom = this.from?.rewrite(rewriter);
     const rewritten = new SelectAst({
-      from: this.from.rewrite(rewriter),
+      ...(rewrittenFrom !== undefined ? { from: rewrittenFrom } : {}),
       joins: this.joins?.map((join) => join.rewrite(rewriter)),
       projection: this.projection.map(
         (projection) =>
@@ -1474,7 +1537,7 @@ export class SelectAst extends QueryAst {
       refs.push(...columns);
     };
 
-    if (this.from.kind === 'derived-table-source') {
+    if (this.from?.kind === 'derived-table-source') {
       pushRefs(this.from.query.collectColumnRefs());
     }
 
@@ -1525,8 +1588,12 @@ export class SelectAst extends QueryAst {
       refs.push(...params);
     };
 
-    if (this.from.kind === 'derived-table-source') {
+    if (this.from?.kind === 'derived-table-source') {
       pushRefs(this.from.query.collectParamRefs());
+    } else if (this.from?.kind === 'function-source') {
+      for (const arg of this.from.args) {
+        pushRefs(arg.collectParamRefs());
+      }
     }
 
     for (const projection of this.projection) {
@@ -1899,7 +1966,7 @@ export class RawSqlExpr extends QueryAst {
 }
 
 export type AnyQueryAst = SelectAst | InsertAst | UpdateAst | DeleteAst | RawSqlExpr;
-export type AnyFromSource = TableSource | DerivedTableSource;
+export type AnyFromSource = TableSource | DerivedTableSource | FunctionSource;
 export type AnyExpression =
   | ColumnRef
   | IdentifierRef
