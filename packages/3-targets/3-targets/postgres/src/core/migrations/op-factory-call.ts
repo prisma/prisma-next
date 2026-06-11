@@ -81,6 +81,10 @@ type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 // transitive package on disk.
 const POSTGRES_MIGRATION_FACADE = '@prisma-next/postgres/migration';
 
+function boundSchema(schemaName: string): string | undefined {
+  return schemaName === UNBOUND_NAMESPACE_ID ? undefined : schemaName;
+}
+
 abstract class PostgresOpFactoryCallNode extends TsExpression implements FrameworkOpFactoryCall {
   abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
@@ -220,7 +224,7 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
       );
     }
     const ddlNode = contractFreeDdl.createTable({
-      ...(this.schemaName !== UNBOUND_NAMESPACE_ID ? { schema: this.schemaName } : {}),
+      ...ifDefined('schema', boundSchema(this.schemaName)),
       table: this.tableName,
       columns: this.columns,
       ...ifDefined('constraints', this.constraints),
@@ -340,7 +344,7 @@ export class AddColumnCall extends PostgresOpFactoryCallNode {
       );
     }
     const ddlNode = contractFreeDdl.alterTable({
-      ...(this.schemaName !== UNBOUND_NAMESPACE_ID ? { schema: this.schemaName } : {}),
+      ...ifDefined('schema', boundSchema(this.schemaName)),
       table: this.tableName,
       actions: [contractFreeDdl.addColumnAction(this.column)],
     });

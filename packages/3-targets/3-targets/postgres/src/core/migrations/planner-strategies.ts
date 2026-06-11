@@ -258,17 +258,17 @@ function buildColumnSpec(
   const typeSql = buildColumnTypeSql(storageCol, mutableHooks, mutableTypes);
   const ddlDefault = postgresDefaultToDdlColumnDefault(storageCol.default);
   const resolved = resolveColumnTypeMetadata(storageCol, mutableTypes);
+  const typeParams =
+    resolved.typeParams === undefined
+      ? undefined
+      : blindCast<
+          JsonValue,
+          'resolved.typeParams is JsonValue-shaped storage metadata; the narrowed value lands in CodecRef.typeParams which is JsonValue'
+        >(resolved.typeParams);
   const codecRef: CodecRef | undefined = resolved.codecId
     ? {
         codecId: resolved.codecId,
-        ...(resolved.typeParams !== undefined
-          ? {
-              typeParams: blindCast<
-                JsonValue,
-                'resolved.typeParams is JsonValue-shaped storage metadata; the narrowed (non-undefined) value lands in CodecRef.typeParams which is JsonValue'
-              >(resolved.typeParams),
-            }
-          : {}),
+        ...ifDefined('typeParams', typeParams),
       }
     : undefined;
   const nullable = overrides?.nullable ?? storageCol.nullable;
