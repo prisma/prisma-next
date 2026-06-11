@@ -18,7 +18,6 @@ export {
   unique,
 } from '@prisma-next/sql-relational-core/contract-free';
 export {
-  addColumn,
   alterColumnType,
   dropColumn,
   dropDefault,

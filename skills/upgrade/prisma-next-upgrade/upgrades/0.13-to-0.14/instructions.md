@@ -239,3 +239,14 @@ surface at compile time (e.g. `db.enums.public.Priority.members.Low` resolves to
 `'low'` rather than `string`). Additive — no existing contract shape changes.
 No consumer action required.
 -->
+
+<!--
+TML-2886: typed ALTER TABLE … ADD COLUMN via AlterTable DDL IR (PR #813). The
+example migrations that used the bare `addColumn()` helper are updated to
+`this.addColumn(...)` (the method on the `Migration` base class, which now carries
+full column typing via the `col()` builder). The column-attribute order in emitted
+CREATE TABLE SQL changed from `… NOT NULL DEFAULT …` to `… DEFAULT … NOT NULL` as a
+by-product of the AlterTable IR alignment. The example fixture snapshots are
+regenerated accordingly. No user-facing contract or migration format change.
+Incidental substrate diff only.
+-->

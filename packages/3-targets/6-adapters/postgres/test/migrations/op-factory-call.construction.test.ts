@@ -8,6 +8,7 @@
 
 import { col, fn, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import {
+  AddColumnCall,
   CreateSchemaCall,
   CreateTableCall,
   DataTransformCall,
@@ -85,7 +86,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
     const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe(
       'CREATE TABLE "public"."user" (\n' +
-        `  "id" bigint NOT NULL DEFAULT (nextval('"user_id_seq"'::regclass))\n` +
+        `  "id" bigint DEFAULT (nextval('"user_id_seq"'::regclass)) NOT NULL\n` +
         ')',
     );
   });
@@ -102,5 +103,33 @@ describe('Postgres call classes - construction + toOp parity', () => {
     expect(op.execute[0]?.sql).toBe(
       'CREATE TABLE "item" (\n' + '  "id" text NOT NULL,\n' + '  PRIMARY KEY ("id")\n' + ')',
     );
+  });
+
+  it('AddColumnCall freezes, labels from column+table, requires a lowerer', async () => {
+    const call = new AddColumnCall('public', 'user', col('email', 'text'));
+
+    expect(Object.isFrozen(call)).toBe(true);
+    expect(call.factoryName).toBe('addColumn');
+    expect(call.operationClass).toBe('additive');
+    expect(call.label).toBe('Add column "email" to "user"');
+    await expect(call.toOp()).rejects.toThrow(/lowerer is required/);
+  });
+
+  it('AddColumnCall.toOp produces ALTER TABLE … ADD COLUMN SQL (byte-parity)', async () => {
+    const call = new AddColumnCall('public', 'user', col('email', 'text', { notNull: true }));
+    const op = await call.toOp(testAdapter);
+    expect(op.execute[0]?.sql).toBe('ALTER TABLE "public"."user" ADD COLUMN "email" text NOT NULL');
+    expect(op.id).toBe('column.user.email');
+    expect(op.operationClass).toBe('additive');
+    expect(op.target).toMatchObject({
+      id: 'postgres',
+      details: { schema: 'public', objectType: 'column', name: 'email', table: 'user' },
+    });
+  });
+
+  it('AddColumnCall.toOp with __unbound__ schema produces an unqualified table name', async () => {
+    const call = new AddColumnCall('__unbound__', 'item', col('score', 'int'));
+    const op = await call.toOp(testAdapter);
+    expect(op.execute[0]?.sql).toBe('ALTER TABLE "item" ADD COLUMN "score" int');
   });
 });

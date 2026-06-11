@@ -51,6 +51,9 @@ import {
   buildSignMarkerBootstrapQueries,
 } from '@prisma-next/target-postgres/contract-free';
 import type {
+  AddColumnAction,
+  AlterTableActionVisitor,
+  PostgresAlterTable,
   PostgresCreateSchema,
   PostgresCreateTable,
   PostgresDdlNode,
@@ -1490,8 +1493,6 @@ async function pgRenderDdlColumnDefault(
 
 async function pgRenderDdlColumn(column: DdlColumn, codecLookup: CodecLookup): Promise<string> {
   const parts = [quoteIdentifier(column.name), column.type];
-  if (column.notNull) parts.push('NOT NULL');
-  if (column.primaryKey) parts.push('PRIMARY KEY');
   if (column.default) {
     const clause = await pgRenderDdlColumnDefault(
       column.default,
@@ -1501,6 +1502,8 @@ async function pgRenderDdlColumn(column: DdlColumn, codecLookup: CodecLookup): P
     );
     if (clause.length > 0) parts.push(clause);
   }
+  if (column.notNull) parts.push('NOT NULL');
+  if (column.primaryKey) parts.push('PRIMARY KEY');
   return parts.join(' ');
 }
 
@@ -1563,12 +1566,34 @@ function pgRenderCreateSchema(node: PostgresCreateSchema): SqlExecuteRequest {
   };
 }
 
+async function pgRenderAlterTable(
+  node: PostgresAlterTable,
+  codecLookup: CodecLookup,
+): Promise<SqlExecuteRequest> {
+  const tableRef = node.schema
+    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`
+    : quoteIdentifier(node.table);
+  const actionVisitor: AlterTableActionVisitor<Promise<string>> = {
+    async addColumn(action: AddColumnAction): Promise<string> {
+      const colFragment = await pgRenderDdlColumn(action.column, codecLookup);
+      return `ADD COLUMN ${colFragment}`;
+    },
+  };
+  const actionSqls = await Promise.all(node.actions.map((a) => a.accept(actionVisitor)));
+  return {
+    sql: `ALTER TABLE ${tableRef} ${actionSqls.join(', ')}`,
+    params: [],
+  };
+}
+
 async function pgRenderDdlExecuteRequest(
   ast: PostgresDdlNode,
   codecLookup: CodecLookup,
 ): Promise<SqlExecuteRequest> {
-  if (ast.kind === 'create-table') {
-    return pgRenderCreateTable(blindCast<PostgresCreateTable, 'kind guard'>(ast), codecLookup);
-  }
-  return pgRenderCreateSchema(blindCast<PostgresCreateSchema, 'kind guard'>(ast));
+  const visitor = {
+    createTable: (node: PostgresCreateTable) => pgRenderCreateTable(node, codecLookup),
+    createSchema: (node: PostgresCreateSchema) => Promise.resolve(pgRenderCreateSchema(node)),
+    alterTable: (node: PostgresAlterTable) => pgRenderAlterTable(node, codecLookup),
+  };
+  return ast.accept(visitor);
 }

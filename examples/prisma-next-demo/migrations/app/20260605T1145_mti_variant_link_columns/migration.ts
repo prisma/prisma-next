@@ -1,8 +1,8 @@
 #!/usr/bin/env -S node
 import {
-  addColumn,
   addForeignKey,
   addPrimaryKey,
+  col,
   Migration,
   MigrationCLI,
   setNotNull,
@@ -35,19 +35,9 @@ export default class M extends Migration {
       // that the cascading FK to `task(id)` would immediately reject. (`migration
       // plan` scaffolds dataTransform backfill placeholders for the new NOT NULL
       // columns; they are stripped here for exactly this reason.)
-      addColumn('public', 'bug', {
-        name: 'id',
-        typeSql: 'character(36)',
-        defaultSql: '',
-        nullable: true,
-      }),
+      this.addColumn({ schema: 'public', table: 'bug', column: col('id', 'character(36)') }),
       setNotNull('public', 'bug', 'id'),
-      addColumn('public', 'feature', {
-        name: 'id',
-        typeSql: 'character(36)',
-        defaultSql: '',
-        nullable: true,
-      }),
+      this.addColumn({ schema: 'public', table: 'feature', column: col('id', 'character(36)') }),
       setNotNull('public', 'feature', 'id'),
       addPrimaryKey('public', 'bug', 'bug_pkey', ['id']),
       addPrimaryKey('public', 'feature', 'feature_pkey', ['id']),
