@@ -2,6 +2,7 @@ import { ContractValidationError } from '@prisma-next/contract/contract-validati
 import type { Contract } from '@prisma-next/contract/types';
 import { type } from 'arktype';
 import type { IndexTypeRegistry } from './index-types';
+import { namespaceTables } from './ir/sql-storage';
 import type { SqlStorage, StorageTable } from './types';
 
 export function validateIndexTypes(
@@ -9,7 +10,7 @@ export function validateIndexTypes(
   indexTypeRegistry: IndexTypeRegistry,
 ): void {
   for (const [namespaceId, ns] of Object.entries(contract.storage.namespaces)) {
-    for (const [tableName, rawTable] of Object.entries(ns.entries.table)) {
+    for (const [tableName, rawTable] of Object.entries(namespaceTables(ns))) {
       const table = rawTable as StorageTable;
       for (const index of table.indexes) {
         if (index.type === undefined && index.options !== undefined) {

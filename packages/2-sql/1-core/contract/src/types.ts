@@ -30,6 +30,9 @@ export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
 export {
+  namespaceTables,
+  namespaceValueSets,
+  type SqlNamespace,
   type SqlNamespaceTablesInput,
   SqlStorage,
   type SqlStorageInput,

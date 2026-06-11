@@ -11,6 +11,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
 import { buildSqlNamespaceMap } from './ir/build-sql-namespace';
+import { namespaceTables } from './ir/sql-storage';
 import { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 import {
   type ForeignKeyInput,
@@ -345,22 +346,18 @@ export function createSqlStorageSchema(
 
 const StorageSchema = createSqlStorageSchema();
 
-// SQL-specific namespace walk shape (`entries.table` is the SQL family's
-// idiom). The wider `object` table value keeps this helper structurally
-// compatible with `SqlNamespace` and JSON envelope variants that lose class
-// identity.
 type NamespacedStorageWalk = {
   readonly namespaces: Readonly<
     Record<
       string,
-      Namespace & { readonly entries: { readonly table: Readonly<Record<string, object>> } }
+      Namespace & { readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>> }
     >
   >;
 };
 
 function eachStorageTable(storage: NamespacedStorageWalk) {
   return Object.entries(storage.namespaces).flatMap(([namespaceId, ns]) =>
-    Object.entries(ns.entries.table).map(([tableName, table]) => ({
+    Object.entries(namespaceTables(ns)).map(([tableName, table]) => ({
       namespaceId,
       tableName,
       table,
@@ -802,7 +799,9 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
       }
 
       const storageTable = model.storage.table;
-      const rawTable = contract.storage.namespaces[storageNamespaceId]?.entries.table[storageTable];
+      const rawTable = namespaceTables(contract.storage.namespaces[storageNamespaceId]!)[
+        storageTable
+      ];
       if (rawTable === undefined) {
         throw new ContractValidationError(
           `Model "${qualifiedName}" references non-existent table "${storageNamespaceId}.${storageTable}"`,
@@ -922,7 +921,10 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
 
       if (fk.target.spaceId === undefined) {
         const targetNamespace = contract.storage.namespaces[fk.target.namespaceId];
-        const referencedRaw = targetNamespace?.entries.table[fk.target.tableName];
+        const referencedRaw =
+          targetNamespace !== undefined
+            ? namespaceTables(targetNamespace)[fk.target.tableName]
+            : undefined;
         if (referencedRaw === undefined) {
           throw new ContractValidationError(
             `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent table "${fk.target.namespaceId}.${fk.target.tableName}"`,

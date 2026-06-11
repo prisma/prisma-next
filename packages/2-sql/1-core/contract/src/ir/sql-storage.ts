@@ -1,14 +1,15 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
 import { freezeNode, type Namespace, type Storage } from '@prisma-next/framework-components/ir';
+import { blindCast } from '@prisma-next/utils/casts';
 import { SqlNode } from './sql-node';
-import type { StorageTable, StorageTableInput } from './storage-table';
+import type { StorageTable } from './storage-table';
 import {
   isStorageTypeInstance,
   type StorageTypeInstance,
   type StorageTypeInstanceInput,
   toStorageTypeInstance,
 } from './storage-type-instance';
-import type { StorageValueSet, StorageValueSetInput } from './storage-value-set';
+import type { StorageValueSet } from './storage-value-set';
 
 /**
  * Polymorphic value type for document-scoped `SqlStorage.types` entries
@@ -21,10 +22,7 @@ export type SqlStorageTypeEntry = StorageTypeInstance | StorageTypeInstanceInput
 
 export interface SqlNamespaceTablesInput {
   readonly id: string;
-  readonly entries: {
-    readonly table: Record<string, StorageTable | StorageTableInput>;
-    readonly valueSet?: Record<string, StorageValueSet | StorageValueSetInput>;
-  };
+  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
 export interface SqlStorageInput<THash extends string = string> {
@@ -54,17 +52,16 @@ export interface SqlStorageInput<THash extends string = string> {
  * the per-target serializer's responsibility (so the family base does
  * not import target-specific subclasses).
  */
-// SQL concretions store `StorageTable` values under `entries.table`.
-// Mongo namespaces carry `entries.collection` instead. The wider
-// `Record<string, object>` on `StorageTable` is only there so emitted
-// `contract.d.ts` table literals (which lack the runtime `kind`
-// discriminator on `StorageTable`) structurally satisfy the slot without
-// a class-instance check.
+/**
+ * SQL family namespace. `entries` is the open ADR 224 dictionary —
+ * `entries[entityKind][entityName]` addresses any entity. Emitted
+ * contract literals satisfy this structurally (no prototype getters
+ * needed). For typed access to specific kinds, use the class getters
+ * on the concretion or the `namespaceTables` / `namespaceValueSets`
+ * family helpers.
+ */
 export type SqlNamespace = Namespace & {
-  readonly entries: Readonly<{
-    readonly table: Readonly<Record<string, StorageTable>>;
-    readonly valueSet?: Readonly<Record<string, StorageValueSet>>;
-  }>;
+  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
   /**
    * Render a dialect-qualified table reference for runtime SQL emission.
    * Present on materialised target concretions (`PostgresSchema`,
@@ -73,6 +70,24 @@ export type SqlNamespace = Namespace & {
    */
   qualifyTable?(tableName: string): string;
 };
+
+const FROZEN_EMPTY: Readonly<Record<string, never>> = Object.freeze({});
+
+/** Returns the frozen table map for a structural {@link SqlNamespace} (no prototype getters). */
+export function namespaceTables(ns: SqlNamespace): Readonly<Record<string, StorageTable>> {
+  return blindCast<
+    Readonly<Record<string, StorageTable>>,
+    'entries[table] holds only StorageTable by construction'
+  >(ns.entries['table'] ?? FROZEN_EMPTY);
+}
+
+/** Returns the frozen value-set map for a structural {@link SqlNamespace}, or an empty map. */
+export function namespaceValueSets(ns: SqlNamespace): Readonly<Record<string, StorageValueSet>> {
+  return blindCast<
+    Readonly<Record<string, StorageValueSet>>,
+    'entries[valueSet] holds only StorageValueSet by construction'
+  >(ns.entries['valueSet'] ?? FROZEN_EMPTY);
+}
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
@@ -99,7 +114,9 @@ export function storageTableAt(
   namespaceId: string,
   tableName: string,
 ): StorageTable | undefined {
-  return storage.namespaces[namespaceId]?.entries.table[tableName];
+  const ns = storage.namespaces[namespaceId];
+  if (ns === undefined) return undefined;
+  return namespaceTables(ns)[tableName];
 }
 
 /**

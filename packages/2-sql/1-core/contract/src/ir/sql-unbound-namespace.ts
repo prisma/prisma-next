@@ -3,7 +3,10 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { StorageTable } from './storage-table';
+
+const FROZEN_EMPTY_TABLE: Readonly<Record<string, StorageTable>> = Object.freeze({});
 
 /**
  * Family-layer placeholder for the SQL unbound-namespace singleton —
@@ -40,9 +43,9 @@ export class SqlUnboundNamespace extends NamespaceBase {
   static readonly instance: SqlUnboundNamespace = new SqlUnboundNamespace();
 
   readonly id = UNBOUND_NAMESPACE_ID;
-  readonly entries: Readonly<{
-    readonly table: Readonly<Record<string, StorageTable>>;
-  }> = Object.freeze({ table: Object.freeze({}) });
+  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>> = Object.freeze({
+    table: FROZEN_EMPTY_TABLE,
+  });
   declare readonly kind: string;
 
   private constructor() {
@@ -54,6 +57,13 @@ export class SqlUnboundNamespace extends NamespaceBase {
       configurable: true,
     });
     freezeNode(this);
+  }
+
+  get table(): Readonly<Record<string, StorageTable>> {
+    return blindCast<
+      Readonly<Record<string, StorageTable>>,
+      'entries[table] holds only StorageTable by construction'
+    >(this.entries['table'] ?? FROZEN_EMPTY_TABLE);
   }
 
   qualifyTable(tableName: string): string {

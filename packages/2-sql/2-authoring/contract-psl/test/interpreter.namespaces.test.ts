@@ -1,7 +1,12 @@
 import type { Contract, ContractModel } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type { ForeignKey, SqlModelStorage, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  type ForeignKey,
+  namespaceTables,
+  type SqlModelStorage,
+  type SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
@@ -129,7 +134,7 @@ namespace auth {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    const postTable = storage.namespaces['public']?.entries.table?.['post'];
+    const postTable = namespaceTables(storage.namespaces['public']!)['post'];
     expect(postTable).toBeDefined();
 
     const fks: readonly ForeignKey[] = postTable?.foreignKeys ?? [];
@@ -165,7 +170,7 @@ namespace auth {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    const postTable = storage.namespaces['public']?.entries.table?.['post'];
+    const postTable = namespaceTables(storage.namespaces['public']!)['post'];
     const fks: readonly ForeignKey[] = postTable?.foreignKeys ?? [];
     expect(fks.length).toBe(1);
     expect(fks[0]).toMatchObject({
@@ -206,13 +211,13 @@ namespace auth {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    const publicUsers = storage.namespaces['public']?.entries.table['users'];
-    const authUsers = storage.namespaces['auth']?.entries.table['users'];
+    const publicUsers = namespaceTables(storage.namespaces['public']!)['users'];
+    const authUsers = namespaceTables(storage.namespaces['auth']!)['users'];
     expect(Object.keys(publicUsers?.columns ?? {}).sort()).toEqual(['email', 'id']);
     expect(Object.keys(authUsers?.columns ?? {}).sort()).toEqual(['id', 'token']);
 
     const fks: readonly ForeignKey[] =
-      storage.namespaces['public']?.entries.table['profile']?.foreignKeys ?? [];
+      namespaceTables(storage.namespaces['public']!)['profile']?.foreignKeys ?? [];
     expect(fks.length).toBe(1);
     expect(fks[0]).toMatchObject({ target: { namespaceId: 'auth', tableName: 'users' } });
 
@@ -292,7 +297,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
     const storage = result.value.storage as SqlStorage;
     // Unbound namespace (no explicit namespace block)
     const profileTable = Object.values(storage.namespaces)
-      .flatMap((ns) => Object.values(ns.entries.table ?? {}))
+      .flatMap((ns) => Object.values(namespaceTables(ns)))
       .find((t) => t !== undefined);
     expect(profileTable).toBeDefined();
 
@@ -330,7 +335,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
 
     const storage = result.value.storage as SqlStorage;
     const profileTable = Object.values(storage.namespaces)
-      .flatMap((ns) => Object.values(ns.entries.table ?? {}))
+      .flatMap((ns) => Object.values(namespaceTables(ns)))
       .find((t) => t !== undefined);
     const fks: readonly ForeignKey[] = profileTable?.foreignKeys ?? [];
     expect(fks.length).toBe(1);
@@ -424,7 +429,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
 
     const storage = result.value.storage as SqlStorage;
     const profileTable = Object.values(storage.namespaces)
-      .flatMap((ns) => Object.values(ns.entries.table ?? {}))
+      .flatMap((ns) => Object.values(namespaceTables(ns)))
       .find((t) => t !== undefined);
     const fks: readonly ForeignKey[] = profileTable?.foreignKeys ?? [];
     expect(fks.length).toBe(1);
@@ -457,7 +462,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
 
     const storage = result.value.storage as SqlStorage;
     const profileTable = Object.values(storage.namespaces)
-      .flatMap((ns) => Object.values(ns.entries.table ?? {}))
+      .flatMap((ns) => Object.values(namespaceTables(ns)))
       .find((t) => t !== undefined);
     const fks: readonly ForeignKey[] = profileTable?.foreignKeys ?? [];
     expect(fks.length).toBe(1);

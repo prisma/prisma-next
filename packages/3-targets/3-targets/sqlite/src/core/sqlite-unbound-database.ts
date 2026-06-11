@@ -13,9 +13,7 @@ import { blindCast, castAs } from '@prisma-next/utils/casts';
 
 export type SqliteDatabaseInput = {
   readonly id: string;
-  readonly entries: {
-    readonly table: Readonly<Record<string, StorageTable | StorageTableInput>>;
-  };
+  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 };
 
 const SQLITE_NAMESPACE_KIND = 'sqlite-namespace' as const;
@@ -42,23 +40,34 @@ export class SqliteDatabase extends NamespaceBase {
   declare readonly kind: string;
 
   readonly id: string;
-  readonly entries: Readonly<{
-    readonly table: Readonly<Record<string, StorageTable>>;
-  }>;
+  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
   constructor(input: SqliteDatabaseInput) {
     super();
     this.id = input.id;
-    this.entries = Object.freeze({
-      table: Object.freeze(
-        Object.fromEntries(
-          Object.entries(input.entries.table).map(([k, v]) => [
-            k,
-            v instanceof StorageTable ? v : new StorageTable(v as StorageTableInput),
-          ]),
-        ),
-      ),
-    });
+
+    const builtEntries: Record<string, Readonly<Record<string, unknown>>> = {};
+    for (const [kind, rawMap] of Object.entries(input.entries)) {
+      if (kind === 'table') {
+        const tableMap: Record<string, StorageTable> = {};
+        for (const [name, v] of Object.entries(
+          rawMap as Record<string, StorageTable | StorageTableInput>,
+        )) {
+          tableMap[name] = v instanceof StorageTable ? v : new StorageTable(v as StorageTableInput);
+        }
+        builtEntries['table'] = Object.freeze(tableMap);
+      } else {
+        throw new Error(
+          `SqliteDatabase: unknown entity kind "${kind}" in entries; expected "table"`,
+        );
+      }
+    }
+
+    if (!Object.hasOwn(builtEntries, 'table')) {
+      builtEntries['table'] = Object.freeze({});
+    }
+
+    this.entries = Object.freeze(builtEntries);
     Object.defineProperty(this, 'kind', {
       value: SQLITE_NAMESPACE_KIND,
       writable: false,
@@ -66,6 +75,13 @@ export class SqliteDatabase extends NamespaceBase {
       configurable: true,
     });
     freezeNode(this);
+  }
+
+  get table(): Readonly<Record<string, StorageTable>> {
+    return blindCast<
+      Readonly<Record<string, StorageTable>>,
+      'entries[table] holds only StorageTable by construction'
+    >(this.entries['table'] ?? Object.freeze({}));
   }
 
   qualifier(): string {
@@ -110,7 +126,9 @@ export function buildSqliteNamespace(
       `buildSqliteNamespace: SQLite has no schema concept; the only valid namespace id is "${UNBOUND_NAMESPACE_ID}" (received "${input.id}").`,
     );
   }
-  if (Object.keys(input.entries.table).length === 0) {
+  const tableKind = input.entries['table'];
+  const tableCount = tableKind !== undefined ? Object.keys(tableKind).length : 0;
+  if (tableCount === 0) {
     return castAs<SqliteUnboundDatabase>(SqliteUnboundDatabase.instance);
   }
   return new SqliteDatabase({ id: input.id, entries: input.entries });

@@ -66,3 +66,96 @@ describe('sqliteCreateNamespace factory', () => {
     );
   });
 });
+
+describe('SqliteDatabase — entries open dictionary', () => {
+  it('exact-shape serialization: JSON.stringify emits only id and entries', () => {
+    const db = new SqliteDatabase({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: { users: { columns: {}, uniques: [], indexes: [], foreignKeys: [] } } },
+    });
+    const parsed = JSON.parse(JSON.stringify(db)) as Record<string, unknown>;
+    expect(Object.keys(parsed).sort()).toEqual(['entries', 'id']);
+  });
+
+  it('kind is non-enumerable', () => {
+    const db = new SqliteDatabase({ id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
+    expect(Object.keys(db)).not.toContain('kind');
+    expect(db.kind).toBe('sqlite-namespace');
+  });
+
+  it('entries is frozen after construction', () => {
+    const db = new SqliteDatabase({ id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
+    expect(Object.isFrozen(db.entries)).toBe(true);
+  });
+
+  it('inner table map is frozen', () => {
+    const db = new SqliteDatabase({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: {
+        table: { users: { columns: {}, uniques: [], indexes: [], foreignKeys: [] } },
+      },
+    });
+    expect(Object.isFrozen(db.entries['table'])).toBe(true);
+  });
+
+  it('table getter returns the frozen name-keyed map from entries', () => {
+    const db = new SqliteDatabase({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: {
+        table: { users: { columns: {}, uniques: [], indexes: [], foreignKeys: [] } },
+      },
+    });
+    expect(db.table).toBe(db.entries['table']);
+  });
+
+  it('table getter is non-enumerable', () => {
+    const db = new SqliteDatabase({ id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
+    expect(Object.keys(db)).not.toContain('table');
+  });
+
+  it('table getter returns StorageTable instances', () => {
+    const db = new SqliteDatabase({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: {
+        table: { users: { columns: {}, uniques: [], indexes: [], foreignKeys: [] } },
+      },
+    });
+    expect(db.table['users']).toBeInstanceOf(StorageTable);
+  });
+
+  it('entries[kind][name] resolves the same as getter[name]', () => {
+    const db = new SqliteDatabase({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: {
+        table: { users: { columns: {}, uniques: [], indexes: [], foreignKeys: [] } },
+      },
+    });
+    expect(db.entries['table']?.['users']).toBe(db.table['users']);
+  });
+
+  it('node itself is frozen', () => {
+    const db = new SqliteDatabase({ id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
+    expect(Object.isFrozen(db)).toBe(true);
+  });
+});
+
+describe('SqliteUnboundDatabase — entries open dictionary', () => {
+  it('exact-shape serialization: JSON.stringify emits only id and entries', () => {
+    const parsed = JSON.parse(JSON.stringify(SqliteUnboundDatabase.instance)) as Record<
+      string,
+      unknown
+    >;
+    expect(Object.keys(parsed).sort()).toEqual(['entries', 'id']);
+  });
+
+  it('table getter returns the frozen empty map', () => {
+    expect(SqliteUnboundDatabase.instance.table).toBe(
+      SqliteUnboundDatabase.instance.entries['table'],
+    );
+    expect(SqliteUnboundDatabase.instance.table).toEqual({});
+  });
+
+  it('table getter is non-enumerable', () => {
+    expect(Object.keys(SqliteUnboundDatabase.instance)).not.toContain('table');
+  });
+});

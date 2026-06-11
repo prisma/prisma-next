@@ -6,7 +6,7 @@ import type {
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
+import { type ForeignKey, namespaceTables, type SqlStorage } from '@prisma-next/sql-contract/types';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { countSemanticLines } from '@prisma-next/test-utils/semantic-lines';
 import { describe, expect, it } from 'vitest';
@@ -542,9 +542,9 @@ model Post {
     const pslStorage = pslContract.value.storage as unknown as SqlStorage;
     const tsStorage = tsContract.storage as unknown as SqlStorage;
     const pslFks: readonly ForeignKey[] =
-      pslStorage.namespaces['public']?.entries.table?.['post']?.foreignKeys ?? [];
+      namespaceTables(pslStorage.namespaces['public']!)['post']?.foreignKeys ?? [];
     const tsFks: readonly ForeignKey[] =
-      tsStorage.namespaces['public']?.entries.table?.['post']?.foreignKeys ?? [];
+      namespaceTables(tsStorage.namespaces['public']!)['post']?.foreignKeys ?? [];
 
     expect(tsFks.length).toBe(1);
     expect(pslFks.length).toBe(1);

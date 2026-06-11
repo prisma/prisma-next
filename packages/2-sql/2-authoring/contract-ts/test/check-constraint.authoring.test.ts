@@ -1,7 +1,12 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import type { SqlStorage, StorageTableInput } from '@prisma-next/sql-contract/types';
-import { CheckConstraint, StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  CheckConstraint,
+  namespaceTables,
+  type SqlStorage,
+  StorageTable,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { defineContract } from '../src/contract-builder';
 import { enumType, member } from '../src/enum-type';

@@ -138,3 +138,161 @@ describe('postgresCreateNamespace factory', () => {
     expect(billing.id).toBe('billing');
   });
 });
+
+describe('PostgresSchema — entries open dictionary', () => {
+  it('exact-shape serialization: JSON.stringify emits only id and entries', () => {
+    const schema = new PostgresSchema({
+      id: 'public',
+      entries: {
+        table: { users: emptyTableInput },
+        type: { role: { name: 'Role', values: ['admin', 'member'] } },
+      },
+    });
+    const parsed = JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
+    expect(Object.keys(parsed).sort()).toEqual(['entries', 'id']);
+  });
+
+  it('kind is non-enumerable', () => {
+    const schema = new PostgresSchema({ id: 'app', entries: { table: {}, type: {} } });
+    expect(Object.keys(schema)).not.toContain('kind');
+    expect(schema.kind).toBe('schema');
+  });
+
+  it('entries is frozen after construction', () => {
+    const schema = new PostgresSchema({ id: 'app', entries: { table: {}, type: {} } });
+    expect(Object.isFrozen(schema.entries)).toBe(true);
+  });
+
+  it('inner table map is frozen', () => {
+    const schema = new PostgresSchema({
+      id: 'app',
+      entries: { table: { users: emptyTableInput }, type: {} },
+    });
+    expect(Object.isFrozen(schema.entries['table'])).toBe(true);
+  });
+
+  it('inner type map is frozen', () => {
+    const schema = new PostgresSchema({
+      id: 'app',
+      entries: {
+        table: {},
+        type: { role: { name: 'Role', values: ['admin', 'member'] } },
+      },
+    });
+    expect(Object.isFrozen(schema.entries['type'])).toBe(true);
+  });
+
+  it('table getter returns the frozen name-keyed map from entries', () => {
+    const schema = new PostgresSchema({
+      id: 'app',
+      entries: { table: { users: emptyTableInput }, type: {} },
+    });
+    expect(schema.table).toBe(schema.entries['table']);
+  });
+
+  it('table getter is non-enumerable', () => {
+    const schema = new PostgresSchema({ id: 'app', entries: { table: {}, type: {} } });
+    expect(Object.keys(schema)).not.toContain('table');
+  });
+
+  it('type getter returns the frozen name-keyed map from entries', () => {
+    const schema = new PostgresSchema({
+      id: 'app',
+      entries: {
+        table: {},
+        type: { role: { name: 'Role', values: ['admin', 'member'] } },
+      },
+    });
+    expect(schema.type).toBe(schema.entries['type']);
+  });
+
+  it('type getter is non-enumerable', () => {
+    const schema = new PostgresSchema({ id: 'app', entries: { table: {}, type: {} } });
+    expect(Object.keys(schema)).not.toContain('type');
+  });
+
+  it('type getter returns PostgresEnumType instances', () => {
+    const schema = new PostgresSchema({
+      id: 'app',
+      entries: {
+        table: {},
+        type: { role: { name: 'Role', values: ['admin', 'member'] } },
+      },
+    });
+    expect(schema.type['role']).toBeInstanceOf(PostgresEnumType);
+  });
+
+  it('valueSet getter returns the frozen name-keyed map when present', () => {
+    const schema = new PostgresSchema({
+      id: 'app',
+      entries: {
+        table: {},
+        type: {},
+        valueSet: { Status: { kind: 'value-set', values: ['active'] } },
+      },
+    });
+    expect(schema.valueSet).toBe(schema.entries['valueSet']);
+  });
+
+  it('valueSet getter is non-enumerable', () => {
+    const schema = new PostgresSchema({ id: 'app', entries: { table: {}, type: {} } });
+    expect(Object.keys(schema)).not.toContain('valueSet');
+  });
+
+  it('valueSet is absent from entries when empty', () => {
+    const schema = new PostgresSchema({ id: 'app', entries: { table: {}, type: {} } });
+    expect(schema.entries['valueSet']).toBeUndefined();
+  });
+
+  it('valueSet is present in entries when non-empty', () => {
+    const schema = new PostgresSchema({
+      id: 'app',
+      entries: {
+        table: {},
+        type: {},
+        valueSet: { Status: { kind: 'value-set', values: ['active'] } },
+      },
+    });
+    expect(schema.entries['valueSet']).toBeDefined();
+  });
+
+  it('table and type are always present in entries even when empty', () => {
+    const schema = new PostgresSchema({ id: 'app', entries: { table: {}, type: {} } });
+    expect(schema.entries['table']).toBeDefined();
+    expect(schema.entries['type']).toBeDefined();
+  });
+
+  it('entries[kind][name] resolves the same as getter[name] for tables', () => {
+    const schema = new PostgresSchema({
+      id: 'app',
+      entries: { table: { users: emptyTableInput }, type: {} },
+    });
+    expect(schema.entries['table']?.['users']).toBe(schema.table['users']);
+  });
+
+  it('entries[kind][name] resolves the same as getter[name] for types', () => {
+    const schema = new PostgresSchema({
+      id: 'app',
+      entries: {
+        table: {},
+        type: { role: { name: 'Role', values: ['admin'] } },
+      },
+    });
+    expect(schema.entries['type']?.['role']).toBe(schema.type['role']);
+  });
+});
+
+describe('PostgresUnboundSchema — entries open dictionary', () => {
+  it('exact-shape serialization: JSON.stringify emits only id and entries', () => {
+    const parsed = JSON.parse(JSON.stringify(PostgresUnboundSchema.instance)) as Record<
+      string,
+      unknown
+    >;
+    expect(Object.keys(parsed).sort()).toEqual(['entries', 'id']);
+  });
+
+  it('table and type are always present in entries even on unbound singleton', () => {
+    expect(PostgresSchema.unbound.entries['table']).toBeDefined();
+    expect(PostgresSchema.unbound.entries['type']).toBeDefined();
+  });
+});

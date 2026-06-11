@@ -11,6 +11,7 @@ import type {
 import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
+  namespaceTables,
   type PostgresEnumStorageEntry,
   type SqlModelStorage,
   type SqlStorage,
@@ -44,7 +45,7 @@ export const sqlEmission = {
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
 
     for (const ns of Object.values(storage.namespaces)) {
-      for (const [tableName, tableUnknown] of Object.entries(ns.entries.table)) {
+      for (const [tableName, tableUnknown] of Object.entries(namespaceTables(ns))) {
         const table = tableUnknown as StorageTable;
         for (const [colName, colUnknown] of Object.entries(table.columns)) {
           const col = colUnknown as { codecId?: string };
@@ -76,7 +77,7 @@ export const sqlEmission = {
 
     const tableNamesSeenAcrossNamespaces = new Map<string, string>();
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
-      for (const tableName of Object.keys(ns.entries.table)) {
+      for (const tableName of Object.keys(namespaceTables(ns))) {
         const existingNs = tableNamesSeenAcrossNamespaces.get(tableName);
         if (existingNs !== undefined && existingNs !== nsId) {
           throw new Error(
@@ -89,7 +90,7 @@ export const sqlEmission = {
 
     const tableNames = new Set<string>();
     for (const ns of Object.values(storage.namespaces)) {
-      for (const t of Object.keys(ns.entries.table)) {
+      for (const t of Object.keys(namespaceTables(ns))) {
         tableNames.add(t);
       }
     }
@@ -111,9 +112,11 @@ export const sqlEmission = {
         }
 
         const tableName = model.storage.table;
-        const table = storage.namespaces[namespaceId]?.entries.table[tableName] as
-          | StorageTable
-          | undefined;
+        const nsForTable = storage.namespaces[namespaceId];
+        const table =
+          nsForTable !== undefined
+            ? (namespaceTables(nsForTable)[tableName] as StorageTable | undefined)
+            : undefined;
         if (!table) {
           throw new Error(
             `Model "${qualifiedName}" references non-existent table "${namespaceId}.${tableName}"`,
@@ -148,7 +151,7 @@ export const sqlEmission = {
     }
 
     for (const ns of Object.values(storage.namespaces)) {
-      for (const [tableName, tableUnknown] of Object.entries(ns.entries.table)) {
+      for (const [tableName, tableUnknown] of Object.entries(namespaceTables(ns))) {
         const table = tableUnknown as StorageTable;
         const columnNames = new Set(Object.keys(table.columns));
 
@@ -207,9 +210,11 @@ export const sqlEmission = {
             }
           }
 
-          const referencedTable = storage.namespaces[fk.target.namespaceId]?.entries.table[
-            fk.target.tableName
-          ] as StorageTable | undefined;
+          const fkTargetNs = storage.namespaces[fk.target.namespaceId];
+          const referencedTable =
+            fkTargetNs !== undefined
+              ? (namespaceTables(fkTargetNs)[fk.target.tableName] as StorageTable | undefined)
+              : undefined;
           if (!referencedTable) {
             throw new Error(
               `Table "${tableName}" foreignKey references non-existent table "${fk.target.tableName}" in namespace "${fk.target.namespaceId}"`,
@@ -282,9 +287,11 @@ export const sqlEmission = {
     const storageNamespaceId = sqlModel.storage.namespaceId;
     if (!storageNamespaceId) return undefined;
 
-    const table = storage.namespaces[storageNamespaceId]?.entries.table[tableName] as
-      | StorageTable
-      | undefined;
+    const tableNs = storage.namespaces[storageNamespaceId];
+    const table =
+      tableNs !== undefined
+        ? (namespaceTables(tableNs)[tableName] as StorageTable | undefined)
+        : undefined;
     if (!table) return undefined;
 
     const column = table.columns[storageField.column];
@@ -526,9 +533,7 @@ function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): st
   const parts: string[] = [];
   for (const [name, ns] of entries) {
     const kindSuffix = `; ${namespaceSerializedKind(ns)}`;
-    const tablesType = generateTablesMapType(
-      (ns.entries.table ?? {}) as Readonly<Record<string, StorageTable>>,
-    );
+    const tablesType = generateTablesMapType(namespaceTables(ns));
     const typeSlot =
       ns.kind === 'schema'
         ? blindCast<
