@@ -64,6 +64,13 @@ export type PslDiagnosticCode =
    */
   | 'PSL_INVALID_OBJECT_LITERAL'
   /**
+   * A string literal with no closing quote — the tokenizer stops the literal at
+   * a newline or at EOF when no terminating `"` is found, and the
+   * recursive-descent parser still consumes the token (preserving the lossless
+   * round-trip) but reports this code anchored on the string token's span.
+   */
+  | 'PSL_UNTERMINATED_STRING'
+  /**
    * An unknown parameter key in an extension-contributed block — a key present
    * in the source block but absent from the descriptor's `parameters` map.
    */

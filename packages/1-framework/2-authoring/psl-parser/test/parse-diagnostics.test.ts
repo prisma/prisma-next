@@ -495,4 +495,118 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(decls[1]).toBeInstanceOf(ModelDeclarationAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
+
+  // F05: the missing-brace caret anchors immediately after the last significant
+  // token, before any trailing trivia — `bump()` flushes trivia before
+  // consuming a token, so the cursor offset sits right after `User` even when
+  // trailing whitespace/newlines follow. This pins that the caret does not float
+  // past the trailing whitespace.
+  it('anchors the missing-brace caret after the name, not past trailing whitespace', () => {
+    const source = 'model User  \n';
+    const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
+    expect(message).toBe('Expected "{" to open the "model" block');
+    // Caret sits at column 10 — immediately after `User` — not at the end of the
+    // trailing whitespace run (which would be column 12). The rendered source
+    // line carries the trailing whitespace verbatim, so this asserts the range
+    // directly rather than via a trailing-whitespace-sensitive snapshot.
+    expect(diagnostic.range.start).toEqual({ line: 0, character: 10 });
+    expect(diagnostic.range.end).toEqual({ line: 0, character: 10 });
+    expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(ModelDeclarationAst);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+  });
+});
+
+describe('parse() diagnoses unterminated string literals', () => {
+  it('reports an unterminated string that runs to EOF, anchored on the token', () => {
+    const source = 'model M {\n  id Int @default("oops';
+    const { result, message, diagnostic } = diagnosticFor(source, 'PSL_UNTERMINATED_STRING');
+    expect(message).toBe('Unterminated string literal');
+    expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
+      "
+      model M {
+        id Int @default("oops
+                        ~~~~~
+      "
+    `);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+  });
+
+  it('reports an unterminated string stopped at a newline', () => {
+    const source = 'model M {\n  id Int @default("oops\n}';
+    const { result, message, diagnostic } = diagnosticFor(source, 'PSL_UNTERMINATED_STRING');
+    expect(message).toBe('Unterminated string literal');
+    expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
+      "
+      model M {
+        id Int @default("oops
+                        ~~~~~
+      }
+      "
+    `);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+  });
+
+  it('does not flag a well-formed string literal', () => {
+    const source = 'model M {\n  id Int @default("ok")\n}';
+    const result = parse(source);
+    expect(result.diagnostics.find((d) => d.code === 'PSL_UNTERMINATED_STRING')).toBeUndefined();
+    expect(greenText(result.document.syntax.green)).toBe(source);
+  });
+
+  it('flags a literal ending in an escaped quote as unterminated', () => {
+    const source = 'model M {\n  id Int @default("a\\"';
+    const { result, message } = diagnosticFor(source, 'PSL_UNTERMINATED_STRING');
+    expect(message).toBe('Unterminated string literal');
+    expect(greenText(result.document.syntax.green)).toBe(source);
+  });
+
+  it('does not flag a literal whose escaped quote precedes a real closing quote', () => {
+    const source = 'model M {\n  id Int @default("a\\"")\n}';
+    const result = parse(source);
+    expect(result.diagnostics.find((d) => d.code === 'PSL_UNTERMINATED_STRING')).toBeUndefined();
+    expect(greenText(result.document.syntax.green)).toBe(source);
+  });
+});
+
+describe('parse() attribute attachment is newline-insensitive', () => {
+  // F06: a standalone attribute on the line after a field attaches to that
+  // field, because newlines are trivia in this grammar. This is a known,
+  // intentional divergence from `parsePslDocument`'s line semantics, to be
+  // revisited at consumer-repoint (see the spec/plan open item). This test pins
+  // the current behaviour so the follow-up has a signal; no code change.
+  it('attaches a standalone attribute on the next line to the preceding field', () => {
+    const source = 'model M {\n  id Int\n  @id\n}';
+    const result = parse(source);
+    expect(result.diagnostics).toHaveLength(0);
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        ModelDeclaration
+          Ident "model"
+          Whitespace " "
+          Identifier
+            Ident "M"
+          Whitespace " "
+          LBrace "{"
+          Newline "\\n"
+          Whitespace "  "
+          FieldDeclaration
+            Identifier
+              Ident "id"
+            Whitespace " "
+            TypeAnnotation
+              Identifier
+                Ident "Int"
+            Newline "\\n"
+            Whitespace "  "
+            FieldAttribute
+              At "@"
+              Identifier
+                Ident "id"
+          Newline "\\n"
+          RBrace "}""
+    `);
+    const model = Array.from(result.document.declarations())[0];
+    expect(model).toBeInstanceOf(ModelDeclarationAst);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+  });
 });

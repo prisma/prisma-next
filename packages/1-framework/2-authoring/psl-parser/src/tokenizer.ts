@@ -195,6 +195,30 @@ function scanString(source: string, pos: number): Token | undefined {
   return { kind: 'StringLiteral', text: source.slice(pos, end) };
 }
 
+/**
+ * Whether a `StringLiteral` token's text is properly closed. `scanString` emits
+ * the same `StringLiteral` kind for both well-formed and unterminated strings
+ * (it stops at a newline or EOF when no closing quote is found), so callers that
+ * need to distinguish the two re-scan the text with the scanner's own
+ * `\\`-skips-the-next-character escape rule. A literal is terminated iff a
+ * non-escaped closing `"` is present, so a trailing escaped quote (`"a\"`) is
+ * *not* terminated.
+ */
+export function isTerminatedStringLiteral(text: string): boolean {
+  if (text.charAt(0) !== '"') return false;
+  let pos = 1;
+  while (pos < text.length) {
+    const c = text.charAt(pos);
+    if (c === '\\' && pos + 1 < text.length) {
+      pos += 2;
+      continue;
+    }
+    if (c === '"') return true;
+    pos++;
+  }
+  return false;
+}
+
 function scanPunctuation(source: string, pos: number): Token | undefined {
   const kind = PUNCTUATION[source.charAt(pos)];
   if (kind === undefined) return undefined;

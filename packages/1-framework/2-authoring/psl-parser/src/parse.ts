@@ -6,7 +6,7 @@ import type { GreenNode } from './syntax/green';
 import { GreenNodeBuilder } from './syntax/green-builder';
 import { createSyntaxTree } from './syntax/red';
 import type { SyntaxKind } from './syntax/syntax-kind';
-import { type Token, Tokenizer, type TokenKind } from './tokenizer';
+import { isTerminatedStringLiteral, type Token, Tokenizer, type TokenKind } from './tokenizer';
 
 export interface ParseDiagnostic {
   readonly code: PslDiagnosticCode;
@@ -203,8 +203,13 @@ export function parseExpression(cursor: Cursor): GreenNode | undefined {
 
 export function parseStringLiteralExpr(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'StringLiteral') return undefined;
+  const stringMark = cursor.mark();
+  const text = cursor.peekToken().text;
   cursor.startNode('StringLiteralExpr');
   cursor.bump();
+  if (!isTerminatedStringLiteral(text)) {
+    cursor.diagnostic('PSL_UNTERMINATED_STRING', 'Unterminated string literal', stringMark);
+  }
   return cursor.finishNode();
 }
 
