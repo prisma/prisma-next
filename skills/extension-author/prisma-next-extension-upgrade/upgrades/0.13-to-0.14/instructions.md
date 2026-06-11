@@ -34,6 +34,15 @@ changes:
 ---
 
 <!--
+control-query-extension-codecs: pgvector test files
+(planner.behavior.test.ts, planner.contract-to-schema-ir.test.ts,
+planner.storage-types.test.ts) were updated to pass an explicit
+`PostgresControlAdapter` to `createPostgresMigrationPlanner`, which now
+requires an adapter argument. Internal test harness change only — no
+extension-author API change. Incidental substrate diff only.
+-->
+
+<!--
 TML-2867: codec-routed DDL defaults. The pgvector extension test files were updated
 to await lazy plan operations (`Promise.all(result.plan.operations)`) and to use
 `PostgresControlAdapter` instead of the removed `createPostgresAdapter`. The
