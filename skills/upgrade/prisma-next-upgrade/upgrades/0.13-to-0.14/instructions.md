@@ -184,3 +184,14 @@ is emitted. Additive and opt-in: only fields that declare `@default(<EnumType>.<
 are affected; no existing contract changes shape. No consumer action required; the
 cutover (TML-2853) will carry the user-facing docs.
 -->
+
+<!--
+TML-2885: typed domain enum block in emitted contract.d.ts (PR #809). The emitter
+now generates a `domain` block in `contract.d.ts` that exposes each PSL-authored enum
+as a `ContractEnumAccessor<Entry>` with literal `values`, `names`, and `members` types.
+`contract.json` is unchanged — the enum data was already there; this is a types-only
+addition. Consumers that re-emit gain a literal-typed `db.enums.<namespace>.<Name>`
+surface at compile time (e.g. `db.enums.public.Priority.members.Low` resolves to
+`'low'` rather than `string`). Additive — no existing contract shape changes.
+No consumer action required.
+-->
