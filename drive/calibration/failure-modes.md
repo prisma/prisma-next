@@ -477,6 +477,23 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-06-10, runtime-target-layer (TML-2502, PR #792). Nearly tripped this three times: slice 1 reported 153 typecheck errors + 18 test failures (`SqlNamespace.entries` vs `.tables`) as "pre-existing/broken base"; a `pnpm build` cleared all of it (274 tests green). It recurred after the rebase onto main (an `enum-accessor` mismatch) and again when a review-fix subagent saw red — both stale dist, both green after build.
 
+### F25. "Pre-existing failure" claim accepted without running the suspect file on pristine main
+
+**Symptom.** After merging main into a feature branch (or any base movement), a gate run shows failures in files the branch didn't touch. The implementer (or merge-resolution agent) classifies them as "pre-existing / in-progress upstream work, not a regression" because the failing tests belong to someone else's feature — and the loop moves on with a real regression aboard. The classification rested on whose tests failed, not on whether they fail without the branch's changes.
+
+**Detection signal.**
+
+- The failing tests landed on main recently (they passed CI there — main's CI being green is itself evidence against "pre-existing").
+- The branch carries changes to shared infrastructure the failing feature flows through (mergers, registries, shared walkers), even if no file overlaps.
+- The report says "not a regression from the merge" without naming the command that proved it.
+
+**Mitigation.**
+
+- **Run the suspect file on pristine main before accepting any "already red" claim**: `git worktree add wip/main-check origin/main`, install + `pnpm turbo run build --filter=<pkg>...`, run the one file, `git worktree remove`. Minutes of cost; rules the question out completely.
+- Heuristic: a test that passed CI on main and fails on the branch is a branch regression until proven otherwise — the burden of proof is on the "pre-existing" claim, never on the regression hypothesis.
+
+**Reference incident.** 2026-06-11, uuid slice (PR #810). After merging main (TML-2882 enum2), 11/14 `interpreter.enum2.test.ts` tests failed; the merge agent called them "in-progress TML-2882 work, not a regression". Running the file on a pristine-main worktree showed 14/14 green — the branch's `mergeAuthoringNamespaces` shallow-copy fix was dropping prototype getters (`blockAttributes`) off enum2's class-instance descriptors. Fixed by narrowing the copy to plain-prototype objects.
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.
