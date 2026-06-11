@@ -19,6 +19,7 @@ export type {
   PgTimestampDescriptor,
   PgTimestamptzDescriptor,
   PgTimetzDescriptor,
+  PgUuidDescriptor,
   PgVarbitDescriptor,
   PgVarcharDescriptor,
 } from '../core/codecs';
@@ -43,6 +44,7 @@ export {
   pgTimestampColumn,
   pgTimestamptzColumn,
   pgTimetzColumn,
+  pgUuidColumn,
   pgVarbitColumn,
   pgVarcharColumn,
 } from '../core/codecs';

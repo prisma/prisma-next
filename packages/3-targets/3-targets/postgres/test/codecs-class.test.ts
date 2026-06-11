@@ -17,6 +17,7 @@ import {
   PG_TIMESTAMP_CODEC_ID,
   PG_TIMESTAMPTZ_CODEC_ID,
   PG_TIMETZ_CODEC_ID,
+  PG_UUID_CODEC_ID,
   PG_VARBIT_CODEC_ID,
 } from '../src/core/codec-ids';
 import {
@@ -37,6 +38,7 @@ import {
   pgTimestampDescriptor,
   pgTimestamptzDescriptor,
   pgTimetzDescriptor,
+  pgUuidDescriptor,
   pgVarbitDescriptor,
 } from '../src/core/codecs';
 
@@ -347,6 +349,25 @@ describe('codecs-class', () => {
     });
   });
 
+  describe('pg/uuid@1', () => {
+    const codec = pgUuidDescriptor.factory()(instanceCtx);
+    const SAMPLE_UUID = '550e8400-e29b-41d4-a716-446655440000';
+
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_UUID_CODEC_ID);
+    });
+
+    it('encodes and decodes string values verbatim', async () => {
+      expect(await codec.encode(SAMPLE_UUID, callCtx)).toBe(SAMPLE_UUID);
+      expect(await codec.decode(SAMPLE_UUID, callCtx)).toBe(SAMPLE_UUID);
+    });
+
+    it('round-trips through JSON identity', () => {
+      expect(codec.encodeJson(SAMPLE_UUID)).toBe(SAMPLE_UUID);
+      expect(codec.decodeJson(SAMPLE_UUID)).toBe(SAMPLE_UUID);
+    });
+  });
+
   describe('descriptor metadata', () => {
     it('codec ids match the PG_*_CODEC_ID constants', () => {
       expect(pgTextDescriptor.codecId).toBe(PG_TEXT_CODEC_ID);
@@ -367,6 +388,7 @@ describe('codecs-class', () => {
       expect(pgEnumDescriptor.codecId).toBe(PG_ENUM_CODEC_ID);
       expect(pgJsonDescriptor.codecId).toBe(PG_JSON_CODEC_ID);
       expect(pgJsonbDescriptor.codecId).toBe(PG_JSONB_CODEC_ID);
+      expect(pgUuidDescriptor.codecId).toBe(PG_UUID_CODEC_ID);
     });
 
     it('exposes nativeType meta keyed under db.sql.postgres', () => {
@@ -391,6 +413,7 @@ describe('codecs-class', () => {
       expect(pgIntervalDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('interval');
       expect(pgJsonDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('json');
       expect(pgJsonbDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('jsonb');
+      expect(pgUuidDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('uuid');
     });
 
     it('exposes traits and targetTypes for each codec', () => {
@@ -404,6 +427,8 @@ describe('codecs-class', () => {
       expect(pgNumericDescriptor.targetTypes).toEqual(['numeric', 'decimal']);
       expect(pgBitDescriptor.targetTypes).toEqual(['bit']);
       expect(pgVarbitDescriptor.targetTypes).toEqual(['bit varying']);
+      expect(pgUuidDescriptor.traits).toEqual(['equality', 'order']);
+      expect(pgUuidDescriptor.targetTypes).toEqual(['uuid']);
     });
   });
 });
