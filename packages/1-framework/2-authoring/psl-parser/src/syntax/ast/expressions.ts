@@ -171,13 +171,13 @@ export class ObjectFieldAst implements AstNode {
     this.syntax = syntax;
   }
 
-  key(): IdentifierAst | StringLiteralExprAst | undefined {
+  key(): IdentifierAst | undefined {
     for (const child of this.syntax.children()) {
       if (!(child instanceof SyntaxNode)) {
         if (child.kind === 'Colon') break;
         continue;
       }
-      return IdentifierAst.cast(child) ?? StringLiteralExprAst.cast(child);
+      return IdentifierAst.cast(child);
     }
     return undefined;
   }

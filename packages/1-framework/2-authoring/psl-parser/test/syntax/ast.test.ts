@@ -621,31 +621,6 @@ describe('ObjectLiteralExprAst', () => {
     }
   });
 
-  it('exposes a string key without mistaking it for the value', () => {
-    // { "k": 1 }
-    const b = new GreenNodeBuilder();
-    b.startNode('ObjectLiteralExpr');
-    b.token('LBrace', '{');
-    b.token('Whitespace', ' ');
-    b.startNode('ObjectField');
-    b.startNode('StringLiteralExpr');
-    b.token('StringLiteral', '"k"');
-    b.finishNode();
-    b.token('Colon', ':');
-    b.token('Whitespace', ' ');
-    b.startNode('NumberLiteralExpr');
-    b.token('NumberLiteral', '1');
-    b.finishNode();
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('RBrace', '}');
-    const root = createSyntaxTree(b.finishNode());
-    const obj = ObjectLiteralExprAst.cast(root)!;
-    const [field] = Array.from(obj.fields());
-    expect(field!.key()).toBeInstanceOf(StringLiteralExprAst);
-    expect(field!.value()).toBeInstanceOf(NumberLiteralExprAst);
-  });
-
   it('cast returns undefined for non-matching kind', () => {
     const b = new GreenNodeBuilder();
     b.startNode('Identifier');

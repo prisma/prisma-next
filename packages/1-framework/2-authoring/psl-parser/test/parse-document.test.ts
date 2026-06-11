@@ -21,11 +21,12 @@ import {
   DocumentAst,
   EnumDeclarationAst,
   FieldDeclarationAst,
+  KeyValuePairAst,
   ModelDeclarationAst,
   NamespaceDeclarationAst,
   TypesBlockAst,
 } from '../src/syntax/ast/declarations';
-import { ObjectLiteralExprAst } from '../src/syntax/ast/expressions';
+import { NumberLiteralExprAst, ObjectLiteralExprAst } from '../src/syntax/ast/expressions';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
 import { highlight, printTree } from './support';
 
@@ -506,15 +507,30 @@ describe('parse() object-literal missing-colon recovery', () => {
     const source = 'datasource db {\n  x = { a b: 1 }\n}';
     const result = parse(source);
     expect(greenText(result.document.syntax.green)).toBe(source); // round-trip holds
-    // One diagnostic from one missing colon: the colon error on `a`.
-    expect(result.diagnostics.map((d) => d.code)).toEqual(['PSL_INVALID_OBJECT_LITERAL']);
-    const [diagnostic] = result.diagnostics;
-    expect(diagnostic!.message).toBe('Expected ":" after "a"');
-    expect(highlight(result.sourceFile, diagnostic!.range)).toMatchInlineSnapshot(`
+    // Two problems: the missing colon on `a`, and the missing comma before `b`.
+    expect(result.diagnostics.map((d) => d.code)).toEqual([
+      'PSL_INVALID_OBJECT_LITERAL',
+      'PSL_INVALID_OBJECT_LITERAL',
+    ]);
+    expect(result.diagnostics.map((d) => d.message)).toEqual([
+      'Expected ":" after "a"',
+      'Expected "," between object-literal fields',
+    ]);
+    const [missingColon, missingComma] = result.diagnostics;
+    expect(highlight(result.sourceFile, missingColon!.range)).toMatchInlineSnapshot(`
       "
       datasource db {
         x = { a b: 1 }
               ~
+      }
+      "
+    `);
+    // The missing-comma `~` sits just after the `a` field (zero-width gap).
+    expect(highlight(result.sourceFile, missingComma!.range)).toMatchInlineSnapshot(`
+      "
+      datasource db {
+        x = { a b: 1 }
+               ~
       }
       "
     `);
@@ -561,6 +577,45 @@ describe('parse() object-literal missing-colon recovery', () => {
           Newline "\\n"
           RBrace "}""
     `);
+  });
+
+  it('flags a missing comma between two well-formed fields and parses both', () => {
+    const source = 'datasource db {\n  x = { a: 1 b: 2 }\n}';
+    const result = parse(source);
+    expect(greenText(result.document.syntax.green)).toBe(source); // round-trip holds
+    // One diagnostic: the missing comma between `a: 1` and `b: 2`.
+    expect(result.diagnostics.map((d) => d.code)).toEqual(['PSL_INVALID_OBJECT_LITERAL']);
+    const [diagnostic] = result.diagnostics;
+    expect(diagnostic!.message).toBe('Expected "," between object-literal fields');
+    // The `~` sits just after the `a: 1` field (zero-width gap before `b`).
+    expect(highlight(result.sourceFile, diagnostic!.range)).toMatchInlineSnapshot(`
+      "
+      datasource db {
+        x = { a: 1 b: 2 }
+                  ~
+      }
+      "
+    `);
+
+    // Both fields parse as proper key/value pairs.
+    const decls = Array.from(result.document.declarations());
+    const block = decls[0];
+    expect(block).toBeInstanceOf(BlockDeclarationAst);
+    if (!(block instanceof BlockDeclarationAst)) return;
+    const pair = Array.from(block.entries())[0];
+    expect(pair).toBeInstanceOf(KeyValuePairAst);
+    if (!(pair instanceof KeyValuePairAst)) return;
+    const obj = pair.value();
+    expect(obj).toBeInstanceOf(ObjectLiteralExprAst);
+    if (!(obj instanceof ObjectLiteralExprAst)) return;
+    const fields = Array.from(obj.fields());
+    expect(fields).toHaveLength(2);
+    expect(fields.map((f) => f.key()?.token()?.text)).toEqual(['a', 'b']);
+    const values = fields.map((f) => f.value());
+    expect(values[0]).toBeInstanceOf(NumberLiteralExprAst);
+    expect(values[1]).toBeInstanceOf(NumberLiteralExprAst);
+    expect((values[0] as NumberLiteralExprAst).value()).toBe(1);
+    expect((values[1] as NumberLiteralExprAst).value()).toBe(2);
   });
 
   it('recovers cleanly when a comma delimits the malformed field (contrast)', () => {

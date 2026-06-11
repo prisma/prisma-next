@@ -262,11 +262,17 @@ export function parseObjectLiteralExpr(cursor: Cursor): GreenNode | undefined {
     parseObjectField(cursor);
     if (cursor.peekKind() === 'Comma') {
       cursor.bump();
-    } else if (cursor.peekKind() !== 'Ident') {
-      // A following identifier key re-enters the loop, so a missing comma
-      // between fields is tolerated in recovery (the next parseObjectField
-      // consumes the key, ≥1 token, guaranteeing progress). Anything else
-      // terminates the field list.
+    } else if (cursor.peekKind() === 'Ident') {
+      // A following identifier key with no separating comma re-enters the loop
+      // (the next parseObjectField consumes the key, ≥1 token, guaranteeing
+      // progress). Flag the missing comma at the gap after the previous field.
+      cursor.diagnostic(
+        'PSL_INVALID_OBJECT_LITERAL',
+        'Expected "," between object-literal fields',
+        cursor.markAfterLastToken(),
+      );
+    } else {
+      // Anything else terminates the field list.
       break;
     }
   }
