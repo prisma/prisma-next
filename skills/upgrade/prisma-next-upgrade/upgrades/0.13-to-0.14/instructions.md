@@ -371,3 +371,15 @@ are preserved so the chain still demonstrates the incremental migration CLI. Dif
 `examples/prisma-next-demo/migrations/**` only. No NEW consumer action beyond the
 existing `enum-becomes-domain-concept` entry above. Incidental substrate diff only.
 -->
+
+<!--
+TML-2550: per-namespace typed resolution. The emitted contract.d.ts TypeMaps
+(`FieldOutputTypes` / `FieldInputTypes`) now nest by namespace
+(`{ [namespace]: { [model]: { [field] } } }`), so the query builder and ORM client
+resolve each namespace's own columns/fields — fixing same-bare-name models declared
+in more than one namespace. The example contract.d.ts fixtures regenerate to the
+nested shape; a consumer re-emit round-trips. The user-facing always-qualified query
+surface is already covered by `qualify-flat-builder-accessors` above — this slice is
+the type-resolution fix beneath it. No user action: re-emit picks up the new shape.
+Incidental substrate diff only.
+-->

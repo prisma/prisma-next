@@ -88,6 +88,25 @@ changes:
         - "PgEnumDescriptor"
         - "PG_ENUM_CODEC_ID"
       anyMatch: true
+  - id: namespaced-type-resolution
+    summary: |
+      Per-namespace type resolution. The emitted TypeMaps `ExtractFieldOutputTypes` /
+      `ExtractFieldInputTypes` (from `@prisma-next/sql-contract`) now nest by namespace —
+      `{ [namespace]: { [model]: { [field] } } }` — and `TableProxy` (from
+      `@prisma-next/sql-builder`) takes a required namespace coordinate: `TableProxy<C, Name>`
+      becomes `TableProxy<C, NsId, Name>`. Extension code that indexes those TypeMaps or
+      constructs `TableProxy` types directly must thread the namespace coordinate
+      (`ExtractFieldOutputTypes<C>[namespace][Model][Field]`, `TableProxy<C, namespace, Name>`):
+      `public` for a standard single-schema contract, the late-bound `__unbound__` namespace
+      for an unbound/SQLite contract. Extensions that only contribute codecs, native types, or
+      migrations and never reference these types are unaffected.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "ExtractFieldOutputTypes"
+        - "ExtractFieldInputTypes"
+        - "TableProxy<"
+      anyMatch: true
 ---
 
 <!--
@@ -310,3 +329,34 @@ Columns restricted to an enum now carry `codecId: 'pg/text@1'` (or another codec
 ### Validation
 
 `pnpm typecheck` flags every deleted-symbol reference. After fixing, run your extension's standard `pnpm test`.
+
+## `namespaced-type-resolution`
+
+The SQL/ORM type machinery now resolves columns, fields, and models **by namespace coordinate** rather than by bare name across all namespaces. Two type-shape changes affect extension code that depends on these types directly:
+
+1. **Emitted TypeMaps nest by namespace.** `ExtractFieldOutputTypes<C>` / `ExtractFieldInputTypes<C>` (from `@prisma-next/sql-contract`) now return `{ [namespace]: { [model]: { [field]: <type> } } }` instead of the flat `{ [model]: { [field] } }`. Index the namespace first:
+
+```ts
+// Before
+type Row = ExtractFieldOutputTypes<C>['User'];
+// After — name the namespace the model is declared in
+type Row = ExtractFieldOutputTypes<C>['public']['User'];
+```
+
+2. **`TableProxy` takes a required namespace coordinate.** `TableProxy<C, Name>` (from `@prisma-next/sql-builder`) becomes `TableProxy<C, NsId, Name>`:
+
+```ts
+// Before
+let p: TableProxy<C, 'users'>;
+// After
+let p: TableProxy<C, 'public', 'users'>;
+```
+
+Use `public` for a standard single-schema SQL contract; for an unbound/SQLite contract use the late-bound namespace (`UNBOUND_NAMESPACE_ID` from `@prisma-next/framework-components/ir`); for a multi-namespace contract, name the namespace each model/table actually sits in. There is no codemod — the correct namespace is call-site-specific. `pnpm typecheck` pins every remaining flat access (`Property '<model>' does not exist on type '{ public: ... }'`). Extensions that only contribute codecs, native types, or migrations — and never reference `ExtractFieldOutputTypes` / `ExtractFieldInputTypes` / `TableProxy` directly — need no change.
+
+<!--
+TML-2550: per-namespace typed resolution. The extension-package contract.d.ts fixtures
+(supabase, paradedb, pgvector, postgis) regenerate to the namespace-nested TypeMaps shape
+above; the diff round-trips on a consumer re-emit and needs no extension-author action beyond
+the `namespaced-type-resolution` entry. Incidental substrate diff only.
+-->
