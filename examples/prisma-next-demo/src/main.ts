@@ -68,6 +68,9 @@
  *                              Post.priority read, and ORDER BY returning low→high→urgent
  * - enum-priority-filter [member] [limit]
  *                              Filter posts by a named Priority member using enum member accessor
+ * - enum-default-demo          Insert a Post without `priority` (typed-optional thanks to
+ *                              `@default(Low)` in the emitted contract), read it back, and
+ *                              confirm the database supplied 'low'
  * - budget-violation           Demo budget enforcement error
  * - guardrail-delete           Demo AST lint blocking DELETE without WHERE
  *
@@ -101,6 +104,7 @@ import { ormClientUpsertUser } from './orm-client/upsert-user';
 import { db } from './prisma/db';
 import { crossAuthorSimilarity } from './queries/cross-author-similarity';
 import { deleteWithoutWhere } from './queries/delete-without-where';
+import { enumDefaultDemo } from './queries/enum-default-demo';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
 import {
   getPostsByPriority,
@@ -519,6 +523,11 @@ async function main() {
       const posts = await getPostsByPriorityMember(requested, limit);
       console.log(`Posts with priority=${requested} (${posts.length} rows):`);
       console.log(JSON.stringify(posts, null, 2));
+    } else if (cmd === 'enum-default-demo') {
+      console.log(
+        'Demonstrating enum member default: inserting a Post without priority, then reading it back...',
+      );
+      await enumDefaultDemo();
     } else if (cmd === 'guardrail-delete') {
       console.log('Running DELETE without WHERE to demonstrate AST-based lint guardrail...');
       try {
@@ -553,7 +562,8 @@ async function main() {
           'users-paginate [cursor] [limit] | users-paginate-back <cursor> [limit] | ' +
           'similarity-search <vec> [limit] | cross-author-similarity [limit] | raw-sql-demo [limit] | ' +
           'cache-demo-user <userId> | cache-demo-users [limit] | cache-demo-sql [limit] | ' +
-          'enum-priority [limit] | enum-priority-filter [member] [limit] | budget-violation | guardrail-delete]',
+          'enum-priority [limit] | enum-priority-filter [member] [limit] | enum-default-demo | ' +
+          'budget-violation | guardrail-delete]',
       );
       process.exit(1);
     }
