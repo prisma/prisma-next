@@ -21,8 +21,7 @@
     "execute": [
       {
         "description": "create table \"cafe\"",
-        "sql": "CREATE TABLE \"public\".\"cafe\" (\n  \"id\" character(36) NOT NULL,\n  \"location\" geometry(Geometry,4326) NOT NULL,\n  \"name\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
-        "params": []
+        "sql": "CREATE TABLE \"public\".\"cafe\" (\n  \"id\" character(36) NOT NULL,\n  \"location\" geometry(Geometry,4326) NOT NULL,\n  \"name\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
       }
     ],
     "postcheck": [
@@ -54,8 +53,7 @@
     "execute": [
       {
         "description": "create table \"neighborhood\"",
-        "sql": "CREATE TABLE \"public\".\"neighborhood\" (\n  \"boundary\" geometry(Geometry,4326) NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"name\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
-        "params": []
+        "sql": "CREATE TABLE \"public\".\"neighborhood\" (\n  \"boundary\" geometry(Geometry,4326) NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"name\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
       }
     ],
     "postcheck": [
@@ -87,8 +85,7 @@
     "execute": [
       {
         "description": "create table \"route\"",
-        "sql": "CREATE TABLE \"public\".\"route\" (\n  \"id\" character(36) NOT NULL,\n  \"name\" text NOT NULL,\n  \"path\" geometry(Geometry,4326) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
-        "params": []
+        "sql": "CREATE TABLE \"public\".\"route\" (\n  \"id\" character(36) NOT NULL,\n  \"name\" text NOT NULL,\n  \"path\" geometry(Geometry,4326) NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
       }
     ],
     "postcheck": [
