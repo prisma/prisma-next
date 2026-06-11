@@ -441,18 +441,25 @@ describe('MongoDriver', () => {
       await db.dropCollection(col).catch(() => undefined);
       await db.createCollection(col);
 
+      const validator = { $jsonSchema: { bsonType: 'object' } };
       await collect(
         driver.execute(
           new CollModWireCommand(col, {
-            validator: { $jsonSchema: { bsonType: 'object' } },
+            validator,
             validationLevel: 'strict',
           }),
         ),
       );
 
-      const colls = await db.listCollections({ name: col }).toArray();
+      const colls = await db.listCollections({ name: col }, { nameOnly: false }).toArray();
       expect(colls).toHaveLength(1);
-      expect(colls[0]).toMatchObject({ name: col });
+      expect(colls[0]).toMatchObject({
+        name: col,
+        options: {
+          validator,
+          validationLevel: 'strict',
+        },
+      });
     });
   });
 
@@ -476,20 +483,24 @@ describe('MongoDriver', () => {
       expect(collsAfter).toHaveLength(1);
     });
 
-    it('iterating a DDL iterable twice does not re-execute the operation', async () => {
+    it('two separate iterators over the same DDL iterable execute the operation exactly once', async () => {
       const db = seedClient.db(dbName);
       const driver = MongoDriverImpl.fromDb(db);
       const col = 'driver_ddl_no_double_exec';
 
       await db.dropCollection(col).catch(() => undefined);
 
-      const cmd = new CreateCollectionWireCommand(col, {});
-      const iterable = driver.execute(cmd);
-      const iterator = iterable[Symbol.asyncIterator]();
+      const iterable = driver.execute(new CreateCollectionWireCommand(col, {}));
 
-      await iterator.next();
-      const second = await iterator.next();
-      expect(second).toEqual({ done: true, value: undefined });
+      await collect(iterable);
+
+      const collsAfterFirst = await db.listCollections({ name: col }).toArray();
+      expect(collsAfterFirst).toHaveLength(1);
+
+      await collect(iterable);
+
+      const collsAfterSecond = await db.listCollections({ name: col }).toArray();
+      expect(collsAfterSecond).toHaveLength(1);
     });
   });
 });

@@ -28,15 +28,15 @@ import { type Db, MongoClient } from 'mongodb';
 import { DRIVER_INFO } from './core/driver-info';
 
 function lazyDdlIterable(start: () => Promise<void>): AsyncIterable<never> {
+  let startedPromise: Promise<void> | undefined;
   return {
     [Symbol.asyncIterator]() {
-      let started = false;
       return {
         async next(): Promise<IteratorResult<never>> {
-          if (!started) {
-            started = true;
-            await start();
+          if (startedPromise === undefined) {
+            startedPromise = start();
           }
+          await startedPromise;
           return { done: true, value: undefined as never };
         },
       };
@@ -228,7 +228,7 @@ export class MongoDriverImpl implements MongoDriver {
   }
 
   protected async executeCollModCommand(cmd: CollModWireCommand): Promise<void> {
-    await this.db.command({ collMod: cmd.collection, ...cmd.options });
+    await this.db.command({ ...cmd.options, collMod: cmd.collection });
   }
 }
 
