@@ -6,9 +6,7 @@ import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime
 import type { Contract } from './end-contract';
 import endContractJson from './end-contract.json' with { type: 'json' };
 
-const endContract = new PostgresContractSerializer().deserializeContract(
-  endContractJson,
-) as Contract;
+const endContract = new PostgresContractSerializer().deserializeContract<Contract>(endContractJson);
 const db = postgres<Contract>({ contractJson: endContractJson, extensions: [pgvector] });
 
 export default class M extends Migration {
