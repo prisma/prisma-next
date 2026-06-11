@@ -20,6 +20,7 @@ import {
   ObjectLiteralExprAst,
   StringLiteralExprAst,
 } from '../src/syntax/ast/expressions';
+import { IdentifierAst } from '../src/syntax/ast/identifier';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
 import { createSyntaxTree } from '../src/syntax/red';
 import { highlight, printTree } from './support';
@@ -637,5 +638,104 @@ describe('expression alternatives are no-ops on non-match', () => {
 
   it('parseObjectLiteralExpr rejects a non-brace token without consuming', () => {
     expectNoOpReject('foo', parseObjectLiteralExpr);
+  });
+});
+
+function parseStringValue(literal: string): string | undefined {
+  const { node } = parse(literal, (c) => parseExpression(c) as GreenNode);
+  const expr = StringLiteralExprAst.cast(createSyntaxTree(node));
+  return expr?.value();
+}
+
+describe('StringLiteralExprAst.value() escape decoding', () => {
+  it('decodes \\xHH to the matching code unit', () => {
+    expect(parseStringValue('"\\x41"')).toBe('A');
+  });
+
+  it('decodes \\uHHHH to the matching code unit', () => {
+    expect(parseStringValue('"\\u0041"')).toBe('A');
+  });
+
+  it('passes a non-ASCII literal character through unchanged', () => {
+    expect(parseStringValue('"é"')).toBe('é');
+  });
+
+  it('keeps decoding the existing C-style escapes', () => {
+    expect(parseStringValue('"a\\nb"')).toBe('a\nb');
+    expect(parseStringValue('"a\\tb"')).toBe('a\tb');
+    expect(parseStringValue('"a\\"b"')).toBe('a"b');
+    expect(parseStringValue('"a\\\\b"')).toBe('a\\b');
+    expect(parseStringValue('"a\\rb"')).toBe('a\rb');
+  });
+
+  it('emits a malformed \\x escape literally and keeps scanning', () => {
+    expect(parseStringValue('"\\x4"')).toBe('\\x4');
+    expect(parseStringValue('"\\xZZ"')).toBe('\\xZZ');
+  });
+
+  it('emits a malformed \\u escape literally and keeps scanning', () => {
+    expect(parseStringValue('"\\u12"')).toBe('\\u12');
+    expect(parseStringValue('"\\uZZZZ"')).toBe('\\uZZZZ');
+  });
+
+  it('decodes \\x adjacent to following plain text', () => {
+    expect(parseStringValue('"\\x41B"')).toBe('AB');
+  });
+
+  it('keeps an unknown escape as a literal backslash + char', () => {
+    expect(parseStringValue('"\\q"')).toBe('\\q');
+  });
+
+  it('round-trips the green text regardless of escape decoding', () => {
+    const source = '"\\x41\\u0041\\xZZ"';
+    const { node } = parse(source, (c) => parseExpression(c) as GreenNode);
+    expect(greenText(node)).toBe(source);
+  });
+});
+
+function parseNumberExpr(source: string) {
+  const { node } = parse(source, (c) => parseExpression(c) as GreenNode);
+  return { node, expr: NumberLiteralExprAst.cast(createSyntaxTree(node)) };
+}
+
+describe('NumberLiteralExprAst.value() for NaN / Infinity', () => {
+  it('parses Infinity as a NumberLiteralExpr whose value() is Infinity', () => {
+    const { node, expr } = parseNumberExpr('Infinity');
+    expect(node.kind).toBe('NumberLiteralExpr');
+    expect(expr?.value()).toBe(Number.POSITIVE_INFINITY);
+    expect(greenText(node)).toBe('Infinity');
+  });
+
+  it('parses -Infinity as a NumberLiteralExpr whose value() is -Infinity', () => {
+    const { node, expr } = parseNumberExpr('-Infinity');
+    expect(node.kind).toBe('NumberLiteralExpr');
+    expect(expr?.value()).toBe(Number.NEGATIVE_INFINITY);
+    expect(greenText(node)).toBe('-Infinity');
+  });
+
+  it('parses NaN as a NumberLiteralExpr whose value() is NaN', () => {
+    const { node, expr } = parseNumberExpr('NaN');
+    expect(node.kind).toBe('NumberLiteralExpr');
+    expect(Number.isNaN(expr?.value())).toBe(true);
+    expect(greenText(node)).toBe('NaN');
+  });
+
+  it('keeps Infinityx as an identifier expression', () => {
+    const { node } = parse('Infinityx', (c) => parseExpression(c) as GreenNode);
+    expect(node.kind).toBe('Identifier');
+    expect(IdentifierAst.cast(createSyntaxTree(node))?.token()?.text).toBe('Infinityx');
+    expect(greenText(node)).toBe('Infinityx');
+  });
+
+  it('keeps NaNxyz as an identifier expression', () => {
+    const { node } = parse('NaNxyz', (c) => parseExpression(c) as GreenNode);
+    expect(node.kind).toBe('Identifier');
+    expect(IdentifierAst.cast(createSyntaxTree(node))?.token()?.text).toBe('NaNxyz');
+    expect(greenText(node)).toBe('NaNxyz');
+  });
+
+  it('still parses ordinary numeric literals', () => {
+    expect(parseNumberExpr('-5').expr?.value()).toBe(-5);
+    expect(parseNumberExpr('3.14').expr?.value()).toBe(3.14);
   });
 });
