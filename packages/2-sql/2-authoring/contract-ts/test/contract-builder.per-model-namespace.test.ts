@@ -5,11 +5,7 @@ import {
   type Namespace,
   NamespaceBase,
 } from '@prisma-next/framework-components/ir';
-import {
-  namespaceTables,
-  type SqlNamespace,
-  type SqlNamespaceTablesInput,
-} from '@prisma-next/sql-contract/types';
+import type { SqlNamespace, SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
@@ -94,7 +90,7 @@ describe('per-model `namespace` field (TS builder)', () => {
     // `keyof` as `never` (preventing `Db<C>` from collapsing to a string
     // index signature). The runtime value is correct; cast to verify it.
     const authNs = (contract.storage.namespaces as Record<string, SqlNamespace>)['auth'];
-    expect(authNs !== undefined ? namespaceTables(authNs)['User'] : undefined).toBeDefined();
+    expect(authNs !== undefined ? authNs.entries.table?.['User'] : undefined).toBeDefined();
   });
 
   it('omits `namespaceId` for models that do not set `namespace` — the late-bound default stays implicit', () => {
@@ -109,7 +105,7 @@ describe('per-model `namespace` field (TS builder)', () => {
     });
 
     const publicNs = (contract.storage.namespaces as Record<string, SqlNamespace>)['public'];
-    expect(publicNs !== undefined ? namespaceTables(publicNs)['User'] : undefined).toBeDefined();
+    expect(publicNs !== undefined ? publicNs.entries.table?.['User'] : undefined).toBeDefined();
   });
 
   it('rejects per-model `namespace` that does not appear in the declared list', () => {

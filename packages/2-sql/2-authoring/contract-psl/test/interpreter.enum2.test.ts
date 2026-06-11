@@ -1,11 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import {
-  namespaceTables,
-  namespaceValueSets,
-  type SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   defineContract,
   enumType,
@@ -171,20 +167,18 @@ model Post {
     const tsDomainNs = (tsContract as unknown as Contract).domain.namespaces['public'];
 
     expect(pslDomainNs?.enum?.['Priority']).toEqual(tsDomainNs?.enum?.['Priority']);
-    expect(pslNs !== undefined ? namespaceValueSets(pslNs)['Priority'] : undefined).toEqual(
-      tsNs !== undefined ? namespaceValueSets(tsNs)['Priority'] : undefined,
+    expect(pslNs !== undefined ? pslNs.entries.valueSet?.['Priority'] : undefined).toEqual(
+      tsNs !== undefined ? tsNs.entries.valueSet?.['Priority'] : undefined,
     );
     expect(pslDomainNs?.models?.['Post']?.fields?.['priority']).toEqual(
       tsDomainNs?.models?.['Post']?.fields?.['priority'],
     );
     // Strict equality on the storage column catches extra properties (e.g. a stray typeRef).
     expect(
-      pslNs !== undefined ? namespaceTables(pslNs)['post']?.columns?.['priority'] : undefined,
-    ).toEqual(
-      tsNs !== undefined ? namespaceTables(tsNs)['post']?.columns?.['priority'] : undefined,
-    );
-    expect(pslNs !== undefined ? namespaceTables(pslNs)['post']?.checks : undefined).toEqual(
-      tsNs !== undefined ? namespaceTables(tsNs)['post']?.checks : undefined,
+      pslNs !== undefined ? pslNs.entries.table?.['post']?.columns?.['priority'] : undefined,
+    ).toEqual(tsNs !== undefined ? tsNs.entries.table?.['post']?.columns?.['priority'] : undefined);
+    expect(pslNs !== undefined ? pslNs.entries.table?.['post']?.checks : undefined).toEqual(
+      tsNs !== undefined ? tsNs.entries.table?.['post']?.checks : undefined,
     );
     // Both authoring paths must produce the same storageHash.
     expect((pslResult.value.storage as unknown as SqlStorage).storageHash).toEqual(
@@ -514,14 +508,12 @@ model User {
     const mixedNs = (mixedResult.value.storage as unknown as SqlStorage).namespaces['public'];
 
     expect(
-      mixedNs !== undefined ? namespaceTables(mixedNs)['user']?.columns?.['role'] : undefined,
+      mixedNs !== undefined ? mixedNs.entries.table?.['user']?.columns?.['role'] : undefined,
     ).toMatchObject(
-      nativeNs !== undefined
-        ? (namespaceTables(nativeNs)['user']?.columns?.['role'] as object)
-        : {},
+      nativeNs !== undefined ? (nativeNs.entries.table?.['user']?.columns?.['role'] as object) : {},
     );
     expect(
-      mixedNs !== undefined ? namespaceValueSets(mixedNs)['Priority'] : undefined,
+      mixedNs !== undefined ? mixedNs.entries.valueSet?.['Priority'] : undefined,
     ).toMatchObject({
       kind: 'valueSet',
       values: ['low', 'high'],
@@ -552,7 +544,7 @@ model Post {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const ns = (result.value.storage as unknown as SqlStorage).namespaces['public'];
-    expect(ns !== undefined ? namespaceValueSets(ns)['Priority'] : undefined).toMatchObject({
+    expect(ns !== undefined ? ns.entries.valueSet?.['Priority'] : undefined).toMatchObject({
       kind: 'valueSet',
       values: [1, 10],
     });

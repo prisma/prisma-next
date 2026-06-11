@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import { type ForeignKey, namespaceTables, type SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   defineContract,
   extensionModel,
@@ -104,22 +104,22 @@ namespace public {
     for (const nsId of Object.keys(pslStorage.namespaces)) {
       const pslTables =
         pslStorage.namespaces[nsId] !== undefined
-          ? namespaceTables(pslStorage.namespaces[nsId]!)
+          ? (pslStorage.namespaces[nsId]!.entries.table ?? {})
           : {};
       const tsTables =
         tsStorage.namespaces[nsId] !== undefined
-          ? namespaceTables(tsStorage.namespaces[nsId]!)
+          ? (tsStorage.namespaces[nsId]!.entries.table ?? {})
           : {};
       expect(Object.keys(pslTables).sort()).toEqual(Object.keys(tsTables).sort());
     }
 
     // Same per-table column shapes
-    const pslAuthUser = namespaceTables(pslStorage.namespaces['auth']!)['user'];
-    const tsAuthUser = namespaceTables(tsStorage.namespaces['auth']!)['user'];
+    const pslAuthUser = pslStorage.namespaces['auth']!.entries.table?.['user'];
+    const tsAuthUser = tsStorage.namespaces['auth']!.entries.table?.['user'];
     expect(pslAuthUser?.columns).toEqual(tsAuthUser?.columns);
 
-    const pslPublicPost = namespaceTables(pslStorage.namespaces['public']!)['post'];
-    const tsPublicPost = namespaceTables(tsStorage.namespaces['public']!)['post'];
+    const pslPublicPost = pslStorage.namespaces['public']!.entries.table?.['post'];
+    const tsPublicPost = tsStorage.namespaces['public']!.entries.table?.['post'];
     expect(pslPublicPost?.columns).toEqual(tsPublicPost?.columns);
 
     // Same FK source/target
@@ -216,10 +216,10 @@ namespace public {
     const pslStorage = pslResult.value.storage as SqlStorage;
     const tsStorage = tsContract.storage as unknown as SqlStorage;
 
-    const pslProfileTable = namespaceTables(pslStorage.namespaces['public']!)['profile'];
+    const pslProfileTable = pslStorage.namespaces['public']!.entries.table?.['profile'];
     const pslFks: readonly ForeignKey[] = pslProfileTable?.foreignKeys ?? [];
 
-    const tsProfileTable = namespaceTables(tsStorage.namespaces['public']!)['profile'];
+    const tsProfileTable = tsStorage.namespaces['public']!.entries.table?.['profile'];
     const tsFks: readonly ForeignKey[] = tsProfileTable?.foreignKeys ?? [];
 
     expect(pslFks.length).toBe(1);

@@ -3,14 +3,16 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import { MongoCollection, type MongoCollectionInput } from '@prisma-next/mongo-contract';
+import {
+  MongoCollection,
+  type MongoCollectionInput,
+  type MongoNamespaceEntries,
+} from '@prisma-next/mongo-contract';
 import { blindCast } from '@prisma-next/utils/casts';
 
 export interface MongoTargetDatabaseInput {
   readonly id: string;
-  readonly entries?: Readonly<
-    Record<string, Readonly<Record<string, MongoCollection | MongoCollectionInput>>>
-  >;
+  readonly entries?: Readonly<Record<string, Readonly<Record<string, MongoCollectionInput>>>>;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface MongoTargetDatabaseInput {
 export class MongoTargetDatabase extends NamespaceBase {
   declare readonly kind: string;
   readonly id: string;
-  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  readonly entries: MongoNamespaceEntries;
 
   constructor(input: MongoTargetDatabaseInput) {
     super();
@@ -42,12 +44,11 @@ export class MongoTargetDatabase extends NamespaceBase {
         const collectionMap: Record<string, MongoCollection> = {};
         for (const [name, c] of Object.entries(
           blindCast<
-            Record<string, MongoCollection | MongoCollectionInput>,
-            'entries[collection] holds MongoCollection or MongoCollectionInput by construction'
+            Record<string, MongoCollectionInput>,
+            'entries[collection] holds MongoCollectionInput by construction'
           >(rawMap),
         )) {
-          collectionMap[name] =
-            c instanceof MongoCollection ? c : new MongoCollection(blindCast(c));
+          collectionMap[name] = new MongoCollection(c);
         }
         builtEntries['collection'] = Object.freeze(collectionMap);
       } else {
@@ -61,7 +62,7 @@ export class MongoTargetDatabase extends NamespaceBase {
       builtEntries['collection'] = Object.freeze({});
     }
 
-    this.entries = Object.freeze(builtEntries);
+    this.entries = Object.freeze(builtEntries) as MongoNamespaceEntries;
     Object.defineProperty(this, 'kind', {
       value: 'database',
       writable: false,
@@ -72,10 +73,7 @@ export class MongoTargetDatabase extends NamespaceBase {
   }
 
   get collection(): Readonly<Record<string, MongoCollection>> {
-    return blindCast<
-      Readonly<Record<string, MongoCollection>>,
-      'entries[collection] holds only MongoCollection by construction'
-    >(this.entries['collection'] ?? Object.freeze({}));
+    return this.entries.collection ?? Object.freeze({});
   }
 
   /**

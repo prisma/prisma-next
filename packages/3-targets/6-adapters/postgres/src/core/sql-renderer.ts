@@ -1,7 +1,6 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import { namespaceTables, namespaceValueSets } from '@prisma-next/sql-contract/types';
 import {
   type AggregateExpr,
   type AnyExpression,
@@ -266,16 +265,14 @@ function resolveEnumOrderValues(
   }
   const sourceNs = contract.storage.namespaces[source.namespaceId];
   const column =
-    sourceNs !== undefined
-      ? namespaceTables(sourceNs)[source.name]?.columns[ref.column]
-      : undefined;
+    sourceNs !== undefined ? sourceNs.entries.table?.[source.name]?.columns[ref.column] : undefined;
   const valueSet = column?.valueSet;
   if (valueSet === undefined) {
     return undefined;
   }
   const valueSetNs = contract.storage.namespaces[valueSet.namespaceId];
   return valueSetNs !== undefined
-    ? namespaceValueSets(valueSetNs)[valueSet.entityName]?.values
+    ? valueSetNs.entries.valueSet?.[valueSet.entityName]?.values
     : undefined;
 }
 
@@ -295,7 +292,7 @@ function resolveEnumOrderValuesForIdentifier(
     }
     const identNs = contract.storage.namespaces[source.namespaceId];
     const column =
-      identNs !== undefined ? namespaceTables(identNs)[source.name]?.columns[name] : undefined;
+      identNs !== undefined ? identNs.entries.table?.[source.name]?.columns[name] : undefined;
     if (column === undefined) {
       continue;
     }
@@ -310,7 +307,7 @@ function resolveEnumOrderValuesForIdentifier(
     const valueSetNs = contract.storage.namespaces[valueSet.namespaceId];
     resolved =
       valueSetNs !== undefined
-        ? namespaceValueSets(valueSetNs)[valueSet.entityName]?.values
+        ? valueSetNs.entries.valueSet?.[valueSet.entityName]?.values
         : undefined;
   }
   return resolved;
@@ -840,11 +837,11 @@ function getInsertColumnOrder(
   let table: { columns: Readonly<Record<string, unknown>> } | undefined;
   if (tableRef.namespaceId !== undefined) {
     const ns = contract.storage.namespaces[tableRef.namespaceId];
-    table = ns !== undefined ? namespaceTables(ns)[tableName] : undefined;
+    table = ns !== undefined ? ns.entries.table?.[tableName] : undefined;
   }
   if (table === undefined) {
     for (const ns of Object.values(contract.storage.namespaces)) {
-      const found = namespaceTables(ns)[tableName];
+      const found = ns.entries.table?.[tableName];
       if (found !== undefined) {
         table = found;
         break;

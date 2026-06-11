@@ -1,9 +1,9 @@
 import { MongoContractSerializerBase } from '@prisma-next/family-mongo/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
+  type MongoCollectionInput,
   type MongoContract,
   MongoStorage,
-  namespaceCollections,
 } from '@prisma-next/mongo-contract';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
@@ -15,18 +15,22 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
     const { storage, ...rest } = validated;
     const namespaces = Object.fromEntries(
       Object.entries(storage.namespaces).map(([nsId, nsData]) => {
-        const collections = namespaceCollections(nsData);
-        const collectionCount = Object.keys(collections).length;
+        const collectionCount = Object.keys(nsData.entries.collection ?? {}).length;
         if (nsId === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
           return [nsId, MongoTargetUnboundDatabase.instance];
         }
-        return [
-          nsId,
-          new MongoTargetDatabase({
-            id: nsData.id,
-            entries: { collection: collections },
-          }),
-        ];
+        const dbInput: {
+          id: string;
+          entries?: Readonly<Record<string, Readonly<Record<string, MongoCollectionInput>>>>;
+        } = { id: nsData.id };
+        if (nsData.entries['collection'] !== undefined) {
+          dbInput.entries = {
+            collection: nsData.entries['collection'] as Readonly<
+              Record<string, MongoCollectionInput>
+            >,
+          };
+        }
+        return [nsId, new MongoTargetDatabase(dbInput)];
       }),
     );
     const targetStorage = new MongoStorage({
@@ -41,7 +45,7 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
     const namespacesJson: Record<string, JsonObject> = {};
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
       const collectionsOut: Record<string, JsonObject> = {};
-      for (const [collName, coll] of Object.entries(namespaceCollections(ns))) {
+      for (const [collName, coll] of Object.entries(ns.entries.collection ?? {})) {
         collectionsOut[collName] = JSON.parse(JSON.stringify(coll)) as JsonObject;
       }
       namespacesJson[nsId] = {

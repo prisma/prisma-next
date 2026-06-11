@@ -13,7 +13,6 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
-import { namespaceTables } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model, rel } from '../src/contract-builder';
 import { ContractModelBuilder } from '../src/contract-dsl';
@@ -289,7 +288,7 @@ describe('F-relfk: cross-space belongsTo().sql({ fk }) produces a cross-space FK
 
     const storage = contract.storage;
     const profileTable = Object.values(storage.namespaces)
-      .flatMap((ns) => Object.values(namespaceTables(ns)))
+      .flatMap((ns) => Object.values(ns.entries.table ?? {}))
       .find((t) => t !== undefined);
 
     const fks = profileTable?.foreignKeys ?? [];

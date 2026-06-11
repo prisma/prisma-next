@@ -30,7 +30,6 @@ import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
-  namespaceTables,
   type PostgresEnumStorageEntry,
   type SqlStorage,
   StorageTable,
@@ -100,7 +99,7 @@ export function tableAt(
 ): StorageTable | undefined {
   const ns = storage.namespaces[namespaceId];
   if (ns === undefined) return undefined;
-  return namespaceTables(ns)[tableName] as StorageTable | undefined;
+  return ns.entries.table?.[tableName];
 }
 
 /**
@@ -464,7 +463,7 @@ function enumRebuildCallRecipe(
   // same-named enums in distinct namespaces keep their columns disjoint.
   const columnRefs: { namespaceId: string; table: string; column: string }[] = [];
   for (const [nsId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(namespaceTables(ns))) {
+    for (const [tableName, table] of Object.entries(ns.entries.table ?? {})) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (
           column.typeRef === typeName &&
@@ -686,7 +685,7 @@ function collectContractChecks(
   tableName: string,
 ): ReadonlyArray<{ name: string; column: string; permittedValues: readonly string[] }> {
   const ns = storage.namespaces[namespaceId];
-  const tableRaw = ns !== undefined ? namespaceTables(ns)[tableName] : undefined;
+  const tableRaw = ns !== undefined ? ns.entries.table?.[tableName] : undefined;
   if (!(tableRaw instanceof StorageTable)) return [];
   const checks = tableRaw.checks;
   if (!checks || checks.length === 0) return [];
@@ -732,7 +731,7 @@ export const checkConstraintPlanCallStrategy: CallMigrationStrategy = (issues, c
   const handledIssueKeys = new Set<string>();
 
   for (const [namespaceId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
-    for (const tableName of Object.keys(namespaceTables(ns))) {
+    for (const tableName of Object.keys(ns.entries.table ?? {})) {
       const contractChecks = collectContractChecks(ctx.toContract.storage, namespaceId, tableName);
       if (contractChecks.length === 0) continue;
 

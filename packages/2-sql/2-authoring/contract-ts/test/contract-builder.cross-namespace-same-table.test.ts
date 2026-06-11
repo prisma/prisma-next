@@ -1,5 +1,5 @@
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
-import { type ForeignKey, namespaceTables, type SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
@@ -80,8 +80,8 @@ describe('same bare table name across namespaces with a cross-namespace FK', () 
   const storage = contract.storage as SqlStorage;
 
   it('lowers both same-named tables into their own namespace with differing columns', () => {
-    const publicUsers = namespaceTables(storage.namespaces['public']!)['users'];
-    const authUsers = namespaceTables(storage.namespaces['auth']!)['users'];
+    const publicUsers = storage.namespaces['public']!.entries.table?.['users'];
+    const authUsers = storage.namespaces['auth']!.entries.table?.['users'];
     expect(publicUsers).toBeDefined();
     expect(authUsers).toBeDefined();
 
@@ -91,7 +91,7 @@ describe('same bare table name across namespaces with a cross-namespace FK', () 
 
   it('lowers the cross-namespace FK with a target coordinate pointing at the other namespace', () => {
     const fks: readonly ForeignKey[] =
-      namespaceTables(storage.namespaces['public']!)['profile']?.foreignKeys ?? [];
+      storage.namespaces['public']!.entries.table?.['profile']?.foreignKeys ?? [];
     expect(fks.length).toBe(1);
     expect(fks[0]).toMatchObject({
       target: { namespaceId: 'auth', tableName: 'users', columns: ['id'] },

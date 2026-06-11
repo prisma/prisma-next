@@ -22,12 +22,11 @@ import type {
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  namespaceTables,
-  type PostgresEnumStorageEntry,
-  type SqlStorage,
-  type StorageTable,
-  type StorageTypeInstance,
+import type {
+  PostgresEnumStorageEntry,
+  SqlStorage,
+  StorageTable,
+  StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -63,7 +62,7 @@ export function tableAt(
   tableName: string,
 ): StorageTable | undefined {
   const ns = storage.namespaces[namespaceId];
-  return ns !== undefined ? namespaceTables(ns)[tableName] : undefined;
+  return ns !== undefined ? ns.entries.table?.[tableName] : undefined;
 }
 
 /**

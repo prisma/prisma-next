@@ -1,4 +1,3 @@
-import { namespaceTables } from '@prisma-next/sql-contract/types';
 import {
   type AnyExpression,
   BinaryExpr,
@@ -165,9 +164,9 @@ describe('mutation-executor', () => {
             entries: {
               ...publicNs.entries,
               table: {
-                ...namespaceTables(publicNs),
+                ...(publicNs.entries.table ?? {}),
                 users: {
-                  ...namespaceTables(publicNs)['users'],
+                  ...publicNs.entries.table?.['users'],
                   primaryKey: { columns: ['pk_id'] },
                 },
               },

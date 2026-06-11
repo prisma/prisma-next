@@ -7,7 +7,6 @@ import {
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   ForeignKey,
-  namespaceTables,
   PrimaryKey,
   SqlStorage,
   StorageColumn,
@@ -91,7 +90,7 @@ describe('PostgresContractSerializer', () => {
     const serializer = new PostgresContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
     expect(contract.targetFamily).toBe('sql');
-    expect(namespaceTables(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!)).toEqual({});
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table ?? {}).toEqual({});
   });
 
   it('hydrates JSON storage into the SQL Contract IR class hierarchy', () => {
@@ -99,7 +98,7 @@ describe('PostgresContractSerializer', () => {
     const contract = serializer.deserializeContract(makeContractWithTablesJson());
 
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const tables = namespaceTables(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!);
+    const tables = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table ?? {};
     const userTable = tables['user'] as StorageTable | undefined;
     expect(userTable).toBeInstanceOf(StorageTable);
     expect(userTable?.columns['id']).toBeInstanceOf(StorageColumn);

@@ -6,12 +6,7 @@ import {
   type Namespace,
   NamespaceBase,
 } from '@prisma-next/framework-components/ir';
-import {
-  namespaceTables,
-  namespaceValueSets,
-  type SqlNamespaceTablesInput,
-  type SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
@@ -217,7 +212,7 @@ describe('enumType() authoring → contract structure', () => {
     }) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const valueSet = storageNs !== undefined ? namespaceValueSets(storageNs)['Role'] : undefined;
+    const valueSet = storageNs !== undefined ? storageNs.entries.valueSet?.['Role'] : undefined;
     expect(valueSet).toBeDefined();
     expect(valueSet?.values).toEqual(['user', 'admin']);
   });
@@ -262,7 +257,7 @@ describe('enumType() authoring → contract structure', () => {
     }) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs !== undefined ? namespaceTables(storageNs)['User'] : undefined;
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
     const roleColumn = userTable?.columns?.['role'];
     expect(roleColumn?.valueSet).toEqual({
       plane: 'storage',
@@ -287,7 +282,7 @@ describe('enumType() authoring → contract structure', () => {
     }) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs !== undefined ? namespaceTables(storageNs)['User'] : undefined;
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
     const roleColumn = userTable?.columns?.['role'];
     expect(roleColumn?.typeRef).toBeUndefined();
   });
@@ -370,7 +365,7 @@ describe('enumType() — valueSet ref namespace (non-default model namespace)', 
     // Same check on the storage side.
     const storageAuthNs = contract.storage.namespaces['auth'];
     const userTable =
-      storageAuthNs !== undefined ? namespaceTables(storageAuthNs)['User'] : undefined;
+      storageAuthNs !== undefined ? storageAuthNs.entries.table?.['User'] : undefined;
     const roleColumn = userTable?.columns?.['role'];
     expect(roleColumn?.valueSet).toEqual({
       plane: 'storage',
@@ -445,7 +440,7 @@ describe('enumType() — full integration via defineContract factory', () => {
     // storage value-set
     const storageNs = contract.storage.namespaces['public'];
     expect(
-      storageNs !== undefined ? namespaceValueSets(storageNs)['Status']?.values : undefined,
+      storageNs !== undefined ? storageNs.entries.valueSet?.['Status']?.values : undefined,
     ).toEqual(['active', 'inactive']);
 
     // domain field valueSet
@@ -458,7 +453,7 @@ describe('enumType() — full integration via defineContract factory', () => {
     });
 
     // storage column valueSet
-    const postTable = storageNs !== undefined ? namespaceTables(storageNs)['Post'] : undefined;
+    const postTable = storageNs !== undefined ? storageNs.entries.table?.['Post'] : undefined;
     expect(postTable?.columns?.['status']?.valueSet).toEqual({
       plane: 'storage',
       entityKind: 'valueSet',

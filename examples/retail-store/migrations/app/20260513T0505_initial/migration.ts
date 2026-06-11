@@ -2,7 +2,6 @@
 import { MigrationCLI } from '@prisma-next/cli/migration-cli';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { Migration } from '@prisma-next/family-mongo/migration';
-import { namespaceCollections } from '@prisma-next/mongo-contract';
 import { createCollection, createIndex } from '@prisma-next/target-mongo/migration';
 import endContractJson from './end-contract.json' with { type: 'json' };
 
@@ -10,7 +9,7 @@ const endContract = new MongoContractSerializer().deserializeContract(endContrac
 
 function requireValidator(collectionName: string) {
   const ns = endContract.storage.namespaces['__unbound__'];
-  const validator = ns ? namespaceCollections(ns)[collectionName]?.validator : undefined;
+  const validator = ns ? ns.entries['collection']?.[collectionName]?.validator : undefined;
   if (validator === undefined) {
     throw new Error(
       `end-contract.json is missing a validator for the ${collectionName} collection`,

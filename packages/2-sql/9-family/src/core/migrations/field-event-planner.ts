@@ -24,12 +24,7 @@
 
 import type { Contract } from '@prisma-next/contract/types';
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
-import {
-  namespaceTables,
-  type SqlStorage,
-  type StorageColumn,
-  StorageTable,
-} from '@prisma-next/sql-contract/types';
+import { type SqlStorage, type StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type { CodecControlHooks, FieldEvent, FieldEventContext } from './types';
 
 export interface PlanFieldEventOperationsOptions {
@@ -82,8 +77,8 @@ export function planFieldEventOperations(
   for (const namespaceId of namespaceIds) {
     const priorNs = priorContract?.storage.namespaces[namespaceId];
     const newNs = newContract.storage.namespaces[namespaceId];
-    const priorTables = priorNs !== undefined ? namespaceTables(priorNs) : undefined;
-    const newTables = newNs !== undefined ? namespaceTables(newNs) : undefined;
+    const priorTables = priorNs?.entries.table;
+    const newTables = newNs?.entries.table;
 
     const tableNames = unionSorted(
       priorTables ? Object.keys(priorTables) : [],

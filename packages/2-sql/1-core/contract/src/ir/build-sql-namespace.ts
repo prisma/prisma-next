@@ -5,10 +5,10 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
-import type { SqlNamespace, SqlNamespaceTablesInput } from './sql-storage';
+import type { SqlNamespace, SqlNamespaceEntries, SqlNamespaceTablesInput } from './sql-storage';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
-import { StorageTable } from './storage-table';
-import { StorageValueSet } from './storage-value-set';
+import { StorageTable, type StorageTableInput } from './storage-table';
+import { StorageValueSet, type StorageValueSetInput } from './storage-value-set';
 
 const SQL_NAMESPACE_KIND = 'sql-namespace' as const;
 
@@ -27,7 +27,7 @@ class SqlBoundNamespace extends NamespaceBase {
   declare readonly kind: string;
 
   readonly id: string;
-  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  readonly entries: SqlNamespaceEntries;
 
   static fromTablesInput(input: SqlNamespaceTablesInput): SqlNamespace {
     const unknownKinds = Object.keys(input.entries).filter(
@@ -58,22 +58,22 @@ class SqlBoundNamespace extends NamespaceBase {
         const tableMap: Record<string, StorageTable> = {};
         for (const [name, v] of Object.entries(
           blindCast<
-            Record<string, StorageTable | { columns: unknown; uniques: unknown[] }>,
-            'entries[table] holds StorageTable or StorageTableInput by construction'
+            Record<string, StorageTableInput>,
+            'entries[table] holds StorageTableInput by construction'
           >(rawMap),
         )) {
-          tableMap[name] = v instanceof StorageTable ? v : new StorageTable(blindCast(v));
+          tableMap[name] = new StorageTable(v);
         }
         builtEntries['table'] = Object.freeze(tableMap);
       } else if (kind === 'valueSet') {
         const vsMap: Record<string, StorageValueSet> = {};
         for (const [name, v] of Object.entries(
           blindCast<
-            Record<string, StorageValueSet>,
-            'entries[valueSet] holds StorageValueSet by construction'
+            Record<string, StorageValueSetInput>,
+            'entries[valueSet] holds StorageValueSetInput by construction'
           >(rawMap),
         )) {
-          vsMap[name] = v instanceof StorageValueSet ? v : new StorageValueSet(blindCast(v));
+          vsMap[name] = new StorageValueSet(v);
         }
         builtEntries['valueSet'] = Object.freeze(vsMap);
       } else {
@@ -87,7 +87,7 @@ class SqlBoundNamespace extends NamespaceBase {
       builtEntries['table'] = Object.freeze({});
     }
 
-    this.entries = Object.freeze(builtEntries);
+    this.entries = Object.freeze(builtEntries) as SqlNamespaceEntries;
     Object.defineProperty(this, 'kind', {
       value: SQL_NAMESPACE_KIND,
       writable: false,
@@ -105,12 +105,7 @@ class SqlBoundNamespace extends NamespaceBase {
   }
 
   get valueSet(): Readonly<Record<string, StorageValueSet>> | undefined {
-    const vs = this.entries['valueSet'];
-    if (vs === undefined) return undefined;
-    return blindCast<
-      Readonly<Record<string, StorageValueSet>>,
-      'entries[valueSet] holds only StorageValueSet by construction'
-    >(vs);
+    return this.entries.valueSet;
   }
 
   qualifyTable(tableName: string): string {

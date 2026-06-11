@@ -5,6 +5,7 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import {
+  type SqlNamespaceEntries,
   type SqlNamespaceTablesInput,
   StorageTable,
   type StorageTableInput,
@@ -13,7 +14,7 @@ import { blindCast, castAs } from '@prisma-next/utils/casts';
 
 export type SqliteDatabaseInput = {
   readonly id: string;
-  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  readonly entries: SqlNamespaceEntries;
 };
 
 const SQLITE_NAMESPACE_KIND = 'sqlite-namespace' as const;
@@ -40,7 +41,7 @@ export class SqliteDatabase extends NamespaceBase {
   declare readonly kind: string;
 
   readonly id: string;
-  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  readonly entries: SqlNamespaceEntries;
 
   constructor(input: SqliteDatabaseInput) {
     super();
@@ -52,16 +53,11 @@ export class SqliteDatabase extends NamespaceBase {
         const tableMap: Record<string, StorageTable> = {};
         for (const [name, v] of Object.entries(
           blindCast<
-            Record<string, StorageTable | StorageTableInput>,
-            'entries[table] holds StorageTable or StorageTableInput by construction'
+            Record<string, StorageTableInput>,
+            'entries[table] holds StorageTableInput by construction'
           >(rawMap),
         )) {
-          tableMap[name] =
-            v instanceof StorageTable
-              ? v
-              : new StorageTable(
-                  blindCast<StorageTableInput, 'table entry is StorageTableInput'>(v),
-                );
+          tableMap[name] = new StorageTable(v);
         }
         builtEntries['table'] = Object.freeze(tableMap);
       } else {
@@ -75,7 +71,7 @@ export class SqliteDatabase extends NamespaceBase {
       builtEntries['table'] = Object.freeze({});
     }
 
-    this.entries = Object.freeze(builtEntries);
+    this.entries = Object.freeze(builtEntries) as SqlNamespaceEntries;
     Object.defineProperty(this, 'kind', {
       value: SQLITE_NAMESPACE_KIND,
       writable: false,
@@ -86,10 +82,7 @@ export class SqliteDatabase extends NamespaceBase {
   }
 
   get table(): Readonly<Record<string, StorageTable>> {
-    return blindCast<
-      Readonly<Record<string, StorageTable>>,
-      'entries[table] holds only StorageTable by construction'
-    >(this.entries['table'] ?? Object.freeze({}));
+    return this.entries.table ?? Object.freeze({});
   }
 
   qualifier(): string {

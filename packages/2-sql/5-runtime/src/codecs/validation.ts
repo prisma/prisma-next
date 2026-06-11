@@ -1,13 +1,13 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import { namespaceTables, type SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 
 export function extractCodecIds(contract: Contract<SqlStorage>): Set<string> {
   const codecIds = new Set<string>();
 
   for (const ns of Object.values(contract.storage.namespaces)) {
-    for (const table of Object.values(namespaceTables(ns))) {
+    for (const table of Object.values(ns.entries.table ?? {})) {
       for (const column of Object.values(table.columns)) {
         const codecId = column.codecId;
         codecIds.add(codecId);
@@ -29,7 +29,7 @@ function extractColumnCodecRefs(contract: Contract<SqlStorage>): ColumnCodecRef[
   const refs: ColumnCodecRef[] = [];
 
   for (const [namespaceId, ns] of Object.entries(contract.storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(namespaceTables(ns))) {
+    for (const [tableName, table] of Object.entries(ns.entries.table ?? {})) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         refs.push({ namespaceId, table: tableName, column: columnName, codecId: column.codecId });
       }

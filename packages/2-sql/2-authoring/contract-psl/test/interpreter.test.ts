@@ -1,7 +1,6 @@
 import { crossRef } from '@prisma-next/contract/types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
-import { namespaceTables } from '@prisma-next/sql-contract/types';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import {
@@ -919,7 +918,7 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-      const user = namespaceTables(storage.namespaces['auth']!)['user'];
+      const user = storage.namespaces['auth']!.entries.table?.['user'];
       expect(user).toBeDefined();
       expect(unboundTables(storage)['user']).toBeUndefined();
       const json = JSON.parse(JSON.stringify(user)) as Record<string, unknown>;
@@ -984,8 +983,8 @@ namespace logs {
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
       expect(unboundTables(storage)['post']).toBeDefined();
-      expect(namespaceTables(storage.namespaces['auth']!)['user']).toBeDefined();
-      expect(namespaceTables(storage.namespaces['logs']!)['auditLog']).toBeDefined();
+      expect(storage.namespaces['auth']!.entries.table?.['user']).toBeDefined();
+      expect(storage.namespaces['logs']!.entries.table?.['auditLog']).toBeDefined();
       expect(unboundTables(storage)['user']).toBeUndefined();
     });
   });

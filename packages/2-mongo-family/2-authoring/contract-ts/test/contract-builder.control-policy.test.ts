@@ -7,7 +7,6 @@ import {
   type MongoCollection,
   type MongoContract,
   type MongoStorageShape,
-  namespaceCollections,
 } from '@prisma-next/mongo-contract';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
@@ -34,7 +33,11 @@ function unboundCollections(storage: MongoStorageShape): Record<string, MongoCol
   if (!namespace) {
     throw new Error(`expected namespace ${UNBOUND_NAMESPACE_ID}`);
   }
-  return { ...namespaceCollections(namespace) };
+  return {
+    ...((namespace.entries['collection'] as
+      | Readonly<Record<string, MongoCollection>>
+      | undefined) ?? {}),
+  };
 }
 
 function collectionEffectiveControl(

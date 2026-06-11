@@ -58,7 +58,11 @@ export type MongoModelDefinition = ContractModel<MongoModelStorage>;
  * `namespaces` field) or a fully-constructed class instance (with
  * `namespaces`). The class structurally satisfies this shape.
  */
-type MongoNamespaceEntries = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+import type { MongoCollection } from './ir/mongo-collection';
+
+type MongoNamespaceEntries = Readonly<Record<string, Readonly<Record<string, unknown>>>> & {
+  readonly collection?: Readonly<Record<string, MongoCollection>>;
+};
 
 export type MongoStorageShape<THash extends string = string> = StorageBase<THash> & {
   readonly namespaces: Record<

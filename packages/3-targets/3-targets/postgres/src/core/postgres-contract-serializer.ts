@@ -14,11 +14,7 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import {
-  namespaceTables,
-  type SqlNamespaceTablesInput,
-  type SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
 import { PostgresEnumTypeSchema } from '@prisma-next/sql-contract/validators';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
@@ -167,7 +163,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
           kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
           entries: {
             table: Object.fromEntries(
-              Object.entries(namespaceTables(ns)).map(([tableName, table]) => [
+              Object.entries(ns.entries.table ?? {}).map(([tableName, table]) => [
                 tableName,
                 this.serializeJsonValue(table) as JsonObject,
               ]),

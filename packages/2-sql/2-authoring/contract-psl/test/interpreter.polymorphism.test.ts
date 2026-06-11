@@ -1,11 +1,7 @@
 import { crossRef } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import {
-  namespaceTables,
-  type SqlModelStorage,
-  type SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { SqlModelStorage, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
@@ -218,7 +214,7 @@ model Feature {
       // the shared primary key (`tasks.id = features.id`). That requires the
       // base PK column to be materialised on the variant storage table.
       const storage = result.value.storage as SqlStorage;
-      const featureTable = namespaceTables(storage.namespaces['public']!)['features'];
+      const featureTable = storage.namespaces['public']!.entries.table?.['features'];
       expect(featureTable?.columns['id']).toMatchObject({ nullable: false });
       expect(featureTable?.columns['priority']).toBeDefined();
       expect(featureTable?.primaryKey).toMatchObject({ columns: ['id'] });
@@ -275,7 +271,7 @@ model Feature {
       // carry the base's namespace (`auth`), not silently fall back to the
       // default namespace — mirroring the regular relation-FK path.
       const storage = result.value.storage as SqlStorage;
-      const featureTable = namespaceTables(storage.namespaces['auth']!)['features'];
+      const featureTable = storage.namespaces['auth']!.entries.table?.['features'];
       expect(featureTable?.foreignKeys).toEqual([
         expect.objectContaining({
           source: expect.objectContaining({
@@ -404,7 +400,7 @@ model Bug {
     function tablesOf(contract: { storage: unknown }) {
       const storage = contract.storage as SqlStorage;
       const ns = storage.namespaces['public'];
-      return ns !== undefined ? namespaceTables(ns) : {};
+      return ns !== undefined ? (ns.entries.table ?? {}) : {};
     }
 
     it('materializes an STI variant column onto the base table (nullable in storage)', () => {

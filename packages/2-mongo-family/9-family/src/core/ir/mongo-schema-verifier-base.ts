@@ -8,11 +8,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  type MongoCollection,
-  type MongoStorage,
-  namespaceCollections,
-} from '@prisma-next/mongo-contract';
+import type { MongoCollection, MongoStorage } from '@prisma-next/mongo-contract';
 
 /**
  * Mongo family `SchemaVerifier` abstract base. Commits the Mongo family
@@ -62,7 +58,7 @@ export abstract class MongoSchemaVerifierBase<
     collectionName: string,
   ): ControlPolicy {
     const namespace = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
-    const collection = namespace ? namespaceCollections(namespace)[collectionName] : undefined;
+    const collection = namespace?.entries.collection?.[collectionName];
     return this.effectiveCollectionControlPolicy(contract, collection);
   }
 

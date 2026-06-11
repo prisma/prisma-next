@@ -24,7 +24,6 @@
  *    same brand/coordinate as one built by hand.
  */
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import { namespaceTables } from '@prisma-next/sql-contract/types';
 import type { TargetFieldRef } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
   defineContract,
@@ -132,7 +131,7 @@ describe('lowering smoke test — FK + relation to AuthUser via real supabasePac
 
   it('lowers the FK with spaceId "supabase", namespace "auth", table "users", column "id"', () => {
     const contract = buildProfileContract();
-    const profileTable = namespaceTables(contract.storage.namespaces['public']!)['profile'];
+    const profileTable = contract.storage.namespaces['public']!.entries.table?.['profile'];
     expect(profileTable).toBeDefined();
     const fks = profileTable?.foreignKeys;
     expect(fks).toHaveLength(1);
@@ -145,7 +144,7 @@ describe('lowering smoke test — FK + relation to AuthUser via real supabasePac
 
   it('cascade action passes through the FK without error', () => {
     const contract = buildProfileContract();
-    const profileTable = namespaceTables(contract.storage.namespaces['public']!)['profile'];
+    const profileTable = contract.storage.namespaces['public']!.entries.table?.['profile'];
     const fk = profileTable?.foreignKeys?.[0];
     expect(fk?.onDelete).toBe('cascade');
   });

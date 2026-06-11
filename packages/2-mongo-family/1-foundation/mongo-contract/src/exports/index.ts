@@ -63,8 +63,8 @@ export type { MongoIndexOptionDefaultsInput } from '../ir/mongo-index-option-def
 export { MongoIndexOptionDefaults } from '../ir/mongo-index-option-defaults';
 export type { MongoIndexOptionsInput } from '../ir/mongo-index-options';
 export { MongoIndexOptions } from '../ir/mongo-index-options';
-export type { MongoNamespace, MongoStorageInput } from '../ir/mongo-storage';
-export { MongoStorage, namespaceCollections } from '../ir/mongo-storage';
+export type { MongoNamespace, MongoNamespaceEntries, MongoStorageInput } from '../ir/mongo-storage';
+export { MongoStorage } from '../ir/mongo-storage';
 export type {
   MongoTimeSeriesCollectionOptionsInput,
   MongoTimeSeriesGranularity,

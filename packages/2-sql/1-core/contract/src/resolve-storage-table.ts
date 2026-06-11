@@ -1,4 +1,4 @@
-import { namespaceTables, type SqlNamespace, type SqlStorage } from './ir/sql-storage';
+import type { SqlNamespace, SqlStorage } from './ir/sql-storage';
 import type { StorageTable } from './ir/storage-table';
 
 export interface ResolvedStorageTable {
@@ -13,8 +13,8 @@ function tableInNamespace(
   if (namespace === undefined) {
     return undefined;
   }
-  const tables = namespaceTables(namespace);
-  if (!Object.hasOwn(tables, tableName)) {
+  const tables = namespace.entries.table;
+  if (tables === undefined || !Object.hasOwn(tables, tableName)) {
     return undefined;
   }
   return tables[tableName];

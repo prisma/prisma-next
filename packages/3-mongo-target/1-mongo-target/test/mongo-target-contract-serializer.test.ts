@@ -7,7 +7,6 @@ import {
   MongoIndex,
   MongoStorage,
   MongoValidator,
-  namespaceCollections,
 } from '@prisma-next/mongo-contract';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -91,7 +90,7 @@ describe('MongoTargetContractSerializer', () => {
 
     const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
     expect(ns).toBeDefined();
-    const items = namespaceCollections(ns!)['items'];
+    const items = ns!.entries.collection?.['items'];
     expect(items).toBeInstanceOf(MongoCollection);
     expect(items?.kind).toBe('mongo-collection');
   });
@@ -188,7 +187,7 @@ describe('MongoTargetContractSerializer', () => {
 
       const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
       expect(ns).toBeDefined();
-      const items = namespaceCollections(ns!)['items'];
+      const items = ns!.entries.collection?.['items'];
       expect(items).toBeInstanceOf(MongoCollection);
       expect(items?.indexes?.[0]).toBeInstanceOf(MongoIndex);
       expect(items?.validator).toBeInstanceOf(MongoValidator);
@@ -274,7 +273,7 @@ describe('MongoTargetContractSerializer', () => {
       const roundtripped = serializer.deserializeContract(reparsed);
       const roundtrippedNs = roundtripped.storage.namespaces[UNBOUND_NAMESPACE_ID];
       expect(roundtrippedNs).toBeDefined();
-      expect(namespaceCollections(roundtrippedNs!)['items']).toBeInstanceOf(MongoCollection);
+      expect(roundtrippedNs!.entries.collection?.['items']).toBeInstanceOf(MongoCollection);
     });
   });
 });

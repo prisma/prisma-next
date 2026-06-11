@@ -2,7 +2,6 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import {
   CheckConstraint,
-  namespaceTables,
   type SqlStorage,
   StorageTable,
   type StorageTableInput,
@@ -65,7 +64,7 @@ describe('check-constraint lowering', () => {
     ) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs !== undefined ? namespaceTables(storageNs)['User'] : undefined;
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
 
     expect(userTable?.checks).toHaveLength(1);
     expect(userTable?.checks?.[0]).toMatchObject({
@@ -110,7 +109,7 @@ describe('check-constraint lowering', () => {
     ) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs !== undefined ? namespaceTables(storageNs)['User'] : undefined;
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
 
     expect(userTable?.checks).toHaveLength(2);
     const checkNames = userTable?.checks?.map((c) => c.name).sort();
@@ -137,7 +136,7 @@ describe('check-constraint lowering', () => {
     ) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs !== undefined ? namespaceTables(storageNs)['User'] : undefined;
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
 
     expect(userTable?.checks).toBeUndefined();
   });
@@ -165,7 +164,7 @@ describe('check-constraint lowering', () => {
     ) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs !== undefined ? namespaceTables(storageNs)['User'] : undefined;
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
 
     expect(userTable?.checks?.[0]).toBeInstanceOf(CheckConstraint);
   });

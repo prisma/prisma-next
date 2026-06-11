@@ -3,12 +3,6 @@ import type { TableProxy } from './table-proxy';
 
 export type CapabilitiesBase = Record<string, Record<string, boolean>>;
 
-/**
- * An open-dictionary `entries` shape compatible with `SqlNamespace` after ADR 224.
- * `entries` is a `Record<string, Record<string, unknown>>`; the `'table'` key may or
- * may not be present. Helpers index into `entries['table']` with an optional-chain
- * pattern to tolerate its absence, matching the `namespaceTables` family helper.
- */
 type NamespaceEntries = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
 export type TableProxyContract = {

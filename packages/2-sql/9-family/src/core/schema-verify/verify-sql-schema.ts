@@ -20,7 +20,6 @@ import type {
 import {
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
-  namespaceTables,
   type PostgresEnumStorageEntry,
   type SqlStorage,
   type StorageColumn,
@@ -425,7 +424,7 @@ function verifySchemaTables(options: {
   for (const namespaceId of namespaceIds) {
     const ns = contract.storage.namespaces[namespaceId];
     if (!ns) continue;
-    for (const [tableName, contractTableRaw] of Object.entries(namespaceTables(ns))) {
+    for (const [tableName, contractTableRaw] of Object.entries(ns.entries.table ?? {})) {
       if (!(contractTableRaw instanceof StorageTable)) {
         throw new Error(
           `verifySqlSchema: expected StorageTable at storage.namespaces.${namespaceId}.entries.table.${tableName}`,
@@ -490,7 +489,7 @@ function verifySchemaTables(options: {
     for (const tableName of Object.keys(schemaTables)) {
       const claimed = namespaceIds.some((namespaceId) => {
         const ns = contract.storage.namespaces[namespaceId];
-        return ns !== undefined && namespaceTables(ns)[tableName] !== undefined;
+        return ns !== undefined && (ns.entries.table ?? {})[tableName] !== undefined;
       });
       if (!claimed) {
         const extraTableControlPolicy = effectiveControlPolicy(undefined, contractDefaultControl);

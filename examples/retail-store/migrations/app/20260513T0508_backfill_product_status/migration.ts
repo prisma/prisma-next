@@ -2,7 +2,6 @@
 import { MigrationCLI } from '@prisma-next/cli/migration-cli';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { Migration } from '@prisma-next/family-mongo/migration';
-import { namespaceCollections } from '@prisma-next/mongo-contract';
 import {
   AggregateCommand,
   MongoExistsExpr,
@@ -37,7 +36,7 @@ const STORAGE_HASH = endContract.storage.storageHash;
 // with the contract if the chain is ever re-emitted.
 function requireProductsValidator() {
   const ns = endContract.storage.namespaces['__unbound__'];
-  const validator = ns ? namespaceCollections(ns)['products']?.validator : undefined;
+  const validator = ns ? ns.entries['collection']?.['products']?.validator : undefined;
   if (validator === undefined) {
     throw new Error('end-contract.json is missing a validator for the products collection');
   }

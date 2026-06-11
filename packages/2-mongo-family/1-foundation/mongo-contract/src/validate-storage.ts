@@ -1,5 +1,4 @@
 import type { MongoContract, MongoModelDefinition } from './contract-types';
-import { namespaceCollections } from './ir/mongo-storage';
 
 function formatCrossRef(crossRef: { readonly namespace: string; readonly model: string }): string {
   return `${crossRef.namespace}.${crossRef.model}`;
@@ -10,7 +9,7 @@ function storageDeclaresCollection(
   collectionName: string,
 ): boolean {
   for (const ns of Object.values(storage.namespaces)) {
-    if (Object.hasOwn(namespaceCollections(ns), collectionName)) {
+    if (Object.hasOwn(ns.entries['collection'] ?? {}, collectionName)) {
       return true;
     }
   }

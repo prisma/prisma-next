@@ -1,12 +1,7 @@
 import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import { SqlContractSerializerBase } from '@prisma-next/family-sql/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  namespaceTables,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
-} from '@prisma-next/sql-contract/types';
+import { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import sqliteControlTargetDescriptor from '../src/core/control-target';
@@ -58,7 +53,7 @@ describe('SqliteContractSerializer', () => {
     const serializer = new SqliteContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
     expect(contract.targetFamily).toBe('sql');
-    expect(namespaceTables(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!)).toEqual({});
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table ?? {}).toEqual({});
   });
 
   it('hydrates JSON storage into the SQL Contract IR class hierarchy', () => {
@@ -66,7 +61,7 @@ describe('SqliteContractSerializer', () => {
     const contract = serializer.deserializeContract(makeContractWithTablesJson());
 
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const userTable = namespaceTables(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!)['user'] as
+    const userTable = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table?.['user'] as
       | StorageTable
       | undefined;
     expect(userTable).toBeInstanceOf(StorageTable);

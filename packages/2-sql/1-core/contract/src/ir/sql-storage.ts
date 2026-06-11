@@ -1,6 +1,5 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
 import { freezeNode, type Namespace, type Storage } from '@prisma-next/framework-components/ir';
-import { blindCast } from '@prisma-next/utils/casts';
 import { SqlNode } from './sql-node';
 import type { StorageTable } from './storage-table';
 import {
@@ -53,15 +52,25 @@ export interface SqlStorageInput<THash extends string = string> {
  * not import target-specific subclasses).
  */
 /**
+ * The typed `entries` shape for SQL family namespaces. The open dictionary
+ * is intersected with optional known-kind maps so that `ns.entries.table`
+ * and `ns.entries.valueSet` resolve without a cast, while unknown pack-
+ * contributed kinds remain valid (the `Record` part allows any string key).
+ */
+export type SqlNamespaceEntries = Readonly<Record<string, Readonly<Record<string, unknown>>>> & {
+  readonly table?: Readonly<Record<string, StorageTable>>;
+  readonly valueSet?: Readonly<Record<string, StorageValueSet>>;
+};
+
+/**
  * SQL family namespace. `entries` is the open ADR 224 dictionary —
  * `entries[entityKind][entityName]` addresses any entity. Emitted
  * contract literals satisfy this structurally (no prototype getters
  * needed). For typed access to specific kinds, use the class getters
- * on the concretion or the `namespaceTables` / `namespaceValueSets`
- * family helpers.
+ * on the concretion or `ns.entries.table` / `ns.entries.valueSet` directly.
  */
 export type SqlNamespace = Namespace & {
-  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  readonly entries: SqlNamespaceEntries;
   /**
    * Render a dialect-qualified table reference for runtime SQL emission.
    * Present on materialised target concretions (`PostgresSchema`,
@@ -70,24 +79,6 @@ export type SqlNamespace = Namespace & {
    */
   qualifyTable?(tableName: string): string;
 };
-
-const FROZEN_EMPTY: Readonly<Record<string, never>> = Object.freeze({});
-
-/** Returns the frozen table map for a structural {@link SqlNamespace} (no prototype getters). */
-export function namespaceTables(ns: SqlNamespace): Readonly<Record<string, StorageTable>> {
-  return blindCast<
-    Readonly<Record<string, StorageTable>>,
-    'entries[table] holds only StorageTable by construction'
-  >(ns.entries['table'] ?? FROZEN_EMPTY);
-}
-
-/** Returns the frozen value-set map for a structural {@link SqlNamespace}, or an empty map. */
-export function namespaceValueSets(ns: SqlNamespace): Readonly<Record<string, StorageValueSet>> {
-  return blindCast<
-    Readonly<Record<string, StorageValueSet>>,
-    'entries[valueSet] holds only StorageValueSet by construction'
-  >(ns.entries['valueSet'] ?? FROZEN_EMPTY);
-}
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
@@ -116,7 +107,7 @@ export function storageTableAt(
 ): StorageTable | undefined {
   const ns = storage.namespaces[namespaceId];
   if (ns === undefined) return undefined;
-  return namespaceTables(ns)[tableName];
+  return ns.entries.table?.[tableName];
 }
 
 /**

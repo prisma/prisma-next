@@ -11,7 +11,6 @@ import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
 import { buildSqlNamespaceMap } from './ir/build-sql-namespace';
-import { namespaceTables } from './ir/sql-storage';
 import { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 import {
   type ForeignKeyInput,
@@ -328,7 +327,7 @@ type NamespacedStorageWalk = {
 
 function eachStorageTable(storage: NamespacedStorageWalk) {
   return Object.entries(storage.namespaces).flatMap(([namespaceId, ns]) =>
-    Object.entries(namespaceTables(ns)).map(([tableName, table]) => ({
+    Object.entries(ns.entries['table'] ?? {}).map(([tableName, table]) => ({
       namespaceId,
       tableName,
       table,
@@ -771,8 +770,7 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
 
       const storageTable = model.storage.table;
       const storageNs = contract.storage.namespaces[storageNamespaceId];
-      const rawTable =
-        storageNs !== undefined ? namespaceTables(storageNs)[storageTable] : undefined;
+      const rawTable = storageNs?.entries.table?.[storageTable];
       if (rawTable === undefined) {
         throw new ContractValidationError(
           `Model "${qualifiedName}" references non-existent table "${storageNamespaceId}.${storageTable}"`,
@@ -892,10 +890,7 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
 
       if (fk.target.spaceId === undefined) {
         const targetNamespace = contract.storage.namespaces[fk.target.namespaceId];
-        const referencedRaw =
-          targetNamespace !== undefined
-            ? namespaceTables(targetNamespace)[fk.target.tableName]
-            : undefined;
+        const referencedRaw = targetNamespace?.entries.table?.[fk.target.tableName];
         if (referencedRaw === undefined) {
           throw new ContractValidationError(
             `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent table "${fk.target.namespaceId}.${fk.target.tableName}"`,
