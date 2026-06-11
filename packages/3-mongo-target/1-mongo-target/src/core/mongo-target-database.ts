@@ -41,7 +41,10 @@ export class MongoTargetDatabase extends NamespaceBase {
       if (kind === 'collection') {
         const collectionMap: Record<string, MongoCollection> = {};
         for (const [name, c] of Object.entries(
-          rawMap as Record<string, MongoCollection | MongoCollectionInput>,
+          blindCast<
+            Record<string, MongoCollection | MongoCollectionInput>,
+            'entries[collection] holds MongoCollection or MongoCollectionInput by construction'
+          >(rawMap),
         )) {
           collectionMap[name] =
             c instanceof MongoCollection ? c : new MongoCollection(blindCast(c));

@@ -49,14 +49,22 @@ class SqlBoundNamespace extends NamespaceBase {
       if (kind === 'table') {
         const tableMap: Record<string, StorageTable> = {};
         for (const [name, v] of Object.entries(
-          rawMap as Record<string, StorageTable | { columns: unknown; uniques: unknown[] }>,
+          blindCast<
+            Record<string, StorageTable | { columns: unknown; uniques: unknown[] }>,
+            'entries[table] holds StorageTable or StorageTableInput by construction'
+          >(rawMap),
         )) {
           tableMap[name] = v instanceof StorageTable ? v : new StorageTable(blindCast(v));
         }
         builtEntries['table'] = Object.freeze(tableMap);
       } else if (kind === 'valueSet') {
         const vsMap: Record<string, StorageValueSet> = {};
-        for (const [name, v] of Object.entries(rawMap as Record<string, StorageValueSet>)) {
+        for (const [name, v] of Object.entries(
+          blindCast<
+            Record<string, StorageValueSet>,
+            'entries[valueSet] holds StorageValueSet by construction'
+          >(rawMap),
+        )) {
           vsMap[name] = v instanceof StorageValueSet ? v : new StorageValueSet(blindCast(v));
         }
         builtEntries['valueSet'] = Object.freeze(vsMap);

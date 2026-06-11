@@ -48,7 +48,10 @@ class MongoBoundNamespace extends NamespaceBase {
       if (kind === 'collection') {
         const collectionMap: Record<string, MongoCollection> = {};
         for (const [name, c] of Object.entries(
-          rawMap as Record<string, MongoCollection | { kind?: unknown }>,
+          blindCast<
+            Record<string, MongoCollection | { kind?: unknown }>,
+            'entries[collection] holds MongoCollection or MongoCollectionInput by construction'
+          >(rawMap),
         )) {
           collectionMap[name] =
             c instanceof MongoCollection ? c : new MongoCollection(blindCast(c));
