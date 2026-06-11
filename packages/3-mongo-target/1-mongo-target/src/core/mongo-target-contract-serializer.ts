@@ -1,6 +1,10 @@
 import { MongoContractSerializerBase } from '@prisma-next/family-mongo/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { type MongoContract, MongoStorage } from '@prisma-next/mongo-contract';
+import {
+  type MongoContract,
+  MongoStorage,
+  namespaceCollections,
+} from '@prisma-next/mongo-contract';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { MongoTargetContract } from './mongo-target-contract';
@@ -11,7 +15,7 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
     const { storage, ...rest } = validated;
     const namespaces = Object.fromEntries(
       Object.entries(storage.namespaces).map(([nsId, nsData]) => {
-        const collections = nsData.entries.collection;
+        const collections = namespaceCollections(nsData);
         const collectionCount = Object.keys(collections).length;
         if (nsId === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
           return [nsId, MongoTargetUnboundDatabase.instance];
@@ -37,7 +41,7 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
     const namespacesJson: Record<string, JsonObject> = {};
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
       const collectionsOut: Record<string, JsonObject> = {};
-      for (const [collName, coll] of Object.entries(ns.entries.collection)) {
+      for (const [collName, coll] of Object.entries(namespaceCollections(ns))) {
         collectionsOut[collName] = JSON.parse(JSON.stringify(coll)) as JsonObject;
       }
       namespacesJson[nsId] = {

@@ -5,29 +5,38 @@ import {
   type Namespace,
   type Storage,
 } from '@prisma-next/framework-components/ir';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { MongoCollection, MongoCollectionInput } from './mongo-collection';
 
 export interface MongoNamespaceCollectionsInput {
   readonly id: string;
-  readonly entries: {
-    readonly collection: Record<string, MongoCollection | MongoCollectionInput>;
-  };
+  readonly entries: Readonly<
+    Record<string, Readonly<Record<string, MongoCollection | MongoCollectionInput>>>
+  >;
 }
 
-// Mongo concretions store `MongoCollection` instances under
-// `entries.collection` (Mongo idiom — distinct from the SQL family's
-// `entries.table`). Narrowing the namespace map here lets target/family-
-// level consumers iterate collection slots and recover the concrete type
-// without the framework's wider `Namespace` tripping them up.
 export type MongoNamespace = Namespace & {
-  readonly entries: Readonly<{
-    readonly collection: Readonly<Record<string, MongoCollection>>;
-  }>;
+  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 };
 
 export interface MongoStorageInput<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
   readonly namespaces: Readonly<Record<string, MongoNamespace>>;
+}
+
+/**
+ * Returns the `entries['collection']` map from a namespace, typed as a
+ * `Record<string, MongoCollection>`. Use this in generic/structural code
+ * where the static type is `MongoNamespace` rather than a class instance
+ * with a `collection` getter.
+ */
+export function namespaceCollections(
+  ns: MongoNamespace,
+): Readonly<Record<string, MongoCollection>> {
+  return blindCast<
+    Readonly<Record<string, MongoCollection>>,
+    'entries[collection] holds only MongoCollection by construction'
+  >(ns.entries['collection'] ?? Object.freeze({}));
 }
 
 export class MongoStorage<THash extends string = string> extends IRNodeBase implements Storage {

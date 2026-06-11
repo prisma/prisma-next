@@ -28,12 +28,11 @@ class MongoBoundNamespace extends NamespaceBase {
   declare readonly kind: string;
 
   readonly id: string;
-  readonly entries: Readonly<{
-    readonly collection: Readonly<Record<string, MongoCollection>>;
-  }>;
+  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
   static fromCollectionsInput(input: MongoNamespaceCollectionsInput): MongoNamespace {
-    const collectionCount = Object.keys(input.entries.collection).length;
+    const collectionMap = input.entries['collection'];
+    const collectionCount = collectionMap !== undefined ? Object.keys(collectionMap).length : 0;
     if (input.id === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
       return castAs<MongoNamespace>(MongoUnboundNamespace.instance);
     }
@@ -43,16 +42,30 @@ class MongoBoundNamespace extends NamespaceBase {
   private constructor(input: MongoNamespaceCollectionsInput) {
     super();
     this.id = input.id;
-    this.entries = Object.freeze({
-      collection: Object.freeze(
-        Object.fromEntries(
-          Object.entries(input.entries.collection).map(([name, c]) => [
-            name,
-            c instanceof MongoCollection ? c : new MongoCollection(c),
-          ]),
-        ),
-      ),
-    });
+
+    const builtEntries: Record<string, Readonly<Record<string, unknown>>> = {};
+    for (const [kind, rawMap] of Object.entries(input.entries)) {
+      if (kind === 'collection') {
+        const collectionMap: Record<string, MongoCollection> = {};
+        for (const [name, c] of Object.entries(
+          rawMap as Record<string, MongoCollection | { kind?: unknown }>,
+        )) {
+          collectionMap[name] =
+            c instanceof MongoCollection ? c : new MongoCollection(blindCast(c));
+        }
+        builtEntries['collection'] = Object.freeze(collectionMap);
+      } else {
+        throw new Error(
+          `buildMongoNamespace: unknown entity kind "${kind}" in entries; expected "collection"`,
+        );
+      }
+    }
+
+    if (!Object.hasOwn(builtEntries, 'collection')) {
+      builtEntries['collection'] = Object.freeze({});
+    }
+
+    this.entries = Object.freeze(builtEntries);
     Object.defineProperty(this, 'kind', {
       value: MONGO_NAMESPACE_KIND,
       writable: false,
@@ -60,6 +73,13 @@ class MongoBoundNamespace extends NamespaceBase {
       configurable: true,
     });
     freezeNode(this);
+  }
+
+  get collection(): Readonly<Record<string, MongoCollection>> {
+    return blindCast<
+      Readonly<Record<string, MongoCollection>>,
+      'entries[collection] holds only MongoCollection by construction'
+    >(this.entries['collection'] ?? Object.freeze({}));
   }
 }
 
