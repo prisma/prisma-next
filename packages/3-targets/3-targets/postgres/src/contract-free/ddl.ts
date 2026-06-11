@@ -1,5 +1,11 @@
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
-import { PostgresCreateSchema, PostgresCreateTable } from '../core/ddl/nodes';
+import {
+  AddColumnAction,
+  type AnyAlterTableAction,
+  PostgresAlterTable,
+  PostgresCreateSchema,
+  PostgresCreateTable,
+} from '../core/ddl/nodes';
 
 /**
  * Build a Postgres `CREATE TABLE` query node.
@@ -34,4 +40,25 @@ export function createSchema(options: {
   readonly ifNotExists?: boolean;
 }): PostgresCreateSchema {
   return new PostgresCreateSchema(options);
+}
+
+/**
+ * Build an `ADD COLUMN` action for use inside {@link alterTable}.
+ * The column is a structured `DdlColumn` so codec-encoded defaults flow
+ * through the adapter's `pgRenderDdlColumn` → `pgRenderDdlColumnDefault` path.
+ */
+export function addColumnAction(column: DdlColumn): AddColumnAction {
+  return new AddColumnAction(column);
+}
+
+/**
+ * Build a Postgres `ALTER TABLE` query node carrying one or more actions.
+ * See {@link addColumnAction} for building actions.
+ */
+export function alterTable(options: {
+  readonly table: string;
+  readonly schema?: string;
+  readonly actions: readonly AnyAlterTableAction[];
+}): PostgresAlterTable {
+  return new PostgresAlterTable(options);
 }

@@ -130,12 +130,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
         [col('id', 'text', { notNull: true }), col('email', 'text', { notNull: true })],
         [primaryKey(['id'])],
       ),
-      new AddColumnCall('public', 'user', {
-        name: 'nickname',
-        typeSql: 'text',
-        defaultSql: '',
-        nullable: true,
-      }),
+      new AddColumnCall('public', 'user', col('nickname', 'text')),
       new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
       new DropTableCall('public', 'stale'),
     ];

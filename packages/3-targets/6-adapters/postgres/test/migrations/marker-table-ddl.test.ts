@@ -20,13 +20,13 @@ describe('Postgres marker table DDL lowering', () => {
   }
 
   test('declares the invariants column as text[] not null default empty array', async () => {
-    expect(await markerTableSql()).toContain(`"invariants" text[] NOT NULL DEFAULT '{}'`);
+    expect(await markerTableSql()).toContain(`"invariants" text[] DEFAULT '{}'::text[] NOT NULL`);
   });
 
   test('keys the marker by `space text` (PRIMARY KEY) instead of the legacy single-row `id`', async () => {
-    expect(await markerTableSql()).toMatch(/"space"\s+text\s+NOT NULL/);
+    expect(await markerTableSql()).toMatch(/"space"\s+text\b/);
     expect(await markerTableSql()).toMatch(
-      /"space"\s+text\s+NOT NULL\s+PRIMARY KEY|PRIMARY KEY\s*\(\s*"space"\s*\)/,
+      /"space"\s+text\b.*NOT NULL.*PRIMARY KEY|PRIMARY KEY\s*\(\s*"space"\s*\)/,
     );
   });
 

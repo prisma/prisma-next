@@ -56,7 +56,7 @@ import {
   SetDefaultCall,
   SetNotNullCall,
 } from './op-factory-call';
-import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
+import type { ForeignKeySpec } from './operations/shared';
 import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
 import { buildExpectedFormatType } from './planner-sql-checks';
 import {
@@ -193,20 +193,6 @@ export interface IssuePlannerOptions {
 
 export interface IssuePlannerValue {
   readonly calls: readonly PostgresOpFactoryCall[];
-}
-
-function toColumnSpec(
-  name: string,
-  column: StorageColumn,
-  codecHooks: ReadonlyMap<string, CodecControlHooks>,
-  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
-): ColumnSpec {
-  return {
-    name,
-    typeSql: buildColumnTypeSql(column, codecHooks, storageTypes),
-    defaultSql: buildColumnDefaultSql(column.default, column),
-    nullable: column.nullable,
-  };
 }
 
 function toDdlColumn(
@@ -363,7 +349,7 @@ function mapIssueToCall(
           new AddColumnCall(
             tableSchema(issue),
             issue.table,
-            toColumnSpec(issue.column, column, codecHooks, storageTypes),
+            toDdlColumn(issue.column, column, codecHooks, storageTypes),
           ),
         ]);
       }

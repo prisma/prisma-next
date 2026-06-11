@@ -65,12 +65,7 @@ describe('renderOps', () => {
     const calls = [
       new CreateTableCall('public', 'user', [col('id', 'text', { notNull: true })]),
       new DropTableCall('public', 'stale'),
-      new AddColumnCall('public', 'user', {
-        name: 'email',
-        typeSql: 'text',
-        defaultSql: '',
-        nullable: true,
-      }),
+      new AddColumnCall('public', 'user', col('email', 'text')),
       new DropColumnCall('public', 'user', 'legacy'),
       new AlterColumnTypeCall('public', 'user', 'age', {
         qualifiedTargetType: 'integer',

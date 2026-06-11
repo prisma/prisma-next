@@ -3,5 +3,5 @@ export {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
 } from '../contract-free/control-bootstrap';
-export { createSchema, createTable } from '../contract-free/ddl';
+export { addColumnAction, alterTable, createSchema, createTable } from '../contract-free/ddl';
 export { PostgresTableSource } from '../core/ast/table-source';
