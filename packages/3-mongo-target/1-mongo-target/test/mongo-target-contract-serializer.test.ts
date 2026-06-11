@@ -7,6 +7,7 @@ import {
   MongoIndex,
   MongoStorage,
   MongoValidator,
+  namespaceCollections,
 } from '@prisma-next/mongo-contract';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -88,7 +89,9 @@ describe('MongoTargetContractSerializer', () => {
     const serializer = new MongoTargetContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
 
-    const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.entries.collection['items'];
+    const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(ns).toBeDefined();
+    const items = namespaceCollections(ns!)['items'];
     expect(items).toBeInstanceOf(MongoCollection);
     expect(items?.kind).toBe('mongo-collection');
   });
@@ -173,7 +176,9 @@ describe('MongoTargetContractSerializer', () => {
       const serializer = new MongoTargetContractSerializer();
       const contract = serializer.deserializeContract(makeFullyPopulatedJson());
 
-      const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.entries.collection['items'];
+      const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+      expect(ns).toBeDefined();
+      const items = namespaceCollections(ns!)['items'];
       expect(items).toBeInstanceOf(MongoCollection);
       expect(items?.indexes?.[0]).toBeInstanceOf(MongoIndex);
       expect(items?.validator).toBeInstanceOf(MongoValidator);
@@ -257,9 +262,9 @@ describe('MongoTargetContractSerializer', () => {
       expect(items.options.collation.kind).toBe('mongo-collation-options');
 
       const roundtripped = serializer.deserializeContract(reparsed);
-      expect(
-        roundtripped.storage.namespaces[UNBOUND_NAMESPACE_ID]?.entries.collection['items'],
-      ).toBeInstanceOf(MongoCollection);
+      const roundtrippedNs = roundtripped.storage.namespaces[UNBOUND_NAMESPACE_ID];
+      expect(roundtrippedNs).toBeDefined();
+      expect(namespaceCollections(roundtrippedNs!)['items']).toBeInstanceOf(MongoCollection);
     });
   });
 });
