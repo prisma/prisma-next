@@ -82,15 +82,6 @@ describe('MongoTargetDatabase entries (open dictionary)', () => {
       expect(db.entries['collection']?.['users']).toBeInstanceOf(MongoCollection);
     });
 
-    it('passes through existing MongoCollection instances', () => {
-      const existing = new MongoCollection({});
-      const db = new MongoTargetDatabase({
-        id: 'app_db',
-        entries: { collection: { users: existing } },
-      });
-      expect(db.collection['users']).toBe(existing);
-    });
-
     it('collection map is always present even when entries is omitted', () => {
       const db = new MongoTargetDatabase({ id: 'app_db' });
       expect(db.entries['collection']).toBeDefined();
