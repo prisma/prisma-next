@@ -20,7 +20,7 @@ import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 import { seed } from '../src/seed';
 
-const contract = new MongoContractSerializer().deserializeContract(contractJson) as Contract;
+const contract = new MongoContractSerializer().deserializeContract<Contract>(contractJson);
 
 /**
  * End-to-end check that a real Mongo runtime + the cross-family
