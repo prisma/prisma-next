@@ -68,7 +68,7 @@ precheck: [{ source: …, filter: f.key.eq(keysToKeySpec(keys)), … }]   // con
 - [x] The runner's DDL dispatch goes `adapter.lower({command}, {}) → driver.execute(wire)` for **every** DDL step; `MongoCommandExecutor` is deleted (file, runner-deps slot, exports); `MongoInspectionExecutor` remains. *(D1)*
 - [x] The contract-free builder exposes `.createCollection(options)` / `.createIndex(keys, options)`; `CreateCollectionCall.toOp()` and `CreateIndexCall.toOp()` (and the factories they delegate to, if retained for `validatedCollection`) construct via the builder, including check filters via the field accessor. *(D2)*
 - [x] Lowering oracle covering all five kinds × all option fields; behavioral tests rewritten through the new path; `op-factory-call.test.ts` updated. *(D1)*
-- [ ] D3 codec-resolution dedup landed as its own commit on this branch.
+- [x] D3 codec-resolution dedup landed as its own commit on this branch. *(D3)*
 - [ ] `pnpm fixtures:check` clean; `pnpm lint:deps` passes; `pnpm lint:casts` delta ≤ 0.
 
 ## Open questions (mechanical — resolved during implementation, recorded in the dispatch)

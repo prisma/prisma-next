@@ -5,6 +5,25 @@ import type { CodecInstanceContext, CodecRef } from './codec-types';
 import { runtimeError } from './runtime-error';
 
 /**
+ * Look up a descriptor for `ref.codecId` using `descriptorFor`; throw
+ * `RUNTIME.CODEC_DESCRIPTOR_MISSING` if none is found.
+ */
+export function resolveCodecDescriptorOrThrow(
+  descriptorFor: (codecId: string) => AnyCodecDescriptor | undefined,
+  ref: CodecRef,
+): AnyCodecDescriptor {
+  const descriptor = descriptorFor(ref.codecId);
+  if (!descriptor) {
+    throw runtimeError(
+      'RUNTIME.CODEC_DESCRIPTOR_MISSING',
+      `No codec descriptor registered for codecId '${ref.codecId}'.`,
+      { codecId: ref.codecId },
+    );
+  }
+  return descriptor;
+}
+
+/**
  * Validates `ref.typeParams` against `descriptor.paramsSchema`.
  *
  * Parameterized codecs that omit `typeParams` have it normalized to `{}` before
