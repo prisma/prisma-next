@@ -19,8 +19,8 @@ export const contract = defineContract(
     const Profile = model('Profile', {
       namespace: 'public',
       fields: {
-        id: field.id.uuidv4(),
-        userId: field.uuid(),
+        id: field.id.uuidv4String(),
+        userId: field.uuidString(),
         username: field.text(),
         bio: field.text().optional(),
         createdAt: field.temporal.createdAt(),
@@ -31,8 +31,8 @@ export const contract = defineContract(
     const Post = model('Post', {
       namespace: 'public',
       fields: {
-        id: field.id.uuidv4(),
-        authorId: field.uuid(),
+        id: field.id.uuidv4String(),
+        authorId: field.uuidString(),
         title: field.text(),
         body: field.text(),
         publishedAt: field.temporal.timestamptz().optional(),

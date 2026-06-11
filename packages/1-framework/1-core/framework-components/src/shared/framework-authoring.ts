@@ -376,7 +376,14 @@ export function mergeAuthoringNamespaces(
     const existingValue = hasExistingValue ? target[key] : undefined;
 
     if (!hasExistingValue) {
-      target[key] = sourceValue;
+      // Copy sub-namespace objects instead of assigning the reference so
+      // subsequent merges don't mutate objects owned by source packs.
+      // Leaf descriptors (checked by leafGuard) are immutable values; only
+      // sub-namespaces need copying.
+      target[key] =
+        isPlainNamespaceObject(sourceValue) && !leafGuard(sourceValue)
+          ? { ...sourceValue }
+          : sourceValue;
       continue;
     }
 
