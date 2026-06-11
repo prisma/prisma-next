@@ -1,5 +1,5 @@
 #!/usr/bin/env -S node
-import { addColumn, Migration, MigrationCLI } from '@prisma-next/postgres/migration';
+import { col, Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 
 export default class M extends Migration {
   override describe() {
@@ -11,30 +11,10 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      addColumn('__unbound__', 'account', {
-        name: 'bio',
-        typeSql: 'text',
-        defaultSql: '',
-        nullable: true,
-      }),
-      addColumn('__unbound__', 'account', {
-        name: 'locale',
-        typeSql: 'text',
-        defaultSql: '',
-        nullable: true,
-      }),
-      addColumn('__unbound__', 'account', {
-        name: 'phone',
-        typeSql: 'text',
-        defaultSql: '',
-        nullable: true,
-      }),
-      addColumn('__unbound__', 'account', {
-        name: 'verified',
-        typeSql: 'bool',
-        defaultSql: 'DEFAULT true',
-        nullable: false,
-      }),
+      this.addColumn({ schema: '__unbound__', table: 'account', column: col('bio', 'text') }),
+      this.addColumn({ schema: '__unbound__', table: 'account', column: col('locale', 'text') }),
+      this.addColumn({ schema: '__unbound__', table: 'account', column: col('phone', 'text') }),
+      this.addColumn({ schema: '__unbound__', table: 'account', column: col('verified', 'bool') }),
     ];
   }
 }

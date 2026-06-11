@@ -1,7 +1,7 @@
 #!/usr/bin/env -S node
 import {
   addCheckConstraint,
-  addColumn,
+  col,
   Migration,
   MigrationCLI,
   setNotNull,
@@ -17,12 +17,7 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      addColumn('public', 'post', {
-        name: 'priority',
-        typeSql: 'text',
-        defaultSql: '',
-        nullable: true,
-      }),
+      this.addColumn({ schema: 'public', table: 'post', column: col('priority', 'text') }),
       setNotNull('public', 'post', 'priority'),
       addCheckConstraint('public', 'post', 'post_priority_check', 'priority', [
         'low',
