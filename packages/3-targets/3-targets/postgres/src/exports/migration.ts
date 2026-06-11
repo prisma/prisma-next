@@ -42,12 +42,6 @@ export {
   createExtension,
   installExtension,
 } from '../core/migrations/operations/dependencies';
-export {
-  addEnumValues,
-  createEnumType,
-  dropEnumType,
-  renameType,
-} from '../core/migrations/operations/enums';
 export { createIndex, dropIndex } from '../core/migrations/operations/indexes';
 export { rawSql } from '../core/migrations/operations/raw';
 export { dropTable } from '../core/migrations/operations/tables';

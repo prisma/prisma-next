@@ -1,9 +1,5 @@
 import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type {
-  PostgresEnumStorageEntry,
-  StorageColumn,
-  StorageTypeInstance,
-} from '@prisma-next/sql-contract/types';
+import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { quoteIdentifier } from '../sql-utils';
 import { buildAddColumnSql } from './planner-ddl-builders';
 import {
@@ -39,7 +35,7 @@ export function buildAddNotNullColumnWithTemporaryDefaultOperation(options: {
   readonly columnName: string;
   readonly column: StorageColumn;
   readonly codecHooks: Map<string, CodecControlHooks>;
-  readonly storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+  readonly storageTypes: Record<string, StorageTypeInstance>;
   readonly temporaryDefault: string;
 }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
   const { schema, tableName, columnName, column, codecHooks, storageTypes, temporaryDefault } =

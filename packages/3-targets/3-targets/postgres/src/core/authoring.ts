@@ -4,48 +4,10 @@ import type {
   AuthoringFieldNamespace,
   AuthoringTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
-import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
-import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
-import { PostgresEnumTypeSchema } from './postgres-enum-type-schema';
 
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
 
-/**
- * Entity type contributions surface as top-level helpers on the
- * composed-helpers shape (e.g. `helpers.enumEntity({...})`), flattened
- * alongside the built-in `model` / `rel` helpers. Pack contributions
- * still ship via the contribution data structure
- * `authoring.entityTypes.<name>`; the composed-helpers template
- * performs the rename in the type system.
- *
- * `enumEntity` is the native-postgres enum builder (CREATE TYPE … AS ENUM).
- * It is renamed from `enum` in D1 (TML-2853) because the SQL family now
- * claims `enum` for the domain-concept enum type (enumType/pg-text@1 form).
- * This native helper and its `PostgresEnumType` backing are deleted in D2.
- */
-/**
- * The factory constructs a `PostgresEnumType` instance natively — the
- * `SqlStorage.types` slot accepts polymorphic IR (the framework
- * `StorageType` alphabet), so no cast is needed at the contribution
- * surface. The declared return type is the structural
- * `PostgresEnumStorageEntry` so the inferred contract type stays
- * portable (it names a type exported from
- * `@prisma-next/sql-contract/types`, a public surface every consumer
- * already imports). Sharpening the inferred contract type to surface
- * enum-specific narrowing through `EntityHelperFunction` is a
- * separable refinement and lives outside this PR.
- */
-export const postgresAuthoringEntityTypes = {
-  enumEntity: {
-    kind: 'entity',
-    discriminator: 'postgres-enum',
-    validatorSchema: PostgresEnumTypeSchema,
-    output: {
-      factory: (input: PostgresEnumTypeInput): PostgresEnumStorageEntry =>
-        new PostgresEnumType(input),
-    },
-  },
-} as const satisfies AuthoringEntityTypeNamespace;
+export const postgresAuthoringEntityTypes = {} as const satisfies AuthoringEntityTypeNamespace;
 
 /**
  * Field presets contributed by the Postgres target pack.

@@ -4,8 +4,6 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import {
-  type PostgresEnumStorageEntry,
-  type SqlNamespaceEntries,
   type SqlNamespaceTablesInput,
   type SqlStorage,
   StorageTable,
@@ -15,12 +13,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { escapeLiteral } from './sql-utils';
-
-export type PostgresNamespaceEntries = SqlNamespaceEntries & {
-  readonly type?: Readonly<Record<string, PostgresEnumType>>;
-};
 
 export interface PostgresSchemaInput {
   readonly id: string;
@@ -33,7 +26,7 @@ export interface PostgresSchemaInput {
  * `namespaces: Record<NamespaceId, PostgresSchema>` map populated by
  * the Postgres PSL interpreter from `namespace { … }` AST buckets.
  *
- * `entries` holds entity-kind maps (`table`, `type`). Qualifier
+ * `entries` holds entity-kind maps (`table`, `valueSet`). Qualifier
  * emission is the rendering seam: DDL / SQL emission asks the namespace
  * for its qualifier (`"<schema>"`) or for a qualified table name
  * (`"<schema>"."<table>"`) and consumes the result polymorphically.
@@ -53,7 +46,7 @@ export class PostgresSchema extends NamespaceBase {
 
   declare readonly kind: 'schema';
   readonly id: string;
-  readonly entries: PostgresNamespaceEntries;
+  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
   constructor(input: PostgresSchemaInput) {
     super();
@@ -61,7 +54,6 @@ export class PostgresSchema extends NamespaceBase {
 
     const carried: Record<string, Readonly<Record<string, unknown>>> = {};
     let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
-    let type: Readonly<Record<string, PostgresEnumType>> = Object.freeze({});
     let valueSet: Readonly<Record<string, StorageValueSet>> | undefined;
     for (const [kind, rawMap] of Object.entries(input.entries)) {
       if (kind === 'table') {
@@ -75,17 +67,6 @@ export class PostgresSchema extends NamespaceBase {
           tableMap[name] = new StorageTable(v);
         }
         table = Object.freeze(tableMap);
-      } else if (kind === 'type') {
-        const typeMap: Record<string, PostgresEnumType> = {};
-        for (const [name, v] of Object.entries(
-          blindCast<
-            Record<string, PostgresEnumTypeInput>,
-            'entries[type] holds PostgresEnumTypeInput by construction'
-          >(rawMap),
-        )) {
-          typeMap[name] = new PostgresEnumType(v);
-        }
-        type = Object.freeze(typeMap);
       } else if (kind === 'valueSet') {
         const vsMap: Record<string, StorageValueSet> = {};
         for (const [name, v] of Object.entries(
@@ -107,7 +88,6 @@ export class PostgresSchema extends NamespaceBase {
     this.entries = Object.freeze({
       ...carried,
       table,
-      type,
       ...ifDefined('valueSet', valueSet),
     });
     Object.defineProperty(this, 'kind', {
@@ -121,10 +101,6 @@ export class PostgresSchema extends NamespaceBase {
 
   get table(): Readonly<Record<string, StorageTable>> {
     return this.entries.table ?? Object.freeze({});
-  }
-
-  get type(): Readonly<Record<string, PostgresEnumType>> {
-    return this.entries.type ?? Object.freeze({});
   }
 
   get valueSet(): Readonly<Record<string, StorageValueSet>> | undefined {
@@ -211,7 +187,7 @@ export class PostgresUnboundSchema extends PostgresSchema {
   static readonly instance: PostgresUnboundSchema = new PostgresUnboundSchema();
 
   constructor(input?: PostgresSchemaInput) {
-    super(input ?? { id: UNBOUND_NAMESPACE_ID, entries: { table: {}, type: {} } });
+    super(input ?? { id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
   }
 
   override qualifier(): string {
@@ -253,19 +229,12 @@ export function isPostgresSchema(ns: unknown): ns is PostgresSchema {
  * by reference and trust the resulting `SqlStorage.namespaces` map to
  * be value-stable for a given input set.
  */
-export function postgresCreateNamespace(
-  input: SqlNamespaceTablesInput,
-  enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
-): PostgresSchema {
+export function postgresCreateNamespace(input: SqlNamespaceTablesInput): PostgresSchema {
   const schemaInput: PostgresSchemaInput = {
     id: input.id,
     entries: {
       ...input.entries,
       table: input.entries['table'] ?? {},
-      type: blindCast<
-        Record<string, PostgresEnumTypeInput>,
-        'enumTypes values are PostgresEnumTypeInput by construction'
-      >(enumTypes ?? {}),
     },
   };
   if (input.id === UNBOUND_NAMESPACE_ID) {

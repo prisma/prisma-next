@@ -17,12 +17,10 @@
 import { col, lit, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import {
   AddColumnCall,
-  AddEnumValuesCall,
   AddForeignKeyCall,
   AddPrimaryKeyCall,
   AddUniqueCall,
   AlterColumnTypeCall,
-  CreateEnumTypeCall,
   CreateExtensionCall,
   CreateIndexCall,
   CreateSchemaCall,
@@ -31,12 +29,10 @@ import {
   DropColumnCall,
   DropConstraintCall,
   DropDefaultCall,
-  DropEnumTypeCall,
   DropIndexCall,
   DropNotNullCall,
   DropTableCall,
   RawSqlCall,
-  RenameTypeCall,
   SetDefaultCall,
   SetNotNullCall,
 } from '@prisma-next/target-postgres/op-factory-call';
@@ -270,42 +266,6 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     expect(ci.renderTypeScript()).toBe(
       'createIndex("public", "doc", "doc_body_idx", ["body"], { type: "gin", options: { fastupdate: false } })',
     );
-  });
-
-  it('CreateEnumTypeCall emits the enum values as an array literal', () => {
-    const call = new CreateEnumTypeCall('public', 'status', ['active', 'archived']);
-    expect(call.renderTypeScript()).toBe(
-      'createEnumType("public", "status", ["active", "archived"])',
-    );
-    expectFactoryImport(call, 'createEnumType');
-  });
-
-  it('AddEnumValuesCall distinguishes typeName from nativeType in its positional args', () => {
-    const call = new AddEnumValuesCall('public', 'status', 'public.status_native', ['pending']);
-    expect(call.renderTypeScript()).toBe(
-      'addEnumValues("public", "status", "public.status_native", ["pending"])',
-    );
-    expectFactoryImport(call, 'addEnumValues');
-  });
-
-  it('DropEnumTypeCall / RenameTypeCall emit matching positional args', () => {
-    const drop = new DropEnumTypeCall('public', 'status');
-    expect(drop.renderTypeScript()).toBe('dropEnumType("public", "status")');
-    expectFactoryImport(drop, 'dropEnumType');
-
-    const rename = new RenameTypeCall('public', 'status_old', 'status');
-    expect(rename.renderTypeScript()).toBe('renameType("public", "status_old", "status")');
-    expectFactoryImport(rename, 'renameType');
-  });
-
-  it('RenameTypeCall prechecks both fromName existence and toName non-existence', () => {
-    const op = new RenameTypeCall('public', 'status_old', 'status').toOp();
-    const prechecks = op.precheck.map((s) => s.sql);
-    expect(prechecks).toHaveLength(2);
-    expect(prechecks[0]).toContain("t.typname = 'status_old'");
-    expect(prechecks[0]).toContain('EXISTS (');
-    expect(prechecks[1]).toContain("t.typname = 'status'");
-    expect(prechecks[1]).toContain('NOT EXISTS (');
   });
 
   it('CreateExtensionCall emits a single-arg factory call', () => {

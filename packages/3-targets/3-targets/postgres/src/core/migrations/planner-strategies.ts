@@ -29,8 +29,6 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  isPostgresEnumStorageEntry,
-  type PostgresEnumStorageEntry,
   type SqlStorage,
   StorageTable,
   type StorageTypeInstance,
@@ -41,26 +39,16 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonValue } from '@prisma-next/utils/json';
-import { PostgresEnumType } from '../postgres-enum-type';
 import { isPostgresSchema } from '../postgres-schema';
-import {
-  determineEnumDiff,
-  readExistingEnumValues,
-  resolveDdlSchemaForNamespaceStorage,
-} from './enum-planning';
 import {
   AddCheckConstraintCall,
   AddColumnCall,
-  AddEnumValuesCall,
   AlterColumnTypeCall,
-  CreateEnumTypeCall,
   DataTransformCall,
   DropCheckConstraintCall,
-  DropEnumTypeCall,
   type PostgresOpFactoryCall,
   postgresDefaultToDdlColumnDefault,
   RawSqlCall,
-  RenameTypeCall,
   SetNotNullCall,
 } from './op-factory-call';
 import { buildAddColumnSql, buildColumnTypeSql } from './planner-ddl-builders';
@@ -79,8 +67,6 @@ import {
 } from './planner-sql-checks';
 import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
-
-const REBUILD_SUFFIX = '__prisma_next_new';
 
 /**
  * Look up a storage table by its explicit namespace coordinate. Returns
@@ -133,6 +119,7 @@ export function resolveDdlSchemaForNamespace(ctx: StrategyContext, namespaceId: 
   return namespaceId;
 }
 
+<<<<<<< HEAD
 /** Default Postgres enum landing namespace — where contract-level (`types:`)
  * enums are placed by the authoring builder when no explicit namespace is
  * given. Mirrors `POSTGRES_ENUM_NAMESPACE_ID` in the contract-ts builder. */
@@ -190,6 +177,8 @@ function locateNamespaceType(
   >(raw);
 }
 
+=======
+>>>>>>> 7289bb6aa (TML-2853: delete native postgres enum machinery (D2))
 // ============================================================================
 // Strategy types
 // ============================================================================
@@ -208,7 +197,7 @@ export interface StrategyContext {
   readonly fromContract: Contract<SqlStorage> | null;
   readonly schemaName: string;
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
-  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance>>;
   readonly schema: SqlSchemaIR;
   readonly policy: MigrationOperationPolicy;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
@@ -229,12 +218,9 @@ export type CallMigrationStrategy = (
       /**
        * `true` for strategies that emit cohesive sequential recipes whose
        * calls must stay contiguous and in the returned order — e.g.
-       * `nativeEnumPlanCallStrategy` (createEnumType → alterColumnType →
-       * dropEnumType → renameType, optionally prefixed by a
-       * `DataTransformCall` placeholder), `notNullBackfillCallStrategy`
-       * (addColumn → dataTransform → setNotNull). Defaults to `false`,
-       * which lets `planIssues` hoist individual calls into their DDL
-       * sequencing bucket.
+       * `notNullBackfillCallStrategy` (addColumn → dataTransform → setNotNull).
+       * Defaults to `false`, which lets `planIssues` hoist individual calls
+       * into their DDL sequencing bucket.
        */
       recipe?: boolean;
     }
@@ -251,10 +237,7 @@ function buildColumnSpec(
   if (!storageCol)
     throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
-  const mutableTypes = ctx.storageTypes as Record<
-    string,
-    StorageTypeInstance | PostgresEnumStorageEntry
-  >;
+  const mutableTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
   const typeSql = buildColumnTypeSql(storageCol, mutableHooks, mutableTypes);
   const ddlDefault = postgresDefaultToDdlColumnDefault(storageCol.default);
   const resolved = resolveColumnTypeMetadata(storageCol, mutableTypes);
@@ -289,10 +272,7 @@ function buildAlterTypeOptions(
   const col = tableAt(ctx.toContract.storage, namespaceId, table)?.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
-  const mutableTypes = ctx.storageTypes as Record<
-    string,
-    StorageTypeInstance | PostgresEnumStorageEntry
-  >;
+  const mutableTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
   const qualifiedTargetType = buildColumnTypeSql(col, mutableHooks, mutableTypes, false);
   const formatTypeExpected = buildExpectedFormatType(col, mutableHooks, mutableTypes);
   return {
@@ -435,6 +415,7 @@ export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ct
   };
 };
 
+<<<<<<< HEAD
 function enumRebuildCallRecipe(
   namespaceId: string,
   typeName: string,
@@ -675,6 +656,8 @@ function collectPostgresEnumTypes(storage: SqlStorage): ReadonlyMap<string, Post
   return result;
 }
 
+=======
+>>>>>>> 7289bb6aa (TML-2853: delete native postgres enum machinery (D2))
 /**
  * Collects every check constraint from a table in the contract storage.
  * Returns an empty array when the table has no checks or the table is absent.
@@ -723,8 +706,6 @@ function checkValueSetsEqual(a: readonly string[], b: readonly string[]): boolea
  *   be altered in place).
  *
  * Consumes `check_missing`, `check_removed`, and `check_mismatch` issues.
- * Does not touch the native enum path (`nativeEnumPlanCallStrategy` is
- * unchanged).
  */
 export const checkConstraintPlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
   const calls: PostgresOpFactoryCall[] = [];
@@ -803,10 +784,9 @@ export const checkConstraintPlanCallStrategy: CallMigrationStrategy = (issues, c
 };
 
 /**
- * Dispatches non-enum codec-typed storage types through their codec's
+ * Dispatches codec-typed storage types through their codec's
  * `planTypeOperations` hook (the authoritative source for codec-driven DDL
- * such as custom type creation). Enum dispatch lives in
- * `nativeEnumPlanCallStrategy` and no longer relies on codec hooks.
+ * such as custom type creation).
  */
 export const storageTypePlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
   const storageTypes = ctx.toContract.storage.types ?? {};
@@ -818,10 +798,6 @@ export const storageTypePlanCallStrategy: CallMigrationStrategy = (issues, ctx) 
   for (const [typeName, typeInstance] of Object.entries(storageTypes).sort(([a], [b]) =>
     a.localeCompare(b),
   )) {
-    // Enums walk natively in `nativeEnumPlanCallStrategy`; codec-hook
-    // dispatch here is reserved for genuinely codec-typed entries
-    // (decimal, varchar, pgvector, …).
-    if (isPostgresEnumStorageEntry(typeInstance)) continue;
     const codecInstance = typeInstance as StorageTypeInstance;
     const hook = ctx.codecHooks.get(codecInstance.codecId);
     if (!hook?.planTypeOperations) continue;
@@ -889,10 +865,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
   const schemaLookups = buildSchemaLookupMap(ctx.schema);
 
   const mutableCodecHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
-  const mutableStorageTypes = ctx.storageTypes as Record<
-    string,
-    StorageTypeInstance | PostgresEnumType
-  >;
+  const mutableStorageTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
 
   for (const issue of issues) {
     if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
@@ -1048,8 +1021,7 @@ function canUseSharedTemporaryDefaultStrategy(options: {
  *
  * - When `'data'` is allowed (`migration plan`), the data-safe strategies
  *   (`notNullBackfillCallStrategy`, `typeChangeCallStrategy`,
- *   `nullableTighteningCallStrategy`) and the enum walk
- *   (`nativeEnumPlanCallStrategy`) consume their matching issues and emit
+ *   `nullableTighteningCallStrategy`) consume their matching issues and emit
  *   `DataTransformCall` placeholders or recipe ops.
  *
  * - When `'data'` is not allowed (`db update` / `db init`), the
@@ -1057,23 +1029,14 @@ function canUseSharedTemporaryDefaultStrategy(options: {
  *   the issue for the downstream walk-schema strategies
  *   (`storageTypePlanCallStrategy`, `notNullAddColumnCallStrategy`) or the
  *   `mapIssueToCall` default to handle with direct DDL.
- *   `nativeEnumPlanCallStrategy` runs in both modes; under `db update` /
- *   `db init` it emits the rebuild recipe without the data-transform
- *   placeholder so value-removal data loss surfaces as a runtime cast
- *   error rather than silent loss.
  *
- * Enum dispatch is unified into a single strategy: the
- * `nativeEnumPlanCallStrategy` decides per-emission whether to emit a
- * rebuild recipe (`recipe: true`, contiguous slot) or hoist the call
- * into the `dep` bucket (`recipe: false`, so a brand-new
- * `CreateEnumTypeCall` runs before any `CreateTableCall` referencing
- * it). Codec-typed entries continue through `storageTypePlanCallStrategy`.
+ * Codec-typed storage type entries are dispatched through
+ * `storageTypePlanCallStrategy`.
  */
 export const postgresPlannerStrategies: readonly CallMigrationStrategy[] = [
   notNullBackfillCallStrategy,
   typeChangeCallStrategy,
   nullableTighteningCallStrategy,
-  nativeEnumPlanCallStrategy,
   checkConstraintPlanCallStrategy,
   storageTypePlanCallStrategy,
   notNullAddColumnCallStrategy,

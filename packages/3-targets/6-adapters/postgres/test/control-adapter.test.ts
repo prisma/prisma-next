@@ -85,52 +85,6 @@ describe('PostgresControlAdapter', () => {
       expect(maxInFlight).toBe(1);
     });
 
-    it('introspects enum storage types', async () => {
-      const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
-      const mockDriver: SqlControlDriverInstance<'postgres'> = {
-        familyId: 'sql',
-        targetId: 'postgres',
-        query: async <Row = Record<string, unknown>>(sql: string) => {
-          if (sql.includes('information_schema.tables')) {
-            return { rows: [] as unknown as Row[] };
-          }
-          if (sql.includes('pg_extension')) {
-            return { rows: [] as unknown as Row[] };
-          }
-          if (sql.includes('pg_enum')) {
-            return {
-              rows: [
-                {
-                  schema_name: 'public',
-                  type_name: 'role',
-                  values: ['USER', 'ADMIN'],
-                },
-              ] as unknown as Row[],
-            };
-          }
-          if (sql.includes('version()')) {
-            return { rows: [{ version: 'PostgreSQL 16.1' }] as unknown as Row[] };
-          }
-          return { rows: [] as unknown as Row[] };
-        },
-        close: async () => {},
-      };
-
-      const result = await adapter.introspect(mockDriver);
-
-      expect(result.annotations?.['pg']).toMatchObject({
-        enumTypes: {
-          public: {
-            role: {
-              codecId: 'pg/enum@1',
-              nativeType: 'role',
-              typeParams: { values: ['USER', 'ADMIN'] },
-            },
-          },
-        },
-      });
-    });
-
     it('introspects schema with tables and columns', async () => {
       const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
       let _queryCallCount = 0;

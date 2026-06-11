@@ -36,7 +36,6 @@ import type {
   PslNamespace,
 } from '@prisma-next/psl-parser';
 import type {
-  PostgresEnumStorageEntry,
   SqlModelStorage,
   SqlNamespaceTablesInput,
   StorageTypeInstance,
@@ -431,10 +430,10 @@ function validateNamedTypeAttributes(input: {
 }
 
 function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput): {
-  readonly storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+  readonly storageTypes: Record<string, StorageTypeInstance>;
   readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
 } {
-  const storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+  const storageTypes: Record<string, StorageTypeInstance> = {};
   const namedTypeDescriptors = new Map<string, ColumnDescriptor>();
 
   for (const declaration of input.declarations) {

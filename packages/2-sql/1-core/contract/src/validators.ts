@@ -113,8 +113,7 @@ const StorageColumnSchema = type({
 /**
  * Codec-triple entry persisted under `storage.types[name]`. Carries an
  * enumerable literal `kind: 'codec-instance'` discriminator so the
- * polymorphic slot dispatch can distinguish codec triples from
- * class-instance kinds (e.g. `'postgres-enum'`) sharing the slot.
+ * polymorphic slot dispatch can distinguish codec triples.
  */
 const StorageTypeInstanceSchema = type
   .declare<StorageTypeInstanceInput & { kind: 'codec-instance' }>()
@@ -224,7 +223,7 @@ const StorageTableSchema = type({
  * structural validation. SQL core registers its own kinds (`'table'`,
  * `'valueSet'`) into the same registry targets extend — there is no
  * separate built-in fallback tier. Target packs pass their contributed
- * kinds (e.g. postgres passes `'type'` → the postgres enum schema).
+ * kinds via `packSchemas`.
  */
 export function createSqlEntrySchemaRegistry(
   packSchemas?: ReadonlyMap<string, Type<unknown>>,

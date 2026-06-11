@@ -195,11 +195,7 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
         pgvector: pgvectorPack,
       },
     },
-    ({ enumEntity, type, field, model }) => {
-      // `enumEntity` is the postgres-native enum builder (CREATE TYPE … AS ENUM).
-      // Renamed from `enum` in D1 (TML-2853) because `enum` is now the domain
-      // concept (SQL family). Deleted in D2 along with PostgresEnumType.
-      const Role = enumEntity({ name: 'role', values: ['USER', 'ADMIN'] as const });
+    ({ type, field, model }) => {
       const Embedding = type.pgvector.Vector(1536);
 
       expectTypeOf(Embedding.codecId).toEqualTypeOf<'pg/vector@1'>();
@@ -207,7 +203,6 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
 
       return {
         types: {
-          Role,
           Embedding,
         },
         models: {
@@ -219,7 +214,6 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
               isActive: field.boolean().default(true),
               score: field.float().optional(),
               profile: field.json().optional(),
-              role: field.namedType(Role),
               embedding: field.namedType(Embedding).optional(),
               createdAt: field.temporal.createdAt(),
             },
@@ -269,9 +263,7 @@ test('integrated callback authoring hides extension namespaces when packs are ab
       family: sqlFamilyPack,
       target: postgresPack,
     },
-    ({ enumEntity, type }) => {
-      enumEntity({ name: 'role', values: ['USER'] as const });
-
+    ({ type }) => {
       if (typecheckOnly) {
         // @ts-expect-error extension-owned helper requires the corresponding pack
         type.pgvector.Vector(1536);
