@@ -589,6 +589,45 @@ describe('assembleAuthoringContributions', () => {
       ]),
     ).toThrow(/pslBlock.*"no-factory-discriminator".*entityType/);
   });
+
+  it('preserves prototype-carrying objects in sub-namespaces through composition', () => {
+    // A sub-namespace whose value is a class instance with a prototype getter.
+    // Before the fix, mergeAuthoringNamespaces used isPlainNamespaceObject which
+    // matched any non-null non-array object, so it would shallow-copy the class
+    // instance ({ ...instance }), stripping the prototype and making the getter
+    // return undefined. With the fix, only plain objects ({} prototype or null)
+    // are shallow-copied; class instances are passed by reference.
+    class SubNs {
+      get leafDescriptor() {
+        return {
+          kind: 'entity' as const,
+          discriminator: 'proto-entity',
+          output: { factory: () => ({}) },
+        };
+      }
+    }
+    const subNsInstance = new SubNs();
+
+    // Wrap the instance behind a plain outer namespace so mergeAuthoringNamespaces
+    // receives subNsInstance as the sourceValue for key 'sub'.
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        authoring: {
+          entityTypes: {
+            sub: subNsInstance as unknown as Record<
+              string,
+              { kind: 'entity'; discriminator: string; output: { factory: () => object } }
+            >,
+          },
+        },
+      }),
+    ]);
+
+    // The sub-namespace value must be the original instance (prototype intact),
+    // not a shallow-copied plain object with an undefined getter.
+    expect(result.entityTypes['sub']).toBe(subNsInstance);
+    expect((result.entityTypes['sub'] as unknown as SubNs).leafDescriptor).toBeDefined();
+  });
 });
 
 describe('extractCodecLookup', () => {
