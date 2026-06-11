@@ -121,7 +121,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     });
   });
 
-  it('accepts uuid() and uuid(7) defaults on @db.Uuid columns', () => {
+  it('accepts uuid() and uuid(7) defaults on @db.Uuid columns, preserving native uuid storage type', () => {
     const document = parsePslDocument({
       schema: `types {
   UuidNativeId = String @db.Uuid
@@ -155,6 +155,57 @@ model UuidNative {
           },
         ]),
       },
+    });
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    const uuidNativeTable = storage.namespaces['public']?.entries.table['uuidNative'];
+    expect(uuidNativeTable?.columns['idV4']).toMatchObject({
+      codecId: 'pg/uuid@1',
+      nativeType: 'uuid',
+    });
+    expect(uuidNativeTable?.columns['idV7']).toMatchObject({
+      codecId: 'pg/uuid@1',
+      nativeType: 'uuid',
+    });
+  });
+
+  it('accepts uuid() default on a named Uuid type field (e.g. id Uuid @id @default(uuid())), preserving native uuid storage type', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Uuid = String @db.Uuid
+}
+
+model Profile {
+  id Uuid @id @default(uuid())
+  name String
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.execution).toMatchObject({
+      mutations: {
+        defaults: [
+          {
+            ref: { table: 'profile', column: 'id' },
+            onCreate: { kind: 'generator', id: 'uuidv4' },
+          },
+        ],
+      },
+    });
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    const profileTable = storage.namespaces['public']?.entries.table['profile'];
+    expect(profileTable?.columns['id']).toMatchObject({
+      codecId: 'pg/uuid@1',
+      nativeType: 'uuid',
     });
   });
 

@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:ffbf9c8bcdce927f175bea3afbbeca615c58e1565e450e50e8e9dfcb327a3bbb'>;
+  StorageHashBase<'sha256:066a33747544c0e070987dc62d3bacfef92227a92c45364b800ab3d99f13993c'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:09bd7caf0ad111e77df2565dce0c4c5b0b784f9d3dfe5c97f969f1016a6b66bb'>;
 export type ProfileHash =
@@ -46,14 +46,14 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type FieldOutputTypes = {
   readonly Profile: {
-    readonly id: Char<36>;
+    readonly id: CodecTypes['pg/uuid@1']['output'];
     readonly username: CodecTypes['pg/text@1']['output'];
     readonly userId: CodecTypes['pg/uuid@1']['output'];
   };
 };
 export type FieldInputTypes = {
   readonly Profile: {
-    readonly id: CodecTypes['sql/char@1']['input'];
+    readonly id: CodecTypes['pg/uuid@1']['input'];
     readonly username: CodecTypes['pg/text@1']['input'];
     readonly userId: CodecTypes['pg/uuid@1']['input'];
   };
@@ -82,10 +82,10 @@ type ContractBase = Omit<
               readonly profile: {
                 columns: {
                   readonly id: {
-                    readonly nativeType: 'character';
-                    readonly codecId: 'sql/char@1';
+                    readonly nativeType: 'uuid';
+                    readonly codecId: 'pg/uuid@1';
                     readonly nullable: false;
-                    readonly typeParams: { readonly length: 36 };
+                    readonly typeRef: 'Uuid';
                   };
                   readonly username: {
                     readonly nativeType: 'text';
@@ -138,11 +138,7 @@ type ContractBase = Omit<
         readonly fields: {
           readonly id: {
             readonly nullable: false;
-            readonly type: {
-              readonly kind: 'scalar';
-              readonly codecId: 'sql/char@1';
-              readonly typeParams: { readonly length: 36 };
-            };
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
           };
           readonly username: {
             readonly nullable: false;
@@ -181,11 +177,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 36 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
               readonly username: {
                 readonly nullable: false;

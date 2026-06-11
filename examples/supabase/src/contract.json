@@ -18,11 +18,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
                 }
               },
               "userId": {
@@ -93,12 +90,10 @@
             "profile": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "typeRef": "Uuid"
                 },
                 "userId": {
                   "codecId": "pg/uuid@1",
@@ -154,7 +149,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:ffbf9c8bcdce927f175bea3afbbeca615c58e1565e450e50e8e9dfcb327a3bbb",
+    "storageHash": "sha256:066a33747544c0e070987dc62d3bacfef92227a92c45364b800ab3d99f13993c",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",
