@@ -374,9 +374,9 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       });
       continue;
     }
-    const fieldHasExplicitNativeType =
+    const fieldUsesNamedType =
       field.typeRef !== undefined || namedTypeDescriptors.has(field.typeName);
-    if (loweredOnCreate && !fieldHasExplicitNativeType) {
+    if (loweredOnCreate && !fieldUsesNamedType) {
       const generatorDescriptor = generatorDescriptorById.get(loweredOnCreate.id);
       const generatedDescriptor = generatorDescriptor?.resolveGeneratedColumnDescriptor?.({
         generated: loweredOnCreate,
