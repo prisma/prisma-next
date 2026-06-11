@@ -18,14 +18,14 @@ export type NamespaceMemberAst =
   | ModelDeclarationAst
   | EnumDeclarationAst
   | CompositeTypeDeclarationAst
-  | BlockDeclarationAst;
+  | GenericBlockDeclarationAst;
 
 function castNamespaceMember(node: SyntaxNode): NamespaceMemberAst | undefined {
   return (
     ModelDeclarationAst.cast(node) ??
     EnumDeclarationAst.cast(node) ??
     CompositeTypeDeclarationAst.cast(node) ??
-    BlockDeclarationAst.cast(node)
+    GenericBlockDeclarationAst.cast(node)
   );
 }
 
@@ -219,7 +219,7 @@ export class TypesBlockAst implements AstNode {
   }
 }
 
-export class BlockDeclarationAst implements AstNode {
+export class GenericBlockDeclarationAst implements AstNode {
   readonly syntax: SyntaxNode;
 
   constructor(syntax: SyntaxNode) {
@@ -246,8 +246,10 @@ export class BlockDeclarationAst implements AstNode {
     yield* filterChildren(this.syntax, KeyValuePairAst.cast);
   }
 
-  static cast(node: SyntaxNode): BlockDeclarationAst | undefined {
-    return node.kind === 'BlockDeclaration' ? new BlockDeclarationAst(node) : undefined;
+  static cast(node: SyntaxNode): GenericBlockDeclarationAst | undefined {
+    return node.kind === 'GenericBlockDeclaration'
+      ? new GenericBlockDeclarationAst(node)
+      : undefined;
   }
 }
 

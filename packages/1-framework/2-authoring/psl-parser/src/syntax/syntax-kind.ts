@@ -5,7 +5,10 @@ export type SyntaxKind =
   | 'CompositeTypeDeclaration'
   | 'Namespace'
   | 'TypesBlock'
-  | 'BlockDeclaration'
+  // The generic/extension block node — the `kw [name] { key = value }` form
+  // produced by `parseGenericBlock`. Deliberately distinct from the reserved
+  // `model`/`enum`/`namespace`/`type`/`types` declarations above.
+  | 'GenericBlockDeclaration'
   | 'FieldDeclaration'
   | 'EnumValueDeclaration'
   | 'NamedTypeDeclaration'
@@ -20,4 +23,6 @@ export type SyntaxKind =
   | 'ArrayLiteral'
   | 'StringLiteralExpr'
   | 'NumberLiteralExpr'
-  | 'BooleanLiteralExpr';
+  | 'BooleanLiteralExpr'
+  | 'ObjectLiteralExpr'
+  | 'ObjectField';
