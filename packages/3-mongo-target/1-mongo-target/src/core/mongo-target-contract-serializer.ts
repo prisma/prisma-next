@@ -25,9 +25,10 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
         } = { id: nsData.id };
         if (nsData.entries['collection'] !== undefined) {
           dbInput.entries = {
-            collection: nsData.entries['collection'] as Readonly<
-              Record<string, MongoCollectionInput>
-            >,
+            collection: blindCast<
+              Readonly<Record<string, MongoCollectionInput>>,
+              'collection entries validated by the mongo storage schema before hydration'
+            >(nsData.entries['collection']),
           };
         }
         return [nsId, new MongoTargetDatabase(dbInput)];

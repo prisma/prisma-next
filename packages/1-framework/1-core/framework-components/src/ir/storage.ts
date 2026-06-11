@@ -1,4 +1,5 @@
 import type { StorageBase } from '@prisma-next/contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { IRNode } from './ir-node';
 import type { Namespace } from './namespace';
 
@@ -64,9 +65,13 @@ export function entityAt(
   if (ns === undefined) return undefined;
   const entries = ns.entries;
   if (entries === null || typeof entries !== 'object') return undefined;
-  const kindMap = (entries as Record<string, unknown>)[coord.entityKind];
+  const kindMap = blindCast<Record<string, unknown>, 'checked object, non-null above'>(entries)[
+    coord.entityKind
+  ];
   if (kindMap === null || typeof kindMap !== 'object') return undefined;
-  return (kindMap as Record<string, unknown>)[coord.entityName];
+  return blindCast<Record<string, unknown>, 'checked object, non-null above'>(kindMap)[
+    coord.entityName
+  ];
 }
 
 /**
