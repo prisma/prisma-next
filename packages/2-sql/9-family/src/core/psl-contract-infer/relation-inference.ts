@@ -42,15 +42,6 @@ export function inferRelations(
 
   for (const table of Object.values(tables)) {
     for (const fk of table.foreignKeys) {
-      // Skip FKs whose referenced table was not inferred (e.g. a Supabase
-      // `public` → `auth.users` FK with the auth schema excluded). Emitting a
-      // relation navigation field here would point at a model that does not
-      // exist in the output, breaking `contract emit`. The scalar FK column is
-      // preserved by the column walk, so only the navigation field is omitted.
-      if (!Object.hasOwn(tables, fk.referencedTable)) {
-        continue;
-      }
-
       const childTableName = table.name;
       const parentTableName = fk.referencedTable;
       const childUsed = usedFieldNames.get(childTableName) as Set<string>;
