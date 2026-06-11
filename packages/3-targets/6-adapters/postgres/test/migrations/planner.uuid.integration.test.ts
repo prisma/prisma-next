@@ -173,9 +173,8 @@ describe.sequential('pg/uuid@1 — end-to-end PGlite coverage', () => {
   /**
    * SDoD1 (c): introspection + verifySchema resolves the live `uuid` column back to `pg/uuid@1`.
    *
-   * Fails if the storage descriptor removes the `pg/uuid@1 → nativeType: uuid` entry, because
-   * then verifySchema cannot reconcile the introspected `uuid` column against the contract's
-   * `pg/uuid@1` codec, and emits a `type_mismatch` issue.
+   * Fails if DDL renders the wrong native type (e.g. `text` instead of `uuid`): introspection
+   * then reports `text` for the live column, and verifySchema emits a `type_mismatch` issue.
    */
   it('introspection + verifySchema confirms schema matches pg/uuid@1 contract', {
     timeout: testTimeout,
