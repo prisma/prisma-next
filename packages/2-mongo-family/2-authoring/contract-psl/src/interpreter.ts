@@ -16,7 +16,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyPolymorphicScopeToMongoIndex,
   buildMongoNamespace,
-  MongoCollection,
+  type MongoCollectionInput,
   MongoIndex,
   type MongoIndexKeyDirection,
   MongoStorage,
@@ -29,6 +29,7 @@ import type {
   PslNamespace,
   PslSpan,
 } from '@prisma-next/psl-parser';
+import { blindCast } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { deriveJsonSchema, derivePolymorphicJsonSchema } from './derive-json-schema';
 import {
@@ -1131,34 +1132,22 @@ export function interpretPslDocumentToMongoContract(
 
   const target = 'mongo';
   const targetFamily = 'mongo';
-  const collectionsAsClasses: Record<string, MongoCollection> = {};
+  const collectionInputs: Record<string, MongoCollectionInput> = {};
   for (const [name, coll] of Object.entries(resolvedCollections)) {
-    const input: {
-      indexes?: ReadonlyArray<MongoIndex>;
-      validator?: unknown;
-      options?: unknown;
-    } = {};
-    if (coll['indexes'] !== undefined) {
-      input.indexes = coll['indexes'] as ReadonlyArray<MongoIndex>;
-    }
-    if (coll['validator'] !== undefined) {
-      input.validator = coll['validator'];
-    }
-    if (coll['options'] !== undefined) {
-      input.options = coll['options'];
-    }
-    // input.validator/options are arktype-validated JSON shapes; MongoCollection
-    // constructor normalises them into MongoValidator / MongoCollectionOptions
-    // instances. The narrow cast is bounded to the field-typed input record.
-    collectionsAsClasses[name] = new MongoCollection(
-      input as ConstructorParameters<typeof MongoCollection>[0],
-    );
+    const raw: Record<string, unknown> = {};
+    if (coll['indexes'] != null) raw['indexes'] = coll['indexes'];
+    if (coll['validator'] != null) raw['validator'] = coll['validator'];
+    if (coll['options'] != null) raw['options'] = coll['options'];
+    collectionInputs[name] = blindCast<
+      MongoCollectionInput,
+      'arktype-validated JSON shapes satisfy MongoCollectionInput by construction'
+    >(raw);
   }
   const storageWithoutHash = {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        entries: { collection: collectionsAsClasses },
+        entries: { collection: collectionInputs },
       },
     },
   };
@@ -1173,7 +1162,7 @@ export function interpretPslDocumentToMongoContract(
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
         id: UNBOUND_NAMESPACE_ID,
-        entries: { collection: collectionsAsClasses },
+        entries: { collection: collectionInputs },
       }),
     },
   }) as Contract['storage'];

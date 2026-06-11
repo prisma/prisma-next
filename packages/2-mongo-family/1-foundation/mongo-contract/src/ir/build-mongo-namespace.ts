@@ -5,7 +5,7 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
-import { MongoCollection } from './mongo-collection';
+import { MongoCollection, type MongoCollectionInput } from './mongo-collection';
 import type { MongoNamespace, MongoNamespaceCollectionsInput } from './mongo-storage';
 import { MongoUnboundNamespace } from './mongo-unbound-namespace';
 
@@ -56,12 +56,11 @@ class MongoBoundNamespace extends NamespaceBase {
         const collectionMap: Record<string, MongoCollection> = {};
         for (const [name, c] of Object.entries(
           blindCast<
-            Record<string, MongoCollection | { kind?: unknown }>,
-            'entries[collection] holds MongoCollection or MongoCollectionInput by construction'
+            Record<string, MongoCollectionInput>,
+            'entries[collection] holds MongoCollectionInput by construction'
           >(rawMap),
         )) {
-          collectionMap[name] =
-            c instanceof MongoCollection ? c : new MongoCollection(blindCast(c));
+          collectionMap[name] = new MongoCollection(c);
         }
         builtEntries['collection'] = Object.freeze(collectionMap);
       } else {

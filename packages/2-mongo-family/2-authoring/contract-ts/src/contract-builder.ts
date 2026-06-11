@@ -33,7 +33,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyPolymorphicScopeToMongoIndex,
   buildMongoNamespace,
-  MongoCollection,
+  type MongoCollection,
   type MongoCollectionInput,
   MongoCollectionOptions,
   type MongoCollectionOptionsAuthoringInput,
@@ -1408,7 +1408,7 @@ function scopeVariantIndex(
 
 function buildCollections(
   models: Record<string, AnyModelBuilder> | undefined,
-): Record<string, MongoCollection> {
+): Record<string, MongoCollectionInput> {
   const intermediate: Record<string, MongoCollectionInput> = {};
   const declaredIndexOwners = new Map<string, string>();
   const modelMap = models ?? {};
@@ -1524,11 +1524,7 @@ function buildCollections(
             : existingCollection;
   }
 
-  const collections: Record<string, MongoCollection> = {};
-  for (const [name, data] of Object.entries(intermediate)) {
-    collections[name] = new MongoCollection(data);
-  }
-  return collections;
+  return intermediate;
 }
 
 function buildContractFromDefinition<
