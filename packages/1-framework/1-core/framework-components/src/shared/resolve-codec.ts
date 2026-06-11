@@ -2,21 +2,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { Codec } from './codec';
 import type { AnyCodecDescriptor } from './codec-descriptor';
 import type { CodecInstanceContext, CodecRef } from './codec-types';
-
-function typeParamsInvalidError(
-  codecId: string,
-  message: string,
-  typeParams: unknown,
-): Error & { code: string; category: string; severity: string } {
-  const error = Object.assign(new Error(message), {
-    name: 'RuntimeError',
-    code: 'RUNTIME.TYPE_PARAMS_INVALID',
-    category: 'RUNTIME',
-    severity: 'error' as const,
-    details: { codecId, typeParams },
-  });
-  return error;
-}
+import { runtimeError } from './runtime-error';
 
 /**
  * Validates `ref.typeParams` against `descriptor.paramsSchema`.
@@ -36,19 +22,19 @@ export function validateCodecTypeParams(descriptor: AnyCodecDescriptor, ref: Cod
   >(descriptor.paramsSchema['~standard'].validate(normalized.typeParams));
 
   if (result instanceof Promise) {
-    throw typeParamsInvalidError(
-      ref.codecId,
+    throw runtimeError(
+      'RUNTIME.TYPE_PARAMS_INVALID',
       `paramsSchema for codec '${ref.codecId}' returned a Promise; runtime validation requires a synchronous Standard Schema validator.`,
-      ref.typeParams,
+      { codecId: ref.codecId, typeParams: ref.typeParams },
     );
   }
 
   if ('issues' in result && result.issues) {
     const messages = result.issues.map((issue) => issue.message).join('; ');
-    throw typeParamsInvalidError(
-      ref.codecId,
+    throw runtimeError(
+      'RUNTIME.TYPE_PARAMS_INVALID',
       `Invalid typeParams for codec '${ref.codecId}': ${messages}`,
-      ref.typeParams,
+      { codecId: ref.codecId, typeParams: ref.typeParams },
     );
   }
 
