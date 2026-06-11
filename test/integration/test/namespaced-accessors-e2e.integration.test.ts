@@ -35,7 +35,7 @@ import {
   type ModelNode,
 } from '@prisma-next/postgres/contract-builder';
 import postgres from '@prisma-next/postgres/runtime';
-import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
+import { type ForeignKey, namespaceTables, type SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
@@ -189,15 +189,17 @@ describe('explicit namespaced accessors end-to-end (PGlite)', () => {
     const storage = roundTripped.storage as SqlStorage;
 
     // Same bare table name `users` in BOTH namespaces, with DIFFERENT columns.
-    const publicUsers = storage.namespaces['public']?.entries.table['users'];
-    const authUsers = storage.namespaces['auth']?.entries.table['users'];
+    const publicNs = storage.namespaces['public'];
+    const authNs = storage.namespaces['auth'];
+    const publicUsers = publicNs !== undefined ? namespaceTables(publicNs)['users'] : undefined;
+    const authUsers = authNs !== undefined ? namespaceTables(authNs)['users'] : undefined;
     expect(publicUsers).toBeDefined();
     expect(authUsers).toBeDefined();
     expect(Object.keys(publicUsers!.columns).sort()).toEqual(['email', 'id']);
     expect(Object.keys(authUsers!.columns).sort()).toEqual(['id', 'token']);
 
     // Cross-namespace FK: public.profile.user_id -> auth.users.id.
-    const profileTable = storage.namespaces['public']?.entries.table['profile'];
+    const profileTable = publicNs !== undefined ? namespaceTables(publicNs)['profile'] : undefined;
     expect(profileTable).toBeDefined();
     const fks: readonly ForeignKey[] = profileTable!.foreignKeys ?? [];
     expect(fks).toHaveLength(1);

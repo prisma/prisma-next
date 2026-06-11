@@ -1,5 +1,6 @@
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { namespaceTables } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   TEST_BASELINE_INVARIANT_ID,
@@ -23,9 +24,8 @@ describe('test-contract-space fixture descriptor', () => {
   it('exposes a contractSpace whose contract declares the test_box table', () => {
     const space = testContractSpaceExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
-    expect(
-      Object.keys(space!.contractJson.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table),
-    ).toEqual([TEST_BOX_TABLE]);
+    const ns = space!.contractJson.storage.namespaces[UNBOUND_NAMESPACE_ID]!;
+    expect(Object.keys(namespaceTables(ns))).toEqual([TEST_BOX_TABLE]);
   });
 
   it('publishes one baseline migration that establishes the head invariant', () => {
