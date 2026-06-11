@@ -1,5 +1,5 @@
 #!/usr/bin/env -S node
-import { col, Migration, MigrationCLI } from '@prisma-next/postgres/migration';
+import { col, lit, Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 
 export default class M extends Migration {
   override describe() {
@@ -11,7 +11,11 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      this.addColumn({ schema: '__unbound__', table: 'account', column: col('verified', 'bool') }),
+      this.addColumn({
+        schema: '__unbound__',
+        table: 'account',
+        column: col('verified', 'bool', { notNull: true, default: lit(true) }),
+      }),
     ];
   }
 }
