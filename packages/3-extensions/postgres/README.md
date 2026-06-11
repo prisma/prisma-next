@@ -94,7 +94,7 @@ export const contract = defineContract(
   { extensionPacks: {} },
   ({ field: f, model: m }) => ({
     models: {
-      User: m('User', { fields: { id: f.id.uuidv4() } }),
+      User: m('User', { fields: { id: f.id.uuidv4String() } }),
     },
   }),
 );

@@ -24,7 +24,7 @@ expectTypeOf<ContractModelDefinitions<typeof withModel>['User']>().not.toBeNever
 
 const withFactory = defineContract({}, ({ model: m, field: f }) => ({
   models: {
-    Post: m('Post', { fields: { id: f.id.uuidv4() } }),
+    Post: m('Post', { fields: { id: f.id.uuidv4String() } }),
   },
 }));
 expectTypeOf(withFactory.target).toEqualTypeOf<'postgres'>();
@@ -39,7 +39,7 @@ const Priority = enumType('Priority', pgText, member('Low', 'low'), member('High
 const mixedEnums = defineContract({ enums: { Role } }, ({ model: m, field: f }) => ({
   enums: { Priority },
   models: {
-    Item: m('Item', { fields: { id: f.id.uuidv4() } }),
+    Item: m('Item', { fields: { id: f.id.uuidv4String() } }),
   },
 }));
 type MixedAccessors = typeof mixedEnums extends { enumAccessors: infer A } ? A : never;

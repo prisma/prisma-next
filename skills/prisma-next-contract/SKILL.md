@@ -119,7 +119,7 @@ Note: scalar lists (e.g. `String[]`) and implicit Prisma-ORM many-to-many (list 
 
 ## Workflow — Edit a model / field / relation (TS builder)
 
-The concept: same model, different authoring surface. The façade re-exports `defineContract`, `field`, `model`, `rel`, plus the `family`/`target` packs as default exports of `@prisma-next/postgres/family` and `@prisma-next/postgres/target`. Use the callback overload (`defineContract({...}, ({ field, model, rel, type }) => ({...}))`) to get the higher-level helpers (`field.text()`, `field.id.uuidv7()`, `field.temporal.createdAt()`, `type.sql.String(35)`).
+The concept: same model, different authoring surface. The façade re-exports `defineContract`, `field`, `model`, `rel`, plus the `family`/`target` packs as default exports of `@prisma-next/postgres/family` and `@prisma-next/postgres/target`. Use the callback overload (`defineContract({...}, ({ field, model, rel, type }) => ({...}))`) to get the higher-level helpers (`field.text()`, `field.id.uuidv7String()`, `field.temporal.createdAt()`, `type.sql.String(35)`).
 
 ```typescript
 import sqlFamily from '@prisma-next/postgres/family';
@@ -135,7 +135,7 @@ export const contract = defineContract(
     models: {
       User: model('User', {
         fields: {
-          id: field.id.uuidv7(),
+          id: field.id.uuidv7String(),
           email: field.text().unique(),
           createdAt: field.temporal.createdAt(),
         },

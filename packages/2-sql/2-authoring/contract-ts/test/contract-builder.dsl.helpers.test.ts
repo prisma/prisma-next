@@ -53,7 +53,7 @@ const sqlFamilyPack = {
           },
         },
       },
-      uuid: {
+      uuidString: {
         kind: 'fieldPreset',
         output: {
           codecId: 'sql/char@1',
@@ -79,7 +79,7 @@ const sqlFamilyPack = {
         },
       },
       id: {
-        uuidv4: {
+        uuidv4String: {
           kind: 'fieldPreset',
           output: {
             codecId: 'sql/char@1',
@@ -89,7 +89,7 @@ const sqlFamilyPack = {
             id: true,
           },
         },
-        uuidv7: {
+        uuidv7String: {
           kind: 'fieldPreset',
           output: {
             codecId: 'sql/char@1',
@@ -230,8 +230,8 @@ describe('contract DSL helper vocabulary', () => {
         models: {
           AuditEntry: model('AuditEntry', {
             fields: {
-              id: field.id.uuidv4({ name: 'audit_entry_pkey' }),
-              actorId: field.uuid().column('actor_id'),
+              id: field.id.uuidv4String({ name: 'audit_entry_pkey' }),
+              actorId: field.uuidString().column('actor_id'),
               shortCode: field.nanoid({ size: 16 }).column('short_code'),
               email: field.text().unique({ name: 'audit_entry_email_key' }),
               createdAt: field.temporal.createdAt().column('created_at'),
@@ -314,10 +314,10 @@ describe('contract DSL helper vocabulary', () => {
         const textState = field.text().build();
         const timestampState = field.timestamp().build();
         const updatedAtState = field.temporal.updatedAt().build();
-        const uuidState = field.uuid().build();
+        const uuidState = field.uuidString().build();
         const nanoidState = field.nanoid({ size: 16 }).build();
-        const uuidV4IdState = field.id.uuidv4().build();
-        const uuidV7IdState = field.id.uuidv7().build();
+        const uuidV4IdState = field.id.uuidv4String().build();
+        const uuidV7IdState = field.id.uuidv7String().build();
         const nanoidIdState = field.id.nanoid({ size: 16 }).build();
 
         expectTypeOf(textState.descriptor?.codecId).toEqualTypeOf<'sql/text@1' | undefined>();
@@ -461,7 +461,7 @@ describe('contract DSL helper vocabulary', () => {
           ({ field, model }) => {
             const User = model('User', {
               fields: {
-                id: field.id.uuidv7(),
+                id: field.id.uuidv7String(),
               },
             }).sql({
               table: 'app_user',
@@ -472,8 +472,8 @@ describe('contract DSL helper vocabulary', () => {
                 User,
                 Post: model('Post', {
                   fields: {
-                    id: field.id.uuidv7(),
-                    userId: field.uuid(),
+                    id: field.id.uuidv7String(),
+                    userId: field.uuidString(),
                   },
                   relations: {
                     user: rel.belongsTo('User', { from: 'userId', to: 'id' }),
@@ -501,7 +501,7 @@ describe('contract DSL helper vocabulary', () => {
           ({ field, model }) => {
             const User = model('User', {
               fields: {
-                id: field.id.uuidv7(),
+                id: field.id.uuidv7String(),
               },
             }).sql({
               table: 'app_user',
@@ -512,8 +512,8 @@ describe('contract DSL helper vocabulary', () => {
                 User,
                 Post: model('Post', {
                   fields: {
-                    id: field.id.uuidv7(),
-                    userId: field.uuid(),
+                    id: field.id.uuidv7String(),
+                    userId: field.uuidString(),
                   },
                 }).sql(({ cols, constraints }) => ({
                   table: 'blog_post',
@@ -601,8 +601,8 @@ describe('contract DSL helper vocabulary', () => {
         models: {
           AuditEntry: model('AuditEntry', {
             fields: {
-              id: field.id.uuidv7().sql({ id: { name: 'audit_entry_pkey' } }),
-              actorId: field.uuid().sql({ column: 'actor_id' }),
+              id: field.id.uuidv7String().sql({ id: { name: 'audit_entry_pkey' } }),
+              actorId: field.uuidString().sql({ column: 'actor_id' }),
               email: field
                 .text()
                 .unique()

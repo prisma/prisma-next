@@ -26,7 +26,7 @@ import { defineContract, field, model } from '@prisma-next/sqlite/contract-build
 
 export default defineContract({
   models: {
-    User: model('User', { fields: { id: field.id.uuidv4() } }),
+    User: model('User', { fields: { id: field.id.uuidv4String() } }),
   },
 });
 ```
@@ -56,7 +56,7 @@ import { defineContract, field, model } from '@prisma-next/sqlite/contract-build
 
 export default defineContract({
   models: {
-    User: model('User', { fields: { id: field.id.uuidv4() } }),
+    User: model('User', { fields: { id: field.id.uuidv4String() } }),
   },
 });
 ```

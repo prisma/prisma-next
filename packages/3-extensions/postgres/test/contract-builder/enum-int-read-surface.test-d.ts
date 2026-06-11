@@ -34,7 +34,7 @@ const contract = defineContract({ enums: { Level } }, ({ field, model }) => ({
   models: {
     Event: model('Event', {
       fields: {
-        id: field.id.uuidv4(),
+        id: field.id.uuidv4String(),
         level: field.namedType(Level),
       },
     }),

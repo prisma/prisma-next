@@ -18,7 +18,7 @@ export const contract = defineContract(
   ({ field, model, rel }) => {
     const User = model('User', {
       fields: {
-        id: field.id.uuidv7(),                 // ← pack-provided preset: UUID v7 primary key
+        id: field.id.uuidv7String(),            // ← pack-provided preset: UUID v7 primary key (char(36))
         email: field.text().unique(),          // ← inline unique constraint
         createdAt: field.createdAt(),          // ← pack-provided preset: timestamp with default
       },
@@ -26,8 +26,8 @@ export const contract = defineContract(
 
     const Post = model('Post', {
       fields: {
-        id: field.id.uuidv7(),
-        authorId: field.uuid(),
+        id: field.id.uuidv7String(),
+        authorId: field.uuidString(),
         title: field.text(),
         body: field.text().optional(),
       },
@@ -58,13 +58,13 @@ export const contract = defineContract(
 Three things to notice:
 
 1. **No table or column layer.** Inside the callback helper namespace, the author writes `field.text()`, not `t.column('email', textColumn)`. Column names come from the field keys via a naming strategy. The author only touches storage names when overriding.
-2. **Semantic intent, then SQL.** Identity (`field.id.uuidv7()`), uniqueness (`.unique()`), and relations (`rel.belongsTo(User, ...)`) are expressed in the model definition. The `.sql()` block is reserved for table mapping, indexes, and constraint names.
+2. **Semantic intent, then SQL.** Identity (`field.id.uuidv7String()`), uniqueness (`.unique()`), and relations (`rel.belongsTo(User, ...)`) are expressed in the model definition. The `.sql()` block is reserved for table mapping, indexes, and constraint names.
 3. **Typed references.** `User` is a model token, not a string. `User.ref('id')` is a typed field reference. The lowering pipeline validates these at build time.
 
 ## Design principles
 
 1. **Semantic model first, storage second.** Authors describe their application's domain graph — models, fields, relations, identity — before they describe how it maps to SQL. Most contracts need no `.sql()` block at all. This is a concrete application of the framework's [domain-first surfaces](../../Architecture%20Overview.md#domain-first-surfaces) principle.
-2. **Pack-driven vocabulary.** Helpers like `field.text()`, `field.id.uuidv7()`, and `field.createdAt()` are not hardcoded DSL keywords. They come from composition units — families, targets, and extension packs — that contribute field vocabulary through preset descriptors ([ADR 170](ADR%20170%20-%20Pack-provided%20type%20constructors%20and%20field%20presets.md)). The vocabulary changes as framework composition changes.
+2. **Pack-driven vocabulary.** Helpers like `field.text()`, `field.id.uuidv7String()`, and `field.createdAt()` are not hardcoded DSL keywords. They come from composition units — families, targets, and extension packs — that contribute field vocabulary through preset descriptors ([ADR 170](ADR%20170%20-%20Pack-provided%20type%20constructors%20and%20field%20presets.md)). The vocabulary changes as framework composition changes.
 3. **Typed local references.** Inside `.sql()`, `cols` provides typed refs to the model's scalar fields only. Relation fields cannot appear in constraint authoring. Cross-model refs use model tokens.
 4. **Same canonical output.** The contract DSL lowers to the same `contract.json` and `contract.d.ts` consumed by `schema()`, `sql()`, `orm()`, the runtime, and migration tooling. Downstream inference is unchanged.
 5. **Contract purity.** The contract object remains pure data — no functions, closures, or side effects. Deterministic canonicalization ensures that equivalent authoring intent produces identical artifacts ([ADR 096](ADR%20096%20-%20TS-authored%20contract%20parity%20&%20purity%20rules.md)).
@@ -89,11 +89,11 @@ The key rule: anything that could exist in a non-SQL data model belongs in the m
 
 ### Pack-driven field vocabulary
 
-Common column patterns like "UUID primary key with v7 generation" collapse into single-call field presets: `field.id.uuidv7()` carries the codec, descriptor, generator, nullability, and identity semantics in one expression.
+Common column patterns like "UUID primary key with v7 generation" collapse into single-call field presets: `field.id.uuidv7String()` carries the codec, descriptor, generator, nullability, and identity semantics in one expression.
 
-These presets are not hardcoded in the DSL. They are `AuthoringFieldPresetDescriptor` values contributed by composition units — the SQL family provides base vocabulary like `field.text()` and `field.uuid()`, the target (e.g. Postgres) can add target-specific presets, and extension packs (e.g. pgvector) add their own. The framework composition system merges these contributions into the `field.*` namespace that the author sees. Each preset carries a codec ID, a column type descriptor (native type, optional parameters), optional default behavior (literal, SQL expression, or execution-time generator), and optional nullability.
+These presets are not hardcoded in the DSL. They are `AuthoringFieldPresetDescriptor` values contributed by composition units — the SQL family provides base vocabulary like `field.text()` and `field.uuidString()`, the target (e.g. Postgres) can add target-specific presets (`field.uuidNative()`, `field.id.uuidv4Native()`, `field.id.uuidv7Native()` — these emit `pg/uuid@1`), and extension packs (e.g. pgvector) add their own. The framework composition system merges these contributions into the `field.*` namespace that the author sees. Each preset carries a codec ID, a column type descriptor (native type, optional parameters), optional default behavior (literal, SQL expression, or execution-time generator), and optional nullability.
 
-When a developer writes `field.id.uuidv7()`, the preset resolves to a specific codec, a UUID native type, a UUIDv7 execution-time generator, and non-nullable semantics — all from the pack registry. The DSL also provides structural helpers (`field.column()`, `field.generated()`, `field.namedType()`) for cases where no preset exists — specifying a raw column descriptor, an execution-time generated value, or a named storage type reference. These are part of the DSL mechanics, not pack-contributed.
+When a developer writes `field.id.uuidv7String()`, the preset resolves to a specific codec (`sql/char@1`), a char(36) column, a UUIDv7 execution-time generator, and non-nullable semantics — all from the pack registry. The DSL also provides structural helpers (`field.column()`, `field.generated()`, `field.namedType()`) for cases where no preset exists — specifying a raw column descriptor, an execution-time generated value, or a named storage type reference. These are part of the DSL mechanics, not pack-contributed.
 
 ### Typed cross-model references
 
@@ -127,7 +127,7 @@ Overrides take precedence at any level:
 Single-field constraints are most readable where the field is defined — the reader doesn't need to look anywhere else to understand the field's role:
 
 ```ts
-id: field.id.uuidv7(),         // primary key
+id: field.id.uuidv7String(),   // primary key
 email: field.text().unique(),  // unique constraint
 ```
 

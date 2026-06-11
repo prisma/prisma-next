@@ -16,7 +16,7 @@ This package is part of the SQL family namespace (`packages/2-sql/2-authoring/co
 
 - the SQL contract DSL centered on `defineContract(...)`
 - the base structural helpers exported from `./contract-builder`: `field.column(...)`, `field.generated(...)`, `field.namedType(...)`, plus `model(...)` and `rel.*`
-- an optional callback overload that exposes pack-composed helpers — namespaced helpers like `field.id.uuidv7()`, `field.text()`, `field.temporal.createdAt()`, `field.temporal.updatedAt()`, plus pack-contributed entity-type helpers at top level alongside the built-in `model` / `rel` (e.g. `enum({ name, values })`)
+- an optional callback overload that exposes pack-composed helpers — namespaced helpers like `field.id.uuidv7String()`, `field.text()`, `field.temporal.createdAt()`, `field.temporal.updatedAt()`, plus pack-contributed entity-type helpers at top level alongside the built-in `model` / `rel` (e.g. `enum({ name, values })`)
 - lowering from authored model definitions into the canonical SQL `Contract`
 
 ## Responsibilities
@@ -132,7 +132,7 @@ export const contract = defineContract(
 
     const User = model('User', {
       fields: {
-        id: field.id.uuidv7().sql({ id: { name: 'user_pkey' } }),
+        id: field.id.uuidv7String().sql({ id: { name: 'user_pkey' } }),
         shortName: field.namedType(types.ShortName),
         role: field.namedType(types.Role),
         embedding: field.namedType(types.Embedding1536).optional(),
@@ -143,8 +143,8 @@ export const contract = defineContract(
 
     const Post = model('Post', {
       fields: {
-        id: field.id.uuidv7(),
-        authorId: field.uuid(),
+        id: field.id.uuidv7String(),
+        authorId: field.uuidString(),
         title: field.text(),
       },
     });
@@ -194,7 +194,7 @@ const Membership = model('Membership', {
 ### Helper Notes
 
 - Structural helpers: `field.column(...)`, `field.generated(...)`, `field.namedType(...)`, plus `model(...)` and `rel.*`
-- Callback helper presets: `field.id.uuidv4()`, `field.id.uuidv7()`, `field.id.nanoid({ size })`, `field.uuid()`, `field.text()`, `field.timestamp()`, `field.temporal.createdAt()`, `field.temporal.updatedAt()`, and `type.*`
+- Callback helper presets: `field.id.uuidv4String()`, `field.id.uuidv7String()`, `field.id.nanoid({ size })`, `field.uuidString()`, `field.text()`, `field.timestamp()`, `field.temporal.createdAt()`, `field.temporal.updatedAt()`, and `type.*` (Postgres also adds `field.uuidNative()`, `field.id.uuidv4Native()`, `field.id.uuidv7Native()` — these emit `pg/uuid@1`)
 - Timestamp helpers mirror PSL semantics: `field.temporal.createdAt()` lowers to a target storage `now()` default, while `field.temporal.updatedAt()` lowers to the target-owned `timestampNow` execution default for create and non-empty update mutations.
 - Keep field-local and FK-local storage overrides next to the authoring site with `field.sql(...)` and `rel.belongsTo(...).sql({ fk })`
 - Prefer typed local refs such as `field.namedType(types.Role)`, `User.refs.id`, and `User.ref('id')` when those tokens are available

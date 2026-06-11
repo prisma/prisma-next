@@ -27,7 +27,7 @@ Illustrative TS shape after this work:
 ```ts
 model('User', {
   fields: {
-    id: field.id.uuidv4(),
+    id: field.id.uuidv4String(),
   },
 }).sql({ table: 'user' })
 ```

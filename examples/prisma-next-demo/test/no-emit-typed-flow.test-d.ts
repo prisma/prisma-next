@@ -3,7 +3,7 @@
  *
  * The no-emit chain is the strongest evidence the typed flow works as designed: authoring a contract via the TS callback surface (`defineContract` + `field.*` builders) produces a contract whose model + field types flow through to the SQL builder lane, so that:
  *
- * - `field.id.uuidv4()` resolves to a string-shaped field;
+ * - `field.id.uuidv4String()` resolves to a string-shaped field;
  * - `fns.eq(f.id, '<uuid string>')` typechecks at the where clause;
  * - `fns.eq(f.id, 1234)` fails to typecheck (id is a string, not a number).
  *
@@ -14,7 +14,7 @@ import { expectTypeOf, test } from 'vitest';
 import type { contract } from '../prisma/contract';
 import { sql } from '../src/prisma-no-emit/context';
 
-test('field.id.uuidv4() produces a string-typed id field on User', () => {
+test('field.id.uuidv4String() produces a string-typed id field on User', () => {
   type UserStorageFields =
     (typeof contract.domain.namespaces)['__unbound__']['models']['User']['storage']['fields'];
   expectTypeOf<UserStorageFields>().toHaveProperty('id');

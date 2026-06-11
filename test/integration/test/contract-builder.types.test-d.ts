@@ -299,7 +299,7 @@ test('local field and belongsTo sql overlays stay typed', () => {
     ({ field }) => {
       const User = model('User', {
         fields: {
-          id: field.id.uuidv4().sql({ id: { name: 'user_pkey' } }),
+          id: field.id.uuidv4String().sql({ id: { name: 'user_pkey' } }),
           email: field
             .text()
             .unique()
@@ -309,8 +309,8 @@ test('local field and belongsTo sql overlays stay typed', () => {
 
       const Post = model('Post', {
         fields: {
-          id: field.id.uuidv4(),
-          authorId: field.uuid().sql({ column: 'author_id' }),
+          id: field.id.uuidv4String(),
+          authorId: field.uuidString().sql({ column: 'author_id' }),
         },
         relations: {
           author: rel
@@ -349,7 +349,7 @@ test('explicit generated id helpers stay typed', () => {
       const ShortLink = model('ShortLink', {
         fields: {
           id: field.id.nanoid({ size: 16 }, { name: 'short_link_pkey' }),
-          ownerId: field.uuid(),
+          ownerId: field.uuidString(),
           publicId: field.nanoid({ size: 16 }),
         },
       }).sql({
@@ -366,8 +366,8 @@ test('explicit generated id helpers stay typed', () => {
       >();
 
       if (typecheckOnly) {
-        // @ts-expect-error uuidv7 helper accepts only an optional trailing PK-name object
-        field.id.uuidv7({ size: 16 });
+        // @ts-expect-error uuidv7String helper accepts only an optional trailing PK-name object
+        field.id.uuidv7String({ size: 16 });
 
         // @ts-expect-error nanoid size must be a number
         field.id.nanoid({ size: '16' });

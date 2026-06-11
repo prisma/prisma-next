@@ -3,7 +3,7 @@ import { defineContract, rel } from '@prisma-next/postgres/contract-builder';
 export const contract = defineContract({}, ({ field, model }) => {
   const User = model('User', {
     fields: {
-      id: field.id.uuidv4(),
+      id: field.id.uuidv4String(),
       email: field.text(),
       createdAt: field.temporal.createdAt(),
       updatedAt: field.temporal.updatedAt(),
@@ -12,9 +12,9 @@ export const contract = defineContract({}, ({ field, model }) => {
 
   const Post = model('Post', {
     fields: {
-      id: field.id.uuidv4(),
+      id: field.id.uuidv4String(),
       title: field.text(),
-      userId: field.uuid(),
+      userId: field.uuidString(),
       createdAt: field.temporal.createdAt(),
       updatedAt: field.temporal.updatedAt(),
     },

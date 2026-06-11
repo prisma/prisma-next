@@ -95,7 +95,7 @@ const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
  * migrated (so they don't get told to do what they just did).
  *
  * Pairing the suppression predicate with the hint makes each entry
- * self-contained: a future entry for, say, `@id` ↔ `id.uuidv7()` cannot
+ * self-contained: a future entry for, say, `@id` ↔ `id.uuidv7String()` cannot
  * silently inherit the wrong predicate when added.
  */
 interface RemovedAttributeRule {
