@@ -67,6 +67,17 @@ changes:
 ---
 
 <!--
+TML-2838: the PGlite-backed example apps (`prisma-next-demo`, `react-router-demo`,
+`supabase`, `bundle-size`, `multi-extension-monorepo`) switched their vitest
+`pool` from `threads` to `forks` and pass `--no-memory-protection-keys`. Running
+PGlite (WebAssembly) across vitest worker threads intermittently aborts on Linux
+with a residual V8 JIT-page race (`jit_page_->allocations_.erase`) that
+`@prisma/dev` 0.24.12 reduced but did not fully eliminate; process-per-fork with
+PKU JIT-hardening disabled removes it. Test-harness only — no runtime, contract,
+or public-API change. Incidental substrate diff only.
+-->
+
+<!--
 TML-2867: codec-routed DDL defaults. The migration planner now resolves each plan
 operation lazily (operations are `Promise<Op>[]`), and DDL execute steps carry a
 `params` array. The example migration fixtures (`prisma-next-demo`,
