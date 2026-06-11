@@ -2,6 +2,22 @@
 from: "0.13"
 to: "0.14"
 changes:
+  - id: uuid-preset-rename
+    summary: |
+      The uuid field presets are renamed: `field.uuid()` → `field.uuidString()`,
+      `field.id.uuidv4()` → `field.id.uuidv4String()`, `field.id.uuidv7()` →
+      `field.id.uuidv7String()`. These names now describe the storage encoding
+      (char(36) string). Postgres-native uuid storage uses the new
+      `field.uuidNative()` / `field.id.uuidv4Native()` / `field.id.uuidv7Native()`
+      presets from `@prisma-next/postgres/contract-builder`.
+    detection:
+      glob: "**/*.ts"
+      contains:
+        - "field.uuid()"
+        - "field.id.uuidv4()"
+        - "field.id.uuidv7()"
+      anyMatch: true
+    script: uuid-preset-rename.ts
   - id: qualify-flat-builder-accessors
     summary: |
       The builder-layer flat accessors are removed: `@prisma-next/sql-builder`'s `sql()` and
@@ -81,6 +97,32 @@ byte-identical. No extension-author action. Incidental substrate diff only.
 -->
 
 # 0.13 → 0.14 — Extension-author upgrade instructions
+
+## `uuid-preset-rename`
+
+The uuid field preset names now include the storage encoding suffix:
+
+| Before | After |
+| --- | --- |
+| `field.uuid()` | `field.uuidString()` |
+| `field.id.uuidv4()` | `field.id.uuidv4String()` |
+| `field.id.uuidv7()` | `field.id.uuidv7String()` |
+
+Apply the rename in any extension test files, contract fixture files, or documentation that uses these presets. The rename is mechanical — run the colocated script or apply the substitutions directly:
+
+```ts
+// Before
+id: field.id.uuidv7(),
+userId: field.id.uuidv4(),
+externalId: field.uuid(),
+
+// After
+id: field.id.uuidv7String(),
+userId: field.id.uuidv4String(),
+externalId: field.uuidString(),
+```
+
+No change to emitted `contract.json` — both old and new preset names emit the same codec (`sql/char@1`).
 
 ## `qualify-flat-builder-accessors`
 

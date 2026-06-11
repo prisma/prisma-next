@@ -2,6 +2,22 @@
 from: "0.13"
 to: "0.14"
 changes:
+  - id: uuid-preset-rename
+    summary: |
+      The uuid field presets are renamed: `field.uuid()` → `field.uuidString()`,
+      `field.id.uuidv4()` → `field.id.uuidv4String()`, `field.id.uuidv7()` →
+      `field.id.uuidv7String()`. These names now describe the storage encoding
+      (char(36) string). Postgres-native uuid storage uses the new
+      `field.uuidNative()` / `field.id.uuidv4Native()` / `field.id.uuidv7Native()`
+      presets from `@prisma-next/postgres/contract-builder`.
+    detection:
+      glob: "**/*.ts"
+      contains:
+        - "field.uuid()"
+        - "field.id.uuidv4()"
+        - "field.id.uuidv7()"
+      anyMatch: true
+    script: uuid-preset-rename.ts
   - id: qualify-flat-builder-accessors
     summary: |
       The builder-layer flat accessors are removed: the query builder and ORM client now
@@ -78,6 +94,34 @@ or public-API change. Incidental substrate diff only.
 -->
 
 # 0.13 → 0.14 — User upgrade instructions
+
+## `uuid-preset-rename`
+
+The uuid field preset names now include the storage encoding suffix:
+
+| Before | After |
+| --- | --- |
+| `field.uuid()` | `field.uuidString()` |
+| `field.id.uuidv4()` | `field.id.uuidv4String()` |
+| `field.id.uuidv7()` | `field.id.uuidv7String()` |
+
+These presets store UUIDs as `char(36)` strings and work across all SQL targets. If you want the Postgres-native `uuid` column type instead, use `field.uuidNative()` / `field.id.uuidv4Native()` / `field.id.uuidv7Native()` from `@prisma-next/postgres/contract-builder`.
+
+The rename is mechanical. Run the colocated script or apply the following find-and-replace in your `contract.ts` (or wherever you use the field builder):
+
+```ts
+// Before
+id: field.id.uuidv7(),
+userId: field.id.uuidv4(),
+externalId: field.uuid(),
+
+// After
+id: field.id.uuidv7String(),
+userId: field.id.uuidv4String(),
+externalId: field.uuidString(),
+```
+
+No change to `contract.json` — both the old and new preset names emit the same codec (`sql/char@1`), so existing emitted contracts remain valid.
 
 ## `qualify-flat-builder-accessors`
 
