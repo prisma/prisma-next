@@ -176,7 +176,8 @@ function renderLimitOffset(
 }
 
 function renderSelect(ast: SelectAst, contract: PostgresContract, pim: ParamIndexMap): string {
-  const selectClause = `SELECT ${renderDistinctPrefix(ast.distinct, ast.distinctOn, contract, pim)}${renderProjection(
+  const sourcesByRef = collectTableSources(ast);
+  const selectClause = `SELECT ${renderDistinctPrefix(ast.distinct, ast.distinctOn, sourcesByRef, contract, pim)}${renderProjection(
     ast.projection,
     contract,
     pim,
@@ -192,7 +193,6 @@ function renderSelect(ast: SelectAst, contract: PostgresContract, pim: ParamInde
     ? `GROUP BY ${ast.groupBy.map((expr) => renderExpr(expr, contract, pim)).join(', ')}`
     : '';
   const havingClause = ast.having ? `HAVING ${renderWhere(ast.having, contract, pim)}` : '';
-  const sourcesByRef = collectTableSources(ast);
   const orderClause = ast.orderBy?.length
     ? `ORDER BY ${ast.orderBy
         .map((order) => {
@@ -379,11 +379,14 @@ function renderReturning(
 function renderDistinctPrefix(
   distinct: true | undefined,
   distinctOn: ReadonlyArray<AnyExpression> | undefined,
+  sourcesByRef: ReadonlyMap<string, TableSourceCoordinate>,
   contract: PostgresContract,
   pim: ParamIndexMap,
 ): string {
   if (distinctOn && distinctOn.length > 0) {
-    const rendered = distinctOn.map((expr) => renderExpr(expr, contract, pim)).join(', ');
+    const rendered = distinctOn
+      .map((expr) => renderOrderByExpr(expr, sourcesByRef, contract, pim))
+      .join(', ');
     return `DISTINCT ON (${rendered}) `;
   }
   if (distinct) {
