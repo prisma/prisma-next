@@ -9,7 +9,6 @@ import type { Contract } from '@prisma-next/contract/types';
 import { mongoFamilyDescriptor } from '@prisma-next/family-mongo/control';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import sql from '@prisma-next/family-sql/control';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
@@ -20,6 +19,7 @@ import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import { type MongoTargetContract, mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
 import postgres from '@prisma-next/target-postgres/control';
 import postgresPackRef from '@prisma-next/target-postgres/pack';
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { dirname, join } from 'pathe';
@@ -122,7 +122,7 @@ function writeExpectedContractJson(fixtureCase: FixtureCase, contractJson: strin
 }
 
 function validateEmittedSqlContract(contractJson: Record<string, unknown>) {
-  return new SqlContractSerializer().deserializeContract(contractJson) as Contract<SqlStorage>;
+  return new PostgresContractSerializer().deserializeContract(contractJson) as Contract<SqlStorage>;
 }
 
 function validateEmittedMongoContract(contractJson: Record<string, unknown>) {

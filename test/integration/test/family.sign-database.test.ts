@@ -3,7 +3,6 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   APP_SPACE_ID,
   createControlStack,
@@ -13,6 +12,7 @@ import { defineContract, field, model } from '@prisma-next/postgres/contract-bui
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
 import postgres from '@prisma-next/target-postgres/control';
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import type { DevDatabase } from '@prisma-next/test-utils';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -90,7 +90,7 @@ describe('family instance sign', () => {
         }
 
         const contract = createTestContract();
-        const validatedContract = new SqlContractSerializer().deserializeContract(
+        const validatedContract = new PostgresContractSerializer().deserializeContract(
           contract,
         ) as Contract<SqlStorage>;
 
@@ -175,7 +175,7 @@ describe('family instance sign', () => {
         }
 
         const contract = createTestContract();
-        const validatedContract = new SqlContractSerializer().deserializeContract(
+        const validatedContract = new PostgresContractSerializer().deserializeContract(
           contract,
         ) as Contract<SqlStorage>;
 
@@ -241,7 +241,7 @@ describe('family instance sign', () => {
         });
 
         const contract = createTestContract();
-        const validatedContract = new SqlContractSerializer().deserializeContract(
+        const validatedContract = new PostgresContractSerializer().deserializeContract(
           contract,
         ) as Contract<SqlStorage>;
 
@@ -305,7 +305,7 @@ describe('family instance sign', () => {
         }
 
         const contract = createTestContract();
-        const validatedContract = new SqlContractSerializer().deserializeContract(
+        const validatedContract = new PostgresContractSerializer().deserializeContract(
           contract,
         ) as Contract<SqlStorage>;
 
