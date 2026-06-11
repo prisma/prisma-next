@@ -412,7 +412,8 @@ model Comment {
     });
   });
 
-  it('maps enums, named types, defaults, indexes, and foreign keys', () => {
+  it.skip('maps enums, named types, defaults, indexes, and foreign keys', () => {
+    // TODO(TML-2853-D2): uses native enum syntax; deleted in D1.
     const document = parsePslDocument({
       schema: `types {
   Email = String
@@ -925,7 +926,8 @@ model OrderItem {
       expect(json).not.toHaveProperty('namespaceId');
     });
 
-    it('Postgres accumulates enums declared across two namespace blocks with the same name', () => {
+    it.skip('Postgres accumulates enums declared across two namespace blocks with the same name', () => {
+      // TODO(TML-2853-D2): uses native enum syntax; deleted in D1.
       const document = parsePslDocument({
         schema: `namespace tenant_a {
   enum Status {

@@ -36,7 +36,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:a12e04d6c0659fefdb8f5082a555117c88092bd11fd66221d634c75ef9c0a1bc'>;
+  StorageHashBase<'sha256:b6500906de64a9e926fe4c18e5244dc56a62af097f5936a040e7ab55b42275b3'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e'>;
 export type ProfileHash =
@@ -324,10 +324,9 @@ type ContractBase = Omit<
                     readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
                   };
                   readonly kind: {
-                    readonly nativeType: 'user_type';
-                    readonly codecId: 'pg/enum@1';
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
                     readonly nullable: false;
-                    readonly typeRef: 'user_type';
                   };
                   readonly address: {
                     readonly nativeType: 'jsonb';
@@ -341,15 +340,7 @@ type ContractBase = Omit<
                 foreignKeys: readonly [];
               };
             };
-            readonly type: {
-              readonly user_type: {
-                readonly kind: 'postgres-enum';
-                readonly name: 'user_type';
-                readonly nativeType: 'user_type';
-                readonly codecId: 'pg/enum@1';
-                readonly values: readonly ['admin', 'user'];
-              };
-            };
+            readonly type: Record<string, never>;
           };
         };
       };
@@ -538,7 +529,7 @@ type ContractBase = Omit<
           };
           readonly kind: {
             readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/enum@1' };
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
           };
           readonly address: {
             readonly nullable: true;
@@ -767,7 +758,7 @@ type ContractBase = Omit<
               };
               readonly kind: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/enum@1' };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly address: {
                 readonly nullable: true;
@@ -826,6 +817,15 @@ type ContractBase = Omit<
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
             };
+          };
+        };
+        readonly enum: {
+          readonly user_type: {
+            readonly codecId: 'pg/text@1';
+            readonly members: readonly [
+              { readonly name: 'admin'; readonly value: 'admin' },
+              { readonly name: 'user'; readonly value: 'user' },
+            ];
           };
         };
       };

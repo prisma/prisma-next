@@ -121,10 +121,13 @@ describe('makePslNamespace / makePslNamespaceEntries', () => {
   });
 
   describe('BUILTIN_PSL_KIND_KEYS and namespacePslExtensionBlocks', () => {
-    it('BUILTIN_PSL_KIND_KEYS contains the three reserved kind strings', () => {
+    it('BUILTIN_PSL_KIND_KEYS contains model and compositeType but not enum', () => {
       expect(BUILTIN_PSL_KIND_KEYS.has('model')).toBe(true);
-      expect(BUILTIN_PSL_KIND_KEYS.has('enum')).toBe(true);
       expect(BUILTIN_PSL_KIND_KEYS.has('compositeType')).toBe(true);
+      // 'enum' is now claimed by the extension-block grammar (TML-2853-D1),
+      // so it must NOT be in BUILTIN_PSL_KIND_KEYS — that would cause
+      // namespacePslExtensionBlocks to skip enum extension blocks.
+      expect(BUILTIN_PSL_KIND_KEYS.has('enum')).toBe(false);
     });
 
     it('namespacePslExtensionBlocks returns only extension blocks, not built-ins', () => {

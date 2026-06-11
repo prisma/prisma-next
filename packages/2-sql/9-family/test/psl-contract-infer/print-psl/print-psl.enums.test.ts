@@ -7,7 +7,9 @@ function printPslFromSql(schemaIR: SqlSchemaIR): string {
   return printPsl(sqlSchemaIrToPslAst(schemaIR));
 }
 
-describe('printPsl', () => {
+describe.skip('printPsl', () => {
+  // TODO(TML-2853-D2): native enum introspection path is being deleted; these
+  // tests will be converted to assert the component-3 diagnostic in D2.
   it('enum types', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {

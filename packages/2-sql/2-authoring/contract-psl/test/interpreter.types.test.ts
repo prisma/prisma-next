@@ -131,7 +131,9 @@ model Event {
     expect(result.value.roots).toEqual({ event: crossRef('Event', 'public') });
   });
 
-  it('preserves enum native type names from @@map instead of lowercasing declarations', () => {
+  it.skip('preserves enum native type names from @@map instead of lowercasing declarations', () => {
+    // TODO(TML-2853-D2): uses native enum syntax (`enum UserRole { USER ADMIN @@map(...) }`);
+    // native enum parse deleted in D1.
     const document = parsePslDocument({
       schema: `enum UserRole {
   USER
@@ -313,7 +315,8 @@ model Event {
     expect(result.value.roots).toEqual({ event: crossRef('Event', 'public') });
   });
 
-  it('lowers a top-level enum into the public namespace enum slot', () => {
+  it.skip('lowers a top-level enum into the public namespace enum slot', () => {
+    // TODO(TML-2853-D2): uses native enum syntax; deleted in D1.
     const document = parsePslDocument({
       schema: `enum UserRole {
   ADMIN
@@ -346,7 +349,8 @@ model Account {
     expect(result.value.storage.namespaces['public']).toBeDefined();
   });
 
-  it('lowers a namespace-scoped enum into storage.namespaces[nsId].entries.type', () => {
+  it.skip('lowers a namespace-scoped enum into storage.namespaces[nsId].entries.type', () => {
+    // TODO(TML-2853-D2): uses native enum syntax inside namespace; deleted in D1.
     const document = parsePslDocument({
       schema: `namespace auth {
   enum user_type {

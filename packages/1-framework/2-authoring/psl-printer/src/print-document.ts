@@ -1,11 +1,5 @@
 import type { PslExtensionBlock } from '@prisma-next/framework-components/psl-ast';
-import type { PrinterEnumValue, PrinterModel, PrinterNamedType } from './types';
-
-export type PrintEnumSection = {
-  readonly name: string;
-  readonly mapName?: string | undefined;
-  readonly values: readonly PrinterEnumValue[];
-};
+import type { PrinterModel, PrinterNamedType } from './types';
 
 /**
  * A namespace's print-time contents. The framework parser collects top-level
@@ -25,7 +19,6 @@ export type PrintEnumSection = {
  */
 export type PrintNamespaceSection = {
   readonly name: string;
-  readonly enums: readonly PrintEnumSection[];
   readonly models: readonly PrinterModel[];
   readonly extensionBlocks: readonly PslExtensionBlock[];
 };

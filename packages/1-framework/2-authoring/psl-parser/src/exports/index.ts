@@ -13,8 +13,6 @@ export type {
   PslDiagnostic,
   PslDiagnosticCode,
   PslDocumentAst,
-  PslEnum,
-  PslEnumValue,
   PslExtensionBlock,
   PslExtensionBlockAttribute,
   PslExtensionBlockAttributeArg,

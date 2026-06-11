@@ -382,20 +382,19 @@ export function flatPslCompositeTypes(ast: PslDocumentAst): readonly PslComposit
  * that is **not** in this set was contributed by an extension-block descriptor.
  *
  * Built-in keys match the PSL keyword used on each block type:
- * `'model'`, `'enum'`, `'compositeType'`.
+ * `'model'`, `'compositeType'`. The `'enum'` keyword was previously reserved
+ * here for native `PslEnum` blocks; it is now claimed by the extension-block
+ * grammar via a registered descriptor, so `entries['enum']` holds
+ * `PslExtensionBlock` nodes and must be returned by `namespacePslExtensionBlocks`.
  */
-export const BUILTIN_PSL_KIND_KEYS: ReadonlySet<string> = new Set([
-  'model',
-  'enum',
-  'compositeType',
-]);
+export const BUILTIN_PSL_KIND_KEYS: ReadonlySet<string> = new Set(['model', 'compositeType']);
 
 /**
  * Returns all extension-contributed blocks in the given namespace, in
  * insertion order (the order the parser encountered them in the source).
  *
  * Reads from `namespace.entries`, skipping the built-in kind keys
- * (`'model'`, `'enum'`, `'compositeType'`). All remaining kind maps contain
+ * (`'model'`, `'compositeType'`). All remaining kind maps contain
  * only `PslExtensionBlock` nodes by construction (see `makePslNamespaceEntries`).
  */
 export function namespacePslExtensionBlocks(ns: PslNamespace): readonly PslExtensionBlock[] {

@@ -294,66 +294,6 @@ const representativeTsAuthoring = `defineContract(
   },
 )`;
 
-function buildTsContract() {
-  return defineContract(
-    {
-      family: sqlFamilyPack,
-      target: portablePostgresTargetPack,
-      extensionPacks: { pgvector: pgvectorExtensionPack },
-    },
-    ({ enum: enumEntity, type, field, model, rel }) => {
-      const types = {
-        Role: enumEntity({ name: 'Role', values: ['USER', 'ADMIN'] as const }),
-        Embedding1536: type.pgvector.Vector(1536),
-      } as const;
-
-      const UserBase = model('User', {
-        fields: {
-          id: field.column(int4Column).id({ name: 'user_pkey' }),
-          email: field.text().unique({ name: 'user_email_key' }),
-          role: field.namedType(types.Role),
-          embedding: field.namedType(types.Embedding1536).optional(),
-          createdAt: field.temporal.createdAt(),
-        },
-      });
-
-      const Post = model('Post', {
-        fields: {
-          id: field.column(int4Column).id({ name: 'post_pkey' }),
-          authorId: field.column(int4Column),
-          title: field.text(),
-        },
-        relations: {
-          author: rel.belongsTo(UserBase, { from: 'authorId', to: 'id' }),
-        },
-      }).sql(({ cols, constraints }) => ({
-        table: 'post',
-        indexes: [constraints.index([cols.authorId], { name: 'post_author_id_idx' })],
-        foreignKeys: [
-          constraints.foreignKey(cols.authorId, UserBase.refs.id, {
-            name: 'post_author_id_fkey',
-            onDelete: 'cascade',
-          }),
-        ],
-      }));
-
-      const User = UserBase.relations({
-        posts: rel.hasMany(() => Post, { by: 'authorId' }),
-      }).sql({
-        table: 'user',
-      });
-
-      return {
-        types,
-        models: {
-          User,
-          Post,
-        },
-      };
-    },
-  );
-}
-
 function buildSqliteTimestampTsContract() {
   return defineContract(
     {
@@ -397,28 +337,10 @@ function buildPostgresTimestampTsContract() {
 }
 
 describe('TS and PSL authoring parity', () => {
-  it('lowers the same representative contract to identical output', () => {
-    const tsContract = buildTsContract();
-    const pslDocument = parsePslDocument({
-      schema: representativePslSchema,
-      sourceId: 'schema.prisma',
-    });
-
-    const interpreted = interpretPslDocumentToSqlContract({
-      document: pslDocument,
-      target: portablePostgresTargetPack,
-      scalarTypeDescriptors,
-      controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
-      authoringContributions,
-      composedExtensionPacks: ['pgvector'],
-      composedExtensionContracts: new Map(),
-      composedExtensionPackRefs: [pgvectorExtensionPack],
-    });
-
-    expect(interpreted.ok).toBe(true);
-    if (!interpreted.ok) return;
-
-    expect(interpreted.value).toEqual(tsContract);
+  it.skip('lowers the same representative contract to identical output', () => {
+    // TODO(TML-2853-D2): representativePslSchema uses native `enum Role { USER ADMIN }`
+    // syntax. Both the PSL and TS authoring paths for native enums are being deleted.
+    // Rewrite this test for the domain-concept form (enumType + member) in D2.
   });
 
   it('keeps the contract DSL within the terseness threshold for the same contract', () => {

@@ -79,7 +79,9 @@ describe('sqlSchemaIrToPslAst', () => {
     expect(userField?.attributes.some((a) => a.name === 'relation')).toBe(true);
   });
 
-  it('emits enum declarations and field references for pg/enum codec annotations', () => {
+  it.skip('emits enum declarations and field references for pg/enum codec annotations', () => {
+    // TODO(TML-2853-D2): infer path for native enums is being deleted; will be
+    // converted to assert the component-3 diagnostic in D2.
     const schemaIR = ir({
       tables: {
         user: {
@@ -116,7 +118,9 @@ describe('sqlSchemaIrToPslAst', () => {
     expect(roleField?.typeName).toBe('RoleT');
   });
 
-  it('links columns to enums and emits a clean @@map for schema-nested storage', () => {
+  it.skip('links columns to enums and emits a clean @@map for schema-nested storage', () => {
+    // TODO(TML-2853-D2): infer path for native enums is being deleted; will be
+    // converted to assert the component-3 diagnostic in D2.
     const schemaIR = ir({
       tables: {
         applications: {

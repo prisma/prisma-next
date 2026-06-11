@@ -16,9 +16,9 @@ function parseQuotedString(raw: string): string | undefined {
   return undefined;
 }
 
-export const sqlFamilyEnum2EntityDescriptor = {
+export const sqlFamilyEnumEntityDescriptor = {
   kind: 'entity' as const,
-  discriminator: 'enum2',
+  discriminator: 'enum',
   output: {
     factory: (
       block: PslExtensionBlock,
@@ -30,8 +30,8 @@ export const sqlFamilyEnum2EntityDescriptor = {
       const typeAttr = block.blockAttributes.find((a) => a.name === 'type');
       if (!typeAttr) {
         diagnostics?.push({
-          code: 'PSL_ENUM2_MISSING_TYPE',
-          message: `enum2 "${block.name}" is missing a @@type("codecId") attribute`,
+          code: 'PSL_ENUM_MISSING_TYPE',
+          message: `enum "${block.name}" is missing a @@type("codecId") attribute`,
           sourceId,
           span: block.span,
         });
@@ -42,8 +42,8 @@ export const sqlFamilyEnum2EntityDescriptor = {
       const codecId = rawCodecArg !== undefined ? parseQuotedString(rawCodecArg) : undefined;
       if (!codecId) {
         diagnostics?.push({
-          code: 'PSL_ENUM2_MISSING_TYPE',
-          message: `enum2 "${block.name}" @@type attribute must have a quoted codec id argument`,
+          code: 'PSL_ENUM_MISSING_TYPE',
+          message: `enum "${block.name}" @@type attribute must have a quoted codec id argument`,
           sourceId,
           span: typeAttr.span,
         });
@@ -55,7 +55,7 @@ export const sqlFamilyEnum2EntityDescriptor = {
         const typeArgSpan = typeAttr.args[0]?.span ?? typeAttr.span;
         diagnostics?.push({
           code: 'PSL_EXTENSION_INVALID_VALUE',
-          message: `enum2 "${block.name}" @@type references unknown codec "${codecId}"`,
+          message: `enum "${block.name}" @@type references unknown codec "${codecId}"`,
           sourceId,
           span: typeArgSpan,
         });
@@ -67,7 +67,7 @@ export const sqlFamilyEnum2EntityDescriptor = {
         const typeArgSpan = typeAttr.args[0]?.span ?? typeAttr.span;
         diagnostics?.push({
           code: 'PSL_EXTENSION_INVALID_VALUE',
-          message: `enum2 "${block.name}" @@type codec "${codecId}" resolves in targetTypesFor but is absent from codecLookup.get`,
+          message: `enum "${block.name}" @@type codec "${codecId}" resolves in targetTypesFor but is absent from codecLookup.get`,
           sourceId,
           span: typeArgSpan,
         });
@@ -85,8 +85,8 @@ export const sqlFamilyEnum2EntityDescriptor = {
             value = codec.decodeJson(memberName);
           } catch {
             diagnostics?.push({
-              code: 'PSL_ENUM2_BARE_MEMBER_NON_STRING_CODEC',
-              message: `enum2 "${block.name}" member "${memberName}" has no value and codec "${codecId}" does not accept a bare name as input`,
+              code: 'PSL_ENUM_BARE_MEMBER_NON_STRING_CODEC',
+              message: `enum "${block.name}" member "${memberName}" has no value and codec "${codecId}" does not accept a bare name as input`,
               sourceId,
               span: paramValue.span,
             });
@@ -100,7 +100,7 @@ export const sqlFamilyEnum2EntityDescriptor = {
           } catch {
             diagnostics?.push({
               code: 'PSL_EXTENSION_INVALID_VALUE',
-              message: `enum2 "${block.name}" member "${memberName}" value "${paramValue.raw}" is not valid JSON`,
+              message: `enum "${block.name}" member "${memberName}" value "${paramValue.raw}" is not valid JSON`,
               sourceId,
               span: paramValue.span,
             });
@@ -115,7 +115,7 @@ export const sqlFamilyEnum2EntityDescriptor = {
             const reason = err instanceof Error ? err.message : String(err);
             diagnostics?.push({
               code: 'PSL_EXTENSION_INVALID_VALUE',
-              message: `enum2 "${block.name}" member "${memberName}" was rejected by codec "${codecId}": ${reason}`,
+              message: `enum "${block.name}" member "${memberName}" was rejected by codec "${codecId}": ${reason}`,
               sourceId,
               span: paramValue.span,
             });
@@ -129,8 +129,8 @@ export const sqlFamilyEnum2EntityDescriptor = {
         const valueKey = String(value);
         if (seenValues.has(valueKey)) {
           diagnostics?.push({
-            code: 'PSL_ENUM2_DUPLICATE_MEMBER_VALUE',
-            message: `enum2 "${block.name}": duplicate member value "${valueKey}"`,
+            code: 'PSL_ENUM_DUPLICATE_MEMBER_VALUE',
+            message: `enum "${block.name}": duplicate member value "${valueKey}"`,
             sourceId,
             span: paramValue.span,
           });
@@ -145,8 +145,8 @@ export const sqlFamilyEnum2EntityDescriptor = {
 
       if (members.length === 0) {
         diagnostics?.push({
-          code: 'PSL_ENUM2_MISSING_TYPE',
-          message: `enum2 "${block.name}" must have at least one member`,
+          code: 'PSL_ENUM_MISSING_TYPE',
+          message: `enum "${block.name}" must have at least one member`,
           sourceId,
           span: block.span,
         });
@@ -163,14 +163,14 @@ export const sqlFamilyEnum2EntityDescriptor = {
 } satisfies AuthoringEntityTypeDescriptor;
 
 export const sqlFamilyEntityTypes: AuthoringEntityTypeNamespace = {
-  enum2: sqlFamilyEnum2EntityDescriptor,
+  enum: sqlFamilyEnumEntityDescriptor,
 };
 
 export const sqlFamilyPslBlockDescriptors = {
-  enum2: {
+  enum: {
     kind: 'pslBlock',
-    keyword: 'enum2',
-    discriminator: 'enum2',
+    keyword: 'enum',
+    discriminator: 'enum',
     name: { required: true },
     parameters: {},
     variadicParameters: true,
