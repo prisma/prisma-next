@@ -181,6 +181,75 @@ model Post {
       (tsContract.storage as unknown as SqlStorage).storageHash,
     );
   });
+
+  it('parity holds with a defaulted field: @default(Low) produces the same column as .default(members.Low)', () => {
+    const pslResult = interpret(`
+enum2 Priority {
+  @@type("pg/text@1")
+  Low    = "low"
+  High   = "high"
+  Urgent = "urgent"
+}
+
+model Post {
+  id       Int      @id
+  priority Priority @default(Low)
+}
+`);
+
+    expect(pslResult.ok).toBe(true);
+    if (!pslResult.ok) return;
+
+    const pgText = { codecId: 'pg/text@1' as const, nativeType: 'text' as const };
+    const PriorityHandle = enumType(
+      'Priority',
+      pgText,
+      member('Low', 'low'),
+      member('High', 'high'),
+      member('Urgent', 'urgent'),
+    );
+
+    const sqlFamilyPack = {
+      kind: 'family' as const,
+      id: 'sql',
+      familyId: 'sql' as const,
+      version: '0.0.1',
+    };
+    const postgresTargetPack = {
+      kind: 'target' as const,
+      id: 'postgres',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      version: '0.0.1',
+      defaultNamespaceId: 'public',
+    };
+
+    const tsContract = defineContract({
+      family: sqlFamilyPack,
+      target: postgresTargetPack,
+      enums: { Priority: PriorityHandle },
+      models: {
+        Post: model('Post', {
+          fields: {
+            id: field.column({ codecId: 'pg/int4@1', nativeType: 'int4' }).id(),
+            priority: field.namedType(PriorityHandle).default(PriorityHandle.members.Low),
+          },
+        }).sql({ table: 'post' }),
+      },
+    });
+
+    const pslNs = (pslResult.value.storage as unknown as SqlStorage).namespaces['public'];
+    const tsNs = (tsContract.storage as unknown as SqlStorage).namespaces['public'];
+
+    // Storage column must be strictly equal (including the default field).
+    expect(pslNs?.entries.table?.['post']?.columns?.['priority']).toEqual(
+      tsNs?.entries.table?.['post']?.columns?.['priority'],
+    );
+    // Both paths must produce the same storageHash.
+    expect((pslResult.value.storage as unknown as SqlStorage).storageHash).toEqual(
+      (tsContract.storage as unknown as SqlStorage).storageHash,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -478,6 +547,159 @@ model Post {
         { name: 'Low', value: 1 },
         { name: 'High', value: 10 },
       ],
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// enum2 field defaults: member-name resolution
+// ---------------------------------------------------------------------------
+
+describe('enum2 field defaults: @default(MemberName) lowering', () => {
+  it('@default(Low) on an enum2 field emits "default": "low" on the storage column', () => {
+    const result = interpret(`
+enum2 Priority {
+  @@type("pg/text@1")
+  Low    = "low"
+  High   = "high"
+  Urgent = "urgent"
+}
+
+model Post {
+  id       Int      @id
+  priority Priority @default(Low)
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const ns = (result.value.storage as unknown as SqlStorage).namespaces['public'];
+    expect(ns?.entries.table?.['post']?.columns?.['priority']).toMatchObject({
+      default: { kind: 'literal', value: 'low' },
+    });
+  });
+
+  it('@default(High) resolves to "high"', () => {
+    const result = interpret(`
+enum2 Priority {
+  @@type("pg/text@1")
+  Low    = "low"
+  High   = "high"
+}
+
+model Post {
+  id       Int      @id
+  priority Priority @default(High)
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const ns = (result.value.storage as unknown as SqlStorage).namespaces['public'];
+    expect(ns?.entries.table?.['post']?.columns?.['priority']).toMatchObject({
+      default: { kind: 'literal', value: 'high' },
+    });
+  });
+
+  it('@default(Low) on an int-backed enum2 field emits numeric literal default', () => {
+    const result = interpret(`
+enum2 Priority {
+  @@type("pg/int4@1")
+  Low  = 1
+  High = 10
+}
+
+model Post {
+  id       Int      @id
+  priority Priority @default(Low)
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const ns = (result.value.storage as unknown as SqlStorage).namespaces['public'];
+    expect(ns?.entries.table?.['post']?.columns?.['priority']).toMatchObject({
+      default: { kind: 'literal', value: 1 },
+    });
+  });
+
+  it('non-member identifier emits diagnostic naming the enum and the identifier', () => {
+    const result = interpret(`
+enum2 Priority {
+  @@type("pg/text@1")
+  Low  = "low"
+  High = "high"
+}
+
+model Post {
+  id       Int      @id
+  priority Priority @default(Critical)
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'PSL_ENUM2_UNKNOWN_DEFAULT_MEMBER' }),
+      ]),
+    );
+    expect(result.failure.diagnostics[0]?.message).toMatch(/Critical/);
+    expect(result.failure.diagnostics[0]?.message).toMatch(/Priority/);
+  });
+
+  it('quoted raw value @default("low") on an enum2 field emits diagnostic', () => {
+    const result = interpret(`
+enum2 Priority {
+  @@type("pg/text@1")
+  Low  = "low"
+  High = "high"
+}
+
+model Post {
+  id       Int      @id
+  priority Priority @default("low")
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'PSL_ENUM2_DEFAULT_MUST_BE_MEMBER_NAME' }),
+      ]),
+    );
+  });
+
+  it('function default @default(uuid()) on an enum2 field emits diagnostic', () => {
+    const result = interpret(`
+enum2 Priority {
+  @@type("pg/text@1")
+  Low  = "low"
+  High = "high"
+}
+
+model Post {
+  id       Int      @id
+  priority Priority @default(uuid())
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'PSL_ENUM2_DEFAULT_MUST_BE_MEMBER_NAME' }),
+      ]),
+    );
+  });
+
+  it('non-enum field with @default is unchanged (a plain text field still lowers correctly)', () => {
+    const result = interpret(`
+model Post {
+  id    Int    @id
+  title String @default("draft")
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const ns = (result.value.storage as unknown as SqlStorage).namespaces['public'];
+    expect(ns?.entries.table?.['post']?.columns?.['title']).toMatchObject({
+      default: { kind: 'literal', value: 'draft' },
     });
   });
 });

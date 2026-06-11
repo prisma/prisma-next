@@ -111,6 +111,42 @@ describe('TS-authored enum on the demo contract (Post.priority)', () => {
   );
 
   it(
+    'inserting a post without priority reads back the low default',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contract });
+        const { runtime, close } = await openRuntime(connectionString);
+        try {
+          await runtime.execute(
+            sql.user.insert([{ id: authorId, email: 'author@example.com', kind: 'user' }]).build(),
+          );
+          await runtime.execute(
+            sql.post
+              .insert([
+                {
+                  id: '10000000-0000-0000-0000-0000000000fe',
+                  title: 'Default priority',
+                  userId: authorId,
+                },
+              ])
+              .build(),
+          );
+          const rows = await runtime.execute(
+            sql.post
+              .select('id', 'priority')
+              .where((f, fns) => fns.eq(f.id, '10000000-0000-0000-0000-0000000000fe'))
+              .build(),
+          );
+          expect(rows[0]?.priority).toBe('low');
+        } finally {
+          await close();
+        }
+      }, {});
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
     'the enum CHECK constraint rejects out-of-union values written at runtime',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {

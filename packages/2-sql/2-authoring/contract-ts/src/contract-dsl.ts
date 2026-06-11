@@ -338,6 +338,36 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
   }
 }
 
+export class EnumScalarFieldBuilder<
+  Handle extends EnumTypeHandle,
+  State extends AnyScalarFieldState = ScalarFieldState<Handle['codecId'], Handle, false, undefined>,
+> extends ScalarFieldBuilder<State> {
+  readonly #handle: Handle;
+
+  constructor(state: State, handle: Handle) {
+    super(state);
+    this.#handle = handle;
+  }
+
+  override default(value: Handle['values'][number]): EnumScalarFieldBuilder<Handle, State> {
+    return blindCast<
+      EnumScalarFieldBuilder<Handle, State>,
+      'object spread does not narrow the generic State conditional; runtime shape is correct'
+    >(
+      new EnumScalarFieldBuilder(
+        { ...this.build(), default: { kind: 'literal', value } },
+        this.#handle,
+      ),
+    );
+  }
+
+  override defaultSql(_expression: never): never {
+    throw new Error(
+      'defaultSql is not available on an enum field; use .default(members.X) instead',
+    );
+  }
+}
+
 function columnField<Descriptor extends ColumnTypeDescriptor>(
   descriptor: Descriptor,
 ): ScalarFieldBuilder<ScalarFieldState<Descriptor['codecId'], undefined, false, undefined>> {
@@ -373,16 +403,17 @@ function namedTypeField<TypeRef extends PostgresEnumStorageEntry>(
 ): ScalarFieldBuilder<ScalarFieldState<string, TypeRef, false, undefined>>;
 function namedTypeField<Handle extends EnumTypeHandle>(
   typeRef: Handle,
-): ScalarFieldBuilder<ScalarFieldState<Handle['codecId'], Handle, false, undefined>>;
-function namedTypeField(
-  typeRef: NamedStorageTypeRef,
-): ScalarFieldBuilder<ScalarFieldState<string, NamedStorageTypeRef, false, undefined>> {
+): EnumScalarFieldBuilder<Handle>;
+function namedTypeField(typeRef: NamedStorageTypeRef): ScalarFieldBuilder {
   if (isEnumTypeHandle(typeRef)) {
-    return new ScalarFieldBuilder({
-      kind: 'scalar',
+    return new EnumScalarFieldBuilder(
+      {
+        kind: 'scalar',
+        typeRef,
+        nullable: false,
+      },
       typeRef,
-      nullable: false,
-    });
+    );
   }
   return new ScalarFieldBuilder({
     kind: 'scalar',
