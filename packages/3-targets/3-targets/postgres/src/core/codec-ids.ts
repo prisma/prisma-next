@@ -8,7 +8,6 @@ export {
 } from '@prisma-next/sql-relational-core/ast';
 export const PG_TEXT_CODEC_ID = 'pg/text@1' as const;
 export const PG_TEXT_ARRAY_CODEC_ID = 'pg/text-array@1' as const;
-export const PG_ENUM_CODEC_ID = 'pg/enum@1' as const;
 export const PG_CHAR_CODEC_ID = 'pg/char@1' as const;
 export const PG_VARCHAR_CODEC_ID = 'pg/varchar@1' as const;
 export const PG_INT_CODEC_ID = 'pg/int@1' as const;

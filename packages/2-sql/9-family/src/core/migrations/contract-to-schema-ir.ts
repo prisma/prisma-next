@@ -1,18 +1,14 @@
 import type { ColumnDefault, Contract, JsonValue } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type CheckConstraint,
   type ForeignKey,
   type Index,
-  isPostgresEnumStorageEntry,
   isStorageTypeInstance,
-  type PostgresEnumStorageEntry,
   type SqlStorage,
   type StorageColumn,
   StorageTable,
   type StorageTypeInstance,
-  toStorageTypeInstance,
   type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
@@ -26,7 +22,6 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
-import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 /**
@@ -105,17 +100,7 @@ function convertColumn(
   };
 }
 
-/**
- * `storageTypes` is polymorphic per Decision 18 (Option B) — codec-typed
- * entries match `StorageTypeInstance`; enum entries match the structural
- * `PostgresEnumStorageEntry` shape (Postgres-only; cross-domain layering
- * keeps target IR classes out of the family layer). Both shapes resolve
- * into the same `(codecId, nativeType, typeParams)` triplet at the
- * column-resolution boundary so downstream walks stay uniform.
- */
-type ResolvedStorageTypes = Readonly<
-  Record<string, StorageTypeInstance | PostgresEnumStorageEntry>
->;
+type ResolvedStorageTypes = Readonly<Record<string, StorageTypeInstance>>;
 
 function resolveColumnTypeMetadata(
   column: StorageColumn,
@@ -130,13 +115,6 @@ function resolveColumnTypeMetadata(
       `Column references storage type "${column.typeRef}" but it is not defined in storage.types.`,
     );
   }
-  if (isPostgresEnumStorageEntry(referenced)) {
-    return {
-      codecId: referenced.codecId,
-      nativeType: referenced.nativeType,
-      typeParams: { values: referenced.values } as Record<string, unknown>,
-    };
-  }
   if (isStorageTypeInstance(referenced)) {
     return {
       codecId: referenced.codecId,
@@ -145,7 +123,7 @@ function resolveColumnTypeMetadata(
     };
   }
   throw new Error(
-    `Storage type "${column.typeRef}" has an unknown polymorphic kind; expected codec-instance or postgres-enum.`,
+    `Storage type "${column.typeRef}" has an unknown polymorphic kind; expected a codec-typed StorageTypeInstance.`,
   );
 }
 
@@ -393,21 +371,9 @@ export function contractToSchemaIR(
   }
 
   const storage = contract.storage;
-  const allTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {
+  const storageTypes: ResolvedStorageTypes = {
     ...((storage.types ?? {}) as ResolvedStorageTypes),
   };
-  for (const ns of Object.values(storage.namespaces)) {
-    const nsEnums = ns.entries['type'];
-    if (nsEnums) {
-      for (const [k, v] of Object.entries(nsEnums)) {
-        allTypes[k] = blindCast<
-          PostgresEnumStorageEntry | StorageTypeInstance,
-          'entries.type holds postgres-specific enum entries at runtime'
-        >(v);
-      }
-    }
-  }
-  const storageTypes = allTypes as ResolvedStorageTypes;
   const tables: Record<string, SqlTableIR> = {};
   for (const ns of Object.values(storage.namespaces)) {
     for (const [tableName, tableDefRaw] of Object.entries(ns.entries.table)) {
@@ -445,66 +411,21 @@ export function contractToSchemaIR(
   };
 }
 
-/**
- * Normalises a native enum storage entry to the codec-typed annotation shape
- * `{codecId, nativeType, typeParams}` the introspector writes and
- * `readExistingEnumValues` reads (`existing.codecId` + `existing.typeParams.values`).
- * Without this the projector would emit the raw `PostgresEnumStorageEntry`
- * shape (top-level `values`, no `typeParams`) and the enum would read as new.
- */
-function normalizeEnumAnnotation(entry: PostgresEnumStorageEntry): StorageTypeInstance {
-  return toStorageTypeInstance({
-    codecId: entry.codecId,
-    nativeType: entry.nativeType,
-    typeParams: { values: entry.values },
-  });
-}
-
 function deriveAnnotations(
   storage: SqlStorage,
   annotationNamespace: string,
-  resolveEnumNamespaceSchema: EnumNamespaceSchemaResolver | undefined,
+  _resolveEnumNamespaceSchema: EnumNamespaceSchemaResolver | undefined,
 ): SqlAnnotations | undefined {
   const storageTypes: Record<string, StorageTypeInstance> = {};
-  const enumTypes: Record<string, Record<string, StorageTypeInstance>> = {};
 
-  const addEnum = (namespaceId: string, entry: PostgresEnumStorageEntry): void => {
-    const schemaName = resolveEnumNamespaceSchema
-      ? resolveEnumNamespaceSchema(storage, namespaceId)
-      : 'public';
-    const bySchema = enumTypes[schemaName] ?? {};
-    bySchema[entry.nativeType] = normalizeEnumAnnotation(entry);
-    enumTypes[schemaName] = bySchema;
-  };
-
-  // Top-level `storage.types`: non-enum codec entries (vector, decimal, …) keyed
-  // by bare `nativeType`. Post-S1.B enums live in `namespaces[*].entries.type`;
-  // a defensive top-level enum is nested under the unbound coordinate's schema.
   for (const typeInstance of Object.values((storage.types ?? {}) as ResolvedStorageTypes)) {
-    if (isPostgresEnumStorageEntry(typeInstance)) {
-      addEnum(UNBOUND_NAMESPACE_ID, typeInstance);
-      continue;
-    }
     if (isStorageTypeInstance(typeInstance)) {
       storageTypes[typeInstance.nativeType] = typeInstance;
     }
   }
 
-  // Namespace-scoped enums: nested by live schema so two namespaces sharing a
-  // native type resolve to distinct live-database types, matching the target's
-  // `readExistingEnumValues` read side (`enumTypes[schema][nativeType]`).
-  for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    const nsEnums = ns.entries['type'];
-    if (!nsEnums) continue;
-    for (const entry of Object.values(nsEnums)) {
-      if (!isPostgresEnumStorageEntry(entry)) continue;
-      addEnum(namespaceId, entry);
-    }
-  }
-
   const envelope = {
     ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
-    ...(Object.keys(enumTypes).length > 0 ? { enumTypes } : {}),
   };
   if (Object.keys(envelope).length === 0) return undefined;
   return { [annotationNamespace]: envelope };

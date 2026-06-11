@@ -1,9 +1,5 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
-import type {
-  PostgresEnumStorageEntry,
-  StorageColumn,
-  StorageTypeInstance,
-} from '@prisma-next/sql-contract/types';
+import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { postgresCreateNamespace } from '../postgres-schema';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
@@ -249,7 +245,7 @@ function formatUserDefinedTypeName(identifier: string): string {
 export function buildExpectedFormatType(
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
-  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {},
+  storageTypes: Record<string, StorageTypeInstance> = {},
 ): string {
   const resolved = resolveColumnTypeMetadata(column, storageTypes);
 

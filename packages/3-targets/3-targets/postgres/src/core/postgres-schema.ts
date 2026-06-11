@@ -4,7 +4,6 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import {
-  type PostgresEnumStorageEntry,
   type SqlNamespaceTablesInput,
   type SqlStorage,
   StorageTable,
@@ -12,14 +11,12 @@ import {
   StorageValueSet,
   type StorageValueSetInput,
 } from '@prisma-next/sql-contract/types';
-import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { escapeLiteral } from './sql-utils';
 
 export interface PostgresSchemaInput {
   readonly id: string;
   readonly entries: {
     readonly table: Record<string, StorageTable | StorageTableInput>;
-    readonly type: Record<string, PostgresEnumType | PostgresEnumTypeInput>;
     readonly valueSet?: Record<string, StorageValueSet | StorageValueSetInput>;
   };
 }
@@ -52,7 +49,6 @@ export class PostgresSchema extends NamespaceBase {
   readonly id: string;
   readonly entries: Readonly<{
     readonly table: Readonly<Record<string, StorageTable>>;
-    readonly type: Readonly<Record<string, PostgresEnumType>>;
     readonly valueSet?: Readonly<Record<string, StorageValueSet>>;
   }>;
 
@@ -67,20 +63,11 @@ export class PostgresSchema extends NamespaceBase {
         ]),
       ),
     );
-    const type = Object.freeze(
-      Object.fromEntries(
-        Object.entries(input.entries.type).map(([k, v]) => [
-          k,
-          v instanceof PostgresEnumType ? v : new PostgresEnumType(v as PostgresEnumTypeInput),
-        ]),
-      ),
-    );
     const valueSetInput = input.entries.valueSet;
     this.entries =
       valueSetInput !== undefined && Object.keys(valueSetInput).length > 0
         ? Object.freeze({
             table,
-            type,
             valueSet: Object.freeze(
               Object.fromEntries(
                 Object.entries(valueSetInput).map(([k, v]) => [
@@ -90,7 +77,7 @@ export class PostgresSchema extends NamespaceBase {
               ),
             ),
           })
-        : Object.freeze({ table, type });
+        : Object.freeze({ table });
     Object.defineProperty(this, 'kind', {
       value: 'schema',
       writable: false,
@@ -180,7 +167,7 @@ export class PostgresUnboundSchema extends PostgresSchema {
   static readonly instance: PostgresUnboundSchema = new PostgresUnboundSchema();
 
   constructor(input?: PostgresSchemaInput) {
-    super(input ?? { id: UNBOUND_NAMESPACE_ID, entries: { table: {}, type: {} } });
+    super(input ?? { id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
   }
 
   override qualifier(): string {
@@ -222,15 +209,11 @@ export function isPostgresSchema(ns: unknown): ns is PostgresSchema {
  * by reference and trust the resulting `SqlStorage.namespaces` map to
  * be value-stable for a given input set.
  */
-export function postgresCreateNamespace(
-  input: SqlNamespaceTablesInput,
-  enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
-): PostgresSchema {
+export function postgresCreateNamespace(input: SqlNamespaceTablesInput): PostgresSchema {
   const schemaInput: PostgresSchemaInput = {
     id: input.id,
     entries: {
       table: input.entries.table,
-      type: (enumTypes ?? {}) as Record<string, PostgresEnumTypeInput>,
       ...(input.entries.valueSet !== undefined ? { valueSet: input.entries.valueSet } : {}),
     },
   };

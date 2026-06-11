@@ -35,8 +35,6 @@ import {
   applyFkDefaults,
   buildSqlNamespace,
   type CheckConstraintInput,
-  isPostgresEnumStorageEntry,
-  type PostgresEnumStorageEntry,
   type SqlNamespaceTablesInput,
   SqlStorage,
   type SqlStorageInput,
@@ -318,55 +316,6 @@ function ensureUnboundNamespaceSlot(
     [UNBOUND_NAMESPACE_ID]: unbound,
     ...namespaces,
   });
-}
-
-const POSTGRES_ENUM_NAMESPACE_ID = 'public';
-
-function partitionStorageTypesForTarget(
-  targetId: string,
-  types: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
-  namespaceTypes?: Readonly<Record<string, Readonly<Record<string, PostgresEnumStorageEntry>>>>,
-): {
-  readonly documentTypes: Record<string, StorageTypeInstance>;
-  readonly namespaceEnumTypesById: Record<string, Record<string, PostgresEnumStorageEntry>>;
-} {
-  const documentTypes: Record<string, StorageTypeInstance> = {};
-  const namespaceEnumTypesById: Record<string, Record<string, PostgresEnumStorageEntry>> = {};
-  for (const [name, entry] of Object.entries(types)) {
-    if (isPostgresEnumStorageEntry(entry)) {
-      if (targetId !== 'postgres') {
-        throw new Error(
-          `buildSqlContractFromDefinition: postgres enum "${name}" is only valid when target is "postgres" (got "${targetId}").`,
-        );
-      }
-      let slot = namespaceEnumTypesById[POSTGRES_ENUM_NAMESPACE_ID];
-      if (slot === undefined) {
-        slot = {};
-        namespaceEnumTypesById[POSTGRES_ENUM_NAMESPACE_ID] = slot;
-      }
-      slot[name] = entry;
-      continue;
-    }
-    documentTypes[name] = entry;
-  }
-  if (namespaceTypes !== undefined) {
-    for (const [nsId, enumsInNs] of Object.entries(namespaceTypes)) {
-      for (const [name, entry] of Object.entries(enumsInNs)) {
-        if (targetId !== 'postgres') {
-          throw new Error(
-            `buildSqlContractFromDefinition: postgres enum "${name}" is only valid when target is "postgres" (got "${targetId}").`,
-          );
-        }
-        let slot = namespaceEnumTypesById[nsId];
-        if (slot === undefined) {
-          slot = {};
-          namespaceEnumTypesById[nsId] = slot;
-        }
-        slot[name] = entry;
-      }
-    }
-  }
-  return { documentTypes, namespaceEnumTypesById };
 }
 
 export function buildSqlContractFromDefinition(
@@ -723,13 +672,9 @@ export function buildSqlContractFromDefinition(
   // discriminator shape before hashing so the storageHash matches the
   // persisted JSON envelope produced from the SqlStorage class instance
   // (which always carries the discriminator).
-  const rawStorageTypes = (definition.storageTypes ?? {}) as Record<
-    string,
-    StorageTypeInstance | PostgresEnumStorageEntry
-  >;
-  const storageTypes = Object.fromEntries(
+  const rawStorageTypes = definition.storageTypes ?? {};
+  const documentTypes: Record<string, StorageTypeInstance> = Object.fromEntries(
     Object.entries(rawStorageTypes).map(([name, entry]) => {
-      if (isPostgresEnumStorageEntry(entry)) return [name, entry];
       if ((entry as { kind?: unknown }).kind === 'codec-instance') return [name, entry];
       return [
         name,
@@ -741,15 +686,7 @@ export function buildSqlContractFromDefinition(
       ];
     }),
   );
-  const { documentTypes, namespaceEnumTypesById } = partitionStorageTypesForTarget(
-    target,
-    storageTypes,
-    definition.namespaceTypes,
-  );
   const namespaceCoordinateIds = collectStorageNamespaceCoordinateIds(definition);
-  for (const id of Object.keys(namespaceEnumTypesById)) {
-    namespaceCoordinateIds.add(id);
-  }
 
   // Build per-namespace registries for `enumType()` handles.
   // All authored enums target the contract's default namespace.
@@ -793,7 +730,6 @@ export function buildSqlContractFromDefinition(
   >(
     Object.fromEntries(
       [...namespaceCoordinateIds].sort().map((id) => {
-        const enumTypes = namespaceEnumTypesById[id];
         const valueSetEntries = storageValueSetsByNs[id];
         const nsInput: SqlNamespaceTablesInput = {
           id,
@@ -804,10 +740,7 @@ export function buildSqlContractFromDefinition(
               : {}),
           },
         };
-        return [
-          id,
-          createNamespace ? createNamespace(nsInput, enumTypes) : buildSqlNamespace(nsInput),
-        ];
+        return [id, createNamespace ? createNamespace(nsInput) : buildSqlNamespace(nsInput)];
       }),
     ),
   );

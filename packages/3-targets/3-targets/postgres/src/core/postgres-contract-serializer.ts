@@ -19,7 +19,6 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { Type } from 'arktype';
 import { postgresAuthoringEntityTypes } from './authoring';
-import type { PostgresEnumType } from './postgres-enum-type';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
@@ -92,38 +91,16 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
 
-    // Extract the postgres-specific `type` slot directly from raw input.
-    // The family base handles the `table` slot; the postgres target owns `type`.
-    const rawRecord = raw as Record<string, unknown>;
-    const rawEntries = rawRecord['entries'];
-    let typeSlot: Record<string, PostgresEnumType> | undefined;
-    if (rawEntries !== null && typeof rawEntries === 'object' && !Array.isArray(rawEntries)) {
-      const rawTypeSlot = (rawEntries as Record<string, unknown>)['type'];
-      if (rawTypeSlot !== null && typeof rawTypeSlot === 'object' && !Array.isArray(rawTypeSlot)) {
-        const enumFactory = this.entityTypeRegistry.get('postgres-enum');
-        typeSlot = Object.fromEntries(
-          Object.entries(rawTypeSlot as Record<string, unknown>).map(([name, entry]) => [
-            name,
-            blindCast<PostgresEnumType, 'postgres-enum factory returns PostgresEnumType'>(
-              enumFactory !== undefined ? enumFactory(entry) : entry,
-            ),
-          ]),
-        );
-      }
-    }
-
     const valueSetSlot = entries.valueSet;
     const hasValueSets = valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0;
     const emptyTables = Object.keys(entries.table).length === 0;
-    const emptyTypes = !typeSlot || Object.keys(typeSlot).length === 0;
-    if (id === UNBOUND_NAMESPACE_ID && emptyTables && emptyTypes && !hasValueSets) {
+    if (id === UNBOUND_NAMESPACE_ID && emptyTables && !hasValueSets) {
       return PostgresSchema.unbound;
     }
     return new PostgresSchema({
       id,
       entries: {
         table: entries.table,
-        type: typeSlot ?? {},
         ...(hasValueSets ? { valueSet: valueSetSlot } : {}),
       },
     });
@@ -173,10 +150,6 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     for (const [tableName, table] of Object.entries(ns.entries.table)) {
       tablesOut[tableName] = this.serializeJsonValue(table) as JsonObject;
     }
-    const typeOut: Record<string, JsonObject> = {};
-    for (const [typeName, ty] of Object.entries(ns.entries.type)) {
-      typeOut[typeName] = this.serializeJsonValue(ty) as JsonObject;
-    }
     const valueSetEntries = ns.entries.valueSet;
     const valueSetOut: Record<string, JsonObject> = {};
     if (valueSetEntries !== undefined) {
@@ -192,7 +165,6 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
       entries: {
         table: tablesOut,
-        type: typeOut,
         ...(Object.keys(valueSetOut).length > 0 ? { valueSet: valueSetOut } : {}),
       },
     };

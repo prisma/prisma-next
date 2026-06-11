@@ -23,7 +23,6 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
-  PostgresEnumStorageEntry,
   SqlStorage,
   StorageTable,
   StorageTypeInstance,
@@ -39,7 +38,7 @@ export interface StrategyContext {
   readonly toContract: Contract<SqlStorage>;
   readonly fromContract: Contract<SqlStorage> | null;
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
-  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance>>;
   readonly schema: SqlSchemaIR;
   readonly policy: MigrationOperationPolicy;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;

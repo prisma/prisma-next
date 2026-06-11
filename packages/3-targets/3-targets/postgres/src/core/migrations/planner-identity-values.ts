@@ -1,12 +1,6 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
-import {
-  isPostgresEnumStorageEntry,
-  type PostgresEnumStorageEntry,
-  type StorageColumn,
-  type StorageTypeInstance,
-} from '@prisma-next/sql-contract/types';
+import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { PostgresEnumType } from '../postgres-enum-type';
 
 /**
  * Resolves the identity value (monoid neutral element) as a SQL literal for a column's type.
@@ -16,30 +10,12 @@ import type { PostgresEnumType } from '../postgres-enum-type';
 export function resolveIdentityValue(
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
-  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {},
+  storageTypes: Record<string, StorageTypeInstance> = {},
 ): string | null {
   const referencedType = column.typeRef ? storageTypes[column.typeRef] : undefined;
-  const referencedIsEnum =
-    referencedType !== undefined && isPostgresEnumStorageEntry(referencedType);
-  const referencedBinding = referencedIsEnum
-    ? ((referencedType as PostgresEnumType).codecBinding ?? {
-        codecId: (referencedType as PostgresEnumStorageEntry).codecId,
-        typeParams: { values: (referencedType as PostgresEnumStorageEntry).values },
-      })
-    : undefined;
-  const codecId =
-    referencedBinding?.codecId ??
-    (referencedType && !referencedIsEnum
-      ? (referencedType as StorageTypeInstance).codecId
-      : undefined) ??
-    column.codecId;
+  const codecId = referencedType?.codecId ?? column.codecId;
   const nativeType = referencedType?.nativeType ?? column.nativeType;
-  const typeParams =
-    (referencedBinding?.typeParams as Record<string, unknown> | undefined) ??
-    (referencedType && !referencedIsEnum
-      ? (referencedType as StorageTypeInstance).typeParams
-      : undefined) ??
-    column.typeParams;
+  const typeParams = referencedType?.typeParams ?? column.typeParams;
 
   if (codecId) {
     const hookDefault = codecHooks.get(codecId)?.resolveIdentityValue?.({

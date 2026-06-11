@@ -2,11 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { ControlPolicySubject } from '@prisma-next/family-sql/control';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  isPostgresEnumStorageEntry,
-  type SqlStorage,
-  storageTableAt,
-} from '@prisma-next/sql-contract/types';
+import { type SqlStorage, storageTableAt } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { isPostgresSchema } from '../postgres-schema';
 import type { PostgresOpFactoryCall } from './op-factory-call';
@@ -24,7 +20,6 @@ import type { PostgresOpFactoryCall } from './op-factory-call';
  */
 const OBJECT_CREATION_FACTORIES: ReadonlySet<string> = new Set<string>([
   'createTable',
-  'createEnumType',
   'createSchema',
 ]);
 
@@ -75,7 +70,6 @@ interface PostgresCallFields {
   readonly schemaName?: string;
   readonly tableName?: string;
   readonly columnName?: string;
-  readonly typeName?: string;
 }
 
 function postgresCallFields(call: PostgresOpFactoryCall): PostgresCallFields {
@@ -83,7 +77,6 @@ function postgresCallFields(call: PostgresOpFactoryCall): PostgresCallFields {
     ...ifDefined('schemaName', 'schemaName' in call ? call.schemaName : undefined),
     ...ifDefined('tableName', 'tableName' in call ? call.tableName : undefined),
     ...ifDefined('columnName', 'columnName' in call ? call.columnName : undefined),
-    ...ifDefined('typeName', 'typeName' in call ? call.typeName : undefined),
   };
 }
 
@@ -95,10 +88,6 @@ export function formatPostgresControlPolicySubjectLabel(
   if (subject?.table) {
     const ddlSchema = ddlSchemaNameForNamespace(contract, subject.namespaceId);
     return `${factoryName}(${ddlSchema}.${subject.table})`;
-  }
-  if (subject?.typeName) {
-    const ddlSchema = ddlSchemaNameForNamespace(contract, subject.namespaceId);
-    return `${factoryName}(${ddlSchema}.${subject.typeName})`;
   }
   return factoryName;
 }
@@ -113,21 +102,6 @@ export function resolvePostgresCallControlPolicySubject(
   if (call.factoryName === 'createSchema' && callFields.schemaName) {
     return {
       namespaceId: resolveNamespaceIdForDdlSchema(contract, callFields.schemaName),
-      createsNewObject,
-    };
-  }
-
-  if (callFields.typeName && call.factoryName !== 'addColumn') {
-    const namespaceId = callFields.schemaName
-      ? resolveNamespaceIdForDdlSchema(contract, callFields.schemaName)
-      : UNBOUND_NAMESPACE_ID;
-    const ns = contract.storage.namespaces[namespaceId];
-    const rawEnum = isPostgresSchema(ns) ? ns.entries.type[callFields.typeName] : undefined;
-    const controlPolicy = isPostgresEnumStorageEntry(rawEnum) ? rawEnum.control : undefined;
-    return {
-      namespaceId,
-      ...ifDefined('explicitNodeControlPolicy', controlPolicy),
-      typeName: callFields.typeName,
       createsNewObject,
     };
   }
@@ -170,7 +144,6 @@ export function resolvePostgresCallControlPolicySubject(
 const POSTGRES_ISSUE_CREATION_FACTORY: Readonly<Record<string, string>> = Object.freeze({
   missing_schema: 'createSchema',
   missing_table: 'createTable',
-  type_missing: 'createEnumType',
 });
 
 export function resolvePostgresIssueCreationFactoryName(issue: SchemaIssue): string | undefined {
@@ -199,20 +172,6 @@ export function resolvePostgresIssueControlPolicySubject(
 
   if (issue.kind === 'missing_schema' && issue.namespaceId) {
     return { namespaceId: issue.namespaceId, createsNewObject };
-  }
-
-  if ('typeName' in issue && issue.typeName) {
-    const namespaceId =
-      'namespaceId' in issue && issue.namespaceId ? issue.namespaceId : UNBOUND_NAMESPACE_ID;
-    const ns = contract.storage.namespaces[namespaceId];
-    const rawEnum = isPostgresSchema(ns) ? ns.entries.type[issue.typeName] : undefined;
-    const controlPolicy = isPostgresEnumStorageEntry(rawEnum) ? rawEnum.control : undefined;
-    return {
-      namespaceId,
-      ...ifDefined('explicitNodeControlPolicy', controlPolicy),
-      typeName: issue.typeName,
-      createsNewObject,
-    };
   }
 
   if ('table' in issue && issue.table) {
