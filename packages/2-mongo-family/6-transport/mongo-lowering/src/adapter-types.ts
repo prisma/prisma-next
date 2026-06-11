@@ -1,4 +1,5 @@
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
+import type { AnyMongoDdlCommand } from '@prisma-next/mongo-query-ast/control';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 
@@ -121,17 +122,25 @@ export type MongoLoweredDraft =
       readonly pipeline: ReadonlyArray<Record<string, unknown>>;
     };
 
+/** Wraps a DDL command for passage to `MongoAdapter.lower`. */
+export interface MongoDdlPlan {
+  readonly command: AnyMongoDdlCommand;
+}
+
 export interface MongoAdapter {
   /**
-   * Lower a `MongoQueryPlan` to a driver-ready wire command.
+   * Lower a query plan or DDL command plan to a driver-ready wire command.
    *
-   * Equivalent to `resolveParams(structuralLower(plan), ctx)`. Preserved for
-   * callers that do not need the two-phase split.
+   * DDL plans (`{ command: AnyMongoDdlCommand }`) lower structurally — no
+   * codec routing. DML plans (`MongoQueryPlan`) go through the two-phase
+   * `structuralLower → resolveParams` pipeline.
+   *
+   * Equivalent to `resolveParams(structuralLower(plan), ctx)` for DML.
    */
-  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand>;
+  lower(plan: MongoQueryPlan | MongoDdlPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand>;
 
   /**
-   * Phase 1 of the two-phase lowering pipeline.
+   * Phase 1 of the two-phase lowering pipeline (DML only).
    *
    * Transforms the plan's command AST into the lowered wire shape **without**
    * calling `resolveValue` on any `MongoParamRef` leaf. All filter predicates,

@@ -1,11 +1,18 @@
 import type { MongoDriver } from '@prisma-next/mongo-lowering';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
+import type { IndexSpecification } from 'mongodb';
 import type {
   AggregateWireCommand,
   AnyMongoWireCommand,
+  CollModWireCommand,
+  CreateCollectionWireCommand,
+  CreateIndexWireCommand,
   DeleteManyResult,
   DeleteManyWireCommand,
   DeleteOneResult,
   DeleteOneWireCommand,
+  DropCollectionWireCommand,
+  DropIndexWireCommand,
   FindOneAndDeleteWireCommand,
   FindOneAndUpdateWireCommand,
   InsertManyResult,
@@ -19,6 +26,10 @@ import type {
 } from '@prisma-next/mongo-wire';
 import { type Db, MongoClient } from 'mongodb';
 import { DRIVER_INFO } from './core/driver-info';
+
+async function* voidToAsyncIterable(op: Promise<void>): AsyncIterable<never> {
+  await op;
+}
 
 export class MongoDriverImpl implements MongoDriver {
   protected readonly db: Db;
@@ -59,6 +70,16 @@ export class MongoDriverImpl implements MongoDriver {
         return this.executeFindOneAndDeleteCommand(wireCommand) as AsyncIterable<Row>;
       case 'aggregate':
         return this.executeAggregateCommand<Row>(wireCommand);
+      case 'createCollection':
+        return castAs<AsyncIterable<Row>>(voidToAsyncIterable(this.executeCreateCollectionCommand(wireCommand)));
+      case 'createIndex':
+        return castAs<AsyncIterable<Row>>(voidToAsyncIterable(this.executeCreateIndexCommand(wireCommand)));
+      case 'dropCollection':
+        return castAs<AsyncIterable<Row>>(voidToAsyncIterable(this.executeDropCollectionCommand(wireCommand)));
+      case 'dropIndex':
+        return castAs<AsyncIterable<Row>>(voidToAsyncIterable(this.executeDropIndexCommand(wireCommand)));
+      case 'collMod':
+        return castAs<AsyncIterable<Row>>(voidToAsyncIterable(this.executeCollModCommand(wireCommand)));
       // v8 ignore next 4
       default: {
         const _exhaustive: never = wireCommand;
@@ -160,6 +181,31 @@ export class MongoDriverImpl implements MongoDriver {
     const collection = this.db.collection(cmd.collection);
     const cursor = collection.aggregate(cmd.pipeline as Record<string, unknown>[]);
     yield* cursor as AsyncIterable<Row>;
+  }
+
+  protected async executeCreateCollectionCommand(cmd: CreateCollectionWireCommand): Promise<void> {
+    await this.db.createCollection(cmd.collection, cmd.options);
+  }
+
+  protected async executeCreateIndexCommand(cmd: CreateIndexWireCommand): Promise<void> {
+    await this.db
+      .collection(cmd.collection)
+      .createIndex(
+        blindCast<IndexSpecification, 'key satisfies {[k:string]:IndexDirection}'>(cmd.key),
+        cmd.options,
+      );
+  }
+
+  protected async executeDropCollectionCommand(cmd: DropCollectionWireCommand): Promise<void> {
+    await this.db.collection(cmd.collection).drop();
+  }
+
+  protected async executeDropIndexCommand(cmd: DropIndexWireCommand): Promise<void> {
+    await this.db.collection(cmd.collection).dropIndex(cmd.name);
+  }
+
+  protected async executeCollModCommand(cmd: CollModWireCommand): Promise<void> {
+    await this.db.command({ collMod: cmd.collection, ...cmd.options });
   }
 }
 

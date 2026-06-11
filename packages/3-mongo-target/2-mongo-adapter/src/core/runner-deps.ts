@@ -5,14 +5,11 @@ import type {
   ControlFamilyInstance,
 } from '@prisma-next/framework-components/control';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
-import type {
-  MongoDdlCommandVisitor,
-  MongoInspectionCommandVisitor,
-} from '@prisma-next/mongo-query-ast/control';
+import type { MongoInspectionCommandVisitor } from '@prisma-next/mongo-query-ast/control';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import type { Db } from 'mongodb';
 import { createMongoAdapter } from '../mongo-adapter';
-import { MongoCommandExecutor, MongoInspectionExecutor } from './command-executor';
+import { MongoInspectionExecutor } from './inspection-executor';
 import { MongoControlAdapterImpl } from './mongo-control-adapter';
 import { isMongoControlDriver } from './mongo-control-driver';
 
@@ -65,7 +62,6 @@ export interface MarkerOperations {
 }
 
 export interface MongoRunnerDependencies {
-  readonly commandExecutor: MongoDdlCommandVisitor<Promise<void>>;
   readonly inspectionExecutor: MongoInspectionCommandVisitor<Promise<Record<string, unknown>[]>>;
   readonly adapter: MongoAdapter;
   readonly driver: MongoDriver;
@@ -94,7 +90,6 @@ export function createMongoRunnerDeps(
   controlAdapter: MongoControlAdapter<'mongo'> = new MongoControlAdapterImpl(),
 ): MongoRunnerDependencies {
   return {
-    commandExecutor: new MongoCommandExecutor(extractDb(controlDriver)),
     inspectionExecutor: new MongoInspectionExecutor(extractDb(controlDriver)),
     adapter: createMongoAdapter(),
     driver,

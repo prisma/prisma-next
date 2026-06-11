@@ -151,6 +151,65 @@ export class AggregateWireCommand extends MongoWireCommand {
   }
 }
 
+export class CreateCollectionWireCommand extends MongoWireCommand {
+  readonly kind = 'createCollection' as const;
+  readonly options: Record<string, unknown>;
+
+  constructor(collection: string, options: Record<string, unknown>) {
+    super(collection);
+    this.options = options;
+    this.freeze();
+  }
+}
+
+export class CreateIndexWireCommand extends MongoWireCommand {
+  readonly kind = 'createIndex' as const;
+  readonly key: Record<string, number | string>;
+  readonly options: Record<string, unknown>;
+
+  constructor(
+    collection: string,
+    key: Record<string, number | string>,
+    options: Record<string, unknown>,
+  ) {
+    super(collection);
+    this.key = key;
+    this.options = options;
+    this.freeze();
+  }
+}
+
+export class DropCollectionWireCommand extends MongoWireCommand {
+  readonly kind = 'dropCollection' as const;
+
+  constructor(collection: string) {
+    super(collection);
+    this.freeze();
+  }
+}
+
+export class DropIndexWireCommand extends MongoWireCommand {
+  readonly kind = 'dropIndex' as const;
+  readonly name: string;
+
+  constructor(collection: string, name: string) {
+    super(collection);
+    this.name = name;
+    this.freeze();
+  }
+}
+
+export class CollModWireCommand extends MongoWireCommand {
+  readonly kind = 'collMod' as const;
+  readonly options: Record<string, unknown>;
+
+  constructor(collection: string, options: Record<string, unknown>) {
+    super(collection);
+    this.options = options;
+    this.freeze();
+  }
+}
+
 export type AnyMongoWireCommand =
   | InsertOneWireCommand
   | InsertManyWireCommand
@@ -160,4 +219,9 @@ export type AnyMongoWireCommand =
   | DeleteManyWireCommand
   | FindOneAndUpdateWireCommand
   | FindOneAndDeleteWireCommand
-  | AggregateWireCommand;
+  | AggregateWireCommand
+  | CreateCollectionWireCommand
+  | CreateIndexWireCommand
+  | DropCollectionWireCommand
+  | DropIndexWireCommand
+  | CollModWireCommand;

@@ -10,17 +10,15 @@ import {
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MongoContract } from '@prisma-next/mongo-contract';
-import type { MongoAdapter, MongoDriver, MongoLoweredDraft } from '@prisma-next/mongo-lowering';
 import type {
-  AnyMongoDdlCommand,
+  MongoDdlPlan,
+  MongoAdapter,
+  MongoDriver,
+  MongoLoweredDraft,
+} from '@prisma-next/mongo-lowering';
+import type {
   AnyMongoInspectionCommand,
   AnyMongoMigrationOperation,
-  CollModCommand,
-  CreateCollectionCommand,
-  CreateIndexCommand,
-  DropCollectionCommand,
-  DropIndexCommand,
-  MongoDdlCommandVisitor,
   MongoInspectionCommandVisitor,
 } from '@prisma-next/mongo-query-ast/control';
 import {
@@ -112,35 +110,15 @@ class StubMongoAdapter implements MongoAdapter {
     return { kind: wireKind, collection: draft.collection } as unknown as WireCommand;
   }
 
-  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<WireCommand> {
-    return this.resolveParams(this.structuralLower(plan), ctx);
-  }
-}
-
-class StubCommandExecutor implements MongoDdlCommandVisitor<Promise<void>> {
-  readonly calls: AnyMongoDdlCommand[] = [];
-
-  constructor(private readonly log?: EventLog) {}
-
-  private async record(command: AnyMongoDdlCommand): Promise<void> {
-    this.calls.push(command);
-    this.log?.record(`ddl:${command.kind}:${command.collection}`);
-  }
-
-  createIndex(command: CreateIndexCommand): Promise<void> {
-    return this.record(command);
-  }
-  dropIndex(command: DropIndexCommand): Promise<void> {
-    return this.record(command);
-  }
-  createCollection(command: CreateCollectionCommand): Promise<void> {
-    return this.record(command);
-  }
-  dropCollection(command: DropCollectionCommand): Promise<void> {
-    return this.record(command);
-  }
-  collMod(command: CollModCommand): Promise<void> {
-    return this.record(command);
+  lower(plan: MongoQueryPlan | MongoDdlPlan, ctx: CodecCallContext): Promise<WireCommand> {
+    if ('collection' in plan) {
+      return this.resolveParams(this.structuralLower(plan), ctx);
+    }
+    const { command } = plan;
+    return Promise.resolve({
+      kind: command.kind,
+      collection: command.collection,
+    } as unknown as WireCommand);
   }
 }
 
@@ -227,7 +205,6 @@ interface Harness {
   readonly runner: MongoMigrationRunner;
   readonly driver: StubMongoDriver;
   readonly adapter: StubMongoAdapter;
-  readonly commandExecutor: StubCommandExecutor;
   readonly inspectionExecutor: StubInspectionExecutor;
   readonly log: EventLog;
 }
@@ -236,10 +213,8 @@ function makeHarness(): Harness {
   const log = new EventLog();
   const driver = new StubMongoDriver(log);
   const adapter = new StubMongoAdapter();
-  const commandExecutor = new StubCommandExecutor(log);
   const inspectionExecutor = new StubInspectionExecutor();
   const deps: MongoRunnerDependencies = {
-    commandExecutor,
     inspectionExecutor,
     adapter,
     driver,
@@ -250,7 +225,6 @@ function makeHarness(): Harness {
     runner: new MongoMigrationRunner(deps),
     driver,
     adapter,
-    commandExecutor,
     inspectionExecutor,
     log,
   };
@@ -399,7 +373,7 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
     expect(harness.driver.executeCalls).toEqual([]);
   });
 
-  it('dispatches DDL ops through the command executor and data ops through the driver, in plan order', async () => {
+  it('dispatches DDL ops through adapter.lower + driver.execute and data ops through the same path, in plan order', async () => {
     const harness = makeHarness();
     const ddlOp = createCollection('orders');
     const dataOp = dataTransform('seed-orders', { run: () => makeRunPlan() });
@@ -411,16 +385,17 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
     });
 
     expect(result.assertOk()).toEqual({ operationsPlanned: 2, operationsExecuted: 2 });
-    expect(harness.commandExecutor.calls).toHaveLength(1);
-    expect(harness.commandExecutor.calls[0]).toMatchObject({
+    expect(harness.driver.executeCalls).toHaveLength(2);
+    expect(harness.driver.executeCalls[0]).toMatchObject({
       kind: 'createCollection',
       collection: 'orders',
     });
-    expect(harness.driver.executeCalls).toEqual([
-      { kind: 'updateMany', collection: RUN_COLLECTION },
-    ]);
+    expect(harness.driver.executeCalls[1]).toMatchObject({
+      kind: 'updateMany',
+      collection: RUN_COLLECTION,
+    });
     expect(harness.log.entries).toEqual([
-      'ddl:createCollection:orders',
+      `dml:createCollection:orders`,
       `dml:updateMany:${RUN_COLLECTION}`,
     ]);
   });
@@ -458,11 +433,9 @@ describe('MongoMigrationRunner schema verification', () => {
     const { ops, calls } = makeTrackingMarkerOps();
     const driver = new StubMongoDriver();
     const adapter = new StubMongoAdapter();
-    const commandExecutor = new StubCommandExecutor();
     const inspectionExecutor = new StubInspectionExecutor();
     const driftIR = new MongoSchemaIR([new MongoSchemaCollection({ name: 'rogue' })]);
     const deps: MongoRunnerDependencies = {
-      commandExecutor,
       inspectionExecutor,
       adapter,
       driver,
@@ -513,11 +486,9 @@ describe('MongoMigrationRunner schema verification', () => {
     let introspectCalls = 0;
     const driver = new StubMongoDriver();
     const adapter = new StubMongoAdapter();
-    const commandExecutor = new StubCommandExecutor();
     const inspectionExecutor = new StubInspectionExecutor();
     const driftIR = new MongoSchemaIR([new MongoSchemaCollection({ name: 'rogue' })]);
     const deps: MongoRunnerDependencies = {
-      commandExecutor,
       inspectionExecutor,
       adapter,
       driver,
@@ -587,7 +558,6 @@ function makeLedgerHarness(): {
     },
   };
   const deps: MongoRunnerDependencies = {
-    commandExecutor: new StubCommandExecutor(),
     inspectionExecutor: new StubInspectionExecutor(),
     adapter: new StubMongoAdapter(),
     driver: new StubMongoDriver(),
