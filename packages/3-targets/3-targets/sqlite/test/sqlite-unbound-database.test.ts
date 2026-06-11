@@ -139,6 +139,18 @@ describe('SqliteDatabase — entries open dictionary', () => {
   });
 });
 
+describe('SqliteDatabase — unknown entity kind', () => {
+  it('construction throws naming the unknown kind when entries contains an unrecognised key', () => {
+    expect(
+      () =>
+        new SqliteDatabase({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: { table: {}, bogus: {} } as never,
+        }),
+    ).toThrow(/unknown entity kind/);
+  });
+});
+
 describe('SqliteUnboundDatabase — entries open dictionary', () => {
   it('exact-shape serialization: JSON.stringify emits only id and entries', () => {
     const parsed = JSON.parse(JSON.stringify(SqliteUnboundDatabase.instance)) as Record<

@@ -131,6 +131,15 @@ describe('SqlBoundNamespace — entries open dictionary', () => {
     expect(Object.isFrozen(ns)).toBe(true);
   });
 
+  it('construction throws naming the unknown kind when entries contains an unrecognised key', () => {
+    expect(() =>
+      buildSqlNamespace({
+        id: 'app',
+        entries: { table: {}, bogus: {} } as never,
+      }),
+    ).toThrow(/unknown entity kind/);
+  });
+
   it('entries[kind][name] resolves the same as the getter[name]', () => {
     const ns = buildSqlNamespace({
       id: 'app',

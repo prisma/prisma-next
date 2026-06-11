@@ -296,3 +296,15 @@ describe('PostgresUnboundSchema — entries open dictionary', () => {
     expect(PostgresSchema.unbound.entries['type']).toBeDefined();
   });
 });
+
+describe('PostgresSchema — unknown entity kind', () => {
+  it('construction throws naming the unknown kind when entries contains an unrecognised key', () => {
+    expect(
+      () =>
+        new PostgresSchema({
+          id: 'app',
+          entries: { table: {}, type: {}, bogus: {} } as never,
+        }),
+    ).toThrow(/unknown entity kind/);
+  });
+});
