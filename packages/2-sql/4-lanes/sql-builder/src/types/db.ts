@@ -3,17 +3,25 @@ import type { TableProxy } from './table-proxy';
 
 export type CapabilitiesBase = Record<string, Record<string, boolean>>;
 
+/**
+ * An open-dictionary `entries` shape compatible with `SqlNamespace` after ADR 224.
+ * `entries` is a `Record<string, Record<string, unknown>>`; the `'table'` key may or
+ * may not be present. Helpers index into `entries['table']` with an optional-chain
+ * pattern to tolerate its absence, matching the `namespaceTables` family helper.
+ */
+type NamespaceEntries = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+
 export type TableProxyContract = {
   readonly storage: {
-    readonly namespaces: Readonly<
-      Record<
-        string,
-        { readonly entries: { readonly table: Readonly<Record<string, StorageTable>> } }
-      >
-    >;
+    readonly namespaces: Readonly<Record<string, { readonly entries: NamespaceEntries }>>;
   };
   readonly capabilities: CapabilitiesBase;
 };
+
+type TablesInNamespace<NS extends { readonly entries: NamespaceEntries }> =
+  NS['entries']['table'] extends Readonly<Record<string, StorageTable>>
+    ? NS['entries']['table']
+    : Readonly<Record<string, StorageTable>>;
 
 // Union of every table name declared in any namespace of `C`. Replaces
 // the prior `UnboundTables<C>` indexing (which only saw `__unbound__`).
@@ -22,13 +30,17 @@ export type UnboundTables<C extends TableProxyContract> = {
 };
 
 export type TableNamesAcrossNamespaces<C extends TableProxyContract> = {
-  [NSId in keyof C['storage']['namespaces']]: keyof C['storage']['namespaces'][NSId]['entries']['table'] &
+  [NSId in keyof C['storage']['namespaces']]: keyof TablesInNamespace<
+    C['storage']['namespaces'][NSId]
+  > &
     string;
 }[keyof C['storage']['namespaces']];
 
 export type TableInAnyNamespace<C extends TableProxyContract, Name extends string> = {
-  [NSId in keyof C['storage']['namespaces']]: Name extends keyof C['storage']['namespaces'][NSId]['entries']['table']
-    ? C['storage']['namespaces'][NSId]['entries']['table'][Name]
+  [NSId in keyof C['storage']['namespaces']]: Name extends keyof TablesInNamespace<
+    C['storage']['namespaces'][NSId]
+  >
+    ? TablesInNamespace<C['storage']['namespaces'][NSId]>[Name]
     : never;
 }[keyof C['storage']['namespaces']];
 
@@ -39,8 +51,10 @@ export type Namespace<
   C extends TableProxyContract,
   NsId extends keyof C['storage']['namespaces'],
 > = {
-  readonly [Name in keyof C['storage']['namespaces'][NsId]['entries']['table'] &
-    string]: TableProxy<C, Name>;
+  readonly [Name in keyof TablesInNamespace<C['storage']['namespaces'][NsId]> & string]: TableProxy<
+    C,
+    Name
+  >;
 };
 
 export type Db<C extends TableProxyContract> = {
