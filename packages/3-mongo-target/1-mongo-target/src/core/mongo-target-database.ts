@@ -48,7 +48,7 @@ export class MongoTargetDatabase extends NamespaceBase {
             'entries[collection] holds MongoCollectionInput by construction'
           >(rawMap),
         )) {
-          collectionMap[name] = new MongoCollection(c);
+          collectionMap[name] = c instanceof MongoCollection ? c : new MongoCollection(c);
         }
         builtEntries['collection'] = Object.freeze(collectionMap);
       } else {
