@@ -713,6 +713,23 @@ describe('extractCodecLookup', () => {
       ]),
     ).toThrow(/Duplicate codec descriptor for codecId "a@1"/);
   });
+
+  it('forCodecRef resolves a known codec ref', () => {
+    const lookup = extractCodecLookup([
+      { id: 'desc', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
+    ]);
+    const codec = lookup.forCodecRef({ codecId: 'a@1' });
+    expect(codec.id).toBe('a@1');
+  });
+
+  it('forCodecRef throws CODEC_DESCRIPTOR_MISSING for unknown codec ids', () => {
+    const lookup = extractCodecLookup([
+      { id: 'desc', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
+    ]);
+    expect(() => lookup.forCodecRef({ codecId: 'nope@1' })).toThrow(
+      /CODEC_DESCRIPTOR_MISSING|nope@1/,
+    );
+  });
 });
 
 describe('assembleScalarTypeDescriptors', () => {
