@@ -74,10 +74,7 @@ function testEnum2Factory(
   }
 
   const rawArg = typeAttr.args[0]?.value;
-  const codecId =
-    rawArg !== undefined && rawArg.startsWith('"') && rawArg.endsWith('"')
-      ? rawArg.slice(1, -1)
-      : undefined;
+  const codecId = rawArg?.startsWith('"') && rawArg.endsWith('"') ? rawArg.slice(1, -1) : undefined;
   if (!codecId) {
     diagnostics?.push({
       code: 'PSL_ENUM2_MISSING_TYPE',

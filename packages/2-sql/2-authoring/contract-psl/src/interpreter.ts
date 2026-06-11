@@ -383,7 +383,7 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
 interface ProcessEnum2DeclarationsInput {
   readonly enum2Blocks: readonly PslExtensionBlock[];
   readonly sourceId: string;
-  readonly authoringContributions: AuthoringContributions;
+  readonly authoringContributions: AuthoringContributions | undefined;
   readonly entityContext: AuthoringEntityContext;
   readonly diagnostics: ContractSourceDiagnostic[];
 }
@@ -2093,9 +2093,15 @@ export function interpretPslDocumentToSqlContract(
     entityContext: {
       family: input.target.familyId,
       target: input.target.targetId,
-      codecLookup: input.codecLookup,
+      ...ifDefined('codecLookup', input.codecLookup),
       sourceId,
-      diagnostics,
+      diagnostics: {
+        push: (d) => {
+          diagnostics.push(
+            blindCast<ContractSourceDiagnostic, 'sink diagnostics are span-compatible'>(d),
+          );
+        },
+      },
     },
     diagnostics,
   });
