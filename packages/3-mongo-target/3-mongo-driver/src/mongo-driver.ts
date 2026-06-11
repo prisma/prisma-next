@@ -1,6 +1,4 @@
 import type { MongoDriver } from '@prisma-next/mongo-lowering';
-import { blindCast, castAs } from '@prisma-next/utils/casts';
-import type { IndexSpecification } from 'mongodb';
 import type {
   AggregateWireCommand,
   AnyMongoWireCommand,
@@ -24,11 +22,18 @@ import type {
   UpdateOneResult,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
+import type { IndexSpecification } from 'mongodb';
 import { type Db, MongoClient } from 'mongodb';
 import { DRIVER_INFO } from './core/driver-info';
 
-async function* voidToAsyncIterable(op: Promise<void>): AsyncIterable<never> {
-  await op;
+function voidToAsyncIterable(op: Promise<void>): AsyncIterable<never> {
+  return {
+    [Symbol.asyncIterator](): AsyncIterator<never> {
+      const done = op.then(() => ({ value: undefined as never, done: true as const }));
+      return { next: () => done };
+    },
+  };
 }
 
 export class MongoDriverImpl implements MongoDriver {
@@ -71,15 +76,25 @@ export class MongoDriverImpl implements MongoDriver {
       case 'aggregate':
         return this.executeAggregateCommand<Row>(wireCommand);
       case 'createCollection':
-        return castAs<AsyncIterable<Row>>(voidToAsyncIterable(this.executeCreateCollectionCommand(wireCommand)));
+        return castAs<AsyncIterable<Row>>(
+          voidToAsyncIterable(this.executeCreateCollectionCommand(wireCommand)),
+        );
       case 'createIndex':
-        return castAs<AsyncIterable<Row>>(voidToAsyncIterable(this.executeCreateIndexCommand(wireCommand)));
+        return castAs<AsyncIterable<Row>>(
+          voidToAsyncIterable(this.executeCreateIndexCommand(wireCommand)),
+        );
       case 'dropCollection':
-        return castAs<AsyncIterable<Row>>(voidToAsyncIterable(this.executeDropCollectionCommand(wireCommand)));
+        return castAs<AsyncIterable<Row>>(
+          voidToAsyncIterable(this.executeDropCollectionCommand(wireCommand)),
+        );
       case 'dropIndex':
-        return castAs<AsyncIterable<Row>>(voidToAsyncIterable(this.executeDropIndexCommand(wireCommand)));
+        return castAs<AsyncIterable<Row>>(
+          voidToAsyncIterable(this.executeDropIndexCommand(wireCommand)),
+        );
       case 'collMod':
-        return castAs<AsyncIterable<Row>>(voidToAsyncIterable(this.executeCollModCommand(wireCommand)));
+        return castAs<AsyncIterable<Row>>(
+          voidToAsyncIterable(this.executeCollModCommand(wireCommand)),
+        );
       // v8 ignore next 4
       default: {
         const _exhaustive: never = wireCommand;

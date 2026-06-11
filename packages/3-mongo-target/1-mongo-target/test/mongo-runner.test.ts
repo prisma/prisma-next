@@ -11,8 +11,8 @@ import {
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type {
-  MongoDdlPlan,
   MongoAdapter,
+  MongoDdlPlan,
   MongoDriver,
   MongoLoweredDraft,
 } from '@prisma-next/mongo-lowering';
@@ -395,7 +395,7 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
       collection: RUN_COLLECTION,
     });
     expect(harness.log.entries).toEqual([
-      `dml:createCollection:orders`,
+      'dml:createCollection:orders',
       `dml:updateMany:${RUN_COLLECTION}`,
     ]);
   });
