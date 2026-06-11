@@ -132,6 +132,32 @@ describe('Tokenizer', () => {
       `);
     });
 
+    it('tokenizes NaN / Infinity / -Infinity as number literals', () => {
+      expect(tokenize('NaN')).toMatchInlineSnapshot(`
+        "NumberLiteral  "NaN"
+        Eof            """
+      `);
+      expect(tokenize('Infinity')).toMatchInlineSnapshot(`
+        "NumberLiteral  "Infinity"
+        Eof            """
+      `);
+      expect(tokenize('-Infinity')).toMatchInlineSnapshot(`
+        "NumberLiteral  "-Infinity"
+        Eof            """
+      `);
+    });
+
+    it('keeps identifier-continued forms (Infinityx / NaNxyz) as identifiers', () => {
+      expect(tokenize('Infinityx')).toMatchInlineSnapshot(`
+        "Ident          "Infinityx"
+        Eof            """
+      `);
+      expect(tokenize('NaNxyz')).toMatchInlineSnapshot(`
+        "Ident          "NaNxyz"
+        Eof            """
+      `);
+    });
+
     it('handles string escapes and unterminated strings', () => {
       expect(tokenize('"hello \\"world\\""')).toMatchInlineSnapshot(`
         "StringLiteral  "\\"hello \\\\\\"world\\\\\\"\\""

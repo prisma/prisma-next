@@ -86,6 +86,7 @@ function scan(source: string, pos: number): Token {
     scanWhitespace(source, pos) ??
     scanComment(source, pos) ??
     scanAt(source, pos) ??
+    scanKeywordNumber(source, pos) ??
     scanIdent(source, pos) ??
     scanNumber(source, pos) ??
     scanString(source, pos) ??
@@ -149,6 +150,22 @@ function scanIdent(source: string, pos: number): Token | undefined {
     }
   }
   return { kind: 'Ident', text: source.slice(pos, end) };
+}
+
+const KEYWORD_NUMBERS = ['-Infinity', 'Infinity', 'NaN'] as const;
+
+// `NaN`, `Infinity`, and `-Infinity` are numeric literals, not identifiers.
+// They must match before `scanIdent` (which would otherwise claim the
+// identifier-led words) and are word-bounded: a following identifier-part char
+// (so `Infinityx` / `NaNxyz`) keeps the run an `Ident` rather than a number.
+function scanKeywordNumber(source: string, pos: number): Token | undefined {
+  for (const word of KEYWORD_NUMBERS) {
+    if (!source.startsWith(word, pos)) continue;
+    const after = readChar(source, pos + word.length);
+    if (after !== '' && isIdentPart(after)) return undefined;
+    return { kind: 'NumberLiteral', text: word };
+  }
+  return undefined;
 }
 
 function scanNumber(source: string, pos: number): Token | undefined {
