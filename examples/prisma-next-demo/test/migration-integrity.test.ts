@@ -8,9 +8,9 @@
 import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -19,7 +19,7 @@ const DEMO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const MIGRATIONS_DIR = join(DEMO_ROOT, 'migrations');
 const CONTRACT_JSON_PATH = join(DEMO_ROOT, 'src', 'prisma', 'contract.json');
 
-const serializer = new SqlContractSerializer();
+const serializer = new PostgresContractSerializer();
 
 function deserializeContract(raw: unknown) {
   return serializer.deserializeContract(raw);
