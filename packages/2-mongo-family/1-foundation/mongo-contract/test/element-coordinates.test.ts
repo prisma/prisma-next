@@ -22,3 +22,39 @@ describe('elementCoordinates with MongoStorage', () => {
     });
   });
 });
+
+describe('coordinate-resolution acceptance — every elementCoordinates tuple resolves', () => {
+  it('every coordinate from a mongo storage resolves through entries[entityKind][entityName]', () => {
+    const storage = new MongoStorage({
+      storageHash: coreHash('sha256:coord-resolution-mongo'),
+      namespaces: {
+        app: buildMongoNamespace({
+          id: 'app',
+          entries: { collection: { users: {}, posts: {}, comments: {} } },
+        }),
+        analytics: buildMongoNamespace({
+          id: 'analytics',
+          entries: { collection: { events: {} } },
+        }),
+      },
+    });
+
+    const coordinates = [...elementCoordinates(storage)];
+    expect(coordinates.length).toBeGreaterThan(0);
+
+    for (const { namespaceId, entityKind, entityName } of coordinates) {
+      const ns = storage.namespaces[namespaceId];
+      expect(ns, `namespace "${namespaceId}" not found`).toBeDefined();
+      const kindMap = ns!.entries[entityKind];
+      expect(
+        kindMap,
+        `entries["${entityKind}"] not found in namespace "${namespaceId}"`,
+      ).toBeDefined();
+      const entity = (kindMap as Record<string, unknown>)[entityName];
+      expect(
+        entity,
+        `entries["${entityKind}"]["${entityName}"] not found in namespace "${namespaceId}"`,
+      ).toBeDefined();
+    }
+  });
+});

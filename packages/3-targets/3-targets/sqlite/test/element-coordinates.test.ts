@@ -2,7 +2,7 @@ import { coreHash } from '@prisma-next/contract/types';
 import { elementCoordinates, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { PostgresSchema, PostgresUnboundSchema } from '../src/core/postgres-schema';
+import { SqliteDatabase, SqliteUnboundDatabase } from '../src/core/sqlite-unbound-database';
 
 const emptyTableInput = {
   columns: {},
@@ -11,26 +11,20 @@ const emptyTableInput = {
   foreignKeys: [],
 } as const;
 
-describe('elementCoordinates with PostgresSchema', () => {
-  it('walks Postgres-promoted namespace (kind === schema)', () => {
-    const schema = new PostgresSchema({
-      id: 'public',
-      entries: { table: { users: emptyTableInput }, type: {} },
-    });
-    expect(schema.kind).toBe('schema');
-
+describe('elementCoordinates with SqliteDatabase', () => {
+  it('walks SQLite namespace tables', () => {
     const storage = new SqlStorage({
-      storageHash: coreHash('sha256:element-coordinates-test'),
+      storageHash: coreHash('sha256:element-coordinates-sqlite'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
-        public: schema,
+        [UNBOUND_NAMESPACE_ID]: SqliteUnboundDatabase.instance,
+        main: new SqliteDatabase({ id: 'main', entries: { table: { users: emptyTableInput } } }),
       },
     });
 
     const coordinates = [...elementCoordinates(storage)];
     expect(coordinates).toContainEqual({
       plane: 'storage',
-      namespaceId: 'public',
+      namespaceId: 'main',
       entityKind: 'table',
       entityName: 'users',
     });
@@ -38,18 +32,14 @@ describe('elementCoordinates with PostgresSchema', () => {
 });
 
 describe('coordinate-resolution acceptance — every elementCoordinates tuple resolves', () => {
-  it('every coordinate from a postgres storage resolves through entries[entityKind][entityName]', () => {
+  it('every coordinate from a sqlite storage resolves through entries[entityKind][entityName]', () => {
     const storage = new SqlStorage({
-      storageHash: coreHash('sha256:coord-resolution-postgres'),
+      storageHash: coreHash('sha256:coord-resolution-sqlite'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
-        public: new PostgresSchema({
-          id: 'public',
-          entries: {
-            table: { users: emptyTableInput, posts: emptyTableInput },
-            type: { role: { name: 'Role', values: ['admin', 'member'] } },
-            valueSet: { status: { kind: 'valueSet', values: ['active', 'inactive'] } },
-          },
+        [UNBOUND_NAMESPACE_ID]: SqliteUnboundDatabase.instance,
+        main: new SqliteDatabase({
+          id: 'main',
+          entries: { table: { users: emptyTableInput, posts: emptyTableInput } },
         }),
       },
     });
