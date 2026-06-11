@@ -63,8 +63,6 @@ const PARAMETERIZED_NATIVE_TYPES: Record<
 
 const PARAMETERIZED_TYPE_PATTERN = /^(.+?)\((.+)\)$/;
 
-const ENUM_CODEC_ID = 'pg/enum@1';
-
 function getOwnMappingValue(map: Record<string, string>, key: string): string | undefined {
   return Object.hasOwn(map, key) ? map[key] : undefined;
 }
@@ -132,30 +130,15 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
 
 export function extractEnumInfo(annotations?: Record<string, unknown>): EnumInfo {
   const pgAnnotations = annotations?.['pg'] as Record<string, unknown> | undefined;
-  const enumTypes = pgAnnotations?.['enumTypes'] as
-    | Record<
-        string,
-        Record<
-          string,
-          { codecId: string; nativeType: string; typeParams?: Record<string, unknown> }
-        >
-      >
-    | undefined;
+  const nativeEnumTypeNames = pgAnnotations?.['nativeEnumTypeNames'];
 
   const typeNames = new Set<string>();
   const definitions = new Map<string, readonly string[]>();
 
-  if (enumTypes) {
-    for (const bySchema of Object.values(enumTypes)) {
-      for (const typeInstance of Object.values(bySchema)) {
-        if (typeInstance.codecId === ENUM_CODEC_ID) {
-          const nativeType = typeInstance.nativeType;
-          typeNames.add(nativeType);
-          const values = typeInstance.typeParams?.['values'];
-          if (Array.isArray(values) && values.every((v): v is string => typeof v === 'string')) {
-            definitions.set(nativeType, values);
-          }
-        }
+  if (Array.isArray(nativeEnumTypeNames)) {
+    for (const name of nativeEnumTypeNames) {
+      if (typeof name === 'string') {
+        typeNames.add(name);
       }
     }
   }
