@@ -1552,11 +1552,18 @@ function buildContractFromDefinition<
   // at `hash({})`.
   const capabilities: Record<string, Record<string, boolean>> = {};
   const collections = buildCollections(definition.models);
+  const unboundNamespace = buildMongoNamespace({
+    id: UNBOUND_NAMESPACE_ID,
+    entries: { collection: collections },
+  });
+  // Hash the constructed (normalized) collection map, not the raw input
+  // literals — persisted storageHash values were computed over the
+  // constructed form.
   const storageBody = {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        collections,
+        collections: unboundNamespace.entries.collection,
       },
     },
   };
@@ -1571,10 +1578,7 @@ function buildContractFromDefinition<
   const storage = new MongoStorage({
     storageHash,
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
-        id: UNBOUND_NAMESPACE_ID,
-        entries: { collection: collections },
-      }),
+      [UNBOUND_NAMESPACE_ID]: unboundNamespace,
     },
   }) as unknown as MongoStorageShape<string>;
 

@@ -1143,11 +1143,18 @@ export function interpretPslDocumentToMongoContract(
       'arktype-validated JSON shapes satisfy MongoCollectionInput by construction'
     >(raw);
   }
+  const unboundNamespace = buildMongoNamespace({
+    id: UNBOUND_NAMESPACE_ID,
+    entries: { collection: collectionInputs },
+  });
+  // Hash the constructed (normalized) collection map, not the raw input
+  // literals — persisted storageHash values were computed over the
+  // constructed form.
   const storageWithoutHash = {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        entries: { collection: collectionInputs },
+        entries: { collection: unboundNamespace.entries.collection },
       },
     },
   };
@@ -1160,10 +1167,7 @@ export function interpretPslDocumentToMongoContract(
   const storage = new MongoStorage({
     storageHash,
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
-        id: UNBOUND_NAMESPACE_ID,
-        entries: { collection: collectionInputs },
-      }),
+      [UNBOUND_NAMESPACE_ID]: unboundNamespace,
     },
   }) as Contract['storage'];
   const capabilities: Record<string, Record<string, boolean>> = {};
