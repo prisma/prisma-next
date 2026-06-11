@@ -10,6 +10,7 @@ import {
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
+import type { CodecLookup } from './codec-types';
 import type { PslBlockParam } from './psl-extension-block';
 
 export type AuthoringArgRef = {
@@ -109,9 +110,30 @@ export type AuthoringFieldNamespace = {
  * discover what the factory actually needs to read (codec lookup,
  * namespace registry, …).
  */
+/**
+ * A write-only sink that a factory may push authoring-time diagnostics into.
+ * The concrete type pushed must be structurally compatible with whatever the
+ * consumer accumulates (typically `ContractSourceDiagnostic[]`); the framework
+ * layer deliberately does not depend on that concrete type.
+ */
+export interface AuthoringDiagnosticSink {
+  push(d: {
+    readonly code: string;
+    readonly message: string;
+    readonly sourceId: string;
+    readonly span?: unknown;
+  }): void;
+}
+
 export interface AuthoringEntityContext {
   readonly family: string;
   readonly target: string;
+  /** Codec registry available to factories that need to validate or decode values. */
+  readonly codecLookup?: CodecLookup;
+  /** Source file identifier threaded into diagnostics emitted by the factory. */
+  readonly sourceId?: string;
+  /** Push channel for authoring-time diagnostics emitted by the factory. */
+  readonly diagnostics?: AuthoringDiagnosticSink;
 }
 
 export interface AuthoringEntityTypeTemplateOutput {
@@ -186,6 +208,21 @@ export interface AuthoringPslBlockDescriptor {
   readonly discriminator: string;
   readonly name: { readonly required: boolean };
   readonly parameters: Record<string, PslBlockParam>;
+  /**
+   * When `true`, the block body accepts a variadic tail of parameters beyond
+   * the declared set. The block body may contain: fields (model-style),
+   * `key = value` parameters, and `@@` attributes. With `variadicParameters`,
+   * bare identifiers (keys without a `= value`) and undeclared `key = value`
+   * pairs flow into the variadic tail — their semantics belong to the
+   * lowering, not the parser.
+   *
+   * A key that IS declared in `parameters` must still be supplied as
+   * `key = value`; a bare occurrence of a declared key is a diagnostic.
+   *
+   * When `false` (default), the validator emits `PSL_EXTENSION_UNKNOWN_PARAMETER`
+   * for keys absent from `parameters`.
+   */
+  readonly variadicParameters?: boolean;
 }
 
 export type AuthoringPslBlockDescriptorNamespace = {
@@ -406,7 +443,7 @@ export function mergeAuthoringNamespaces(
   }
 }
 
-function collectAuthoringLeafPaths(
+function collectDescriptorPaths(
   namespace: Readonly<Record<string, unknown>>,
   isLeaf: (value: unknown) => boolean,
   path: readonly string[] = [],
@@ -420,29 +457,25 @@ function collectAuthoringLeafPaths(
     }
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       paths.push(
-        ...collectAuthoringLeafPaths(
-          value as Readonly<Record<string, unknown>>,
-          isLeaf,
-          currentPath,
-        ),
+        ...collectDescriptorPaths(value as Readonly<Record<string, unknown>>, isLeaf, currentPath),
       );
     }
   }
   return paths;
 }
 
-interface AuthoringLeafEntry {
+interface DescriptorEntry {
   readonly path: string;
   readonly discriminator: string;
 }
 
-function collectAuthoringLeafDiscriminators(
+function collectDescriptorEntries(
   namespace: Readonly<Record<string, unknown>>,
   isLeaf: (value: unknown) => boolean,
   label: string,
   path: readonly string[] = [],
-): AuthoringLeafEntry[] {
-  const entries: AuthoringLeafEntry[] = [];
+): DescriptorEntry[] {
+  const entries: DescriptorEntry[] = [];
   for (const [key, value] of Object.entries(namespace)) {
     const currentPath = [...path, key];
     if (isLeaf(value)) {
@@ -486,7 +519,7 @@ function collectAuthoringLeafDiscriminators(
           );
         }
       }
-      entries.push(...collectAuthoringLeafDiscriminators(record, isLeaf, label, currentPath));
+      entries.push(...collectDescriptorEntries(record, isLeaf, label, currentPath));
     }
   }
   return entries;
@@ -498,7 +531,7 @@ function collectAuthoringLeafDiscriminators(
  * lowering factory lookup dispatches by discriminator, so one would silently
  * shadow the other. Catch duplicates before building any dispatch map.
  */
-function assertUniqueDiscriminators(entries: readonly AuthoringLeafEntry[], label: string): void {
+function assertUniqueDiscriminators(entries: readonly DescriptorEntry[], label: string): void {
   const seen = new Map<string, string>();
   for (const { path, discriminator } of entries) {
     const existing = seen.get(discriminator);
@@ -511,23 +544,50 @@ function assertUniqueDiscriminators(entries: readonly AuthoringLeafEntry[], labe
   }
 }
 
+function collectPslBlockDescriptorEntries(
+  namespace: Readonly<Record<string, unknown>>,
+  path: readonly string[] = [],
+): DescriptorEntry[] {
+  const entries: DescriptorEntry[] = [];
+  for (const [key, value] of Object.entries(namespace)) {
+    const currentPath = [...path, key];
+    if (isAuthoringPslBlockDescriptor(value)) {
+      entries.push({
+        path: currentPath.join('.'),
+        discriminator: value.discriminator,
+      });
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const record = blindCast<
+        Readonly<Record<string, unknown>>,
+        'walker descends into psl block namespace'
+      >(value);
+      const hasKind = record['kind'] === 'pslBlock';
+      const hasKeyword = typeof record['keyword'] === 'string';
+      const hasDiscriminator = typeof record['discriminator'] === 'string';
+      if (hasKind || (hasKeyword && hasDiscriminator)) {
+        throw new Error(
+          `Malformed authoring pslBlock contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/keyword/discriminator) but does not satisfy the pslBlock descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
+        );
+      }
+      entries.push(...collectPslBlockDescriptorEntries(record, currentPath));
+    }
+  }
+  return entries;
+}
+
 /**
- * Every `pslBlockDescriptors` entry needs a matching `entityTypes` factory
- * (same discriminator): the parser would otherwise produce an AST node
- * nothing can lower to an IR class instance. The link is one-directional
- * — an `entityTypes` factory may stand alone (e.g. `enum`, reachable from
- * the TypeScript builder without any PSL block).
+ * Every `pslBlockDescriptors` entry requires a matching `entityTypes` factory
+ * with the same discriminator. An `entityTypes` factory may stand alone (e.g.
+ * `enum`, reachable from the TypeScript builder without any PSL block).
  */
 function assertPslBlocksHaveFactories(
   entityTypeNamespace: AuthoringEntityTypeNamespace,
   pslBlockNamespace: AuthoringPslBlockDescriptorNamespace,
 ): void {
-  const blockEntries = collectAuthoringLeafDiscriminators(
-    pslBlockNamespace,
-    isAuthoringPslBlockDescriptor,
-    'pslBlock',
-  );
-  const entityEntries = collectAuthoringLeafDiscriminators(
+  const blockEntries = collectPslBlockDescriptorEntries(pslBlockNamespace);
+  const entityEntries = collectDescriptorEntries(
     entityTypeNamespace,
     isAuthoringEntityTypeDescriptor,
     'entityType',
@@ -554,13 +614,13 @@ export function assertNoCrossRegistryCollisions(
   pslBlockNamespace: AuthoringPslBlockDescriptorNamespace = {},
 ): void {
   const typePaths = new Set(
-    collectAuthoringLeafPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
+    collectDescriptorPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
   );
   const fieldPaths = new Set(
-    collectAuthoringLeafPaths(fieldNamespace, isAuthoringFieldPresetDescriptor),
+    collectDescriptorPaths(fieldNamespace, isAuthoringFieldPresetDescriptor),
   );
   const entityPaths = new Set(
-    collectAuthoringLeafPaths(entityTypeNamespace, isAuthoringEntityTypeDescriptor),
+    collectDescriptorPaths(entityTypeNamespace, isAuthoringEntityTypeDescriptor),
   );
   // Within-registry duplicate detection is handled upstream by the merge
   // walker (`mergeAuthoringNamespaces` in control-stack.ts and

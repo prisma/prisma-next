@@ -237,7 +237,7 @@ describe('enumType() authoring → contract structure', () => {
       plane: 'domain',
       entityKind: 'enum',
       namespaceId: 'public',
-      name: 'Role',
+      entityName: 'Role',
     });
   });
 
@@ -260,9 +260,9 @@ describe('enumType() authoring → contract structure', () => {
     const roleColumn = userTable?.columns?.['role'];
     expect(roleColumn?.valueSet).toEqual({
       plane: 'storage',
-      entityKind: 'value-set',
+      entityKind: 'valueSet',
       namespaceId: 'public',
-      name: 'Role',
+      entityName: 'Role',
     });
   });
 
@@ -356,7 +356,7 @@ describe('enumType() — valueSet ref namespace (non-default model namespace)', 
       plane: 'domain',
       entityKind: 'enum',
       namespaceId: 'public',
-      name: 'Role',
+      entityName: 'Role',
     });
 
     // Same check on the storage side.
@@ -365,9 +365,9 @@ describe('enumType() — valueSet ref namespace (non-default model namespace)', 
     const roleColumn = userTable?.columns?.['role'];
     expect(roleColumn?.valueSet).toEqual({
       plane: 'storage',
-      entityKind: 'value-set',
+      entityKind: 'valueSet',
       namespaceId: 'public',
-      name: 'Role',
+      entityName: 'Role',
     });
   });
 });
@@ -443,16 +443,16 @@ describe('enumType() — full integration via defineContract factory', () => {
       plane: 'domain',
       entityKind: 'enum',
       namespaceId: 'public',
-      name: 'Status',
+      entityName: 'Status',
     });
 
     // storage column valueSet
     const postTable = storageNs?.entries.table?.['Post'];
     expect(postTable?.columns?.['status']?.valueSet).toEqual({
       plane: 'storage',
-      entityKind: 'value-set',
+      entityKind: 'valueSet',
       namespaceId: 'public',
-      name: 'Status',
+      entityName: 'Status',
     });
   });
 });

@@ -148,7 +148,9 @@ export function generateContractDts(
 
   const resolveEnumValues: EnumValuesResolver = (ref) =>
     ref.entityKind === 'enum'
-      ? contract.domain.namespaces[ref.namespaceId]?.enum?.[ref.name]?.members.map((m) => m.value)
+      ? contract.domain.namespaces[ref.namespaceId]?.enum?.[ref.entityName]?.members.map(
+          (m) => m.value,
+        )
       : undefined;
 
   const fieldTypesMaps = generateBothFieldTypesMaps(

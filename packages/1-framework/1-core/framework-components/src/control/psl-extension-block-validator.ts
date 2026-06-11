@@ -107,15 +107,17 @@ export function validateExtensionBlock(
   const nodeKeys = new Set(Object.keys(node.parameters));
 
   // 1. Unknown parameters — keys in the node not in the descriptor.
-  for (const key of nodeKeys) {
-    if (!descriptorKeys.has(key)) {
-      const captured = node.parameters[key];
-      diagnostics.push({
-        code: 'PSL_EXTENSION_UNKNOWN_PARAMETER',
-        message: `Unknown parameter "${key}" in "${descriptor.keyword}" block "${node.name}". The descriptor does not declare this parameter.`,
-        sourceId,
-        span: captured?.span ?? node.span,
-      });
+  if (!descriptor.variadicParameters) {
+    for (const key of nodeKeys) {
+      if (!descriptorKeys.has(key)) {
+        const captured = node.parameters[key];
+        diagnostics.push({
+          code: 'PSL_EXTENSION_UNKNOWN_PARAMETER',
+          message: `Unknown parameter "${key}" in "${descriptor.keyword}" block "${node.name}". The descriptor does not declare this parameter.`,
+          sourceId,
+          span: captured?.span ?? node.span,
+        });
+      }
     }
   }
 

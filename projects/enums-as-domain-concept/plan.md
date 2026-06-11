@@ -38,8 +38,11 @@ already proven in production use.
 - **Next:** **TML-2882 (transitional PSL `enum2` block)** — the new mechanism becomes
   PSL-authorable and goes live in the demo's real emitted-contract app.
 - **Then:** **TML-2855 (member defaults)** — its PSL `@default(member)` surface attaches
-  to a real PSL enum field once TML-2882 lands — and **TML-2853 (cutover)** directly
-  behind it, now reduced to rename + migrate + delete.
+  to a real PSL enum field once TML-2882 lands — and **TML-2885 (emit-typed
+  `db.enums`)** — TML-2882's review surfaced that the emitter omits the domain `enum`
+  block from `contract.d.ts`, so emitted-path `db.enums` members type-widen to
+  `JsonValue` (R6 unmet through emit; spec R6 amended 2026-06-10). Both precede
+  **TML-2853 (cutover)**, now reduced to rename + migrate + delete.
 - **Parallel track (any time):** **TML-2884 (Mongo enums, one vertical slice)** — author →
   `$jsonSchema` enforce → typed read + `db.enums`, end-to-end. Independent of the SQL track
   and the cutover; can be picked up whenever there's capacity.
@@ -113,7 +116,8 @@ already proven in production use.
      remains; the no-bare-cast ratchet is clean.
    - **Builds on:** TML-2851 (migrations/verification understand the new shape),
      TML-2852 (typed reads through emit), TML-2882 (the PSL lowering exists and is proven
-     live — the cutover no longer builds it), TML-2855 (member-default parity).
+     live — the cutover no longer builds it), TML-2855 (member-default parity),
+     TML-2885 (R6 emit parity — `db.enums` literal-typed through the emitted contract).
    - **Hands to:** A single enum path under the single `enum` keyword — the project's end
      state.
    - **Focus:** repoint `enum` to the transitional block's lowering and retire the
@@ -156,6 +160,23 @@ already proven in production use.
     client — disjoint from group A's migration/planner surface. Out of scope: server-side
     enforcement and defaults (now TML-2855, parallel group C).
 
+### Emit-typed `db.enums` — follows the transitional PSL block; cutover prerequisite
+
+- **Slice `emit-typed-domain-enums`** — Linear: [TML-2885](https://linear.app/prisma-company/issue/TML-2885)
+  - **Outcome:** R6 holds through the emitted contract: the emitter types the domain
+    `enum` block in `contract.d.ts` (literal member tuples), and the `db.enums`
+    accessor types resolve literal `values` / `members` for emitted-contract
+    consumers — today they widen to `JsonValue` (runtime correct). Proven by an
+    emit-then-consume type test; the demo's `priorityValue()` cast workaround is
+    deleted as acceptance evidence.
+  - **Builds on:** TML-2852 (the emitter's field-narrowing pattern, applied to the
+    enum entity) + TML-2882 (the demo's PSL-authored enum as the proving ground).
+    Independent of TML-2855.
+  - **Hands to:** TML-2853 — the cutover's R1–R6 parity check is honest through emit.
+  - **Why this exists:** surfaced by the PR #805 review (2026-06-10); same
+    verify-through-emit escape class as TML-2852 D4. Spec R6 amended to require emit
+    parity.
+
 ### Enum member defaults — follows the transitional PSL block (was parallel group C)
 
 > Originally specced as an independent parallel slice, then promoted to next; now
@@ -165,16 +186,25 @@ already proven in production use.
 
 
 - **Slice `enum-member-defaults`** — Linear: [TML-2855](https://linear.app/prisma-company/issue/TML-2855)
-  - **Outcome:** `@default(Role.member)` works end-to-end — an `enumMember` `ColumnDefault`
-    variant, the TS `.default(Role.members.x)` + PSL `@default(member)` surfaces, and the
-    Postgres `DEFAULT '<value>'` rendering. Member-only-ness enforced at authoring/lowering.
-  - **Builds on:** Slice 1's `domain…enum` + members. Independent of enforcement (TML-2851) —
-    a default renders a literal; it doesn't need the check.
+  - **Respecced 2026-06-10 (directional-invariant correction, spec §9):** the
+    TML-2851-era `enumMember` `ColumnDefault` variant is a storage → domain reference,
+    which violates the invariant that storage is plannable in isolation. **This
+    slice's first task is to remove/redesign that carrier** (zero persisted instances
+    exist, so it's churn-free) before persisting any default.
+  - **Outcome:** `@default(Role.member)` works end-to-end — the storage column carries
+    the **resolved literal** default (plannable from storage alone, `DEFAULT 'admin'`);
+    member intent, where recorded, lives on the domain field (the legal direction);
+    the TS `.default(Role.members.x)` + PSL `@default(member)` surfaces lower to that
+    shape. Member-only-ness enforced at authoring/lowering.
+  - **Builds on:** Slice 1's `domain…enum` + members; TML-2882's PSL enum field.
+    Independent of enforcement (TML-2851) — a default renders a literal; it doesn't
+    need the check.
   - **Hands to:** Member-default capability, consumed by the cutover (TML-2853).
-  - **Focus:** the `ColumnDefault` `enumMember` variant + validator; TS-DSL `.default(member)`;
-    PSL `@default(member)` lowering; `buildColumnDefaultSql` rendering. Additive/dark (a union
-    extension; opt-in via `enumType` + `.default`). Split from TML-2851 so each is one
-    coherent review. Out: the check (TML-2851), reads (TML-2852), the cutover (TML-2853).
+  - **Focus:** remove the `enumMember` `ColumnDefault` variant + validator (replace
+    with the resolved literal in storage + optional domain-side intent); TS-DSL
+    `.default(member)`; PSL `@default(member)` lowering; `buildColumnDefaultSql`
+    rendering of the literal. Out: the check (TML-2851), reads (TML-2852), the
+    cutover (TML-2853).
 
 ### Parallel track — Mongo enums, one complete vertical slice (R10; independent of the SQL track)
 

@@ -77,11 +77,19 @@ const ExecutionSchema = type({
   },
 });
 
-const ValueSetRefSchema = type({
-  plane: "'domain' | 'storage'",
+const StorageValueSetRefSchema = type({
+  plane: "'storage'",
   namespaceId: 'string',
-  entityKind: "'enum' | 'value-set'",
-  name: 'string',
+  entityKind: "'valueSet'",
+  entityName: 'string',
+  'spaceId?': 'string',
+});
+
+const DomainEnumRefSchema = type({
+  plane: "'domain'",
+  namespaceId: 'string',
+  entityKind: "'enum'",
+  entityName: 'string',
   'spaceId?': 'string',
 });
 
@@ -94,7 +102,7 @@ const StorageColumnSchema = type({
   'typeRef?': 'string',
   'default?': ColumnDefaultSchema,
   'control?': ControlPolicySchema,
-  'valueSet?': ValueSetRefSchema,
+  'valueSet?': StorageValueSetRefSchema,
 }).narrow((col, ctx) => {
   if (col.typeParams !== undefined && col.typeRef !== undefined) {
     return ctx.mustBe('a column with either typeParams or typeRef, not both');
@@ -135,11 +143,11 @@ const DocumentScopedStorageTypeSchema = StorageTypeInstanceSchema;
 
 /**
  * Storage value-set entry under `storage.namespaces[id].entries.valueSet[name]`.
- * Carries a `kind: 'value-set'` discriminator (enumerable, survives JSON) and an
+ * Carries a `kind: 'valueSet'` discriminator (enumerable, survives JSON) and an
  * ordered `values` array of codec-encoded permitted values.
  */
 export const StorageValueSetSchema = type({
-  kind: "'value-set'",
+  kind: "'valueSet'",
   values: type('string | number | boolean | null | unknown[] | Record<string, unknown>')
     .array()
     .readonly(),
@@ -210,7 +218,7 @@ export const CheckConstraintSchema = type({
   '+': 'reject',
   name: 'string',
   column: 'string',
-  valueSet: ValueSetRefSchema,
+  valueSet: StorageValueSetRefSchema,
 });
 
 const StorageTableSchema = type({
@@ -405,7 +413,7 @@ const ModelFieldSchema = type({
   type: ContractFieldTypeSchema,
   'many?': 'true',
   'dict?': 'true',
-  'valueSet?': ValueSetRefSchema,
+  'valueSet?': DomainEnumRefSchema,
 });
 
 const ModelStorageFieldSchema = type({

@@ -10,12 +10,21 @@ import postgres from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../src/prisma/contract.d';
+import type { Contract } from '../src/prisma/contract';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { db } from '../src/prisma/db';
 import { crossAuthorSimilarity } from '../src/queries/cross-author-similarity';
+import { getPriorityEnumFromEmit } from '../src/queries/get-posts-by-priority';
 import { initTestDatabase } from './utils/control-client';
+
+function priorityValue(name: string): 'low' | 'high' | 'urgent' {
+  return blindCast<
+    'low' | 'high' | 'urgent',
+    'EnumAccessor.members returns JsonValue; the emitted contract type does not carry literal enum types in domain.namespaces'
+  >(getPriorityEnumFromEmit().members[name]);
+}
 
 const context = db.context;
 const { contract } = context;
@@ -96,6 +105,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
       id: seededPostIds.aliceClose,
       title: 'Alice close',
       userId: seededUserIds.alice,
+      priority: priorityValue('Low'),
       createdAt: new Date('2024-03-10T10:00:00.000Z'),
       embedding: makeVector([1, 0, 0]),
     },
@@ -103,6 +113,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
       id: seededPostIds.aliceFar,
       title: 'Alice far',
       userId: seededUserIds.alice,
+      priority: priorityValue('Low'),
       createdAt: new Date('2024-03-11T10:00:00.000Z'),
       embedding: makeVector([0.7, 0.3, 0]),
     },
@@ -110,6 +121,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
       id: seededPostIds.bobClose,
       title: 'Bob close',
       userId: seededUserIds.bob,
+      priority: priorityValue('Low'),
       createdAt: new Date('2024-03-12T10:00:00.000Z'),
       embedding: makeVector([0.5, 0.5, 0]),
     },
@@ -117,6 +129,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
       id: seededPostIds.bobMid,
       title: 'Bob mid',
       userId: seededUserIds.bob,
+      priority: priorityValue('Low'),
       createdAt: new Date('2024-03-13T10:00:00.000Z'),
       embedding: makeVector([0, 1, 0]),
     },
@@ -124,6 +137,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
       id: seededPostIds.bobFar,
       title: 'Bob far',
       userId: seededUserIds.bob,
+      priority: priorityValue('Low'),
       createdAt: new Date('2024-03-14T10:00:00.000Z'),
       embedding: makeVector([-1, 0, 0]),
     },
@@ -131,6 +145,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
       id: seededPostIds.carolUnembedded,
       title: 'Carol unembedded',
       userId: seededUserIds.carol,
+      priority: priorityValue('Low'),
       createdAt: new Date('2024-03-15T10:00:00.000Z'),
     },
   ];

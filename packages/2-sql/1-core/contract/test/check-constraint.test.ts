@@ -9,8 +9,8 @@ import { createSqlStorageSchema } from '../src/validators';
 const baseValueSetRef: ValueSetRef = {
   plane: 'storage',
   namespaceId: 'public',
-  entityKind: 'value-set',
-  name: 'Role',
+  entityKind: 'valueSet',
+  entityName: 'Role',
 };
 
 describe('CheckConstraint', () => {
@@ -150,8 +150,8 @@ describe('StorageTableSchema validates checks', () => {
             valueSet: {
               plane: 'storage',
               namespaceId: 'public',
-              entityKind: 'value-set',
-              name: 'Role',
+              entityKind: 'valueSet',
+              entityName: 'Role',
             },
           },
         ],
@@ -169,8 +169,8 @@ describe('StorageTableSchema validates checks', () => {
             valueSet: {
               plane: 'storage',
               namespaceId: 'public',
-              entityKind: 'value-set',
-              name: 'Role',
+              entityKind: 'valueSet',
+              entityName: 'Role',
             },
           },
         ],

@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
+import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -62,48 +63,53 @@ describe('demo migration integrity — guard verification', () => {
     }
   });
 
-  it('detects a no-op self-edge migration (sameSourceAndTarget)', async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), 'demo-integrity-proof-'));
+  it(
+    'detects a no-op self-edge migration (sameSourceAndTarget)',
+    async () => {
+      tmpDir = await mkdtemp(join(tmpdir(), 'demo-integrity-proof-'));
 
-    // Copy the real migrations dir into tmpDir so we only mutate a copy.
-    const tmpMigrationsDir = join(tmpDir, 'migrations');
-    await cp(MIGRATIONS_DIR, tmpMigrationsDir, { recursive: true });
+      // Copy the real migrations dir into tmpDir so we only mutate a copy.
+      const tmpMigrationsDir = join(tmpDir, 'migrations');
+      await cp(MIGRATIONS_DIR, tmpMigrationsDir, { recursive: true });
 
-    // Inject a no-op migration: from === to.
-    const selfEdgeHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-    const baseMetadata = {
-      from: selfEdgeHash,
-      to: selfEdgeHash,
-      providedInvariants: [] as string[],
-      createdAt: '2026-06-09T00:00:00.000Z',
-    };
-    const noopMigration = {
-      ...baseMetadata,
-      migrationHash: computeMigrationHash(baseMetadata, []),
-    };
-    const noopDir = join(tmpMigrationsDir, 'app', '20260609T0000_noop_selfedge');
-    await mkdir(noopDir, { recursive: true });
-    await writeFile(join(noopDir, 'migration.json'), JSON.stringify(noopMigration, null, 2));
-    await writeFile(join(noopDir, 'ops.json'), JSON.stringify([]));
+      // Inject a no-op migration: from === to.
+      const selfEdgeHash =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      const baseMetadata = {
+        from: selfEdgeHash,
+        to: selfEdgeHash,
+        providedInvariants: [] as string[],
+        createdAt: '2026-06-09T00:00:00.000Z',
+      };
+      const noopMigration = {
+        ...baseMetadata,
+        migrationHash: computeMigrationHash(baseMetadata, []),
+      };
+      const noopDir = join(tmpMigrationsDir, 'app', '20260609T0000_noop_selfedge');
+      await mkdir(noopDir, { recursive: true });
+      await writeFile(join(noopDir, 'migration.json'), JSON.stringify(noopMigration, null, 2));
+      await writeFile(join(noopDir, 'ops.json'), JSON.stringify([]));
 
-    const appContract = await loadAppContract();
-    const aggregate = await loadContractSpaceAggregate({
-      migrationsDir: tmpMigrationsDir,
-      deserializeContract,
-      appContract,
-    });
+      const appContract = await loadAppContract();
+      const aggregate = await loadContractSpaceAggregate({
+        migrationsDir: tmpMigrationsDir,
+        deserializeContract,
+        appContract,
+      });
 
-    const violations = aggregate.checkIntegrity({
-      declaredExtensions: [PGVECTOR_EXTENSION],
-      checkContracts: true,
-    });
+      const violations = aggregate.checkIntegrity({
+        declaredExtensions: [PGVECTOR_EXTENSION],
+        checkContracts: true,
+      });
 
-    const selfEdgeViolations = violations.filter((v) => v.kind === 'sameSourceAndTarget');
-    expect(selfEdgeViolations).toHaveLength(1);
-    expect(selfEdgeViolations[0]).toMatchObject({
-      kind: 'sameSourceAndTarget',
-      spaceId: 'app',
-      dirName: '20260609T0000_noop_selfedge',
-    });
-  });
+      const selfEdgeViolations = violations.filter((v) => v.kind === 'sameSourceAndTarget');
+      expect(selfEdgeViolations).toHaveLength(1);
+      expect(selfEdgeViolations[0]).toMatchObject({
+        kind: 'sameSourceAndTarget',
+        spaceId: 'app',
+        dirName: '20260609T0000_noop_selfedge',
+      });
+    },
+    timeouts.databaseOperation,
+  );
 });

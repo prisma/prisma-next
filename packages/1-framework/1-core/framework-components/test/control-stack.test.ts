@@ -575,6 +575,20 @@ describe('assembleAuthoringContributions', () => {
       ]),
     ).toThrow(/Duplicate authoring field helper "id\.shared"/);
   });
+
+  it('rejects a pslBlockDescriptors entry with no matching entityTypes factory', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            pslBlockDescriptors: {
+              fooBlock: makeDeclarativePslBlockDescriptor('no-factory-discriminator'),
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/pslBlock.*"no-factory-discriminator".*entityType/);
+  });
 });
 
 describe('extractCodecLookup', () => {

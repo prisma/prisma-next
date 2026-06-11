@@ -17,6 +17,7 @@ import type {
   AuthoringEntityTypeDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import { instantiateAuthoringEntityType } from '@prisma-next/framework-components/authoring';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaultRegistry,
@@ -24,11 +25,13 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
+import { namespacePslExtensionBlocks } from '@prisma-next/framework-components/psl-ast';
 import type {
   ParsePslDocumentResult,
   PslAttribute,
   PslCompositeType,
   PslEnum,
+  PslExtensionBlock,
   PslField,
   PslModel,
   PslNamedTypeDeclaration,
@@ -43,6 +46,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import {
   buildSqlContractFromDefinition,
+  type EnumTypeHandle,
   type FieldNode,
   type ForeignKeyNode,
   type IndexNode,
@@ -124,6 +128,7 @@ export interface InterpretPslDocumentToSqlContractInput {
    * `SqlUnboundNamespace` singleton.
    */
   readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly codecLookup?: CodecLookup;
 }
 
 function buildComposedExtensionPackRefs(
@@ -375,6 +380,59 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
   return { storageTypes, enumTypeDescriptors };
 }
 
+interface ProcessEnum2DeclarationsInput {
+  readonly enum2Blocks: readonly PslExtensionBlock[];
+  readonly sourceId: string;
+  readonly authoringContributions: AuthoringContributions | undefined;
+  readonly entityContext: AuthoringEntityContext;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}
+
+function processEnum2Declarations(input: ProcessEnum2DeclarationsInput): {
+  readonly enumHandles: Record<string, EnumTypeHandle>;
+  readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
+} {
+  const enumHandles: Record<string, EnumTypeHandle> = {};
+  const enumTypeDescriptors = new Map<string, ColumnDescriptor>();
+
+  if (input.enum2Blocks.length === 0) {
+    return { enumHandles, enumTypeDescriptors };
+  }
+
+  const enum2EntityDescriptor = getAuthoringEntity(input.authoringContributions, ['enum2']);
+  if (!enum2EntityDescriptor) {
+    for (const decl of input.enum2Blocks) {
+      input.diagnostics.push({
+        code: 'PSL_ENUM2_MISSING_FACTORY',
+        message: `enum2 "${decl.name}" requires an "enum2" entityType factory in the active authoring contributions`,
+        sourceId: input.sourceId,
+        span: decl.span,
+      });
+    }
+    return { enumHandles, enumTypeDescriptors };
+  }
+
+  for (const decl of input.enum2Blocks) {
+    const handle = instantiateAuthoringEntityType(
+      'enum2',
+      enum2EntityDescriptor,
+      [decl],
+      input.entityContext,
+    );
+
+    if (handle === undefined || handle === null) continue;
+
+    const enumHandle = blindCast<EnumTypeHandle, 'enum2 factory returns EnumTypeHandle'>(handle);
+    enumHandles[decl.name] = enumHandle;
+    enumTypeDescriptors.set(decl.name, {
+      codecId: enumHandle.codecId,
+      nativeType: enumHandle.nativeType,
+    });
+  }
+
+  return { enumHandles, enumTypeDescriptors };
+}
+
 interface ResolveNamedTypeDeclarationsInput {
   readonly declarations: readonly PslNamedTypeDeclaration[];
   readonly sourceId: string;
@@ -619,6 +677,7 @@ interface BuildModelNodeInput {
   readonly diagnostics: ContractSourceDiagnostic[];
   /** Resolved namespace id keyed by model name — used to stamp the target namespace on FKs. */
   readonly modelNamespaceIds: ReadonlyMap<string, string>;
+  readonly enum2Handles?: ReadonlyMap<string, EnumTypeHandle>;
 }
 
 interface BuildModelNodeResult {
@@ -1320,14 +1379,18 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     modelNode: {
       modelName: model.name,
       tableName,
-      fields: resolvedFields.map((resolvedField) => ({
-        fieldName: resolvedField.field.name,
-        columnName: resolvedField.columnName,
-        descriptor: resolvedField.descriptor,
-        nullable: resolvedField.field.optional,
-        ...ifDefined('default', resolvedField.defaultValue),
-        ...ifDefined('executionDefaults', resolvedField.executionDefaults),
-      })),
+      fields: resolvedFields.map((resolvedField) => {
+        const enumHandle = input.enum2Handles?.get(resolvedField.field.typeName);
+        return {
+          fieldName: resolvedField.field.name,
+          columnName: resolvedField.columnName,
+          descriptor: resolvedField.descriptor,
+          nullable: resolvedField.field.optional,
+          ...ifDefined('default', resolvedField.defaultValue),
+          ...ifDefined('executionDefaults', resolvedField.executionDefaults),
+          ...ifDefined('enumTypeHandle', enumHandle),
+        };
+      }),
       ...ifDefined('id', primaryKey),
       ...(uniqueConstraints.length > 0 ? { uniques: uniqueConstraints } : {}),
       ...(indexNodes.length > 0 ? { indexes: indexNodes } : {}),
@@ -2006,6 +2069,68 @@ export function interpretPslDocumentToSqlContract(
     }
   }
 
+  const topLevelEnum2s = input.document.ast.namespaces
+    .filter((ns) => ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME)
+    .flatMap((ns) => namespacePslExtensionBlocks(ns).filter((b) => b.kind === 'enum2'));
+  for (const ns of input.document.ast.namespaces) {
+    if (ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME) continue;
+    const nsEnum2s = namespacePslExtensionBlocks(ns).filter((b) => b.kind === 'enum2');
+    if (nsEnum2s.length === 0) continue;
+    for (const decl of nsEnum2s) {
+      diagnostics.push({
+        code: 'PSL_ENUM2_NAMESPACE_NOT_SUPPORTED',
+        message: `enum2 "${decl.name}" inside namespace "${ns.name}" is not supported; declare enum2 at the top level`,
+        sourceId,
+        span: decl.span,
+      });
+    }
+  }
+
+  const enum2Result = processEnum2Declarations({
+    enum2Blocks: topLevelEnum2s,
+    sourceId,
+    authoringContributions: input.authoringContributions,
+    entityContext: {
+      family: input.target.familyId,
+      target: input.target.targetId,
+      ...ifDefined('codecLookup', input.codecLookup),
+      sourceId,
+      diagnostics: {
+        push: (d) => {
+          diagnostics.push(
+            blindCast<ContractSourceDiagnostic, 'sink diagnostics are span-compatible'>(d),
+          );
+        },
+      },
+    },
+    diagnostics,
+  });
+
+  const collidingEnum2Names = new Set<string>();
+  for (const [name, descriptor] of enum2Result.enumTypeDescriptors) {
+    if (allEnumTypeDescriptors.has(name)) {
+      collidingEnum2Names.add(name);
+      const collision = topLevelEnum2s.find((e) => e.name === name);
+      diagnostics.push({
+        code: 'PSL_ENUM2_DUPLICATE_TYPE_NAME',
+        message: `enum2 "${name}" collides with an existing type name; each type name must be unique`,
+        sourceId,
+        ...ifDefined('span', collision?.span),
+      });
+    } else {
+      allEnumTypeDescriptors.set(name, descriptor);
+    }
+  }
+
+  const validEnum2Handles: Record<string, EnumTypeHandle> = {};
+  for (const [name, handle] of Object.entries(enum2Result.enumHandles)) {
+    if (!collidingEnum2Names.has(name)) {
+      validEnum2Handles[name] = handle;
+    }
+  }
+
+  const enum2HandlesByName = new Map(Object.entries(validEnum2Handles));
+
   const namedTypeResult = resolveNamedTypeDeclarations({
     declarations: input.document.ast.types?.declarations ?? [],
     sourceId,
@@ -2068,6 +2193,7 @@ export function interpretPslDocumentToSqlContract(
       sourceId,
       diagnostics,
       modelNamespaceIds,
+      ...(enum2HandlesByName.size > 0 ? { enum2Handles: enum2HandlesByName } : {}),
     });
     modelNodes.push(
       namespaceId !== undefined ? { ...result.modelNode, namespaceId } : result.modelNode,
@@ -2162,6 +2288,7 @@ export function interpretPslDocumentToSqlContract(
     ...(Object.keys(namespaceEnumStorageTypes).length > 0
       ? { namespaceTypes: namespaceEnumStorageTypes }
       : {}),
+    ...(Object.keys(validEnum2Handles).length > 0 ? { enums: validEnum2Handles } : {}),
     ...ifDefined('createNamespace', input.createNamespace),
     models: stiColumnModelNodes.map((model) => ({
       ...model,
@@ -2233,6 +2360,7 @@ export function interpretPslDocumentToSqlContract(
                 patchedModels[modelCoordinateKey(namespaceId, modelName)] ?? model,
               ]),
             ),
+            ...(namespaceSlice.enum !== undefined ? { enum: namespaceSlice.enum } : {}),
             ...(namespaceSlice.valueObjects !== undefined
               ? { valueObjects: namespaceSlice.valueObjects }
               : {}),

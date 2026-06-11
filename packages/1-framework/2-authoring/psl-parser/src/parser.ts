@@ -17,6 +17,8 @@ import type {
   PslEnum,
   PslEnumValue,
   PslExtensionBlock,
+  PslExtensionBlockAttribute,
+  PslExtensionBlockAttributeArg,
   PslExtensionBlockParamValue,
   PslField,
   PslFieldAttribute,
@@ -1592,18 +1594,15 @@ function lookupExtensionBlockDescriptor(
 
 /**
  * Reads an extension block body generically, driven by the descriptor's
- * `parameters` map. Each `key = <rhs>` line in the body is matched against
- * a declared parameter and the RHS is captured per the parameter's kind:
+ * `parameters` map. Each body line is one of:
  *
- * - `ref`    → the bareword identifier token (`PslExtensionBlockParamRef`)
- * - `value`  → the raw RHS text verbatim (`PslExtensionBlockParamScalarValue`)
- * - `option` → the chosen bareword token (`PslExtensionBlockParamOption`)
- * - `list`   → bracketed `[a, b, …]` list, each element captured per `of`
- *   (`PslExtensionBlockParamList`)
+ * - `@@name(args…)` — a block attribute, captured in `blockAttributes`
+ * - `key = <rhs>` — a parameter entry, captured in `parameters` per descriptor
+ * - `key` — a bare-identifier entry (no `= value`), captured as `kind:'bare'`
  *
- * No validation runs here (unknown key, missing required, codec acceptance,
- * option-in-set, ref resolution). A body line that is not `key = value`
- * shaped emits a `PSL_INVALID_EXTENSION_BLOCK_MEMBER` parse diagnostic.
+ * Duplicate parameter keys emit `PSL_EXTENSION_DUPLICATE_PARAMETER`; the first
+ * occurrence wins. `@@` attribute lines are not validated here (name or args);
+ * that is a concern of the consuming interpreter.
  */
 function parseExtensionBlock(
   context: ParserContext,
@@ -1613,6 +1612,7 @@ function parseExtensionBlock(
   bounds: BlockBounds,
 ): PslExtensionBlock {
   const parameters: Record<string, PslExtensionBlockParamValue> = {};
+  const blockAttributes: PslExtensionBlockAttribute[] = [];
 
   for (let lineIndex = bounds.startLine + 1; lineIndex < bounds.endLine; lineIndex += 1) {
     const raw = context.lines[lineIndex] ?? '';
@@ -1621,42 +1621,135 @@ function parseExtensionBlock(
       continue;
     }
 
+    if (line.startsWith('@@')) {
+      const attr = parseExtensionBlockAttribute(context, line, lineIndex);
+      if (attr !== undefined) {
+        blockAttributes.push(attr);
+      }
+      continue;
+    }
+
     const assignMatch = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
-    if (!assignMatch) {
-      pushDiagnostic(context, {
-        code: 'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
-        message: `Invalid extension block body line "${line}"; expected "key = value"`,
-        span: createTrimmedLineSpan(context, lineIndex),
-      });
+    if (assignMatch) {
+      const key = assignMatch[1] ?? '';
+      const rhsRaw = (assignMatch[2] ?? '').trim();
+
+      if (Object.hasOwn(parameters, key)) {
+        pushDiagnostic(context, {
+          code: 'PSL_EXTENSION_DUPLICATE_PARAMETER',
+          message: `Duplicate parameter "${key}" in "${descriptor.keyword}" block "${blockName}"; first occurrence wins`,
+          span: createTrimmedLineSpan(context, lineIndex),
+        });
+        continue;
+      }
+
+      const paramDescriptor = descriptor.parameters[key];
+      if (paramDescriptor === undefined) {
+        parameters[key] = {
+          kind: 'value',
+          raw: rhsRaw,
+          span: createTrimmedLineSpan(context, lineIndex),
+        };
+      } else {
+        const captured = captureParamRhs(context, lineIndex, rhsRaw, paramDescriptor);
+        if (captured !== undefined) {
+          parameters[key] = captured;
+        }
+      }
       continue;
     }
 
-    const key = assignMatch[1] ?? '';
-    const rhsRaw = (assignMatch[2] ?? '').trim();
-    const paramDescriptor = descriptor.parameters[key];
+    const bareMatch = line.match(/^([A-Za-z_]\w*)$/);
+    if (bareMatch) {
+      const key = bareMatch[1] ?? '';
 
-    if (paramDescriptor === undefined) {
-      // Unknown parameter — captured as a raw value; the generic validator reports this.
-      parameters[key] = {
-        kind: 'value',
-        raw: rhsRaw,
-        span: createTrimmedLineSpan(context, lineIndex),
-      };
+      if (!descriptor.variadicParameters) {
+        pushDiagnostic(context, {
+          code: 'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
+          message: `Invalid extension block body line "${line}"; expected "key = value" or "@@attribute"`,
+          span: createTrimmedLineSpan(context, lineIndex),
+        });
+        continue;
+      }
+
+      if (Object.hasOwn(descriptor.parameters, key)) {
+        pushDiagnostic(context, {
+          code: 'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
+          message: `Parameter "${key}" in "${descriptor.keyword}" block "${blockName}" is declared in the descriptor and must be supplied as "${key} = value"`,
+          span: createTrimmedLineSpan(context, lineIndex),
+        });
+        continue;
+      }
+
+      if (Object.hasOwn(parameters, key)) {
+        pushDiagnostic(context, {
+          code: 'PSL_EXTENSION_DUPLICATE_PARAMETER',
+          message: `Duplicate parameter "${key}" in "${descriptor.keyword}" block "${blockName}"; first occurrence wins`,
+          span: createTrimmedLineSpan(context, lineIndex),
+        });
+        continue;
+      }
+
+      parameters[key] = { kind: 'bare', span: createTrimmedLineSpan(context, lineIndex) };
       continue;
     }
 
-    const captured = captureParamRhs(context, lineIndex, rhsRaw, paramDescriptor);
-    if (captured !== undefined) {
-      parameters[key] = captured;
-    }
+    pushDiagnostic(context, {
+      code: 'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
+      message: `Invalid extension block body line "${line}"; expected "key = value", "key", or "@@attribute"`,
+      span: createTrimmedLineSpan(context, lineIndex),
+    });
   }
 
   return {
     kind: descriptor.discriminator,
     name: blockName,
     parameters,
+    blockAttributes,
     span: createLineRangeSpan(context, keywordLineIndex, bounds.endLine),
   };
+}
+
+/**
+ * Parses a `@@name(args…)` block-attribute line inside an extension block
+ * using the shared block-attribute tokeniser (`extractAttributeTokensWithSpans`
+ * + `parseAttributeToken`).  Returns undefined (and emits a diagnostic) on
+ * malformed syntax.
+ */
+function parseExtensionBlockAttribute(
+  context: ParserContext,
+  line: string,
+  lineIndex: number,
+): PslExtensionBlockAttribute | undefined {
+  const rawLine = context.lines[lineIndex] ?? '';
+  const startCol = firstNonWhitespaceColumn(rawLine);
+
+  const tokenParse = extractAttributeTokensWithSpans(context, lineIndex, line, startCol);
+  if (!tokenParse.ok || tokenParse.tokens.length !== 1) {
+    pushDiagnostic(context, {
+      code: 'PSL_INVALID_EXTENSION_BLOCK_ATTRIBUTE',
+      message: `Invalid extension block attribute "${line}"`,
+      span: createTrimmedLineSpan(context, lineIndex),
+    });
+    return undefined;
+  }
+  const token = tokenParse.tokens[0];
+  if (!token) {
+    return undefined;
+  }
+  const parsed = parseAttributeToken(context, {
+    token: token.text,
+    target: 'model',
+    lineIndex,
+    span: token.span,
+  });
+  if (!parsed) {
+    return undefined;
+  }
+  const args: PslExtensionBlockAttributeArg[] = parsed.args
+    .filter((a): a is PslAttributeArgument & { kind: 'positional' } => a.kind === 'positional')
+    .map((a) => ({ kind: 'positional' as const, value: a.value, span: a.span }));
+  return { name: parsed.name, args, span: parsed.span };
 }
 
 /**
