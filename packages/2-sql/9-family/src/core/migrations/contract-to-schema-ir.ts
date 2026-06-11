@@ -7,6 +7,8 @@ import {
   type Index,
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
+  namespaceTables,
+  namespaceValueSets,
   type PostgresEnumStorageEntry,
   type SqlStorage,
   type StorageColumn,
@@ -174,7 +176,7 @@ export function resolveValueSetValues(
       `resolveValueSetValues: namespace "${ref.namespaceId}" not found in storage (${contextLabel})`,
     );
   }
-  const valueSet = ns.entries.valueSet?.[ref.entityName];
+  const valueSet = namespaceValueSets(ns)[ref.entityName];
   if (!valueSet) {
     throw new Error(
       `resolveValueSetValues: value-set "${ref.entityName}" not found in namespace "${ref.namespaceId}" (${contextLabel})`,
@@ -320,11 +322,11 @@ export function detectDestructiveChanges(
   for (const namespaceId of namespaceIds) {
     const fromNs = from.namespaces[namespaceId];
     const toNs = to.namespaces[namespaceId];
-    const fromTables = fromNs?.entries.table;
+    const fromTables = fromNs !== undefined ? namespaceTables(fromNs) : undefined;
     if (!fromTables) continue;
 
     for (const tableName of Object.keys(fromTables)) {
-      const toTableRaw = toNs?.entries.table[tableName];
+      const toTableRaw = toNs !== undefined ? namespaceTables(toNs)[tableName] : undefined;
       if (!(toTableRaw instanceof StorageTable)) {
         conflicts.push({
           kind: 'tableRemoved',
@@ -410,7 +412,7 @@ export function contractToSchemaIR(
   const storageTypes = allTypes as ResolvedStorageTypes;
   const tables: Record<string, SqlTableIR> = {};
   for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, tableDefRaw] of Object.entries(ns.entries.table)) {
+    for (const [tableName, tableDefRaw] of Object.entries(namespaceTables(ns))) {
       if (!(tableDefRaw instanceof StorageTable)) {
         throw new Error(
           `contractToSchemaIR: expected StorageTable at namespaces.${ns.id}.entries.table.${tableName}`,

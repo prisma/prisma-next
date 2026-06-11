@@ -1,7 +1,7 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { namespaceTables, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
   AndExpr,
@@ -556,7 +556,7 @@ describe('Postgres adapter', () => {
           public: new PostgresSchema({
             id: 'public',
             entries: {
-              table: contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table,
+              table: namespaceTables(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!),
               type: {},
             },
           }),

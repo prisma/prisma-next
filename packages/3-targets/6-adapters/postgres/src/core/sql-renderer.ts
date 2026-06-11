@@ -1,6 +1,7 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
+import { namespaceTables, namespaceValueSets } from '@prisma-next/sql-contract/types';
 import {
   type AggregateExpr,
   type AnyExpression,
@@ -263,16 +264,19 @@ function resolveEnumOrderValues(
   if (source === undefined || source.namespaceId === undefined) {
     return undefined;
   }
+  const sourceNs = contract.storage.namespaces[source.namespaceId];
   const column =
-    contract.storage.namespaces[source.namespaceId]?.entries.table[source.name]?.columns[
-      ref.column
-    ];
+    sourceNs !== undefined
+      ? namespaceTables(sourceNs)[source.name]?.columns[ref.column]
+      : undefined;
   const valueSet = column?.valueSet;
   if (valueSet === undefined) {
     return undefined;
   }
-  return contract.storage.namespaces[valueSet.namespaceId]?.entries.valueSet?.[valueSet.entityName]
-    ?.values;
+  const valueSetNs = contract.storage.namespaces[valueSet.namespaceId];
+  return valueSetNs !== undefined
+    ? namespaceValueSets(valueSetNs)[valueSet.entityName]?.values
+    : undefined;
 }
 
 /**
@@ -289,8 +293,9 @@ function resolveEnumOrderValuesForIdentifier(
     if (source.namespaceId === undefined) {
       continue;
     }
+    const identNs = contract.storage.namespaces[source.namespaceId];
     const column =
-      contract.storage.namespaces[source.namespaceId]?.entries.table[source.name]?.columns[name];
+      identNs !== undefined ? namespaceTables(identNs)[source.name]?.columns[name] : undefined;
     if (column === undefined) {
       continue;
     }
@@ -302,9 +307,11 @@ function resolveEnumOrderValuesForIdentifier(
     if (valueSet === undefined) {
       return undefined;
     }
+    const valueSetNs = contract.storage.namespaces[valueSet.namespaceId];
     resolved =
-      contract.storage.namespaces[valueSet.namespaceId]?.entries.valueSet?.[valueSet.entityName]
-        ?.values;
+      valueSetNs !== undefined
+        ? namespaceValueSets(valueSetNs)[valueSet.entityName]?.values
+        : undefined;
   }
   return resolved;
 }
@@ -833,11 +840,11 @@ function getInsertColumnOrder(
   let table: { columns: Readonly<Record<string, unknown>> } | undefined;
   if (tableRef.namespaceId !== undefined) {
     const ns = contract.storage.namespaces[tableRef.namespaceId];
-    table = ns?.entries.table[tableName];
+    table = ns !== undefined ? namespaceTables(ns)[tableName] : undefined;
   }
   if (table === undefined) {
     for (const ns of Object.values(contract.storage.namespaces)) {
-      const found = ns.entries.table[tableName];
+      const found = namespaceTables(ns)[tableName];
       if (found !== undefined) {
         table = found;
         break;

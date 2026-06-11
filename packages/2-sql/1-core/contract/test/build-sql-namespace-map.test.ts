@@ -1,6 +1,7 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { buildSqlNamespace, buildSqlNamespaceMap } from '../src/ir/build-sql-namespace';
+import { namespaceTables } from '../src/ir/sql-storage';
 import { SqlUnboundNamespace } from '../src/ir/sql-unbound-namespace';
 
 const emptyTableInput = {
@@ -24,6 +25,6 @@ describe('buildSqlNamespaceMap', () => {
     });
     expect(map[UNBOUND_NAMESPACE_ID]).toBe(SqlUnboundNamespace.instance);
     expect(map.app.id).toBe('app');
-    expect(map.app.entries.table.users).toBeDefined();
+    expect(namespaceTables(map.app!)['users']).toBeDefined();
   });
 });

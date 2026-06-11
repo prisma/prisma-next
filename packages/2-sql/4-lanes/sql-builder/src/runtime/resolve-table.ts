@@ -1,4 +1,8 @@
-import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  namespaceTables,
+  type SqlStorage,
+  type StorageTable,
+} from '@prisma-next/sql-contract/types';
 
 export function resolveTableInNamespace(
   storage: SqlStorage,
@@ -6,8 +10,8 @@ export function resolveTableInNamespace(
   tableName: string,
 ): StorageTable | undefined {
   const namespace = storage.namespaces[namespaceId];
-  if (namespace === undefined || !Object.hasOwn(namespace.entries.table, tableName)) {
-    return undefined;
-  }
-  return namespace.entries.table[tableName];
+  if (namespace === undefined) return undefined;
+  const tables = namespaceTables(namespace);
+  if (!Object.hasOwn(tables, tableName)) return undefined;
+  return tables[tableName];
 }

@@ -39,7 +39,7 @@ describe('PostgresSchema', () => {
       id: 'app',
       entries: { table: { users: emptyTableInput }, type: {} },
     });
-    expect(schema.entries.table['users']).toBeInstanceOf(StorageTable);
+    expect(schema.table['users']).toBeInstanceOf(StorageTable);
   });
 
   it('normalises plain enum inputs into PostgresEnumType instances', () => {
@@ -52,7 +52,7 @@ describe('PostgresSchema', () => {
         },
       },
     });
-    expect(schema.entries.type['role']).toBeInstanceOf(PostgresEnumType);
+    expect(schema.type['role']).toBeInstanceOf(PostgresEnumType);
   });
 });
 
@@ -63,10 +63,10 @@ describe('PostgresUnboundSchema', () => {
   });
 
   it('carries empty frozen tables and enum maps on the unbound singleton', () => {
-    expect(PostgresSchema.unbound.entries.table).toEqual({});
-    expect(Object.isFrozen(PostgresSchema.unbound.entries.table)).toBe(true);
-    expect(PostgresSchema.unbound.entries.type).toEqual({});
-    expect(Object.isFrozen(PostgresSchema.unbound.entries.type)).toBe(true);
+    expect(PostgresSchema.unbound.table).toEqual({});
+    expect(Object.isFrozen(PostgresSchema.unbound.entries['table'])).toBe(true);
+    expect(PostgresSchema.unbound.type).toEqual({});
+    expect(Object.isFrozen(PostgresSchema.unbound.entries['type'])).toBe(true);
   });
 
   it('elides the schema qualifier so emission paths render unqualified output', () => {

@@ -5,7 +5,7 @@ import {
   emptyCodecLookup,
 } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { namespaceValueSets, type SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/build-contract';
 import type { ContractDefinition } from '../src/contract-definition';
@@ -48,7 +48,7 @@ function definitionWith(enumHandle: ReturnType<typeof enumType>): ContractDefini
 
 function valueSetValues(contract: Contract<SqlStorage>, name: string): readonly JsonValue[] {
   const ns = contract.storage.namespaces['public'];
-  return ns?.entries.valueSet?.[name]?.values ?? [];
+  return (ns !== undefined ? namespaceValueSets(ns)[name]?.values : undefined) ?? [];
 }
 
 function memberValues(contract: Contract<SqlStorage>, name: string): readonly JsonValue[] {

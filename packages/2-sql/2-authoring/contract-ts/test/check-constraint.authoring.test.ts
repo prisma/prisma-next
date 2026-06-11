@@ -65,7 +65,7 @@ describe('check-constraint lowering', () => {
     ) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs?.entries.table?.['User'];
+    const userTable = storageNs !== undefined ? namespaceTables(storageNs)['User'] : undefined;
 
     expect(userTable?.checks).toHaveLength(1);
     expect(userTable?.checks?.[0]).toMatchObject({
@@ -110,7 +110,7 @@ describe('check-constraint lowering', () => {
     ) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs?.entries.table?.['User'];
+    const userTable = storageNs !== undefined ? namespaceTables(storageNs)['User'] : undefined;
 
     expect(userTable?.checks).toHaveLength(2);
     const checkNames = userTable?.checks?.map((c) => c.name).sort();
@@ -137,7 +137,7 @@ describe('check-constraint lowering', () => {
     ) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs?.entries.table?.['User'];
+    const userTable = storageNs !== undefined ? namespaceTables(storageNs)['User'] : undefined;
 
     expect(userTable?.checks).toBeUndefined();
   });
@@ -165,7 +165,7 @@ describe('check-constraint lowering', () => {
     ) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs?.entries.table?.['User'];
+    const userTable = storageNs !== undefined ? namespaceTables(storageNs)['User'] : undefined;
 
     expect(userTable?.checks?.[0]).toBeInstanceOf(CheckConstraint);
   });

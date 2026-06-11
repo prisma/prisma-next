@@ -5,7 +5,12 @@ import {
   type Namespace,
   NamespaceBase,
 } from '@prisma-next/framework-components/ir';
-import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
+import {
+  namespaceTables,
+  type SqlNamespace,
+  type SqlNamespaceTablesInput,
+} from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -59,7 +64,9 @@ class StubNamespace extends NamespaceBase {
 function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
   return new StubNamespace(
     input.id,
-    input.entries.table as Readonly<Record<string, IRNode>> | undefined,
+    blindCast<Readonly<Record<string, IRNode>>, 'entries[table] holds only IRNode-shaped tables'>(
+      input.entries['table'],
+    ),
   );
 }
 
@@ -86,14 +93,8 @@ describe('per-model `namespace` field (TS builder)', () => {
     // The type-level `tables` for a declared namespace is `{}` to keep
     // `keyof` as `never` (preventing `Db<C>` from collapsing to a string
     // index signature). The runtime value is correct; cast to verify it.
-    expect(
-      (
-        contract.storage.namespaces as Record<
-          string,
-          { entries: { table: Record<string, unknown> } }
-        >
-      )['auth']?.entries.table['User'],
-    ).toBeDefined();
+    const authNs = (contract.storage.namespaces as Record<string, SqlNamespace>)['auth'];
+    expect(authNs !== undefined ? namespaceTables(authNs)['User'] : undefined).toBeDefined();
   });
 
   it('omits `namespaceId` for models that do not set `namespace` — the late-bound default stays implicit', () => {
@@ -107,9 +108,8 @@ describe('per-model `namespace` field (TS builder)', () => {
       },
     });
 
-    expect(
-      (contract.storage.namespaces['public']?.entries.table as Record<string, unknown>)['User'],
-    ).toBeDefined();
+    const publicNs = (contract.storage.namespaces as Record<string, SqlNamespace>)['public'];
+    expect(publicNs !== undefined ? namespaceTables(publicNs)['User'] : undefined).toBeDefined();
   });
 
   it('rejects per-model `namespace` that does not appear in the declared list', () => {

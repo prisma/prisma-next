@@ -2,6 +2,7 @@ import type { ValueSetRef } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { buildSqlNamespace } from '../src/ir/build-sql-namespace';
+import { namespaceTables, namespaceValueSets } from '../src/ir/sql-storage';
 import { StorageColumn } from '../src/ir/storage-column';
 import { StorageTable } from '../src/ir/storage-table';
 import { StorageValueSet } from '../src/ir/storage-value-set';
@@ -54,10 +55,10 @@ describe('SqlNamespace with valueSet entries', () => {
       },
     });
 
-    expect(ns.entries.table['users']).toBeDefined();
-    expect(ns.entries.valueSet?.['Role']).toBeDefined();
-    expect(ns.entries.valueSet?.['Role']?.kind).toBe('valueSet');
-    expect(ns.entries.valueSet?.['Role']?.values).toEqual(['user', 'admin']);
+    expect(namespaceTables(ns)['users']).toBeDefined();
+    expect(namespaceValueSets(ns)['Role']).toBeDefined();
+    expect(namespaceValueSets(ns)['Role']?.kind).toBe('valueSet');
+    expect(namespaceValueSets(ns)['Role']?.values).toEqual(['user', 'admin']);
   });
 
   it('leaves the valueSet slot absent when not provided', () => {
@@ -65,7 +66,7 @@ describe('SqlNamespace with valueSet entries', () => {
       id: UNBOUND_NAMESPACE_ID,
       entries: { table: { users: baseTable } },
     });
-    expect(ns.entries.valueSet).toBeUndefined();
+    expect(ns.entries['valueSet']).toBeUndefined();
   });
 });
 

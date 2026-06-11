@@ -14,7 +14,11 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  namespaceTables,
+  type SqlNamespaceTablesInput,
+  type SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { Type } from 'arktype';
@@ -112,9 +116,10 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       }
     }
 
-    const valueSetSlot = entries.valueSet;
+    const valueSetSlot = entries['valueSet'];
     const hasValueSets = valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0;
-    const emptyTables = Object.keys(entries.table).length === 0;
+    const tableSlot = entries['table'] ?? {};
+    const emptyTables = Object.keys(tableSlot).length === 0;
     const emptyTypes = !typeSlot || Object.keys(typeSlot).length === 0;
     if (id === UNBOUND_NAMESPACE_ID && emptyTables && emptyTypes && !hasValueSets) {
       return PostgresSchema.unbound;
@@ -122,7 +127,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     return new PostgresSchema({
       id,
       entries: {
-        table: entries.table,
+        table: tableSlot,
         type: typeSlot ?? {},
         ...(hasValueSets ? { valueSet: valueSetSlot } : {}),
       },
@@ -142,7 +147,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
           kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
           entries: {
             table: Object.fromEntries(
-              Object.entries(ns.entries.table).map(([tableName, table]) => [
+              Object.entries(namespaceTables(ns)).map(([tableName, table]) => [
                 tableName,
                 this.serializeJsonValue(table) as JsonObject,
               ]),
@@ -170,14 +175,14 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
 
   private serializePostgresNamespace(ns: PostgresSchema, isUnboundSlot: boolean): JsonObject {
     const tablesOut: Record<string, JsonObject> = {};
-    for (const [tableName, table] of Object.entries(ns.entries.table)) {
+    for (const [tableName, table] of Object.entries(ns.table)) {
       tablesOut[tableName] = this.serializeJsonValue(table) as JsonObject;
     }
     const typeOut: Record<string, JsonObject> = {};
-    for (const [typeName, ty] of Object.entries(ns.entries.type)) {
+    for (const [typeName, ty] of Object.entries(ns.type)) {
       typeOut[typeName] = this.serializeJsonValue(ty) as JsonObject;
     }
-    const valueSetEntries = ns.entries.valueSet;
+    const valueSetEntries = ns.valueSet;
     const valueSetOut: Record<string, JsonObject> = {};
     if (valueSetEntries !== undefined) {
       for (const [valueSetName, valueSet] of Object.entries(valueSetEntries)) {

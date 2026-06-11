@@ -4,7 +4,11 @@ import type {
   ContractRelationThrough,
   CrossReference,
 } from '@prisma-next/contract/types';
-import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  namespaceTables,
+  type SqlStorage,
+  type StorageTable,
+} from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
@@ -362,7 +366,8 @@ function resolveThrough(
   if (!through) return undefined;
   const { table, namespaceId, parentColumns, childColumns, targetColumns } = through;
 
-  const junctionTable = contract.storage.namespaces[namespaceId]?.entries.table[table];
+  const ns = contract.storage.namespaces[namespaceId];
+  const junctionTable = ns !== undefined ? namespaceTables(ns)[table] : undefined;
   if (!junctionTable) return undefined;
 
   const fkColumnSet = new Set<string>([...parentColumns, ...childColumns]);

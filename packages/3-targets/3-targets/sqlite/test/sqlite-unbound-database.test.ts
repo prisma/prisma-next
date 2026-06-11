@@ -18,8 +18,8 @@ describe('SqliteUnboundDatabase', () => {
   });
 
   it('carries an empty frozen tables map', () => {
-    expect(SqliteUnboundDatabase.instance.entries.table).toEqual({});
-    expect(Object.isFrozen(SqliteUnboundDatabase.instance.entries.table)).toBe(true);
+    expect(SqliteUnboundDatabase.instance.entries['table']).toEqual({});
+    expect(Object.isFrozen(SqliteUnboundDatabase.instance.entries['table'])).toBe(true);
   });
 
   it('elides every qualifier — SQLite has no schema concept and emits unqualified DDL', () => {

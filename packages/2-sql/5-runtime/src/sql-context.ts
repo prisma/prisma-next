@@ -29,6 +29,7 @@ import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import {
   isPostgresEnumStorageEntry,
+  namespaceTables,
   type SqlStorage,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
@@ -335,7 +336,7 @@ function collectTypeRefSites(
 ): Map<string, Array<{ readonly table: string; readonly column: string }>> {
   const sites = new Map<string, Array<{ readonly table: string; readonly column: string }>>();
   for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.entries.table)) {
+    for (const [tableName, table] of Object.entries(namespaceTables(ns))) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (typeof column.typeRef !== 'string') continue;
         const list = sites.get(column.typeRef);
@@ -397,7 +398,7 @@ function validateColumnTypeParams(
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): void {
   for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.entries.table)) {
+    for (const [tableName, table] of Object.entries(namespaceTables(ns))) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (column.typeParams) {
           const descriptor = codecDescriptors.get(column.codecId);
@@ -426,7 +427,7 @@ function assertColumnCodecIntegrity(
   codecDescriptors: CodecDescriptorRegistry,
 ): void {
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.entries.table)) {
+    for (const [tableName, table] of Object.entries(namespaceTables(ns))) {
       for (const columnName of Object.keys(table.columns)) {
         const ref = codecDescriptors.codecRefForColumn(namespaceId, tableName, columnName);
         if (!ref) continue;
@@ -565,7 +566,7 @@ function buildContractCodecRegistry(
   }
 
   for (const [namespaceId, ns] of Object.entries(contract.storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.entries.table)) {
+    for (const [tableName, table] of Object.entries(namespaceTables(ns))) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (column.typeRef !== undefined) continue;
         const ref = codecDescriptors.codecRefForColumn(namespaceId, tableName, columnName);
@@ -597,7 +598,7 @@ function buildContractCodecRegistry(
   });
 
   for (const [namespaceId, ns] of Object.entries(contract.storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.entries.table)) {
+    for (const [tableName, table] of Object.entries(namespaceTables(ns))) {
       for (const columnName of Object.keys(table.columns)) {
         const ref = codecDescriptors.codecRefForColumn(namespaceId, tableName, columnName);
         if (!ref) continue;

@@ -30,6 +30,7 @@ import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
+  namespaceTables,
   type PostgresEnumStorageEntry,
   type SqlStorage,
   StorageTable,
@@ -97,9 +98,9 @@ export function tableAt(
   namespaceId: string,
   tableName: string,
 ): StorageTable | undefined {
-  // Namespace.tables is typed as Record<string, IRNode> at the interface level;
-  // SQL family namespaces always hold StorageTable instances.
-  return storage.namespaces[namespaceId]?.entries.table[tableName] as StorageTable | undefined;
+  const ns = storage.namespaces[namespaceId];
+  if (ns === undefined) return undefined;
+  return namespaceTables(ns)[tableName] as StorageTable | undefined;
 }
 
 /**
@@ -141,7 +142,7 @@ const DEFAULT_ENUM_NAMESPACE_ID = 'public';
 function namespaceHasEnum(storage: SqlStorage, namespaceId: string, typeName: string): boolean {
   const ns = storage.namespaces[namespaceId];
   if (!isPostgresSchema(ns)) return false;
-  return ns.entries.type[typeName] !== undefined;
+  return ns.type[typeName] !== undefined;
 }
 
 /**
@@ -463,8 +464,7 @@ function enumRebuildCallRecipe(
   // same-named enums in distinct namespaces keep their columns disjoint.
   const columnRefs: { namespaceId: string; table: string; column: string }[] = [];
   for (const [nsId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
-    for (const [tableName, tableNode] of Object.entries(ns.entries.table)) {
-      const table = tableNode as StorageTable;
+    for (const [tableName, table] of Object.entries(namespaceTables(ns))) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (
           column.typeRef === typeName &&
@@ -667,9 +667,7 @@ function collectPostgresEnumTypes(storage: SqlStorage): ReadonlyMap<string, Post
   const result = new Map<string, PostgresEnumType>();
   for (const [nsId, ns] of Object.entries(storage.namespaces)) {
     if (!isPostgresSchema(ns)) continue;
-    for (const [name, instance] of Object.entries(ns.entries.type).sort(([a], [b]) =>
-      a.localeCompare(b),
-    )) {
+    for (const [name, instance] of Object.entries(ns.type).sort(([a], [b]) => a.localeCompare(b))) {
       if (instance instanceof PostgresEnumType) {
         result.set(enumCompoundKey(nsId, name), instance);
       }
@@ -688,7 +686,7 @@ function collectContractChecks(
   tableName: string,
 ): ReadonlyArray<{ name: string; column: string; permittedValues: readonly string[] }> {
   const ns = storage.namespaces[namespaceId];
-  const tableRaw = ns?.entries.table[tableName];
+  const tableRaw = ns !== undefined ? namespaceTables(ns)[tableName] : undefined;
   if (!(tableRaw instanceof StorageTable)) return [];
   const checks = tableRaw.checks;
   if (!checks || checks.length === 0) return [];
@@ -734,7 +732,7 @@ export const checkConstraintPlanCallStrategy: CallMigrationStrategy = (issues, c
   const handledIssueKeys = new Set<string>();
 
   for (const [namespaceId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
-    for (const tableName of Object.keys(ns.entries.table)) {
+    for (const tableName of Object.keys(namespaceTables(ns))) {
       const contractChecks = collectContractChecks(ctx.toContract.storage, namespaceId, tableName);
       if (contractChecks.length === 0) continue;
 
