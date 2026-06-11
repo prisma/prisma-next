@@ -1,6 +1,6 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
-import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -8,14 +8,14 @@ import {
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import type { Client } from 'pg';
 
-const postgresControlAdapter = createPostgresAdapter();
+const postgresControlAdapter = new PostgresControlAdapter();
 const postgresControlLowererContext = { contract: {} as PostgresContract };
 
 export async function executeLoweredStatement(
   client: Client,
-  statement: LoweredStatement,
+  statement: SqlExecuteRequest,
 ): Promise<void> {
-  if (statement.params.length > 0) {
+  if (statement.params && statement.params.length > 0) {
     await client.query(statement.sql, [...statement.params]);
     return;
   }
@@ -26,7 +26,10 @@ export async function bootstrapPostgresSignMarkerTables(client: Client): Promise
   for (const query of buildSignMarkerBootstrapQueries()) {
     await executeLoweredStatement(
       client,
-      postgresControlAdapter.lower(query as PostgresDdlNode, postgresControlLowererContext),
+      await postgresControlAdapter.lowerToExecuteRequest(
+        query as PostgresDdlNode,
+        postgresControlLowererContext,
+      ),
     );
   }
 }
@@ -38,7 +41,10 @@ export async function bootstrapPostgresControlSchema(client: Client): Promise<vo
   }
   await executeLoweredStatement(
     client,
-    postgresControlAdapter.lower(schemaQuery as PostgresDdlNode, postgresControlLowererContext),
+    await postgresControlAdapter.lowerToExecuteRequest(
+      schemaQuery as PostgresDdlNode,
+      postgresControlLowererContext,
+    ),
   );
 }
 
@@ -46,7 +52,10 @@ export async function bootstrapPostgresControlTables(client: Client): Promise<vo
   for (const query of buildControlTableBootstrapQueries()) {
     await executeLoweredStatement(
       client,
-      postgresControlAdapter.lower(query as PostgresDdlNode, postgresControlLowererContext),
+      await postgresControlAdapter.lowerToExecuteRequest(
+        query as PostgresDdlNode,
+        postgresControlLowererContext,
+      ),
     );
   }
 }

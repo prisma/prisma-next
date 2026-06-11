@@ -41,6 +41,7 @@
     "./defined": "./dist/defined.mjs",
     "./hash-content": "./dist/hash-content.mjs",
     "./json": "./dist/json.mjs",
+    "./promise": "./dist/promise.mjs",
     "./redact-db-url": "./dist/redact-db-url.mjs",
     "./result": "./dist/result.mjs",
     "./simplify-deep": "./dist/simplify-deep.mjs",

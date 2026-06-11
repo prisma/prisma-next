@@ -1,10 +1,10 @@
-import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import { createRuntime, type Runtime } from '@prisma-next/sql-runtime';
+import pgvector from '@prisma-next/extension-pgvector/runtime';
+import postgres from '@prisma-next/postgres/runtime';
+import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
-import { Pool } from 'pg';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { contract } from '../prisma/contract';
-import { context, sql, stack } from '../src/prisma-no-emit/context';
+import { sql } from '../src/prisma-no-emit/context';
 import { getPostsByPriority, getPriorityEnum } from '../src/prisma-no-emit/priority-feed';
 import { initTestDatabase } from './utils/control-client';
 
@@ -38,20 +38,13 @@ const seed = [
 async function openRuntime(
   connectionString: string,
 ): Promise<{ runtime: Runtime; close: () => Promise<void> }> {
-  const pool = new Pool({ connectionString });
-  const stackInstance = instantiateExecutionStack(stack);
-  const driver = stackInstance.driver;
-  if (!driver) {
-    throw new Error('Driver descriptor missing from execution stack');
-  }
-  try {
-    await driver.connect({ kind: 'pgPool', pool });
-  } catch (error) {
-    await pool.end();
-    throw error;
-  }
-  const runtime = createRuntime({ stackInstance, context, driver });
-  return { runtime, close: () => pool.end() };
+  const client = postgres({
+    contract,
+    url: connectionString,
+    extensions: [pgvector],
+  });
+  const runtime = await client.connect();
+  return { runtime, close: () => client.close() };
 }
 
 describe('TS-authored enum on the demo contract (Post.priority)', () => {

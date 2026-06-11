@@ -1,6 +1,7 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import {
   INIT_ADDITIVE_POLICY,
+  type SqlMigrationPlanOperation,
   type SqlMigrationPlanOperationStep,
 } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
@@ -134,7 +135,10 @@ describe.sequential('`namespace unbound` multi-tenancy via search_path', () => {
         throw new Error(`planner failed: ${JSON.stringify(planResult)}`);
       }
 
-      const allSteps = planResult.plan.operations.flatMap((op) => [
+      const planOps = (await Promise.all(
+        planResult.plan.operations,
+      )) as SqlMigrationPlanOperation<unknown>[];
+      const allSteps = planOps.flatMap((op) => [
         ...flattenSql(op.precheck),
         ...flattenSql(op.execute),
         ...flattenSql(op.postcheck),
@@ -150,7 +154,7 @@ describe.sequential('`namespace unbound` multi-tenancy via search_path', () => {
         expect(sql).not.toContain('public."tenant"');
       }
 
-      const executeSteps = planResult.plan.operations.flatMap((op) => op.execute);
+      const executeSteps = planOps.flatMap((op) => op.execute);
 
       // Apply the *same* unqualified DDL twice — once per tenant via
       // session-scoped `search_path`. Each apply lands in a different

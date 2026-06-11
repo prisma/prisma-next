@@ -103,7 +103,7 @@ class MongoRuntimeImpl
         ),
       // When MongoRuntimeImpl grows connection()/transaction() surfaces,
       // derive a scope-narrowed ctx per call (mirror
-      // SqlRuntimeImpl#executeAgainstQueryable in `sql-runtime.ts`).
+      // SqlRuntime#executeAgainstQueryable in `sql-runtime.ts`).
       scope: 'runtime',
       // Placeholder satisfying the required field on the cross-family base. The
       // stored ctx is a runtime-level template; the per-execute ctx constructed

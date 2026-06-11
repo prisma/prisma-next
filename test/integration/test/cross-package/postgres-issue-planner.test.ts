@@ -1,4 +1,4 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -21,7 +21,7 @@ import {
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
-const testAdapter = createPostgresAdapter();
+const testAdapter = new PostgresControlAdapter();
 
 function makeContract(
   overrides: {
@@ -901,7 +901,7 @@ describe('planIssues', () => {
       expect(createSchemaIdx).toBeLessThan(createTableIdx);
     });
 
-    it('emits a CreateSchemaCall whose toOp emits CREATE SCHEMA IF NOT EXISTS', () => {
+    it('emits a CreateSchemaCall whose toOp emits CREATE SCHEMA IF NOT EXISTS', async () => {
       const toContract = makeNamespacedContract({ auth: { entries: { table: {} } } });
       const issues: SchemaIssue[] = [
         {
@@ -923,7 +923,7 @@ describe('planIssues', () => {
       if (!result.ok) throw new Error('expected ok');
       const call = result.value.calls[0]!;
       expect(call.factoryName).toBe('createSchema');
-      const op = call.toOp(testAdapter);
+      const op = await call.toOp(testAdapter);
       expect(op.execute?.[0]?.sql).toContain('CREATE SCHEMA IF NOT EXISTS "auth"');
     });
   });

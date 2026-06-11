@@ -1,5 +1,6 @@
 import type { ColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
+import type { CodecRef } from '../ast/codec-types';
 import type { AnyDdlColumnDefault } from '../ast/ddl-types';
 import {
   DdlColumn,
@@ -14,6 +15,7 @@ export interface DdlColumnOptions {
   readonly notNull?: boolean;
   readonly primaryKey?: boolean;
   readonly default?: AnyDdlColumnDefault;
+  readonly codecRef?: CodecRef;
 }
 
 export function lit(value: ColumnDefaultLiteralInputValue): LiteralColumnDefault {

@@ -460,6 +460,23 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-06-04, control-policy close-out ADR (ADR 224, TML-2831). First draft (drawn from `spec.md`) used `effectiveControl` (shipped `effectiveControlPolicy`), `defaultControl` (shipped `defaultControlPolicy`, renamed under TML-2800), and a predicted diagnostic `control_managed_in_external_space` (shipped `controlPolicySuppressedCall`); it also shipped a structurally-wrong `defineContract` TS example and a relative link off by one `../`. All caught in the orchestrator's source-verification review before merge. The implementer's brief *had* asked it to verify against source — which surfaced the divergences in its return — but the brief's own predicted names were themselves from the stale spec, so the verification was doing double duty.
 
+### F24. Stale `dist` makes a red gate look like a broken base
+
+**Symptom.** A dispatch (or babysitter) runs `pnpm typecheck` / `pnpm test` in a freshly-created or freshly-updated worktree and gets a wall of red — cross-package type errors (`X is not assignable`, `property Y does not exist`) or runtime failures that name a *consumed* package's API. The implementer concludes "the base is broken" or "pre-existing failure, not mine" and either gives up or ships around it. The errors are actually **stale `dist/*.d.mts` artefacts**: a dependency package's emitted types are out of date relative to its source after a base update / rebase, so consumers typecheck against the old surface.
+
+**Detection signal.**
+
+- Worktree was just created, rebased, or had its base updated (`git pull`, `WorktreeCreate`, a rebase-onto-main).
+- The red errors are *cross-package* and reference a dependency's types/exports, not the file the dispatch is editing.
+- An implementer's report contains "pre-existing on the base" / "broken base" for a cross-package type or API mismatch.
+
+**Mitigation.**
+
+- **Run `pnpm build` before trusting any red typecheck/test in a fresh or freshly-updated worktree.** Turbo is cached, so it's cheap; it refreshes every `dist/*.d.mts`. Re-run the gate after. CLAUDE.md's golden rule ("after changing exported types in a consumed package, run that package's build before validating downstream") generalises to "after any base movement, build first."
+- Brief implementers and babysitters to build-then-gate, and to never report "broken base" for a cross-package mismatch until a post-build re-run still fails. A genuine base breakage survives `pnpm build`; stale dist does not.
+
+**Reference incident.** 2026-06-10, runtime-target-layer (TML-2502, PR #792). Nearly tripped this three times: slice 1 reported 153 typecheck errors + 18 test failures (`SqlNamespace.entries` vs `.tables`) as "pre-existing/broken base"; a `pnpm build` cleared all of it (274 tests green). It recurred after the rebase onto main (an `enum-accessor` mismatch) and again when a review-fix subagent saw red — both stale dist, both green after build.
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.

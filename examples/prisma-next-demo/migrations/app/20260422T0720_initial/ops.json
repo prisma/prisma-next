@@ -80,7 +80,8 @@
     "execute": [
       {
         "description": "create table \"bug\"",
-        "sql": "CREATE TABLE \"public\".\"bug\" (\n  \"severity\" text NOT NULL,\n  \"stepsToRepro\" text\n)"
+        "sql": "CREATE TABLE \"public\".\"bug\" (\n  \"severity\" text NOT NULL,\n  \"stepsToRepro\" text\n)",
+        "params": []
       }
     ],
     "postcheck": [
@@ -112,7 +113,8 @@
     "execute": [
       {
         "description": "create table \"feature\"",
-        "sql": "CREATE TABLE \"public\".\"feature\" (\n  \"priority\" text NOT NULL,\n  \"targetRelease\" text\n)"
+        "sql": "CREATE TABLE \"public\".\"feature\" (\n  \"priority\" text NOT NULL,\n  \"targetRelease\" text\n)",
+        "params": []
       }
     ],
     "postcheck": [
@@ -144,7 +146,8 @@
     "execute": [
       {
         "description": "create table \"post\"",
-        "sql": "CREATE TABLE \"public\".\"post\" (\n  \"createdAt\" timestamptz NOT NULL DEFAULT (now()),\n  \"embedding\" vector(1536),\n  \"id\" character(36) NOT NULL,\n  \"title\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+        "sql": "CREATE TABLE \"public\".\"post\" (\n  \"createdAt\" timestamptz NOT NULL DEFAULT (now()),\n  \"embedding\" vector(1536),\n  \"id\" character(36) NOT NULL,\n  \"title\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
       }
     ],
     "postcheck": [
@@ -176,7 +179,8 @@
     "execute": [
       {
         "description": "create table \"task\"",
-        "sql": "CREATE TABLE \"public\".\"task\" (\n  \"createdAt\" timestamptz NOT NULL DEFAULT (now()),\n  \"description\" text,\n  \"id\" character(36) NOT NULL,\n  \"status\" text NOT NULL DEFAULT 'open',\n  \"title\" text NOT NULL,\n  \"type\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+        "sql": "CREATE TABLE \"public\".\"task\" (\n  \"createdAt\" timestamptz NOT NULL DEFAULT (now()),\n  \"description\" text,\n  \"id\" character(36) NOT NULL,\n  \"status\" text NOT NULL DEFAULT 'open',\n  \"title\" text NOT NULL,\n  \"type\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
       }
     ],
     "postcheck": [
@@ -208,7 +212,8 @@
     "execute": [
       {
         "description": "create table \"user\"",
-        "sql": "CREATE TABLE \"public\".\"user\" (\n  \"address\" jsonb,\n  \"createdAt\" timestamptz NOT NULL DEFAULT (now()),\n  \"email\" text NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"kind\" \"user_type\" NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+        "sql": "CREATE TABLE \"public\".\"user\" (\n  \"address\" jsonb,\n  \"createdAt\" timestamptz NOT NULL DEFAULT (now()),\n  \"email\" text NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"kind\" \"user_type\" NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
       }
     ],
     "postcheck": [

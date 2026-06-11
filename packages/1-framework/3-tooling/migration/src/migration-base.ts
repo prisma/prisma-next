@@ -38,7 +38,7 @@ const MigrationMetaSchema = type({
  * migration to be valid.
  */
 export abstract class Migration<
-  TOperation extends MigrationPlanOperation = MigrationPlanOperation,
+  _TOperation extends MigrationPlanOperation = MigrationPlanOperation,
   TFamilyId extends string = string,
   TTargetId extends string = string,
 > implements MigrationPlan
@@ -64,9 +64,10 @@ export abstract class Migration<
    * Ordered list of operations this migration performs.
    *
    * Implemented as a getter so that subclasses can either precompute the list
-   * in their constructor or build it lazily per access.
+   * in their constructor or build it lazily per access. Entries may be Promises
+   * when the target requires async codec resolution (e.g. DDL literal defaults).
    */
-  abstract get operations(): readonly TOperation[];
+  abstract get operations(): readonly (MigrationPlanOperation | Promise<MigrationPlanOperation>)[];
 
   /**
    * Metadata inputs used to build `migration.json` and to derive the plan's
@@ -161,14 +162,15 @@ function buildAttestedMetadata(
  * reads (to source `existing`) and writes (to persist `opsJson` /
  * `metadataJson`).
  */
-export function buildMigrationArtifacts(
+export async function buildMigrationArtifacts(
   instance: Migration,
   existing: Partial<MigrationMetadata> | null,
-): MigrationArtifacts {
-  const ops = instance.operations;
-  if (!Array.isArray(ops)) {
+): Promise<MigrationArtifacts> {
+  const rawOps = instance.operations;
+  if (!Array.isArray(rawOps)) {
     throw new Error('operations must be an array');
   }
+  const ops = await Promise.all(rawOps);
 
   for (let index = 0; index < ops.length; index++) {
     const result = MigrationOpSchema(ops[index]);

@@ -25,7 +25,6 @@ import type {
 } from '@prisma-next/sql-runtime';
 import {
   createExecutionContext,
-  createRuntime,
   createSqlExecutionStack,
   withTransaction,
 } from '@prisma-next/sql-runtime';
@@ -39,6 +38,7 @@ import {
   resolveOptionalPostgresBinding,
   resolvePostgresBinding,
 } from './binding';
+import { PostgresRuntimeImpl } from './postgres-runtime';
 
 export type PostgresTargetId = 'postgres';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
@@ -235,9 +235,9 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
       void connectDriver(binding).catch(() => undefined);
     }
 
-    runtimeInstance = createRuntime({
-      stackInstance,
+    runtimeInstance = new PostgresRuntimeImpl({
       context,
+      adapter: stackInstance.adapter,
       driver,
       ...ifDefined('verifyMarker', options.verifyMarker),
       ...ifDefined('middleware', options.middleware),

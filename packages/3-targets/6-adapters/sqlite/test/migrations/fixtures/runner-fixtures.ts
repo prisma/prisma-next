@@ -2,10 +2,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { createSqliteAdapter } from '@prisma-next/adapter-sqlite/adapter';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import sqliteDriverDescriptor from '@prisma-next/driver-sqlite/control';
-import sqlFamilyDescriptor, { createMigrationPlan } from '@prisma-next/family-sql/control';
+import sqlFamilyDescriptor, {
+  createMigrationPlan,
+  type SqlMigrationPlanOperation,
+} from '@prisma-next/family-sql/control';
 import {
   APP_SPACE_ID,
   createControlStack,
@@ -18,13 +20,14 @@ import {
   buildSynthMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { buildControlTableBootstrapQueries } from '@prisma-next/target-sqlite/contract-free';
 import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
 import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
 import { applicationDomainOf } from '@prisma-next/test-utils';
+import { SqliteControlAdapter } from '../../../src/core/control-adapter';
 import type { SqliteContract } from '../../../src/core/types';
 import sqliteAdapterDescriptor from '../../../src/exports/control';
 
@@ -174,9 +177,7 @@ export const LEDGER_TEST_SPACE_ID = 'ledger-test';
 
 export function createLedgerTestPlan(options: {
   readonly destinationHash: string;
-  readonly operations: ReturnType<
-    typeof createMigrationPlan<SqlitePlanTargetDetails>
-  >['operations'];
+  readonly operations: readonly SqlMigrationPlanOperation<SqlitePlanTargetDetails>[];
   readonly migrationEdges: readonly AggregateMigrationEdgeRef[];
 }) {
   return createMigrationPlan<SqlitePlanTargetDetails>({
@@ -189,7 +190,7 @@ export function createLedgerTestPlan(options: {
   });
 }
 
-const sqliteControlAdapter = createSqliteAdapter();
+const sqliteControlAdapter = new SqliteControlAdapter();
 const sqliteControlLowererContext = { contract: {} as SqliteContract };
 
 export async function bootstrapSqliteControlTables(driver: SqliteControlDriver): Promise<void> {
@@ -197,16 +198,16 @@ export async function bootstrapSqliteControlTables(driver: SqliteControlDriver):
     const sqliteQuery = query as unknown as SqliteDdlNode;
     await executeStatement(
       driver,
-      sqliteControlAdapter.lower(sqliteQuery, sqliteControlLowererContext),
+      await sqliteControlAdapter.lowerToExecuteRequest(sqliteQuery, sqliteControlLowererContext),
     );
   }
 }
 
 export async function executeStatement(
   driver: SqliteControlDriver,
-  statement: LoweredStatement,
+  statement: SqlExecuteRequest,
 ): Promise<void> {
-  if (statement.params.length > 0) {
+  if (statement.params && statement.params.length > 0) {
     await driver.query(statement.sql, statement.params);
     return;
   }

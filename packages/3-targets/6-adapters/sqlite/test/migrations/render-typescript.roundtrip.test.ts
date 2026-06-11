@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { col, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import {
   AddColumnCall,
   CreateIndexCall,
@@ -28,8 +29,10 @@ import { renderOps } from '@prisma-next/target-sqlite/render-ops';
 import { timeouts } from '@prisma-next/test-utils';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { SqliteControlAdapter } from '../../src/exports/control';
 
 const execFileAsync = promisify(execFile);
+const testAdapter = new SqliteControlAdapter();
 const packageRoot = resolve(import.meta.dirname, '../..');
 const repoRoot = resolve(packageRoot, '../../../..');
 const targetSqliteRoot = resolve(repoRoot, 'packages/3-targets/3-targets/sqlite');
@@ -113,21 +116,11 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
     timeout: timeouts.coldTransformImport,
   }, async () => {
     const calls = [
-      new CreateTableCall('user', {
-        columns: [
-          {
-            name: 'id',
-            typeSql: 'INTEGER',
-            defaultSql: '',
-            nullable: false,
-            inlineAutoincrementPrimaryKey: true,
-          },
-          { name: 'email', typeSql: 'TEXT', defaultSql: '', nullable: false },
-        ],
-        primaryKey: { columns: ['id'] },
-        uniques: [{ columns: ['email'], name: 'uq_user_email' }],
-        foreignKeys: [],
-      }),
+      new CreateTableCall(
+        'user',
+        [col('id', 'INTEGER', { primaryKey: true }), col('email', 'TEXT', { notNull: true })],
+        [primaryKey(['id'])],
+      ),
       new AddColumnCall('user', {
         name: 'nickname',
         typeSql: 'TEXT',
@@ -151,7 +144,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
     const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
     const ops = JSON.parse(opsJson);
 
-    const expected = JSON.parse(JSON.stringify(renderOps(calls)));
+    const expected = JSON.parse(JSON.stringify(await Promise.all(renderOps(calls, testAdapter))));
     expect(ops).toEqual(expected);
   });
 
@@ -237,7 +230,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
 
     const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
 
-    const expected = JSON.parse(JSON.stringify(renderOps(calls)));
+    const expected = JSON.parse(JSON.stringify(await Promise.all(renderOps(calls, testAdapter))));
     expect(ops).toEqual(expected);
   });
 });

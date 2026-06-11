@@ -37,7 +37,6 @@ import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expressio
 import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
 import { SqliteControlAdapter } from './control-adapter';
-import { renderLoweredDdl } from './ddl-renderer';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
 
 const defaultCapabilities = Object.freeze({
@@ -87,7 +86,9 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
     context: LowererContext<SqliteContract>,
   ): SqliteLoweredStatement {
     if (isDdlNode(ast)) {
-      return renderLoweredDdl(ast);
+      throw new Error(
+        'lower() does not lower DDL on the runtime adapter — DDL lowering is a control-plane concern handled by the control adapter.',
+      );
     }
     return renderLoweredSql(ast, context.contract);
   }

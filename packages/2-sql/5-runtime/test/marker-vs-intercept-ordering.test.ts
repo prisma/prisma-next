@@ -20,9 +20,8 @@ import type {
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
-import { createRuntime } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs } from './utils';
+import { createTestRuntime as createRuntime, descriptorsFromCodecs } from './utils';
 
 /**
  * Pins the ordering invariant: marker verification runs upstream of `runWithMiddleware`, so the

@@ -19,7 +19,38 @@ changes:
         - "@prisma-next/sql-builder"
         - "@prisma-next/sql-orm-client"
       anyMatch: true
+  - id: create-runtime-removed
+    summary: |
+      `createRuntime` is removed from `@prisma-next/sql-runtime`. Extension code that
+      constructed a runtime via `createRuntime(...)` must switch to the target class
+      constructor directly: `new PostgresRuntimeImpl({...})` from
+      `@prisma-next/postgres/runtime`, or `new SqliteRuntimeImpl({...})` from
+      `@prisma-next/sqlite/runtime`. Pass the same options minus the `stackInstance`
+      unpacking — supply `adapter` directly instead of `stackInstance.adapter`.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "createRuntime"
 ---
+
+<!--
+TML-2867: codec-routed DDL defaults. The pgvector extension test files were updated
+to await lazy plan operations (`Promise.all(result.plan.operations)`) and to use
+`PostgresControlAdapter` instead of the removed `createPostgresAdapter`. The
+`packages/3-extensions/postgres re-export test` deletion was already declared by
+TML-2859 above. No extension-author API change. Incidental substrate diff only.
+-->
+
+<!--
+TML-2859: SQLite createTable authoring method. The free `createTable` function from
+`@prisma-next/sqlite/migration` is now a protected method on the `SqliteMigration`
+base class. The `createTable` re-export test in `packages/3-extensions/sqlite/` was
+removed (it asserted the free function was exported, which is no longer true). The
+README was updated to reflect the current authoring surface. No extension-author action
+beyond what the `sqlite-create-table-method` entry in the 0.12-to-0.13 instructions
+already covers. Incidental substrate diff only.
+-->
+
 
 <!--
 TML-2785: the sql-orm-client runtime gained M:N correlated include
@@ -76,3 +107,23 @@ For an unbound contract (e.g. SQLite, or any target whose entities live in the l
 ### Validation
 
 This is a type-level change — `pnpm typecheck` (or `pnpm build`) pinpoints every remaining flat access as a compile error (`Property '<table>' does not exist on type 'Db<…>'`). Fix each by inserting the namespace segment, then run your extension's standard `pnpm test`.
+
+## `create-runtime-removed`
+
+`createRuntime` is removed from `@prisma-next/sql-runtime`. Construct the target runtime class directly instead.
+
+```ts
+// Before
+import { createRuntime } from '@prisma-next/sql-runtime';
+const runtime = createRuntime({ stackInstance, context, driver, ...opts });
+
+// After — Postgres
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
+const runtime = new PostgresRuntimeImpl({ adapter: stackInstance.adapter, context, driver, ...opts });
+
+// After — SQLite
+import { SqliteRuntimeImpl } from '@prisma-next/sqlite/runtime';
+const runtime = new SqliteRuntimeImpl({ adapter: stackInstance.adapter, context, driver, ...opts });
+```
+
+The options are identical except `stackInstance` is no longer passed: supply `adapter` from `stackInstance.adapter` directly. Depend on the bare-name interfaces (`PostgresRuntime`, `SqliteRuntime`) for type annotations, not the `Impl` classes.

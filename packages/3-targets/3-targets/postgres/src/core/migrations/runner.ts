@@ -18,7 +18,8 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlQueryError } from '@prisma-next/sql-errors';
-import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
@@ -86,6 +87,12 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     const space = options.plan.spaceId;
     const lockKey = `${LOCK_DOMAIN}:${schema}:${space}`;
 
+    // Materialize any async ops before running checks or executing.
+    const planOps = blindCast<
+      readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[],
+      'ops were produced by the PG planner and are SqlMigrationPlanOperation<PostgresPlanTargetDetails>; MigrationPlan.operations uses the wider framework type to accommodate Promise covariance'
+    >(await Promise.all(options.plan.operations));
+
     // Static checks (idempotent — safe to run again when the caller is
     // `execute(...)` because the cost is a single object comparison).
     const destinationCheck = this.ensurePlanMatchesDestinationContract(
@@ -94,7 +101,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     );
     if (!destinationCheck.ok) return destinationCheck;
 
-    const policyCheck = this.enforcePolicyCompatibility(options.policy, options.plan.operations);
+    const policyCheck = this.enforcePolicyCompatibility(options.policy, planOps);
     if (!policyCheck.ok) return policyCheck;
 
     await this.acquireLock(driver, lockKey);
@@ -113,7 +120,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     if (skipOperations) {
       applyValue = { operationsExecuted: 0, executedOperations: [] };
     } else {
-      const applyResult = await this.applyPlan(driver, options);
+      const applyResult = await this.applyPlan(driver, options, planOps);
       if (!applyResult.ok) return applyResult;
       applyValue = applyResult.value;
     }
@@ -158,11 +165,16 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     if (!isSelfEdgeNoOp) {
       const markerResult = await this.upsertMarker(driver, options, existingMarker, space);
       if (!markerResult.ok) return markerResult;
-      await this.recordLedgerEntries(driver, options, applyValue.executedOperations);
+      await this.recordLedgerEntries(
+        driver,
+        options,
+        applyValue.executedOperations,
+        planOps.length,
+      );
     }
 
     return runnerSuccess({
-      operationsPlanned: options.plan.operations.length,
+      operationsPlanned: planOps.length,
       operationsExecuted: applyValue.operationsExecuted,
     });
   }
@@ -209,6 +221,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   private async applyPlan(
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
+    ops: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[],
   ): Promise<Result<ApplyPlanSuccessValue, SqlMigrationRunnerFailure>> {
     const checks = options.executionChecks;
     const runPrechecks = checks?.prechecks !== false; // Default true
@@ -217,7 +230,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
 
     let operationsExecuted = 0;
     const executedOperations: Array<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> = [];
-    for (const operation of options.plan.operations) {
+    for (const operation of ops) {
       options.callbacks?.onOperationStart?.(operation);
       try {
         // Idempotency probe: only run if both postchecks and idempotency checks are enabled
@@ -282,13 +295,13 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     if (schemaQuery === undefined) {
       throw new Error('Postgres control-table bootstrap must include CREATE SCHEMA');
     }
-    await this.executeStatement(driver, this.family.lowerAst(schemaQuery, lowererContext));
+    await this.executeStatement(driver, await this.family.lowerAst(schemaQuery, lowererContext));
     const legacyDetection = await this.detectLegacyMarkerShape(driver);
     if (!legacyDetection.ok) {
       return legacyDetection;
     }
     for (const query of tableQueries) {
-      await this.executeStatement(driver, this.family.lowerAst(query, lowererContext));
+      await this.executeStatement(driver, await this.family.lowerAst(query, lowererContext));
     }
     return okVoid();
   }
@@ -629,14 +642,15 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     executedOperations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[],
+    planOpsLength: number,
   ): Promise<void> {
     const plan = options.plan;
     const space = plan.spaceId;
     const edges = options.migrationEdges;
     const totalEdgeOps = edges.reduce((sum, edge) => sum + edge.operationCount, 0);
-    if (totalEdgeOps !== plan.operations.length) {
+    if (totalEdgeOps !== planOpsLength) {
       throw new Error(
-        `Ledger write: plan.operations length (${plan.operations.length}) does not match sum of migrationEdges operationCount (${totalEdgeOps})`,
+        `Ledger write: plan.operations length (${planOpsLength}) does not match sum of migrationEdges operationCount (${totalEdgeOps})`,
       );
     }
     // The ledger records the operations as executed — idempotency-skipped ops
@@ -688,12 +702,8 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
 
   private async executeStatement(
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-    statement: LoweredStatement,
+    statement: SqlExecuteRequest,
   ): Promise<void> {
-    if (statement.params.length > 0) {
-      await driver.query(statement.sql, statement.params);
-      return;
-    }
-    await driver.query(statement.sql);
+    await driver.query(statement.sql, statement.params);
   }
 }

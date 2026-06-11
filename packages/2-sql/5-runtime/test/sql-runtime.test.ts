@@ -28,10 +28,10 @@ import type {
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
-import { createRuntime, withTransaction } from '../src/sql-runtime';
+import { withTransaction } from '../src/sql-runtime';
 import { createAsyncSecretCodec, decryptSecret } from './seeded-secret-codec';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs, stubAst } from './utils';
+import { createTestRuntime as createRuntime, descriptorsFromCodecs, stubAst } from './utils';
 
 const runtimeSecretSeed = 'sql-runtime-secret';
 
@@ -242,7 +242,7 @@ function createRawExecutionPlan<Row = Record<string, unknown>>(
   };
 }
 
-describe('createRuntime', () => {
+describe('SqlRuntime', () => {
   it('creates runtime with context and driver', () => {
     const { stackInstance, context, driver } = createTestSetup();
 

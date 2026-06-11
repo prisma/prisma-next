@@ -2,13 +2,11 @@
  * SQLite migration IR: one concrete `*Call` class per pure factory under
  * `operations/`, plus a shared `SqliteOpFactoryCallNode` abstract base.
  *
- * Each call class carries fully-resolved literal arguments (flat
- * `SqliteColumnSpec` / `SqliteTableSpec` etc.) — codec / `typeRef` / default
- * expansion happens upstream in the issue-planner / strategies, mirroring
- * the Postgres `ColumnSpec` pattern. As a result, `toOp()` and
- * `renderTypeScript()` both pass the same flat data through; the rendered
- * TypeScript scaffold is fully self-contained and does not need access to a
- * `storageTypes` map at runtime.
+ * Each call class carries fully-resolved literal arguments. `CreateTableCall`
+ * holds structured `DdlColumn[]` + `DdlTableConstraint[]` and lowers via the
+ * adapter's DDL path; other call classes carry flat SQL fragments. Codec /
+ * `typeRef` / default expansion happens upstream in the issue-planner /
+ * strategies, mirroring the Postgres `ColumnSpec` pattern.
  */
 
 import { errorUnfilledPlaceholder } from '@prisma-next/errors/migration';
@@ -16,13 +14,24 @@ import type {
   MigrationOperationClass,
   SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
+import type { ExecuteRequestLowerer, Lowerer } from '@prisma-next/family-sql/control-adapter';
 import type { OpFactoryCall as FrameworkOpFactoryCall } from '@prisma-next/framework-components/control';
+import type {
+  AnyDdlColumnDefault,
+  DdlColumn,
+  DdlTableConstraint,
+} from '@prisma-next/sql-relational-core/ast';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
+import { ifDefined } from '@prisma-next/utils/defined';
+import * as contractFreeDdl from '../../contract-free/ddl';
+import { escapeLiteral } from '../sql-utils';
 import { addColumn, dropColumn } from './operations/columns';
 import { createIndex, dropIndex } from './operations/indexes';
 import type { SqliteColumnSpec, SqliteIndexSpec, SqliteTableSpec } from './operations/shared';
-import { createTable, dropTable, recreateTable } from './operations/tables';
+import { step } from './operations/shared';
+import { dropTable, recreateTable } from './operations/tables';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
+import { buildTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<SqlitePlanTargetDetails>;
 
@@ -32,7 +41,7 @@ abstract class SqliteOpFactoryCallNode extends TsExpression implements Framework
   abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
-  abstract toOp(): Op;
+  abstract toOp(lowerer?: Lowerer): Op | Promise<Op>;
 
   importRequirements(): readonly ImportRequirement[] {
     return [{ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName }];
@@ -47,27 +56,157 @@ abstract class SqliteOpFactoryCallNode extends TsExpression implements Framework
 // Table
 // ============================================================================
 
+// ---------------------------------------------------------------------------
+// TypeScript rendering helpers for DdlColumn / DdlTableConstraint
+// ---------------------------------------------------------------------------
+
+function renderDdlColumnDefault(def: AnyDdlColumnDefault | undefined): string {
+  if (!def) return '';
+  if (def.kind === 'literal') {
+    return `lit(${jsonToTsSource(def.value)})`;
+  }
+  return `fn(${jsonToTsSource(def.expression)})`;
+}
+
+function renderDdlColumnAsTsCall(column: DdlColumn): string {
+  const opts: string[] = [];
+  if (column.notNull) opts.push('notNull: true');
+  if (column.primaryKey) opts.push('primaryKey: true');
+  if (column.default) opts.push(`default: ${renderDdlColumnDefault(column.default)}`);
+  const optsStr = opts.length > 0 ? `, { ${opts.join(', ')} }` : '';
+  return `col(${jsonToTsSource(column.name)}, ${jsonToTsSource(column.type)}${optsStr})`;
+}
+
+function renderDdlConstraintAsTsCall(constraint: DdlTableConstraint): string {
+  switch (constraint.kind) {
+    case 'primary-key': {
+      const nameOpt = constraint.name ? `, { name: ${jsonToTsSource(constraint.name)} }` : '';
+      return `primaryKey(${jsonToTsSource(constraint.columns)}${nameOpt})`;
+    }
+    case 'foreign-key': {
+      const opts: string[] = [];
+      if (constraint.name) opts.push(`name: ${jsonToTsSource(constraint.name)}`);
+      if (constraint.onDelete) opts.push(`onDelete: ${jsonToTsSource(constraint.onDelete)}`);
+      if (constraint.onUpdate) opts.push(`onUpdate: ${jsonToTsSource(constraint.onUpdate)}`);
+      const optsStr = opts.length > 0 ? `, { ${opts.join(', ')} }` : '';
+      return `foreignKey(${jsonToTsSource(constraint.columns)}, ${jsonToTsSource(constraint.refTable)}, ${jsonToTsSource(constraint.refColumns)}${optsStr})`;
+    }
+    case 'unique': {
+      const nameOpt = constraint.name ? `, { name: ${jsonToTsSource(constraint.name)} }` : '';
+      return `unique(${jsonToTsSource(constraint.columns)}${nameOpt})`;
+    }
+  }
+}
+
+function constraintImportSymbols(constraints: readonly DdlTableConstraint[] | undefined): string[] {
+  if (!constraints || constraints.length === 0) return [];
+  const symbols = new Set<string>();
+  for (const c of constraints) {
+    if (c.kind === 'primary-key') symbols.add('primaryKey');
+    else if (c.kind === 'foreign-key') symbols.add('foreignKey');
+    else if (c.kind === 'unique') symbols.add('unique');
+  }
+  return [...symbols];
+}
+
+function defaultImportSymbols(columns: readonly DdlColumn[]): string[] {
+  const symbols = new Set<string>();
+  for (const col of columns) {
+    if (col.default?.kind === 'literal') symbols.add('lit');
+    else if (col.default?.kind === 'function') symbols.add('fn');
+  }
+  return [...symbols];
+}
+
 export class CreateTableCall extends SqliteOpFactoryCallNode {
   readonly factoryName = 'createTable' as const;
   readonly operationClass = 'additive' as const;
   readonly tableName: string;
-  readonly spec: SqliteTableSpec;
+  readonly columns: readonly DdlColumn[];
+  readonly constraints: readonly DdlTableConstraint[] | undefined;
   readonly label: string;
 
-  constructor(tableName: string, spec: SqliteTableSpec) {
+  constructor(
+    tableName: string,
+    columns: readonly DdlColumn[],
+    constraints?: readonly DdlTableConstraint[],
+  ) {
     super();
     this.tableName = tableName;
-    this.spec = spec;
+    this.columns = Object.freeze([...columns]);
+    this.constraints = constraints ? Object.freeze([...constraints]) : undefined;
     this.label = `Create table ${tableName}`;
     this.freeze();
   }
 
-  toOp(): Op {
-    return createTable(this.tableName, this.spec);
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `CreateTableCall.toOp: a DDL lowerer is required on the SQLite planner path (table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+      );
+    }
+    const ddlNode = contractFreeDdl.createTable({
+      table: this.tableName,
+      columns: this.columns,
+      ...ifDefined('constraints', this.constraints),
+    });
+    const statement = await lowerer.lowerToExecuteRequest(ddlNode);
+    const tableName = this.tableName;
+    const escapedName = escapeLiteral(tableName);
+    return {
+      id: `table.${tableName}`,
+      label: `Create table ${tableName}`,
+      summary: `Creates table ${tableName} with required columns`,
+      operationClass: 'additive',
+      target: { id: 'sqlite', details: buildTargetDetails('table', tableName) },
+      precheck: [
+        step(
+          `ensure table "${tableName}" does not exist`,
+          `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapedName}'`,
+        ),
+      ],
+      execute: [
+        {
+          description: `create table "${tableName}"`,
+          sql: statement.sql,
+          params: statement.params ?? [],
+        },
+      ],
+      postcheck: [
+        step(
+          `verify table "${tableName}" exists`,
+          `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapedName}'`,
+        ),
+      ],
+    };
   }
 
   renderTypeScript(): string {
-    return `createTable(${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.spec)})`;
+    const columnsList = this.columns.map(renderDdlColumnAsTsCall).join(', ');
+    const constraintsList = this.constraints
+      ? this.constraints.map(renderDdlConstraintAsTsCall).join(', ')
+      : undefined;
+
+    const opts: string[] = [];
+    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`columns: [${columnsList}]`);
+    if (constraintsList) opts.push(`constraints: [${constraintsList}]`);
+
+    return `this.createTable({ ${opts.join(', ')} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    const req: ImportRequirement[] = [];
+    if (this.columns.length > 0) {
+      req.push({ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: 'col' });
+      for (const sym of defaultImportSymbols(this.columns)) {
+        req.push({ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: sym });
+      }
+    }
+    for (const sym of constraintImportSymbols(this.constraints)) {
+      req.push({ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: sym });
+    }
+    return req;
   }
 }
 
@@ -84,7 +223,7 @@ export class DropTableCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return dropTable(this.tableName);
   }
 
@@ -125,7 +264,7 @@ export class RecreateTableCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return recreateTable({
       tableName: this.tableName,
       contractTable: this.contractTable,
@@ -172,7 +311,7 @@ export class AddColumnCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return addColumn(this.tableName, this.column);
   }
 
@@ -196,7 +335,7 @@ export class DropColumnCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return dropColumn(this.tableName, this.columnName);
   }
 
@@ -226,7 +365,7 @@ export class CreateIndexCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return createIndex(this.tableName, this.indexName, this.columns);
   }
 
@@ -250,7 +389,7 @@ export class DropIndexCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return dropIndex(this.tableName, this.indexName);
   }
 
@@ -292,7 +431,7 @@ export class DataTransformCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     throw errorUnfilledPlaceholder(this.label);
   }
 
@@ -344,7 +483,7 @@ export class RawSqlCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return this.op;
   }
 

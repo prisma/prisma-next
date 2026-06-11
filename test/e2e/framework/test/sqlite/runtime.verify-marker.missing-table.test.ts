@@ -12,11 +12,11 @@ import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import {
   createExecutionContext,
-  createRuntime,
   createSqlExecutionStack,
   type Log,
   type Runtime,
 } from '@prisma-next/sql-runtime';
+import { SqliteRuntimeImpl } from '@prisma-next/sqlite/runtime';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -68,7 +68,7 @@ async function buildHarness(log: Log): Promise<Harness> {
   if (!driver) throw new Error('SQLite driver missing from execution stack');
   await driver.connect({ kind: 'path', path: dbPath });
 
-  const runtime = createRuntime({ stackInstance, context, driver, log });
+  const runtime = new SqliteRuntimeImpl({ context, adapter: stackInstance.adapter, driver, log });
   const db = sqlBuilder<Contract>({
     context,
     rawCodecInferer: stack.adapter.rawCodecInferer,

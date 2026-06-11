@@ -6,14 +6,14 @@
  * VP1 of the Runtime pipeline project.
  */
 
-import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import postgres from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
-import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
-import { type CreateRuntimeOptions, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
+import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { blindCast } from '@prisma-next/utils/casts';
-import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
+import type { Contract } from '../src/prisma/contract.d';
+import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { db } from '../src/prisma/db';
 import { crossAuthorSimilarity } from '../src/queries/cross-author-similarity';
 import { getPriorityEnumFromEmit } from '../src/queries/get-posts-by-priority';
@@ -28,33 +28,14 @@ function priorityValue(name: string): 'low' | 'high' | 'urgent' {
 
 const context = db.context;
 const { contract } = context;
-const executionStack = db.stack;
-
-async function createTestDriver(connectionString: string) {
-  const stackInstance = instantiateExecutionStack(
-    executionStack,
-  ) as CreateRuntimeOptions['stackInstance'];
-  const driver = stackInstance.driver as unknown as SqlDriver<unknown>;
-  if (!driver) {
-    throw new Error('Driver descriptor missing from execution stack');
-  }
-  const pool = new Pool({ connectionString });
-  try {
-    await driver.connect({ kind: 'pgPool', pool });
-  } catch (error) {
-    await pool.end();
-    throw error;
-  }
-  return { stackInstance, driver };
-}
 
 async function getRuntime(connectionString: string): Promise<Runtime> {
-  const { stackInstance, driver } = await createTestDriver(connectionString);
-  return createRuntime({
-    stackInstance,
-    context,
-    driver,
+  const client = postgres<Contract>({
+    contractJson,
+    url: connectionString,
+    extensions: db.stack.extensionPacks,
   });
+  return client.connect();
 }
 
 const seededUserIds = {

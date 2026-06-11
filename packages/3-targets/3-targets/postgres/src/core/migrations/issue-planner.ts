@@ -8,7 +8,7 @@
  * through `mapIssueToCall` for the default case.
  */
 
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   MigrationOperationPolicy,
@@ -25,9 +25,11 @@ import type {
   StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
-import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
+import type { CodecRef, DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import * as contractFree from '@prisma-next/sql-relational-core/contract-free';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { PostgresEnumType } from '../postgres-enum-type';
@@ -65,6 +67,7 @@ import {
   type StrategyContext,
   tableAt,
 } from './planner-strategies';
+import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
 export type { CallMigrationStrategy, StrategyContext };
 
@@ -214,9 +217,27 @@ function toDdlColumn(
 ): DdlColumn {
   const typeSql = buildColumnTypeSql(column, codecHooks, storageTypes);
   const ddlDefault = postgresDefaultToDdlColumnDefault(column.default);
+  const resolved = resolveColumnTypeMetadata(
+    column,
+    storageTypes as Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+  );
+  const codecRef: CodecRef | undefined = resolved.codecId
+    ? {
+        codecId: resolved.codecId,
+        ...(resolved.typeParams !== undefined
+          ? {
+              typeParams: blindCast<
+                JsonValue,
+                'resolved.typeParams is JsonValue-shaped storage metadata; the narrowed (non-undefined) value lands in CodecRef.typeParams which is JsonValue'
+              >(resolved.typeParams),
+            }
+          : {}),
+      }
+    : undefined;
   return contractFree.col(name, typeSql, {
     ...(!column.nullable ? { notNull: true } : {}),
-    ...(ddlDefault ? { default: ddlDefault } : {}),
+    ...ifDefined('default', ddlDefault),
+    ...ifDefined('codecRef', codecRef),
   });
 }
 

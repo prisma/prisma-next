@@ -83,6 +83,18 @@ it('produces the expected result for someField=foo', () => {
 
 No `vi.mock`, no `vi.resetModules`, no `vi.setConfig`, no lazy import. The core's tests carry the load; the wrapper is obviously-correct one-screen wiring.
 
+## Never mock our own runtime/class constructor
+
+A specific, recurring smell: a facade test that does `vi.mock('../src/runtime/foo-runtime', …)` to replace **our own** `FooRuntimeImpl` constructor with a stub, so the test can assert "the factory called the constructor" or hand back a fake runtime. This is the worst case of the above — the test proves nothing about behaviour, it asserts that a line of code we wrote calls a constructor we wrote, and it breaks the moment the constructor signature changes (it also forces ugly `class { constructor() { return {...} } }` delegating mocks once vitest rejects `mockReturnValue` on a `new` call).
+
+The fix is to test against **real objects over a fake boundary**, not a mocked self:
+
+- Run the real factory / facade / runtime and mock only the **third-party boundary** — e.g. `vi.mock('pg', …)` with a fake `Pool`/`Client`, or a hand-written recording `SqlDriver` fake the real runtime executes against. Assert observable behaviour (which SQL was issued, which pool was closed, what rows came back), not "the constructor was invoked."
+- For an in-memory-capable target, prefer the real thing: a real `:memory:` SQLite driver makes the test honest with no mocks at all.
+- To assert a surface *doesn't* expose something (e.g. a role-bound `Db` has no `connection()`), use a behavioural check plus a type-level `*.test-d.ts` assertion — not a constructor spy.
+
+If you find yourself needing to mock your own constructor to make a test pass, the test isn't worth keeping in that shape — rewrite it against real objects + a fake driver, or delete it. (Reference: PR #792 / TML-2502 rewrote the postgres/sqlite/supabase facade suites this way — real factories over a fake `pg` and real `:memory:` sqlite; the recording-fake-driver pattern lives in `packages/2-sql/5-runtime/test/`.)
+
 ## Repo precedent
 
 The `migration list` command's test file (`packages/1-framework/3-tooling/cli/test/commands/migration-list.test.ts`) is the canonical example in this repo. It tests `runMigrationList({ migrationsDir, spaceFilter })` directly against tmpdir migration trees; zero `vi.*` calls.

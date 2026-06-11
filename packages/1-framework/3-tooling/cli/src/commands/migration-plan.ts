@@ -118,7 +118,7 @@ async function runPlannerLeg(
   let plannedOps: readonly MigrationPlanOperation[] = [];
   let hasPlaceholders = false;
   try {
-    plannedOps = plannerResult.plan.operations;
+    plannedOps = await Promise.all(plannerResult.plan.operations);
     if (plannedOps.length === 0) {
       return notOk(
         errorMigrationPlanningFailed({

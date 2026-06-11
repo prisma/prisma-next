@@ -2,9 +2,9 @@ import { instantiateExecutionStack } from '@prisma-next/framework-components/exe
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
-import type { Runtime } from '../src/exports';
-import { createRuntime, createSqlExecutionStack } from '../src/exports';
+import { createSqlExecutionStack, type Runtime } from '../src/exports';
 import {
+  createTestRuntime as createRuntime,
   createStubAdapter,
   createTestAdapterDescriptor,
   createTestContext,
