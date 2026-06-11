@@ -13,7 +13,6 @@ import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type {
@@ -24,7 +23,6 @@ import type {
 import type {
   AnyQueryAst,
   CodecRef,
-  ContractCodecRegistry,
   DdlColumn,
   DdlNode,
   DdlTableConstraint,
@@ -36,6 +34,7 @@ import type {
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
+import { contractCodecRegistryFromLookup } from '@prisma-next/sql-runtime';
 import type {
   PrimaryKey,
   SqlCheckConstraintIRInput,
@@ -191,21 +190,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       context?.contract,
     );
     const lowered = renderLoweredSql(ast, contract, this.codecLookup);
-    const lookup = this.codecLookup;
-    const codecRegistry: ContractCodecRegistry = {
-      forColumn: () => undefined,
-      forCodecRef(ref) {
-        const codec = lookup.getForRef(ref.codecId, ref.typeParams);
-        if (codec === undefined) {
-          throw runtimeError(
-            'RUNTIME.CODEC_DESCRIPTOR_MISSING',
-            `No codec descriptor registered for codecId '${ref.codecId}'.`,
-            { codecId: ref.codecId },
-          );
-        }
-        return codec;
-      },
-    };
+    const codecRegistry = contractCodecRegistryFromLookup(this.codecLookup);
     const params = await encodeControlQueryParams(lowered, ast, codecRegistry);
     return { sql: lowered.sql, params };
   }
