@@ -145,7 +145,7 @@ type ContractBase = Omit<
         readonly __unbound__: {
           readonly id: '__unbound__';
           readonly kind: 'postgres-unbound-schema';
-          readonly entries: { readonly table: {}; readonly type: Record<string, never> };
+          readonly entries: { readonly table: {} };
         };
         readonly public: {
           readonly id: 'public';
@@ -395,7 +395,16 @@ type ContractBase = Omit<
                 foreignKeys: readonly [];
               };
             };
-            readonly type: Record<string, never>;
+            readonly valueSet: {
+              readonly user_type: {
+                readonly kind: 'valueSet';
+                readonly values: readonly ['admin', 'user'];
+              };
+              readonly Priority: {
+                readonly kind: 'valueSet';
+                readonly values: readonly ['low', 'high', 'urgent'];
+              };
+            };
           };
         };
       };
