@@ -1,5 +1,6 @@
 import {
   AggregateWireCommand,
+  CreateCollectionWireCommand,
   DeleteManyWireCommand,
   DeleteOneWireCommand,
   FindOneAndDeleteWireCommand,
@@ -321,11 +322,45 @@ describe('MongoDriver', () => {
     it('close() is a no-op — does not close the external client', async () => {
       const driver = MongoDriverImpl.fromDb(seedClient.db(dbName));
       await expect(driver.close()).resolves.toBeUndefined();
-      // Explicit readiness check: seedClient must still respond after
-      // driver.close(). Catches regressions where fromDb() starts closing
-      // the caller-owned client.
       const pingResult = await seedClient.db(dbName).command({ ping: 1 });
       expect(pingResult).toMatchObject({ ok: 1 });
+    });
+  });
+
+  describe('DDL laziness', () => {
+    it('execute() on a DDL command performs no database action until iterated', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_ddl_lazy_create';
+
+      await db.dropCollection(col).catch(() => undefined);
+
+      const cmd = new CreateCollectionWireCommand(col, {});
+      const iterable = driver.execute(cmd);
+
+      const collsBefore = await db.listCollections({ name: col }).toArray();
+      expect(collsBefore).toHaveLength(0);
+
+      await collect(iterable);
+
+      const collsAfter = await db.listCollections({ name: col }).toArray();
+      expect(collsAfter).toHaveLength(1);
+    });
+
+    it('iterating a DDL iterable twice does not re-execute the operation', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_ddl_no_double_exec';
+
+      await db.dropCollection(col).catch(() => undefined);
+
+      const cmd = new CreateCollectionWireCommand(col, {});
+      const iterable = driver.execute(cmd);
+      const iterator = iterable[Symbol.asyncIterator]();
+
+      await iterator.next();
+      const second = await iterator.next();
+      expect(second).toEqual({ done: true, value: undefined });
     });
   });
 });
