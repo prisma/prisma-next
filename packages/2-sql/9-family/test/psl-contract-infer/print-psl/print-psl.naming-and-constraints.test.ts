@@ -358,7 +358,7 @@ describe('printPsl', () => {
     `);
   });
 
-  it('throws a native-enum diagnostic when a pg/enum@1 annotation is present alongside a table', () => {
+  it('throws a native-enum diagnostic when a nativeEnumTypeNames annotation is present alongside a table', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {
         user_role: {
@@ -374,15 +374,7 @@ describe('printPsl', () => {
       },
       annotations: {
         pg: {
-          enumTypes: {
-            public: {
-              user_role: {
-                codecId: 'pg/enum@1',
-                nativeType: 'user_role',
-                typeParams: { values: ['USER', 'ADMIN'] },
-              },
-            },
-          },
+          nativeEnumTypeNames: ['user_role'],
         },
       },
     };
@@ -392,25 +384,12 @@ describe('printPsl', () => {
     );
   });
 
-  it('throws a native-enum diagnostic when multiple pg/enum@1 annotations normalize to the same name', () => {
+  it('throws a native-enum diagnostic when multiple native enum type names are present', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {},
       annotations: {
         pg: {
-          enumTypes: {
-            public: {
-              user_role: {
-                codecId: 'pg/enum@1',
-                nativeType: 'user_role',
-                typeParams: { values: ['USER'] },
-              },
-              UserRole: {
-                codecId: 'pg/enum@1',
-                nativeType: 'UserRole',
-                typeParams: { values: ['ADMIN'] },
-              },
-            },
-          },
+          nativeEnumTypeNames: ['user_role', 'UserRole'],
         },
       },
     };

@@ -131,23 +131,10 @@ describe('createPostgresTypeMap', () => {
 });
 
 describe('extractEnumTypeNames', () => {
-  it('extracts enum type names from annotations', () => {
+  it('extracts enum type names from nativeEnumTypeNames annotation', () => {
     const annotations = {
       pg: {
-        enumTypes: {
-          public: {
-            user_role: {
-              codecId: 'pg/enum@1',
-              nativeType: 'user_role',
-              typeParams: { values: ['USER', 'ADMIN'] },
-            },
-            status: {
-              codecId: 'pg/enum@1',
-              nativeType: 'status',
-              typeParams: { values: ['ACTIVE', 'INACTIVE'] },
-            },
-          },
-        },
+        nativeEnumTypeNames: ['user_role', 'status'],
       },
     };
     const result = extractEnumTypeNames(annotations);
@@ -159,74 +146,28 @@ describe('extractEnumTypeNames', () => {
     expect(extractEnumTypeNames({})).toEqual(new Set());
   });
 
-  it('reads enums nested by schema, keyed by native type', () => {
-    const annotations = {
-      pg: {
-        enumTypes: {
-          public: {
-            application_kind: {
-              codecId: 'pg/enum@1',
-              nativeType: 'application_kind',
-              typeParams: { values: ['complete', 'formless'] },
-            },
-          },
-        },
-      },
-    };
-    expect(extractEnumTypeNames(annotations)).toEqual(new Set(['application_kind']));
-    expect(extractEnumDefinitions(annotations)).toEqual(
-      new Map([['application_kind', ['complete', 'formless']]]),
-    );
+  it('returns empty set when nativeEnumTypeNames is absent', () => {
+    const annotations = { pg: { schema: 'public', version: '15.1' } };
+    expect(extractEnumTypeNames(annotations)).toEqual(new Set());
   });
 
-  it('ignores non-enum storage types while keeping enum codec entries', () => {
+  it('ignores non-string entries in nativeEnumTypeNames', () => {
     const annotations = {
       pg: {
-        enumTypes: {
-          public: {
-            user_role: {
-              codecId: 'pg/enum@1',
-              nativeType: 'user_role',
-              typeParams: { values: ['USER', 'ADMIN'] },
-            },
-            status: {
-              codecId: 'pg/enum@1',
-              nativeType: 'status',
-              typeParams: { values: 'ACTIVE' },
-            },
-            metadata: {
-              codecId: 'pg/json@1',
-              nativeType: 'jsonb',
-              typeParams: {},
-            },
-          },
-        },
+        nativeEnumTypeNames: ['user_role', 42, null, 'status'],
       },
     };
-
     expect(extractEnumTypeNames(annotations)).toEqual(new Set(['user_role', 'status']));
-    expect(extractEnumDefinitions(annotations)).toEqual(
-      new Map([['user_role', ['USER', 'ADMIN']]]),
-    );
   });
 });
 
 describe('extractEnumDefinitions', () => {
-  it('extracts enum definitions', () => {
+  it('returns an empty map (detection-only; values are not captured during introspection)', () => {
     const annotations = {
       pg: {
-        enumTypes: {
-          public: {
-            user_role: {
-              codecId: 'pg/enum@1',
-              nativeType: 'user_role',
-              typeParams: { values: ['USER', 'ADMIN'] },
-            },
-          },
-        },
+        nativeEnumTypeNames: ['user_role'],
       },
     };
-    const result = extractEnumDefinitions(annotations);
-    expect(result.get('user_role')).toEqual(['USER', 'ADMIN']);
+    expect(extractEnumDefinitions(annotations)).toEqual(new Map());
   });
 });

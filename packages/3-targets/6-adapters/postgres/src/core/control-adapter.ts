@@ -1080,10 +1080,22 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
+    const nativeEnumResult = await driver.query<{ typname: string }>(
+      `SELECT t.typname
+         FROM pg_catalog.pg_type t
+         JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+         WHERE t.typtype = 'e'
+           AND n.nspname = $1
+         ORDER BY t.typname`,
+      [schema],
+    );
+    const nativeEnumTypeNames = nativeEnumResult.rows.map((r) => r.typname);
+
     const annotations = {
       pg: {
         schema,
         version: await this.getPostgresVersion(driver),
+        ...(nativeEnumTypeNames.length > 0 && { nativeEnumTypeNames }),
       },
     };
 

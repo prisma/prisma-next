@@ -96,15 +96,7 @@ describe('sqlSchemaIrToPslAst', () => {
       },
       annotations: {
         pg: {
-          enumTypes: {
-            public: {
-              role_t: {
-                codecId: 'pg/enum@1',
-                nativeType: 'role_t',
-                typeParams: { values: ['admin', 'user'] },
-              },
-            },
-          },
+          nativeEnumTypeNames: ['role_t'],
         },
       },
     });
@@ -131,15 +123,7 @@ describe('sqlSchemaIrToPslAst', () => {
       },
       annotations: {
         pg: {
-          enumTypes: {
-            public: {
-              application_kind: {
-                codecId: 'pg/enum@1',
-                nativeType: 'application_kind',
-                typeParams: { values: ['complete', 'formless'] },
-              },
-            },
-          },
+          nativeEnumTypeNames: ['application_kind'],
         },
       },
     });
