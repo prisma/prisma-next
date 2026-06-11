@@ -117,6 +117,30 @@ use the enum itself (`Priority.members.Low` / the `db.enums` accessor), never ra
 member value** (`WHERE priority = Priority.members.High`) — the most common real-world
 usage must be in the proof.
 
+**Amendment (2026-06-11, operator review settlement — general rules, not exceptions):**
+
+- **Block-body grammar (settled vocabulary, rides into the ADR 126 amendment):** a PSL
+  block body may contain *fields* (model-style, already in the grammar), *key-value
+  parameters*, and *`@@` attributes*. The generic-grammar extensions this slice adds
+  are general-purpose: **variadic parameter lists** (a block may accept parameters
+  beyond its declared set — rename the `allowAdditionalParameters` flag accordingly)
+  and **bare identifiers as keys-without-values** (legal in the grammar; semantics
+  owned by the lowering). Bare members stay; R1's value-defaults-to-name sugar stands.
+  A *declared* parameter must be supplied as `key = value`; bare identifiers flow only
+  into the variadic tail.
+- **`interpreterLowered` is deleted in favor of a real factory:** enum2 registers an
+  `entityTypes` factory whose output is the lowering product —
+  `factory: (block, ctx) => EnumTypeHandle` — and `processEnum2Declarations` shrinks
+  to registry dispatch + collection. Two general-purpose context extensions enable
+  this: `AuthoringEntityContext` carries the codec lookup, and factories get a
+  diagnostics channel (span-accurate member-vs-codec validation reports through it).
+  `assertPslBlocksHaveFactories` returns to full strength with no flag. Direction of
+  travel (ADR 225 rewrite, not this slice): all top-level blocks lower via registered
+  factories, built-ins being early-registered.
+- **Spec §5 typing mechanism divergence** found in the same review (columns must be
+  typed from their own `valueSet` ref, not baked domain-derived unions) is **out of
+  this slice** — tracked as TML-2886.
+
 ## Coherence rationale
 
 One outcome a reviewer holds in one sitting: *"the new enum is now authorable through
