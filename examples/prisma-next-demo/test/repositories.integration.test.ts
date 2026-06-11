@@ -1,15 +1,9 @@
-import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { createCacheMiddleware } from '@prisma-next/middleware-cache';
+import postgres from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
-import {
-  type CreateRuntimeOptions,
-  createRuntime,
-  type Runtime,
-  type SqlMiddleware,
-} from '@prisma-next/sql-runtime';
+import type { Runtime, SqlMiddleware } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
-import { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { ormClientAggregateUsers } from '../src/orm-client/aggregate-users';
 import { createOrmClient } from '../src/orm-client/client';
@@ -37,56 +31,36 @@ import { ormClientGetUsersCached } from '../src/orm-client/get-users-cached';
 import { ormClientSearchPostsByEmbedding } from '../src/orm-client/search-posts-by-embedding';
 import { ormClientUpdateUserEmail } from '../src/orm-client/update-user-email';
 import { ormClientUpsertUser } from '../src/orm-client/upsert-user';
+import type { Contract } from '../src/prisma/contract.d';
+import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { db } from '../src/prisma/db';
 import { initTestDatabase } from './utils/control-client';
 
 const context = db.context;
 const { contract } = context;
-const executionStack = db.stack;
-
-async function createTestDriver(connectionString: string) {
-  const stackInstance = instantiateExecutionStack(
-    executionStack,
-  ) as CreateRuntimeOptions['stackInstance'];
-  const driver = stackInstance.driver as unknown as SqlDriver<unknown>;
-  if (!driver) {
-    throw new Error('Driver descriptor missing from execution stack');
-  }
-  const pool = new Pool({ connectionString });
-  try {
-    await driver.connect({ kind: 'pgPool', pool });
-  } catch (error) {
-    await pool.end();
-    throw error;
-  }
-  return { stackInstance, driver };
-}
+const Priority = db.enums.public.Priority;
 
 async function getRuntime(connectionString: string): Promise<Runtime> {
-  const { stackInstance, driver } = await createTestDriver(connectionString);
-  return createRuntime({
-    stackInstance,
-    context,
-    driver,
+  const client = postgres<Contract>({
+    contractJson,
+    url: connectionString,
+    extensions: db.stack.extensionPacks,
   });
+  return client.connect();
 }
 
-/**
- * Creates a runtime wired up with the supplied middleware. Used by
- * cache-middleware tests below; each test owns its own cache instance
- * so entries don't bleed between tests.
- */
 async function getRuntimeWithMiddleware(
   connectionString: string,
   middleware: readonly SqlMiddleware[],
 ): Promise<{ runtime: Runtime; driver: SqlDriver<unknown> }> {
-  const { stackInstance, driver } = await createTestDriver(connectionString);
-  const runtime = createRuntime({
-    stackInstance,
-    context,
-    driver,
+  const client = postgres<Contract>({
+    contractJson,
+    url: connectionString,
     middleware,
+    extensions: db.stack.extensionPacks,
   });
+  const runtime = await client.connect();
+  const driver = (runtime as unknown as { driver: SqlDriver<unknown> }).driver;
   return { runtime, driver };
 }
 
@@ -170,30 +144,35 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
       id: seededPostIds.older,
       title: 'Older post',
       userId: seededUserIds.admin,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-01-01T10:00:00.000Z'),
     },
     {
       id: seededPostIds.newer,
       title: 'Newer post',
       userId: seededUserIds.admin,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-01-02T10:00:00.000Z'),
     },
     {
       id: seededPostIds.memberNote,
       title: 'Other user note',
       userId: seededUserIds.member,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-01-03T10:00:00.000Z'),
     },
     {
       id: seededPostIds.adminDeepDive,
       title: 'Admin deep dive post',
       userId: seededUserIds.adminTwo,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-01-04T10:00:00.000Z'),
     },
     {
       id: seededPostIds.adminZebra,
       title: 'Zebra post note',
       userId: seededUserIds.adminTwo,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-01-05T10:00:00.000Z'),
     },
   ];
@@ -210,6 +189,7 @@ async function seedEmbeddingPosts(runtime: Runtime): Promise<void> {
       id: embeddingPostIds.reference,
       title: 'Reference post',
       userId: seededUserIds.admin,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-02-01T10:00:00.000Z'),
       embedding: makeVector([1, 0, 0]),
     },
@@ -217,6 +197,7 @@ async function seedEmbeddingPosts(runtime: Runtime): Promise<void> {
       id: embeddingPostIds.similar1,
       title: 'Very similar post',
       userId: seededUserIds.member,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-02-02T10:00:00.000Z'),
       embedding: makeVector([0.95, 0.05, 0]),
     },
@@ -224,6 +205,7 @@ async function seedEmbeddingPosts(runtime: Runtime): Promise<void> {
       id: embeddingPostIds.similar2,
       title: 'Somewhat similar post',
       userId: seededUserIds.adminTwo,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-02-03T10:00:00.000Z'),
       embedding: makeVector([0.7, 0.3, 0]),
     },
@@ -231,6 +213,7 @@ async function seedEmbeddingPosts(runtime: Runtime): Promise<void> {
       id: embeddingPostIds.dissimilar,
       title: 'Dissimilar post',
       userId: seededUserIds.admin,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-02-04T10:00:00.000Z'),
       embedding: makeVector([-0.5, -0.5, 0]),
     },

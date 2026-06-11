@@ -18,17 +18,14 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
                 }
               },
               "userId": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/uuid@1",
                   "kind": "scalar"
                 }
               },
@@ -93,15 +90,13 @@
             "profile": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "typeRef": "Uuid"
                 },
                 "userId": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
                   "nullable": false,
                   "typeRef": "Uuid"
@@ -154,10 +149,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:1274e9f6ce2c4b3d89de46cd369727b71b1b01ab3844bf5366f86e2ee4cfd02d",
+    "storageHash": "sha256:066a33747544c0e070987dc62d3bacfef92227a92c45364b800ab3d99f13993c",
     "types": {
       "Uuid": {
-        "codecId": "pg/text@1",
+        "codecId": "pg/uuid@1",
         "kind": "codec-instance",
         "nativeType": "uuid"
       }

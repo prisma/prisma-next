@@ -7,7 +7,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import { errorPostgresMigrationStackMissing } from '../errors';
-import { CreateSchemaCall, CreateTableCall } from './op-factory-call';
+import { AddColumnCall, CreateSchemaCall, CreateTableCall } from './op-factory-call';
 import { type DataTransformOptions, dataTransform } from './operations/data-transform';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
@@ -64,7 +64,7 @@ export abstract class PostgresMigration extends SqlMigration<
     contract: TContract,
     name: string,
     options: DataTransformOptions,
-  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+  ): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
@@ -82,7 +82,7 @@ export abstract class PostgresMigration extends SqlMigration<
     readonly ifNotExists?: boolean;
     readonly columns: readonly DdlColumn[];
     readonly constraints?: readonly DdlTableConstraint[];
-  }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
@@ -102,10 +102,25 @@ export abstract class PostgresMigration extends SqlMigration<
   protected createSchema(options: {
     readonly schema: string;
     readonly ifNotExists?: boolean;
-  }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
     return new CreateSchemaCall(options.schema).toOp(this.controlAdapter);
+  }
+
+  protected addColumn(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly column: DdlColumn;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new AddColumnCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.column,
+    ).toOp(this.controlAdapter);
   }
 }

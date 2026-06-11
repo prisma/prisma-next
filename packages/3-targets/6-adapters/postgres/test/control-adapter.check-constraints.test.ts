@@ -1,5 +1,6 @@
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
 import { PostgresControlAdapter, parseCheckConstraintDef } from '../src/core/control-adapter';
 
 // ---------------------------------------------------------------------------
@@ -89,7 +90,7 @@ describe('parseCheckConstraintDef', () => {
 
 describe('PostgresControlAdapter.introspect — check constraints', () => {
   it('introspects a table with a check constraint and parses the value set', async () => {
-    const adapter = new PostgresControlAdapter();
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
     const mockDriver: SqlControlDriverInstance<'postgres'> = {
       familyId: 'sql',
       targetId: 'postgres',
@@ -143,7 +144,7 @@ describe('PostgresControlAdapter.introspect — check constraints', () => {
   });
 
   it('skips free-form check constraints it cannot parse', async () => {
-    const adapter = new PostgresControlAdapter();
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
     const mockDriver: SqlControlDriverInstance<'postgres'> = {
       familyId: 'sql',
       targetId: 'postgres',
@@ -192,7 +193,7 @@ describe('PostgresControlAdapter.introspect — check constraints', () => {
   });
 
   it('does not add checks property when table has no check constraints', async () => {
-    const adapter = new PostgresControlAdapter();
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
     const mockDriver: SqlControlDriverInstance<'postgres'> = {
       familyId: 'sql',
       targetId: 'postgres',

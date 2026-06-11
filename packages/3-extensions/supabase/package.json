@@ -16,7 +16,15 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
+    "@prisma-next/adapter-postgres": "workspace:0.13.0",
     "@prisma-next/contract": "workspace:0.13.0",
+    "@prisma-next/driver-postgres": "workspace:0.13.0",
+    "@prisma-next/postgres": "workspace:0.13.0",
+    "@prisma-next/sql-builder": "workspace:0.13.0",
+    "@prisma-next/sql-orm-client": "workspace:0.13.0",
+    "@prisma-next/target-postgres": "workspace:0.13.0",
+    "jose": "^5",
+    "pg": "catalog:",
     "@prisma-next/contract-authoring": "workspace:0.13.0",
     "@prisma-next/family-sql": "workspace:0.13.0",
     "@prisma-next/framework-components": "workspace:0.13.0",
@@ -32,18 +40,13 @@
     "arktype": "^2.2.0"
   },
   "devDependencies": {
-    "@prisma-next/adapter-postgres": "workspace:0.13.0",
     "@prisma-next/cli": "workspace:0.13.0",
-    "@prisma-next/driver-postgres": "workspace:0.13.0",
     "@prisma-next/operations": "workspace:0.13.0",
-    "@prisma-next/postgres": "workspace:0.13.0",
     "@prisma-next/sql-contract-psl": "workspace:0.13.0",
-    "@prisma-next/target-postgres": "workspace:0.13.0",
     "@prisma-next/test-utils": "workspace:0.13.0",
     "@prisma-next/tsconfig": "workspace:0.13.0",
     "@prisma-next/tsdown": "workspace:0.13.0",
     "@types/pg": "catalog:",
-    "pg": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

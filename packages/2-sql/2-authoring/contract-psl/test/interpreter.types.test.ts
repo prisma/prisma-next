@@ -56,7 +56,7 @@ model Event {
     if (!result.ok) return;
 
     expect(documentScopedTypes(result.value)).toMatchObject({
-      Id: { codecId: 'pg/text@1', nativeType: 'uuid' },
+      Id: { codecId: 'pg/uuid@1', nativeType: 'uuid' },
       Slug: {
         codecId: 'sql/varchar@1',
         nativeType: 'character varying',
@@ -83,7 +83,7 @@ model Event {
             table: {
               event: {
                 columns: {
-                  id: { codecId: 'pg/text@1', nativeType: 'uuid', nullable: false, typeRef: 'Id' },
+                  id: { codecId: 'pg/uuid@1', nativeType: 'uuid', nullable: false, typeRef: 'Id' },
                   slug: {
                     codecId: 'sql/varchar@1',
                     nativeType: 'character varying',

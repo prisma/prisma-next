@@ -736,7 +736,8 @@ describe('printPslFromAst', () => {
   });
 
   it('parser → printer → parser round-trip for a small schema', () => {
-    const source = `// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+    const source = `// use prisma-next
+// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
 model User {
   id    Int    @id
@@ -973,7 +974,8 @@ namespace auth {
     it('parser → printer → parser round-trip for a cross-space colon-prefix field', () => {
       // AC2: a field authored as `supabase:auth.User` must survive a full
       // text→parse→print→text round-trip with the colon-prefix intact.
-      const source = `// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      const source = `// use prisma-next
+// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
 model Profile {
   id     Int             @id

@@ -1,4 +1,5 @@
 import type { CrossReference } from './cross-reference';
+import type { JsonValue } from './types';
 import type { ValueSetRef } from './value-set-ref';
 
 export type ScalarFieldType = {
@@ -34,7 +35,7 @@ export type ContractField = {
  */
 export type ContractEnum = {
   readonly codecId: string;
-  readonly members: readonly { readonly name: string; readonly value: string }[];
+  readonly members: readonly { readonly name: string; readonly value: JsonValue }[];
 };
 
 export type ContractRelationOn = {

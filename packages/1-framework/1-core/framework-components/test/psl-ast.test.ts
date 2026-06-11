@@ -17,7 +17,7 @@ function makeModel(name: string): PslModel {
 }
 
 function makeExtensionBlock(discriminator: string, name: string): PslExtensionBlock {
-  return { kind: discriminator, name, parameters: {}, span: SPAN };
+  return { kind: discriminator, name, parameters: {}, blockAttributes: [], span: SPAN };
 }
 
 describe('makePslNamespace / makePslNamespaceEntries', () => {

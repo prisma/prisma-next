@@ -12,6 +12,8 @@ import {
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createSqliteBuiltinCodecLookup } from '../../src/core/codec-lookup';
+import { SqliteControlAdapter } from '../../src/core/control-adapter';
 
 const HOOKED_CODEC = 'cs/string@1';
 
@@ -72,9 +74,11 @@ function makeFrameworkComponents(
 }
 
 describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
-  const planner = createSqliteMigrationPlanner();
+  const planner = createSqliteMigrationPlanner(
+    new SqliteControlAdapter(createSqliteBuiltinCodecLookup()),
+  );
 
-  it('inlines ops emitted by onFieldEvent after structural DDL', () => {
+  it('inlines ops emitted by onFieldEvent after structural DDL', async () => {
     const hooks: CodecControlHooks = {
       onFieldEvent: (event, ctx) => [
         wrapOp({
@@ -109,12 +113,13 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
 
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
-    const ids = result.plan.operations.map((op) => op.id);
+    const ops = await Promise.all(result.plan.operations);
+    const ids = ops.map((op) => op.id);
     expect(ids[ids.length - 1]).toBe('codec.added.User.email');
     expect(ids).toContain('table.User');
   });
 
-  it('fires on field drop in app-space (verifies M2 R1 wiring across event kinds)', () => {
+  it('fires on field drop in app-space (verifies M2 R1 wiring across event kinds)', async () => {
     const events: string[] = [];
     const hooks: CodecControlHooks = {
       onFieldEvent: (event, ctx) => {
@@ -169,11 +174,12 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
     expect(events).toContain('dropped:User.email');
-    const ids = result.plan.operations.map((op) => op.id);
+    const ops = await Promise.all(result.plan.operations);
+    const ids = ops.map((op) => op.id);
     expect(ids).toContain('codec.dropped.User.email');
   });
 
-  it('does not fire when no codec has an onFieldEvent hook', () => {
+  it('does not fire when no codec has an onFieldEvent hook', async () => {
     const result = planner.plan({
       contract: contract(
         {
@@ -190,10 +196,11 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
 
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
-    expect(result.plan.operations.every((op) => !op.id.startsWith('codec.'))).toBe(true);
+    const ops = await Promise.all(result.plan.operations);
+    expect(ops.every((op) => !op.id.startsWith('codec.'))).toBe(true);
   });
 
-  it('produces byte-identical operations across re-emits (deterministic)', () => {
+  it('produces byte-identical operations across re-emits (deterministic)', async () => {
     const hooks: CodecControlHooks = {
       onFieldEvent: (event, ctx) => [
         wrapOp({
@@ -241,6 +248,10 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
     expect(a.kind).toBe('success');
     expect(b.kind).toBe('success');
     if (a.kind !== 'success' || b.kind !== 'success') return;
-    expect(JSON.stringify(a.plan.operations)).toBe(JSON.stringify(b.plan.operations));
+    const [aOps, bOps] = await Promise.all([
+      Promise.all(a.plan.operations),
+      Promise.all(b.plan.operations),
+    ]);
+    expect(JSON.stringify(aOps)).toBe(JSON.stringify(bOps));
   });
 });

@@ -36,6 +36,7 @@ import {
   sqlTimestampDescriptor,
   sqlVarcharDescriptor,
 } from '@prisma-next/sql-relational-core/ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import {
@@ -77,6 +78,7 @@ import {
   PG_TIMESTAMP_CODEC_ID,
   PG_TIMESTAMPTZ_CODEC_ID,
   PG_TIMETZ_CODEC_ID,
+  PG_UUID_CODEC_ID,
   PG_VARBIT_CODEC_ID,
   PG_VARCHAR_CODEC_ID,
 } from './codec-ids';
@@ -789,6 +791,47 @@ export const pgByteaColumn = () =>
 pgByteaColumn satisfies ColumnHelperFor<PgByteaDescriptor>;
 pgByteaColumn satisfies ColumnHelperForStrict<PgByteaDescriptor>;
 
+const PG_UUID_META = { db: { sql: { postgres: { nativeType: 'uuid' } } } } as const;
+
+export class PgUuidCodec extends CodecImpl<
+  typeof PG_UUID_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string
+> {
+  async encode(value: string, _ctx: CodecCallContext): Promise<string> {
+    return value;
+  }
+  async decode(wire: string, _ctx: CodecCallContext): Promise<string> {
+    return wire;
+  }
+  encodeJson(value: string): JsonValue {
+    return value;
+  }
+  decodeJson(json: JsonValue): string {
+    return blindCast<string, 'uuid columns serialize to JSON as their wire string form'>(json);
+  }
+}
+
+export class PgUuidDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_UUID_CODEC_ID;
+  override readonly traits = ['equality', 'order'] as const;
+  override readonly targetTypes = ['uuid'] as const;
+  override readonly meta = PG_UUID_META;
+  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override factory(): (ctx: CodecInstanceContext) => PgUuidCodec {
+    return () => new PgUuidCodec(this);
+  }
+}
+
+export const pgUuidDescriptor = new PgUuidDescriptor();
+
+export const pgUuidColumn = () =>
+  column(pgUuidDescriptor.factory(), pgUuidDescriptor.codecId, undefined, 'uuid');
+
+pgUuidColumn satisfies ColumnHelperFor<PgUuidDescriptor>;
+pgUuidColumn satisfies ColumnHelperForStrict<PgUuidDescriptor>;
+
 export class PgIntervalCodec extends CodecImpl<
   typeof PG_INTERVAL_CODEC_ID,
   readonly ['equality', 'order'],
@@ -1080,6 +1123,7 @@ export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   pgBitDescriptor,
   pgVarbitDescriptor,
   pgByteaDescriptor,
+  pgUuidDescriptor,
   pgIntervalDescriptor,
   pgEnumDescriptor,
   pgJsonDescriptor,

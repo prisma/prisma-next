@@ -13,7 +13,7 @@ This project depends on [TML-2459 — Target-Extensible IR](../target-extensible
 
 This project depends on [control-policy](../control-policy/spec.md) for verifier severity dispatch on `missing_rls_policy`, `extra_rls_policy`, `missing_role`.
 
-This project can run in parallel with [cross-contract-refs](../cross-contract-refs/spec.md) and [runtime-target-layer](../runtime-target-layer/spec.md). The TS `ref()` helper consumes cross-contract model handles transparently — no integration work between the two projects beyond the brand contract already established by cross-contract-refs.
+This project can run in parallel with [cross-contract-refs](../cross-contract-refs/spec.md) and [runtime-target-layer](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md). The TS `ref()` helper consumes cross-contract model handles transparently — no integration work between the two projects beyond the brand contract already established by cross-contract-refs.
 
 [extension-supabase](../extension-supabase/spec.md) consumes this project's deliverables (RLS authoring + roles introspection) to declare Supabase's standard roles + canonical example contract.
 

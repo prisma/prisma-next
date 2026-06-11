@@ -132,20 +132,29 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
 
 export function extractEnumInfo(annotations?: Record<string, unknown>): EnumInfo {
   const pgAnnotations = annotations?.['pg'] as Record<string, unknown> | undefined;
-  const storageTypes = pgAnnotations?.['storageTypes'] as
-    | Record<string, { codecId: string; nativeType: string; typeParams?: Record<string, unknown> }>
+  const enumTypes = pgAnnotations?.['enumTypes'] as
+    | Record<
+        string,
+        Record<
+          string,
+          { codecId: string; nativeType: string; typeParams?: Record<string, unknown> }
+        >
+      >
     | undefined;
 
   const typeNames = new Set<string>();
   const definitions = new Map<string, readonly string[]>();
 
-  if (storageTypes) {
-    for (const [key, typeInstance] of Object.entries(storageTypes)) {
-      if (typeInstance.codecId === ENUM_CODEC_ID) {
-        typeNames.add(key);
-        const values = typeInstance.typeParams?.['values'];
-        if (Array.isArray(values)) {
-          definitions.set(key, values as string[]);
+  if (enumTypes) {
+    for (const bySchema of Object.values(enumTypes)) {
+      for (const typeInstance of Object.values(bySchema)) {
+        if (typeInstance.codecId === ENUM_CODEC_ID) {
+          const nativeType = typeInstance.nativeType;
+          typeNames.add(nativeType);
+          const values = typeInstance.typeParams?.['values'];
+          if (Array.isArray(values) && values.every((v): v is string => typeof v === 'string')) {
+            definitions.set(nativeType, values);
+          }
         }
       }
     }

@@ -6,7 +6,6 @@ import {
 import {
   asNamespaceId,
   type ColumnDefault,
-  type ColumnDefaultLiteralInputValue,
   type Contract,
   type ContractEnum,
   type ContractField,
@@ -63,16 +62,15 @@ type DomainFieldRef =
   | { readonly kind: 'scalar'; readonly many?: boolean }
   | { readonly kind: 'valueObject'; readonly name: string; readonly many?: boolean };
 
-function encodeDefaultLiteralValue(
-  value: ColumnDefaultLiteralInputValue,
-  codecId: string,
-  codecLookup?: CodecLookup,
-): JsonValue {
+function encodeViaCodec(value: unknown, codecId: string, codecLookup?: CodecLookup): JsonValue {
   const codec = codecLookup?.get(codecId);
   if (codec) {
     return codec.encodeJson(value);
   }
-  return value as JsonValue;
+  return blindCast<
+    JsonValue,
+    'no codec lookup at build time: literal/enum member value is already JSON-safe'
+  >(value);
 }
 
 function encodeColumnDefault(
@@ -85,7 +83,7 @@ function encodeColumnDefault(
   }
   return {
     kind: 'literal',
-    value: encodeDefaultLiteralValue(defaultInput.value, codecId, codecLookup),
+    value: encodeViaCodec(defaultInput.value, codecId, codecLookup),
   };
 }
 
@@ -451,9 +449,9 @@ export function buildSqlContractFromDefinition(
         enumHandle !== undefined
           ? {
               plane: 'storage',
-              entityKind: 'value-set',
+              entityKind: 'valueSet',
               namespaceId: defaultNamespaceId,
-              name: enumHandle.enumName,
+              entityName: enumHandle.enumName,
             }
           : undefined;
       const domainValueSetRef: ValueSetRef | undefined =
@@ -462,7 +460,7 @@ export function buildSqlContractFromDefinition(
               plane: 'domain',
               entityKind: 'enum',
               namespaceId: defaultNamespaceId,
-              name: enumHandle.enumName,
+              entityName: enumHandle.enumName,
             }
           : undefined;
 
@@ -771,7 +769,10 @@ export function buildSqlContractFromDefinition(
     }
     domainSlot[enumName] = {
       codecId: handle.codecId,
-      members: handle.enumMembers,
+      members: handle.enumMembers.map((m) => ({
+        name: m.name,
+        value: encodeViaCodec(m.value, handle.codecId, codecLookup),
+      })),
     };
 
     let storageSlot = storageValueSetsByNs[nsId];
@@ -780,8 +781,8 @@ export function buildSqlContractFromDefinition(
       storageValueSetsByNs[nsId] = storageSlot;
     }
     storageSlot[enumName] = {
-      kind: 'value-set',
-      values: handle.values,
+      kind: 'valueSet',
+      values: handle.values.map((v) => encodeViaCodec(v, handle.codecId, codecLookup)),
     };
   }
 

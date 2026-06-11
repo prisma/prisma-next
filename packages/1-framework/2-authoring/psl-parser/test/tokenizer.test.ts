@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Token } from '../src/tokenizer';
-import { Tokenizer } from '../src/tokenizer';
+import { isTerminatedStringLiteral, Tokenizer } from '../src/tokenizer';
 
 const KIND_COLUMN_WIDTH = 15;
 
@@ -132,6 +132,32 @@ describe('Tokenizer', () => {
       `);
     });
 
+    it('tokenizes NaN / Infinity / -Infinity as number literals', () => {
+      expect(tokenize('NaN')).toMatchInlineSnapshot(`
+        "NumberLiteral  "NaN"
+        Eof            """
+      `);
+      expect(tokenize('Infinity')).toMatchInlineSnapshot(`
+        "NumberLiteral  "Infinity"
+        Eof            """
+      `);
+      expect(tokenize('-Infinity')).toMatchInlineSnapshot(`
+        "NumberLiteral  "-Infinity"
+        Eof            """
+      `);
+    });
+
+    it('keeps identifier-continued forms (Infinityx / NaNxyz) as identifiers', () => {
+      expect(tokenize('Infinityx')).toMatchInlineSnapshot(`
+        "Ident          "Infinityx"
+        Eof            """
+      `);
+      expect(tokenize('NaNxyz')).toMatchInlineSnapshot(`
+        "Ident          "NaNxyz"
+        Eof            """
+      `);
+    });
+
     it('handles string escapes and unterminated strings', () => {
       expect(tokenize('"hello \\"world\\""')).toMatchInlineSnapshot(`
         "StringLiteral  "\\"hello \\\\\\"world\\\\\\"\\""
@@ -216,5 +242,27 @@ describe('Tokenizer', () => {
       t.next(); // Eof
       expect(t.peek(0).kind).toBe('Eof');
     });
+  });
+});
+
+describe('isTerminatedStringLiteral', () => {
+  it('treats a literal with a closing quote as terminated', () => {
+    expect(isTerminatedStringLiteral('"ok"')).toBe(true);
+  });
+
+  it('treats an empty string literal as terminated', () => {
+    expect(isTerminatedStringLiteral('""')).toBe(true);
+  });
+
+  it('treats a literal with no closing quote as unterminated', () => {
+    expect(isTerminatedStringLiteral('"oops')).toBe(false);
+  });
+
+  it('treats a trailing escaped quote as not closing the literal', () => {
+    expect(isTerminatedStringLiteral('"a\\"')).toBe(false);
+  });
+
+  it('treats a real closing quote after an escaped quote as terminated', () => {
+    expect(isTerminatedStringLiteral('"a\\""')).toBe(true);
   });
 });

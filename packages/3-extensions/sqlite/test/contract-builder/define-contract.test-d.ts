@@ -24,7 +24,7 @@ expectTypeOf<ContractModelDefinitions<typeof withModel>['User']>().not.toBeNever
 
 const withFactory = defineContract({}, ({ model: m, field: f }) => ({
   models: {
-    Post: m('Post', { fields: { id: f.id.uuidv4() } }),
+    Post: m('Post', { fields: { id: f.id.uuidv4String() } }),
   },
 }));
 expectTypeOf(withFactory.target).toEqualTypeOf<'sqlite'>();

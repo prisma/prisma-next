@@ -35,8 +35,12 @@ import {
   StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import type { CodecRef, DdlColumn } from '@prisma-next/sql-relational-core/ast';
+import { col } from '@prisma-next/sql-relational-core/contract-free';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
+import type { JsonValue } from '@prisma-next/utils/json';
 import { PostgresEnumType } from '../postgres-enum-type';
 import { isPostgresSchema } from '../postgres-schema';
 import {
@@ -54,15 +58,12 @@ import {
   DropCheckConstraintCall,
   DropEnumTypeCall,
   type PostgresOpFactoryCall,
+  postgresDefaultToDdlColumnDefault,
   RawSqlCall,
   RenameTypeCall,
   SetNotNullCall,
 } from './op-factory-call';
-import {
-  buildAddColumnSql,
-  buildColumnDefaultSql,
-  buildColumnTypeSql,
-} from './planner-ddl-builders';
+import { buildAddColumnSql, buildColumnTypeSql } from './planner-ddl-builders';
 import { resolveIdentityValue } from './planner-identity-values';
 import {
   buildAddColumnOperationIdentity,
@@ -77,6 +78,7 @@ import {
   tableIsEmptyCheck,
 } from './planner-sql-checks';
 import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
+import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
 const REBUILD_SUFFIX = '__prisma_next_new';
 
@@ -244,21 +246,37 @@ function buildColumnSpec(
   column: string,
   ctx: StrategyContext,
   overrides?: { nullable?: boolean },
-) {
-  const col = tableAt(ctx.toContract.storage, namespaceId, table)?.columns[column];
-  if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
+): DdlColumn {
+  const storageCol = tableAt(ctx.toContract.storage, namespaceId, table)?.columns[column];
+  if (!storageCol)
+    throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
   const mutableTypes = ctx.storageTypes as Record<
     string,
     StorageTypeInstance | PostgresEnumStorageEntry
   >;
-  return {
-    name: column,
-    typeSql: buildColumnTypeSql(col, mutableHooks, mutableTypes),
-    defaultSql: buildColumnDefaultSql(col.default, col),
-    columnDefault: col.default,
-    nullable: overrides?.nullable ?? col.nullable,
-  };
+  const typeSql = buildColumnTypeSql(storageCol, mutableHooks, mutableTypes);
+  const ddlDefault = postgresDefaultToDdlColumnDefault(storageCol.default);
+  const resolved = resolveColumnTypeMetadata(storageCol, mutableTypes);
+  const typeParams =
+    resolved.typeParams === undefined
+      ? undefined
+      : blindCast<
+          JsonValue,
+          'resolved.typeParams is JsonValue-shaped storage metadata; the narrowed value lands in CodecRef.typeParams which is JsonValue'
+        >(resolved.typeParams);
+  const codecRef: CodecRef | undefined = resolved.codecId
+    ? {
+        codecId: resolved.codecId,
+        ...ifDefined('typeParams', typeParams),
+      }
+    : undefined;
+  const nullable = overrides?.nullable ?? storageCol.nullable;
+  return col(column, typeSql, {
+    ...(!nullable ? { notNull: true } : {}),
+    ...ifDefined('default', ddlDefault),
+    ...ifDefined('codecRef', codecRef),
+  });
 }
 
 function buildAlterTypeOptions(

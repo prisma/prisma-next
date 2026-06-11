@@ -1,4 +1,4 @@
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { CodecRegistry } from '@prisma-next/framework-components/codec';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type {
   Adapter,
@@ -13,7 +13,6 @@ import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expressio
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { PostgresControlAdapter } from './control-adapter';
-import { renderLoweredDdl } from './ddl-renderer';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
@@ -42,7 +41,7 @@ class PostgresAdapterImpl
   readonly targetId = 'postgres' as const;
 
   readonly profile: AdapterProfile<'postgres'>;
-  private readonly codecLookup: CodecLookup;
+  private readonly codecLookup: CodecRegistry;
 
   constructor(options?: PostgresAdapterOptions) {
     this.codecLookup = options?.codecLookup ?? createPostgresBuiltinCodecLookup();
@@ -75,7 +74,9 @@ class PostgresAdapterImpl
     context: LowererContext<PostgresContract>,
   ): PostgresLoweredStatement {
     if (isDdlNode(ast)) {
-      return renderLoweredDdl(ast);
+      throw new Error(
+        'lower() does not lower DDL on the runtime adapter — DDL lowering is a control-plane concern handled by the control adapter.',
+      );
     }
     return renderLoweredSql(ast, context.contract, this.codecLookup);
   }

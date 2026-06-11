@@ -22,7 +22,7 @@
 
 import { errorUnfilledPlaceholder } from '@prisma-next/errors/migration';
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecuteRequestLowerer, Lowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
   OpFactoryCall as FrameworkOpFactoryCall,
   MigrationOperationClass,
@@ -36,11 +36,11 @@ import type {
 import { FunctionColumnDefault, LiteralColumnDefault } from '@prisma-next/sql-relational-core/ast';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import * as contractFreeDdl from '../../contract-free/ddl';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import {
-  addColumn,
   alterColumnType,
   dropColumn,
   dropDefault,
@@ -59,10 +59,10 @@ import {
 import { createExtension } from './operations/dependencies';
 import { addEnumValues, createEnumType, dropEnumType, renameType } from './operations/enums';
 import { createIndex, dropIndex } from './operations/indexes';
-import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
+import type { ForeignKeySpec } from './operations/shared';
 import { step, targetDetails } from './operations/shared';
 import { dropTable } from './operations/tables';
-import { toRegclassLiteral } from './planner-sql-checks';
+import { columnExistsCheck, toRegclassLiteral } from './planner-sql-checks';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
@@ -81,11 +81,15 @@ type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 // transitive package on disk.
 const POSTGRES_MIGRATION_FACADE = '@prisma-next/postgres/migration';
 
+function boundSchema(schemaName: string): string | undefined {
+  return schemaName === UNBOUND_NAMESPACE_ID ? undefined : schemaName;
+}
+
 abstract class PostgresOpFactoryCallNode extends TsExpression implements FrameworkOpFactoryCall {
   abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
-  abstract toOp(lowerer?: Lowerer): Op;
+  abstract toOp(lowerer?: Lowerer): Op | Promise<Op>;
 
   importRequirements(): readonly ImportRequirement[] {
     return [{ moduleSpecifier: POSTGRES_MIGRATION_FACADE, symbol: this.factoryName }];
@@ -213,19 +217,19 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(lowerer?: Lowerer): Op {
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
         `CreateTableCall.toOp: a DDL lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
     const ddlNode = contractFreeDdl.createTable({
-      ...(this.schemaName !== UNBOUND_NAMESPACE_ID ? { schema: this.schemaName } : {}),
+      ...ifDefined('schema', boundSchema(this.schemaName)),
       table: this.tableName,
       columns: this.columns,
-      ...(this.constraints ? { constraints: this.constraints } : {}),
+      ...ifDefined('constraints', this.constraints),
     });
-    const { sql } = lowerer.lower(ddlNode, { contract: {} });
+    const statement = await lowerer.lowerToExecuteRequest(ddlNode);
     const schemaName = this.schemaName;
     const tableName = this.tableName;
     return {
@@ -240,7 +244,13 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
           `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NULL`,
         ),
       ],
-      execute: [step(`create table "${tableName}"`, sql)],
+      execute: [
+        {
+          description: `create table "${tableName}"`,
+          sql: statement.sql,
+          params: statement.params ?? [],
+        },
+      ],
       postcheck: [
         step(
           `verify table "${tableName}" exists`,
@@ -315,10 +325,10 @@ export class AddColumnCall extends PostgresOpFactoryCallNode {
   readonly operationClass = 'additive' as const;
   readonly schemaName: string;
   readonly tableName: string;
-  readonly column: ColumnSpec;
+  readonly column: DdlColumn;
   readonly label: string;
 
-  constructor(schemaName: string, tableName: string, column: ColumnSpec) {
+  constructor(schemaName: string, tableName: string, column: DdlColumn) {
     super();
     this.schemaName = schemaName;
     this.tableName = tableName;
@@ -327,12 +337,65 @@ export class AddColumnCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
-    return addColumn(this.schemaName, this.tableName, this.column);
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `AddColumnCall.toOp: a DDL lowerer is required on the Postgres planner path (column "${this.column.name}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    const ddlNode = contractFreeDdl.alterTable({
+      ...ifDefined('schema', boundSchema(this.schemaName)),
+      table: this.tableName,
+      actions: [contractFreeDdl.addColumnAction(this.column)],
+    });
+    const statement = await lowerer.lowerToExecuteRequest(ddlNode);
+    const schemaName = this.schemaName;
+    const tableName = this.tableName;
+    const columnName = this.column.name;
+    return {
+      id: `column.${tableName}.${columnName}`,
+      label: `Add column "${columnName}" to "${tableName}"`,
+      operationClass: 'additive',
+      target: targetDetails('column', columnName, schemaName, tableName),
+      precheck: [
+        step(
+          `ensure column "${columnName}" is missing`,
+          columnExistsCheck({
+            schema: schemaName,
+            table: tableName,
+            column: columnName,
+            exists: false,
+          }),
+        ),
+      ],
+      execute: [step(`add column "${columnName}"`, statement.sql)],
+      postcheck: [
+        step(
+          `verify column "${columnName}" exists`,
+          columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
+        ),
+      ],
+    };
   }
 
   renderTypeScript(): string {
-    return `addColumn(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.column)})`;
+    const opts: string[] = [];
+    if (this.schemaName !== UNBOUND_NAMESPACE_ID) {
+      opts.push(`schema: ${jsonToTsSource(this.schemaName)}`);
+    }
+    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`column: ${renderDdlColumnAsTsCall(this.column)}`);
+    return `this.addColumn({ ${opts.join(', ')} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    const req: ImportRequirement[] = [
+      { moduleSpecifier: POSTGRES_MIGRATION_FACADE, symbol: 'col' },
+    ];
+    for (const sym of defaultImportSymbols([this.column])) {
+      req.push({ moduleSpecifier: POSTGRES_MIGRATION_FACADE, symbol: sym });
+    }
+    return req;
   }
 }
 
@@ -1016,14 +1079,14 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(lowerer?: Lowerer): Op {
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
         `CreateSchemaCall.toOp: a DDL lowerer is required on the Postgres planner path (schema "${this.schemaName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
     const ddlNode = contractFreeDdl.createSchema({ schema: this.schemaName, ifNotExists: true });
-    const { sql } = lowerer.lower(ddlNode, { contract: {} });
+    const statement = await lowerer.lowerToExecuteRequest(ddlNode);
     const schemaName = this.schemaName;
     return {
       id: `schema.${schemaName}`,
@@ -1031,7 +1094,13 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
       operationClass: 'additive',
       target: { id: 'postgres' },
       precheck: [],
-      execute: [step(`Create schema "${schemaName}"`, sql)],
+      execute: [
+        {
+          description: `Create schema "${schemaName}"`,
+          sql: statement.sql,
+          params: statement.params ?? [],
+        },
+      ],
       postcheck: [],
     };
   }

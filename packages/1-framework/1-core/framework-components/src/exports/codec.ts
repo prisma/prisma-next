@@ -16,6 +16,7 @@ export type {
   CodecLookup,
   CodecMeta,
   CodecRef,
+  CodecRegistry,
   CodecTrait,
 } from '../shared/codec-types';
 export { emptyCodecLookup, voidParamsSchema } from '../shared/codec-types';
@@ -26,3 +27,4 @@ export type {
   ColumnTypeDescriptor,
 } from '../shared/column-spec';
 export { column } from '../shared/column-spec';
+export { materializeCodec, validateCodecTypeParams } from '../shared/resolve-codec';

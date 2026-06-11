@@ -75,7 +75,7 @@ describe('value-set serializer hydration + round-trip', () => {
 
     const valueSet = hydrated.storage.namespaces['public']?.entries.valueSet?.['Role'];
     expect(valueSet).toBeInstanceOf(StorageValueSet);
-    expect(valueSet?.kind).toBe('value-set');
+    expect(valueSet?.kind).toBe('valueSet');
     expect(valueSet?.values).toEqual(['user', 'admin']);
   });
 
@@ -85,7 +85,7 @@ describe('value-set serializer hydration + round-trip', () => {
     const hydrated = serializer.deserializeContract(json) as Contract<SqlStorage>;
 
     const valueSet = hydrated.storage.namespaces['public']?.entries.valueSet?.['Role'];
-    expect(valueSet?.kind).toBe('value-set');
+    expect(valueSet?.kind).toBe('valueSet');
   });
 
   it('domain enum slot round-trips as plain data', () => {
@@ -112,9 +112,9 @@ describe('value-set serializer hydration + round-trip', () => {
     const roleColumn = storageNs?.entries.table?.['Post']?.columns?.['role'];
     expect(roleColumn?.valueSet).toEqual({
       plane: 'storage',
-      entityKind: 'value-set',
+      entityKind: 'valueSet',
       namespaceId: 'public',
-      name: 'Role',
+      entityName: 'Role',
     });
   });
 
@@ -129,7 +129,7 @@ describe('value-set serializer hydration + round-trip', () => {
       plane: 'domain',
       entityKind: 'enum',
       namespaceId: 'public',
-      name: 'Role',
+      entityName: 'Role',
     });
   });
 
@@ -183,7 +183,7 @@ describe('validators — value-set and enum', () => {
     const namespaces = storage['namespaces'] as Record<string, unknown>;
     const publicNs = namespaces['public'] as Record<string, unknown>;
     const entries = publicNs['entries'] as Record<string, unknown>;
-    entries['valueSet'] = { Role: { kind: 'value-set' } }; // missing values
+    entries['valueSet'] = { Role: { kind: 'valueSet' } }; // missing values
     expect(() => validateSqlContractFully(json)).toThrow();
   });
 
@@ -193,7 +193,7 @@ describe('validators — value-set and enum', () => {
     const namespaces = storage['namespaces'] as Record<string, unknown>;
     const publicNs = namespaces['public'] as Record<string, unknown>;
     const entries = publicNs['entries'] as Record<string, unknown>;
-    entries['valueSet'] = { Role: { kind: 'value-set', values: 'not-an-array' } };
+    entries['valueSet'] = { Role: { kind: 'valueSet', values: 'not-an-array' } };
     expect(() => validateSqlContractFully(json)).toThrow();
   });
 

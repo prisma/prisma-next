@@ -1,5 +1,8 @@
 import { type Contract, profileHash, type StorageHashBase } from '@prisma-next/contract/types';
-import type { OpFactoryCall } from '@prisma-next/framework-components/control';
+import type {
+  MigrationPlanOperation,
+  OpFactoryCall,
+} from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   buildSqlNamespace,
@@ -149,7 +152,9 @@ describe('planFieldEventOperations', () => {
         newTablePresent: true,
       },
     ]);
-    expect(ops.map((o) => o.toOp().id)).toEqual(['add-search-config-User-email']);
+    expect(ops.map((o) => (o.toOp() as MigrationPlanOperation).id)).toEqual([
+      'add-search-config-User-email',
+    ]);
   });
 
   it("fires 'dropped' once per dropped field on the prior field's codec", () => {
@@ -184,7 +189,9 @@ describe('planFieldEventOperations', () => {
         newTablePresent: false,
       },
     ]);
-    expect(ops.map((o) => o.toOp().id)).toEqual(['remove-search-config-User-email']);
+    expect(ops.map((o) => (o.toOp() as MigrationPlanOperation).id)).toEqual([
+      'remove-search-config-User-email',
+    ]);
   });
 
   it("fires 'altered' when nullable changes", () => {
@@ -379,7 +386,11 @@ describe('planFieldEventOperations', () => {
       codecHooks,
     });
 
-    expect(ops.map((o) => o.toOp().id)).toEqual(['first', 'second', 'third']);
+    expect(ops.map((o) => (o.toOp() as MigrationPlanOperation).id)).toEqual([
+      'first',
+      'second',
+      'third',
+    ]);
   });
 
   it('returns an empty list when the hook returns an empty array', () => {
@@ -425,7 +436,7 @@ describe('planFieldEventOperations', () => {
     });
 
     expect(cs.calls.map((c) => c.event)).toEqual(['added', 'dropped', 'altered']);
-    expect(ops.map((o) => o.toOp().id)).toEqual([
+    expect(ops.map((o) => (o.toOp() as MigrationPlanOperation).id)).toEqual([
       'added:toAdd',
       'dropped:toDrop',
       'altered:toAlter',
@@ -549,7 +560,7 @@ describe('planFieldEventOperations', () => {
       codecHooks,
     });
 
-    expect(ops.map((o) => o.toOp().id)).toEqual([
+    expect(ops.map((o) => (o.toOp() as MigrationPlanOperation).id)).toEqual([
       'added:Add.x',
       'added:Add.y',
       'dropped:Drop.a',

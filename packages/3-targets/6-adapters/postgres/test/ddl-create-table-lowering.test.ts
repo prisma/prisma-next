@@ -1,11 +1,12 @@
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import { PostgresCreateTable } from '@prisma-next/target-postgres/ddl';
 import { describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../src/core/adapter';
+import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
+import { PostgresControlAdapter } from '../src/core/control-adapter';
 import type { PostgresContract } from '../src/core/types';
 
 describe('PostgresCreateTable DDL lowering', () => {
-  it('renders IF NOT EXISTS on schema-qualified create table', () => {
+  it('renders IF NOT EXISTS on schema-qualified create table', async () => {
     const ast = new PostgresCreateTable({
       schema: 'prisma_contract',
       table: 'marker',
@@ -16,8 +17,8 @@ describe('PostgresCreateTable DDL lowering', () => {
       ],
     });
 
-    const adapter = createPostgresAdapter();
-    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toBe(
       'CREATE TABLE IF NOT EXISTS "prisma_contract"."marker" (\n  "space" text NOT NULL PRIMARY KEY,\n  "core_hash" text NOT NULL\n)',
@@ -25,7 +26,7 @@ describe('PostgresCreateTable DDL lowering', () => {
     expect(lowered.params).toEqual([]);
   });
 
-  it('renders each column default shape', () => {
+  it('renders each column default shape', async () => {
     const ast = new PostgresCreateTable({
       table: 'defaults',
       columns: [
@@ -39,8 +40,8 @@ describe('PostgresCreateTable DDL lowering', () => {
       ],
     });
 
-    const adapter = createPostgresAdapter();
-    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain(`"a" text DEFAULT 'x'`);
     expect(lowered.sql).toContain('"b" int DEFAULT 7');
@@ -52,31 +53,31 @@ describe('PostgresCreateTable DDL lowering', () => {
     expect(lowered.sql).not.toContain('autoincrement');
   });
 
-  it('escapes single quotes in string-literal defaults', () => {
+  it('escapes single quotes in string-literal defaults', async () => {
     const ast = new PostgresCreateTable({
       table: 'defaults',
       columns: [col('name', 'text', { default: lit("O'Reilly") })],
     });
 
-    const adapter = createPostgresAdapter();
-    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain(`"name" text DEFAULT 'O''Reilly'`);
   });
 
-  it('escapes single quotes in JSON-object literal defaults on jsonb columns and adds the ::jsonb cast', () => {
+  it('escapes single quotes in JSON-object literal defaults on jsonb columns and adds the ::jsonb cast', async () => {
     const ast = new PostgresCreateTable({
       table: 'defaults',
       columns: [col('meta', 'jsonb', { default: lit({ a: "x'y" }) })],
     });
 
-    const adapter = createPostgresAdapter();
-    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain(`"meta" jsonb DEFAULT '{"a":"x''y"}'::jsonb`);
   });
 
-  it('casts a string literal default to the column type on non-text columns', () => {
+  it('casts a string literal default to the column type on non-text columns', async () => {
     // The literal `'abc-...'` parses as `text` by default; without the
     // cast Postgres would attempt an implicit text → uuid coercion at
     // default-evaluation time, which exists for some target types
@@ -91,8 +92,8 @@ describe('PostgresCreateTable DDL lowering', () => {
         col('birthdate', 'date', { default: lit('2024-01-01') }),
       ],
     });
-    const adapter = createPostgresAdapter();
-    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
     expect(lowered.sql).toContain(`"id" uuid DEFAULT '00000000-0000-0000-0000-000000000000'::uuid`);
     expect(lowered.sql).toContain(
       `"window" tstzrange DEFAULT '[2024-01-01,2024-12-31)'::tstzrange`,
@@ -100,7 +101,7 @@ describe('PostgresCreateTable DDL lowering', () => {
     expect(lowered.sql).toContain(`"birthdate" date DEFAULT '2024-01-01'::date`);
   });
 
-  it('omits the cast when the column type is already text-shaped', () => {
+  it('omits the cast when the column type is already text-shaped', async () => {
     // `text`, `varchar(N)`, `character varying(N)`, `char(N)`,
     // `character(N)` all type a string literal identically — the
     // implicit cast is a no-op, so the explicit cast would only add
@@ -116,8 +117,8 @@ describe('PostgresCreateTable DDL lowering', () => {
         col('a_character', 'character(8)', { default: lit('hello') }),
       ],
     });
-    const adapter = createPostgresAdapter();
-    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
     expect(lowered.sql).toContain(`"a_text" text DEFAULT 'hello'`);
     expect(lowered.sql).toContain(`"a_varchar" varchar(50) DEFAULT 'hello'`);
     expect(lowered.sql).toContain(`"a_character_varying" character varying(255) DEFAULT 'hello'`);
@@ -129,7 +130,7 @@ describe('PostgresCreateTable DDL lowering', () => {
     expect(lowered.sql).not.toContain('::character');
   });
 
-  it('omits the cast on numeric, boolean, and null literal defaults', () => {
+  it('omits the cast on numeric, boolean, and null literal defaults', async () => {
     // These literals are typed by Postgres directly (no `text`
     // indirection), so they need no explicit cast.
     const ast = new PostgresCreateTable({
@@ -141,8 +142,8 @@ describe('PostgresCreateTable DDL lowering', () => {
         col('a_nullable', 'uuid', { default: lit(null) }),
       ],
     });
-    const adapter = createPostgresAdapter();
-    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
     expect(lowered.sql).toContain('"a_int" int DEFAULT 42');
     expect(lowered.sql).toContain('"a_float" float8 DEFAULT 3.14');
     expect(lowered.sql).toContain('"a_bool" boolean DEFAULT true');
@@ -150,7 +151,7 @@ describe('PostgresCreateTable DDL lowering', () => {
     expect(lowered.sql).not.toContain('::');
   });
 
-  it('omits the cast on function defaults — a `DEFAULT (expr)` already returns the column type', () => {
+  it('omits the cast on function defaults — a `DEFAULT (expr)` already returns the column type', async () => {
     const ast = new PostgresCreateTable({
       table: 'defaults',
       columns: [
@@ -158,10 +159,24 @@ describe('PostgresCreateTable DDL lowering', () => {
         col('meta', 'jsonb', { default: fn(`jsonb_build_object('k', 1)`) }),
       ],
     });
-    const adapter = createPostgresAdapter();
-    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
     expect(lowered.sql).toContain('"id" uuid DEFAULT (gen_random_uuid())');
     expect(lowered.sql).toContain(`"meta" jsonb DEFAULT (jsonb_build_object('k', 1))`);
     expect(lowered.sql).not.toContain('::');
+  });
+
+  it('column with both default and notNull renders DEFAULT before NOT NULL, neither dropped', async () => {
+    const ast = new PostgresCreateTable({
+      table: 't',
+      columns: [
+        col('active', 'bool', { notNull: true, default: lit(true) }),
+        col('status', 'text', { notNull: true, default: lit('open') }),
+      ],
+    });
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
+    expect(lowered.sql).toContain('"active" bool DEFAULT true NOT NULL');
+    expect(lowered.sql).toContain(`"status" text DEFAULT 'open' NOT NULL`);
   });
 });

@@ -11,7 +11,7 @@ export const contract = defineContract({}, ({ field, model }) => ({
   models: {
     Note: model('Note', {
       fields: {
-        id: field.id.uuidv7(),
+        id: field.id.uuidv7String(),
       },
     }),
   },

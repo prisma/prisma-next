@@ -24,7 +24,7 @@
  */
 
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
   MigrationPlanWithAuthoringSurface,
   OpFactoryCall,
@@ -35,8 +35,6 @@ import { PostgresMigration } from './postgres-migration';
 import { renderOps } from './render-ops';
 import { renderCallsToTypeScript } from './render-typescript';
 
-type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
-
 export class TypeScriptRenderablePostgresMigration
   extends PostgresMigration
   implements MigrationPlanWithAuthoringSurface
@@ -44,13 +42,19 @@ export class TypeScriptRenderablePostgresMigration
   readonly #calls: readonly OpFactoryCall[];
   readonly #meta: MigrationMeta;
   readonly #spaceId: string;
-  readonly #lowerer: Lowerer | undefined;
+  readonly #lowerer: ExecuteRequestLowerer | undefined;
+  #operationsCache:
+    | readonly (
+        | SqlMigrationPlanOperation<PostgresPlanTargetDetails>
+        | Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>>
+      )[]
+    | undefined;
 
   constructor(
     calls: readonly OpFactoryCall[],
     meta: MigrationMeta,
     spaceId: string,
-    lowerer?: Lowerer,
+    lowerer?: ExecuteRequestLowerer,
   ) {
     super();
     this.#calls = calls;
@@ -59,8 +63,12 @@ export class TypeScriptRenderablePostgresMigration
     this.#lowerer = lowerer;
   }
 
-  override get operations(): readonly Op[] {
-    return renderOps(this.#calls, this.#lowerer);
+  override get operations(): readonly (
+    | SqlMigrationPlanOperation<PostgresPlanTargetDetails>
+    | Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>>
+  )[] {
+    this.#operationsCache ??= renderOps(this.#calls, this.#lowerer);
+    return this.#operationsCache;
   }
 
   override describe(): MigrationMeta {

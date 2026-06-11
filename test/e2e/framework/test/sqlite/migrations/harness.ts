@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { integerColumn, textColumn } from '@prisma-next/adapter-sqlite/column-types';
-import sqliteAdapterDescriptor, { SqliteControlAdapter } from '@prisma-next/adapter-sqlite/control';
+import sqliteAdapterDescriptor, {
+  createSqliteBuiltinCodecLookup,
+  SqliteControlAdapter,
+} from '@prisma-next/adapter-sqlite/control';
 import type { Contract } from '@prisma-next/contract/types';
 import sqliteDriverDescriptor from '@prisma-next/driver-sqlite/control';
 import sqlFamilyDescriptor, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
@@ -133,7 +136,7 @@ export async function applyMigration(
   try {
     const planner = sqliteTargetDescriptor.createPlanner(controlAdapter);
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
-    const adapter = new SqliteControlAdapter();
+    const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
     const policy = options.policy ?? INIT_ADDITIVE_POLICY;
 
     let currentSchema: SqlSchemaIR = emptySchema;
@@ -222,7 +225,7 @@ export async function applyMigration(
       driver,
       schema: { ...freshSchema, tables: userTables },
       operationsExecuted: runResult.value.perSpaceResults[0]?.value.operationsExecuted ?? 0,
-      plannedOperationIds: planResult.plan.operations.map((op) => op.id),
+      plannedOperationIds: (await Promise.all(planResult.plan.operations)).map((op) => op.id),
     });
   } finally {
     testDb.cleanup();

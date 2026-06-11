@@ -4,6 +4,7 @@ export default defineConfig({
   entry: [
     'src/exports/apply-specifier-default-control-policy.ts',
     'src/exports/default-namespace.ts',
+    'src/exports/enum-accessor.ts',
     'src/exports/resolve-domain-model.ts',
     'src/exports/types.ts',
     'src/exports/validate-domain.ts',

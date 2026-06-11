@@ -351,6 +351,7 @@ describe('createContractInferCommand', () => {
         target: { kind: 'ref', identifier: 'User', span: SYNTHETIC_SPAN },
         using: { kind: 'value', raw: '"auth.uid() = user_id"', span: SYNTHETIC_SPAN },
       },
+      blockAttributes: [],
       span: SYNTHETIC_SPAN,
     };
     const astWithPolicySelect: PslDocumentAst = {

@@ -22,6 +22,7 @@
     "@prisma-next/sql-relational-core": "workspace:0.13.0",
     "@prisma-next/sql-runtime": "workspace:0.13.0",
     "@prisma-next/target-postgres": "workspace:0.13.0",
+    "jose": "^5",
     "pg": "catalog:"
   },
   "devDependencies": {

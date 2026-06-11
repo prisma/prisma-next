@@ -1,4 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -10,6 +11,8 @@ import {
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createSqliteBuiltinCodecLookup } from '../../src/core/codec-lookup';
+import { SqliteControlAdapter } from '../../src/core/control-adapter';
 
 function makeColumn(overrides: Partial<StorageColumn> = {}): StorageColumn {
   return {
@@ -55,9 +58,11 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
 const emptySchema = { tables: {} };
 
 describe('SQLite migration planner', () => {
-  const planner = createSqliteMigrationPlanner();
+  const planner = createSqliteMigrationPlanner(
+    new SqliteControlAdapter(createSqliteBuiltinCodecLookup()),
+  );
 
-  it('plans CREATE TABLE for new table', () => {
+  it('plans CREATE TABLE for new table', async () => {
     const contract = makeContract({
       users: makeTable({
         columns: {
@@ -79,7 +84,7 @@ describe('SQLite migration planner', () => {
 
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
-    const ops = result.plan.operations;
+    const ops = (await Promise.all(result.plan.operations)) as SqlMigrationPlanOperation<unknown>[];
     expect(ops.length).toBeGreaterThanOrEqual(1);
     const tableOp = ops.find((op) => op.id === 'table.users');
     expect(tableOp).toBeDefined();
@@ -87,7 +92,7 @@ describe('SQLite migration planner', () => {
     expect(tableOp!.execute[0]!.sql).toContain('"users"');
   });
 
-  it('plans ADD COLUMN for existing table', () => {
+  it('plans ADD COLUMN for existing table', async () => {
     const contract = makeContract({
       users: makeTable({
         columns: {
@@ -126,13 +131,13 @@ describe('SQLite migration planner', () => {
 
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
-    const ops = result.plan.operations;
+    const ops = (await Promise.all(result.plan.operations)) as SqlMigrationPlanOperation<unknown>[];
     const colOp = ops.find((op) => op.id === 'column.users.bio');
     expect(colOp).toBeDefined();
     expect(colOp!.execute[0]!.sql).toContain('ADD COLUMN "bio"');
   });
 
-  it('plans CREATE INDEX', () => {
+  it('plans CREATE INDEX', async () => {
     const contract = makeContract({
       users: makeTable({
         columns: {
@@ -155,7 +160,7 @@ describe('SQLite migration planner', () => {
 
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
-    const ops = result.plan.operations;
+    const ops = (await Promise.all(result.plan.operations)) as SqlMigrationPlanOperation<unknown>[];
     const indexOp = ops.find((op) => op.id === 'index.users.idx_users_email');
     expect(indexOp).toBeDefined();
     expect(indexOp!.execute[0]!.sql).toContain('CREATE INDEX');

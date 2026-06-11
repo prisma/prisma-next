@@ -6,6 +6,7 @@ import type {
 } from '@prisma-next/driver-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Log,
@@ -14,11 +15,7 @@ import type {
   SqlRuntimeExtensionDescriptor,
   VerifyMarkerOption,
 } from '@prisma-next/sql-runtime';
-import {
-  createExecutionContext,
-  createRuntime,
-  createSqlExecutionStack,
-} from '@prisma-next/sql-runtime';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import { setupTestDatabase as setupTestDatabaseBase } from '@prisma-next/sql-runtime/test/utils';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Client } from 'pg';
@@ -82,9 +79,9 @@ export async function createTestRuntime(
     throw error;
   }
 
-  return createRuntime({
-    stackInstance,
+  return new PostgresRuntimeImpl({
     context,
+    adapter: stackInstance.adapter,
     driver,
     ...(options?.verifyMarker !== undefined ? { verifyMarker: options.verifyMarker } : {}),
     ...(options?.middleware ? { middleware: options.middleware } : {}),

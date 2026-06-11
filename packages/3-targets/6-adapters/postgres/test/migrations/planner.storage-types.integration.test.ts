@@ -110,7 +110,8 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
       expectNarrowedType(planResult.kind === 'success');
 
       // Verify plan includes type operation before table operation
-      const operationIds = planResult.plan.operations.map((op) => op.id);
+      const planOps = await Promise.all(planResult.plan.operations);
+      const operationIds = planOps.map((op) => op.id);
       expect(operationIds).toContain('type.Role');
       expect(operationIds).toContain('table.user');
       expect(operationIds.indexOf('type.Role')).toBeLessThan(operationIds.indexOf('table.user'));
@@ -190,7 +191,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
       expectNarrowedType(planResult.kind === 'success');
 
       // Should not include type.Role operation since it already exists
-      const operationIds = planResult.plan.operations.map((op) => op.id);
+      const operationIds = (await Promise.all(planResult.plan.operations)).map((op) => op.id);
       expect(operationIds).not.toContain('type.Role');
       expect(operationIds).toContain('table.user');
     });
@@ -219,7 +220,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
       expectNarrowedType(planResult.kind === 'success');
 
       // Should include operation to add ADMIN value
-      const operationIds = planResult.plan.operations.map((op) => op.id);
+      const operationIds = (await Promise.all(planResult.plan.operations)).map((op) => op.id);
       expect(operationIds).toContain('type.Role.addValues');
     });
   });

@@ -1,5 +1,15 @@
 import pgvector from '@prisma-next/extension-pgvector/pack';
-import { defineContract, rel } from '@prisma-next/postgres/contract-builder';
+import { defineContract, enumType, member, rel } from '@prisma-next/postgres/contract-builder';
+
+const pgText = { codecId: 'pg/text@1', nativeType: 'text' } as const;
+
+const Priority = enumType(
+  'Priority',
+  pgText,
+  member('Low', 'low'),
+  member('High', 'high'),
+  member('Urgent', 'urgent'),
+);
 
 export const contract = defineContract(
   {
@@ -13,7 +23,7 @@ export const contract = defineContract(
 
     const User = model('User', {
       fields: {
-        id: field.id.uuidv4(),
+        id: field.id.uuidv4String(),
         email: field.text(),
         createdAt: field.temporal.createdAt(),
         updatedAt: field.temporal.updatedAt(),
@@ -24,9 +34,10 @@ export const contract = defineContract(
 
     const Post = model('Post', {
       fields: {
-        id: field.id.uuidv4(),
+        id: field.id.uuidv4String(),
         title: field.text(),
-        userId: field.uuid(),
+        userId: field.uuidString(),
+        priority: field.namedType(Priority).default(Priority.members.Low),
         createdAt: field.temporal.createdAt(),
         updatedAt: field.temporal.updatedAt(),
         embedding: field.namedType(types.Embedding1536).optional(),
@@ -34,6 +45,7 @@ export const contract = defineContract(
     });
 
     return {
+      enums: { Priority },
       types,
       models: {
         User: User.relations({

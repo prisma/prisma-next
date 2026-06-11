@@ -27,6 +27,7 @@ import {
   PG_TIMESTAMP_CODEC_ID,
   PG_TIMESTAMPTZ_CODEC_ID,
   PG_TIMETZ_CODEC_ID,
+  PG_UUID_CODEC_ID,
   PG_VARBIT_CODEC_ID,
   PG_VARCHAR_CODEC_ID,
   SQL_CHAR_CODEC_ID,
@@ -215,6 +216,7 @@ export const postgresAdapterDescriptorMeta = {
         [PG_JSON_CODEC_ID]: identityHooks,
         [PG_JSONB_CODEC_ID]: identityHooks,
         [PG_BYTEA_CODEC_ID]: identityHooks,
+        [PG_UUID_CODEC_ID]: identityHooks,
       },
     },
     storage: [
@@ -281,6 +283,7 @@ export const postgresAdapterDescriptorMeta = {
       { typeId: PG_JSON_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'json' },
       { typeId: PG_JSONB_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'jsonb' },
       { typeId: PG_BYTEA_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'bytea' },
+      { typeId: PG_UUID_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'uuid' },
     ],
     queryOperationTypes: {
       import: {

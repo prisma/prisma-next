@@ -4,14 +4,11 @@ import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RuntimeQueryable } from '@prisma-next/sql-orm-client';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import {
-  createExecutionContext,
-  createRuntime,
-  createSqlExecutionStack,
-} from '@prisma-next/sql-runtime';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { Pool } from 'pg';
 import { getTestContract } from './helpers';
@@ -41,6 +38,16 @@ interface SeedComment {
   id: number;
   body: string;
   postId: number;
+}
+
+interface SeedTag {
+  id: string;
+  name: string;
+}
+
+interface SeedUserTag {
+  userId: number;
+  tagId: string;
 }
 
 export interface PgIntegrationRuntime extends RuntimeQueryable {
@@ -97,9 +104,9 @@ export async function createPgIntegrationRuntime(
       }
       await driver.connect({ kind: 'pgPool', pool });
 
-      const realRuntime = createRuntime({
-        stackInstance,
+      const realRuntime = new PostgresRuntimeImpl({
         context,
+        adapter: stackInstance.adapter,
         driver,
       });
       return { adapter, realRuntime, contract };
@@ -173,6 +180,7 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
   )`);
   await runtime.query('create extension if not exists vector');
 
+  await runtime.query('drop table if exists user_tags');
   await runtime.query('drop table if exists tags');
   await runtime.query('drop table if exists comments');
   await runtime.query('drop table if exists profiles');
@@ -219,6 +227,16 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
     create table tags (
       id text primary key,
       name text not null unique
+    )
+  `);
+
+  await runtime.query(`
+    create table user_tags (
+      user_id integer not null,
+      tag_id text not null,
+      note text,
+      created_at text not null default now(),
+      primary key (user_id, tag_id)
     )
   `);
 }
@@ -275,6 +293,27 @@ export async function seedComments(
       comment.id,
       comment.body,
       comment.postId,
+    ]);
+  }
+}
+
+export async function seedTags(
+  runtime: PgIntegrationRuntime,
+  tags: readonly SeedTag[],
+): Promise<void> {
+  for (const tag of tags) {
+    await runtime.query('insert into tags (id, name) values ($1, $2)', [tag.id, tag.name]);
+  }
+}
+
+export async function seedUserTags(
+  runtime: PgIntegrationRuntime,
+  userTags: readonly SeedUserTag[],
+): Promise<void> {
+  for (const ut of userTags) {
+    await runtime.query('insert into user_tags (user_id, tag_id) values ($1, $2)', [
+      ut.userId,
+      ut.tagId,
     ]);
   }
 }

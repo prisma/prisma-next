@@ -1,6 +1,8 @@
 # Summary
 
-This project ships `@prisma-next/extension-supabase` — the user-facing npm package that integrates Supabase with Prisma Next end-to-end. It consumes the four framework primitives shipped in parallel ([target-extensible-ir](../target-extensible-ir/spec.md), [cross-contract-refs](../cross-contract-refs/spec.md), [postgres-rls](../postgres-rls/spec.md), [runtime-target-layer](../runtime-target-layer/spec.md) — plus the [control-policy](../control-policy/spec.md) framework primitive) and packages them into a working developer experience: a hand-authored contract describing Supabase's `auth.*` and `storage.*` schemas, branded typed model handles + role refs from a `/contract` subpath, a `supabase({...})` runtime factory returning a role-bound `Db` interface (`asUser(jwt)` / `asAnon()` / `asServiceRole()`), and a canonical example app that exercises the entire stack against a real Supabase project. The runtime is `class SupabaseRuntime extends PostgresRuntime` — RLS enforcement is structural (`SET LOCAL role` issued below the user middleware chain inside an implicit transaction), not policy. The package is the user-visible deliverable that makes the launch a launch.
+> **Scope note — read before reshaping this spec.** The runtime half this spec describes has **already shipped** under the runtime-target-layer project (see [ADR 230](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md)): `SupabaseRuntime` (as `SupabaseRuntimeImpl`), the async `supabase({...})` factory, `asUser` / `asAnon` / `asServiceRole`, JWT validation, and the role-bound `Db` are all live in `@prisma-next/extension-supabase/runtime`. The role binding is enforced by **session-coupled connections** (`set_config(role/claims)` on the connection + `RESET ALL` on release), **not** the `SET LOCAL`-in-`execute()`-override / `withRawConnection` design this spec body still describes. The remaining scope for this project is therefore the **non-runtime** surface: the hand-authored Supabase contract, the `/contract` typed handles + role refs, the `/pack` descriptor, and the example app — plus reconciling this spec's runtime sections to the shipped API. Reconcile fully at this project's drive-start (the body below predates ADR 230).
+
+This project ships `@prisma-next/extension-supabase` — the user-facing npm package that integrates Supabase with Prisma Next end-to-end. It consumes the four framework primitives shipped in parallel ([target-extensible-ir](../target-extensible-ir/spec.md), [cross-contract-refs](../cross-contract-refs/spec.md), [postgres-rls](../postgres-rls/spec.md), [runtime-target-layer](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md) — plus the [control-policy](../control-policy/spec.md) framework primitive) and packages them into a working developer experience: a hand-authored contract describing Supabase's `auth.*` and `storage.*` schemas, branded typed model handles + role refs from a `/contract` subpath, a `supabase({...})` runtime factory returning a role-bound `Db` interface (`asUser(jwt)` / `asAnon()` / `asServiceRole()`), and a canonical example app that exercises the entire stack against a real Supabase project. The `SupabaseRuntime` (as `SupabaseRuntimeImpl`) and the `supabase()` façade shipped under [runtime-target-layer (ADR 230)](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md); this project consumes them. The package is the user-visible deliverable that makes the launch a launch.
 
 # Context
 
@@ -70,27 +72,15 @@ export async function adminListProfiles() {
 
 `SupabaseDb` is **not** a `Db` — there's no `db.sql.from(...)` at the top level. A user must pick a role before they can build a query. This is intentional: in a Supabase app there is no meaningful "no role" execution context; the alternative (defaulting to whatever role the connection authenticated as, typically a privileged one) is exactly the silent-RLS-bypass footgun the design eliminates.
 
-Under the hood:
-
-```
-abstract class RuntimeCore<…>                                              // framework-components (existing, exported)
-   ↑
-class SqlRuntime extends RuntimeCore<…>                                    // sql-runtime (exported via runtime-target-layer project)
-   ↑
-class PostgresRuntime extends SqlRuntime                                   // postgres/runtime (added by runtime-target-layer project)
-   ↑
-class SupabaseRuntime extends PostgresRuntime                              // THIS PROJECT
-                                                                           // overrides execute() to wrap in implicit transaction +
-                                                                           // SET LOCAL role + request.jwt.claims, below user middleware
-```
+Under the hood, the runtime is `SupabaseRuntimeImpl` (which extends `SqlRuntimeBase`) shipped under runtime-target-layer. See [ADR 230](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md) for the class hierarchy and session-coupled connection mechanism. This project consumes that runtime.
 
 ## Problem
 
 Three concrete problems motivate this project:
 
-**1. The framework primitives are useless to a Supabase user without a Supabase-specific binding.** TML-2459 ships namespaces. The cross-contract-refs project ships `supabase:auth.User` syntax. The postgres-rls project ships `.rls([...])`. The runtime-target-layer project ships `PostgresRuntime`. None of these have any Supabase-aware content — they are *framework primitives*. A Supabase user needs the framework primitives **plus** the Supabase-specific glue: a contract describing Supabase's schemas, role constants for `anon` / `authenticated` / `service_role`, a runtime that knows how to validate Supabase-signed JWTs and bind them to a Postgres session via `SET LOCAL`. Without this project, the launch ships an empty integration story — "you can build the building blocks, here's no example of putting them together."
+**1. The framework primitives are useless to a Supabase user without a Supabase-specific binding.** TML-2459 ships namespaces. The cross-contract-refs project ships `supabase:auth.User` syntax. The postgres-rls project ships `.rls([...])`. The runtime-target-layer project ships the `SupabaseRuntimeImpl` and the `supabase()` façade. None of these have any Supabase-specific contract content — they are *framework primitives*. A Supabase user needs the framework primitives **plus** the Supabase-specific glue: a contract describing Supabase's schemas, role constants for `anon` / `authenticated` / `service_role`, and a canonical example app that exercises the entire stack. Without this project, the launch ships an empty integration story — "you can build the building blocks, here's no example of putting them together."
 
-**2. The role-binding contract has to be unbypassable, not documented.** The most common Supabase footgun is "I forgot to set the role" — a query that silently runs as a privileged role because the developer expected RLS to enforce isolation and forgot to `SET LOCAL role` first. The fix is structural, not procedural: the user-facing API must make it *impossible* to execute a query without first picking a role. The runtime-target-layer project provides the substrate (`withRawConnection` below middleware, implicit transactions); this project consumes it to ship a `SupabaseDb` whose top-level type intentionally lacks `.sql.from(...)`. The user picks a role first, gets back a `RoleBoundDb` that *does* have `.sql.from(...)`, and only then can run a query. The role binding is part of the type system, enforced at compile time.
+**2. The role-binding contract has to be unbypassable, not documented.** The most common Supabase footgun is "I forgot to set the role" — a query that silently runs as a privileged role because the developer expected RLS to enforce isolation and forgot to bind a role first. The fix is structural, not procedural: the user-facing API must make it *impossible* to execute a query without first picking a role. The runtime-target-layer project ships the `SupabaseDb` façade whose top-level type intentionally lacks `.sql.from(...)`. The user picks a role first (`asUser(jwt)` / `asAnon()` / `asServiceRole()`), gets back a `RoleBoundDb`, and only then can run a query. The role binding is enforced by **façade encapsulation** — the role-bound `Db` exposes no unbound `connection()` — not by the type system at compile time.
 
 **3. The launch needs a working example app, not just a feature inventory.** A working example end-to-end (auth flow → profile creation → cascade-delete on user removal → RLS-protected list) is the artefact that turns "we shipped a Supabase integration" into "you can actually use it." The example app doubles as a regression test surface (it exercises every framework primitive against a real database) and as documentation (it's the answer to "show me how to use this"). Without it, the launch is a feature ship without a demo.
 
@@ -238,7 +228,7 @@ export interface SupabaseRuntimeOptions {
   jwksUrl?: string;
   /** Pool knobs forwarded to the underlying Postgres runtime. */
   pool?: PoolOptions;
-  /** User middleware. Forwarded to the underlying runtime. SET LOCAL is NOT visible to these. */
+  /** User middleware. Forwarded to the underlying runtime. Role-binding session setup is NOT visible to these. */
   middleware?: readonly SqlMiddleware[];
 }
 
@@ -257,35 +247,17 @@ export default function supabase<TContract, TTypeMaps>(
 ): Promise<SupabaseDb<TContract, TTypeMaps>>;
 ```
 
-Six properties are load-bearing:
+The `supabase()` façade, `SupabaseDb`, `RoleBoundDb`, and `SupabaseRuntimeImpl` shipped under runtime-target-layer (ADR 230). See [ADR 230](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md) for the full design. Key properties for context:
 
-- **`SupabaseDb` is not a `Db`.** Top-level type intentionally lacks `.sql.from(...)`. Users must call `asUser(jwt)` / `asAnon()` / `asServiceRole()` first; the returned `RoleBoundDb` *does* extend `Db`. Role binding is part of the type system.
-- **Factory is uniformly async.** `supabase({...})` returns `Promise<SupabaseDb>` regardless of whether the user passed `jwtSecret` (synchronous-resolvable) or `jwksUrl` (requires HTTP fetch for JWKS warmup). The uniform-async signature avoids splitting the API into sync-when-secret / async-when-jwks.
-- **JWT validation is eager.** `asUser(jwt)` validates the JWT synchronously and throws a typed `InvalidJwtError` on malformed / expired / mis-signed tokens *before* any connection is acquired. The signing key is always in hand by the time `asUser` runs (because the factory warmed it up).
-- **`SET LOCAL` is structural, not policy.** `SupabaseRuntime.execute()` (the subclass override) issues `SET LOCAL role = '...'` and `SET LOCAL request.jwt.claims = '...'` via the `withRawConnection` accessor from the runtime-target-layer project — below the user middleware chain entirely. User middleware never sees the SET LOCAL statements; user middleware cannot prevent them. The role binding is unbypassable except by writing a custom `SupabaseRuntime` subclass, which is an obvious red flag in code review.
-- **No `serviceRoleKey` option.** Supabase's service-role key is a JWT identity used by `@supabase/supabase-js` to authenticate to PostgREST. We're below PostgREST — we connect directly to Postgres with a privileged URL. The only Supabase-issued secret we need is `jwtSecret` (or `jwksUrl`) to validate *user* JWTs.
-- **Implicit transactions.** `SET LOCAL` requires an open transaction (otherwise the SET has session scope and survives into the next pool checkout — exactly the RLS-bypass footgun the design eliminates). Every role-bound execute is wrapped in `BEGIN; SET LOCAL …; <query>; COMMIT`. Multi-statement transactions (`db.asUser(jwt).transaction(async (tx) => { … })`) issue one `BEGIN; SET LOCAL …;` at transaction open; the closure body runs against `tx` pinned to the same connection; commit/rollback at closure exit. `SET LOCAL` never outlives its transaction; transaction completion resets it before the connection returns to the pool.
+- **`SupabaseDb` is not a `Db`.** Top-level type intentionally lacks `.sql.from(...)`. Users must call `asUser(jwt)` / `asAnon()` / `asServiceRole()` first; the returned `RoleBoundDb` *does* extend `Db`. Role binding is enforced by façade encapsulation — the role-bound `Db` exposes no unbound connection.
+- **Factory is uniformly async.** `supabase({...})` returns `Promise<SupabaseDb>` regardless of whether `jwtSecret` or `jwksUrl` is configured.
+- **JWT validation is eager.** `asUser(jwt)` validates the JWT synchronously and throws a typed `InvalidJwtError` before any connection is acquired.
+- **Session-coupled connection role binding.** `SupabaseRuntimeImpl` acquires a raw connection, runs `SELECT set_config('role', …, false)` and `SELECT set_config('request.jwt.claims', …, false)` on it below the middleware chain, runs the query on that bound connection, then `RESET ALL` (or destroys) on release. User middleware never sees the role-binding setup; it cannot prevent it.
+- **No `serviceRoleKey` option.** We connect directly to Postgres — not through PostgREST. The only Supabase-issued secret we need is `jwtSecret` (or `jwksUrl`) to validate user JWTs.
 
 ### Class hierarchy
 
-```
-abstract class RuntimeCore<…>                                              // framework-components (exists)
-   ↑
-class SqlRuntime extends RuntimeCore<…>                                    // sql-runtime (exported via runtime-target-layer)
-   ↑
-class PostgresRuntime extends SqlRuntime                                   // postgres/runtime (added by runtime-target-layer)
-   ↑
-class SupabaseRuntime extends PostgresRuntime                              // THIS PROJECT
-```
-
-`SupabaseRuntime`'s additional surface:
-
-- A constructor that consumes `SupabaseRuntimeOptions`, validates the JWT secret / JWKS configuration, warms up the JWKS if applicable, and forwards `contractJson` / `url` / `pool` / `middleware` to `super(...)`.
-- An override of `execute()` that wraps the call in `withTransaction(() => withRawConnection(conn => { conn.exec(SET LOCAL …); return super.execute(plan); }))`.
-- A `RoleBoundDb` factory method that produces the role-bound `Db` instance, threading the current role + claims through to the next `execute()` call's `SET LOCAL`.
-- A custom transaction method on the role-bound `Db` that reuses `withTransaction` for the multi-statement case.
-
-The subclass is approximately 200–400 LOC depending on how tightly the JWT validation, the JWKS cache, and the role-bound `Db` wrapper are scoped. None of the new logic touches the framework hot path; the cost is paid by Supabase users only.
+Shipped under runtime-target-layer (ADR 230). The family seam is `abstract class SqlRuntimeBase`; per-target concretions are `PostgresRuntimeImpl`, `SqliteRuntimeImpl`, `SupabaseRuntimeImpl`. The bare names `PostgresRuntime`/`SupabaseRuntime` are interfaces (the dependency surface), not classes. See [ADR 230](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md) for details.
 
 ### Example app (canonical demo)
 
@@ -301,11 +273,7 @@ The example is a regression test surface across two lanes (decision [C14](../sup
 
 ### Pool considerations
 
-RLS + connection pooling has a known footgun: if you `SET ROLE` and don't reset it, the next pool checkout inherits the role. The design eliminates this by construction:
-
-- **Always `SET LOCAL`, never bare `SET`.** Transaction-scoped, automatic reset at COMMIT/ROLLBACK.
-- **Always in a transaction.** The subclass `execute()` override guarantees this; no execute path on a `SupabaseRuntime` runs outside a transaction.
-- **Document the pool requirements** (must reset session state between checkouts) for users running a custom pool — defense-in-depth note, not the primary mitigation.
+RLS + connection pooling has a known footgun: if a role is set and not reset, the next pool checkout inherits it. The shipped design (ADR 230) eliminates this by construction: `SupabaseRuntimeImpl` uses `set_config(…, false)` (session-scoped) and calls `RESET ALL` on release, rather than `SET LOCAL` inside a transaction. The role-bound `Db` exposes no unbound connection, making role bypass structurally impossible via the public API.
 
 # Requirements
 
@@ -330,20 +298,21 @@ RLS + connection pooling has a known footgun: if you `SET ROLE` and don't reset 
 
 ### Runtime facade
 
+The runtime (`SupabaseRuntimeImpl`, `supabase()` façade, `SupabaseDb`, `RoleBoundDb`) shipped under runtime-target-layer (ADR 230). This project's `/runtime` subpath re-exports them. Requirements below describe the shipped API for documentation purposes.
+
 - **FR9.** `/runtime` exports a default function `supabase<TContract, TTypeMaps>(options: SupabaseRuntimeOptions): Promise<SupabaseDb<TContract, TTypeMaps>>`.
 - **FR10.** `SupabaseRuntimeOptions` carries `contractJson`, `url`, optional `jwtSecret` xor `jwksUrl`, optional `pool` and `middleware`. Passing both `jwtSecret` and `jwksUrl` is a configuration error (thrown synchronously from `supabase({...})`).
 - **FR11.** `supabase({...})` returns `Promise<SupabaseDb>` regardless of whether `jwtSecret` or `jwksUrl` is configured. The factory warms up the JWKS (single HTTP fetch) when `jwksUrl` is set; resolves to the `SupabaseDb` once the signing key is in hand.
-- **FR12.** `SupabaseDb` exposes exactly three role-binding methods: `asUser(jwt: string)`, `asAnon()`, `asServiceRole()`. It does **not** extend `Db`; the type system enforces that a user must pick a role before building queries.
+- **FR12.** `SupabaseDb` exposes exactly three role-binding methods: `asUser(jwt: string)`, `asAnon()`, `asServiceRole()`. It does **not** extend `Db`; a user must pick a role before building queries.
 - **FR13.** `asUser(jwt)` validates the JWT synchronously: signature against `jwtSecret` or the warmed JWKS, expiry check, audience check (if configured), issuer check (if configured). Failures throw `InvalidJwtError` with a typed `reason` field naming the specific failure. No connection is acquired during validation.
 - **FR14.** `asAnon()` and `asServiceRole()` are pure factories — no validation; they return a `RoleBoundDb` bound to the respective wire role name with empty claims.
-- **FR15.** `RoleBoundDb` extends `Db` (so user code can call `.sql.from(...)`, `.orm.<model>.find(...)`, etc.) and adds a `transaction<R>(fn: (tx: RoleBoundDb) => Promise<R>): Promise<R>` method that runs the closure under a single transaction with one `SET LOCAL role` + `SET LOCAL request.jwt.claims` issued at transaction open.
-- **FR16.** Every role-bound `execute()` is wrapped in an implicit transaction. Single-statement calls produce `BEGIN; SET LOCAL …; <query>; COMMIT;` automatically. Multi-statement transactions via `RoleBoundDb.transaction()` produce one `BEGIN; SET LOCAL …;`, the closure body, then `COMMIT` / `ROLLBACK` on closure exit.
-- **FR17.** `SET LOCAL` statements are issued via the `withRawConnection` accessor from the runtime-target-layer project. They are not visible to user middleware. User middleware sees logical query traffic only.
-- **FR18.** The `middleware?: readonly SqlMiddleware[]` option is forwarded unchanged to the base `PostgresRuntime`. Existing middleware (telemetry, logging, query budgets) works transparently.
+- **FR15.** `RoleBoundDb` extends `Db` (so user code can call `.sql.from(...)`, `.orm.<model>.find(...)`, etc.) and adds a `transaction<R>(fn: (tx: RoleBoundDb) => Promise<R>): Promise<R>` method.
+- **FR16.** Role binding is applied via session-coupled connections (per ADR 230): `SupabaseRuntimeImpl` acquires a raw connection, runs `set_config(role/claims, …, false)` on it below the middleware chain, runs the query on that bound connection, and `RESET ALL` on release. User middleware does not see the role-binding setup.
+- **FR17.** The `middleware?: readonly SqlMiddleware[]` option is forwarded unchanged to the underlying runtime. Existing middleware (telemetry, logging, query budgets) works transparently.
 
 ### Class hierarchy
 
-- **FR19.** `SupabaseRuntime extends PostgresRuntime` is exported from the `/runtime` subpath as a public class. The class is the structural extension point for downstream code that wants to subclass `SupabaseRuntime` further (rare; documented as an escape hatch).
+- **FR18.** The `Runtime` interface is the public dependency surface. `SupabaseRuntimeImpl` (extending `SqlRuntimeBase`) is the shipped concretion; it is not a public export for subclassing. See [ADR 230](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md) for the full hierarchy.
 
 ### Example app
 
@@ -361,16 +330,16 @@ RLS + connection pooling has a known footgun: if you `SET ROLE` and don't reset 
 
 ## Non-Functional Requirements
 
-- **NFR1.** The runtime hot path for a single role-bound query (the `BEGIN; SET LOCAL role; SET LOCAL request.jwt.claims; <query>; COMMIT;` cycle) adds <2ms median overhead vs. an unrolewrapped Postgres query against PGlite. Measured by a synthetic benchmark in the example app.
+- **NFR1.** The runtime hot path for a single role-bound query (session-coupled connection setup + query + `RESET ALL`) adds <2ms median overhead vs. an unwrapped Postgres query against PGlite. Measured by a synthetic benchmark in the example app.
 - **NFR2.** JWT validation is sub-millisecond for symmetric-secret (`jwtSecret`) validation; <10ms for JWKS-cached (`jwksUrl`) validation. Measured by a synthetic benchmark in the package's test suite.
 - **NFR3.** The package's tree-shaken `/pack` subpath bundles to under 5 KB (gzip). The `/contract` subpath under 10 KB. The `/runtime` subpath is larger (it carries the runtime class hierarchy via re-exports) and is allowed up to 50 KB. Verified by bundle-size CI check at merge time.
 - **NFR4.** Layering is enforced by `pnpm lint:deps`. The package depends on `@prisma-next/postgres/runtime`, `@prisma-next/sql-runtime`, `@prisma-next/framework-components`, `@prisma-next/config`, `@prisma-next/contract-core`, plus an off-the-shelf JWT validation library (`jose` is the leading candidate). It does not depend on `@supabase/supabase-js` or any Supabase SDK — the framework speaks Postgres directly.
-- **NFR5.** Documentation: the package README walks through setup, usage, the role-binding model, the `SET LOCAL`-below-middleware security property, and known caveats. The README also points at the example app as the canonical reference.
+- **NFR5.** Documentation: the package README walks through setup, usage, the role-binding model (session-coupled connections, per ADR 230), and known caveats. The README also points at the example app as the canonical reference.
 
 ## Non-goals
 
 - **Trigger-driven "create profile on signup" pattern.** A common Supabase pattern is a Postgres trigger on `auth.users` insert that calls `INSERT INTO public.profiles ...`. This requires either user-authored SQL triggers (out of v0.1 framework scope; functions are not first-class IR per umbrella decision **C4**) or a separate "create profile after JWT validation" call in the user's handler. **Working assumption: handler-side creation is the v0.1 recommendation.** The trigger pattern is a stretch goal explicitly captured in the PM-pass.
-- **PGREST/PostgREST compatibility.** Prisma Next connects directly to Postgres, not through PostgREST. The `service_role` "key" concept (a JWT identity for authenticating to PostgREST) is irrelevant — we use `SET LOCAL role = 'service_role'` instead. Apps that need both Prisma Next *and* PostgREST run them side-by-side with their own auth flows.
+- **PGREST/PostgREST compatibility.** Prisma Next connects directly to Postgres, not through PostgREST. The `service_role` "key" concept (a JWT identity for authenticating to PostgREST) is irrelevant — we bind the `service_role` Postgres role via session-coupled connection setup instead. Apps that need both Prisma Next *and* PostgREST run them side-by-side with their own auth flows.
 - **`@supabase/supabase-js` interop.** No code path through the Supabase JS SDK. The integration is Postgres-direct.
 - **Storage upload ergonomics.** The `storage.*` tables are declared in the contract for read-only reference. Ergonomic upload/download helpers are out of v0.1 scope. Users either write raw `INSERT INTO storage.objects ...` queries or use `@supabase/storage-js` for uploads.
 - **Realtime channels.** The `realtime.*` schema is declared in the contract but no integration with Supabase Realtime websocket subscriptions exists in v0.1.
@@ -386,7 +355,7 @@ This project is the integration layer; it consumes all four sibling projects:
 - **[target-extensible-ir](../target-extensible-ir/spec.md)** — for namespaces, the target-only IR kind seam, the `Namespace` + `__unspecified__` pattern. (Through M5b.)
 - **[cross-contract-refs](../cross-contract-refs/spec.md)** — for the brand machinery the `/contract` model handles consume.
 - **[postgres-rls](../postgres-rls/spec.md)** — for the `.rls([…])` authoring surface, `PostgresRlsPolicy` IR, `PostgresRole` IR, the verifier algorithm, the migration ops.
-- **[runtime-target-layer](../runtime-target-layer/spec.md)** — for `PostgresRuntime` as the base class and `withRawConnection` as the below-middleware primitive.
+- **[runtime-target-layer](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md)** — ships `SupabaseRuntimeImpl`, the `supabase()` façade, `SupabaseDb`, `RoleBoundDb`, JWT validation, and session-coupled connection role binding. This project consumes and re-exports them.
 - **[control-policy](../control-policy/spec.md)** — for the `external` control-policy value the shipped Supabase contract uses by default.
 
 Resulting global sequence (within the Supabase umbrella): **TML-2459 + control-policy → cross-contract-refs ∥ postgres-rls ∥ runtime-target-layer → this project**.
@@ -400,8 +369,8 @@ This project lands the integration / launch. Slipping any upstream dependency ca
 - [ ] **AC3.** An app contract that imports `roles.anon` / `roles.authenticated` from `/contract` and uses them in `.rls([{ roles: [roles.anon, roles.authenticated], … }])` lowers correctly. The emitted `CREATE POLICY` statements name the wire role names (`anon`, `authenticated`).
 - [ ] **AC4.** `await supabase({ contractJson, url, jwtSecret })` returns a `SupabaseDb` instance. The instance exposes `asUser`, `asAnon`, `asServiceRole`; it does *not* expose `.sql.from(...)` at the top level (type-level assertion).
 - [ ] **AC5.** `db.asUser(badJwt)` throws `InvalidJwtError` synchronously with a typed `reason` field. No connection is acquired; the throw happens before any I/O.
-- [ ] **AC6.** `db.asUser(validJwt).sql.from('profile').select(...).build().execute()` runs the query inside an implicit transaction with `SET LOCAL role = 'authenticated'` and `SET LOCAL request.jwt.claims = '{...}'` issued before the query. Verified by hooking the underlying connection (in a test fixture) and asserting the statement sequence.
-- [ ] **AC7.** User middleware registered via the `middleware` option sees only the user's logical query — not the `BEGIN`, `SET LOCAL …`, or `COMMIT` statements. Verified by a logging middleware that records every statement it sees.
+- [ ] **AC6.** `db.asUser(validJwt).sql.from('profile').select(...).build().execute()` runs the query on a connection that has had `set_config('role', 'authenticated', false)` and `set_config('request.jwt.claims', '{...}', false)` applied, with `RESET ALL` on release. Verified by hooking the underlying connection (in a test fixture) and asserting the statement sequence.
+- [ ] **AC7.** User middleware registered via the `middleware` option sees only the user's logical query — not the role-binding session setup. Verified by a logging middleware that records every statement it sees.
 - [ ] **AC8.** End-to-end test against PGlite seeded with `bootstrapSupabaseShim(client)`:
   - `Profile` created via `asUser(jwt)` lands in the table with the correct `user_id`.
   - `Profile.user_id` cascades on `DELETE FROM auth.users` (FK with `onDelete: 'cascade'`).
@@ -420,9 +389,9 @@ This project lands the integration / launch. Slipping any upstream dependency ca
 
 This project's primary security responsibility is RLS enforcement. The security properties:
 
-- **Role binding is structural.** `SupabaseDb` doesn't extend `Db`; the type system forces role selection before query execution. A user *cannot* skip role binding by accident.
-- **`SET LOCAL` is below user middleware.** Issued via `withRawConnection` (from runtime-target-layer); user middleware cannot reorder, replace, or suppress it.
-- **Implicit transactions.** Every role-bound execute is in a transaction; `SET LOCAL` never outlives the transaction. The pool-leak footgun (a role persisting across pool checkouts) is structurally impossible.
+- **Role binding is enforced by façade encapsulation.** `SupabaseDb` doesn't extend `Db`; a user cannot execute a query without first picking a role. The role-bound `Db` exposes no unbound connection.
+- **Session-coupled connection role binding is below user middleware.** `SupabaseRuntimeImpl` applies `set_config(role/claims)` on the raw connection before handing it to the query; user middleware cannot reorder, replace, or suppress it.
+- **`RESET ALL` on release.** Every role-bound connection is reset before returning to the pool. The pool-leak footgun (a role persisting across pool checkouts) is structurally impossible.
 - **JWT validation is eager.** Bad JWTs throw before any connection is acquired. The runtime never executes a query for a malformed / expired / mis-signed token.
 - **No `serviceRoleKey` option.** The `service_role` JWT-key concept (used by `@supabase/supabase-js` for PostgREST auth) is intentionally absent. Service-role access requires connecting with a privileged Postgres URL — making service-role use a deployment-time decision, not a runtime credential the application code can mishandle.
 - **Connection-string handling.** The framework expects a Postgres-compatible URL containing credentials. Users are responsible for not leaking this URL into logs or client-side bundles. The package's README documents this explicitly; the example app uses `process.env['DATABASE_URL']` and includes a `.env.example` that doesn't ship secret values.
@@ -445,13 +414,13 @@ CI cost: the example app's hermetic integration tests (PGlite + `bootstrapSupaba
 
 ## Observability
 
-User middleware sees logical query traffic only; the `SET LOCAL` plumbing is invisible. This is intentional (lint/budget middleware shouldn't count `BEGIN` / `COMMIT` / `SET` against user-query budgets) but means observability for the role-binding plumbing has to live elsewhere. The package can expose a separate "internal observability" hook in a future iteration if real users need it; v0.1 trusts that the structural correctness (`SET LOCAL` is issued by the same code path every time) makes per-call observability unnecessary.
+User middleware sees logical query traffic only; the session-coupled connection role-binding setup is invisible to it. This is intentional (lint/budget middleware shouldn't count role-binding overhead against user-query budgets) but means observability for the role-binding plumbing has to live elsewhere. The package can expose a separate "internal observability" hook in a future iteration if real users need it; v0.1 trusts that the structural correctness (role binding is applied by the same code path every time) makes per-call observability unnecessary.
 
 The `InvalidJwtError` is a typed error with a `reason` field — handlers can log it explicitly and surface the failure category in their telemetry without parsing error messages.
 
 ## Data Protection
 
-User data flows through the runtime constantly; the RLS enforcement *is* the data-protection mechanism. The package's correctness is what makes the user's data protection real. No personal data is stored by the package itself (no caching of JWT claims beyond the request scope, no caching of role bindings beyond the per-connection `SET LOCAL`).
+User data flows through the runtime constantly; the RLS enforcement *is* the data-protection mechanism. The package's correctness is what makes the user's data protection real. No personal data is stored by the package itself (no caching of JWT claims beyond the request scope, no caching of role bindings beyond the connection's session state).
 
 The JWT secret / JWKS URL is a configuration secret; the package handles it in memory only and never logs it. Users are responsible for sourcing it from a secret manager.
 
@@ -466,7 +435,7 @@ Not applicable. The package is library code; analytics are the consuming applica
 - [target-extensible-ir project spec](../target-extensible-ir/spec.md) — load-bearing dependency for namespaces + the target-only IR kind seam.
 - [cross-contract-refs project spec](../cross-contract-refs/spec.md) — load-bearing dependency for the brand machinery the typed handles consume.
 - [postgres-rls project spec](../postgres-rls/spec.md) — load-bearing dependency for `.rls(...)` authoring + `PostgresRole` IR + verifier behaviour.
-- [runtime-target-layer project spec](../runtime-target-layer/spec.md) — load-bearing dependency for the `PostgresRuntime` base class + the `withRawConnection` accessor.
+- [runtime-target-layer project spec / ADR 230](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md) — ships `SupabaseRuntimeImpl`, the `supabase()` façade, session-coupled connection role binding, JWT validation, and `RoleBoundDb`. This project consumes and re-exports them.
 - [control-policy project spec](../control-policy/spec.md) — the framework primitive whose `external` value the shipped Supabase contract uses by default.
 - [Umbrella `extension-package.md`](../supabase-integration/extension-package.md) — the longer-form design narrative this spec consolidates. Retained in the umbrella as historical context.
 - [TML-2492 — Skill: author a Prisma Next extension](https://linear.app/prisma-company/issue/TML-2492/skill-author-a-prisma-next-extension) — the extension-authoring skill this package serves as canonical example for.

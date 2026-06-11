@@ -8,6 +8,7 @@ import {
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 import {
   contract,
@@ -37,7 +38,7 @@ interface LedgerRow {
   readonly operations: unknown;
 }
 
-const ledgerAdapter = new PostgresControlAdapter();
+const ledgerAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 type ExpectedLedgerEntry = Omit<LedgerEntryRecord, 'appliedAt'>;
 

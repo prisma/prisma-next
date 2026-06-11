@@ -62,6 +62,7 @@ type ContractDefinition<
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
   Namespaces extends readonly string[] | undefined = undefined,
+  Enums extends Record<string, EnumTypeHandle> = Record<string, EnumTypeHandle>,
 > = {
   readonly family: Family;
   readonly target: Target;
@@ -75,7 +76,7 @@ type ContractDefinition<
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
-  readonly enums?: Record<string, EnumTypeHandle>;
+  readonly enums?: Enums;
 };
 
 type ContractScaffold<
@@ -86,6 +87,7 @@ type ContractScaffold<
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
   Namespaces extends readonly string[] | undefined = undefined,
+  Enums extends Record<string, EnumTypeHandle> = Record<string, EnumTypeHandle>,
 > = {
   readonly family: Family;
   readonly target: Target;
@@ -99,7 +101,7 @@ type ContractScaffold<
   readonly types?: never;
   readonly models?: never;
   readonly codecLookup?: CodecLookup;
-  readonly enums?: Record<string, EnumTypeHandle>;
+  readonly enums?: Enums;
 };
 
 type ContractFactory<
@@ -108,9 +110,11 @@ type ContractFactory<
   Types extends Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
   Models extends Record<string, ModelLike>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Enums extends Record<string, EnumTypeHandle> = Record<string, EnumTypeHandle>,
 > = (helpers: ComposedAuthoringHelpers<Family, Target, ExtensionPacks>) => {
   readonly types?: Types;
   readonly models?: Models;
+  readonly enums?: Enums;
 };
 
 function validateTargetPackRef(
@@ -324,6 +328,20 @@ type BoundDefinitionInput<
   readonly enums?: Record<string, EnumTypeHandle>;
 };
 
+// A bare `Record<string, EnumTypeHandle>` (no literal keys) is the widened
+// default for a side that declared no enums; drop it so the merge keeps only
+// literally-authored enum handles.
+type LiteralEnums<E extends Record<string, EnumTypeHandle>> = string extends keyof E
+  ? Record<never, never>
+  : E;
+
+// Merges enum handles authored on the scaffold definition with those returned
+// from the factory callback. Either side may be the widened default (empty).
+export type MergeEnums<
+  ScaffoldEnums extends Record<string, EnumTypeHandle>,
+  FactoryEnums extends Record<string, EnumTypeHandle>,
+> = LiteralEnums<ScaffoldEnums> & LiteralEnums<FactoryEnums>;
+
 // Merges a bound input with the pre-bound family/target to produce a full ContractDefinition.
 type WithFamilyTarget<
   Input,
@@ -375,6 +393,7 @@ export function buildBoundContract<
   const Built extends {
     readonly types?: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
     readonly models?: Record<string, ModelLike>;
+    readonly enums?: Record<string, EnumTypeHandle>;
   },
 >(
   family: F,
@@ -399,6 +418,7 @@ export function buildBoundContract(
       ) => {
         readonly types?: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
         readonly models?: Record<string, ModelLike>;
+        readonly enums?: Record<string, EnumTypeHandle>;
       })
     | undefined,
 ) {
@@ -412,10 +432,12 @@ export function buildBoundContract(
         extensionPacks: definition.extensionPacks,
       }),
     );
+    const mergedEnums = { ...(definition.enums ?? {}), ...built.enums };
     return buildContractFromDsl({
       ...full,
       ...ifDefined('types', built.types),
       ...ifDefined('models', built.models),
+      ...ifDefined('enums', Object.keys(mergedEnums).length > 0 ? mergedEnums : undefined),
     });
   }
 
@@ -437,6 +459,7 @@ export function defineContract<
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
   const Namespaces extends readonly string[] | undefined = undefined,
+  const Enums extends Record<string, EnumTypeHandle> = Record<string, EnumTypeHandle>,
 >(
   definition: ContractDefinition<
     Family,
@@ -447,7 +470,8 @@ export function defineContract<
     Naming,
     StorageHash,
     ForeignKeyDefaults,
-    Namespaces
+    Namespaces,
+    Enums
   >,
 ): SqlContractResult<
   ContractDefinition<
@@ -459,7 +483,8 @@ export function defineContract<
     Naming,
     StorageHash,
     ForeignKeyDefaults,
-    Namespaces
+    Namespaces,
+    Enums
   >
 >;
 export function defineContract<
@@ -477,6 +502,8 @@ export function defineContract<
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
   const Namespaces extends readonly string[] | undefined = undefined,
+  const ScaffoldEnums extends Record<string, EnumTypeHandle> = Record<string, EnumTypeHandle>,
+  const FactoryEnums extends Record<string, EnumTypeHandle> = Record<string, EnumTypeHandle>,
 >(
   definition: ContractScaffold<
     Family,
@@ -485,9 +512,10 @@ export function defineContract<
     Naming,
     StorageHash,
     ForeignKeyDefaults,
-    Namespaces
+    Namespaces,
+    ScaffoldEnums
   >,
-  factory: ContractFactory<Family, Target, Types, Models, ExtensionPacks>,
+  factory: ContractFactory<Family, Target, Types, Models, ExtensionPacks, FactoryEnums>,
 ): SqlContractResult<
   ContractDefinition<
     Family,
@@ -498,7 +526,8 @@ export function defineContract<
     Naming,
     StorageHash,
     ForeignKeyDefaults,
-    Namespaces
+    Namespaces,
+    MergeEnums<ScaffoldEnums, FactoryEnums>
   >
 >;
 export function defineContract(

@@ -4,7 +4,7 @@ import { defineContract, rel } from '@prisma-next/sqlite/contract-builder';
 export const contract = defineContract({}, ({ field, model }) => {
   const User = model('User', {
     fields: {
-      id: field.id.uuidv4(),
+      id: field.id.uuidv4String(),
       email: field.column(textColumn),
       displayName: field.column(textColumn),
       createdAt: field.column(datetimeColumn).defaultSql('now()'),
@@ -13,9 +13,9 @@ export const contract = defineContract({}, ({ field, model }) => {
 
   const Post = model('Post', {
     fields: {
-      id: field.id.uuidv4(),
+      id: field.id.uuidv4String(),
       title: field.column(textColumn),
-      userId: field.uuid(),
+      userId: field.uuidString(),
       createdAt: field.column(datetimeColumn).defaultSql('now()'),
     },
   });

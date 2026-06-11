@@ -217,16 +217,16 @@ describe('verifySqlSchema — check constraints', () => {
                 column,
                 valueSet: {
                   plane: 'storage',
-                  entityKind: 'value-set',
+                  entityKind: 'valueSet',
                   namespaceId: UNBOUND_NAMESPACE_ID,
-                  name: valueSetName,
+                  entityName: valueSetName,
                 },
               }),
             ],
           }),
         },
         valueSet: {
-          [valueSetName]: new StorageValueSet({ kind: 'value-set', values: values as string[] }),
+          [valueSetName]: new StorageValueSet({ kind: 'valueSet', values: values as string[] }),
         },
       },
     });
@@ -382,9 +382,9 @@ describe('verifySqlSchema — check constraints', () => {
                 column: 'status',
                 valueSet: {
                   plane: 'storage',
-                  entityKind: 'value-set',
+                  entityKind: 'valueSet',
                   namespaceId: UNBOUND_NAMESPACE_ID,
-                  name: 'post_status_values_DOES_NOT_EXIST',
+                  entityName: 'post_status_values_DOES_NOT_EXIST',
                 },
               }),
             ],

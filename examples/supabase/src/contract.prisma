@@ -4,7 +4,7 @@ types {
 
 namespace public {
   model Profile {
-    id       String @id @default(uuid())
+    id       Uuid   @id @default(uuid())
     username String
     userId   Uuid   @unique
     user     supabase:auth.AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -1,4 +1,7 @@
-import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import {
+  INIT_ADDITIVE_POLICY,
+  type SqlMigrationPlanOperation,
+} from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -115,7 +118,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       throw new Error('expected planner success for subset');
     }
     // Contract only has 'user' table - should plan missing column, unique, and index
-    expect(subsetResult.plan.operations.map((op) => op.id)).toEqual([
+    expect((await Promise.all(subsetResult.plan.operations)).map((op) => op.id)).toEqual([
       'column.user.email',
       'unique.user.user_email_key',
       'index.user.user_email_idx',
@@ -147,9 +150,10 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       throw new Error('expected planner success for constrained fallback case');
     }
 
-    const addEmailOperation = planResult.plan.operations.find(
-      (op) => op.id === 'column.user.email',
-    );
+    const planOps = (await Promise.all(
+      planResult.plan.operations,
+    )) as SqlMigrationPlanOperation<unknown>[];
+    const addEmailOperation = planOps.find((op) => op.id === 'column.user.email');
     expect(addEmailOperation).toBeDefined();
     expect(addEmailOperation?.precheck.map((step) => step.sql)).toContain(
       'SELECT NOT EXISTS (SELECT 1 FROM "user" LIMIT 1)',
@@ -157,7 +161,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
     expect(addEmailOperation?.execute.map((step) => step.sql)).toEqual([
       'ALTER TABLE "user" ADD COLUMN "email" text NOT NULL',
     ]);
-    expect(planResult.plan.operations.map((op) => op.id)).toEqual([
+    expect(planOps.map((op) => op.id)).toEqual([
       'column.user.email',
       'unique.user.user_email_key',
       'index.user.user_email_idx',

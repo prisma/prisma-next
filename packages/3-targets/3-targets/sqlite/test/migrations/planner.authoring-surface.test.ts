@@ -1,4 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -10,6 +11,13 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../../src/core/migrations/planner';
+
+const stubLowerer: ExecuteRequestLowerer = {
+  lower: () => {
+    throw new Error('lower() called on stubLowerer — planner must use lowerToExecuteRequest()');
+  },
+  lowerToExecuteRequest: async () => ({ sql: '', params: [] }),
+};
 
 function createContract(): Contract<SqlStorage> {
   return {
@@ -61,7 +69,7 @@ const emptySchema: SqlSchemaIR = { tables: {} };
 describe('SqliteMigrationPlanner authoring surface', () => {
   describe('plan(...).plan', () => {
     it('returns a TypeScriptRenderableSqliteMigration with targetId="sqlite"', () => {
-      const planner = createSqliteMigrationPlanner();
+      const planner = createSqliteMigrationPlanner(stubLowerer);
       const result = planner.plan({
         contract: createContract(),
         schema: emptySchema,
@@ -77,7 +85,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
     });
 
     it('describe() returns the supplied from/to meta derived from fromContract', () => {
-      const planner = createSqliteMigrationPlanner();
+      const planner = createSqliteMigrationPlanner(stubLowerer);
       const contract = createContract();
       const fromContract = fromContractWithHash('sha256:from');
       const result = planner.plan({
@@ -96,7 +104,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
     });
 
     it('describe().from is null when fromContract is null', () => {
-      const planner = createSqliteMigrationPlanner();
+      const planner = createSqliteMigrationPlanner(stubLowerer);
       const result = planner.plan({
         contract: createContract(),
         schema: emptySchema,
@@ -111,7 +119,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
     });
 
     it('destination carries both storageHash and profileHash from the contract', () => {
-      const planner = createSqliteMigrationPlanner();
+      const planner = createSqliteMigrationPlanner(stubLowerer);
       const contract = createContract();
       const result = planner.plan({
         contract: contract,
@@ -129,8 +137,8 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       });
     });
 
-    it('operations getter renders the IR via toOp() in emission order', () => {
-      const planner = createSqliteMigrationPlanner();
+    it('operations getter renders the IR via toOp() in emission order', async () => {
+      const planner = createSqliteMigrationPlanner(stubLowerer);
       const result = planner.plan({
         contract: createContract(),
         schema: emptySchema,
@@ -141,14 +149,14 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       });
 
       if (result.kind !== 'success') throw new Error('expected success');
-      const ops = result.plan.operations;
+      const ops = await Promise.all(result.plan.operations);
       expect(ops).toHaveLength(1);
       expect(ops[0]?.id).toBe('table.user');
       expect(ops[0]?.operationClass).toBe('additive');
     });
 
     it('renderTypeScript() emits a class-flow scaffold with target-sqlite/migration import', () => {
-      const planner = createSqliteMigrationPlanner();
+      const planner = createSqliteMigrationPlanner(stubLowerer);
       const result = planner.plan({
         contract: createContract(),
         schema: emptySchema,
@@ -171,7 +179,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
 
   describe('emptyMigration(context)', () => {
     it("identifies as the 'sqlite' target with no operations and the supplied destination hash", () => {
-      const planner = createSqliteMigrationPlanner();
+      const planner = createSqliteMigrationPlanner(stubLowerer);
       const empty = planner.emptyMigration(
         {
           packageDir: '/tmp/migration-pkg',
@@ -187,7 +195,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
     });
 
     it('renders a stub whose describe() carries from/to and whose operations list is empty', () => {
-      const planner = createSqliteMigrationPlanner();
+      const planner = createSqliteMigrationPlanner(stubLowerer);
       const empty = planner.emptyMigration(
         {
           packageDir: '/tmp/migration-pkg',
@@ -208,7 +216,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
 
   describe('policy violations', () => {
     it('returns failure when policy excludes "additive"', () => {
-      const planner = createSqliteMigrationPlanner();
+      const planner = createSqliteMigrationPlanner(stubLowerer);
       const result = planner.plan({
         contract: createContract(),
         schema: emptySchema,

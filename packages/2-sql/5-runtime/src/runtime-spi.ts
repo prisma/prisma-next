@@ -9,7 +9,7 @@ export interface MarkerReader {
 }
 
 /**
- * SQL family adapter SPI consumed by `SqlRuntime`. Encapsulates the
+ * SQL family adapter SPI consumed by `SqlRuntimeBase`. Encapsulates the
  * runtime contract, marker reader, and plan validation logic so the
  * runtime can be unit-tested without a concrete SQL adapter profile.
  *

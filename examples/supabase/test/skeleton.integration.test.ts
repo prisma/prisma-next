@@ -51,7 +51,7 @@ import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import contractJson from '../src/contract.json' with { type: 'json' };
-import { db } from '../src/prisma/db';
+import { createDb } from '../src/prisma/db';
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
 
 // Active in CI (test:examples). This asserts the M1 walking-skeleton behaviour only —
@@ -276,6 +276,23 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
         await client.close();
       }
 
+      // Grant roles access to the WAL schema created by dbInit (PGlite single-connection
+      // accommodation: role-bound sessions share the connection with the WAL drain query).
+      await withClient(connectionString, async (pg) => {
+        await pg.query(
+          'GRANT USAGE ON SCHEMA _prisma_dev_wal TO anon, authenticated, service_role',
+        );
+        await pg.query(
+          'GRANT ALL ON ALL TABLES IN SCHEMA _prisma_dev_wal TO anon, authenticated, service_role',
+        );
+        await pg.query(
+          'GRANT ALL ON ALL SEQUENCES IN SCHEMA _prisma_dev_wal TO anon, authenticated, service_role',
+        );
+        await pg.query(
+          'GRANT EXECUTE ON FUNCTION _prisma_dev_wal.capture_event() TO anon, authenticated, service_role',
+        );
+      });
+
       // Exercise the cascade.
       //
       // auth.users is foreign — non-navigable per Option B, no ORM surface.
@@ -294,14 +311,16 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       });
 
       // Use the ORM for public.profile operations.
-      const runtime = await db.connect({ url: connectionString });
+      const appDb = await createDb(connectionString);
       try {
+        const sr = appDb.asServiceRole();
+
         // Insert a profile row via the ORM.
-        await runtime.execute(db.sql.public.profile.insert([{ username: 'bob', userId }]).build());
+        await sr.execute(sr.sql.public.profile.insert([{ username: 'bob', userId }]).build());
 
         // Count profiles for this user before the cascade delete.
-        const beforeRows = await runtime.execute(
-          db.sql.public.profile
+        const beforeRows = await sr.execute(
+          sr.sql.public.profile
             .select('id')
             .where((f, fns) => fns.eq(f.userId, userId))
             .build(),
@@ -315,15 +334,15 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
         });
 
         // Count profiles for this user after the cascade delete — must be zero.
-        const afterRows = await runtime.execute(
-          db.sql.public.profile
+        const afterRows = await sr.execute(
+          sr.sql.public.profile
             .select('id')
             .where((f, fns) => fns.eq(f.userId, userId))
             .build(),
         );
         expect(afterRows).toHaveLength(0);
       } finally {
-        await db.close();
+        await appDb.close();
       }
     },
     timeouts.spinUpPpgDev * 4,

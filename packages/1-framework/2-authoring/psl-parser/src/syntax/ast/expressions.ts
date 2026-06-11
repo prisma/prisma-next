@@ -56,6 +56,78 @@ export class ArrayLiteralAst implements AstNode {
   }
 }
 
+const HEX = /^[0-9a-fA-F]+$/;
+
+function decodeFixedHex(raw: string, start: number, width: number): string | undefined {
+  if (start + width > raw.length) return undefined;
+  const hex = raw.slice(start, start + width);
+  if (!HEX.test(hex)) return undefined;
+  return String.fromCharCode(Number.parseInt(hex, 16));
+}
+
+function decodeStringLiteral(raw: string): string {
+  let out = '';
+  let i = 0;
+  while (i < raw.length) {
+    const ch = raw.charAt(i);
+    if (ch !== '\\' || i + 1 >= raw.length) {
+      out += ch;
+      i++;
+      continue;
+    }
+    const next = raw.charAt(i + 1);
+    switch (next) {
+      case 'n':
+        out += '\n';
+        i += 2;
+        continue;
+      case 'r':
+        out += '\r';
+        i += 2;
+        continue;
+      case 't':
+        out += '\t';
+        i += 2;
+        continue;
+      case '"':
+        out += '"';
+        i += 2;
+        continue;
+      case '\\':
+        out += '\\';
+        i += 2;
+        continue;
+      case 'x': {
+        const decoded = decodeFixedHex(raw, i + 2, 2);
+        if (decoded === undefined) {
+          out += '\\x';
+          i += 2;
+          continue;
+        }
+        out += decoded;
+        i += 4;
+        continue;
+      }
+      case 'u': {
+        const decoded = decodeFixedHex(raw, i + 2, 4);
+        if (decoded === undefined) {
+          out += '\\u';
+          i += 2;
+          continue;
+        }
+        out += decoded;
+        i += 6;
+        continue;
+      }
+      default:
+        out += `\\${next}`;
+        i += 2;
+        continue;
+    }
+  }
+  return out;
+}
+
 export class StringLiteralExprAst implements AstNode {
   readonly syntax: SyntaxNode;
 
@@ -70,23 +142,7 @@ export class StringLiteralExprAst implements AstNode {
   value(): string | undefined {
     const tok = this.token();
     if (!tok) return undefined;
-    const raw = tok.text.slice(1, -1);
-    return raw.replace(/\\(.)/g, (_match, char: string) => {
-      switch (char) {
-        case 'n':
-          return '\n';
-        case 'r':
-          return '\r';
-        case 't':
-          return '\t';
-        case '"':
-          return '"';
-        case '\\':
-          return '\\';
-        default:
-          return `\\${char}`;
-      }
-    });
+    return decodeStringLiteral(tok.text.slice(1, -1));
   }
 
   static cast(node: SyntaxNode): StringLiteralExprAst | undefined {
@@ -140,12 +196,82 @@ export class BooleanLiteralExprAst implements AstNode {
   }
 }
 
+export class ObjectLiteralExprAst implements AstNode {
+  readonly syntax: SyntaxNode;
+
+  constructor(syntax: SyntaxNode) {
+    this.syntax = syntax;
+  }
+
+  lbrace(): Token | undefined {
+    return findChildToken(this.syntax, 'LBrace');
+  }
+
+  rbrace(): Token | undefined {
+    return findChildToken(this.syntax, 'RBrace');
+  }
+
+  *fields(): Iterable<ObjectFieldAst> {
+    yield* filterChildren(this.syntax, ObjectFieldAst.cast);
+  }
+
+  static cast(node: SyntaxNode): ObjectLiteralExprAst | undefined {
+    return node.kind === 'ObjectLiteralExpr' ? new ObjectLiteralExprAst(node) : undefined;
+  }
+}
+
+export class ObjectFieldAst implements AstNode {
+  readonly syntax: SyntaxNode;
+
+  constructor(syntax: SyntaxNode) {
+    this.syntax = syntax;
+  }
+
+  key(): IdentifierAst | undefined {
+    for (const child of this.syntax.children()) {
+      if (!(child instanceof SyntaxNode)) {
+        if (child.kind === 'Colon') break;
+        continue;
+      }
+      return IdentifierAst.cast(child);
+    }
+    return undefined;
+  }
+
+  colon(): Token | undefined {
+    return findChildToken(this.syntax, 'Colon');
+  }
+
+  value(): ExpressionAst | undefined {
+    if (this.colon()) {
+      let pastColon = false;
+      for (const child of this.syntax.children()) {
+        if (!(child instanceof SyntaxNode)) {
+          if (child.kind === 'Colon') pastColon = true;
+          continue;
+        }
+        if (pastColon) {
+          const expr = castExpression(child);
+          if (expr) return expr;
+        }
+      }
+      return undefined;
+    }
+    return findFirstChild(this.syntax, castExpression);
+  }
+
+  static cast(node: SyntaxNode): ObjectFieldAst | undefined {
+    return node.kind === 'ObjectField' ? new ObjectFieldAst(node) : undefined;
+  }
+}
+
 export type ExpressionAst =
   | FunctionCallAst
   | ArrayLiteralAst
   | StringLiteralExprAst
   | NumberLiteralExprAst
   | BooleanLiteralExprAst
+  | ObjectLiteralExprAst
   | IdentifierAst;
 
 export function castExpression(node: SyntaxNode): ExpressionAst | undefined {
@@ -155,6 +281,7 @@ export function castExpression(node: SyntaxNode): ExpressionAst | undefined {
     StringLiteralExprAst.cast(node) ??
     NumberLiteralExprAst.cast(node) ??
     BooleanLiteralExprAst.cast(node) ??
+    ObjectLiteralExprAst.cast(node) ??
     IdentifierAst.cast(node)
   );
 }

@@ -41,52 +41,31 @@ Execute SQL query Plans with deterministic verification, guardrails, and feedbac
 
 ## Usage
 
+`SqlRuntime` is an abstract base class. Construct a runtime via the target factory — `postgres()` from `@prisma-next/postgres` or `sqlite()` from `@prisma-next/sqlite`. You do not call `new SqlRuntime()` directly.
+
 ```typescript
-import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import postgresDriver from '@prisma-next/driver-postgres/runtime';
-import pgvector from '@prisma-next/extension-pgvector/runtime';
-import postgresTarget from '@prisma-next/target-postgres/runtime';
-import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import {
-  budgets,
-  createExecutionContext,
-  createRuntime,
-  createSqlExecutionStack,
-} from '@prisma-next/sql-runtime';
+import postgres from '@prisma-next/postgres';
+import { budgets } from '@prisma-next/sql-runtime';
+import type { Contract } from './src/contract';
+import contractJson from './src/contract.json' with { type: 'json' };
 
-const contract = postgresTarget.contractSerializer.deserializeContract(contractJson);
-const stack = createSqlExecutionStack({
-  target: postgresTarget,
-  adapter: postgresAdapter,
-  driver: postgresDriver,
-  extensionPacks: [pgvector],
-});
-
-// Static context (no instantiation needed)
-const context = createExecutionContext({ contract, stack });
-
-// Dynamic runtime
-const stackInstance = instantiateExecutionStack(stack);
-const driver = stack.driver.create({ connect: { connectionString: process.env.DATABASE_URL } });
-const runtime = createRuntime({
-  stackInstance,
-  context,
-  driver,
+const db = postgres<Contract>({
+  contractJson,
+  url: process.env.DATABASE_URL,
   middleware: [budgets()],
 });
 
-for await (const row of runtime.execute(plan)) {
+for await (const row of db.runtime().execute(plan)) {
   console.log(row);
 }
 ```
 
-Use `verifyMarker: false` to skip the marker read entirely — e.g. during a known-skewed deploy window where contract drift is expected and tolerated.
+Pass `verifyMarker: false` to skip the marker read entirely — e.g. during a known-skewed deploy window where contract drift is expected and tolerated.
 
 ```typescript
-const runtime = createRuntime({
-  stackInstance,
-  context,
-  driver,
+const db = postgres<Contract>({
+  contractJson,
+  url: process.env.DATABASE_URL,
   verifyMarker: false,
   middleware: [budgets()],
 });
@@ -96,9 +75,9 @@ const runtime = createRuntime({
 
 ### Runtime
 
-- `createRuntime` - Create a SQL runtime instance
-- `Runtime` - Runtime instance type
-- `CreateRuntimeOptions` - Options for `createRuntime`
+- `SqlRuntime` - Abstract family-layer base class; subclass to build a target runtime (construction happens via target factories — `postgres()` from `@prisma-next/postgres`, `sqlite()` from `@prisma-next/sqlite`)
+- `Runtime` - Runtime instance interface
+- `withTransaction` - Helper to run a callback inside a transaction against any `Runtime`
 - `VerifyMarkerOption` - Marker-verification option (`'onFirstUse'` default; `false` to skip)
 - `RuntimeTelemetryEvent`, `TelemetryOutcome` - Telemetry event types
 
@@ -159,10 +138,12 @@ The `lints` middleware operates on `plan.ast` when it is a SQL `QueryAst`:
 When `plan.ast` is missing, the middleware falls back to raw heuristic guardrails (`fallbackWhenAstMissing: 'raw'`) or skips linting (`fallbackWhenAstMissing: 'skip'`). Default is `'raw'`.
 
 ```typescript
-import { createRuntime, lints } from '@prisma-next/sql-runtime';
+import postgres from '@prisma-next/postgres';
+import { lints } from '@prisma-next/sql-runtime';
 
-const runtime = createRuntime({
-  // ...
+const db = postgres<Contract>({
+  contractJson,
+  url: process.env.DATABASE_URL,
   middleware: [lints({ severities: { noLimit: 'error' } })],
 });
 ```
@@ -175,7 +156,7 @@ The SQL runtime extends the abstract `RuntimeCore` base class from `@prisma-next
 2. **SqlStaticContributions**: Codecs, operation signatures, parameterized codecs, and mutation default generators contributed by each descriptor
 3. **ExecutionContext**: Built from contract + stack descriptors (no instantiation)
 4. **ExecutionStackInstance**: Instantiated components used at runtime for execution
-5. **SqlRuntime**: `class SqlRuntimeImpl extends RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>` — overrides `lower` (with codec param-encoding), `runDriver`, `runBeforeCompile` (delegates to the SQL `beforeCompile` chain), and `close`. The execution path also wraps the `runWithMiddleware` helper from `framework-components/runtime` with codec row-decoding, marker verification (via the `RuntimeFamilyAdapter` defined in `runtime-spi.ts`), and telemetry fingerprinting (via `computeSqlFingerprint` from `fingerprint.ts`).
+5. **SqlRuntime**: `class SqlRuntime extends RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>` — overrides `lower` (with codec param-encoding), `runDriver`, `runBeforeCompile` (delegates to the SQL `beforeCompile` chain), and `close`. The execution path also wraps the `runWithMiddleware` helper from `framework-components/runtime` with codec row-decoding, marker verification (via the `RuntimeFamilyAdapter` defined in `runtime-spi.ts`), and telemetry fingerprinting (via `computeSqlFingerprint` from `fingerprint.ts`).
 6. **SqlMarker**: Provides SQL statements for marker management
 
 ```mermaid

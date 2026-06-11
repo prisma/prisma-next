@@ -6,46 +6,27 @@
  * VP1 of the Runtime pipeline project.
  */
 
-import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import postgres from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
-import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
-import { type CreateRuntimeOptions, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
+import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
-import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
+import type { Contract } from '../src/prisma/contract';
+import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { db } from '../src/prisma/db';
 import { crossAuthorSimilarity } from '../src/queries/cross-author-similarity';
 import { initTestDatabase } from './utils/control-client';
 
 const context = db.context;
 const { contract } = context;
-const executionStack = db.stack;
-
-async function createTestDriver(connectionString: string) {
-  const stackInstance = instantiateExecutionStack(
-    executionStack,
-  ) as CreateRuntimeOptions['stackInstance'];
-  const driver = stackInstance.driver as unknown as SqlDriver<unknown>;
-  if (!driver) {
-    throw new Error('Driver descriptor missing from execution stack');
-  }
-  const pool = new Pool({ connectionString });
-  try {
-    await driver.connect({ kind: 'pgPool', pool });
-  } catch (error) {
-    await pool.end();
-    throw error;
-  }
-  return { stackInstance, driver };
-}
 
 async function getRuntime(connectionString: string): Promise<Runtime> {
-  const { stackInstance, driver } = await createTestDriver(connectionString);
-  return createRuntime({
-    stackInstance,
-    context,
-    driver,
+  const client = postgres<Contract>({
+    contractJson,
+    url: connectionString,
+    extensions: db.stack.extensionPacks,
   });
+  return client.connect();
 }
 
 const seededUserIds = {
@@ -115,6 +96,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
       id: seededPostIds.aliceClose,
       title: 'Alice close',
       userId: seededUserIds.alice,
+      priority: db.enums.public.Priority.members.Low,
       createdAt: new Date('2024-03-10T10:00:00.000Z'),
       embedding: makeVector([1, 0, 0]),
     },
@@ -122,6 +104,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
       id: seededPostIds.aliceFar,
       title: 'Alice far',
       userId: seededUserIds.alice,
+      priority: db.enums.public.Priority.members.Low,
       createdAt: new Date('2024-03-11T10:00:00.000Z'),
       embedding: makeVector([0.7, 0.3, 0]),
     },
@@ -129,6 +112,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
       id: seededPostIds.bobClose,
       title: 'Bob close',
       userId: seededUserIds.bob,
+      priority: db.enums.public.Priority.members.Low,
       createdAt: new Date('2024-03-12T10:00:00.000Z'),
       embedding: makeVector([0.5, 0.5, 0]),
     },
@@ -136,6 +120,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
       id: seededPostIds.bobMid,
       title: 'Bob mid',
       userId: seededUserIds.bob,
+      priority: db.enums.public.Priority.members.Low,
       createdAt: new Date('2024-03-13T10:00:00.000Z'),
       embedding: makeVector([0, 1, 0]),
     },
@@ -143,6 +128,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
       id: seededPostIds.bobFar,
       title: 'Bob far',
       userId: seededUserIds.bob,
+      priority: db.enums.public.Priority.members.Low,
       createdAt: new Date('2024-03-14T10:00:00.000Z'),
       embedding: makeVector([-1, 0, 0]),
     },
@@ -150,6 +136,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
       id: seededPostIds.carolUnembedded,
       title: 'Carol unembedded',
       userId: seededUserIds.carol,
+      priority: db.enums.public.Priority.members.Low,
       createdAt: new Date('2024-03-15T10:00:00.000Z'),
     },
   ];

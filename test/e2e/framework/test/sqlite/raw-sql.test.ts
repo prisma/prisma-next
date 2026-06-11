@@ -15,11 +15,11 @@ import { param } from '@prisma-next/sql-relational-core/expression';
 import type { SqlParamRefMutator } from '@prisma-next/sql-relational-core/middleware';
 import {
   createExecutionContext,
-  createRuntime,
   createSqlExecutionStack,
   type Runtime,
   type SqlMiddleware,
 } from '@prisma-next/sql-runtime';
+import { SqliteRuntimeImpl } from '@prisma-next/sqlite/runtime';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -89,9 +89,9 @@ async function buildHarness(middleware?: readonly SqlMiddleware[]): Promise<Harn
   if (!driver) throw new Error('SQLite driver missing from execution stack');
   await driver.connect({ kind: 'path', path: dbPath });
 
-  const runtime = createRuntime({
-    stackInstance,
+  const runtime = new SqliteRuntimeImpl({
     context,
+    adapter: stackInstance.adapter,
     driver,
     verifyMarker: false,
     ...(middleware ? { middleware } : {}),

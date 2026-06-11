@@ -1,3 +1,7 @@
+export type { ParseDiagnostic, ParseResult } from '../parse';
+export { parse } from '../parse';
+export type { Position, Range } from '../source-file';
+export { SourceFile } from '../source-file';
 export {
   AttributeArgListAst,
   FieldAttributeAst,
@@ -5,12 +9,12 @@ export {
 } from '../syntax/ast/attributes';
 export type { NamespaceMemberAst } from '../syntax/ast/declarations';
 export {
-  BlockDeclarationAst,
   CompositeTypeDeclarationAst,
   DocumentAst,
   EnumDeclarationAst,
   EnumValueDeclarationAst,
   FieldDeclarationAst,
+  GenericBlockDeclarationAst,
   KeyValuePairAst,
   ModelDeclarationAst,
   NamedTypeDeclarationAst,
@@ -25,6 +29,8 @@ export {
   castExpression,
   FunctionCallAst,
   NumberLiteralExprAst,
+  ObjectFieldAst,
+  ObjectLiteralExprAst,
   StringLiteralExprAst,
 } from '../syntax/ast/expressions';
 // AST wrappers

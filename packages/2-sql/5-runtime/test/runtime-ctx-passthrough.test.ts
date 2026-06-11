@@ -19,12 +19,11 @@ import type {
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
-import { createRuntime } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs } from './utils';
+import { createTestRuntime as createRuntime, descriptorsFromCodecs } from './utils';
 
 /**
- * Pins that the SQL runtime's middleware ctx exposes a working `now()` clock and `contentHash()` plan hasher even when no `log` was supplied to `createRuntime` (default noop log path).
+ * Pins that the SQL runtime's middleware ctx exposes a working `now()` clock and `contentHash()` plan hasher even when no `log` was supplied (default noop log path).
  */
 
 const testContract: Contract<SqlStorage> = {

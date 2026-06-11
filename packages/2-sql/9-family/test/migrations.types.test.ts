@@ -54,10 +54,10 @@ describe('createMigrationPlan', () => {
     });
 
     expect(Object.isFrozen(plan.operations)).toBe(true);
-    expect(Object.isFrozen(plan.operations[0]!)).toBe(true);
-    expect(Object.isFrozen(plan.operations[0]!.precheck)).toBe(true);
+    const firstOperation = plan.operations[0]! as SqlMigrationPlanOperation<TestTargetDetails>;
+    expect(Object.isFrozen(firstOperation)).toBe(true);
+    expect(Object.isFrozen(firstOperation.precheck)).toBe(true);
 
-    const firstOperation = plan.operations[0]!;
     expectTypeOf(firstOperation.target.details).toEqualTypeOf<TestTargetDetails | undefined>();
   });
 
@@ -84,16 +84,17 @@ describe('createMigrationPlan', () => {
     // Mutate original
     mutableDetails.schema = 'mutated';
 
+    const op0 = plan.operations[0]! as SqlMigrationPlanOperation<TestTargetDetails>;
     // Assert plan's details unchanged
-    expect(plan.operations[0]!.target.details).toMatchObject({
+    expect(op0.target.details).toMatchObject({
       schema: 'public',
       objectType: 'table',
       name: 'user',
     });
 
     // Assert frozen
-    expect(Object.isFrozen(plan.operations[0]!.target)).toBe(true);
-    expect(Object.isFrozen(plan.operations[0]!.target.details)).toBe(true);
+    expect(Object.isFrozen(op0.target)).toBe(true);
+    expect(Object.isFrozen(op0.target.details)).toBe(true);
   });
 
   it('preserves primitive details without cloning', () => {
@@ -115,9 +116,10 @@ describe('createMigrationPlan', () => {
       providedInvariants: [],
     });
 
+    const op0 = plan.operations[0]! as SqlMigrationPlanOperation<TestTargetDetails>;
     // Primitive should remain as-is (no cloning needed)
-    expect(plan.operations[0]!.target.details).toBe('primitive-string');
-    expect(Object.isFrozen(plan.operations[0]!.target)).toBe(true);
+    expect(op0.target.details).toBe('primitive-string');
+    expect(Object.isFrozen(op0.target)).toBe(true);
   });
 
   it('freezes and clones array details', () => {
@@ -143,10 +145,11 @@ describe('createMigrationPlan', () => {
     // Mutate original array
     mutableArray.push('item3');
 
+    const op0 = plan.operations[0]! as SqlMigrationPlanOperation<TestTargetDetails>;
     // Assert plan's array unchanged
-    expect(plan.operations[0]!.target.details).toEqual(['item1', 'item2']);
-    expect(Object.isFrozen(plan.operations[0]!.target)).toBe(true);
-    expect(Object.isFrozen(plan.operations[0]!.target.details)).toBe(true);
+    expect(op0.target.details).toEqual(['item1', 'item2']);
+    expect(Object.isFrozen(op0.target)).toBe(true);
+    expect(Object.isFrozen(op0.target.details)).toBe(true);
   });
 });
 

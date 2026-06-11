@@ -74,7 +74,7 @@ export const contract = defineContract(
     models: {
       User: model('User', {
         fields: {
-          id: field.id.uuidv7(),
+          id: field.id.uuidv7String(),
           email: field.text().unique(),
           username: field.text().optional(),
           name: field.text().optional(),
@@ -166,7 +166,7 @@ export const contract = defineContract(
     models: {
       User: model('User', {
         fields: {
-          id: field.id.uuidv7(),
+          id: field.id.uuidv7String(),
           email: field.text().unique(),
           username: field.text().optional(),
           name: field.text().optional(),
@@ -180,10 +180,10 @@ export const contract = defineContract(
 
       Post: model('Post', {
         fields: {
-          id: field.id.uuidv7(),
+          id: field.id.uuidv7String(),
           title: field.text(),
           content: field.text().optional(),
-          authorId: field.uuid(),
+          authorId: field.uuidString(),
           createdAt: field.temporal.createdAt(),
           updatedAt: field.temporal.updatedAt(),
         },

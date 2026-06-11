@@ -1,9 +1,12 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
+import postgresAdapterDescriptor, {
+  createPostgresBuiltinCodecLookup,
+  PostgresControlAdapter,
+} from '@prisma-next/adapter-postgres/control';
 import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   NativeTypeExpander,
+  SqlMigrationPlanOperation,
   SqlPlannerResult,
 } from '@prisma-next/family-sql/control';
 import {
@@ -28,7 +31,7 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
 
-const testAdapter = createPostgresAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 const adapterCodecHooks = extractCodecControlHooks([postgresAdapterDescriptor]);
 const expandParameterizedNativeType: NativeTypeExpander = (input) => {
   if (!input.codecId) return input.nativeType;
@@ -156,7 +159,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
     }
   });
 
-  it('detects additive changes from empty state', () => {
+  it('detects additive changes from empty state', async () => {
     const storage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       ...ns({
@@ -191,13 +194,16 @@ describe('contractToSchemaIR → planner round-trip', () => {
 
     expect(result.kind).toBe('success');
     if (result.kind === 'success') {
-      expect(result.plan.operations.length).toBeGreaterThan(0);
-      const tableOp = result.plan.operations.find((op) => op.id.includes('user'));
+      const ops = (await Promise.all(
+        result.plan.operations,
+      )) as SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+      expect(ops.length).toBeGreaterThan(0);
+      const tableOp = ops.find((op) => op.id.includes('user'));
       expect(tableOp).toBeDefined();
     }
   });
 
-  it('detects incremental table addition', () => {
+  it('detects incremental table addition', async () => {
     const fromStorage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       ...ns({
@@ -256,11 +262,12 @@ describe('contractToSchemaIR → planner round-trip', () => {
 
     expect(result.kind).toBe('success');
     if (result.kind === 'success') {
-      const postOp = result.plan.operations.find((op) => op.id.includes('post'));
+      const ops = (await Promise.all(
+        result.plan.operations,
+      )) as SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+      const postOp = ops.find((op) => op.id.includes('post'));
       expect(postOp).toBeDefined();
-      const userOp = result.plan.operations.find(
-        (op) => op.id.startsWith('table.') && op.id.includes('user'),
-      );
+      const userOp = ops.find((op) => op.id.startsWith('table.') && op.id.includes('user'));
       expect(userOp).toBeUndefined();
     }
   });
@@ -317,7 +324,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
 });
 
 describe('planner — additive scenarios', () => {
-  it('detects added column on existing table', () => {
+  it('detects added column on existing table', async () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       ...ns({
@@ -349,13 +356,16 @@ describe('planner — additive scenarios', () => {
 
     expect(result.kind).toBe('success');
     if (result.kind === 'success') {
-      const addColOp = result.plan.operations.find((op) => op.id.includes('age'));
+      const ops = (await Promise.all(
+        result.plan.operations,
+      )) as SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+      const addColOp = ops.find((op) => op.id.includes('age'));
       expect(addColOp).toBeDefined();
       expect(addColOp!.label).toContain('age');
     }
   });
 
-  it('detects added table', () => {
+  it('detects added table', async () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       ...ns({
@@ -391,12 +401,15 @@ describe('planner — additive scenarios', () => {
 
     expect(result.kind).toBe('success');
     if (result.kind === 'success') {
-      const tableOp = result.plan.operations.find((op) => op.id.includes('post'));
+      const ops = (await Promise.all(
+        result.plan.operations,
+      )) as SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+      const tableOp = ops.find((op) => op.id.includes('post'));
       expect(tableOp).toBeDefined();
     }
   });
 
-  it('detects multiple changes at once (table + unique + index)', () => {
+  it('detects multiple changes at once (table + unique + index)', async () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       ...ns({
@@ -435,8 +448,11 @@ describe('planner — additive scenarios', () => {
 
     expect(result.kind).toBe('success');
     if (result.kind === 'success') {
-      expect(result.plan.operations.length).toBeGreaterThanOrEqual(3);
-      const ids = result.plan.operations.map((op) => op.id);
+      const ops = (await Promise.all(
+        result.plan.operations,
+      )) as SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+      expect(ops.length).toBeGreaterThanOrEqual(3);
+      const ids = ops.map((op) => op.id);
       expect(ids.some((id) => id.includes('post'))).toBe(true);
       expect(ids.some((id) => id.includes('unique') || id.includes('slug'))).toBe(true);
       expect(ids.some((id) => id.includes('index') || id.includes('title'))).toBe(true);
@@ -814,7 +830,7 @@ function createDemoContract(
 describe('incremental migration with full contract surface (enums, FKs)', () => {
   const frameworkComponents = [createAdapterHooksComponent(), pgvectorDescriptor];
 
-  it('only emits ops for the actual change when adding a column to an existing table', () => {
+  it('only emits ops for the actual change when adding a column to an existing table', async () => {
     const toStorage: Omit<SqlStorageInput, 'storageHash'> = {
       ...DEMO_BASE_STORAGE,
       ...ns({
@@ -850,7 +866,10 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
       throw new Error(`Expected success but got ${JSON.stringify(result)}`);
     }
 
-    const opIds = result.plan.operations.map((op) => op.id);
+    const ops = (await Promise.all(
+      result.plan.operations,
+    )) as SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+    const opIds = ops.map((op) => op.id);
 
     expect(opIds).toEqual(['column.user.name']);
     expect(opIds.filter((id) => id.startsWith('type.'))).toHaveLength(0);
@@ -881,7 +900,7 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
     expect(result.plan.operations).toHaveLength(0);
   });
 
-  it('emits all ops on initial migration from empty state', () => {
+  it('emits all ops on initial migration from empty state', async () => {
     const fromSchemaIR = contractToSchemaIR(null, {
       expandNativeType: expandParameterizedNativeType,
       renderDefault: postgresRenderDefault,
@@ -903,7 +922,10 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
       throw new Error(`Expected success but got ${JSON.stringify(result)}`);
     }
 
-    const opIds = result.plan.operations.map((op) => op.id);
+    const ops = (await Promise.all(
+      result.plan.operations,
+    )) as SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+    const opIds = ops.map((op) => op.id);
     expect(opIds.some((id) => id.startsWith('type.'))).toBe(true);
     expect(opIds.some((id) => id.startsWith('table.'))).toBe(true);
   });

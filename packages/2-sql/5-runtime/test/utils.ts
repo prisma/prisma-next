@@ -38,12 +38,9 @@ import type {
 import { SelectAst as SelectAstCtor, TableSource } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { applicationDomainOf, collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { Client } from 'pg';
-import {
-  createExecutionContext,
-  type createRuntime,
-  createSqlExecutionStack,
-} from '../src/exports';
+import { createExecutionContext, createSqlExecutionStack } from '../src/exports';
 import type {
   ExecutionContext,
   SqlRuntimeAdapterDescriptor,
@@ -52,6 +49,7 @@ import type {
   SqlRuntimeExtensionDescriptor,
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
+import { type Runtime, type RuntimeOptions, SqlRuntimeBase } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
 
 function createTestMutationDefaultGenerators() {
@@ -62,12 +60,41 @@ function createTestMutationDefaultGenerators() {
   }));
 }
 
+class TestSqlRuntime extends SqlRuntimeBase {}
+
+type CreateTestRuntimeOptions<TContract extends Contract<SqlStorage>> = Omit<
+  RuntimeOptions<TContract>,
+  'adapter'
+> & {
+  readonly stackInstance: { readonly adapter: RuntimeOptions<TContract>['adapter'] };
+};
+
+/**
+ * Test-only concrete runtime. Unpacks `stackInstance.adapter` and forwards
+ * the rest into `TestSqlRuntime`, a trivial concrete leaf of the abstract
+ * `SqlRuntimeBase`.
+ */
+export function createTestRuntime<TContract extends Contract<SqlStorage>>(
+  options: CreateTestRuntimeOptions<TContract>,
+): Runtime {
+  const { stackInstance, context, driver, verifyMarker, middleware, mode, log } = options;
+  return new TestSqlRuntime({
+    context,
+    adapter: stackInstance.adapter,
+    driver,
+    ...ifDefined('verifyMarker', verifyMarker),
+    ...ifDefined('middleware', middleware),
+    ...ifDefined('mode', mode),
+    ...ifDefined('log', log),
+  });
+}
+
 /**
  * Executes a plan and collects all results into an array. This helper DRYs up the common pattern of executing plans in tests. The return type is inferred from the plan's type parameter.
  */
 export async function executePlanAndCollect<
   P extends SqlExecutionPlan<ResultType<P>> | SqlQueryPlan<ResultType<P>>,
->(runtime: ReturnType<typeof createRuntime>, plan: P): Promise<ResultType<P>[]> {
+>(runtime: Runtime, plan: P): Promise<ResultType<P>[]> {
   type Row = ResultType<P>;
   return collectAsync<Row>(runtime.execute<Row>(plan));
 }
@@ -76,7 +103,7 @@ export async function executePlanAndCollect<
  * Drains a plan execution, consuming all results without collecting them. Useful for testing side effects without memory overhead.
  */
 export async function drainPlanExecution(
-  runtime: ReturnType<typeof createRuntime>,
+  runtime: Runtime,
   plan: SqlExecutionPlan | SqlQueryPlan<unknown>,
 ): Promise<void> {
   return drainAsyncIterable(runtime.execute(plan));

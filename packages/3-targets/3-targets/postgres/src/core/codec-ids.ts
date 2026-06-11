@@ -30,3 +30,4 @@ export const PG_INTERVAL_CODEC_ID = 'pg/interval@1' as const;
 export const PG_JSON_CODEC_ID = 'pg/json@1' as const;
 export const PG_JSONB_CODEC_ID = 'pg/jsonb@1' as const;
 export const PG_BYTEA_CODEC_ID = 'pg/bytea@1' as const;
+export const PG_UUID_CODEC_ID = 'pg/uuid@1' as const;

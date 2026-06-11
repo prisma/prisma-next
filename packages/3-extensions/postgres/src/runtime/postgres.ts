@@ -1,4 +1,5 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contract/enum-accessor';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
@@ -24,11 +25,11 @@ import type {
 } from '@prisma-next/sql-runtime';
 import {
   createExecutionContext,
-  createRuntime,
   createSqlExecutionStack,
   withTransaction,
 } from '@prisma-next/sql-runtime';
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Client, Pool } from 'pg';
 import {
@@ -37,6 +38,7 @@ import {
   resolveOptionalPostgresBinding,
   resolvePostgresBinding,
 } from './binding';
+import { PostgresRuntimeImpl } from './postgres-runtime';
 
 export type PostgresTargetId = 'postgres';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
@@ -45,11 +47,13 @@ export interface PostgresTransactionContext<TContract extends Contract<SqlStorag
   extends TransactionContext {
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
+  readonly enums: NamespacedEnums<TContract>;
 }
 
 export interface PostgresClient<TContract extends Contract<SqlStorage>> {
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
+  readonly enums: NamespacedEnums<TContract>;
   readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
@@ -231,9 +235,9 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
       void connectDriver(binding).catch(() => undefined);
     }
 
-    runtimeInstance = createRuntime({
-      stackInstance,
+    runtimeInstance = new PostgresRuntimeImpl({
       context,
+      adapter: stackInstance.adapter,
       driver,
       ...ifDefined('verifyMarker', options.verifyMarker),
       ...ifDefined('middleware', options.middleware),
@@ -255,9 +259,15 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
 
   const sql: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
 
+  const enums = blindCast<
+    NamespacedEnums<TContract>,
+    'buildNamespacedEnums returns the namespace-keyed accessor map this contract types'
+  >(Object.freeze(buildNamespacedEnums(contract.domain)));
+
   return {
     sql,
     orm,
+    enums,
     raw: rawSqlTag,
     context,
     stack,
@@ -327,7 +337,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
         // Spreading would evaluate the getter once and freeze its value.
         const tx: PostgresTransactionContext<TContract> = Object.assign(
           Object.create(txCtx) as TransactionContext,
-          { sql: txSql, orm: txOrm },
+          { sql: txSql, orm: txOrm, enums },
         );
 
         return fn(tx);

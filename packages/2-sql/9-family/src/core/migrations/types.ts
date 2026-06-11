@@ -251,7 +251,10 @@ export interface SqlMigrationPlan<TTargetDetails> extends MigrationPlan {
    * Destination contract identity that the plan intends to reach.
    */
   readonly destination: SqlMigrationPlanContractInfo;
-  readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];
+  readonly operations: readonly (
+    | SqlMigrationPlanOperation<TTargetDetails>
+    | Promise<SqlMigrationPlanOperation<TTargetDetails>>
+  )[];
   /**
    * Sorted, deduplicated invariant ids declared by this plan's data-transform
    * ops. Required at the SQL-family layer (the SQL runners consume this as

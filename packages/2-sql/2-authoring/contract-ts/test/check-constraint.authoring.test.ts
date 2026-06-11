@@ -68,9 +68,9 @@ describe('check-constraint lowering', () => {
       column: 'role',
       valueSet: {
         plane: 'storage',
-        entityKind: 'value-set',
+        entityKind: 'valueSet',
         namespaceId: 'public',
-        name: 'Role',
+        entityName: 'Role',
       },
     });
   });
@@ -210,9 +210,9 @@ describe('check-constraint serialize→hydrate round-trip', () => {
     expect(hydratedTable.checks![0]!.column).toBe('role');
     expect(hydratedTable.checks![0]!.valueSet).toEqual({
       plane: 'storage',
-      entityKind: 'value-set',
+      entityKind: 'valueSet',
       namespaceId: 'public',
-      name: 'Role',
+      entityName: 'Role',
     });
   });
 });

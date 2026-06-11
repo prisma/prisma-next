@@ -38,6 +38,7 @@ import {
   pgTimestampDescriptor,
   pgTimestamptzDescriptor,
   pgTimetzDescriptor,
+  pgUuidDescriptor,
   pgVarbitDescriptor,
   pgVarcharDescriptor,
 } from './codecs';
@@ -68,6 +69,7 @@ export const codecDescriptorMap = {
   bit: pgBitDescriptor,
   'bit varying': pgVarbitDescriptor,
   bytea: pgByteaDescriptor,
+  uuid: pgUuidDescriptor,
   interval: pgIntervalDescriptor,
   enum: pgEnumDescriptor,
   json: pgJsonDescriptor,

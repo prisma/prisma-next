@@ -5,12 +5,12 @@ import {
   ModelAttributeAst,
 } from '../../src/syntax/ast/attributes';
 import {
-  BlockDeclarationAst,
   CompositeTypeDeclarationAst,
   DocumentAst,
   EnumDeclarationAst,
   EnumValueDeclarationAst,
   FieldDeclarationAst,
+  GenericBlockDeclarationAst,
   KeyValuePairAst,
   ModelDeclarationAst,
   NamedTypeDeclarationAst,
@@ -23,6 +23,8 @@ import {
   BooleanLiteralExprAst,
   FunctionCallAst,
   NumberLiteralExprAst,
+  ObjectFieldAst,
+  ObjectLiteralExprAst,
   StringLiteralExprAst,
 } from '../../src/syntax/ast/expressions';
 import { IdentifierAst } from '../../src/syntax/ast/identifier';
@@ -81,7 +83,7 @@ describe('static cast', () => {
     ['CompositeTypeDeclarationAst', CompositeTypeDeclarationAst.cast, 'CompositeTypeDeclaration'],
     ['NamespaceDeclarationAst', NamespaceDeclarationAst.cast, 'Namespace'],
     ['TypesBlockAst', TypesBlockAst.cast, 'TypesBlock'],
-    ['BlockDeclarationAst', BlockDeclarationAst.cast, 'BlockDeclaration'],
+    ['GenericBlockDeclarationAst', GenericBlockDeclarationAst.cast, 'GenericBlockDeclaration'],
     ['KeyValuePairAst', KeyValuePairAst.cast, 'KeyValuePair'],
     ['FieldDeclarationAst', FieldDeclarationAst.cast, 'FieldDeclaration'],
     ['EnumValueDeclarationAst', EnumValueDeclarationAst.cast, 'EnumValueDeclaration'],
@@ -522,6 +524,113 @@ describe('ArrayLiteralAst', () => {
   });
 });
 
+describe('ObjectLiteralExprAst', () => {
+  function buildObjectLiteral() {
+    // { name: "x", count: 1 }
+    const b = new GreenNodeBuilder();
+    b.startNode('ObjectLiteralExpr');
+    b.token('LBrace', '{');
+    b.token('Whitespace', ' ');
+    b.startNode('ObjectField');
+    b.startNode('Identifier');
+    b.token('Ident', 'name');
+    b.finishNode();
+    b.token('Colon', ':');
+    b.token('Whitespace', ' ');
+    b.startNode('StringLiteralExpr');
+    b.token('StringLiteral', '"x"');
+    b.finishNode();
+    b.finishNode();
+    b.token('Comma', ',');
+    b.token('Whitespace', ' ');
+    b.startNode('ObjectField');
+    b.startNode('Identifier');
+    b.token('Ident', 'count');
+    b.finishNode();
+    b.token('Colon', ':');
+    b.token('Whitespace', ' ');
+    b.startNode('NumberLiteralExpr');
+    b.token('NumberLiteral', '1');
+    b.finishNode();
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.token('RBrace', '}');
+    return b.finishNode();
+  }
+
+  it('exposes braces and iterates fields', () => {
+    const root = createSyntaxTree(buildObjectLiteral());
+    const obj = ObjectLiteralExprAst.cast(root)!;
+    expect(obj.lbrace()?.text).toBe('{');
+    expect(obj.rbrace()?.text).toBe('}');
+    expect(Array.from(obj.fields())).toHaveLength(2);
+  });
+
+  it('exposes identifier key, colon, and value per field', () => {
+    const root = createSyntaxTree(buildObjectLiteral());
+    const obj = ObjectLiteralExprAst.cast(root)!;
+    const [first, second] = Array.from(obj.fields());
+    expect(first!.key()).toBeInstanceOf(IdentifierAst);
+    expect(first!.key()?.token()?.text).toBe('name');
+    expect(first!.colon()?.text).toBe(':');
+    expect(first!.value()).toBeInstanceOf(StringLiteralExprAst);
+    expect(second!.key()?.token()?.text).toBe('count');
+    expect(second!.value()).toBeInstanceOf(NumberLiteralExprAst);
+  });
+
+  it('exposes a nested object literal as a field value', () => {
+    // { a: { b: 1 } }
+    const b = new GreenNodeBuilder();
+    b.startNode('ObjectLiteralExpr');
+    b.token('LBrace', '{');
+    b.token('Whitespace', ' ');
+    b.startNode('ObjectField');
+    b.startNode('Identifier');
+    b.token('Ident', 'a');
+    b.finishNode();
+    b.token('Colon', ':');
+    b.token('Whitespace', ' ');
+    b.startNode('ObjectLiteralExpr');
+    b.token('LBrace', '{');
+    b.token('Whitespace', ' ');
+    b.startNode('ObjectField');
+    b.startNode('Identifier');
+    b.token('Ident', 'b');
+    b.finishNode();
+    b.token('Colon', ':');
+    b.token('Whitespace', ' ');
+    b.startNode('NumberLiteralExpr');
+    b.token('NumberLiteral', '1');
+    b.finishNode();
+    b.finishNode(); // inner ObjectField
+    b.token('Whitespace', ' ');
+    b.token('RBrace', '}');
+    b.finishNode(); // inner ObjectLiteralExpr
+    b.finishNode(); // outer ObjectField
+    b.token('Whitespace', ' ');
+    b.token('RBrace', '}');
+    const root = createSyntaxTree(b.finishNode());
+    const outer = ObjectLiteralExprAst.cast(root)!;
+    const [field] = Array.from(outer.fields());
+    const inner = field!.value();
+    expect(inner).toBeInstanceOf(ObjectLiteralExprAst);
+    if (inner instanceof ObjectLiteralExprAst) {
+      const [innerField] = Array.from(inner.fields());
+      expect(innerField!.key()?.token()?.text).toBe('b');
+      expect(innerField!.value()).toBeInstanceOf(NumberLiteralExprAst);
+    }
+  });
+
+  it('cast returns undefined for non-matching kind', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('Identifier');
+    b.token('Ident', 'x');
+    const root = createSyntaxTree(b.finishNode());
+    expect(ObjectLiteralExprAst.cast(root)).toBeUndefined();
+    expect(ObjectFieldAst.cast(root)).toBeUndefined();
+  });
+});
+
 describe('DocumentAst', () => {
   it('iterates mixed declarations', () => {
     const b = new GreenNodeBuilder();
@@ -609,7 +718,7 @@ describe('TypesBlockAst', () => {
   function buildTypesBlock() {
     const b = new GreenNodeBuilder();
     b.startNode('TypesBlock');
-    b.token('Ident', 'type');
+    b.token('Ident', 'types');
     b.token('Whitespace', ' ');
     b.token('LBrace', '{');
     b.token('Newline', '\n');
@@ -633,7 +742,7 @@ describe('TypesBlockAst', () => {
   it('exposes keyword, braces', () => {
     const root = createSyntaxTree(buildTypesBlock());
     const decl = TypesBlockAst.cast(root)!;
-    expect(decl.keyword()?.text).toBe('type');
+    expect(decl.keyword()?.text).toBe('types');
     expect(decl.lbrace()?.text).toBe('{');
     expect(decl.rbrace()?.text).toBe('}');
   });
@@ -684,10 +793,10 @@ describe('NamedTypeDeclarationAst', () => {
   });
 });
 
-describe('BlockDeclarationAst', () => {
+describe('GenericBlockDeclarationAst', () => {
   function buildBlock() {
     const b = new GreenNodeBuilder();
-    b.startNode('BlockDeclaration');
+    b.startNode('GenericBlockDeclaration');
     b.token('Ident', 'datasource');
     b.token('Whitespace', ' ');
     b.startNode('Identifier');
@@ -715,7 +824,7 @@ describe('BlockDeclarationAst', () => {
 
   it('exposes keyword, name, braces', () => {
     const root = createSyntaxTree(buildBlock());
-    const decl = BlockDeclarationAst.cast(root)!;
+    const decl = GenericBlockDeclarationAst.cast(root)!;
     expect(decl.keyword()?.text).toBe('datasource');
     expect(decl.name()?.token()?.text).toBe('db');
     expect(decl.lbrace()?.text).toBe('{');
@@ -724,7 +833,7 @@ describe('BlockDeclarationAst', () => {
 
   it('iterates entries', () => {
     const root = createSyntaxTree(buildBlock());
-    const decl = BlockDeclarationAst.cast(root)!;
+    const decl = GenericBlockDeclarationAst.cast(root)!;
     const entries = Array.from(decl.entries());
     expect(entries).toHaveLength(1);
     expect(entries[0]!.key()?.token()?.text).toBe('provider');
@@ -951,7 +1060,7 @@ describe('NamespaceDeclarationAst', () => {
     b.token('LBrace', '{');
     b.token('RBrace', '}');
     b.finishNode();
-    b.startNode('BlockDeclaration');
+    b.startNode('GenericBlockDeclaration');
     b.token('Ident', 'extend');
     b.token('Whitespace', ' ');
     b.startNode('Identifier');
@@ -984,7 +1093,7 @@ describe('NamespaceDeclarationAst', () => {
     expect(decls).toHaveLength(3);
     expect(decls[0]).toBeInstanceOf(ModelDeclarationAst);
     expect(decls[1]).toBeInstanceOf(EnumDeclarationAst);
-    expect(decls[2]).toBeInstanceOf(BlockDeclarationAst);
+    expect(decls[2]).toBeInstanceOf(GenericBlockDeclarationAst);
   });
 });
 

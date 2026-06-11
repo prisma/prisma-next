@@ -26,7 +26,7 @@ import { defineContract, field, model } from '@prisma-next/sqlite/contract-build
 
 export default defineContract({
   models: {
-    User: model('User', { fields: { id: field.id.uuidv4() } }),
+    User: model('User', { fields: { id: field.id.uuidv4String() } }),
   },
 });
 ```
@@ -56,7 +56,7 @@ import { defineContract, field, model } from '@prisma-next/sqlite/contract-build
 
 export default defineContract({
   models: {
-    User: model('User', { fields: { id: field.id.uuidv4() } }),
+    User: model('User', { fields: { id: field.id.uuidv4String() } }),
   },
 });
 ```
@@ -76,7 +76,7 @@ await control.dbUpdate({ migrations: { dir: 'migrations/app' } });
 
 ### `@prisma-next/sqlite/migration`
 
-Re-exports all migration operation helpers from `@prisma-next/target-sqlite/migration` (`Migration`, `MigrationCLI`, `createTable`, `addColumn`, `dropTable`, `createIndex`, `dropIndex`, `dropColumn`, `recreateTable`, `dataTransform`, `placeholder`, `rawSql`).
+Re-exports all migration operation helpers from `@prisma-next/target-sqlite/migration` (`Migration`, `MigrationCLI`, `col`, `lit`, `fn`, `primaryKey`, `foreignKey`, `unique`, `addColumn`, `dropTable`, `createIndex`, `dropIndex`, `dropColumn`, `recreateTable`, `dataTransform`, `placeholder`, `rawSql`). `createTable` is no longer a free export — it is a protected method on `Migration`; call it as `this.createTable({...})` inside `get operations()`.
 
 ### `@prisma-next/sqlite/runtime`
 

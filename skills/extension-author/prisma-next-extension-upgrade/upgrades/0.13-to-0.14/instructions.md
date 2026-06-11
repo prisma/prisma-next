@@ -2,6 +2,22 @@
 from: "0.13"
 to: "0.14"
 changes:
+  - id: uuid-preset-rename
+    summary: |
+      The uuid field presets are renamed: `field.uuid()` → `field.uuidString()`,
+      `field.id.uuidv4()` → `field.id.uuidv4String()`, `field.id.uuidv7()` →
+      `field.id.uuidv7String()`. These names now describe the storage encoding
+      (char(36) string). Postgres-native uuid storage uses the new
+      `field.uuidNative()` / `field.id.uuidv4Native()` / `field.id.uuidv7Native()`
+      presets from `@prisma-next/postgres/contract-builder`.
+    detection:
+      glob: "**/*.ts"
+      contains:
+        - "field.uuid()"
+        - "field.id.uuidv4()"
+        - "field.id.uuidv7()"
+      anyMatch: true
+    script: uuid-preset-rename.ts
   - id: qualify-flat-builder-accessors
     summary: |
       The builder-layer flat accessors are removed: `@prisma-next/sql-builder`'s `sql()` and
@@ -19,9 +35,103 @@ changes:
         - "@prisma-next/sql-builder"
         - "@prisma-next/sql-orm-client"
       anyMatch: true
+  - id: create-runtime-removed
+    summary: |
+      `createRuntime` is removed from `@prisma-next/sql-runtime`. Extension code that
+      constructed a runtime via `createRuntime(...)` must switch to the target class
+      constructor directly: `new PostgresRuntimeImpl({...})` from
+      `@prisma-next/postgres/runtime`, or `new SqliteRuntimeImpl({...})` from
+      `@prisma-next/sqlite/runtime`. Pass the same options minus the `stackInstance`
+      unpacking — supply `adapter` directly instead of `stackInstance.adapter`.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "createRuntime"
 ---
 
+<!--
+control-query-extension-codecs: pgvector test files
+(planner.behavior.test.ts, planner.contract-to-schema-ir.test.ts,
+planner.storage-types.test.ts) were updated to pass an explicit
+`PostgresControlAdapter` to `createPostgresMigrationPlanner`, which now
+requires an adapter argument. Internal test harness change only — no
+extension-author API change. Incidental substrate diff only.
+-->
+
+<!--
+TML-2867: codec-routed DDL defaults. The pgvector extension test files were updated
+to await lazy plan operations (`Promise.all(result.plan.operations)`) and to use
+`PostgresControlAdapter` instead of the removed `createPostgresAdapter`. The
+`packages/3-extensions/postgres re-export test` deletion was already declared by
+TML-2859 above. No extension-author API change. Incidental substrate diff only.
+-->
+
+<!--
+TML-2859: SQLite createTable authoring method. The free `createTable` function from
+`@prisma-next/sqlite/migration` is now a protected method on the `SqliteMigration`
+base class. The `createTable` re-export test in `packages/3-extensions/sqlite/` was
+removed (it asserted the free function was exported, which is no longer true). The
+README was updated to reflect the current authoring surface. No extension-author action
+beyond what the `sqlite-create-table-method` entry in the 0.12-to-0.13 instructions
+already covers. Incidental substrate diff only.
+-->
+
+
+<!--
+TML-2785: the sql-orm-client runtime gained M:N correlated include
+reads — `.include()` of an N:M relation resolves child rows through the
+junction table via a correlated subquery. Internal runtime only; no
+extension API or contract-shape change. No extension-author action
+required.
+
+TML-2838: the temporary `--no-memory-protection-keys` test-harness workaround
+has been removed from every PGlite-backed vitest config (including
+`packages/3-extensions/{postgres,supabase}`) now that the WAL-teardown crash is
+fixed upstream in `@prisma/dev` 0.24.12 (which pulls in the
+`@prisma/streams-local` worker-termination fix). Test-harness only — no
+runtime, contract, or public-API change. Incidental substrate diff only.
+-->
+
+<!--
+TML-2852: the enum read surface. Additive surface for `enumType`-authored enums.
+`@prisma-next/postgres/contract-builder` gains `enumType` / `member` exports (the
+Postgres-bound `enumType` constrains member values to the column codec) and the
+factory `defineContract` overload threads a top-level `enums` key;
+`@prisma-next/sql-orm-client` gains the lane-agnostic `db.enums.<namespace>.<Name>`
+runtime accessor map (built from `domain.namespaces[ns].enum`) and value-union
+narrowing of enum-restricted fields, plus emit-time narrowing in the emitter from a
+field's `valueSet` ref. All additive — existing exports and the framework SPI are
+unchanged, PSL `enum` stays native until the cutover, and `fixtures:check` is
+byte-identical. No extension-author action. Incidental substrate diff only.
+-->
+
 # 0.13 → 0.14 — Extension-author upgrade instructions
+
+## `uuid-preset-rename`
+
+The uuid field preset names now include the storage encoding suffix:
+
+| Before | After |
+| --- | --- |
+| `field.uuid()` | `field.uuidString()` |
+| `field.id.uuidv4()` | `field.id.uuidv4String()` |
+| `field.id.uuidv7()` | `field.id.uuidv7String()` |
+
+Apply the rename in any extension test files, contract fixture files, or documentation that uses these presets. The rename is mechanical — run the colocated script or apply the substitutions directly:
+
+```ts
+// Before
+id: field.id.uuidv7(),
+userId: field.id.uuidv4(),
+externalId: field.uuid(),
+
+// After
+id: field.id.uuidv7String(),
+userId: field.id.uuidv4String(),
+externalId: field.uuidString(),
+```
+
+No change to emitted `contract.json` — both old and new preset names emit the same codec (`sql/char@1`).
 
 ## `qualify-flat-builder-accessors`
 
@@ -48,3 +158,23 @@ For an unbound contract (e.g. SQLite, or any target whose entities live in the l
 ### Validation
 
 This is a type-level change — `pnpm typecheck` (or `pnpm build`) pinpoints every remaining flat access as a compile error (`Property '<table>' does not exist on type 'Db<…>'`). Fix each by inserting the namespace segment, then run your extension's standard `pnpm test`.
+
+## `create-runtime-removed`
+
+`createRuntime` is removed from `@prisma-next/sql-runtime`. Construct the target runtime class directly instead.
+
+```ts
+// Before
+import { createRuntime } from '@prisma-next/sql-runtime';
+const runtime = createRuntime({ stackInstance, context, driver, ...opts });
+
+// After — Postgres
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
+const runtime = new PostgresRuntimeImpl({ adapter: stackInstance.adapter, context, driver, ...opts });
+
+// After — SQLite
+import { SqliteRuntimeImpl } from '@prisma-next/sqlite/runtime';
+const runtime = new SqliteRuntimeImpl({ adapter: stackInstance.adapter, context, driver, ...opts });
+```
+
+The options are identical except `stackInstance` is no longer passed: supply `adapter` from `stackInstance.adapter` directly. Depend on the bare-name interfaces (`PostgresRuntime`, `SqliteRuntime`) for type annotations, not the `Impl` classes.

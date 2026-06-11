@@ -7,3 +7,5 @@ export type {
   PostgresOptionsWithContractJson,
 } from '../runtime/postgres';
 export { default } from '../runtime/postgres';
+export type { PostgresRuntime } from '../runtime/postgres-runtime';
+export { PostgresRuntimeImpl } from '../runtime/postgres-runtime';

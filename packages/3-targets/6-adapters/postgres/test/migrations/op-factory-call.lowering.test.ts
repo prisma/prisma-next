@@ -45,13 +45,14 @@ import { TypeScriptRenderablePostgresMigration } from '@prisma-next/target-postg
 import { renderOps } from '@prisma-next/target-postgres/render-ops';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../../src/core/adapter';
+import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
+import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 const META = { from: 'sha256:from', to: 'sha256:to' } as const;
-const testAdapter = createPostgresAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 describe('renderOps', () => {
-  it('lowers each variant via its pure factory, pinning id/operationClass/target.details', () => {
+  it('lowers each variant via its pure factory, pinning id/operationClass/target.details', async () => {
     const liftedOp = {
       id: 'custom.op.1',
       label: 'Custom raw op',
@@ -64,12 +65,7 @@ describe('renderOps', () => {
     const calls = [
       new CreateTableCall('public', 'user', [col('id', 'text', { notNull: true })]),
       new DropTableCall('public', 'stale'),
-      new AddColumnCall('public', 'user', {
-        name: 'email',
-        typeSql: 'text',
-        defaultSql: '',
-        nullable: true,
-      }),
+      new AddColumnCall('public', 'user', col('email', 'text')),
       new DropColumnCall('public', 'user', 'legacy'),
       new AlterColumnTypeCall('public', 'user', 'age', {
         qualifiedTargetType: 'integer',
@@ -101,7 +97,7 @@ describe('renderOps', () => {
       new CreateSchemaCall('app'),
     ];
 
-    const ops = renderOps(calls, testAdapter);
+    const ops = await Promise.all(renderOps(calls, testAdapter));
 
     const schemaObject = (objectType: string, name: string, table?: string) => ({
       schema: 'public',

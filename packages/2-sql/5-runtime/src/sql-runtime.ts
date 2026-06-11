@@ -1,8 +1,4 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type {
-  ExecutionStackInstance,
-  RuntimeDriverInstance,
-} from '@prisma-next/framework-components/execution';
 import {
   AsyncIterableResult,
   checkAborted,
@@ -23,6 +19,7 @@ import type {
   LoweredStatement,
   PreparedExecuteRequest,
   SqlCodecCallContext,
+  SqlConnection,
   SqlDriver,
   SqlQueryable,
   SqlTransaction,
@@ -64,11 +61,7 @@ import type {
   TelemetryOutcome,
   VerifyMarkerOption,
 } from './runtime-spi';
-import type {
-  ExecutionContext,
-  SqlRuntimeAdapterInstance,
-  SqlRuntimeExtensionInstance,
-} from './sql-context';
+import type { ExecutionContext } from './sql-context';
 import { SqlFamilyAdapter } from './sql-family-adapter';
 
 export type Log = RuntimeLog;
@@ -83,25 +76,10 @@ export interface RuntimeOptions<TContract extends Contract<SqlStorage> = Contrac
   readonly log?: Log;
 }
 
-export interface CreateRuntimeOptions<
-  TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
-  TTargetId extends string = string,
-> {
-  readonly stackInstance: ExecutionStackInstance<
-    'sql',
-    TTargetId,
-    SqlRuntimeAdapterInstance<TTargetId>,
-    RuntimeDriverInstance<'sql', TTargetId>,
-    SqlRuntimeExtensionInstance<TTargetId>
-  >;
-  readonly context: ExecutionContext<TContract>;
-  readonly driver: SqlDriver<unknown>;
-  readonly verifyMarker?: VerifyMarkerOption;
-  readonly middleware?: readonly SqlMiddleware[];
-  readonly mode?: 'strict' | 'permissive';
-  readonly log?: Log;
-}
-
+/**
+ * SQL-family runtime interface. Named `Runtime` (not `SqlRuntime`) by deliberate exception
+ * to avoid a repo-wide rename; see ADR 230 (runtime target layer) for the recorded decision.
+ */
 export interface Runtime extends RuntimeQueryable {
   connection(): Promise<RuntimeConnection>;
   telemetry(): RuntimeTelemetryEvent | null;
@@ -167,7 +145,12 @@ function isExecutionPlan(plan: SqlExecutionPlan | SqlQueryPlan): plan is SqlExec
 const noopLogSink = (): void => {};
 const noopLog: Log = { info: noopLogSink, warn: noopLogSink, error: noopLogSink };
 
-class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
+/**
+ * Abstract family-layer base for SQL runtimes. Subclass to build a target runtime
+ * (e.g. `PostgresRuntimeImpl`); app code should consume the `Runtime` interface returned
+ * by the target factories, never this class directly.
+ */
+export abstract class SqlRuntimeBase<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
   extends RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>
   implements Runtime
 {
@@ -325,6 +308,16 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     );
   }
 
+  /**
+   * Returns the raw driver connection. The connection is a `SqlQueryable` — SQL
+   * issued on it runs below the middleware/codec/telemetry pipeline. It carries
+   * its own lifecycle (`release`/`destroy`/`beginTransaction`); the caller owns
+   * disposal.
+   */
+  protected acquireRawConnection(): Promise<SqlConnection> {
+    return this.driver.acquireConnection();
+  }
+
   private async *streamRows<Row>(
     exec: SqlExecutionPlan,
     decodeContext: DecodeContext,
@@ -385,7 +378,12 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     }
   }
 
-  private executeAgainstQueryable<Row>(
+  /**
+   * Execute a plan against a caller-supplied queryable, running the full
+   * middleware/codec/telemetry pipeline. Use `acquireRawConnection` to obtain a
+   * queryable that subclasses can bind typed plans to.
+   */
+  protected executeAgainstQueryable<Row>(
     plan: SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>,
     queryable: SqlQueryable,
     options?: RuntimeExecuteOptions,
@@ -526,7 +524,11 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     return new PreparedStatementImpl<ParamsFromDeclaration<D, CT>, Row>(internals);
   }
 
-  private executePreparedAgainstQueryable<P, Row>(
+  /**
+   * Execute a prepared statement against a caller-supplied queryable, running
+   * the full middleware/codec/telemetry pipeline.
+   */
+  protected executePreparedAgainstQueryable<P, Row>(
     ps: PreparedStatementImpl<P, Row>,
     userParams: Record<string, unknown>,
     queryable: SqlQueryable,
@@ -753,8 +755,13 @@ function transactionClosedError(): Error {
   );
 }
 
+/** Minimal structural type `withTransaction` depends on — anything that can open a connection. */
+export interface ConnectionProvider {
+  connection(): Promise<RuntimeConnection>;
+}
+
 export async function withTransaction<R>(
-  runtime: Runtime,
+  runtime: ConnectionProvider,
   fn: (tx: TransactionContext) => PromiseLike<R>,
 ): Promise<R> {
   const connection = await runtime.connection();
@@ -858,20 +865,4 @@ export async function withTransaction<R>(
       await connection.release();
     }
   }
-}
-
-export function createRuntime<TContract extends Contract<SqlStorage>, TTargetId extends string>(
-  options: CreateRuntimeOptions<TContract, TTargetId>,
-): Runtime {
-  const { stackInstance, context, driver, verifyMarker, middleware, mode, log } = options;
-
-  return new SqlRuntimeImpl({
-    context,
-    adapter: stackInstance.adapter,
-    driver,
-    ...ifDefined('verifyMarker', verifyMarker),
-    ...ifDefined('middleware', middleware),
-    ...ifDefined('mode', mode),
-    ...ifDefined('log', log),
-  });
 }

@@ -1,5 +1,6 @@
 import { deriveProvidedInvariants } from '@prisma-next/migration-tools/invariants';
 import { Migration } from '@prisma-next/migration-tools/migration';
+import { isThenable } from '@prisma-next/utils/promise';
 import type { SqlMigrationPlanOperation, SqlPlanTargetDetails } from './migrations/types';
 
 /**
@@ -31,6 +32,9 @@ export abstract class SqlMigration<
    * `MigrationPlan.providedInvariants?` stays optional.
    */
   get providedInvariants(): readonly string[] {
-    return deriveProvidedInvariants(this.operations);
+    const ops = this.operations.filter(
+      (op): op is SqlMigrationPlanOperation<TDetails> => !isThenable(op),
+    );
+    return deriveProvidedInvariants(ops);
   }
 }

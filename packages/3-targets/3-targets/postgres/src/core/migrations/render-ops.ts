@@ -1,7 +1,11 @@
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
-import type { OpFactoryCall } from '@prisma-next/framework-components/control';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
+import type {
+  MigrationPlanOperation,
+  OpFactoryCall,
+} from '@prisma-next/framework-components/control';
 import { blindCast } from '@prisma-next/utils/casts';
+import { isThenable } from '@prisma-next/utils/promise';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
@@ -13,11 +17,11 @@ type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
  * silently flow through to postgres-shaped renderers — exactly the
  * place to fail loudly with op metadata (`id` + `target.id`).
  */
-function assertPostgresOp(
-  op: ReturnType<OpFactoryCall['toOp']>,
-  callFactoryName: string,
-): asserts op is Op {
-  const targetId = (op as Partial<Op>).target?.id;
+function assertPostgresOp(op: MigrationPlanOperation, callFactoryName: string): asserts op is Op {
+  const targetId = blindCast<
+    { target?: { id?: string } },
+    'op.target is present on concrete SqlMigrationPlanOperation but absent on the framework MigrationPlanOperation base'
+  >(op).target?.id;
   if (targetId !== 'postgres') {
     throw new Error(
       `renderOps: expected postgres op but got target.id="${String(targetId)}" for op.id="${op.id}" (factoryName="${callFactoryName}"). An OpFactoryCall produced an op for a different target on the postgres planner path; check the call's target binding.`,
@@ -25,13 +29,22 @@ function assertPostgresOp(
   }
 }
 
-export function renderOps(calls: readonly OpFactoryCall[], lowerer?: Lowerer): Op[] {
+export function renderOps(
+  calls: readonly OpFactoryCall[],
+  lowerer?: ExecuteRequestLowerer,
+): (Op | Promise<Op>)[] {
   return calls.map((c) => {
-    const op = blindCast<
-      { toOp(lowerer?: Lowerer): ReturnType<OpFactoryCall['toOp']> },
-      'PG OpFactoryCall.toOp accepts an optional Lowerer; the framework interface omits it because not all targets need a lowerer — the PG target overrides with this extended signature'
+    const opOrPromise = blindCast<
+      { toOp(lowerer?: ExecuteRequestLowerer): Op | Promise<Op> },
+      'PG OpFactoryCall.toOp accepts an optional ExecuteRequestLowerer; the framework interface omits it because not all targets need a lowerer — the PG target overrides with this extended signature'
     >(c).toOp(lowerer);
-    assertPostgresOp(op, c.factoryName);
-    return op;
+    if (isThenable(opOrPromise)) {
+      return opOrPromise.then((op) => {
+        assertPostgresOp(op, c.factoryName);
+        return op;
+      });
+    }
+    assertPostgresOp(opOrPromise, c.factoryName);
+    return opOrPromise;
   });
 }
