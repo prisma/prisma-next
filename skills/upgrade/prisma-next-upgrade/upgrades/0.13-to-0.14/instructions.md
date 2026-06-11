@@ -164,3 +164,13 @@ const runtime = new PostgresRuntimeImpl({ adapter: stackInstance.adapter, contex
 ```
 
 The constructor options are identical to what `createRuntime` accepted, except `stackInstance` is not taken: pass `adapter` from `stackInstance.adapter` directly.
+
+<!--
+TML-2882: transitional PSL `enum2` block (PR #805). The demo authors `enum2 Priority`
+and a `priority` field; emitted artifacts and migrations regenerate accordingly, and
+the `ValueSetRef` carrier / `StorageValueSet` node tag land in their first persisted
+form. Additive and opt-in: no existing consumer contract changes shape, native `enum`
+is untouched, and re-emit round-trips. No consumer action required; the keyword is
+transitional and is renamed to `enum` at the cutover (TML-2853), which will carry the
+user-facing upgrade entry.
+-->
