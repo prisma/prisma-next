@@ -16,11 +16,11 @@ import {
 } from '../src/parse';
 import { AttributeArgListAst, FieldAttributeAst } from '../src/syntax/ast/attributes';
 import {
-  BlockDeclarationAst,
   CompositeTypeDeclarationAst,
   DocumentAst,
   EnumDeclarationAst,
   FieldDeclarationAst,
+  GenericBlockDeclarationAst,
   KeyValuePairAst,
   ModelDeclarationAst,
   NamespaceDeclarationAst,
@@ -236,7 +236,7 @@ describe('parse() well-formed document conformance', () => {
 
     expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
       "Document
-        BlockDeclaration
+        GenericBlockDeclaration
           Ident "datasource"
           Whitespace " "
           Identifier
@@ -317,7 +317,7 @@ describe('parse() well-formed document conformance', () => {
               Ident "Role"
             LBrace "{"
             RBrace "}"
-          BlockDeclaration
+          GenericBlockDeclaration
             Ident "extend"
             Whitespace " "
             Identifier
@@ -423,7 +423,7 @@ describe('parse() representative multi-construct schema', () => {
     const result = parse(source);
     const decls = Array.from(result.document.declarations());
     expect(decls).toHaveLength(6);
-    expect(decls[0]).toBeInstanceOf(BlockDeclarationAst);
+    expect(decls[0]).toBeInstanceOf(GenericBlockDeclarationAst);
     expect(decls[1]).toBeInstanceOf(TypesBlockAst);
     expect(decls[2]).toBeInstanceOf(ModelDeclarationAst);
     expect(decls[3]).toBeInstanceOf(EnumDeclarationAst);
@@ -538,12 +538,12 @@ describe('parse() object-literal missing-colon recovery', () => {
     // The enclosing datasource block stays intact: one declaration, a block.
     const decls = Array.from(result.document.declarations());
     expect(decls).toHaveLength(1);
-    expect(decls[0]).toBeInstanceOf(BlockDeclarationAst);
+    expect(decls[0]).toBeInstanceOf(GenericBlockDeclarationAst);
 
     // The object literal has two fields (`a` key-only, `b` = 1) and a closing brace.
     expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
       "Document
-        BlockDeclaration
+        GenericBlockDeclaration
           Ident "datasource"
           Whitespace " "
           Identifier
@@ -600,8 +600,8 @@ describe('parse() object-literal missing-colon recovery', () => {
     // Both fields parse as proper key/value pairs.
     const decls = Array.from(result.document.declarations());
     const block = decls[0];
-    expect(block).toBeInstanceOf(BlockDeclarationAst);
-    if (!(block instanceof BlockDeclarationAst)) return;
+    expect(block).toBeInstanceOf(GenericBlockDeclarationAst);
+    if (!(block instanceof GenericBlockDeclarationAst)) return;
     const pair = Array.from(block.entries())[0];
     expect(pair).toBeInstanceOf(KeyValuePairAst);
     if (!(pair instanceof KeyValuePairAst)) return;
@@ -657,7 +657,7 @@ describe('parse() object-literal missing-colon recovery', () => {
     // The enclosing datasource block stays intact: one declaration, a block.
     const decls = Array.from(result.document.declarations());
     expect(decls).toHaveLength(1);
-    expect(decls[0]).toBeInstanceOf(BlockDeclarationAst);
+    expect(decls[0]).toBeInstanceOf(GenericBlockDeclarationAst);
   });
 });
 
@@ -722,7 +722,7 @@ describe('parse() declaration-level diagnostics', () => {
     expect(greenText(result.document.syntax.green)).toBe(source);
     const decls = Array.from(result.document.declarations());
     expect(decls).toHaveLength(2);
-    expect(decls[0]).toBeInstanceOf(BlockDeclarationAst);
+    expect(decls[0]).toBeInstanceOf(GenericBlockDeclarationAst);
     expect(decls[1]).toBeInstanceOf(ModelDeclarationAst);
   });
 
@@ -808,8 +808,8 @@ describe('parse() declaration-level diagnostics', () => {
     expect(result.diagnostics.map((d) => d.code)).toContain('PSL_INVALID_EXTENSION_BLOCK_MEMBER');
     expect(greenText(result.document.syntax.green)).toBe(source);
     const decl = Array.from(result.document.declarations())[0];
-    expect(decl).toBeInstanceOf(BlockDeclarationAst);
-    if (decl instanceof BlockDeclarationAst) {
+    expect(decl).toBeInstanceOf(GenericBlockDeclarationAst);
+    if (decl instanceof GenericBlockDeclarationAst) {
       const entries = Array.from(decl.entries());
       expect(entries).toHaveLength(1);
       expect(entries[0]!.key()?.token()?.text).toBe('provider');

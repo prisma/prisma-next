@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from '../src/parse';
 import {
-  BlockDeclarationAst,
   CompositeTypeDeclarationAst,
   DocumentAst,
   EnumDeclarationAst,
+  GenericBlockDeclarationAst,
   ModelDeclarationAst,
   NamespaceDeclarationAst,
   TypesBlockAst,
@@ -58,7 +58,7 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     `);
     const decls = Array.from(result.document.declarations());
     expect(decls).toHaveLength(1);
-    expect(decls[0]).toBeInstanceOf(BlockDeclarationAst);
+    expect(decls[0]).toBeInstanceOf(GenericBlockDeclarationAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
 
@@ -225,8 +225,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
       "
     `);
     const decl = Array.from(result.document.declarations())[0];
-    expect(decl).toBeInstanceOf(BlockDeclarationAst);
-    if (decl instanceof BlockDeclarationAst) {
+    expect(decl).toBeInstanceOf(GenericBlockDeclarationAst);
+    if (decl instanceof GenericBlockDeclarationAst) {
       const entries = Array.from(decl.entries());
       expect(entries).toHaveLength(1);
       expect(entries[0]!.key()?.token()?.text).toBe('provider');
@@ -250,8 +250,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
       "
     `);
     const decl = Array.from(result.document.declarations())[0];
-    expect(decl).toBeInstanceOf(BlockDeclarationAst);
-    if (decl instanceof BlockDeclarationAst) {
+    expect(decl).toBeInstanceOf(GenericBlockDeclarationAst);
+    if (decl instanceof GenericBlockDeclarationAst) {
       const entries = Array.from(decl.entries());
       expect(entries).toHaveLength(1);
       expect(entries[0]!.key()?.token()?.text).toBe('provider');

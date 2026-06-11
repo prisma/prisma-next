@@ -9,12 +9,12 @@ export {
 } from '../syntax/ast/attributes';
 export type { NamespaceMemberAst } from '../syntax/ast/declarations';
 export {
-  BlockDeclarationAst,
   CompositeTypeDeclarationAst,
   DocumentAst,
   EnumDeclarationAst,
   EnumValueDeclarationAst,
   FieldDeclarationAst,
+  GenericBlockDeclarationAst,
   KeyValuePairAst,
   ModelDeclarationAst,
   NamedTypeDeclarationAst,

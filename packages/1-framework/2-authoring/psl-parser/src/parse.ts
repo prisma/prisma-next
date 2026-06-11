@@ -576,7 +576,7 @@ export function parseEnum(cursor: Cursor): GreenNode | undefined {
  * Excluding the reserved keywords keeps a malformed reserved block (e.g. `model {` with
  * no name) routed to its dedicated parser. The generic keyword set is open
  * (extension-contributed), so a bare identifier with no brace (e.g. `oops`) is read as an
- * unfinished custom declaration — a committed `BlockDeclaration` + missing-brace diagnostic
+ * unfinished custom declaration — a committed `GenericBlockDeclaration` + missing-brace diagnostic
  * — not unsupported content. A non-identifier lead can't be a declaration name, so it falls
  * through to `parseUnsupportedTopLevel`.
  */
@@ -585,7 +585,7 @@ export function parseGenericBlock(cursor: Cursor): GreenNode | undefined {
   const keyword = cursor.peekToken().text;
   if (RESERVED_BLOCK_KEYWORDS.has(keyword)) return undefined;
   const hasName = cursor.peekKind(1) === 'Ident' && cursor.peekKind(2) === 'LBrace';
-  cursor.startNode('BlockDeclaration');
+  cursor.startNode('GenericBlockDeclaration');
   cursor.bump();
   if (hasName) {
     parseIdentifier(cursor);

@@ -5,12 +5,12 @@ import {
   ModelAttributeAst,
 } from '../../src/syntax/ast/attributes';
 import {
-  BlockDeclarationAst,
   CompositeTypeDeclarationAst,
   DocumentAst,
   EnumDeclarationAst,
   EnumValueDeclarationAst,
   FieldDeclarationAst,
+  GenericBlockDeclarationAst,
   KeyValuePairAst,
   ModelDeclarationAst,
   NamedTypeDeclarationAst,
@@ -83,7 +83,7 @@ describe('static cast', () => {
     ['CompositeTypeDeclarationAst', CompositeTypeDeclarationAst.cast, 'CompositeTypeDeclaration'],
     ['NamespaceDeclarationAst', NamespaceDeclarationAst.cast, 'Namespace'],
     ['TypesBlockAst', TypesBlockAst.cast, 'TypesBlock'],
-    ['BlockDeclarationAst', BlockDeclarationAst.cast, 'BlockDeclaration'],
+    ['GenericBlockDeclarationAst', GenericBlockDeclarationAst.cast, 'GenericBlockDeclaration'],
     ['KeyValuePairAst', KeyValuePairAst.cast, 'KeyValuePair'],
     ['FieldDeclarationAst', FieldDeclarationAst.cast, 'FieldDeclaration'],
     ['EnumValueDeclarationAst', EnumValueDeclarationAst.cast, 'EnumValueDeclaration'],
@@ -793,10 +793,10 @@ describe('NamedTypeDeclarationAst', () => {
   });
 });
 
-describe('BlockDeclarationAst', () => {
+describe('GenericBlockDeclarationAst', () => {
   function buildBlock() {
     const b = new GreenNodeBuilder();
-    b.startNode('BlockDeclaration');
+    b.startNode('GenericBlockDeclaration');
     b.token('Ident', 'datasource');
     b.token('Whitespace', ' ');
     b.startNode('Identifier');
@@ -824,7 +824,7 @@ describe('BlockDeclarationAst', () => {
 
   it('exposes keyword, name, braces', () => {
     const root = createSyntaxTree(buildBlock());
-    const decl = BlockDeclarationAst.cast(root)!;
+    const decl = GenericBlockDeclarationAst.cast(root)!;
     expect(decl.keyword()?.text).toBe('datasource');
     expect(decl.name()?.token()?.text).toBe('db');
     expect(decl.lbrace()?.text).toBe('{');
@@ -833,7 +833,7 @@ describe('BlockDeclarationAst', () => {
 
   it('iterates entries', () => {
     const root = createSyntaxTree(buildBlock());
-    const decl = BlockDeclarationAst.cast(root)!;
+    const decl = GenericBlockDeclarationAst.cast(root)!;
     const entries = Array.from(decl.entries());
     expect(entries).toHaveLength(1);
     expect(entries[0]!.key()?.token()?.text).toBe('provider');
@@ -1060,7 +1060,7 @@ describe('NamespaceDeclarationAst', () => {
     b.token('LBrace', '{');
     b.token('RBrace', '}');
     b.finishNode();
-    b.startNode('BlockDeclaration');
+    b.startNode('GenericBlockDeclaration');
     b.token('Ident', 'extend');
     b.token('Whitespace', ' ');
     b.startNode('Identifier');
@@ -1093,7 +1093,7 @@ describe('NamespaceDeclarationAst', () => {
     expect(decls).toHaveLength(3);
     expect(decls[0]).toBeInstanceOf(ModelDeclarationAst);
     expect(decls[1]).toBeInstanceOf(EnumDeclarationAst);
-    expect(decls[2]).toBeInstanceOf(BlockDeclarationAst);
+    expect(decls[2]).toBeInstanceOf(GenericBlockDeclarationAst);
   });
 });
 
