@@ -197,7 +197,6 @@ describe('shared contract definition lowering', () => {
           decodeJson: (json: unknown) => new Date(json as string),
         };
       },
-      getForRef: () => undefined,
       targetTypesFor: (id) => (id === 'pg/timestamptz@1' ? ['timestamptz'] : undefined),
       metaFor: () => undefined,
       renderOutputTypeFor: () => undefined,

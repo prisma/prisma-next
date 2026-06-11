@@ -36,23 +36,38 @@ export interface CodecCallContext {
 /**
  * Codec-id-keyed read surface threaded into emit and authoring paths.
  *
- * - `get(id)` returns a representative {@link Codec} instance for the codec id (used by `family.deserializeContract` for `decodeJson` of literal column defaults). For parameterized codecs whose factory requires concrete params, this may return `undefined` — use `getForRef` instead.
- * - `getForRef(id, typeParams)` constructs the codec faithfully with the given type-params, so parameterized codecs (e.g. `pg/vector@1`) receive the concrete params the caller supplies. Returns `undefined` if the id is unknown.
+ * - `get(id)` returns a representative {@link Codec} instance for the codec id (used by `family.deserializeContract` for `decodeJson` of literal column defaults). For parameterized codecs whose factory requires concrete params, this may return `undefined` — use `CodecRegistry.forCodecRef` instead.
  * - `targetTypesFor(id)` exposes the codec-id-keyed `targetTypes` metadata the runtime instance no longer carries (TML-2357). Returns the same array `CodecDescriptor.targetTypes` would; for Mongo (whose registration doesn't yet resolve through the unified descriptor map — TML-2324) the family-side assembly populates this directly from the contributor's codec metadata.
  * - `metaFor(id)` exposes the codec-id-keyed `meta` (e.g. SQL-side `db.sql.postgres.nativeType`) the runtime instance no longer carries.
  * - `renderOutputTypeFor(id, params)` exposes the codec-id-keyed `renderOutputType` renderer the runtime instance no longer carries. Returns `undefined` when the codec doesn't render a custom type or when the codec id is unknown.
  */
 export interface CodecLookup {
   get(id: string): Codec | undefined;
-  getForRef(id: string, typeParams: JsonValue | undefined): Codec | undefined;
   targetTypesFor(id: string): readonly string[] | undefined;
   metaFor(id: string): CodecMeta | undefined;
   renderOutputTypeFor(id: string, params: Record<string, unknown>): string | undefined;
 }
 
+/**
+ * Full codec registry — the read surface of {@link CodecLookup} plus codec resolution by ref or
+ * column coordinate. Built once by `extractCodecLookup` and passed by reference to adapters and
+ * other consumers that need to materialise codecs at runtime.
+ *
+ * - `forCodecRef(ref)` materialises a codec from a {@link CodecRef}. Throws
+ *   `RUNTIME.CODEC_DESCRIPTOR_MISSING` for unknown ids and `RUNTIME.TYPE_PARAMS_INVALID` on param
+ *   schema rejection.
+ * - `forColumn(namespaceId, table, column)` returns the codec for a specific column coordinate, or
+ *   `undefined` when no column-to-codec mapping is present. This registry is contract-free so it
+ *   always returns `undefined` — the method exists so the object structurally satisfies the SQL
+ *   `ContractCodecRegistry` interface.
+ */
+export interface CodecRegistry extends CodecLookup {
+  forCodecRef(ref: CodecRef): Codec;
+  forColumn(namespaceId: string, table: string, column: string): Codec | undefined;
+}
+
 export const emptyCodecLookup: CodecLookup = {
   get: () => undefined,
-  getForRef: () => undefined,
   targetTypesFor: () => undefined,
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,

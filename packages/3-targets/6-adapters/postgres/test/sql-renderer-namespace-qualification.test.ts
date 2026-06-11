@@ -28,7 +28,6 @@ const userTableInput = {
 
 const emptyLookup: CodecLookup = {
   get: () => undefined,
-  getForRef: () => undefined,
   targetTypesFor: () => undefined,
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,

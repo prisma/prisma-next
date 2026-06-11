@@ -756,7 +756,6 @@ describe('validateScalarTypeCodecIds', () => {
     const descriptors = new Map([['String', 'missing/codec@1']]);
     const lookup: CodecLookup = {
       get: () => undefined,
-      getForRef: () => undefined,
       targetTypesFor: () => undefined,
       metaFor: () => undefined,
       renderOutputTypeFor: () => undefined,
@@ -779,7 +778,6 @@ describe('validateScalarTypeCodecIds', () => {
               decodeJson: (v: JsonValue) => v,
             }
           : undefined,
-      getForRef: () => undefined,
       targetTypesFor: (id: string) => (id === 'test/text@1' ? ['text'] : undefined),
       metaFor: () => undefined,
       renderOutputTypeFor: () => undefined,

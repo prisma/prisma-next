@@ -3,10 +3,7 @@ export type {
   RuntimeLog as Log,
 } from '@prisma-next/framework-components/runtime';
 export type { MarkerReadResult } from '@prisma-next/sql-relational-core/ast';
-export {
-  contractCodecRegistryFromLookup,
-  createAstCodecRegistry,
-} from '../codecs/ast-codec-registry';
+export { createAstCodecRegistry } from '../codecs/ast-codec-registry';
 export { deriveParamMetadata, encodeParamsWithMetadata } from '../codecs/encoding';
 export {
   extractCodecIds,

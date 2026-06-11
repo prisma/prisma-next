@@ -1,4 +1,4 @@
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { CodecRegistry } from '@prisma-next/framework-components/codec';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type {
   Adapter,
@@ -41,7 +41,7 @@ class PostgresAdapterImpl
   readonly targetId = 'postgres' as const;
 
   readonly profile: AdapterProfile<'postgres'>;
-  private readonly codecLookup: CodecLookup;
+  private readonly codecLookup: CodecRegistry;
 
   constructor(options?: PostgresAdapterOptions) {
     this.codecLookup = options?.codecLookup ?? createPostgresBuiltinCodecLookup();

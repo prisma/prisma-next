@@ -2,7 +2,7 @@ import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contr
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
 import { APP_SPACE_ID, extractCodecLookup } from '@prisma-next/framework-components/control';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
@@ -10,6 +10,7 @@ import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   CodecRef,
+  ContractCodecRegistry,
   DdlColumn,
   DdlNode,
   DdlTableConstraint,
@@ -21,7 +22,6 @@ import type {
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
-import { contractCodecRegistryFromLookup } from '@prisma-next/sql-runtime';
 import type {
   PrimaryKey,
   SqlColumnIR,
@@ -113,7 +113,7 @@ type FkAccumulator = {
   onUpdate: string;
 };
 
-function createSqliteBuiltinCodecLookup(): CodecLookup {
+function createSqliteBuiltinCodecLookup(): CodecRegistry {
   return extractCodecLookup([
     {
       id: 'sqlite-builtin-codecs',
@@ -126,10 +126,10 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   readonly familyId = 'sql' as const;
   readonly targetId = 'sqlite' as const;
 
-  private readonly codecLookup: CodecLookup;
+  private readonly codecRegistry: CodecRegistry;
 
-  constructor(codecLookup?: CodecLookup) {
-    this.codecLookup = codecLookup ?? createSqliteBuiltinCodecLookup();
+  constructor(codecRegistry?: CodecRegistry) {
+    this.codecRegistry = codecRegistry ?? createSqliteBuiltinCodecLookup();
   }
 
   readonly normalizeDefault = parseSqliteDefault;
@@ -174,14 +174,17 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
     if (isDdlNode(ast)) {
       return sqliteRenderDdlExecuteRequest(
         blindCast<SqliteDdlNode, 'isDdlNode guard'>(ast),
-        this.codecLookup,
+        this.codecRegistry,
       );
     }
     const contract = blindCast<SqliteContract, 'Caller must supply matching contract'>(
       context?.contract,
     );
     const lowered = renderLoweredSql(ast, contract);
-    const codecRegistry = contractCodecRegistryFromLookup(this.codecLookup);
+    const codecRegistry = blindCast<
+      ContractCodecRegistry,
+      'framework CodecRegistry: its descriptors materialise SQL codecs; the framework Codec type erases to BaseCodec at this boundary'
+    >(this.codecRegistry);
     const params = await encodeControlQueryParams(lowered, ast, codecRegistry);
     return { sql: lowered.sql, params };
   }

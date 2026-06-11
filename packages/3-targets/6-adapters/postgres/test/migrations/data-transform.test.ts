@@ -2,7 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { CliStructuredError } from '@prisma-next/errors/control';
 import { placeholder } from '@prisma-next/errors/migration';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
+import type { Codec, CodecRegistry } from '@prisma-next/framework-components/codec';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -224,9 +224,13 @@ const transformingCodec: Codec = {
   decodeJson: (v) => v as never,
 };
 
-const transformingLookup: CodecLookup = {
+const transformingLookup: CodecRegistry = {
   ...emptyCodecLookup,
   get: (id) => (id === TEST_CODEC_ID ? transformingCodec : undefined),
+  forCodecRef: () => {
+    throw new Error('not used in this test');
+  },
+  forColumn: () => undefined,
 };
 
 const testRegistry: ContractCodecRegistry = {

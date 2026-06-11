@@ -41,7 +41,6 @@ const mongoCodecLookup: CodecLookup = {
       decodeJson: (j: unknown) => j,
     } as ReturnType<CodecLookup['get']>;
   },
-  getForRef: () => undefined,
   targetTypesFor: (id: string) => mongoTargetTypes[id],
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,

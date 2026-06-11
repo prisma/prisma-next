@@ -1,4 +1,8 @@
-import type { Codec, CodecDescriptor, CodecLookup } from '@prisma-next/framework-components/codec';
+import type {
+  Codec,
+  CodecDescriptor,
+  CodecRegistry,
+} from '@prisma-next/framework-components/codec';
 import {
   CodecDescriptorImpl,
   emptyCodecLookup,
@@ -36,9 +40,13 @@ const transformingCodec = {
   decode: async (wire: unknown) => wire,
 } as unknown as Codec;
 
-const transformingLookup: CodecLookup = {
+const transformingLookup: CodecRegistry = {
   ...emptyCodecLookup,
   get: (id) => (id === 'test/transform@1' ? transformingCodec : undefined),
+  forCodecRef: () => {
+    throw new Error('not used in DDL tests');
+  },
+  forColumn: () => undefined,
 };
 
 describe('SqliteControlAdapter.lowerToExecuteRequest — DDL literal defaults', () => {
