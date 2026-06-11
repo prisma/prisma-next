@@ -905,16 +905,6 @@ type ContractBase = Omit<
             };
           };
         };
-        readonly enum: {
-          readonly Priority: {
-            readonly codecId: 'pg/text@1';
-            readonly members: readonly [
-              { readonly name: 'Low'; readonly value: 'low' },
-              { readonly name: 'High'; readonly value: 'high' },
-              { readonly name: 'Urgent'; readonly value: 'urgent' },
-            ];
-          };
-        };
       };
     };
   };
