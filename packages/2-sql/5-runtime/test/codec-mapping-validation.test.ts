@@ -1,0 +1,71 @@
+import type { Contract } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
+import { buildSqlNamespace, type SqlStorage } from '@prisma-next/sql-contract/types';
+import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
+import { applicationDomainOf } from '@prisma-next/test-utils';
+import { describe, expect, it } from 'vitest';
+import { validateContractCodecMappings } from '../src/codecs/validation';
+
+function registryWith(...codecIds: string[]): CodecDescriptorRegistry {
+  const descriptors = new Map(
+    codecIds.map((id) => [id, { codecId: id } as CodecDescriptor<unknown>]),
+  );
+  return {
+    descriptorFor: (codecId) => descriptors.get(codecId),
+    codecRefForColumn: () => undefined,
+    values: () => descriptors.values(),
+    byTargetType: () => [],
+  };
+}
+
+function tableWithColumn(codecId: string) {
+  return {
+    columns: { value: { nativeType: 'text', codecId } },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  };
+}
+
+function contractWithNamespaces(
+  namespaces: Record<string, ReturnType<typeof buildSqlNamespace>>,
+): Contract<SqlStorage> {
+  return {
+    targetFamily: 'sql',
+    target: 'postgres',
+    profileHash: profileHash('sha256:test'),
+    roots: {},
+    storage: { storageHash: coreHash('sha256:test'), namespaces },
+    domain: applicationDomainOf({ models: {} }),
+    capabilities: {},
+  } as Contract<SqlStorage>;
+}
+
+describe('validateContractCodecMappings', () => {
+  it('passes when every column codec is registered', () => {
+    const contract = contractWithNamespaces({
+      app: buildSqlNamespace({
+        id: 'app',
+        entries: { table: { docs: tableWithColumn('pg/text@1') } },
+      }),
+    });
+    expect(() => validateContractCodecMappings(registryWith('pg/text@1'), contract)).not.toThrow();
+  });
+
+  it('reports a missing codec even when another namespace has the same table.column with a registered codec', () => {
+    const contract = contractWithNamespaces({
+      app: buildSqlNamespace({
+        id: 'app',
+        entries: { table: { docs: tableWithColumn('pg/text@1') } },
+      }),
+      analytics: buildSqlNamespace({
+        id: 'analytics',
+        entries: { table: { docs: tableWithColumn('ext/missing@1') } },
+      }),
+    });
+    expect(() => validateContractCodecMappings(registryWith('pg/text@1'), contract)).toThrow(
+      /analytics\.docs\.value \(ext\/missing@1\)/,
+    );
+  });
+});
