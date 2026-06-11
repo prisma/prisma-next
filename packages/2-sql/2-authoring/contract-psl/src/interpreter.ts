@@ -9,7 +9,6 @@ import type {
   ContractModel,
   ContractValueObject,
   ControlPolicy,
-  JsonValue,
 } from '@prisma-next/contract/types';
 import { crossRef } from '@prisma-next/contract/types';
 import type {
@@ -48,7 +47,6 @@ import {
 import {
   buildSqlContractFromDefinition,
   type EnumTypeHandle,
-  enumType,
   type FieldNode,
   type ForeignKeyNode,
   type IndexNode,
@@ -385,7 +383,8 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
 interface ProcessEnum2DeclarationsInput {
   readonly enum2Blocks: readonly PslExtensionBlock[];
   readonly sourceId: string;
-  readonly codecLookup: CodecLookup | undefined;
+  readonly authoringContributions: AuthoringContributions;
+  readonly entityContext: AuthoringEntityContext;
   readonly diagnostics: ContractSourceDiagnostic[];
 }
 
@@ -400,142 +399,34 @@ function processEnum2Declarations(input: ProcessEnum2DeclarationsInput): {
     return { enumHandles, enumTypeDescriptors };
   }
 
+  const enum2EntityDescriptor = getAuthoringEntity(input.authoringContributions, ['enum2']);
+  if (!enum2EntityDescriptor) {
+    for (const decl of input.enum2Blocks) {
+      input.diagnostics.push({
+        code: 'PSL_ENUM2_MISSING_FACTORY',
+        message: `enum2 "${decl.name}" requires an "enum2" entityType factory in the active authoring contributions`,
+        sourceId: input.sourceId,
+        span: decl.span,
+      });
+    }
+    return { enumHandles, enumTypeDescriptors };
+  }
+
   for (const decl of input.enum2Blocks) {
-    const typeAttr = decl.blockAttributes.find((a) => a.name === 'type');
-    if (!typeAttr) {
-      input.diagnostics.push({
-        code: 'PSL_ENUM2_MISSING_TYPE',
-        message: `enum2 "${decl.name}" is missing a @@type("codecId") attribute`,
-        sourceId: input.sourceId,
-        span: decl.span,
-      });
-      continue;
-    }
-
-    const rawCodecArg = typeAttr.args[0]?.value;
-    const codecId = rawCodecArg !== undefined ? parseQuotedStringLiteral(rawCodecArg) : undefined;
-    if (!codecId) {
-      input.diagnostics.push({
-        code: 'PSL_ENUM2_MISSING_TYPE',
-        message: `enum2 "${decl.name}" @@type attribute must have a quoted codec id argument`,
-        sourceId: input.sourceId,
-        span: typeAttr.span,
-      });
-      continue;
-    }
-
-    const nativeType = input.codecLookup?.targetTypesFor(codecId)?.[0];
-    if (nativeType === undefined) {
-      const typeArgSpan = typeAttr.args[0]?.span ?? typeAttr.span;
-      input.diagnostics.push({
-        code: 'PSL_EXTENSION_INVALID_VALUE',
-        message: `enum2 "${decl.name}" @@type references unknown codec "${codecId}"`,
-        sourceId: input.sourceId,
-        span: typeArgSpan,
-      });
-      continue;
-    }
-
-    const codec = input.codecLookup?.get(codecId);
-
-    const seenValues = new Set<string>();
-    const members: { name: string; value: unknown }[] = [];
-    let memberError = false;
-
-    for (const [memberName, paramValue] of Object.entries(decl.parameters)) {
-      let value: unknown;
-      if (paramValue.kind === 'bare') {
-        if (codec !== undefined) {
-          try {
-            value = codec.decodeJson(memberName);
-          } catch {
-            input.diagnostics.push({
-              code: 'PSL_ENUM2_BARE_MEMBER_NON_STRING_CODEC',
-              message: `enum2 "${decl.name}" member "${memberName}" has no value and codec "${codecId}" does not accept a bare name as input`,
-              sourceId: input.sourceId,
-              span: paramValue.span,
-            });
-            memberError = true;
-            continue;
-          }
-        } else {
-          value = memberName;
-        }
-      } else if (paramValue.kind === 'value') {
-        let jsonValue: unknown;
-        try {
-          jsonValue = JSON.parse(paramValue.raw);
-        } catch {
-          input.diagnostics.push({
-            code: 'PSL_EXTENSION_INVALID_VALUE',
-            message: `enum2 "${decl.name}" member "${memberName}" value "${paramValue.raw}" is not valid JSON`,
-            sourceId: input.sourceId,
-            span: paramValue.span,
-          });
-          memberError = true;
-          continue;
-        }
-
-        if (codec !== undefined) {
-          try {
-            value = codec.decodeJson(
-              blindCast<JsonValue, 'JSON.parse returns a JsonValue-compatible value'>(jsonValue),
-            );
-          } catch (err) {
-            const reason = err instanceof Error ? err.message : String(err);
-            input.diagnostics.push({
-              code: 'PSL_EXTENSION_INVALID_VALUE',
-              message: `enum2 "${decl.name}" member "${memberName}" was rejected by codec "${codecId}": ${reason}`,
-              sourceId: input.sourceId,
-              span: paramValue.span,
-            });
-            memberError = true;
-            continue;
-          }
-        } else {
-          value = jsonValue;
-        }
-      } else {
-        continue;
-      }
-
-      const valueKey = String(value);
-      if (seenValues.has(valueKey)) {
-        input.diagnostics.push({
-          code: 'PSL_ENUM2_DUPLICATE_MEMBER_VALUE',
-          message: `enum2 "${decl.name}": duplicate member value "${valueKey}"`,
-          sourceId: input.sourceId,
-          span: paramValue.span,
-        });
-        memberError = true;
-        continue;
-      }
-      seenValues.add(valueKey);
-      members.push({ name: memberName, value });
-    }
-
-    if (memberError) continue;
-
-    if (members.length === 0) {
-      input.diagnostics.push({
-        code: 'PSL_ENUM2_MISSING_TYPE',
-        message: `enum2 "${decl.name}" must have at least one member`,
-        sourceId: input.sourceId,
-        span: decl.span,
-      });
-      continue;
-    }
-
-    const handle = enumType(
-      decl.name,
-      { codecId, nativeType },
-      ...members.map((m) => ({ name: m.name, value: m.value })),
+    const handle = instantiateAuthoringEntityType(
+      'enum2',
+      enum2EntityDescriptor,
+      [decl],
+      input.entityContext,
     );
 
-    enumHandles[decl.name] = handle;
+    if (handle === undefined || handle === null) continue;
+
+    const enumHandle = blindCast<EnumTypeHandle, 'enum2 factory returns EnumTypeHandle'>(handle);
+    enumHandles[decl.name] = enumHandle;
     enumTypeDescriptors.set(decl.name, {
-      codecId,
-      nativeType,
+      codecId: enumHandle.codecId,
+      nativeType: enumHandle.nativeType,
     });
   }
 
@@ -1497,7 +1388,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
           nullable: resolvedField.field.optional,
           ...ifDefined('default', resolvedField.defaultValue),
           ...ifDefined('executionDefaults', resolvedField.executionDefaults),
-          ...(enumHandle !== undefined ? { enumTypeHandle: enumHandle } : {}),
+          ...ifDefined('enumTypeHandle', enumHandle),
         };
       }),
       ...ifDefined('id', primaryKey),
@@ -2198,7 +2089,14 @@ export function interpretPslDocumentToSqlContract(
   const enum2Result = processEnum2Declarations({
     enum2Blocks: topLevelEnum2s,
     sourceId,
-    codecLookup: input.codecLookup,
+    authoringContributions: input.authoringContributions,
+    entityContext: {
+      family: input.target.familyId,
+      target: input.target.targetId,
+      codecLookup: input.codecLookup,
+      sourceId,
+      diagnostics,
+    },
     diagnostics,
   });
 

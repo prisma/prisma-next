@@ -12,7 +12,7 @@ import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../src/prisma/contract.d';
+import type { Contract } from '../src/prisma/contract';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { db } from '../src/prisma/db';
 import { crossAuthorSimilarity } from '../src/queries/cross-author-similarity';

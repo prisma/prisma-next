@@ -477,24 +477,7 @@ describe('assembleAuthoringContributions', () => {
     ).not.toThrow();
   });
 
-  it('accepts a pslBlockDescriptors entry with interpreterLowered:true and no matching entityTypes factory', () => {
-    expect(() =>
-      assembleAuthoringContributions([
-        createDescriptor({
-          authoring: {
-            pslBlockDescriptors: {
-              enum2: {
-                ...makeDeclarativePslBlockDescriptor('interpreter-lowered-discriminator'),
-                interpreterLowered: true,
-              },
-            },
-          },
-        }),
-      ]),
-    ).not.toThrow();
-  });
-
-  it('still rejects a pslBlockDescriptors entry without interpreterLowered and no matching entityTypes factory', () => {
+  it('rejects a pslBlockDescriptors entry with no matching entityTypes factory', () => {
     expect(() =>
       assembleAuthoringContributions([
         createDescriptor({

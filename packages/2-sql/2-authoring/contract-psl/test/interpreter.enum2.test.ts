@@ -337,6 +337,32 @@ namespace public {
     );
   });
 
+  it('missing enum2 entityType factory emits diagnostic for each enum2 block', () => {
+    const entityTypesWithoutEnum2 = { enum: testEnumEntityContributions.enum };
+    const result = interpret(
+      `
+enum2 Priority {
+  @@type("pg/text@1")
+  Low = "low"
+}
+model Post { id Int @id }
+`,
+      {
+        authoringContributions: {
+          entityTypes: entityTypesWithoutEnum2,
+          field: {},
+          type: {},
+          pslBlockDescriptors: { enum2: enum2PslBlockDescriptor },
+        },
+      },
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_ENUM2_MISSING_FACTORY' })]),
+    );
+  });
+
   it('missing pslBlockDescriptors means enum2 is treated as unknown top-level block', () => {
     const result = interpret(
       `

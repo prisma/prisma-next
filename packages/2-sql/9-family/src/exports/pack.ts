@@ -1,5 +1,5 @@
 import type { FamilyPackRef } from '@prisma-next/framework-components/components';
-import { sqlFamilyPslBlockDescriptors } from '../core/authoring-entity-types';
+import { sqlFamilyEntityTypes, sqlFamilyPslBlockDescriptors } from '../core/authoring-entity-types';
 import { sqlFamilyAuthoringFieldPresets } from '../core/authoring-field-presets';
 import { sqlFamilyAuthoringTypes } from '../core/authoring-type-constructors';
 
@@ -11,6 +11,7 @@ const sqlFamilyPack = {
   authoring: {
     field: sqlFamilyAuthoringFieldPresets,
     type: sqlFamilyAuthoringTypes,
+    entityTypes: sqlFamilyEntityTypes,
     pslBlockDescriptors: sqlFamilyPslBlockDescriptors,
   },
 } as const satisfies FamilyPackRef<'sql'>;

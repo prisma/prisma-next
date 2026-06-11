@@ -4,7 +4,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
-import { sqlFamilyPslBlockDescriptors } from './authoring-entity-types';
+import { sqlFamilyEntityTypes, sqlFamilyPslBlockDescriptors } from './authoring-entity-types';
 import { sqlFamilyAuthoringFieldPresets } from './authoring-field-presets';
 import { sqlFamilyAuthoringTypes } from './authoring-type-constructors';
 import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './control-instance';
@@ -20,6 +20,7 @@ export class SqlFamilyDescriptor
   readonly authoring = {
     field: sqlFamilyAuthoringFieldPresets,
     type: sqlFamilyAuthoringTypes,
+    entityTypes: sqlFamilyEntityTypes,
     pslBlockDescriptors: sqlFamilyPslBlockDescriptors,
   } as const;
 
