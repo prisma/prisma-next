@@ -3,11 +3,7 @@ import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { StorageColumn } from '../src/ir/storage-column';
 import { StorageTable } from '../src/ir/storage-table';
-import {
-  createSqlContractSchema,
-  PostgresEnumTypeSchema,
-  validateStorage,
-} from '../src/validators';
+import { createSqlContractSchema, validateStorage } from '../src/validators';
 
 function storageWithColumn(control?: unknown) {
   return {
@@ -132,20 +128,6 @@ describe('SQL storage validators accept control', () => {
 
   it('rejects a table carrying a non-ControlPolicy string', () => {
     expect(() => validateStorage(storageWithTable('bogus'))).toThrow();
-  });
-});
-
-describe('PostgresEnumTypeSchema control field', () => {
-  const schema = PostgresEnumTypeSchema;
-
-  it('accepts an enum entry carrying control', () => {
-    const result = schema({ kind: 'postgres-enum', values: ['a', 'b'], control: 'external' });
-    expect(result instanceof type.errors).toBe(false);
-  });
-
-  it('rejects an enum entry carrying a non-ControlPolicy string', () => {
-    const result = schema({ kind: 'postgres-enum', values: ['a', 'b'], control: 'bogus' });
-    expect(result instanceof type.errors).toBe(true);
   });
 });
 

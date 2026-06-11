@@ -4,9 +4,17 @@ import { describe, expect, it } from 'vitest';
 import {
   createNamespaceEntrySchema,
   createSqlStorageSchema,
-  PostgresEnumTypeSchema,
   StorageValueSetSchema,
 } from '../src/validators';
+
+// Synthetic pack-contributed schema used to test registry dispatch without
+// depending on a target-specific schema (PostgresEnumTypeSchema now lives in
+// the postgres target pack).
+const SyntheticPackEntrySchema = type({
+  kind: "'synthetic-kind'",
+  'name?': 'string',
+  values: type.string.array().readonly(),
+});
 
 // ---------------------------------------------------------------------------
 // Minimal valid fixtures
@@ -71,39 +79,45 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
   });
 
   it('accepts a namespace with a pack-registered entries key', () => {
-    const registry = new Map<string, ReturnType<typeof type>>([['type', PostgresEnumTypeSchema]]);
+    const registry = new Map<string, ReturnType<typeof type>>([
+      ['synth', SyntheticPackEntrySchema],
+    ]);
     const schema = createNamespaceEntrySchema(registry);
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
         table: {},
-        type: { Color: { kind: 'postgres-enum', values: ['red', 'green'], name: 'Color' } },
+        synth: { Foo: { kind: 'synthetic-kind', values: ['a', 'b'], name: 'Foo' } },
       },
     });
     expect(result).not.toBeInstanceOf(type.errors);
   });
 
   it('rejects a pack-registered entry with a non-conforming value', () => {
-    const registry = new Map<string, ReturnType<typeof type>>([['type', PostgresEnumTypeSchema]]);
+    const registry = new Map<string, ReturnType<typeof type>>([
+      ['synth', SyntheticPackEntrySchema],
+    ]);
     const schema = createNamespaceEntrySchema(registry);
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
         table: {},
-        type: { Color: { kind: 'postgres-enum' } },
+        synth: { Foo: { kind: 'synthetic-kind' } },
       },
     });
     expect(result).toBeInstanceOf(type.errors);
   });
 
   it('rejects an unknown entries key even when a pack registry is provided', () => {
-    const registry = new Map<string, ReturnType<typeof type>>([['type', PostgresEnumTypeSchema]]);
+    const registry = new Map<string, ReturnType<typeof type>>([
+      ['synth', SyntheticPackEntrySchema],
+    ]);
     const schema = createNamespaceEntrySchema(registry);
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
         table: {},
-        type: {},
+        synth: {},
         unknown: { X: { kind: 'unknown' } },
       },
     });
@@ -140,13 +154,15 @@ describe('createSqlStorageSchema — registry-driven storage validation', () => 
     expect(String(result)).toMatch(/bogus/);
   });
 
-  it('accepts storage with a pack-registered type entries key', () => {
-    const registry = new Map<string, ReturnType<typeof type>>([['type', PostgresEnumTypeSchema]]);
+  it('accepts storage with a pack-registered entries key', () => {
+    const registry = new Map<string, ReturnType<typeof type>>([
+      ['synth', SyntheticPackEntrySchema],
+    ]);
     const schema = createSqlStorageSchema(registry);
     const result = schema(
       makeStorage({
         table: {},
-        type: { Color: { kind: 'postgres-enum', values: ['red', 'green'], name: 'Color' } },
+        synth: { Foo: { kind: 'synthetic-kind', values: ['a', 'b'], name: 'Foo' } },
       }),
     );
     expect(result).not.toBeInstanceOf(type.errors);

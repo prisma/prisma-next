@@ -125,19 +125,6 @@ const StorageTypeInstanceSchema = type
     'typeParams?': 'Record<string, unknown>',
   });
 
-/**
- * Postgres native enum entry under `storage.namespaces[namespaceId].entries.type[name]`.
- * Document-scoped `storage.types` carries codec aliases only
- * (`DocumentScopedStorageTypeSchema`).
- */
-const PostgresEnumTypeSchema = type({
-  kind: "'postgres-enum'",
-  'name?': 'string',
-  'nativeType?': 'string',
-  values: type.string.array().readonly(),
-  'control?': ControlPolicySchema,
-});
-
 /** Document-scoped `storage.types`: codec triples only. */
 const DocumentScopedStorageTypeSchema = StorageTypeInstanceSchema;
 
@@ -232,13 +219,6 @@ const StorageTableSchema = type({
   'checks?': CheckConstraintSchema.array().readonly(),
 });
 
-/**
- * Re-exported so target packs can register their schema against the
- * `'type'` entries key. Full extraction of enum-specific schemas into
- * the Postgres pack is a follow-up; today the symbol lives here.
- */
-export { PostgresEnumTypeSchema };
-
 const BUILTIN_ENTRY_SCHEMAS: ReadonlyMap<string, Type<unknown>> = new Map<string, Type<unknown>>([
   ['table', castAs<Type<unknown>>(StorageTableSchema)],
   ['valueSet', castAs<Type<unknown>>(StorageValueSetSchema)],
@@ -251,7 +231,7 @@ const BUILTIN_ENTRY_SCHEMAS: ReadonlyMap<string, Type<unknown>> = new Map<string
  * entries key to an arktype schema that validates a single inner-map
  * value for that kind. Built-in keys (`'table'`, `'valueSet'`) are always
  * present; target packs contribute additional keys (e.g. postgres
- * registers `'type'` → `PostgresEnumTypeSchema`). An unregistered key
+ * registers `'type'` → the postgres enum schema). An unregistered key
  * fails validation naming the key, so validation fails closed.
  */
 export function createNamespaceEntrySchema(
