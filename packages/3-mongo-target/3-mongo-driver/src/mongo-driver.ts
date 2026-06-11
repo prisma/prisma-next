@@ -27,11 +27,19 @@ import type { IndexSpecification } from 'mongodb';
 import { type Db, MongoClient } from 'mongodb';
 import { DRIVER_INFO } from './core/driver-info';
 
-function voidToAsyncIterable(op: Promise<void>): AsyncIterable<never> {
+function lazyDdlIterable(start: () => Promise<void>): AsyncIterable<never> {
   return {
-    [Symbol.asyncIterator](): AsyncIterator<never> {
-      const done = op.then(() => ({ value: undefined as never, done: true as const }));
-      return { next: () => done };
+    [Symbol.asyncIterator]() {
+      let started = false;
+      return {
+        async next(): Promise<IteratorResult<never>> {
+          if (!started) {
+            started = true;
+            await start();
+          }
+          return { done: true, value: undefined as never };
+        },
+      };
     },
   };
 }
@@ -77,23 +85,23 @@ export class MongoDriverImpl implements MongoDriver {
         return this.executeAggregateCommand<Row>(wireCommand);
       case 'createCollection':
         return castAs<AsyncIterable<Row>>(
-          voidToAsyncIterable(this.executeCreateCollectionCommand(wireCommand)),
+          lazyDdlIterable(() => this.executeCreateCollectionCommand(wireCommand)),
         );
       case 'createIndex':
         return castAs<AsyncIterable<Row>>(
-          voidToAsyncIterable(this.executeCreateIndexCommand(wireCommand)),
+          lazyDdlIterable(() => this.executeCreateIndexCommand(wireCommand)),
         );
       case 'dropCollection':
         return castAs<AsyncIterable<Row>>(
-          voidToAsyncIterable(this.executeDropCollectionCommand(wireCommand)),
+          lazyDdlIterable(() => this.executeDropCollectionCommand(wireCommand)),
         );
       case 'dropIndex':
         return castAs<AsyncIterable<Row>>(
-          voidToAsyncIterable(this.executeDropIndexCommand(wireCommand)),
+          lazyDdlIterable(() => this.executeDropIndexCommand(wireCommand)),
         );
       case 'collMod':
         return castAs<AsyncIterable<Row>>(
-          voidToAsyncIterable(this.executeCollModCommand(wireCommand)),
+          lazyDdlIterable(() => this.executeCollModCommand(wireCommand)),
         );
       // v8 ignore next 4
       default: {
