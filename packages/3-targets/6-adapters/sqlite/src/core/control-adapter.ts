@@ -3,7 +3,7 @@ import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
-import { APP_SPACE_ID, extractCodecLookup } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
@@ -32,7 +32,6 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
-import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -113,23 +112,14 @@ type FkAccumulator = {
   onUpdate: string;
 };
 
-function createSqliteBuiltinCodecLookup(): CodecRegistry {
-  return extractCodecLookup([
-    {
-      id: 'sqlite-builtin-codecs',
-      types: { codecTypes: { codecDescriptors: Array.from(sqliteCodecRegistry.values()) } },
-    },
-  ]);
-}
-
 export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   readonly familyId = 'sql' as const;
   readonly targetId = 'sqlite' as const;
 
   private readonly codecRegistry: CodecRegistry;
 
-  constructor(codecRegistry?: CodecRegistry) {
-    this.codecRegistry = codecRegistry ?? createSqliteBuiltinCodecLookup();
+  constructor(codecRegistry: CodecRegistry) {
+    this.codecRegistry = codecRegistry;
   }
 
   readonly normalizeDefault = parseSqliteDefault;

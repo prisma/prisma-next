@@ -29,10 +29,11 @@ import { renderOps } from '@prisma-next/target-sqlite/render-ops';
 import { timeouts } from '@prisma-next/test-utils';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createSqliteBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { SqliteControlAdapter } from '../../src/exports/control';
 
 const execFileAsync = promisify(execFile);
-const testAdapter = new SqliteControlAdapter();
+const testAdapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
 const packageRoot = resolve(import.meta.dirname, '../..');
 const repoRoot = resolve(packageRoot, '../../../..');
 const targetSqliteRoot = resolve(repoRoot, 'packages/3-targets/3-targets/sqlite');

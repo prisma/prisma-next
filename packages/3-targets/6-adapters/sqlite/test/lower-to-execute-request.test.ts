@@ -22,11 +22,12 @@ import { jsonText, sqliteTable, text } from '@prisma-next/target-sqlite/contract
 import { SqliteCreateTable } from '@prisma-next/target-sqlite/ddl';
 import { createContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createSqliteBuiltinCodecLookup } from '../src/core/codec-lookup';
 import { SqliteControlAdapter } from '../src/core/control-adapter';
 import { encodeControlQueryParams } from '../src/core/control-codecs';
 import type { SqliteContract } from '../src/core/types';
 
-const adapter = new SqliteControlAdapter();
+const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
 const ctx = { contract: {} as SqliteContract };
 
 /**
@@ -346,7 +347,7 @@ describe('SqliteControlAdapter.lowerToExecuteRequest — extension codec end-to-
 
   it('throws when a contract column references a codec absent from the adapter lookup', async () => {
     const { contract, table } = buildExtContractAndTable();
-    const noExtAdapter = new SqliteControlAdapter();
+    const noExtAdapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
 
     const ast = table.select(table.label).where(table.label.eq('plaintext')).build();
     await expect(noExtAdapter.lowerToExecuteRequest(ast, { contract })).rejects.toThrow(

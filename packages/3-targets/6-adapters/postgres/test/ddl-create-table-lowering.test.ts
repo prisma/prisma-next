@@ -1,6 +1,7 @@
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import { PostgresCreateTable } from '@prisma-next/target-postgres/ddl';
 import { describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../src/core/control-adapter';
 import type { PostgresContract } from '../src/core/types';
 
@@ -16,7 +17,7 @@ describe('PostgresCreateTable DDL lowering', () => {
       ],
     });
 
-    const adapter = new PostgresControlAdapter();
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
     const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toBe(
@@ -39,7 +40,7 @@ describe('PostgresCreateTable DDL lowering', () => {
       ],
     });
 
-    const adapter = new PostgresControlAdapter();
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
     const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain(`"a" text DEFAULT 'x'`);
@@ -58,7 +59,7 @@ describe('PostgresCreateTable DDL lowering', () => {
       columns: [col('name', 'text', { default: lit("O'Reilly") })],
     });
 
-    const adapter = new PostgresControlAdapter();
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
     const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain(`"name" text DEFAULT 'O''Reilly'`);
@@ -70,7 +71,7 @@ describe('PostgresCreateTable DDL lowering', () => {
       columns: [col('meta', 'jsonb', { default: lit({ a: "x'y" }) })],
     });
 
-    const adapter = new PostgresControlAdapter();
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
     const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain(`"meta" jsonb DEFAULT '{"a":"x''y"}'::jsonb`);
@@ -91,7 +92,7 @@ describe('PostgresCreateTable DDL lowering', () => {
         col('birthdate', 'date', { default: lit('2024-01-01') }),
       ],
     });
-    const adapter = new PostgresControlAdapter();
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
     const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
     expect(lowered.sql).toContain(`"id" uuid DEFAULT '00000000-0000-0000-0000-000000000000'::uuid`);
     expect(lowered.sql).toContain(
@@ -116,7 +117,7 @@ describe('PostgresCreateTable DDL lowering', () => {
         col('a_character', 'character(8)', { default: lit('hello') }),
       ],
     });
-    const adapter = new PostgresControlAdapter();
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
     const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
     expect(lowered.sql).toContain(`"a_text" text DEFAULT 'hello'`);
     expect(lowered.sql).toContain(`"a_varchar" varchar(50) DEFAULT 'hello'`);
@@ -141,7 +142,7 @@ describe('PostgresCreateTable DDL lowering', () => {
         col('a_nullable', 'uuid', { default: lit(null) }),
       ],
     });
-    const adapter = new PostgresControlAdapter();
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
     const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
     expect(lowered.sql).toContain('"a_int" int DEFAULT 42');
     expect(lowered.sql).toContain('"a_float" float8 DEFAULT 3.14');
@@ -158,7 +159,7 @@ describe('PostgresCreateTable DDL lowering', () => {
         col('meta', 'jsonb', { default: fn(`jsonb_build_object('k', 1)`) }),
       ],
     });
-    const adapter = new PostgresControlAdapter();
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
     const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
     expect(lowered.sql).toContain('"id" uuid DEFAULT (gen_random_uuid())');
     expect(lowered.sql).toContain(`"meta" jsonb DEFAULT (jsonb_build_object('k', 1))`);

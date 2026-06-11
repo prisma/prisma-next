@@ -6,6 +6,7 @@ import {
 import { col } from '@prisma-next/sql-relational-core/contract-free';
 import { createTable } from '@prisma-next/target-sqlite/contract-free';
 import { describe, expect, it } from 'vitest';
+import { createSqliteBuiltinCodecLookup } from '../src/core/codec-lookup';
 import { SqliteControlAdapter } from '../src/core/control-adapter';
 import type { SqliteContract } from '../src/core/types';
 
@@ -34,7 +35,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
       ],
     });
 
-    const adapter = new SqliteControlAdapter();
+    const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
     const lowered = await adapter.lowerToExecuteRequest(ast, {
       contract: {} as SqliteContract,
     });
@@ -59,7 +60,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
       constraints: [new PrimaryKeyConstraint({ columns: ['a', 'b'], name: 'pk_items' })],
     });
 
-    const adapter = new SqliteControlAdapter();
+    const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
     const lowered = await adapter.lowerToExecuteRequest(ast, {
       contract: {} as SqliteContract,
     });
@@ -83,7 +84,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
       ],
     });
 
-    const adapter = new SqliteControlAdapter();
+    const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
     const lowered = await adapter.lowerToExecuteRequest(ast, {
       contract: {} as SqliteContract,
     });
@@ -99,7 +100,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
       columns: [col('id', 'TEXT', { primaryKey: true, notNull: true })],
     });
 
-    const adapter = new SqliteControlAdapter();
+    const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
     const lowered = await adapter.lowerToExecuteRequest(ast, {
       contract: {} as SqliteContract,
     });
@@ -124,7 +125,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
       ],
     });
 
-    const adapter = new SqliteControlAdapter();
+    const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
     const lowered = await adapter.lowerToExecuteRequest(ast, {
       contract: {} as SqliteContract,
     });

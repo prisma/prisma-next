@@ -1,4 +1,7 @@
-import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
+import {
+  createPostgresBuiltinCodecLookup,
+  PostgresControlAdapter,
+} from '@prisma-next/adapter-postgres/control';
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
 import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import {
@@ -8,7 +11,7 @@ import {
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import type { Client } from 'pg';
 
-const postgresControlAdapter = new PostgresControlAdapter();
+const postgresControlAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 const postgresControlLowererContext = { contract: {} as PostgresContract };
 
 export async function executeLoweredStatement(

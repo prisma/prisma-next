@@ -1,4 +1,7 @@
-import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
+import {
+  createPostgresBuiltinCodecLookup,
+  PostgresControlAdapter,
+} from '@prisma-next/adapter-postgres/control';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
@@ -18,7 +21,7 @@ import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
 
-const testAdapter = new PostgresControlAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 const emptySchema: SqlSchemaIR = {
   tables: {},

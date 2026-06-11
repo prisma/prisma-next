@@ -1,4 +1,5 @@
 import postgresAdapterDescriptor, {
+  createPostgresBuiltinCodecLookup,
   PostgresControlAdapter,
 } from '@prisma-next/adapter-postgres/control';
 import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
@@ -30,7 +31,7 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
 
-const testAdapter = new PostgresControlAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 const adapterCodecHooks = extractCodecControlHooks([postgresAdapterDescriptor]);
 const expandParameterizedNativeType: NativeTypeExpander = (input) => {
   if (!input.codecId) return input.nativeType;

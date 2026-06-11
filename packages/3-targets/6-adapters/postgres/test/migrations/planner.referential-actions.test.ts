@@ -15,6 +15,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 function createRefActionContract(
@@ -89,7 +90,9 @@ async function planAndGetFkSql(
   onDelete?: ReferentialAction,
   onUpdate?: ReferentialAction,
 ): Promise<string> {
-  const planner = createPostgresMigrationPlanner(new PostgresControlAdapter());
+  const planner = createPostgresMigrationPlanner(
+    new PostgresControlAdapter(createPostgresBuiltinCodecLookup()),
+  );
   const contract = createRefActionContract(onDelete, onUpdate);
   const result = planner.plan({
     contract,

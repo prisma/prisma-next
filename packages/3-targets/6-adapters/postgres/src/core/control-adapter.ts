@@ -65,7 +65,6 @@ import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-t
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { encodeControlQueryParams } from './control-codecs';
 import {
   introspectPostgresEnumTypes,
@@ -106,8 +105,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
   private readonly codecRegistry: CodecRegistry;
 
-  constructor(codecRegistry?: CodecRegistry) {
-    this.codecRegistry = codecRegistry ?? createPostgresBuiltinCodecLookup();
+  constructor(codecRegistry: CodecRegistry) {
+    this.codecRegistry = codecRegistry;
   }
 
   /**

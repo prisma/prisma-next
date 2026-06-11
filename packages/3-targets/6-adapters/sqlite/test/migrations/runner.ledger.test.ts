@@ -8,6 +8,7 @@ import {
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
+import { createSqliteBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { SqliteControlAdapter } from '../../src/core/control-adapter';
 import {
   contract,
@@ -35,7 +36,7 @@ interface LedgerRow {
   readonly created_at: string;
 }
 
-const ledgerAdapter = new SqliteControlAdapter();
+const ledgerAdapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
 
 type ExpectedLedgerEntry = Omit<LedgerEntryRecord, 'appliedAt'>;
 

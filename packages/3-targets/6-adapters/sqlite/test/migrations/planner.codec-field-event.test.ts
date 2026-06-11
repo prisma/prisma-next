@@ -12,6 +12,7 @@ import {
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createSqliteBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { SqliteControlAdapter } from '../../src/core/control-adapter';
 
 const HOOKED_CODEC = 'cs/string@1';
@@ -73,7 +74,9 @@ function makeFrameworkComponents(
 }
 
 describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
-  const planner = createSqliteMigrationPlanner(new SqliteControlAdapter());
+  const planner = createSqliteMigrationPlanner(
+    new SqliteControlAdapter(createSqliteBuiltinCodecLookup()),
+  );
 
   it('inlines ops emitted by onFieldEvent after structural DDL', async () => {
     const hooks: CodecControlHooks = {

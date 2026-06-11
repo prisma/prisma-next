@@ -1,4 +1,7 @@
-import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
+import {
+  createPostgresBuiltinCodecLookup,
+  PostgresControlAdapter,
+} from '@prisma-next/adapter-postgres/control';
 import {
   asNamespaceId,
   type ColumnDefaultLiteralInputValue,
@@ -26,7 +29,7 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
 
-const testAdapter = new PostgresControlAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
   const planner = createPostgresMigrationPlanner(testAdapter);

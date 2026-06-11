@@ -11,6 +11,7 @@ import {
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createSqliteBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { SqliteControlAdapter } from '../../src/core/control-adapter';
 
 function makeColumn(overrides: Partial<StorageColumn> = {}): StorageColumn {
@@ -57,7 +58,9 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
 const emptySchema = { tables: {} };
 
 describe('SQLite migration planner', () => {
-  const planner = createSqliteMigrationPlanner(new SqliteControlAdapter());
+  const planner = createSqliteMigrationPlanner(
+    new SqliteControlAdapter(createSqliteBuiltinCodecLookup()),
+  );
 
   it('plans CREATE TABLE for new table', async () => {
     const contract = makeContract({

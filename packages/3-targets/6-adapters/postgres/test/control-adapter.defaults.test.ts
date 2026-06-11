@@ -2,6 +2,7 @@ import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../src/core/control-adapter';
 
 const createMockDriver = (
@@ -53,7 +54,7 @@ describe('PostgresControlAdapter column defaults', () => {
   it('stores raw default expressions from database', {
     timeout: timeouts.databaseOperation,
   }, async () => {
-    const adapter = new PostgresControlAdapter();
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
     const mockDriver = createMockDriver([
       {
         column_name: 'id',

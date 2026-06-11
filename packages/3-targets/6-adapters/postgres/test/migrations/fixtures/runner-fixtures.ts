@@ -23,6 +23,7 @@ import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { applicationDomainOf, createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import { createPostgresBuiltinCodecLookup } from '../../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../../src/core/control-adapter';
 import type { PostgresContract } from '../../../src/core/types';
 import postgresAdapterDescriptor from '../../../src/exports/control';
@@ -161,7 +162,7 @@ export function createLedgerTestPlan<TDetails extends PostgresPlanTargetDetails>
   });
 }
 
-const postgresControlAdapter = new PostgresControlAdapter();
+const postgresControlAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 const postgresControlLowererContext = { contract: {} as PostgresContract };
 
 export async function bootstrapPostgresControlSchema(driver: PostgresControlDriver): Promise<void> {

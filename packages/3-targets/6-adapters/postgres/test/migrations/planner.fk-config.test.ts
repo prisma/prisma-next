@@ -7,6 +7,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 function createFkTestContract(fkConfig: {
@@ -83,7 +84,9 @@ const MIGRATION_PLAN_POLICY = {
 } as const;
 
 describe('PostgresMigrationPlanner - per-FK config combinations', () => {
-  const planner = createPostgresMigrationPlanner(new PostgresControlAdapter());
+  const planner = createPostgresMigrationPlanner(
+    new PostgresControlAdapter(createPostgresBuiltinCodecLookup()),
+  );
 
   it('emits both FK constraints and FK indexes when constraint=true, index=true', async () => {
     const contract = createFkTestContract({ constraint: true, index: true });

@@ -1,3 +1,4 @@
+import type { RuntimeErrorEnvelope } from '../shared/runtime-error';
 import { runtimeError } from '../shared/runtime-error';
 
 export type { RuntimeErrorEnvelope } from '../shared/runtime-error';
@@ -37,7 +38,7 @@ export type RuntimeAbortedPhase =
  * `DOMException`, explicit `controller.abort(reason)` produces whatever
  * the caller passed. No synthesis happens here.
  */
-export function runtimeAborted(phase: RuntimeAbortedPhase, cause?: unknown) {
+export function runtimeAborted(phase: RuntimeAbortedPhase, cause?: unknown): RuntimeErrorEnvelope {
   const envelope = runtimeError(RUNTIME_ABORTED, `Operation aborted during ${phase}`, { phase });
   return Object.assign(envelope, { cause });
 }

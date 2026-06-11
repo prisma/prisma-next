@@ -32,10 +32,11 @@ import { renderOps } from '@prisma-next/target-postgres/render-ops';
 import { timeouts } from '@prisma-next/test-utils';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 const execFileAsync = promisify(execFile);
-const testAdapter = new PostgresControlAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 const packageRoot = resolve(import.meta.dirname, '../..');
 const repoRoot = resolve(packageRoot, '../../../..');
 const targetPostgresRoot = resolve(repoRoot, 'packages/3-targets/3-targets/postgres');

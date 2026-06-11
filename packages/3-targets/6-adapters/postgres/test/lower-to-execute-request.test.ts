@@ -22,11 +22,12 @@ import { jsonb, pgTable, text } from '@prisma-next/target-postgres/contract-free
 import { PostgresCreateTable } from '@prisma-next/target-postgres/ddl';
 import { createContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../src/core/control-adapter';
 import { encodeControlQueryParams } from '../src/core/control-codecs';
 import type { PostgresContract } from '../src/core/types';
 
-const adapter = new PostgresControlAdapter();
+const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 const ctx = { contract: {} as PostgresContract };
 
 /**
@@ -356,7 +357,7 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — extension codec end-t
 
   it('throws when a contract column references a codec absent from the adapter lookup', async () => {
     const { contract, table } = buildExtContractAndTable();
-    const noExtAdapter = new PostgresControlAdapter();
+    const noExtAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
     const ast = table.select(table.label).where(table.label.eq('plaintext')).build();
     await expect(noExtAdapter.lowerToExecuteRequest(ast, { contract })).rejects.toThrow(

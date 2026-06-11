@@ -30,5 +30,6 @@ export default postgresAdapterDescriptor;
 
 export { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 export { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
+export { createPostgresBuiltinCodecLookup } from '../core/codec-lookup';
 export { PostgresControlAdapter } from '../core/control-adapter';
 export { escapeLiteral, qualifyName, quoteIdentifier, SqlEscapeError };

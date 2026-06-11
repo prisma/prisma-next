@@ -36,6 +36,7 @@ import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
+import { createSqliteBuiltinCodecLookup } from './codec-lookup';
 import { SqliteControlAdapter } from './control-adapter';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
 
@@ -57,7 +58,8 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
   readonly profile: AdapterProfile<'sqlite'>;
 
   constructor(options?: SqliteAdapterOptions) {
-    const controlAdapter = new SqliteControlAdapter();
+    const codecLookup = createSqliteBuiltinCodecLookup();
+    const controlAdapter = new SqliteControlAdapter(codecLookup);
     this.profile = Object.freeze({
       id: options?.profileId ?? 'sqlite/default@1',
       target: 'sqlite',

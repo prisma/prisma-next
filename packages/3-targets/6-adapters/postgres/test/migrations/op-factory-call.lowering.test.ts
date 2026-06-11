@@ -45,10 +45,11 @@ import { TypeScriptRenderablePostgresMigration } from '@prisma-next/target-postg
 import { renderOps } from '@prisma-next/target-postgres/render-ops';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 const META = { from: 'sha256:from', to: 'sha256:to' } as const;
-const testAdapter = new PostgresControlAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 describe('renderOps', () => {
   it('lowers each variant via its pure factory, pinning id/operationClass/target.details', async () => {

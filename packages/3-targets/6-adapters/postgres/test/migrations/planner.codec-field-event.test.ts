@@ -15,10 +15,11 @@ import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/pla
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 const emptySchema: SqlSchemaIR = { tables: {} };
-const testAdapter = new PostgresControlAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 const PG_TEXT_CODEC = 'pg/text@1';
 const HOOKED_CODEC = 'cs/string@1';

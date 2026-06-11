@@ -1,11 +1,12 @@
 import { buildSignMarkerBootstrapQueries } from '@prisma-next/target-postgres/contract-free';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import { describe, expect, test } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 import type { PostgresContract } from '../../src/core/types';
 
 describe('Postgres marker table DDL lowering', () => {
-  const adapter = new PostgresControlAdapter();
+  const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
   const lowererContext = { contract: {} as PostgresContract };
 
   async function markerTableSql(): Promise<string> {

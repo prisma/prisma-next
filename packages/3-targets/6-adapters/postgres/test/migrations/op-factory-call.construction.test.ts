@@ -13,9 +13,10 @@ import {
   DataTransformCall,
 } from '@prisma-next/target-postgres/op-factory-call';
 import { describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
-const testAdapter = new PostgresControlAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 describe('Postgres call classes - construction + toOp parity', () => {
   it('CreateTableCall freezes, labels from the table name, and lowers to a createTable op', async () => {

@@ -1,4 +1,8 @@
-import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
+import {
+  createPostgresBuiltinCodecLookup,
+  PostgresControlAdapter,
+} from '@prisma-next/adapter-postgres/control';
+
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -41,7 +45,7 @@ const RECONCILIATION_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'],
 };
 
-const testAdapter = new PostgresControlAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 const planner = createPostgresMigrationPlanner(testAdapter);
 
 const emptySchema: SqlSchemaIR = { tables: {} };

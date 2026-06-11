@@ -34,7 +34,7 @@ export {
   quoteIdentifier,
   SqlEscapeError,
 } from '@prisma-next/target-sqlite/sql-utils';
-
+export { createSqliteBuiltinCodecLookup } from '../core/codec-lookup';
 // `SqlControlAdapterDescriptor` is declared in two places in the codebase
 // (`family-sql/control-adapter` and `family-sql/migrations/types`); the
 // migrations-side declaration narrows `create()`'s return type to the base
