@@ -81,7 +81,7 @@ export class MongoMigrationRunner {
   constructor(private readonly deps: MongoRunnerDependencies) {}
 
   async execute(options: MongoMigrationRunnerExecuteOptions): Promise<MongoMigrationRunnerResult> {
-    const { commandExecutor, inspectionExecutor, adapter, driver, markerOps } = this.deps;
+    const { inspectionExecutor, adapter, driver, markerOps } = this.deps;
     const operations = deserializeMongoOps(options.plan.operations as readonly unknown[]);
     // Plans produced by the contract-space-aware planner stamp `spaceId`
     // onto the plan; plans without one fall through to the application's
@@ -152,7 +152,10 @@ export class MongoMigrationRunner {
         }
 
         for (const step of ddlOp.execute) {
-          await step.command.accept(commandExecutor);
+          const wire = await adapter.lower({ command: step.command }, {});
+          for await (const _ of driver.execute(wire)) {
+            /* consume */
+          }
         }
 
         if (runPostchecks) {
@@ -394,9 +397,7 @@ export class MongoMigrationRunner {
   ): Promise<boolean> {
     for (const check of checks) {
       const documents = await check.source.accept(inspectionExecutor);
-      const matchFound = documents.some((doc) =>
-        filterEvaluator.evaluate(check.filter, doc as Record<string, unknown>),
-      );
+      const matchFound = documents.some((doc) => filterEvaluator.evaluate(check.filter, doc));
       const passed = check.expect === 'exists' ? matchFound : !matchFound;
       if (!passed) return false;
     }

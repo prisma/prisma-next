@@ -9,8 +9,13 @@ export type {
 export type { AnyMongoWireCommand } from '../wire-commands';
 export {
   AggregateWireCommand,
+  CollModWireCommand,
+  CreateCollectionWireCommand,
+  CreateIndexWireCommand,
   DeleteManyWireCommand,
   DeleteOneWireCommand,
+  DropCollectionWireCommand,
+  DropIndexWireCommand,
   FindOneAndDeleteWireCommand,
   FindOneAndUpdateWireCommand,
   InsertManyWireCommand,
