@@ -19,6 +19,7 @@ import {
   type SqlNamespaceTablesInput,
   type SqlStorage,
 } from '@prisma-next/sql-contract/types';
+import { PostgresEnumTypeSchema } from '@prisma-next/sql-contract/validators';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { Type } from 'arktype';
@@ -42,27 +43,21 @@ function isAuthoringEntityTypeFactoryOutput(
 }
 
 /**
- * Walks a pack's entity-type namespace tree and emits the maps the
- * family base consumes — hydrators and validator-schema fragments, both
- * keyed by the descriptor's `discriminator`.
+ * Walks a pack's entity-type namespace tree and emits hydration factories
+ * keyed by the descriptor's `discriminator`. Used for `storage.types`
+ * (codec-triple hydration). Namespace entries hydration dispatches by
+ * entries key, not discriminator — handled by `hydrateEntriesKind`.
  */
-function collectEntityRegistryContributions(namespace: AuthoringEntityTypeNamespace): {
-  readonly entityTypeRegistry: ReadonlyMap<string, SqlEntityHydrationFactory>;
-  readonly validatorFragments: ReadonlyMap<string, Type<unknown>>;
-} {
-  const entityTypeRegistry = new Map<string, SqlEntityHydrationFactory>();
-  const validatorFragments = new Map<string, Type<unknown>>();
+function collectStorageTypesHydrators(
+  namespace: AuthoringEntityTypeNamespace,
+): ReadonlyMap<string, SqlEntityHydrationFactory> {
+  const registry = new Map<string, SqlEntityHydrationFactory>();
   const walk = (node: AuthoringEntityTypeNamespace): void => {
     for (const value of Object.values(node)) {
       if (isAuthoringEntityTypeDescriptor(value)) {
         if (isAuthoringEntityTypeFactoryOutput(value.output)) {
           const { factory } = value.output;
-          entityTypeRegistry.set(value.discriminator, (raw) =>
-            factory(raw, POSTGRES_AUTHORING_CTX),
-          );
-        }
-        if (value.validatorSchema !== undefined) {
-          validatorFragments.set(value.discriminator, value.validatorSchema);
+          registry.set(value.discriminator, (raw) => factory(raw, POSTGRES_AUTHORING_CTX));
         }
         continue;
       }
@@ -72,15 +67,45 @@ function collectEntityRegistryContributions(namespace: AuthoringEntityTypeNamesp
     }
   };
   walk(namespace);
-  return { entityTypeRegistry, validatorFragments };
+  return registry;
 }
 
+// Validator registry keyed by entries key: postgres registers 'type' → the
+// inner name→entry map schema. Family built-ins ('table', 'valueSet') are
+// always present in the base; this adds the postgres-specific extension.
+const POSTGRES_VALIDATOR_REGISTRY: ReadonlyMap<string, Type<unknown>> = new Map<
+  string,
+  Type<unknown>
+>([['type', PostgresEnumTypeSchema as Type<unknown>]]);
+
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
+  private readonly enumFactory: SqlEntityHydrationFactory | undefined;
+
   constructor() {
-    const { entityTypeRegistry, validatorFragments } = collectEntityRegistryContributions(
-      postgresAuthoringEntityTypes,
-    );
-    super(entityTypeRegistry, validatorFragments);
+    const storageTypesHydrators = collectStorageTypesHydrators(postgresAuthoringEntityTypes);
+    super(storageTypesHydrators, POSTGRES_VALIDATOR_REGISTRY);
+    this.enumFactory = storageTypesHydrators.get('postgres-enum');
+  }
+
+  protected override hydrateEntriesKind(
+    key: string,
+    innerMap: unknown,
+  ): Record<string, unknown> | undefined {
+    if (key === 'type') {
+      if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
+        return {};
+      }
+      const { enumFactory } = this;
+      return Object.fromEntries(
+        Object.entries(innerMap as Record<string, unknown>).map(([name, entry]) => [
+          name,
+          blindCast<PostgresEnumType, 'postgres-enum factory returns PostgresEnumType'>(
+            enumFactory !== undefined ? enumFactory(entry) : entry,
+          ),
+        ]),
+      );
+    }
+    return super.hydrateEntriesKind(key, innerMap);
   }
 
   protected override hydrateSqlNamespaceEntry(
@@ -92,30 +117,11 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     }
     const hydrated = blindCast<
       SqlNamespaceTablesInput,
-      'super.hydrateSqlNamespaceEntry returns the tables form when raw is not a NamespaceBase'
+      'super.hydrateSqlNamespaceEntry returns SqlNamespaceTablesInput when raw is not a NamespaceBase'
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
 
-    // Extract the postgres-specific `type` slot directly from raw input.
-    // The family base handles the `table` slot; the postgres target owns `type`.
-    const rawRecord = raw as Record<string, unknown>;
-    const rawEntries = rawRecord['entries'];
-    let typeSlot: Record<string, PostgresEnumType> | undefined;
-    if (rawEntries !== null && typeof rawEntries === 'object' && !Array.isArray(rawEntries)) {
-      const rawTypeSlot = (rawEntries as Record<string, unknown>)['type'];
-      if (rawTypeSlot !== null && typeof rawTypeSlot === 'object' && !Array.isArray(rawTypeSlot)) {
-        const enumFactory = this.entityTypeRegistry.get('postgres-enum');
-        typeSlot = Object.fromEntries(
-          Object.entries(rawTypeSlot as Record<string, unknown>).map(([name, entry]) => [
-            name,
-            blindCast<PostgresEnumType, 'postgres-enum factory returns PostgresEnumType'>(
-              enumFactory !== undefined ? enumFactory(entry) : entry,
-            ),
-          ]),
-        );
-      }
-    }
-
+    const typeSlot = entries['type'] as Record<string, PostgresEnumType> | undefined;
     const valueSetSlot = entries['valueSet'];
     const hasValueSets = valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0;
     const tableSlot = entries['table'] ?? {};
@@ -127,9 +133,19 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     return new PostgresSchema({
       id,
       entries: {
-        table: tableSlot,
+        table: blindCast<
+          Record<string, unknown>,
+          'table entries are StorageTable instances after base hydration'
+        >(tableSlot),
         type: typeSlot ?? {},
-        ...(hasValueSets ? { valueSet: valueSetSlot } : {}),
+        ...(hasValueSets
+          ? {
+              valueSet: blindCast<
+                Record<string, unknown>,
+                'valueSet entries are StorageValueSet instances after base hydration'
+              >(valueSetSlot),
+            }
+          : {}),
       },
     });
   }

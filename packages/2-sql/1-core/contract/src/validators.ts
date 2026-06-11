@@ -234,89 +234,55 @@ const StorageTableSchema = type({
 });
 
 /**
- * Re-exported so target packs can register their `validatorSchema`
- * fragment without re-declaring the schema for the kinds the family
- * core already validates. Full extraction of enum-specific schemas
- * into the Postgres pack is a follow-up; today the symbol lives here.
+ * Re-exported so target packs can register their schema against the
+ * `'type'` entries key. Full extraction of enum-specific schemas into
+ * the Postgres pack is a follow-up; today the symbol lives here.
  */
 export { PostgresEnumTypeSchema };
 
-/**
- * Composes a hardcoded family `fallback` schema with optional
- * pack-contributed `fragments` keyed by the entry's `kind`
- * discriminator. The composition is **additive**, not substitutive:
- *
- * - No fragments registered → entries are validated by `fallback`
- *   alone (the unchanged baseline).
- * - An entry's `kind` matches `fallbackKind` AND a fragment for that
- *   kind is registered → the entry must pass **both** `fallback` and
- *   the fragment. This preserves family-owned invariants (e.g. the
- *   built-in `PostgresEnumType` shape) even when a pack contributes
- *   its own schema for the same kind.
- * - An entry's `kind` matches a registered fragment for some
- *   non-fallback kind → the fragment alone validates the entry.
- *   `fallback` is family-specific (validates a single hardcoded kind)
- *   and would reject any other kind, so it does not apply here.
- * - An entry's `kind` matches no fragment → fall through to
- *   `fallback`.
- */
-function namespaceSlotEntrySchema(
-  fallback: Type<unknown>,
-  fallbackKind: string,
-  fragments?: ReadonlyMap<string, Type<unknown>>,
-): Type<unknown> {
-  if (fragments === undefined || fragments.size === 0) {
-    return fallback;
-  }
-  return type('unknown').narrow((entry, ctx) => {
-    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
-      return ctx.mustBe('an object');
-    }
-    const kind = (entry as { kind?: unknown }).kind;
-    if (typeof kind === 'string') {
-      const fragment = fragments.get(kind);
-      if (fragment !== undefined) {
-        if (kind === fallbackKind) {
-          const baseParsed = fallback(entry);
-          if (baseParsed instanceof type.errors) {
-            return ctx.reject({ expected: baseParsed.summary });
-          }
-        }
-        const parsed = fragment(entry);
-        if (parsed instanceof type.errors) {
-          return ctx.reject({ expected: parsed.summary });
-        }
-        return true;
-      }
-    }
-    const parsed = fallback(entry);
-    if (parsed instanceof type.errors) {
-      return ctx.reject({ expected: parsed.summary });
-    }
-    return true;
-  });
-}
+const BUILTIN_ENTRY_SCHEMAS: ReadonlyMap<string, Type<unknown>> = new Map<string, Type<unknown>>([
+  ['table', StorageTableSchema as Type<unknown>],
+  ['valueSet', StorageValueSetSchema as Type<unknown>],
+]);
 
 /**
  * Builds the per-namespace entry schema for `storage.namespaces[id]`.
- * Pack-contributed `validatorSchema` fragments — keyed by the
- * descriptor's `discriminator` — validate each entry by matching the
- * entry's `kind` field on the `'entries.type'` slot.
+ *
+ * Validation is registry-driven: the `registry` parameter maps each
+ * entries key to an arktype schema that validates a single inner-map
+ * value for that kind. Built-in keys (`'table'`, `'valueSet'`) are always
+ * present; target packs contribute additional keys (e.g. postgres
+ * registers `'type'` → `PostgresEnumTypeSchema`). An unregistered key
+ * fails validation naming the key, so validation fails closed.
  */
 export function createNamespaceEntrySchema(
-  fragments?: ReadonlyMap<string, Type<unknown>>,
+  registry: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
   return type({
     '+': 'reject',
     id: 'string',
     'kind?': 'string',
-    entries: type({
-      '+': 'reject',
-      'table?': type({ '[string]': StorageTableSchema }),
-      'type?': type({
-        '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),
-      }),
-      'valueSet?': type({ '[string]': StorageValueSetSchema }),
+    entries: type('unknown').narrow((rawEntries, ctx) => {
+      if (typeof rawEntries !== 'object' || rawEntries === null || Array.isArray(rawEntries)) {
+        return ctx.mustBe('an object');
+      }
+      const entries = rawEntries as Record<string, unknown>;
+      for (const [key, innerMap] of Object.entries(entries)) {
+        const entrySchema = BUILTIN_ENTRY_SCHEMAS.get(key) ?? registry.get(key);
+        if (entrySchema === undefined) {
+          return ctx.reject({ expected: `entries key "${key}" is not a registered entity kind` });
+        }
+        if (typeof innerMap !== 'object' || innerMap === null || Array.isArray(innerMap)) {
+          return ctx.reject({ expected: `entries["${key}"] must be an object` });
+        }
+        for (const [, value] of Object.entries(innerMap as Record<string, unknown>)) {
+          const parsed = entrySchema(value);
+          if (parsed instanceof type.errors) {
+            return ctx.reject({ expected: parsed.summary });
+          }
+        }
+      }
+      return true;
     }),
   }) as Type<unknown>;
 }
@@ -328,9 +294,9 @@ export function createNamespaceEntrySchema(
  * storage hash stay family-shared.
  */
 export function createSqlStorageSchema(
-  fragments?: ReadonlyMap<string, Type<unknown>>,
+  registry: ReadonlyMap<string, Type<unknown>> = new Map(),
 ): Type<unknown> {
-  const namespaceEntry = createNamespaceEntrySchema(fragments);
+  const namespaceEntry = createNamespaceEntrySchema(registry);
   return type({
     '+': 'reject',
     storageHash: 'string',
@@ -487,9 +453,9 @@ const ContractMetaSchema = type({
  * of the contract envelope is family-shared.
  */
 export function createSqlContractSchema(
-  fragments?: ReadonlyMap<string, Type<unknown>>,
+  registry: ReadonlyMap<string, Type<unknown>> = new Map(),
 ): Type<unknown> {
-  const storage = createSqlStorageSchema(fragments);
+  const storage = createSqlStorageSchema(registry);
   return type({
     '+': 'reject',
     target: 'string',
