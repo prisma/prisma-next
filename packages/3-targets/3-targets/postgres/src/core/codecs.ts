@@ -36,6 +36,7 @@ import {
   sqlTimestampDescriptor,
   sqlVarcharDescriptor,
 } from '@prisma-next/sql-relational-core/ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import {
@@ -808,7 +809,7 @@ export class PgUuidCodec extends CodecImpl<
     return value;
   }
   decodeJson(json: JsonValue): string {
-    return json as string;
+    return blindCast<string, 'uuid columns serialize to JSON as their wire string form'>(json);
   }
 }
 
