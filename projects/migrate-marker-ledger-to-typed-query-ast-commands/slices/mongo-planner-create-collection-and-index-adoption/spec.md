@@ -1,6 +1,6 @@
 # Slice 6 — `mongo-planner-create-collection-and-index-adoption` (spec)
 
-**Project:** migrate-marker-ledger-to-typed-query-ast-commands · **Phase:** 1 (prove planner adoption across all three targets) · **Linear:** _create at pickup_
+**Project:** migrate-marker-ledger-to-typed-query-ast-commands · **Phase:** 1 (prove planner adoption across all three targets) · **Linear:** [TML-2888](https://linear.app/prisma-company/issue/TML-2888)
 
 > The design is **settled** (operator, 2026-06-11) — see the dated entry in [`../../design-notes.md`](../../design-notes.md) ("Slice 6 — Mongo planner DDL through the adapter"). No spike dispatch; the open questions below are mechanical, resolved during implementation.
 
