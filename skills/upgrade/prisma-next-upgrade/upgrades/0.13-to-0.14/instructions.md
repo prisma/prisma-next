@@ -174,3 +174,13 @@ is untouched, and re-emit round-trips. No consumer action required; the keyword 
 transitional and is renamed to `enum` at the cutover (TML-2853), which will carry the
 user-facing upgrade entry.
 -->
+
+<!--
+TML-2855: member defaults via `@default(member)` (PR #808). The PSL interpreter and
+contract-ts authoring surface now resolve `@default(EnumType.Member)` to a
+`{ kind: 'literal', value: '<dbValue>' }` default. The demo `priority` field gains
+`@default(Priority.Low)` and a new migration (`20260610T2216_set_priority_default`)
+is emitted. Additive and opt-in: only fields that declare `@default(<EnumType>.<Member>)`
+are affected; no existing contract changes shape. No consumer action required; the
+cutover (TML-2853) will carry the user-facing docs.
+-->
