@@ -165,4 +165,18 @@ describe('PostgresCreateTable DDL lowering', () => {
     expect(lowered.sql).toContain(`"meta" jsonb DEFAULT (jsonb_build_object('k', 1))`);
     expect(lowered.sql).not.toContain('::');
   });
+
+  it('column with both default and notNull renders DEFAULT before NOT NULL, neither dropped', async () => {
+    const ast = new PostgresCreateTable({
+      table: 't',
+      columns: [
+        col('active', 'bool', { notNull: true, default: lit(true) }),
+        col('status', 'text', { notNull: true, default: lit('open') }),
+      ],
+    });
+    const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
+    expect(lowered.sql).toContain('"active" bool DEFAULT true NOT NULL');
+    expect(lowered.sql).toContain(`"status" text DEFAULT 'open' NOT NULL`);
+  });
 });
