@@ -3717,6 +3717,9 @@ importers:
       '@prisma-next/mongo-query-ast':
         specifier: workspace:0.13.0
         version: link:../../2-mongo-family/4-query/query-ast
+      '@prisma-next/mongo-query-builder':
+        specifier: workspace:0.13.0
+        version: link:../../2-mongo-family/5-query-builders/query-builder
       '@prisma-next/mongo-schema-ir':
         specifier: workspace:0.13.0
         version: link:../../2-mongo-family/3-tooling/mongo-schema-ir

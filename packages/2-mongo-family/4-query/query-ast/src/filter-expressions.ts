@@ -16,6 +16,10 @@ abstract class MongoFilterExpression extends MongoAstNode {
   not(this: MongoFilterExpr): MongoNotExpr {
     return new MongoNotExpr(this);
   }
+
+  and(this: MongoFilterExpr, other: MongoFilterExpr): MongoAndExpr {
+    return MongoAndExpr.of([this, other]);
+  }
 }
 
 Object.defineProperty(MongoFilterExpression.prototype, FILTER_EXPR_BRAND, {
