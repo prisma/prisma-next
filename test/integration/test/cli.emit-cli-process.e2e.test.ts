@@ -201,20 +201,20 @@ describe('contract emit command (CLI process e2e)', () => {
       ]?.entries['table'] as Record<string, unknown> | undefined;
       const userTable = tables?.['user'] as Record<string, unknown> | undefined;
       const originalUserTable = originalTables?.['user'] as Record<string, unknown> | undefined;
-      if (userTable && originalUserTable) {
-        const columns = userTable['columns'] as
-          | Record<string, { nativeType?: string; codecId?: string }>
-          | undefined;
-        const originalColumns = originalUserTable['columns'] as
-          | Record<string, { nativeType?: string; codecId?: string }>
-          | undefined;
-        if (columns && originalColumns) {
-          expect(columns['id']?.codecId).toBe(originalColumns['id']?.codecId);
-          expect(columns['email']?.codecId).toBe(originalColumns['email']?.codecId);
-          expect(columns['id']?.nativeType).toBe(originalColumns['id']?.nativeType);
-          expect(columns['email']?.nativeType).toBe(originalColumns['email']?.nativeType);
-        }
-      }
+      expect(userTable).toBeDefined();
+      expect(originalUserTable).toBeDefined();
+      const columns = userTable?.['columns'] as
+        | Record<string, { nativeType?: string; codecId?: string }>
+        | undefined;
+      const originalColumns = originalUserTable?.['columns'] as
+        | Record<string, { nativeType?: string; codecId?: string }>
+        | undefined;
+      expect(columns).toBeDefined();
+      expect(originalColumns).toBeDefined();
+      expect(columns?.['id']?.codecId).toBe(originalColumns?.['id']?.codecId);
+      expect(columns?.['email']?.codecId).toBe(originalColumns?.['email']?.codecId);
+      expect(columns?.['id']?.nativeType).toBe(originalColumns?.['id']?.nativeType);
+      expect(columns?.['email']?.nativeType).toBe(originalColumns?.['email']?.nativeType);
     },
     timeouts.spinUpPpgDev,
   );
