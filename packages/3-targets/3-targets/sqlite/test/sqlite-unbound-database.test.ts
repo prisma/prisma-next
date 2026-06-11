@@ -66,10 +66,13 @@ describe('sqliteCreateNamespace factory', () => {
     );
   });
 
-  it('unknown kind with zero tables throws instead of returning the unbound singleton', () => {
-    expect(() =>
-      sqliteCreateNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { bogus: {} } as never }),
-    ).toThrow(/unknown entity kind/);
+  it('unknown kind with zero tables carries it through, not returning the unbound singleton', () => {
+    const ns = sqliteCreateNamespace({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { bogus: { item: {} } } as never,
+    });
+    expect(ns.entries['bogus']).toBeDefined();
+    expect(ns).not.toBe(SqliteUnboundDatabase.instance);
   });
 });
 
@@ -146,14 +149,25 @@ describe('SqliteDatabase — entries open dictionary', () => {
 });
 
 describe('SqliteDatabase — unknown entity kind', () => {
-  it('construction throws naming the unknown kind when entries contains an unrecognised key', () => {
-    expect(
-      () =>
-        new SqliteDatabase({
-          id: UNBOUND_NAMESPACE_ID,
-          entries: { table: {}, bogus: {} } as never,
-        }),
-    ).toThrow(/unknown entity kind/);
+  it('carries an unknown kind through frozen as-is (permissive-carry)', () => {
+    const bogusMap = Object.freeze({ foo: { x: 1 } });
+    const db = new SqliteDatabase({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: {}, bogus: bogusMap } as never,
+    });
+    expect(db.entries['bogus']).toEqual(bogusMap);
+    expect(Object.isFrozen(db.entries['bogus'])).toBe(true);
+  });
+
+  it('unknown kind survives JSON.stringify round-trip', () => {
+    const db = new SqliteDatabase({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: {}, bogus: { item: { value: 42 } } } as never,
+    });
+    const parsed = JSON.parse(JSON.stringify(db)) as Record<string, unknown>;
+    expect((parsed['entries'] as Record<string, unknown>)['bogus']).toEqual({
+      item: { value: 42 },
+    });
   });
 });
 

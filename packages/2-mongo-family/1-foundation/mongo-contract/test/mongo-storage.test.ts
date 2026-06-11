@@ -89,12 +89,33 @@ describe('MongoStorage', () => {
     expect(storage.namespaces[UNBOUND_NAMESPACE_ID]).toBe(MongoUnboundNamespace.instance);
   });
 
-  it('buildMongoNamespace with unbound id and only an unknown kind throws instead of returning the unbound singleton', () => {
-    expect(() =>
-      buildMongoNamespace({
-        id: UNBOUND_NAMESPACE_ID,
-        entries: { bogus: {} } as never,
-      }),
-    ).toThrow(/unknown entity kind/);
+  it('buildMongoNamespace carries an unknown kind through frozen as-is (permissive-carry)', () => {
+    const bogusMap = Object.freeze({ foo: { x: 1 } });
+    const ns = buildMongoNamespace({
+      id: 'default',
+      entries: { collection: {}, bogus: bogusMap } as never,
+    });
+    expect(ns.entries['bogus']).toEqual(bogusMap);
+    expect(Object.isFrozen(ns.entries['bogus'])).toBe(true);
+  });
+
+  it('buildMongoNamespace unknown kind survives JSON.stringify round-trip', () => {
+    const ns = buildMongoNamespace({
+      id: 'default',
+      entries: { collection: {}, bogus: { item: { value: 42 } } } as never,
+    });
+    const parsed = JSON.parse(JSON.stringify(ns)) as Record<string, unknown>;
+    expect((parsed['entries'] as Record<string, unknown>)['bogus']).toEqual({
+      item: { value: 42 },
+    });
+  });
+
+  it('buildMongoNamespace with unbound id and only an unknown kind does not return the unbound singleton', () => {
+    const ns = buildMongoNamespace({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { bogus: { item: {} } } as never,
+    });
+    expect(ns.entries['bogus']).toBeDefined();
+    expect(ns).not.toBe(MongoUnboundNamespace.instance);
   });
 });

@@ -1,4 +1,6 @@
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { coreHash } from '@prisma-next/contract/types';
+import { elementCoordinates, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { buildSqlNamespace } from '../src/ir/build-sql-namespace';
 import { SqlUnboundNamespace } from '../src/ir/sql-unbound-namespace';
@@ -131,22 +133,52 @@ describe('SqlBoundNamespace — entries open dictionary', () => {
     expect(Object.isFrozen(ns)).toBe(true);
   });
 
-  it('construction throws naming the unknown kind when entries contains an unrecognised key', () => {
-    expect(() =>
-      buildSqlNamespace({
-        id: 'app',
-        entries: { table: {}, bogus: {} } as never,
-      }),
-    ).toThrow(/unknown entity kind/);
+  it('carries an unknown kind through frozen as-is (permissive-carry)', () => {
+    const bogusMap = Object.freeze({ foo: { x: 1 } });
+    const ns = buildSqlNamespace({
+      id: 'app',
+      entries: { table: {}, bogus: bogusMap } as never,
+    });
+    expect(ns.entries['bogus']).toEqual(bogusMap);
+    expect(Object.isFrozen(ns.entries['bogus'])).toBe(true);
   });
 
-  it('unbound id with only an unknown kind throws instead of returning the unbound singleton', () => {
-    expect(() =>
-      buildSqlNamespace({
-        id: UNBOUND_NAMESPACE_ID,
-        entries: { bogus: {} } as never,
-      }),
-    ).toThrow(/unknown entity kind/);
+  it('unknown kind survives JSON.stringify round-trip', () => {
+    const ns = buildSqlNamespace({
+      id: 'app',
+      entries: { table: {}, bogus: { item: { value: 42 } } } as never,
+    });
+    const parsed = JSON.parse(JSON.stringify(ns)) as Record<string, unknown>;
+    expect((parsed['entries'] as Record<string, unknown>)['bogus']).toEqual({
+      item: { value: 42 },
+    });
+  });
+
+  it('unbound id with only an unknown kind does not return the unbound singleton', () => {
+    const ns = buildSqlNamespace({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { bogus: { item: {} } } as never,
+    });
+    expect(ns.entries['bogus']).toBeDefined();
+    expect(ns).not.toBe(SqlUnboundNamespace.instance);
+  });
+
+  it('elementCoordinates yields unknown-kind entries', () => {
+    const ns = buildSqlNamespace({
+      id: 'app',
+      entries: { table: {}, bogus: { myEntity: {} } } as never,
+    });
+    const storage = new SqlStorage({
+      storageHash: coreHash('sha256:carry-test'),
+      namespaces: { app: ns },
+    });
+    const coords = [...elementCoordinates(storage)];
+    expect(coords).toContainEqual({
+      plane: 'storage',
+      namespaceId: 'app',
+      entityKind: 'bogus',
+      entityName: 'myEntity',
+    });
   });
 
   it('entries[kind][name] resolves the same as the getter[name]', () => {

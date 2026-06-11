@@ -30,19 +30,19 @@ class SqlBoundNamespace extends NamespaceBase {
   readonly entries: SqlNamespaceEntries;
 
   static fromTablesInput(input: SqlNamespaceTablesInput): SqlNamespace {
-    const unknownKinds = Object.keys(input.entries).filter(
-      (kind) => kind !== 'table' && kind !== 'valueSet',
-    );
-    if (unknownKinds.length > 0) {
-      throw new Error(
-        `buildSqlNamespace: unknown entity kind(s) ${unknownKinds.map((k) => JSON.stringify(k)).join(', ')} in entries; expected "table" or "valueSet"`,
-      );
-    }
     const tableKind = input.entries['table'];
     const tableCount = tableKind !== undefined ? Object.keys(tableKind).length : 0;
     const valueSetKind = input.entries['valueSet'];
     const hasValueSets = valueSetKind !== undefined && Object.keys(valueSetKind).length > 0;
-    if (input.id === UNBOUND_NAMESPACE_ID && tableCount === 0 && !hasValueSets) {
+    const hasUnknownKinds = Object.keys(input.entries).some(
+      (kind) => kind !== 'table' && kind !== 'valueSet',
+    );
+    if (
+      input.id === UNBOUND_NAMESPACE_ID &&
+      tableCount === 0 &&
+      !hasValueSets &&
+      !hasUnknownKinds
+    ) {
       return castAs<SqlNamespace>(SqlUnboundNamespace.instance);
     }
     return castAs<SqlNamespace>(new SqlBoundNamespace(input));
@@ -77,9 +77,7 @@ class SqlBoundNamespace extends NamespaceBase {
         }
         builtEntries['valueSet'] = Object.freeze(vsMap);
       } else {
-        throw new Error(
-          `buildSqlNamespace: unknown entity kind "${kind}" in entries; expected "table" or "valueSet"`,
-        );
+        builtEntries[kind] = Object.freeze(rawMap);
       }
     }
 

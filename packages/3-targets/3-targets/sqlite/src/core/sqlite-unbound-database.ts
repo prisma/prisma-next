@@ -61,9 +61,7 @@ export class SqliteDatabase extends NamespaceBase {
         }
         builtEntries['table'] = Object.freeze(tableMap);
       } else {
-        throw new Error(
-          `SqliteDatabase: unknown entity kind "${kind}" in entries; expected "table"`,
-        );
+        builtEntries[kind] = Object.freeze(rawMap);
       }
     }
 
@@ -129,8 +127,8 @@ export function buildSqliteNamespace(
   }
   const tableKind = input.entries['table'];
   const tableCount = tableKind !== undefined ? Object.keys(tableKind).length : 0;
-  const hasOnlyKnownKinds = Object.keys(input.entries).every((kind) => kind === 'table');
-  if (hasOnlyKnownKinds && tableCount === 0) {
+  const hasUnknownKinds = Object.keys(input.entries).some((kind) => kind !== 'table');
+  if (tableCount === 0 && !hasUnknownKinds) {
     return castAs<SqliteUnboundDatabase>(SqliteUnboundDatabase.instance);
   }
   return new SqliteDatabase({ id: input.id, entries: input.entries });

@@ -94,9 +94,7 @@ export class PostgresSchema extends NamespaceBase {
         }
         builtEntries['valueSet'] = Object.freeze(vsMap);
       } else {
-        throw new Error(
-          `PostgresSchema: unknown entity kind "${kind}" in entries; expected "table", "type", or "valueSet"`,
-        );
+        builtEntries[kind] = Object.freeze(rawMap);
       }
     }
 

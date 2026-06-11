@@ -137,12 +137,6 @@ describe('postgresCreateNamespace factory', () => {
     expect(auth.id).toBe('auth');
     expect(billing.id).toBe('billing');
   });
-
-  it('forwards an unknown entries kind to the constructor, which throws naming the kind', () => {
-    expect(() =>
-      postgresCreateNamespace({ id: 'auth', entries: { table: {}, bogus: {} } as never }),
-    ).toThrow(/unknown entity kind/);
-  });
 });
 
 describe('PostgresSchema — entries open dictionary', () => {
@@ -304,13 +298,32 @@ describe('PostgresUnboundSchema — entries open dictionary', () => {
 });
 
 describe('PostgresSchema — unknown entity kind', () => {
-  it('construction throws naming the unknown kind when entries contains an unrecognised key', () => {
-    expect(
-      () =>
-        new PostgresSchema({
-          id: 'app',
-          entries: { table: {}, type: {}, bogus: {} } as never,
-        }),
-    ).toThrow(/unknown entity kind/);
+  it('carries an unknown kind through frozen as-is (permissive-carry)', () => {
+    const bogusMap = Object.freeze({ foo: { x: 1 } });
+    const schema = new PostgresSchema({
+      id: 'app',
+      entries: { table: {}, type: {}, bogus: bogusMap } as never,
+    });
+    expect(schema.entries['bogus']).toEqual(bogusMap);
+    expect(Object.isFrozen(schema.entries['bogus'])).toBe(true);
+  });
+
+  it('unknown kind survives JSON.stringify round-trip', () => {
+    const schema = new PostgresSchema({
+      id: 'app',
+      entries: { table: {}, type: {}, bogus: { item: { value: 42 } } } as never,
+    });
+    const parsed = JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
+    expect((parsed['entries'] as Record<string, unknown>)['bogus']).toEqual({
+      item: { value: 42 },
+    });
+  });
+
+  it('forwards an unknown entries kind to the constructor, which carries it (permissive-carry)', () => {
+    const schema = postgresCreateNamespace({
+      id: 'auth',
+      entries: { table: {}, bogus: { item: {} } } as never,
+    });
+    expect(schema.entries['bogus']).toBeDefined();
   });
 });
