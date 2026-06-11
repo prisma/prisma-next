@@ -233,7 +233,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       return Object.fromEntries(
         Object.entries(innerMap as Record<string, unknown>).map(([tableName, table]) => [
           tableName,
-          table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
+          new StorageTable(table as StorageTableInput),
         ]),
       );
     }
@@ -249,14 +249,11 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
           >(innerMap),
         ).map(([vsName, vs]) => [
           vsName,
-          vs instanceof StorageValueSet
-            ? vs
-            : new StorageValueSet(
-                blindCast<
-                  StorageValueSetInput,
-                  'non-instance valueSet entry is StorageValueSetInput'
-                >(vs),
-              ),
+          new StorageValueSet(
+            blindCast<StorageValueSetInput, 'valueSet entry is StorageValueSetInput after parse'>(
+              vs,
+            ),
+          ),
         ]),
       );
     }
