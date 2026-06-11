@@ -17,6 +17,7 @@ export interface EnumAccessor {
   readonly names: readonly string[];
   readonly members: Readonly<Record<string, JsonValue>>;
   has(v: JsonValue): boolean;
+  hasName(name: string): boolean;
   nameOf(v: JsonValue): string | undefined;
   ordinalOf(v: JsonValue): number;
 }
@@ -29,6 +30,7 @@ export function createEnumAccessor(contractEnum: ContractEnum): EnumAccessor {
   );
 
   const valueSet = new Set(values);
+  const nameSet = Object.freeze(new Set(names));
   const valueToName = new Map(contractEnum.members.map((m) => [m.value, m.name]));
   const valueToOrdinal = new Map(values.map((v, i) => [v, i]));
 
@@ -37,6 +39,7 @@ export function createEnumAccessor(contractEnum: ContractEnum): EnumAccessor {
     names,
     members,
     has: (v: JsonValue) => valueSet.has(v),
+    hasName: (name: string) => nameSet.has(name),
     nameOf: (v: JsonValue) => valueToName.get(v),
     ordinalOf: (v: JsonValue) => valueToOrdinal.get(v) ?? -1,
   };
@@ -108,7 +111,7 @@ type Present<T> = Exclude<T, undefined>;
 // A domain enum entry as carried in `domain.namespaces[ns].enum[name]`: an
 // ordered member tuple. The no-emit (built) path preserves the literal member
 // values so the derived accessor keeps its literal `values`/`names`/`members`.
-type EnumMemberEntry = { readonly name: string; readonly value: unknown };
+type EnumMemberEntry = { readonly name: string; readonly value: JsonValue };
 type EnumEntry = { readonly members: readonly EnumMemberEntry[] };
 
 type EnumEntryValues<Entry extends EnumEntry> = {
@@ -134,10 +137,25 @@ export type ContractEnumAccessor<Entry extends EnumEntry> = {
   readonly values: EnumEntryValues<Entry>;
   readonly names: EnumEntryNames<Entry>;
   readonly members: EnumEntryMembers<Entry>;
-  has(v: EnumEntryValues<Entry>[number]): boolean;
+  /** Returns true and narrows `v` to the enum's value union when `v` is a declared member value. */
+  has(v: JsonValue): v is EnumEntryValues<Entry>[number];
+  /** Returns true and narrows `name` to the enum's member-name union when `name` is a declared member name. */
+  hasName(name: string): name is Extract<EnumEntryNames<Entry>[number], string>;
   nameOf(v: EnumEntryValues<Entry>[number]): string | undefined;
   ordinalOf(v: EnumEntryValues<Entry>[number]): number;
 };
+
+/**
+ * The value union for a `ContractEnumAccessor`.
+ * Use in function signatures to accept any declared enum value without re-exporting
+ * the member type alias from the accessor's generic entry.
+ */
+export type EnumValues<A> = A extends { readonly values: ReadonlyArray<infer V> } ? V : never;
+
+/**
+ * The member-name union for a `ContractEnumAccessor`.
+ */
+export type EnumMemberNames<A> = A extends { readonly names: ReadonlyArray<infer N> } ? N : never;
 
 type EnumEntriesToAccessors<Enums> = {
   readonly [K in keyof Enums]: Enums[K] extends EnumEntry ? ContractEnumAccessor<Enums[K]> : never;

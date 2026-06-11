@@ -1,4 +1,7 @@
+import type { EnumValues } from '@prisma-next/contract/enum-accessor';
 import { db } from '../prisma/db';
+
+const Priority = db.enums.public.Priority;
 
 export async function getPostsByPriority(limit = 10) {
   const plan = db.sql.public.post
@@ -10,13 +13,10 @@ export async function getPostsByPriority(limit = 10) {
   return db.runtime().execute(plan);
 }
 
-type PriorityMemberName = keyof (typeof db.enums.public.Priority)['members'];
-
-export async function getPostsByPriorityMember(priorityMember: PriorityMemberName, limit = 10) {
-  const value = db.enums.public.Priority.members[priorityMember];
+export async function getPostsByPriorityMember(priority: EnumValues<typeof Priority>, limit = 10) {
   const plan = db.sql.public.post
     .select('id', 'title', 'priority')
-    .where((cols, ops) => ops.eq(cols.priority, value))
+    .where((cols, ops) => ops.eq(cols.priority, priority))
     .orderBy('id')
     .limit(limit)
     .build();

@@ -510,15 +510,13 @@ async function main() {
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       const priority = db.enums.public.Priority;
       const requested = memberName ?? 'Low';
-      const isPriorityMember = (name: string): name is keyof (typeof priority)['members'] =>
-        name in priority.members;
-      if (!isPriorityMember(requested)) {
+      if (!priority.hasName(requested)) {
         console.error(
           `Unknown Priority member "${requested}" — expected one of: ${Object.keys(priority.members).join(', ')}`,
         );
         process.exit(1);
       }
-      const posts = await getPostsByPriorityMember(requested, limit);
+      const posts = await getPostsByPriorityMember(priority.members[requested], limit);
       console.log(`Posts with priority=${requested} (${posts.length} rows):`);
       console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'enum-default-demo') {

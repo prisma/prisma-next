@@ -1,6 +1,8 @@
 export type {
   ContractEnumAccessor,
   EnumAccessor,
+  EnumMemberNames,
+  EnumValues,
   NamespacedEnums,
   NamespaceEnumAccessors,
 } from '../enum-accessor';

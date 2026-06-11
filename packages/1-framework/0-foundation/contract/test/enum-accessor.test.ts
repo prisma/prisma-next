@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { ContractEnumAccessor, EnumMemberNames, EnumValues } from '../src/enum-accessor';
 import {
   buildEnumsMapForNamespace,
   buildNamespacedEnums,
@@ -72,6 +73,26 @@ describe('createEnumAccessor()', () => {
       const accessor = createEnumAccessor(roleEnum);
       expect(accessor.has('User')).toBe(false);
       expect(accessor.has('ADMIN')).toBe(false);
+    });
+  });
+
+  describe('.hasName()', () => {
+    it('returns true for a declared member name', () => {
+      const accessor = createEnumAccessor(roleEnum);
+      expect(accessor.hasName('User')).toBe(true);
+      expect(accessor.hasName('Admin')).toBe(true);
+    });
+
+    it('returns false for an undeclared member name', () => {
+      const accessor = createEnumAccessor(roleEnum);
+      expect(accessor.hasName('SuperAdmin')).toBe(false);
+      expect(accessor.hasName('')).toBe(false);
+    });
+
+    it('is case-sensitive', () => {
+      const accessor = createEnumAccessor(roleEnum);
+      expect(accessor.hasName('user')).toBe(false);
+      expect(accessor.hasName('ADMIN')).toBe(false);
     });
   });
 
@@ -207,5 +228,36 @@ describe('buildNamespacedEnums()', () => {
     };
 
     expect(buildNamespacedEnums(domain)).toEqual({ public: {} });
+  });
+});
+
+describe('ContractEnumAccessor type surface', () => {
+  type RoleEntry = typeof roleEnum;
+  type RoleAccessor = ContractEnumAccessor<RoleEntry>;
+
+  it('has() narrows to the value union', () => {
+    const v: string = 'user';
+    const accessor = createEnumAccessor(roleEnum) as RoleAccessor;
+    if (accessor.has(v)) {
+      expectTypeOf(v).toEqualTypeOf<'user' | 'admin'>();
+    }
+  });
+
+  it('hasName() narrows to the member-name union', () => {
+    const n: string = 'User';
+    const accessor = createEnumAccessor(roleEnum) as RoleAccessor;
+    if (accessor.hasName(n)) {
+      expectTypeOf(n).toEqualTypeOf<'User' | 'Admin'>();
+    }
+  });
+
+  it('EnumValues extracts the literal value union', () => {
+    expectTypeOf<EnumValues<RoleAccessor>>().toEqualTypeOf<'user' | 'admin'>();
+    expectTypeOf<EnumValues<RoleAccessor>>().not.toEqualTypeOf<string>();
+  });
+
+  it('EnumMemberNames extracts the literal name union', () => {
+    expectTypeOf<EnumMemberNames<RoleAccessor>>().toEqualTypeOf<'User' | 'Admin'>();
+    expectTypeOf<EnumMemberNames<RoleAccessor>>().not.toEqualTypeOf<string>();
   });
 });

@@ -19,12 +19,6 @@ import { loadAppConfig } from '../src/app-config';
 import { createOrmClient } from '../src/orm-client/client';
 import { db } from '../src/prisma/db';
 
-type PriorityMemberName = keyof (typeof db.enums.public.Priority)['members'];
-
-function priorityValue(name: PriorityMemberName): 'low' | 'high' | 'urgent' {
-  return db.enums.public.Priority.members[name];
-}
-
 async function main() {
   const { databaseUrl } = loadAppConfig();
   const runtime = await db.connect({ url: databaseUrl });
@@ -100,7 +94,7 @@ async function main() {
           {
             title: 'First Post',
             userId: alice.id,
-            priority: priorityValue('Low'),
+            priority: db.enums.public.Priority.members.Low,
             embedding: generateEmbedding(1),
             createdAt: new Date(),
           },
@@ -114,7 +108,7 @@ async function main() {
           {
             title: 'Second Post',
             userId: alice.id,
-            priority: priorityValue('High'),
+            priority: db.enums.public.Priority.members.High,
             embedding: generateEmbedding(2),
             createdAt: new Date(),
           },
@@ -128,7 +122,7 @@ async function main() {
           {
             title: 'Third Post',
             userId: bob.id,
-            priority: priorityValue('Urgent'),
+            priority: db.enums.public.Priority.members.Urgent,
             embedding: generateEmbedding(3),
             createdAt: new Date(),
           },
