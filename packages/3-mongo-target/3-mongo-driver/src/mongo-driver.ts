@@ -228,7 +228,8 @@ export class MongoDriverImpl implements MongoDriver {
   }
 
   protected async executeCollModCommand(cmd: CollModWireCommand): Promise<void> {
-    await this.db.command({ ...cmd.options, collMod: cmd.collection });
+    // The command name must be the first key in a MongoDB command document.
+    await this.db.command({ collMod: cmd.collection, ...cmd.options });
   }
 }
 
