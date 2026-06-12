@@ -72,6 +72,7 @@ export function entityAt<T = unknown>(
   if (!isRecord(entries)) return undefined;
   const kindMap = entries[coord.entityKind];
   if (!isRecord(kindMap)) return undefined;
+  if (!Object.hasOwn(kindMap, coord.entityName)) return undefined;
   return blindCast<T | undefined, 'caller asserts the entity type at this coordinate'>(
     kindMap[coord.entityName],
   );

@@ -116,4 +116,13 @@ describe('entityAt', () => {
       entityAt(storage, { namespaceId: 'public', entityKind: 'table', entityName: 'missing' }),
     ).toBeUndefined();
   });
+
+  it('returns undefined for prototype keys like toString and constructor', () => {
+    expect(
+      entityAt(storage, { namespaceId: 'public', entityKind: 'table', entityName: 'toString' }),
+    ).toBeUndefined();
+    expect(
+      entityAt(storage, { namespaceId: 'public', entityKind: 'table', entityName: 'constructor' }),
+    ).toBeUndefined();
+  });
 });
