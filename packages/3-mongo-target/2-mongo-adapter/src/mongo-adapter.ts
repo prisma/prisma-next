@@ -8,7 +8,7 @@ import type {
   MongoUpdatePipelineStage,
   MongoUpdateSpec,
 } from '@prisma-next/mongo-query-ast/execution';
-import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
+import type { AnyMongoDdlWireCommand, AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 import {
   AggregateWireCommand,
   CollModWireCommand,
@@ -352,6 +352,8 @@ class MongoAdapterImpl implements MongoAdapter {
     }
   }
 
+  lower(plan: MongoDdlPlan, ctx: CodecCallContext): Promise<AnyMongoDdlWireCommand>;
+  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand>;
   lower(plan: MongoQueryPlan | MongoDdlPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand> {
     if ('collection' in plan) {
       return this.resolveParams(this.structuralLower(plan), ctx);

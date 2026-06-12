@@ -153,9 +153,7 @@ export class MongoMigrationRunner {
 
         for (const step of ddlOp.execute) {
           const wire = await adapter.lower({ command: step.command }, {});
-          for await (const _ of driver.execute(wire)) {
-            /* consume */
-          }
+          await driver.run(wire);
         }
 
         if (runPostchecks) {
