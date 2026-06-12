@@ -14,7 +14,7 @@ import {
   UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
-import { MongoClient } from 'mongodb';
+import { MongoClient, MongoServerError } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createMongoDriver, MongoDriverImpl } from '../src/mongo-driver';
@@ -339,7 +339,7 @@ describe('MongoDriver', () => {
 
       await db.dropCollection(col).catch(() => undefined);
 
-      await collect(driver.execute(new CreateCollectionWireCommand(col, {})));
+      await driver.run(new CreateCollectionWireCommand(col, {}));
 
       const colls = await db.listCollections({ name: col }).toArray();
       expect(colls).toHaveLength(1);
@@ -353,9 +353,7 @@ describe('MongoDriver', () => {
 
       await db.dropCollection(col).catch(() => undefined);
 
-      await collect(
-        driver.execute(new CreateCollectionWireCommand(col, { capped: true, size: 1024 * 1024 })),
-      );
+      await driver.run(new CreateCollectionWireCommand(col, { capped: true, size: 1024 * 1024 }));
 
       const colls = await db.listCollections({ name: col }).toArray();
       expect(colls).toHaveLength(1);
@@ -372,7 +370,7 @@ describe('MongoDriver', () => {
       await db.dropCollection(col).catch(() => undefined);
       await db.createCollection(col);
 
-      await collect(driver.execute(new CreateIndexWireCommand(col, { email: 1 }, {})));
+      await driver.run(new CreateIndexWireCommand(col, { email: 1 }, {}));
 
       const indexes = await db.collection(col).indexes();
       expect(indexes.some((idx) => Object.hasOwn(idx.key, 'email'))).toBe(true);
@@ -386,10 +384,8 @@ describe('MongoDriver', () => {
       await db.dropCollection(col).catch(() => undefined);
       await db.createCollection(col);
 
-      await collect(
-        driver.execute(
-          new CreateIndexWireCommand(col, { username: 1 }, { unique: true, name: 'uniq_username' }),
-        ),
+      await driver.run(
+        new CreateIndexWireCommand(col, { username: 1 }, { unique: true, name: 'uniq_username' }),
       );
 
       const indexes = await db.collection(col).indexes();
@@ -408,7 +404,7 @@ describe('MongoDriver', () => {
       await db.dropCollection(col).catch(() => undefined);
       await db.createCollection(col);
 
-      await collect(driver.execute(new DropCollectionWireCommand(col)));
+      await driver.run(new DropCollectionWireCommand(col));
 
       const colls = await db.listCollections({ name: col }).toArray();
       expect(colls).toHaveLength(0);
@@ -425,7 +421,7 @@ describe('MongoDriver', () => {
       await db.createCollection(col);
       await db.collection(col).createIndex({ score: 1 }, { name: 'score_idx' });
 
-      await collect(driver.execute(new DropIndexWireCommand(col, 'score_idx')));
+      await driver.run(new DropIndexWireCommand(col, 'score_idx'));
 
       const indexes = await db.collection(col).indexes();
       expect(indexes.every((idx) => idx.name !== 'score_idx')).toBe(true);
@@ -442,13 +438,11 @@ describe('MongoDriver', () => {
       await db.createCollection(col);
 
       const validator = { $jsonSchema: { bsonType: 'object' } };
-      await collect(
-        driver.execute(
-          new CollModWireCommand(col, {
-            validator,
-            validationLevel: 'strict',
-          }),
-        ),
+      await driver.run(
+        new CollModWireCommand(col, {
+          validator,
+          validationLevel: 'strict',
+        }),
       );
 
       const colls = await db.listCollections({ name: col }, { nameOnly: false }).toArray();
@@ -463,44 +457,14 @@ describe('MongoDriver', () => {
     });
   });
 
-  describe('DDL laziness', () => {
-    it('execute() on a DDL command performs no database action until iterated', async () => {
+  describe('run() error propagation', () => {
+    it('rejects when the server returns an error', async () => {
       const db = seedClient.db(dbName);
       const driver = MongoDriverImpl.fromDb(db);
-      const col = 'driver_ddl_lazy_create';
 
-      await db.dropCollection(col).catch(() => undefined);
-
-      const cmd = new CreateCollectionWireCommand(col, {});
-      const iterable = driver.execute(cmd);
-
-      const collsBefore = await db.listCollections({ name: col }).toArray();
-      expect(collsBefore).toHaveLength(0);
-
-      await collect(iterable);
-
-      const collsAfter = await db.listCollections({ name: col }).toArray();
-      expect(collsAfter).toHaveLength(1);
-    });
-
-    it('two separate iterators over the same DDL iterable execute the operation exactly once', async () => {
-      const db = seedClient.db(dbName);
-      const driver = MongoDriverImpl.fromDb(db);
-      const col = 'driver_ddl_no_double_exec';
-
-      await db.dropCollection(col).catch(() => undefined);
-
-      const iterable = driver.execute(new CreateCollectionWireCommand(col, {}));
-
-      await collect(iterable);
-
-      const collsAfterFirst = await db.listCollections({ name: col }).toArray();
-      expect(collsAfterFirst).toHaveLength(1);
-
-      await collect(iterable);
-
-      const collsAfterSecond = await db.listCollections({ name: col }).toArray();
-      expect(collsAfterSecond).toHaveLength(1);
+      await expect(
+        driver.run(new DropCollectionWireCommand('nonexistent_collection_xyz')),
+      ).rejects.toThrow();
     });
   });
 });

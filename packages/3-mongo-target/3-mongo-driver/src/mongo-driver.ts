@@ -1,7 +1,8 @@
 import type { MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
   AggregateWireCommand,
-  AnyMongoWireCommand,
+  AnyMongoDdlWireCommand,
+  AnyMongoDmlWireCommand,
   CollModWireCommand,
   CreateCollectionWireCommand,
   CreateIndexWireCommand,
@@ -22,27 +23,10 @@ import type {
   UpdateOneResult,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
-import { blindCast, castAs } from '@prisma-next/utils/casts';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { IndexSpecification } from 'mongodb';
 import { type Db, MongoClient } from 'mongodb';
 import { DRIVER_INFO } from './core/driver-info';
-
-function lazyDdlIterable(start: () => Promise<void>): AsyncIterable<never> {
-  let startedPromise: Promise<void> | undefined;
-  return {
-    [Symbol.asyncIterator]() {
-      return {
-        async next(): Promise<IteratorResult<never>> {
-          if (startedPromise === undefined) {
-            startedPromise = start();
-          }
-          await startedPromise;
-          return { done: true, value: undefined as never };
-        },
-      };
-    },
-  };
-}
 
 export class MongoDriverImpl implements MongoDriver {
   protected readonly db: Db;
@@ -63,7 +47,7 @@ export class MongoDriverImpl implements MongoDriver {
     return new MongoDriverImpl(db, undefined);
   }
 
-  execute<Row = Record<string, unknown>>(wireCommand: AnyMongoWireCommand): AsyncIterable<Row> {
+  execute<Row = Record<string, unknown>>(wireCommand: AnyMongoDmlWireCommand): AsyncIterable<Row> {
     switch (wireCommand.kind) {
       case 'insertOne':
         return this.executeInsertOneCommand(wireCommand) as AsyncIterable<Row>;
@@ -83,30 +67,30 @@ export class MongoDriverImpl implements MongoDriver {
         return this.executeFindOneAndDeleteCommand(wireCommand) as AsyncIterable<Row>;
       case 'aggregate':
         return this.executeAggregateCommand<Row>(wireCommand);
-      case 'createCollection':
-        return castAs<AsyncIterable<Row>>(
-          lazyDdlIterable(() => this.executeCreateCollectionCommand(wireCommand)),
-        );
-      case 'createIndex':
-        return castAs<AsyncIterable<Row>>(
-          lazyDdlIterable(() => this.executeCreateIndexCommand(wireCommand)),
-        );
-      case 'dropCollection':
-        return castAs<AsyncIterable<Row>>(
-          lazyDdlIterable(() => this.executeDropCollectionCommand(wireCommand)),
-        );
-      case 'dropIndex':
-        return castAs<AsyncIterable<Row>>(
-          lazyDdlIterable(() => this.executeDropIndexCommand(wireCommand)),
-        );
-      case 'collMod':
-        return castAs<AsyncIterable<Row>>(
-          lazyDdlIterable(() => this.executeCollModCommand(wireCommand)),
-        );
       // v8 ignore next 4
       default: {
         const _exhaustive: never = wireCommand;
         throw new Error(`Unknown wire command kind: ${(_exhaustive as { kind: string }).kind}`);
+      }
+    }
+  }
+
+  async run(wireCommand: AnyMongoDdlWireCommand): Promise<void> {
+    switch (wireCommand.kind) {
+      case 'createCollection':
+        return this.executeCreateCollectionCommand(wireCommand);
+      case 'createIndex':
+        return this.executeCreateIndexCommand(wireCommand);
+      case 'dropCollection':
+        return this.executeDropCollectionCommand(wireCommand);
+      case 'dropIndex':
+        return this.executeDropIndexCommand(wireCommand);
+      case 'collMod':
+        return this.executeCollModCommand(wireCommand);
+      // v8 ignore next 4
+      default: {
+        const _exhaustive: never = wireCommand;
+        throw new Error(`Unknown DDL wire command kind: ${(_exhaustive as { kind: string }).kind}`);
       }
     }
   }

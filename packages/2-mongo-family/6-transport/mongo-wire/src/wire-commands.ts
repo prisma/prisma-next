@@ -210,7 +210,7 @@ export class CollModWireCommand extends MongoWireCommand {
   }
 }
 
-export type AnyMongoWireCommand =
+export type AnyMongoDmlWireCommand =
   | InsertOneWireCommand
   | InsertManyWireCommand
   | UpdateOneWireCommand
@@ -219,9 +219,25 @@ export type AnyMongoWireCommand =
   | DeleteManyWireCommand
   | FindOneAndUpdateWireCommand
   | FindOneAndDeleteWireCommand
-  | AggregateWireCommand
+  | AggregateWireCommand;
+
+export type AnyMongoDdlWireCommand =
   | CreateCollectionWireCommand
   | CreateIndexWireCommand
   | DropCollectionWireCommand
   | DropIndexWireCommand
   | CollModWireCommand;
+
+export type AnyMongoWireCommand = AnyMongoDmlWireCommand | AnyMongoDdlWireCommand;
+
+const DDL_KINDS: ReadonlySet<string> = new Set([
+  'createCollection',
+  'createIndex',
+  'dropCollection',
+  'dropIndex',
+  'collMod',
+]);
+
+export function isDdlWireCommand(cmd: AnyMongoWireCommand): cmd is AnyMongoDdlWireCommand {
+  return DDL_KINDS.has(cmd.kind);
+}

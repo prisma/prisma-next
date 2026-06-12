@@ -1,7 +1,7 @@
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
 import type { AnyMongoDdlCommand } from '@prisma-next/mongo-query-ast/control';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
-import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
+import type { AnyMongoDdlWireCommand, AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 
 /**
  * Intermediate state produced by structural lowering. `MongoParamRef` leaves
@@ -128,15 +128,8 @@ export interface MongoDdlPlan {
 }
 
 export interface MongoAdapter {
-  /**
-   * Lower a query plan or DDL command plan to a driver-ready wire command.
-   *
-   * DDL plans (`{ command: AnyMongoDdlCommand }`) lower structurally — no
-   * codec routing. DML plans (`MongoQueryPlan`) go through the two-phase
-   * `structuralLower → resolveParams` pipeline.
-   *
-   * Equivalent to `resolveParams(structuralLower(plan), ctx)` for DML.
-   */
+  lower(plan: MongoDdlPlan, ctx: CodecCallContext): Promise<AnyMongoDdlWireCommand>;
+  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand>;
   lower(plan: MongoQueryPlan | MongoDdlPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand>;
 
   /**
