@@ -6,6 +6,7 @@ import {
   type MongoCollectionInput,
   type MongoContract,
   MongoContractSchema,
+  type MongoNamespaceEntries,
   validateMongoStorage,
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
@@ -119,9 +120,9 @@ export abstract class MongoContractSerializerBase<TContract>
    * namespace's entries via {@link hydrateEntriesKind} — the same
    * per-kind extension hook the SQL family base exposes. The family
    * base hydrates the family-core `collection` kind; targets override
-   * to add pack-contributed kinds. Fails closed: a kind the hook does
-   * not recognise throws naming the kind and the namespace id — never
-   * silently dropped.
+   * to add pack-contributed kinds. {@link hydrateEntriesKind} is the
+   * single per-kind authority: it throws for unrecognised kinds, so this
+   * walk never silently drops an entry.
    */
   protected hydrateMongoContract(contract: MongoContract): MongoContract {
     const rawNamespaces = contract.storage.namespaces;
@@ -129,27 +130,17 @@ export abstract class MongoContractSerializerBase<TContract>
       Object.entries(rawNamespaces).map(([nsId, nsEnvelope]) => {
         const entriesOutput: Record<string, Record<string, unknown>> = {};
         for (const [kind, innerMap] of Object.entries(nsEnvelope.entries)) {
-          const hydrated = this.hydrateEntriesKind(kind, innerMap);
-          if (hydrated === undefined) {
-            throw new Error(
-              `Unknown entries key "${kind}" in namespace "${nsId}"; no hydration factory registered for this entity kind`,
-            );
-          }
-          entriesOutput[kind] = hydrated;
+          entriesOutput[kind] = this.hydrateEntriesKind(kind, innerMap, nsId);
         }
-        const { collection, ...carriedKinds } = entriesOutput;
         return [
           nsId,
           {
             ...nsEnvelope,
             id: nsEnvelope.id,
-            entries: {
-              ...carriedKinds,
-              collection: blindCast<
-                Readonly<Record<string, MongoCollection>>,
-                'hydrateEntriesKind constructs MongoCollection instances for the collection kind'
-              >(collection ?? {}),
-            },
+            entries: blindCast<
+              MongoNamespaceEntries,
+              'hydrateEntriesKind constructs the correct IR instances per kind'
+            >(entriesOutput),
           },
         ];
       }),
@@ -164,25 +155,24 @@ export abstract class MongoContractSerializerBase<TContract>
   }
 
   /**
-   * Per-kind hydration hook — the registry the boundary error refers
-   * to. The family base hydrates `collection` (the Mongo family-core
-   * kind); returns `undefined` for any other kind so the caller fails
-   * closed naming the kind and namespace id. Targets override to add
-   * pack-contributed kinds and delegate unknown kinds to `super`.
+   * Per-kind hydration hook — the single authority for mapping a raw
+   * entries inner map to hydrated IR instances. The family base hydrates
+   * `collection`; targets override to add pack-contributed kinds and
+   * delegate unknown kinds to `super`. Throws for any kind neither this
+   * class nor the target override handles, naming the kind and namespace
+   * id so the error is actionable.
    */
   protected hydrateEntriesKind(
     kind: string,
     innerMap: unknown,
-  ): Record<string, unknown> | undefined {
+    nsId: string,
+  ): Record<string, unknown> {
     if (kind === 'collection') {
-      if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
-        return {};
-      }
       return Object.fromEntries(
         Object.entries(
           blindCast<
             Record<string, unknown>,
-            'collection inner map is a plain record after object check'
+            'collection inner map is a plain record validated by the mongo contract schema'
           >(innerMap),
         ).map(([name, raw]) => [
           name,
@@ -195,7 +185,9 @@ export abstract class MongoContractSerializerBase<TContract>
         ]),
       );
     }
-    return undefined;
+    throw new Error(
+      `Unknown entries key "${kind}" in namespace "${nsId}"; no hydration factory registered for this entity kind`,
+    );
   }
 
   /**
