@@ -51,34 +51,43 @@ changes:
     summary: |
       `SqlNamespace.entries` is now an open dictionary typed
       `Readonly<Record<string, Readonly<Record<string, unknown>>>>`. The previously
-      closed shape (`{ table?: ..., type?: ..., valueSet?: ... }`) is gone — dot-access
+      closed shape (`{ table?: ..., valueSet?: ... }`) is gone — dot-access
       like `.entries.table` or `.entries.collection` no longer compiles. Read tables via
       the `namespaceTables(ns)` helper from `@prisma-next/sql-contract/types`, or via
       bracket notation `entries['table']`. For typed getter access on the concrete
-      class instances use the non-enumerable getters (`ns.table`, `schema.type`,
-      `db.collection`). Annotations and type constraints that hard-code the closed shape
+      class instances use the non-enumerable getters (`ns.table`, `db.collection`).
+      Annotations and type constraints that hard-code the closed shape
       must be widened to the open dict.
     detection:
       glob: "**/*.{ts,tsx}"
       contains:
         - ".entries.table"
         - ".entries.collection"
-        - ".entries.type"
         - ".entries.valueSet"
       anyMatch: true
-  - id: postgres-contract-serializer
+  - id: enum-becomes-domain-concept
     summary: |
-      `SqlContractSerializer` (from `@prisma-next/family-sql/ir`) can no longer
-      deserialize Postgres contracts. The family serializer now rejects the `type` entries
-      key that every Postgres namespace carries. Extension code that deserializes a
-      Postgres-emitted contract via `new SqlContractSerializer().deserializeContract(...)`
-      must switch to `new PostgresContractSerializer()` from
-      `@prisma-next/target-postgres/runtime`. SQLite and non-Postgres contracts are
-      unaffected.
+      The native Postgres enum surface is deleted from the SPI. `PostgresEnumStorageEntry`
+      no longer exists in `@prisma-next/sql-contract/types` — the `SqlStorage.types` slot
+      now holds codec-instance entries only (`StorageTypeInstance`). The `pg/enum@1`
+      codec surface is deleted from `@prisma-next/target-postgres` (`PgEnumDescriptor`,
+      `pgEnumColumn`, `PG_ENUM_CODEC_ID`, the `enum` codec-type-map entry), as are the
+      native `enumType` / `enumColumn` helpers from
+      `@prisma-next/adapter-postgres/column-types`. Enums are domain entities plus a
+      storage `valueSet` enforced by a CHECK constraint; columns reference them as
+      `pg/text@1` (or another codec) with a `valueSet` ref. Extensions that referenced
+      `PostgresEnumStorageEntry` in type constraints drop it (use `StorageTypeInstance`
+      alone); fixtures that used `pg/enum@1` as a codec id must switch to a live codec
+      or an inert fixture id.
     detection:
       glob: "**/*.{ts,tsx}"
       contains:
-        - "SqlContractSerializer"
+        - "PostgresEnumStorageEntry"
+        - "pg/enum@1"
+        - "pgEnumColumn"
+        - "PgEnumDescriptor"
+        - "PG_ENUM_CODEC_ID"
+      anyMatch: true
 ---
 
 <!--
@@ -227,12 +236,11 @@ entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>
 // Previously it was a closed shape:
 entries: {
   table?: Readonly<Record<string, StorageTable>>;
-  type?: Readonly<Record<string, PostgresEnumType>>;
   valueSet?: Readonly<Record<string, StorageValueSet>>;
 }
 ```
 
-Dot-access like `.entries.table`, `.entries.collection`, or `.entries.type` no longer compiles. Migrate to one of the two canonical read styles:
+Dot-access like `.entries.table` or `.entries.collection` no longer compiles. Migrate to one of the two canonical read styles:
 
 **Generic/walker code** — bracket notation:
 
@@ -251,9 +259,6 @@ const tables = ns.entries['table'] as Record<string, StorageTable> | undefined;
 import { namespaceTables, namespaceValueSets } from '@prisma-next/sql-contract/types';
 const tables = namespaceTables(ns);    // Record<string, StorageTable>
 const vsets  = namespaceValueSets(ns); // Record<string, StorageValueSet> | undefined
-
-// Using the non-enumerable class getter (for PostgresSchema instances)
-const enumTypes = schema.type; // Record<string, PostgresEnumType>
 
 // Using the namespaceCollections() helper (for MongoNamespace values)
 import { namespaceCollections } from '@prisma-next/mongo-contract';
@@ -274,20 +279,28 @@ const tables = namespaceTables(ns);
 
 This is a compile-time-only change when using the helpers — no runtime behavior differs. Run `pnpm typecheck` to find all remaining dot-access sites.
 
-## `postgres-contract-serializer`
+## `enum-becomes-domain-concept`
 
-`SqlContractSerializer` (from `@prisma-next/family-sql/ir`) can no longer deserialize Postgres contracts. Every Postgres namespace carries a `type` key in its `entries`; the family serializer validates entries against a built-in registry (`table`, `valueSet` only) and throws a `ContractValidationError` when it encounters `type`.
+Native Postgres enums are removed from the framework. Enums are now a **domain concept**: a domain enum entity plus a storage `valueSet` entity, with member values stored through an ordinary codec (typically `pg/text@1` → a `text` column) and the value set enforced by a planner-generated CHECK constraint. The whole native surface is deleted:
 
-Replace with `PostgresContractSerializer` from `@prisma-next/target-postgres/runtime`:
+- `PostgresEnumStorageEntry` is gone from `@prisma-next/sql-contract/types`. The polymorphic `SqlStorage.types` slot now carries codec-instance entries only. Type constraints that accepted both narrow to `StorageTypeInstance`:
 
-```ts
-// Before
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
-const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+  ```ts
+  // Before
+  import type { PostgresEnumStorageEntry, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+  type TypesConstraint = Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
 
-// After
-import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
-const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
-```
+  // After
+  import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+  type TypesConstraint = Record<string, StorageTypeInstance>;
+  ```
 
-Extension code that only uses the target descriptor's serializer (`descriptor.contractSerializer`) is unaffected — the postgres descriptor already exposes a `PostgresContractSerializer` instance. Only code that directly instantiates `SqlContractSerializer` for a Postgres contract needs to change. SQLite and non-Postgres contracts are unaffected.
+- The `pg/enum@1` codec and its registry surface are deleted from `@prisma-next/target-postgres`: `PgEnumDescriptor`, `pgEnumColumn`, `PG_ENUM_CODEC_ID`, and the `enum` entry in the codec type map. Test fixtures that used `'pg/enum@1'` as an opaque codec id must switch to a live codec id or an inert fixture id (e.g. `app/test-enum@1`) — the id no longer resolves to a registered codec.
+- The native `enumType(name, values[])` / `enumColumn(...)` authoring helpers are deleted from `@prisma-next/adapter-postgres/column-types`. The domain authoring surface is `enumType(name, codecRef, ...member(name, value))` + `member` from the target contract-builder, returned under the contract's `enums` key.
+- Introspection no longer adopts native enum types: the adapter records detected native enum type names under `annotations.pg.nativeEnumTypeNames` (names only), and `contract infer` refuses with a diagnostic naming them. The old `annotations.pg.enumTypes` structure is gone.
+
+Columns restricted to an enum now carry `codecId: 'pg/text@1'` (or another codec), `nativeType: 'text'`, and a `valueSet` reference; the owning table carries a check entry. If your extension reads `storage.types` looking for enum shapes, read the namespace's `valueSet` entries instead.
+
+### Validation
+
+`pnpm typecheck` flags every deleted-symbol reference. After fixing, run your extension's standard `pnpm test`.
