@@ -204,6 +204,46 @@ types {
     });
   });
 
+  describe('bare-name resolution prefers the referrer namespace', () => {
+    const source = `
+namespace auth {
+  model Token {
+    id String @id
+  }
+
+  model Session {
+    id String @id
+  }
+}
+
+namespace billing {
+  model Token {
+    id String @id
+  }
+
+  model Invoice {
+    id      String @id
+    token   Token
+    session Session
+  }
+}
+`;
+
+    it('resolves a bare reference to a same-named declaration in the referrer namespace, not the first document-wide match', () => {
+      expect(fieldTarget(resolveSource(source), 'billing', 'Invoice', 'token')).toEqual({
+        kind: 'ref',
+        coord: { kind: 'model', namespaceId: 'billing', name: 'Token' },
+      });
+    });
+
+    it('falls back to a document-wide match when the referrer namespace has no such declaration', () => {
+      expect(fieldTarget(resolveSource(source), 'billing', 'Invoice', 'session')).toEqual({
+        kind: 'ref',
+        coord: { kind: 'model', namespaceId: 'auth', name: 'Session' },
+      });
+    });
+  });
+
   describe('attribute accessors', () => {
     const source = `
 model User {
