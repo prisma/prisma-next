@@ -722,14 +722,15 @@ async function applyJunctionOwnedMutation(
 
   if (mutation.kind === 'create') {
     for (const childInput of mutation.data) {
-      const relatedRow = await insertSingleRow(
+      const relatedRow = await createGraph(
         scope,
         context,
         relation.relatedNamespaceId,
         relation.relatedModelName,
-        blindCast<Record<string, unknown>, 'mutation create input is a plain object payload'>(
-          childInput,
-        ),
+        blindCast<
+          MutationCreateInput<Contract<SqlStorage>, string>,
+          'junction-created target is a nested mutation create input'
+        >(childInput),
       );
       const targetPkValues = readJunctionTargetValues(contract, relation, relatedRow);
       await insertJunctionLink(scope, context, relation, parentPkValues, targetPkValues, 'create');

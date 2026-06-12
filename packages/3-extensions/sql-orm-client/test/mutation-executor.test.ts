@@ -14,6 +14,7 @@ import {
 import type { MockRuntime, TestContract } from './helpers';
 import {
   buildManyToManyContract,
+  buildManyToManyContractWithTargetRelation,
   createMockRuntime,
   getTestContext,
   getTestContract,
@@ -508,6 +509,47 @@ describe('mutation-executor', () => {
     expect((runtime.executions.at(-1)!.plan as { params: readonly unknown[] }).params).toEqual([
       1, 20,
     ]);
+  });
+
+  it('executeNestedCreateMutation() recurses junction-created targets through the nested-create graph', async () => {
+    const contract = buildManyToManyContractWithTargetRelation();
+    const runtime = createMockRuntime();
+    runtime.setNextResults([[{ id: 1 }], [{ id: 99 }], [{ id: 20, owner_id: 99 }], []]);
+
+    const created = await executeNestedCreateMutation({
+      context: { ...getTestContext(), contract },
+      runtime,
+      namespaceId: 'public',
+      modelName: 'Parent',
+      data: {
+        id: 1,
+        children: (children: { create: (rows: readonly Record<string, unknown>[]) => unknown }) =>
+          children.create([
+            {
+              id: 20,
+              owner: (owner: { connect: (criterion: Record<string, unknown>) => unknown }) =>
+                owner.connect({ id: 99 }),
+            },
+          ]),
+      } as never,
+    });
+
+    expect(created).toEqual({ id: 1 });
+    const unwrapRow = (row: Record<string, unknown>) =>
+      Object.fromEntries(
+        Object.entries(row).map(([column, param]) => [column, (param as { value: unknown }).value]),
+      );
+    const childInsert = findJunctionDml(runtime, 'insert', 'children');
+    expect(unwrapRow((childInsert.rows as ReadonlyArray<Record<string, unknown>>)[0]!)).toEqual({
+      id: 20,
+      owner_id: 99,
+    });
+    const link = (
+      findJunctionDml(runtime, 'insert', 'parent_child').rows as ReadonlyArray<
+        Record<string, unknown>
+      >
+    )[0]!;
+    expect(unwrapRow(link)).toEqual({ parent_id: 1, child_id: 20 });
   });
 
   it('executeNestedCreateMutation() AND-s composite keys in the junction INSERT', async () => {
