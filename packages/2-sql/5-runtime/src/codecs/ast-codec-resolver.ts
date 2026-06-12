@@ -40,7 +40,11 @@ export function createAstCodecResolver(
       const cached = cache.get(key);
       if (cached) return cached;
 
-      const descriptor = resolveCodecDescriptorOrThrow((id) => descriptors.descriptorFor(id), ref);
+      const descriptor = resolveCodecDescriptorOrThrow(
+        (id) => descriptors.descriptorFor(id),
+        ref,
+        'RUNTIME.CODEC_DESCRIPTOR_MISSING',
+      );
       const ctx = instanceContextFor(ref);
       const codec = materializeCodec(descriptor, ref, ctx);
 

@@ -5,6 +5,12 @@ import type {
 } from '@prisma-next/mongo-query-ast/control';
 import { type Db, type Document, MongoServerError } from 'mongodb';
 
+/**
+ * Executes the read-only catalog inspections (`listCollections` / `listIndexes`)
+ * that migration prechecks/postchecks and operation preview evaluate, directly
+ * against `db`. Routing these checks through the adapter's lowering seam is
+ * deferred to the `typed-migration-verification-queries` slice.
+ */
 export class MongoInspectionExecutor implements MongoInspectionCommandVisitor<Promise<Document[]>> {
   constructor(private readonly db: Db) {}
 

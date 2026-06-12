@@ -6,19 +6,20 @@ import { runtimeError } from './runtime-error';
 
 /**
  * Look up a descriptor for `ref.codecId` using `descriptorFor`; throw
- * `RUNTIME.CODEC_DESCRIPTOR_MISSING` if none is found.
+ * `code` if none is found. Each plane names its own error path: the control
+ * plane resolves contract-stack descriptors (`CONTRACT.*`), the execution
+ * plane resolves at query time (`RUNTIME.*`).
  */
 export function resolveCodecDescriptorOrThrow(
   descriptorFor: (codecId: string) => AnyCodecDescriptor | undefined,
   ref: CodecRef,
+  code: 'CONTRACT.CODEC_DESCRIPTOR_MISSING' | 'RUNTIME.CODEC_DESCRIPTOR_MISSING',
 ): AnyCodecDescriptor {
   const descriptor = descriptorFor(ref.codecId);
   if (!descriptor) {
-    throw runtimeError(
-      'RUNTIME.CODEC_DESCRIPTOR_MISSING',
-      `No codec descriptor registered for codecId '${ref.codecId}'.`,
-      { codecId: ref.codecId },
-    );
+    throw runtimeError(code, `No codec descriptor registered for codecId '${ref.codecId}'.`, {
+      codecId: ref.codecId,
+    });
   }
   return descriptor;
 }

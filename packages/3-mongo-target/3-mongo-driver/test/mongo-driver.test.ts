@@ -14,7 +14,7 @@ import {
   UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
-import { MongoClient, MongoServerError } from 'mongodb';
+import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createMongoDriver, MongoDriverImpl } from '../src/mongo-driver';
@@ -463,7 +463,7 @@ describe('MongoDriver', () => {
       const driver = MongoDriverImpl.fromDb(db);
 
       await expect(
-        driver.run(new DropCollectionWireCommand('nonexistent_collection_xyz')),
+        driver.run(new CollModWireCommand('nonexistent_collection_xyz', { validationLevel: 'strict' })),
       ).rejects.toThrow();
     });
   });

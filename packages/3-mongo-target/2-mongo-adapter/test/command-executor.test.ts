@@ -1,5 +1,6 @@
 /**
- * Behavioral tests for DDL execution via the `lower → driver.execute` path.
+ * Behavioral tests for DDL execution via the adapter-owned seam
+ * (`controlAdapter.executeDdl(driver, command)` → `driver.run(wire)`).
  *
  * Each test exercises one of the five DDL command kinds against mongodb-memory-server
  * and asserts the resulting database state.
@@ -18,7 +19,7 @@ import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { MongoInspectionExecutor } from '../src/core/inspection-executor';
-import { createMongoAdapter } from '../src/mongo-adapter';
+import { MongoControlAdapterImpl } from '../src/exports/control';
 
 let replSet: MongoMemoryReplSet;
 let client: MongoClient;
@@ -56,15 +57,12 @@ async function execDdl(
     | DropIndexCommand
     | CollModCommand,
 ): Promise<void> {
-  const adapter = createMongoAdapter();
+  const controlAdapter = new MongoControlAdapterImpl();
   const driver = MongoDriverImpl.fromDb(db);
-  const wire = await adapter.lower({ command: cmd }, {});
-  for await (const _ of driver.execute(wire)) {
-    /* consume */
-  }
+  await controlAdapter.executeDdl(driver, cmd);
 }
 
-describe('createIndex via lower → execute', () => {
+describe('createIndex via executeDdl', () => {
   it('creates a unique index on a collection', async () => {
     await db.createCollection('users');
     const cmd = new CreateIndexCommand('users', [{ field: 'email', direction: 1 }], {
@@ -174,7 +172,7 @@ describe('createIndex via lower → execute', () => {
   });
 });
 
-describe('dropIndex via lower → execute', () => {
+describe('dropIndex via executeDdl', () => {
   it('drops an existing index', async () => {
     await db.createCollection('posts');
     await db.collection('posts').createIndex({ title: 1 }, { name: 'title_1' });
@@ -188,7 +186,7 @@ describe('dropIndex via lower → execute', () => {
   });
 });
 
-describe('createCollection via lower → execute', () => {
+describe('createCollection via executeDdl', () => {
   it('creates a plain collection', async () => {
     const cmd = new CreateCollectionCommand('events');
     await execDdl(cmd);
@@ -285,7 +283,7 @@ describe('createCollection via lower → execute', () => {
   });
 });
 
-describe('dropCollection via lower → execute', () => {
+describe('dropCollection via executeDdl', () => {
   it('drops an existing collection', async () => {
     await db.createCollection('temp');
     const cmd = new DropCollectionCommand('temp');
@@ -296,7 +294,7 @@ describe('dropCollection via lower → execute', () => {
   });
 });
 
-describe('collMod via lower → execute', () => {
+describe('collMod via executeDdl', () => {
   it('applies validator to an existing collection', async () => {
     await db.createCollection('docs');
     const cmd = new CollModCommand('docs', {

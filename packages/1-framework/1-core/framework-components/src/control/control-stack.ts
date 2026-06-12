@@ -353,7 +353,11 @@ export function extractCodecLookup(
   return {
     get: (id) => byId.get(id),
     forCodecRef(ref: CodecRef) {
-      const d = resolveCodecDescriptorOrThrow((id) => descriptorsById.get(id), ref);
+      const d = resolveCodecDescriptorOrThrow(
+        (id) => descriptorsById.get(id),
+        ref,
+        'CONTRACT.CODEC_DESCRIPTOR_MISSING',
+      );
       return materializeCodec(d, ref, { name: `<ref:${ref.codecId}>` });
     },
     forColumn: () => undefined,
