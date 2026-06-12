@@ -1,5 +1,22 @@
 export type { ParseDiagnostic, ParseResult } from '../parse';
 export { parse } from '../parse';
+export type {
+  DeclCoord,
+  DeclKind,
+  ResolvedArg,
+  ResolvedCompositeType,
+  ResolvedDocument,
+  ResolvedEnum,
+  ResolvedEnumValue,
+  ResolvedExtensionBlock,
+  ResolvedField,
+  ResolvedFieldType,
+  ResolvedModel,
+  ResolvedNamedType,
+  ResolvedNamespace,
+  TypeTarget,
+} from '../resolve';
+export { ResolvedAttribute, resolve } from '../resolve';
 export type { Position, Range } from '../source-file';
 export { SourceFile } from '../source-file';
 export {
