@@ -1,7 +1,11 @@
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
 import type { AnyMongoDdlCommand } from '@prisma-next/mongo-query-ast/control';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
-import type { AnyMongoDdlWireCommand, AnyMongoWireCommand } from '@prisma-next/mongo-wire';
+import type {
+  AnyMongoDdlWireCommand,
+  AnyMongoDmlWireCommand,
+  AnyMongoWireCommand,
+} from '@prisma-next/mongo-wire';
 
 /**
  * Intermediate state produced by structural lowering. `MongoParamRef` leaves
@@ -129,7 +133,7 @@ export interface MongoDdlPlan {
 
 export interface MongoAdapter {
   lower(plan: MongoDdlPlan, ctx: CodecCallContext): Promise<AnyMongoDdlWireCommand>;
-  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand>;
+  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoDmlWireCommand>;
   lower(plan: MongoQueryPlan | MongoDdlPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand>;
 
   /**
@@ -152,5 +156,5 @@ export interface MongoAdapter {
    * frozen `AnyMongoWireCommand` ready for the driver. The same abort-signal
    * forwarding and `RUNTIME.ABORTED` surface contract as `lower` applies.
    */
-  resolveParams(draft: MongoLoweredDraft, ctx: CodecCallContext): Promise<AnyMongoWireCommand>;
+  resolveParams(draft: MongoLoweredDraft, ctx: CodecCallContext): Promise<AnyMongoDmlWireCommand>;
 }

@@ -39,12 +39,14 @@ import {
   type MongoRunnerDependencies,
 } from '../src/core/mongo-runner';
 
+import type {
+  AnyMongoDdlWireCommand,
+  AnyMongoDmlWireCommand,
+  AnyMongoWireCommand,
+} from '@prisma-next/mongo-wire';
+
 type Row = Record<string, unknown>;
-// The wire-command union is exposed on `MongoAdapter['lower']`'s return type
-// (Promise<AnyMongoWireCommand>) and on `MongoDriver.execute`'s parameter
-// type. Re-deriving it here avoids a dependency on `@prisma-next/mongo-wire`,
-// which `target-mongo` does not list as a direct devDependency.
-type WireCommand = Awaited<ReturnType<MongoAdapter['lower']>>;
+type WireCommand = AnyMongoWireCommand;
 
 const ALL_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'],
@@ -83,8 +85,15 @@ class StubMongoDriver implements MongoDriver {
     })();
   }
 
+  async run(_wireCommand: WireCommand): Promise<void> {}
+
   async close(): Promise<void> {}
 }
+
+type DdlWireCommand = Awaited<
+  ReturnType<{ (p: MongoDdlPlan, c: CodecCallContext): ReturnType<MongoAdapter['lower']> }>
+>;
+type DmlWireCommand = Parameters<MongoDriver['execute']>[0];
 
 class StubMongoAdapter implements MongoAdapter {
   readonly loweredPlans: MongoQueryPlan[] = [];
@@ -104,12 +113,14 @@ class StubMongoAdapter implements MongoAdapter {
     };
   }
 
-  async resolveParams(draft: MongoLoweredDraft, _ctx: CodecCallContext): Promise<WireCommand> {
+  async resolveParams(draft: MongoLoweredDraft, _ctx: CodecCallContext): Promise<DmlWireCommand> {
     const wireKind =
       draft.kind === 'aggregate' || draft.kind === 'rawAggregate' ? 'aggregate' : 'updateMany';
-    return { kind: wireKind, collection: draft.collection } as unknown as WireCommand;
+    return { kind: wireKind, collection: draft.collection } as unknown as DmlWireCommand;
   }
 
+  lower(plan: MongoDdlPlan, ctx: CodecCallContext): Promise<DdlWireCommand>;
+  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<DmlWireCommand>;
   lower(plan: MongoQueryPlan | MongoDdlPlan, ctx: CodecCallContext): Promise<WireCommand> {
     if ('collection' in plan) {
       return this.resolveParams(this.structuralLower(plan), ctx);
@@ -443,6 +454,7 @@ describe('MongoMigrationRunner schema verification', () => {
       inspectionExecutor,
       adapter,
       driver,
+      executeDdl: async () => {},
       markerOps: ops,
       introspectSchema: async () => driftIR,
     };
@@ -496,6 +508,7 @@ describe('MongoMigrationRunner schema verification', () => {
       inspectionExecutor,
       adapter,
       driver,
+      executeDdl: async () => {},
       markerOps: trackingReadMarker,
       introspectSchema: async () => {
         introspectCalls++;
@@ -565,6 +578,7 @@ function makeLedgerHarness(): {
     inspectionExecutor: new StubInspectionExecutor(),
     adapter: new StubMongoAdapter(),
     driver: new StubMongoDriver(),
+    executeDdl: async () => {},
     markerOps,
     introspectSchema: async () => new MongoSchemaIR([]),
   };
