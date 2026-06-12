@@ -974,7 +974,11 @@ function isUniqueConstraintError(error: unknown): boolean {
 
   if ('code' in error) {
     const code = error.code;
-    if (code === '23505' || code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    if (
+      code === '23505' ||
+      code === 'SQLITE_CONSTRAINT_UNIQUE' ||
+      code === 'SQLITE_CONSTRAINT_PRIMARYKEY'
+    ) {
       return true;
     }
   }
@@ -987,8 +991,7 @@ function isUniqueConstraintError(error: unknown): boolean {
   return (
     message.includes('duplicate key') ||
     message.includes('unique constraint') ||
-    message.includes('unique violation') ||
-    message.includes('constraint failed')
+    message.includes('unique violation')
   );
 }
 
