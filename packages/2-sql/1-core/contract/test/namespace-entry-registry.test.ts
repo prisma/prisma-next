@@ -126,6 +126,24 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
     expect(String(result)).toMatch(/unknown/);
   });
 
+  it('rejects a Date passed as an inner entries map', () => {
+    const schema = createNamespaceEntrySchema(createSqlEntrySchemaRegistry());
+    const result = schema({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: new Date() },
+    });
+    expect(result).toBeInstanceOf(type.errors);
+  });
+
+  it('rejects a Map passed as an inner entries map', () => {
+    const schema = createNamespaceEntrySchema(createSqlEntrySchemaRegistry());
+    const result = schema({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: new Map([['users', minimalTable]]) },
+    });
+    expect(result).toBeInstanceOf(type.errors);
+  });
+
   it('rejects core kinds when given a truly empty registry — no hidden fallback tier', () => {
     const schema = createNamespaceEntrySchema(new Map());
     const result = schema({
