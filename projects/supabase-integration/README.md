@@ -6,7 +6,7 @@
 
 The Supabase integration is delivered through six framework-primitive projects + one integration project. The framework primitives are independent of each other; all depend on the target-extensible IR foundation (TML-2459) — `explicit-namespace-dsl` specifically on its runtime-qualification slice (TML-2605). The integration project depends on all of them.
 
-Status reflects the state as of the last planning pass (2026-06-08); keep it current as constituents land.
+Status reflects the state as of the last planning pass (2026-06-11); keep it current as constituents land. The bottom row (`enums-as-domain-concept`) is a separate Terminal framework project adopted into this list because Supabase relies on enums — see the note below the table.
 
 | Project | Concern | Status | Linear |
 |---|---|---|---|
@@ -17,8 +17,11 @@ Status reflects the state as of the last planning pass (2026-06-08); keep it cur
 | [runtime-target-layer](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md) | Abstract `SqlRuntimeBase` family seam + `*RuntimeImpl` concretions behind bare-name interfaces; role binding via session-coupled connections (`set_config(role/claims)` + `RESET ALL`); **also shipped the `SupabaseRuntime` + `supabase()` façade** (`asUser`/`asAnon`/`asServiceRole`). Design in ADR 230. | ✅ **Done & closed** (project dir removed; proven independently against a raw-SQL RLS policy) | [TML-2502](https://linear.app/prisma-company/issue/TML-2502) |
 | [explicit-namespace-dsl](../explicit-namespace-dsl/spec.md) | Namespace-aware DSL/ORM query surface (`db.sql.<ns>.<table>`, `db.<ns>.<Model>`); disambiguates colliding cross-namespace names (`auth.users` vs `public.users`); additive on the default-namespace fallback | 🚧 **In progress (Serhii)** — **launch blocker** | [TML-2550](https://linear.app/prisma-company/issue/TML-2550) |
 | [extension-supabase](../extension-supabase/spec.md) | `@prisma-next/extension-supabase` package: shipped contract, typed handles, pack descriptor, example app. (The `SupabaseRuntime` + `supabase()` façade already shipped under runtime-target-layer / ADR 230 — this project's remaining scope is the contract/pack/handles/example surface.) | 🚧 **M1 + skeleton in progress** ([TML-2834](https://linear.app/prisma-company/issue/TML-2834)) | [TML-2503](https://linear.app/prisma-company/issue/TML-2503) |
+| [enums-as-domain-concept](../enums-as-domain-concept/spec.md) | Enum as a domain-plane entity — a name→value `valueSet` restriction layered on the column's codec (not a native `CREATE TYPE`); Postgres realizes it as a value-set + check constraint, Mongo as a `$jsonSchema` validator; typed reads + `db.enums.<ns>.<Name>` + declaration-order `ORDER BY`. **Adopted into the list** — `auth.*` and typical app schemas lean on Postgres enums. | 🚧 **In progress** (separate Terminal project) — substrate (TML-2850) + Postgres enforcement (TML-2851) + read surface (TML-2852) landed; PSL authoring (TML-2882), member defaults (TML-2855), native-enum cutover (TML-2853), Mongo vertical (TML-2884) remain | [Enums project](https://linear.app/prisma-company/project/enums-as-a-domain-concept-696d6b36cb89) |
 
 The PSL-block substrate `target-contributed-psl-blocks` ([TML-2537](https://linear.app/prisma-company/issue/TML-2537)) is not a constituent but was on the critical path: ✅ **landed** (substrate + close-out; project dir removed), so `postgres-rls`'s PSL `policy {}` surface is now unblocked. Note: the substrate uses **per-operation keywords** (`policy_select` / `policy_insert` / …) rather than a single conditional `policy { operation = … }` block — postgres-rls's PSL grammar must align with that shape.
+
+`enums-as-domain-concept` is likewise a separate Terminal framework project (its own [Linear project](https://linear.app/prisma-company/project/enums-as-a-domain-concept-696d6b36cb89), not one of the original six), tracked here because enums are central to Supabase: the `auth.*` schema declares Postgres enum types and typical app schemas use them heavily, so faithfully modelling enum-typed columns in the Supabase contract — and giving Supabase apps first-class enums — depends on it. It is **in flight**: the contract substrate, Postgres check-constraint enforcement, and the typed read surface (`db.enums`) have landed; PSL authoring, member defaults, the native-enum cutover, and the Mongo vertical remain. It is not a hard blocker for the minimal walking skeleton, but it is required for faithful enum-typed `auth.*` columns and the v0.1 enum story. (Design choice worth noting: the Postgres realization is a text column + value-set + check constraint, **not** a native `CREATE TYPE … AS ENUM`.)
 
 ### Dependency graph
 
@@ -30,6 +33,7 @@ flowchart TD
   rls["postgres-rls (TML-2501)"]
   rtl["runtime-target-layer (TML-2502)"]
   ns["explicit-namespace-dsl (TML-2550)"]
+  enums["enums-as-domain-concept (adopted)"]
   ext["extension-supabase (integration / launch)"]
 
   foundation --> control
@@ -42,6 +46,8 @@ flowchart TD
   rls --> ext
   rtl --> ext
   ns --> ext
+  foundation --> enums
+  enums -.->|"enum-typed columns"| ext
 ```
 
 `runtime-target-layer` shipped **independently** of `postgres-rls`: its end-to-end proof (below-middleware role binding actually filtering rows) is demonstrated against a **raw-SQL RLS policy** authored in the test fixture, so it needed neither RLS-policy authoring nor roles-as-IR to land. `postgres-rls` later swaps its authored policies onto that same runtime substrate, but the two were never sequence-coupled.
