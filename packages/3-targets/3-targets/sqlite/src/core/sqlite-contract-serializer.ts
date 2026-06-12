@@ -1,6 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { SqlContractSerializerBase } from '@prisma-next/family-sql/ir';
-import { type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { buildSqliteNamespace } from './sqlite-unbound-database';
@@ -20,12 +20,9 @@ export class SqliteContractSerializer extends SqlContractSerializerBase<Contract
     nsId: string,
     raw: Namespace | Record<string, unknown>,
   ): Namespace | SqlNamespaceTablesInput {
-    if (raw instanceof NamespaceBase) {
-      return raw;
-    }
     const hydrated = blindCast<
       SqlNamespaceTablesInput,
-      'super.hydrateSqlNamespaceEntry returns the tables form when raw is not a NamespaceBase'
+      'super.hydrateSqlNamespaceEntry returns SqlNamespaceTablesInput for raw JSON input'
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     return buildSqliteNamespace(hydrated);
   }
