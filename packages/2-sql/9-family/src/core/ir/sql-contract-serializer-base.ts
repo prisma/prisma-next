@@ -181,6 +181,9 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     nsId: string,
     raw: Namespace | Record<string, unknown>,
   ): Namespace | SqlNamespaceTablesInput {
+    if (raw instanceof NamespaceBase) {
+      return raw;
+    }
     const rawRecord = isPlainRecord(raw) ? raw : {};
     const id = typeof rawRecord['id'] === 'string' ? rawRecord['id'] : nsId;
     const parsed = NamespaceRawSchema({ ...rawRecord, id });
