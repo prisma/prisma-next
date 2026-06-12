@@ -32,7 +32,6 @@ import {
   type UpdateAst,
   type WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import { PostgresTableSource } from '@prisma-next/target-postgres/contract-free';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresContract } from './types';
@@ -392,11 +391,17 @@ function renderDistinctPrefix(
   return '';
 }
 
+function hasExplicitSchema(
+  table: Pick<TableSource, 'name' | 'namespaceId'>,
+): table is Pick<TableSource, 'name' | 'namespaceId'> & { readonly schema: string } {
+  return 'schema' in table && typeof table.schema === 'string';
+}
+
 function qualifyTableFromNamespaceCoordinate(
   table: Pick<TableSource, 'name' | 'namespaceId'>,
   contract: PostgresContract,
 ): string {
-  if (table instanceof PostgresTableSource && table.schema !== undefined) {
+  if (hasExplicitSchema(table)) {
     return `${quoteIdentifier(table.schema)}.${quoteIdentifier(table.name)}`;
   }
   if (table.namespaceId === undefined) {
