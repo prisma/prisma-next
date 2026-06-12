@@ -11,7 +11,7 @@ const Priority = enumType(
   member('Urgent', 'urgent'),
 );
 
-const UserType = enumType('user_type', pgText, member('admin', 'admin'), member('user', 'user'));
+const UserType = enumType('user_type', pgText, member('admin'), member('user'));
 
 export const contract = defineContract(
   {

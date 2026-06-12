@@ -7,8 +7,8 @@ type Address {
 
 enum user_type {
   @@type("pg/text@1")
-  admin = "admin"
-  user  = "user"
+  admin
+  user
 }
 
 model User {
