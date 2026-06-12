@@ -543,6 +543,67 @@ export function buildManyToManyContract(opts: {
   } as unknown as FrameworkContract<SqlStorage>;
 }
 
+/**
+ * Extends {@link buildManyToManyContract} with an `Owner` model and an N:1
+ * `owner` relation on `Child` (children.owner_id → owners.id), so tests can
+ * exercise junction-created targets that carry their own relation mutations.
+ */
+export function buildManyToManyContractWithTargetRelation(): FrameworkContract<SqlStorage> {
+  const contract = buildManyToManyContract({
+    junctionTable: 'parent_child',
+    parentColumns: ['parent_id'],
+    childColumns: ['child_id'],
+    targetColumns: ['id'],
+  });
+
+  const intColumn = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
+  const intField = { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } };
+
+  interface MutableModel {
+    fields: Record<string, unknown>;
+    relations: Record<string, unknown>;
+    storage: { namespaceId: string; table: string; fields: Record<string, unknown> };
+  }
+  interface MutableTable {
+    columns: Record<string, unknown>;
+    primaryKey: { columns: string[] };
+    uniques: unknown[];
+    indexes: unknown[];
+    foreignKeys: unknown[];
+  }
+  const raw = contract as unknown as {
+    domain: { namespaces: { public: { models: Record<string, MutableModel> } } };
+    storage: { namespaces: { public: { entries: { table: Record<string, MutableTable> } } } };
+  };
+
+  const models = raw.domain.namespaces.public.models;
+  models['Owner'] = {
+    fields: { id: intField },
+    relations: {},
+    storage: { namespaceId: 'public', table: 'owners', fields: { id: { column: 'id' } } },
+  };
+  const child = models['Child']!;
+  child.fields['owner_id'] = intField;
+  child.storage.fields['owner_id'] = { column: 'owner_id' };
+  child.relations['owner'] = {
+    to: { model: 'Owner', namespace: 'public' },
+    cardinality: 'N:1',
+    on: { localFields: ['owner_id'], targetFields: ['id'] },
+  };
+
+  const tables = raw.storage.namespaces.public.entries.table;
+  tables['owners'] = {
+    columns: { id: intColumn },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  };
+  tables['children']!.columns['owner_id'] = intColumn;
+
+  return contract;
+}
+
 export function createMockRuntime(): MockRuntime {
   const executions: MockExecution[] = [];
   let nextResult: Record<string, unknown>[][] = [];
