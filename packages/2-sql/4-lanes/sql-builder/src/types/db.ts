@@ -41,12 +41,14 @@ export type TableInAnyNamespace<C extends TableProxyContract, Name extends strin
 // The exact storage table at a single namespace coordinate. Resolving through
 // the coordinate (rather than the cross-namespace `UnboundTables` union) keeps
 // a bare table name shared across namespaces resolving to each namespace's own
-// table — no per-namespace column intersection.
+// table — no per-namespace column intersection. `TablesInNamespace` narrows the
+// open-dict `entries['table']` (`Record<string, unknown>`) back to the typed
+// `StorageTable` map before indexing by the bare name.
 export type NamespaceTable<
   C extends TableProxyContract,
   NsId extends string,
   Name extends string,
-> = C['storage']['namespaces'][NsId]['entries']['table'][Name];
+> = TablesInNamespace<C['storage']['namespaces'][NsId]>[Name];
 
 // The tables of a single storage namespace, keyed by bare table name. Lets
 // callers reach a table by its namespace coordinate (`db.<ns>.<table>`) when
@@ -58,7 +60,8 @@ export type Namespace<
   NsId extends string & keyof C['storage']['namespaces'],
 > = {
   readonly [Name in keyof TablesInNamespace<C['storage']['namespaces'][NsId]> & string]: TableProxy<
-    C, NsId,
+    C,
+    NsId,
     Name
   >;
 };
