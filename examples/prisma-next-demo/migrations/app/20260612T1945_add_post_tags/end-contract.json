@@ -176,25 +176,15 @@
               "tags": {
                 "cardinality": "N:M",
                 "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "postId"
-                  ]
+                  "localFields": ["id"],
+                  "targetFields": ["postId"]
                 },
                 "through": {
-                  "childColumns": [
-                    "tagId"
-                  ],
+                  "childColumns": ["tagId"],
                   "namespaceId": "public",
-                  "parentColumns": [
-                    "postId"
-                  ],
+                  "parentColumns": ["postId"],
                   "table": "post_tag",
-                  "targetColumns": [
-                    "id"
-                  ]
+                  "targetColumns": ["id"]
                 },
                 "to": {
                   "model": "Tag",
@@ -204,12 +194,8 @@
               "user": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": [
-                    "userId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
+                  "localFields": ["userId"],
+                  "targetFields": ["id"]
                 },
                 "to": {
                   "model": "User",
@@ -263,12 +249,8 @@
               "post": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": [
-                    "postId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
+                  "localFields": ["postId"],
+                  "targetFields": ["id"]
                 },
                 "to": {
                   "model": "Post",
@@ -278,12 +260,8 @@
               "tag": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": [
-                    "tagId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
+                  "localFields": ["tagId"],
+                  "targetFields": ["id"]
                 },
                 "to": {
                   "model": "Tag",
@@ -328,25 +306,15 @@
               "posts": {
                 "cardinality": "N:M",
                 "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "tagId"
-                  ]
+                  "localFields": ["id"],
+                  "targetFields": ["tagId"]
                 },
                 "through": {
-                  "childColumns": [
-                    "postId"
-                  ],
+                  "childColumns": ["postId"],
                   "namespaceId": "public",
-                  "parentColumns": [
-                    "tagId"
-                  ],
+                  "parentColumns": ["tagId"],
                   "table": "post_tag",
-                  "targetColumns": [
-                    "id"
-                  ]
+                  "targetColumns": ["id"]
                 },
                 "to": {
                   "model": "Post",
@@ -429,12 +397,8 @@
               "user": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": [
-                    "userId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
+                  "localFields": ["userId"],
+                  "targetFields": ["id"]
                 },
                 "to": {
                   "model": "User",
@@ -530,12 +494,8 @@
               "posts": {
                 "cardinality": "1:N",
                 "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "userId"
-                  ]
+                  "localFields": ["id"],
+                  "targetFields": ["userId"]
                 },
                 "to": {
                   "model": "Post",
@@ -545,12 +505,8 @@
               "tasks": {
                 "cardinality": "1:N",
                 "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "userId"
-                  ]
+                  "localFields": ["id"],
+                  "targetFields": ["userId"]
                 },
                 "to": {
                   "model": "Task",
@@ -660,16 +616,12 @@
                   "index": false,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "bug"
                   },
                   "target": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "task"
                   }
@@ -677,9 +629,7 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             },
@@ -710,16 +660,12 @@
                   "index": false,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "feature"
                   },
                   "target": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "task"
                   }
@@ -727,9 +673,7 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             },
@@ -801,16 +745,12 @@
                   "constraint": true,
                   "index": true,
                   "source": {
-                    "columns": [
-                      "userId"
-                    ],
+                    "columns": ["userId"],
                     "namespaceId": "public",
                     "tableName": "post"
                   },
                   "target": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -818,9 +758,7 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             },
@@ -842,16 +780,12 @@
                   "constraint": true,
                   "index": true,
                   "source": {
-                    "columns": [
-                      "postId"
-                    ],
+                    "columns": ["postId"],
                     "namespaceId": "public",
                     "tableName": "post_tag"
                   },
                   "target": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "post"
                   }
@@ -860,16 +794,12 @@
                   "constraint": true,
                   "index": true,
                   "source": {
-                    "columns": [
-                      "tagId"
-                    ],
+                    "columns": ["tagId"],
                     "namespaceId": "public",
                     "tableName": "post_tag"
                   },
                   "target": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "tag"
                   }
@@ -877,10 +807,7 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "postId",
-                  "tagId"
-                ]
+                "columns": ["postId", "tagId"]
               },
               "uniques": []
             },
@@ -903,9 +830,7 @@
               "foreignKeys": [],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             },
@@ -963,16 +888,12 @@
                   "constraint": true,
                   "index": true,
                   "source": {
-                    "columns": [
-                      "userId"
-                    ],
+                    "columns": ["userId"],
                     "namespaceId": "public",
                     "tableName": "task"
                   },
                   "target": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -980,9 +901,7 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             },
@@ -1030,9 +949,7 @@
               "foreignKeys": [],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             }
@@ -1043,20 +960,13 @@
               "kind": "postgres-enum",
               "name": "user_type",
               "nativeType": "user_type",
-              "values": [
-                "admin",
-                "user"
-              ]
+              "values": ["admin", "user"]
             }
           },
           "valueSet": {
             "Priority": {
               "kind": "valueSet",
-              "values": [
-                "low",
-                "high",
-                "urgent"
-              ]
+              "values": ["low", "high", "urgent"]
             }
           }
         },
@@ -1087,7 +997,6 @@
           },
           "ref": {
             "column": "id",
-            "namespace": "public",
             "table": "post"
           }
         },
@@ -1118,7 +1027,6 @@
           },
           "ref": {
             "column": "id",
-            "namespace": "public",
             "table": "user"
           }
         }

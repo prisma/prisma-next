@@ -12,12 +12,11 @@ type Address {
 }
 
 enum user_type {
-  @@type("pg/text@1")
   admin
   user
 }
 
-enum Priority {
+enum2 Priority {
   @@type("pg/text@1")
   Low    = "low"
   High   = "high"

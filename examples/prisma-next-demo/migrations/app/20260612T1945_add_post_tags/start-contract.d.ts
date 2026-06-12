@@ -36,9 +36,9 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:d1a720d7254dfa4cd2dc39353b21de48198fc5aa75dc9a471c95f0e9f1be889f'>;
+  StorageHashBase<'sha256:372f890816e6e404f2365d11fca59175fa4e79ba84125ab08ca71c4561cf4581'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:121c95f63b02bdb28df5144a60628a5b77975d6946fe146da451075d1f3115d8'>;
+  ExecutionHashBase<'sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
@@ -78,11 +78,6 @@ export type FieldOutputTypes = {
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
     readonly embedding: Vector<1536> | null;
   };
-  readonly PostTag: {
-    readonly postId: CodecTypes['pg/text@1']['output'];
-    readonly tagId: CodecTypes['pg/text@1']['output'];
-  };
-  readonly Tag: { readonly id: Char<36>; readonly label: CodecTypes['pg/text@1']['output'] };
   readonly Task: {
     readonly id: Char<36>;
     readonly title: CodecTypes['pg/text@1']['output'];
@@ -117,14 +112,6 @@ export type FieldInputTypes = {
     readonly priority: 'low' | 'high' | 'urgent';
     readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
     readonly embedding: CodecTypes['pg/vector@1']['input'] | null;
-  };
-  readonly PostTag: {
-    readonly postId: CodecTypes['pg/text@1']['input'];
-    readonly tagId: CodecTypes['pg/text@1']['input'];
-  };
-  readonly Tag: {
-    readonly id: CodecTypes['sql/char@1']['input'];
-    readonly label: CodecTypes['pg/text@1']['input'];
   };
   readonly Task: {
     readonly id: CodecTypes['sql/char@1']['input'];
@@ -302,72 +289,6 @@ type ContractBase = Omit<
                     readonly index: true;
                   },
                 ];
-              };
-              readonly post_tag: {
-                columns: {
-                  readonly postId: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
-                  readonly tagId: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
-                };
-                primaryKey: { readonly columns: readonly ['postId', 'tagId'] };
-                uniques: readonly [];
-                indexes: readonly [];
-                foreignKeys: readonly [
-                  {
-                    readonly source: {
-                      readonly namespaceId: 'public' & NamespaceId;
-                      readonly tableName: 'post_tag';
-                      readonly columns: readonly ['postId'];
-                    };
-                    readonly target: {
-                      readonly namespaceId: 'public' & NamespaceId;
-                      readonly tableName: 'post';
-                      readonly columns: readonly ['id'];
-                    };
-                    readonly constraint: true;
-                    readonly index: true;
-                  },
-                  {
-                    readonly source: {
-                      readonly namespaceId: 'public' & NamespaceId;
-                      readonly tableName: 'post_tag';
-                      readonly columns: readonly ['tagId'];
-                    };
-                    readonly target: {
-                      readonly namespaceId: 'public' & NamespaceId;
-                      readonly tableName: 'tag';
-                      readonly columns: readonly ['id'];
-                    };
-                    readonly constraint: true;
-                    readonly index: true;
-                  },
-                ];
-              };
-              readonly tag: {
-                columns: {
-                  readonly id: {
-                    readonly nativeType: 'character';
-                    readonly codecId: 'sql/char@1';
-                    readonly nullable: false;
-                    readonly typeParams: { readonly length: 36 };
-                  };
-                  readonly label: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
-                };
-                primaryKey: { readonly columns: readonly ['id'] };
-                uniques: readonly [];
-                indexes: readonly [];
-                foreignKeys: readonly [];
               };
               readonly task: {
                 columns: {
@@ -574,21 +495,6 @@ type ContractBase = Omit<
           };
         };
         readonly relations: {
-          readonly tags: {
-            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Tag' };
-            readonly cardinality: 'N:M';
-            readonly on: {
-              readonly localFields: readonly ['id'];
-              readonly targetFields: readonly ['postId'];
-            };
-            readonly through: {
-              readonly table: 'post_tag';
-              readonly namespaceId: 'public';
-              readonly parentColumns: readonly ['postId'];
-              readonly childColumns: readonly ['tagId'];
-              readonly targetColumns: readonly ['id'];
-            };
-          };
           readonly user: {
             readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
             readonly cardinality: 'N:1';
@@ -608,85 +514,6 @@ type ContractBase = Omit<
             readonly priority: { readonly column: 'priority' };
             readonly createdAt: { readonly column: 'createdAt' };
             readonly embedding: { readonly column: 'embedding' };
-          };
-        };
-      };
-      readonly PostTag: {
-        readonly fields: {
-          readonly postId: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-          readonly tagId: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-        };
-        readonly relations: {
-          readonly post: {
-            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
-            readonly cardinality: 'N:1';
-            readonly on: {
-              readonly localFields: readonly ['postId'];
-              readonly targetFields: readonly ['id'];
-            };
-          };
-          readonly tag: {
-            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Tag' };
-            readonly cardinality: 'N:1';
-            readonly on: {
-              readonly localFields: readonly ['tagId'];
-              readonly targetFields: readonly ['id'];
-            };
-          };
-        };
-        readonly storage: {
-          readonly table: 'post_tag';
-          readonly namespaceId: 'public';
-          readonly fields: {
-            readonly postId: { readonly column: 'postId' };
-            readonly tagId: { readonly column: 'tagId' };
-          };
-        };
-      };
-      readonly Tag: {
-        readonly fields: {
-          readonly id: {
-            readonly nullable: false;
-            readonly type: {
-              readonly kind: 'scalar';
-              readonly codecId: 'sql/char@1';
-              readonly typeParams: { readonly length: 36 };
-            };
-          };
-          readonly label: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-        };
-        readonly relations: {
-          readonly posts: {
-            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
-            readonly cardinality: 'N:M';
-            readonly on: {
-              readonly localFields: readonly ['id'];
-              readonly targetFields: readonly ['tagId'];
-            };
-            readonly through: {
-              readonly table: 'post_tag';
-              readonly namespaceId: 'public';
-              readonly parentColumns: readonly ['tagId'];
-              readonly childColumns: readonly ['postId'];
-              readonly targetColumns: readonly ['id'];
-            };
-          };
-        };
-        readonly storage: {
-          readonly table: 'tag';
-          readonly namespaceId: 'public';
-          readonly fields: {
-            readonly id: { readonly column: 'id' };
-            readonly label: { readonly column: 'label' };
           };
         };
       };
@@ -825,8 +652,6 @@ type ContractBase = Omit<
   readonly roots: {
     readonly user: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
     readonly post: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
-    readonly tag: { readonly namespace: 'public' & NamespaceId; readonly model: 'Tag' };
-    readonly post_tag: { readonly namespace: 'public' & NamespaceId; readonly model: 'PostTag' };
     readonly task: { readonly namespace: 'public' & NamespaceId; readonly model: 'Task' };
   };
   readonly domain: {
@@ -909,21 +734,6 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
-              readonly tags: {
-                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Tag' };
-                readonly cardinality: 'N:M';
-                readonly on: {
-                  readonly localFields: readonly ['id'];
-                  readonly targetFields: readonly ['postId'];
-                };
-                readonly through: {
-                  readonly table: 'post_tag';
-                  readonly namespaceId: 'public';
-                  readonly parentColumns: readonly ['postId'];
-                  readonly childColumns: readonly ['tagId'];
-                  readonly targetColumns: readonly ['id'];
-                };
-              };
               readonly user: {
                 readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
                 readonly cardinality: 'N:1';
@@ -943,85 +753,6 @@ type ContractBase = Omit<
                 readonly priority: { readonly column: 'priority' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly embedding: { readonly column: 'embedding' };
-              };
-            };
-          };
-          readonly PostTag: {
-            readonly fields: {
-              readonly postId: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
-              readonly tagId: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
-            };
-            readonly relations: {
-              readonly post: {
-                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
-                readonly cardinality: 'N:1';
-                readonly on: {
-                  readonly localFields: readonly ['postId'];
-                  readonly targetFields: readonly ['id'];
-                };
-              };
-              readonly tag: {
-                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Tag' };
-                readonly cardinality: 'N:1';
-                readonly on: {
-                  readonly localFields: readonly ['tagId'];
-                  readonly targetFields: readonly ['id'];
-                };
-              };
-            };
-            readonly storage: {
-              readonly table: 'post_tag';
-              readonly namespaceId: 'public';
-              readonly fields: {
-                readonly postId: { readonly column: 'postId' };
-                readonly tagId: { readonly column: 'tagId' };
-              };
-            };
-          };
-          readonly Tag: {
-            readonly fields: {
-              readonly id: {
-                readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 36 };
-                };
-              };
-              readonly label: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
-            };
-            readonly relations: {
-              readonly posts: {
-                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
-                readonly cardinality: 'N:M';
-                readonly on: {
-                  readonly localFields: readonly ['id'];
-                  readonly targetFields: readonly ['tagId'];
-                };
-                readonly through: {
-                  readonly table: 'post_tag';
-                  readonly namespaceId: 'public';
-                  readonly parentColumns: readonly ['tagId'];
-                  readonly childColumns: readonly ['postId'];
-                  readonly targetColumns: readonly ['id'];
-                };
-              };
-            };
-            readonly storage: {
-              readonly table: 'tag';
-              readonly namespaceId: 'public';
-              readonly fields: {
-                readonly id: { readonly column: 'id' };
-                readonly label: { readonly column: 'label' };
               };
             };
           };
@@ -1257,15 +988,7 @@ type ContractBase = Omit<
     readonly mutations: {
       readonly defaults: readonly [
         {
-          readonly ref: {
-            readonly namespace: 'public';
-            readonly table: 'post';
-            readonly column: 'id';
-          };
-          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
-        },
-        {
-          readonly ref: { readonly table: 'tag'; readonly column: 'id' };
+          readonly ref: { readonly table: 'post'; readonly column: 'id' };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
         {
@@ -1273,11 +996,7 @@ type ContractBase = Omit<
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
         {
-          readonly ref: {
-            readonly namespace: 'public';
-            readonly table: 'user';
-            readonly column: 'id';
-          };
+          readonly ref: { readonly table: 'user'; readonly column: 'id' };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
       ];

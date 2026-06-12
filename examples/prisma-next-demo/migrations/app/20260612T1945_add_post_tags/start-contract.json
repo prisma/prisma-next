@@ -8,14 +8,6 @@
       "model": "Post",
       "namespace": "public"
     },
-    "post_tag": {
-      "model": "PostTag",
-      "namespace": "public"
-    },
-    "tag": {
-      "model": "Tag",
-      "namespace": "public"
-    },
     "task": {
       "model": "Task",
       "namespace": "public"
@@ -173,43 +165,11 @@
               }
             },
             "relations": {
-              "tags": {
-                "cardinality": "N:M",
-                "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "postId"
-                  ]
-                },
-                "through": {
-                  "childColumns": [
-                    "tagId"
-                  ],
-                  "namespaceId": "public",
-                  "parentColumns": [
-                    "postId"
-                  ],
-                  "table": "post_tag",
-                  "targetColumns": [
-                    "id"
-                  ]
-                },
-                "to": {
-                  "model": "Tag",
-                  "namespace": "public"
-                }
-              },
               "user": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": [
-                    "userId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
+                  "localFields": ["userId"],
+                  "targetFields": ["id"]
                 },
                 "to": {
                   "model": "User",
@@ -240,131 +200,6 @@
               },
               "namespaceId": "public",
               "table": "post"
-            }
-          },
-          "PostTag": {
-            "fields": {
-              "postId": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "tagId": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              }
-            },
-            "relations": {
-              "post": {
-                "cardinality": "N:1",
-                "on": {
-                  "localFields": [
-                    "postId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
-                },
-                "to": {
-                  "model": "Post",
-                  "namespace": "public"
-                }
-              },
-              "tag": {
-                "cardinality": "N:1",
-                "on": {
-                  "localFields": [
-                    "tagId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
-                },
-                "to": {
-                  "model": "Tag",
-                  "namespace": "public"
-                }
-              }
-            },
-            "storage": {
-              "fields": {
-                "postId": {
-                  "column": "postId"
-                },
-                "tagId": {
-                  "column": "tagId"
-                }
-              },
-              "namespaceId": "public",
-              "table": "post_tag"
-            }
-          },
-          "Tag": {
-            "fields": {
-              "id": {
-                "nullable": false,
-                "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
-                }
-              },
-              "label": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              }
-            },
-            "relations": {
-              "posts": {
-                "cardinality": "N:M",
-                "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "tagId"
-                  ]
-                },
-                "through": {
-                  "childColumns": [
-                    "postId"
-                  ],
-                  "namespaceId": "public",
-                  "parentColumns": [
-                    "tagId"
-                  ],
-                  "table": "post_tag",
-                  "targetColumns": [
-                    "id"
-                  ]
-                },
-                "to": {
-                  "model": "Post",
-                  "namespace": "public"
-                }
-              }
-            },
-            "storage": {
-              "fields": {
-                "id": {
-                  "column": "id"
-                },
-                "label": {
-                  "column": "label"
-                }
-              },
-              "namespaceId": "public",
-              "table": "tag"
             }
           },
           "Task": {
@@ -429,12 +264,8 @@
               "user": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": [
-                    "userId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
+                  "localFields": ["userId"],
+                  "targetFields": ["id"]
                 },
                 "to": {
                   "model": "User",
@@ -530,12 +361,8 @@
               "posts": {
                 "cardinality": "1:N",
                 "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "userId"
-                  ]
+                  "localFields": ["id"],
+                  "targetFields": ["userId"]
                 },
                 "to": {
                   "model": "Post",
@@ -545,12 +372,8 @@
               "tasks": {
                 "cardinality": "1:N",
                 "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "userId"
-                  ]
+                  "localFields": ["id"],
+                  "targetFields": ["userId"]
                 },
                 "to": {
                   "model": "Task",
@@ -660,16 +483,12 @@
                   "index": false,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "bug"
                   },
                   "target": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "task"
                   }
@@ -677,9 +496,7 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             },
@@ -710,16 +527,12 @@
                   "index": false,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "feature"
                   },
                   "target": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "task"
                   }
@@ -727,9 +540,7 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             },
@@ -801,16 +612,12 @@
                   "constraint": true,
                   "index": true,
                   "source": {
-                    "columns": [
-                      "userId"
-                    ],
+                    "columns": ["userId"],
                     "namespaceId": "public",
                     "tableName": "post"
                   },
                   "target": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -818,94 +625,7 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
-              },
-              "uniques": []
-            },
-            "post_tag": {
-              "columns": {
-                "postId": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "tagId": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                }
-              },
-              "foreignKeys": [
-                {
-                  "constraint": true,
-                  "index": true,
-                  "source": {
-                    "columns": [
-                      "postId"
-                    ],
-                    "namespaceId": "public",
-                    "tableName": "post_tag"
-                  },
-                  "target": {
-                    "columns": [
-                      "id"
-                    ],
-                    "namespaceId": "public",
-                    "tableName": "post"
-                  }
-                },
-                {
-                  "constraint": true,
-                  "index": true,
-                  "source": {
-                    "columns": [
-                      "tagId"
-                    ],
-                    "namespaceId": "public",
-                    "tableName": "post_tag"
-                  },
-                  "target": {
-                    "columns": [
-                      "id"
-                    ],
-                    "namespaceId": "public",
-                    "tableName": "tag"
-                  }
-                }
-              ],
-              "indexes": [],
-              "primaryKey": {
-                "columns": [
-                  "postId",
-                  "tagId"
-                ]
-              },
-              "uniques": []
-            },
-            "tag": {
-              "columns": {
-                "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
-                },
-                "label": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                }
-              },
-              "foreignKeys": [],
-              "indexes": [],
-              "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             },
@@ -963,16 +683,12 @@
                   "constraint": true,
                   "index": true,
                   "source": {
-                    "columns": [
-                      "userId"
-                    ],
+                    "columns": ["userId"],
                     "namespaceId": "public",
                     "tableName": "task"
                   },
                   "target": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -980,9 +696,7 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             },
@@ -1030,9 +744,7 @@
               "foreignKeys": [],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             }
@@ -1043,20 +755,13 @@
               "kind": "postgres-enum",
               "name": "user_type",
               "nativeType": "user_type",
-              "values": [
-                "admin",
-                "user"
-              ]
+              "values": ["admin", "user"]
             }
           },
           "valueSet": {
             "Priority": {
               "kind": "valueSet",
-              "values": [
-                "low",
-                "high",
-                "urgent"
-              ]
+              "values": ["low", "high", "urgent"]
             }
           }
         },
@@ -1064,7 +769,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:d1a720d7254dfa4cd2dc39353b21de48198fc5aa75dc9a471c95f0e9f1be889f",
+    "storageHash": "sha256:372f890816e6e404f2365d11fca59175fa4e79ba84125ab08ca71c4561cf4581",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",
@@ -1077,7 +782,7 @@
     }
   },
   "execution": {
-    "executionHash": "sha256:121c95f63b02bdb28df5144a60628a5b77975d6946fe146da451075d1f3115d8",
+    "executionHash": "sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e",
     "mutations": {
       "defaults": [
         {
@@ -1087,18 +792,7 @@
           },
           "ref": {
             "column": "id",
-            "namespace": "public",
             "table": "post"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "uuidv4",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "id",
-            "table": "tag"
           }
         },
         {
@@ -1118,7 +812,6 @@
           },
           "ref": {
             "column": "id",
-            "namespace": "public",
             "table": "user"
           }
         }
