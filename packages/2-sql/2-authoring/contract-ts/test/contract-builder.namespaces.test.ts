@@ -38,10 +38,10 @@ describe('SqlStorage.namespaces population', () => {
       models: [minimalModelArgs],
     });
     expect(Object.keys(contract.storage.namespaces).sort()).toEqual(['__unbound__', 'public']);
-    const slot = contract.storage.namespaces['public']!;
-    expect(slot).not.toBe(SqlUnboundNamespace.instance);
-    expect(slot.id).toBe('public');
-    expect(slot.entries.table?.['app_user']).toBeDefined();
+    const publicNamespace = contract.storage.namespaces['public']!;
+    expect(publicNamespace).not.toBe(SqlUnboundNamespace.instance);
+    expect(publicNamespace.id).toBe('public');
+    expect(publicNamespace.entries.table?.['app_user']).toBeDefined();
     expect(
       Object.keys(contract.storage.namespaces['__unbound__']!.entries.table ?? {}),
     ).toHaveLength(0);

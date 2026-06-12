@@ -119,15 +119,15 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
 
-    const typeSlot = blindCast<
+    const typeEntries = blindCast<
       Record<string, PostgresEnumType> | undefined,
       'hydrateEntriesKind populates entries[type] with PostgresEnumType instances'
     >(entries['type']);
-    const valueSetSlot = entries['valueSet'];
-    const hasValueSets = valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0;
-    const tableSlot = entries['table'] ?? {};
-    const emptyTables = Object.keys(tableSlot).length === 0;
-    const emptyTypes = !typeSlot || Object.keys(typeSlot).length === 0;
+    const valueSetEntries = entries['valueSet'];
+    const hasValueSets = valueSetEntries !== undefined && Object.keys(valueSetEntries).length > 0;
+    const tableEntries = entries['table'] ?? {};
+    const emptyTables = Object.keys(tableEntries).length === 0;
+    const emptyTypes = !typeEntries || Object.keys(typeEntries).length === 0;
     if (id === UNBOUND_NAMESPACE_ID && emptyTables && emptyTypes && !hasValueSets) {
       return PostgresSchema.unbound;
     }
@@ -137,14 +137,14 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
         table: blindCast<
           Record<string, unknown>,
           'table entries are StorageTable instances after base hydration'
-        >(tableSlot),
-        type: typeSlot ?? {},
+        >(tableEntries),
+        type: typeEntries ?? {},
         ...(hasValueSets
           ? {
               valueSet: blindCast<
                 Record<string, unknown>,
                 'valueSet entries are StorageValueSet instances after base hydration'
-              >(valueSetSlot),
+              >(valueSetEntries),
             }
           : {}),
       },

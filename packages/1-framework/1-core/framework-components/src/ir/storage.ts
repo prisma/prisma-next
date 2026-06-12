@@ -31,11 +31,11 @@ export interface EntityCoordinate {
  * value, yielded as {@link EntityCoordinate} tuples with
  * `plane: 'storage'` (the parameter type binds the plane).
  *
- * Iterates each namespace's `entries` slot maps structurally. Skips
+ * Iterates each namespace's `entries` kind maps structurally. Skips
  * non-object `entries`; `id` and `kind` are not walked (`kind` is
  * non-enumerable on concretions). For every entity-kind key under
  * `entries` whose value is a non-null object, yields one coordinate per
- * entity name in that map. No family-specific slot vocabulary is required.
+ * entity name in that map. No family-specific kind vocabulary is required.
  */
 export function* elementCoordinates(
   storage: Pick<StorageBase, 'namespaces'>,
@@ -43,9 +43,9 @@ export function* elementCoordinates(
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
     const entries = ns.entries;
     if (entries === null || typeof entries !== 'object') continue;
-    for (const [entityKind, slot] of Object.entries(entries)) {
-      if (slot === null || typeof slot !== 'object') continue;
-      for (const entityName of Object.keys(slot)) {
+    for (const [entityKind, kindMap] of Object.entries(entries)) {
+      if (kindMap === null || typeof kindMap !== 'object') continue;
+      for (const entityName of Object.keys(kindMap)) {
         yield { plane: 'storage', namespaceId, entityKind, entityName };
       }
     }
@@ -92,7 +92,7 @@ export function entityAt<T = unknown>(
  * is honest at every layer.
  *
  * Extends `IRNode` so the framework's IR-walking surfaces (verifiers,
- * serializers) can dispatch on `Storage`-typed slots through the same
+ * serializers) can dispatch on `Storage`-typed fields through the same
  * IR-node alphabet as every other node — the structural dual already
  * holds in code (every concrete storage class extends an IR-node base);
  * the interface promotion makes the typing honest.
