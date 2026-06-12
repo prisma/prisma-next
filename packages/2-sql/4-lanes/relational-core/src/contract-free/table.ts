@@ -7,10 +7,12 @@ import {
   type AnyFromSource,
   BinaryExpr,
   ColumnRef,
+  ExistsExpr,
   IdentifierRef,
   InsertAst,
   InsertOnConflict,
   type InsertValue,
+  JoinAst,
   LiteralExpr,
   NullCheckExpr,
   OperationExpr,
@@ -18,8 +20,9 @@ import {
   OrExpr,
   ParamRef,
   ProjectionItem,
+  RawExpr,
   SelectAst,
-  type TableSource,
+  TableSource,
   UpdateAst,
 } from '../ast/types';
 
@@ -69,6 +72,10 @@ export class CfExpr {
   eqParam(value: unknown, codecId: string): CfExpr {
     return new CfExpr(BinaryExpr.eq(this.ast, ParamRef.of(value, { codec: { codecId } })));
   }
+
+  eqExpr(other: CfExpr): CfExpr {
+    return new CfExpr(BinaryExpr.eq(this.ast, other.ast));
+  }
 }
 
 export interface CfFnOptions {
@@ -113,17 +120,50 @@ export const cfExpr = {
       }),
     );
   },
+  columnRef(qualifier: string, name: string): CfExpr {
+    return new CfExpr(ColumnRef.of(qualifier, name));
+  },
+  allOf(exprs: ReadonlyArray<CfExpr>): CfExpr {
+    return new CfExpr(AndExpr.of(exprs.map((expr) => expr.ast)));
+  },
+  /**
+   * Opaque DB-side SQL expression (e.g. `current_schema()`) carried as a
+   * `RawExpr`. For zero-operand catalog functions where a `'function'`
+   * lowering template has nothing to substitute.
+   */
+  raw(sql: string, returns: ParamSpec): CfExpr {
+    return new CfExpr(new RawExpr({ parts: [sql], returns }));
+  },
+  exists(query: CfExprSelectQuery): CfExpr {
+    return new CfExpr(ExistsExpr.exists(query.build()));
+  },
+  notExists(query: CfExprSelectQuery): CfExpr {
+    return new CfExpr(ExistsExpr.notExists(query.build()));
+  },
 };
+
+/** Aliased table source for catalog queries (no namespace coordinate). */
+export function cfTable(name: string, alias?: string): TableSource {
+  return TableSource.named(name, alias);
+}
 
 export class CfExprSelectQuery {
   constructor(
     private readonly src: AnyFromSource | undefined,
     private readonly projectionItems: ReadonlyArray<ProjectionItem>,
     private readonly whereExpr: CfExpr | undefined,
+    private readonly joinItems: ReadonlyArray<JoinAst> = [],
   ) {}
 
   from(source: AnyFromSource): CfExprSelectQuery {
-    return new CfExprSelectQuery(source, this.projectionItems, this.whereExpr);
+    return new CfExprSelectQuery(source, this.projectionItems, this.whereExpr, this.joinItems);
+  }
+
+  join(source: AnyFromSource, on: CfExpr): CfExprSelectQuery {
+    return new CfExprSelectQuery(this.src, this.projectionItems, this.whereExpr, [
+      ...this.joinItems,
+      JoinAst.inner(source, on.ast),
+    ]);
   }
 
   project(alias: string, expr: CfExpr): CfExprSelectQuery {
@@ -131,11 +171,12 @@ export class CfExprSelectQuery {
       this.src,
       [...this.projectionItems, ProjectionItem.of(alias, expr.ast)],
       this.whereExpr,
+      this.joinItems,
     );
   }
 
   where(expr: CfExpr): CfExprSelectQuery {
-    return new CfExprSelectQuery(this.src, this.projectionItems, expr);
+    return new CfExprSelectQuery(this.src, this.projectionItems, expr, this.joinItems);
   }
 
   build(): SelectAst {
@@ -143,7 +184,8 @@ export class CfExprSelectQuery {
       this.src !== undefined
         ? SelectAst.from(this.src).withProjection(this.projectionItems)
         : SelectAst.noFrom().withProjection(this.projectionItems);
-    return this.whereExpr !== undefined ? base.withWhere(this.whereExpr.ast) : base;
+    const withJoins = this.joinItems.length > 0 ? base.withJoins(this.joinItems) : base;
+    return this.whereExpr !== undefined ? withJoins.withWhere(this.whereExpr.ast) : withJoins;
   }
 }
 

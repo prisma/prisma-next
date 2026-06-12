@@ -12,6 +12,7 @@ export {
   type ColumnProxy,
   type ColumnSchema,
   cfExpr,
+  cfTable,
   type ExcludedProxy,
   exprSelect,
   type TableHandle,

@@ -1,17 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
   AggregateExpr,
+  type AndExpr,
   type BinaryExpr,
+  type ColumnRef,
+  type ExistsExpr,
   FunctionSource,
   IdentifierRef,
   LiteralExpr,
   NullCheckExpr,
   OperationExpr,
   ParamRef,
+  type RawExpr,
   SelectAst,
   TableSource,
 } from '../../src/exports/ast';
-import { CfExpr, cfExpr, exprSelect } from '../../src/exports/contract-free';
+import { CfExpr, cfExpr, cfTable, exprSelect } from '../../src/exports/contract-free';
 
 describe('FunctionSource', () => {
   it('creates a frozen function-source node with name and args', () => {
@@ -87,6 +91,127 @@ describe('cfExpr.fn — catalog function-call helper', () => {
     expect(nullCheck.kind).toBe('null-check');
     expect(nullCheck.isNull).toBe(true);
     expect((nullCheck.expr as OperationExpr).kind).toBe('operation');
+  });
+});
+
+describe('cfTable — aliased catalog table source', () => {
+  it('creates a TableSource with an alias and no namespace coordinate', () => {
+    const src = cfTable('pg_constraint', 'c');
+    expect(src).toBeInstanceOf(TableSource);
+    expect(src.name).toBe('pg_constraint');
+    expect(src.alias).toBe('c');
+    expect(src.namespaceId).toBeUndefined();
+  });
+
+  it('alias is optional', () => {
+    expect(cfTable('pg_namespace').alias).toBeUndefined();
+  });
+});
+
+describe('cfExpr.columnRef / eqExpr / allOf / raw', () => {
+  it('columnRef builds an alias-qualified ColumnRef', () => {
+    const ref = cfExpr.columnRef('c', 'conname').ast as ColumnRef;
+    expect(ref.kind).toBe('column-ref');
+    expect(ref.table).toBe('c');
+    expect(ref.column).toBe('conname');
+  });
+
+  it('eqExpr compares two expressions', () => {
+    const eq = cfExpr.columnRef('n', 'oid').eqExpr(cfExpr.columnRef('c', 'connamespace'))
+      .ast as BinaryExpr;
+    expect(eq.kind).toBe('binary');
+    expect(eq.op).toBe('eq');
+    expect((eq.left as ColumnRef).column).toBe('oid');
+    expect((eq.right as ColumnRef).column).toBe('connamespace');
+  });
+
+  it('allOf builds a flat AndExpr', () => {
+    const a = cfExpr.columnRef('c', 'conname').eqParam('user_pkey', 'pg/text@1');
+    const b = cfExpr.columnRef('n', 'nspname').eqParam('public', 'pg/text@1');
+    const c = cfExpr.columnRef('i', 'indisprimary');
+    const all = cfExpr.allOf([a, b, c]).ast as AndExpr;
+    expect(all.kind).toBe('and');
+    expect(all.exprs).toHaveLength(3);
+    expect(all.exprs[0]).toBe(a.ast);
+    expect(all.exprs[2]).toBe(c.ast);
+  });
+
+  it('raw carries opaque SQL with a return spec', () => {
+    const raw = cfExpr.raw('current_schema()', { codecId: 'pg/text@1', nullable: false })
+      .ast as RawExpr;
+    expect(raw.kind).toBe('raw-expr');
+    expect(raw.parts).toEqual(['current_schema()']);
+    expect(raw.returns).toEqual({ codecId: 'pg/text@1', nullable: false });
+  });
+});
+
+describe('CfExprSelectQuery.join — inner join surface', () => {
+  it('adds an INNER JOIN with an expression ON clause', () => {
+    const on = cfExpr.columnRef('n', 'oid').eqExpr(cfExpr.columnRef('c', 'connamespace'));
+    const ast = exprSelect()
+      .from(cfTable('pg_constraint', 'c'))
+      .join(cfTable('pg_namespace', 'n'), on)
+      .project('one', cfExpr.lit(1))
+      .build();
+
+    expect(ast.joins).toHaveLength(1);
+    const join = ast.joins?.[0];
+    expect(join?.joinType).toBe('inner');
+    expect(join?.lateral).toBe(false);
+    expect((join?.source as TableSource).alias).toBe('n');
+    expect(join?.on).toBe(on.ast);
+  });
+
+  it('chains multiple joins in order', () => {
+    const ast = exprSelect()
+      .from(cfTable('pg_index', 'i'))
+      .join(
+        cfTable('pg_class', 'c'),
+        cfExpr.columnRef('c', 'oid').eqExpr(cfExpr.columnRef('i', 'indrelid')),
+      )
+      .join(
+        cfTable('pg_namespace', 'n'),
+        cfExpr.columnRef('n', 'oid').eqExpr(cfExpr.columnRef('c', 'relnamespace')),
+      )
+      .project('one', cfExpr.lit(1))
+      .build();
+    expect(ast.joins).toHaveLength(2);
+    expect((ast.joins?.[0]?.source as TableSource).name).toBe('pg_class');
+    expect((ast.joins?.[1]?.source as TableSource).name).toBe('pg_namespace');
+  });
+});
+
+describe('cfExpr.exists / notExists — EXISTS projection (OQ4)', () => {
+  it('accepts a buildable CfExprSelectQuery and builds it internally', () => {
+    const inner = exprSelect()
+      .from(cfTable('pg_constraint', 'c'))
+      .project('one', cfExpr.lit(1))
+      .where(cfExpr.columnRef('c', 'conname').eqParam('user_pkey', 'pg/text@1'));
+
+    const exists = cfExpr.exists(inner).ast as ExistsExpr;
+    expect(exists.kind).toBe('exists');
+    expect(exists.notExists).toBe(false);
+    expect(exists.subquery).toBeInstanceOf(SelectAst);
+    expect((exists.subquery.from as TableSource).name).toBe('pg_constraint');
+    expect(exists.subquery.where?.kind).toBe('binary');
+  });
+
+  it('notExists sets the notExists flag on the same node kind', () => {
+    const inner = exprSelect().from(cfTable('pg_constraint', 'c')).project('one', cfExpr.lit(1));
+    const notExists = cfExpr.notExists(inner).ast as ExistsExpr;
+    expect(notExists.kind).toBe('exists');
+    expect(notExists.notExists).toBe(true);
+  });
+
+  it('composes with project() and collects subquery params', () => {
+    const inner = exprSelect()
+      .from(cfTable('pg_constraint', 'c'))
+      .project('one', cfExpr.lit(1))
+      .where(cfExpr.columnRef('c', 'conname').eqParam('user_pkey', 'pg/text@1'));
+    const ast = exprSelect().project('result', cfExpr.exists(inner)).build();
+    const refs = ast.collectParamRefs();
+    expect(refs).toHaveLength(1);
+    expect((refs[0] as ParamRef).value).toBe('user_pkey');
   });
 });
 
