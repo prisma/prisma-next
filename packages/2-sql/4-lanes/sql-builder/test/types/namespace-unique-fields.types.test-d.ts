@@ -1,10 +1,12 @@
 import { expectTypeOf, test } from 'vitest';
 import type { Db } from '../../src/exports/types';
+import type { ContractToQC } from '../../src/types/table-proxy';
 import type { Contract } from '../fixtures/generated/contract';
 
 /**
  * Regression: the same bare table name in two namespaces, each with a
- * namespace-UNIQUE column, must be selectable through its own namespace facet.
+ * namespace-UNIQUE column, must be selectable through its own namespace facet
+ * and resolve to that namespace's own column type.
  *
  * The generated fixture declares `public.users` with a unique `email` column.
  * Here we extend it with an `auth` namespace that declares the SAME bare table
@@ -14,7 +16,7 @@ import type { Contract } from '../fixtures/generated/contract';
  * derives its selectable columns from the table at that namespace coordinate
  * (`storage.namespaces[Ns].entries.table.users`) rather than a cross-namespace
  * union. So each namespace's unique column is selectable through its own facet,
- * and the other namespace's unique column is not.
+ * and resolves to its own type, while the other namespace's column is absent.
  */
 
 interface TwoNamespaceContract extends Omit<Contract, 'storage'> {
@@ -53,12 +55,33 @@ interface TwoNamespaceContract extends Omit<Contract, 'storage'> {
 
 declare const db: Db<TwoNamespaceContract>;
 
-test('the public-namespace users facet can select its unique column `email`', () => {
-  const row = db.public.users.select('id', 'email').build();
-  expectTypeOf(row).not.toBeNever();
+type PublicUsersColumns = ContractToQC<
+  TwoNamespaceContract,
+  'public',
+  'users'
+>['resolvedColumnOutputTypes'];
+type AuthUsersColumns = ContractToQC<
+  TwoNamespaceContract,
+  'auth',
+  'users'
+>['resolvedColumnOutputTypes'];
+
+test('the public-namespace users facet selects `email` and resolves it to its own type', () => {
+  // Selectable through the public facet — a compile error if it were not.
+  db.public.users.select('id', 'email').build();
+
+  expectTypeOf<PublicUsersColumns['id']>().toEqualTypeOf<number>();
+  expectTypeOf<PublicUsersColumns['email']>().toEqualTypeOf<string>();
+  // `token` belongs to auth.users, not public.users.
+  expectTypeOf<'token' extends keyof PublicUsersColumns ? true : false>().toEqualTypeOf<false>();
 });
 
-test('the auth-namespace users facet can select its unique column `token`', () => {
-  const row = db.auth.users.select('id', 'token').build();
-  expectTypeOf(row).not.toBeNever();
+test('the auth-namespace users facet selects `token` and resolves it to its own type', () => {
+  // Selectable through the auth facet — a compile error if it were not.
+  db.auth.users.select('id', 'token').build();
+
+  expectTypeOf<AuthUsersColumns['id']>().toEqualTypeOf<number>();
+  expectTypeOf<AuthUsersColumns['token']>().toEqualTypeOf<string>();
+  // `email` belongs to public.users, not auth.users.
+  expectTypeOf<'email' extends keyof AuthUsersColumns ? true : false>().toEqualTypeOf<false>();
 });
