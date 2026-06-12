@@ -7,7 +7,7 @@ function modelsOf(ir: Contract): Record<string, unknown> {
   return ir.domain.namespaces[UNBOUND_NAMESPACE_ID]!.models;
 }
 
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { parse, resolve } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToMongoContract } from '../src/interpreter';
 
@@ -54,9 +54,12 @@ function mongoCollectionsOf(ir: { readonly storage: unknown }): Record<string, u
 }
 
 function interpret(schema: string) {
-  const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
+  const { document, sourceFile } = parse(schema);
+  const resolved = resolve(document, { codecLookup: mongoCodecLookup });
   return interpretPslDocumentToMongoContract({
-    document,
+    document: resolved,
+    sourceId: 'test.prisma',
+    sourceFile,
     scalarTypeDescriptors: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
   });

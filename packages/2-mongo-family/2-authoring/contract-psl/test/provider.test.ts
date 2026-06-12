@@ -87,6 +87,66 @@ describe('mongoContract provider helper', () => {
     });
   });
 
+  it('does not surface a spurious diagnostic for a valid `ObjectId @id` schema', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'mongo-psl-provider-objectid-'));
+    tempDirs.push(tempDir);
+    const schemaPath = join(tempDir, 'schema.prisma');
+    await writeFile(
+      schemaPath,
+      `model User {
+  id ObjectId @id @map("_id")
+  name String
+}
+`,
+      'utf-8',
+    );
+
+    const contract = mongoContract('./schema.prisma');
+    const result = await contract.source.load(
+      createMongoTestContext({ resolvedInputs: [schemaPath] }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toMatchObject({
+      domain: { namespaces: { __unbound__: { models: { User: expect.any(Object) } } } },
+    });
+  });
+
+  it('still reports a genuinely unknown field type as PSL_UNSUPPORTED_FIELD_TYPE', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'mongo-psl-provider-unknown-'));
+    tempDirs.push(tempDir);
+    const schemaPath = join(tempDir, 'schema.prisma');
+    await writeFile(
+      schemaPath,
+      `model User {
+  id    ObjectId @id @map("_id")
+  thing Mystery
+}
+`,
+      'utf-8',
+    );
+
+    const contract = mongoContract('./schema.prisma');
+    const result = await contract.source.load(
+      createMongoTestContext({ resolvedInputs: [schemaPath] }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+          message: expect.stringContaining('Mystery'),
+        }),
+      ]),
+    );
+    expect(result.failure.diagnostics.some((d) => d.code === 'PSL_UNRESOLVED_TYPE_REFERENCE')).toBe(
+      false,
+    );
+  });
+
   it('returns read failure diagnostics with the resolved absolute schema path', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'mongo-psl-provider-'));
     tempDirs.push(tempDir);

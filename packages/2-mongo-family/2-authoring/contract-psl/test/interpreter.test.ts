@@ -14,7 +14,7 @@ import {
   MongoStorage,
   MongoValidator,
 } from '@prisma-next/mongo-contract';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { parse, resolve } from '@prisma-next/psl-parser/syntax';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { describe, expect, it } from 'vitest';
 import {
@@ -89,11 +89,14 @@ function model(ir: Contract, name: string): MongoModel {
 
 function interpret(
   schema: string,
-  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'document'>>,
+  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'document' | 'sourceFile'>>,
 ) {
-  const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
+  const { document, sourceFile } = parse(schema);
+  const resolved = resolve(document, { codecLookup: mongoCodecLookup });
   return interpretPslDocumentToMongoContract({
-    document,
+    document: resolved,
+    sourceId: 'test.prisma',
+    sourceFile,
     scalarTypeDescriptors: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
     ...overrides,
@@ -102,7 +105,7 @@ function interpret(
 
 function interpretOk(
   schema: string,
-  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'document'>>,
+  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'document' | 'sourceFile'>>,
 ) {
   const result = interpret(schema, overrides);
   expect(result.ok).toBe(true);
@@ -1881,20 +1884,12 @@ describe('interpretPslDocumentToMongoContract', () => {
 
   describe('namespace block rejection', () => {
     it('rejects explicit namespace blocks with a Mongo-flavoured diagnostic', () => {
-      const document = parsePslDocument({
-        schema: `namespace auth {
+      const result = interpret(`namespace auth {
   model User {
     id String @id
   }
 }
-`,
-        sourceId: 'schema.prisma',
-      });
-
-      const result = interpretPslDocumentToMongoContract({
-        document,
-        scalarTypeDescriptors: mongoScalarTypeDescriptors,
-      });
+`);
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -1913,20 +1908,12 @@ describe('interpretPslDocumentToMongoContract', () => {
     });
 
     it('rejects `namespace unbound { … }` (Mongo has no late-binding namespace)', () => {
-      const document = parsePslDocument({
-        schema: `namespace unbound {
+      const result = interpret(`namespace unbound {
   model Tenant {
     id String @id
   }
 }
-`,
-        sourceId: 'schema.prisma',
-      });
-
-      const result = interpretPslDocumentToMongoContract({
-        document,
-        scalarTypeDescriptors: mongoScalarTypeDescriptors,
-      });
+`);
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -1938,23 +1925,13 @@ describe('interpretPslDocumentToMongoContract', () => {
     });
 
     it('accepts top-level model declarations (no namespace block)', () => {
-      const document = parsePslDocument({
-        schema: `model User {
+      const ir = interpretOk(`model User {
   id ObjectId @id @map("_id")
   name String
 }
-`,
-        sourceId: 'schema.prisma',
-      });
+`);
 
-      const result = interpretPslDocumentToMongoContract({
-        document,
-        scalarTypeDescriptors: mongoScalarTypeDescriptors,
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(modelsOf(result.value)['User']).toBeDefined();
+      expect(modelsOf(ir)['User']).toBeDefined();
     });
   });
 });

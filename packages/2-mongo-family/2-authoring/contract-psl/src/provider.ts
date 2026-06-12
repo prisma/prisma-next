@@ -73,7 +73,17 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
         const { document, diagnostics: parseDiagnostics, sourceFile } = parse(schema);
         const resolved = resolve(document, { codecLookup: context.codecLookup });
 
-        const syntacticAndSemantic = [...parseDiagnostics, ...resolved.diagnostics];
+        // `ObjectId` and custom scalars legitimately resolve to an `unresolved`
+        // target in Mongo, so `resolve` emits `PSL_UNRESOLVED_TYPE_REFERENCE` for
+        // them. Forwarding it would surface a spurious error the interpreter would
+        // never raise: `PSL_UNSUPPORTED_FIELD_TYPE` (a `scalarTypeDescriptors` miss)
+        // is the authoritative unknown-type signal. All other resolve diagnostics
+        // (name-collision, extension-block) and parse diagnostics pass through.
+        const semanticDiagnostics = resolved.diagnostics.filter(
+          (diagnostic) => diagnostic.code !== 'PSL_UNRESOLVED_TYPE_REFERENCE',
+        );
+
+        const syntacticAndSemantic = [...parseDiagnostics, ...semanticDiagnostics];
         if (syntacticAndSemantic.length > 0) {
           return notOk({
             summary: `Failed to parse Prisma schema at "${schemaPath}"`,
