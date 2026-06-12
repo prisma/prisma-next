@@ -10,7 +10,7 @@ This demo shows:
 - Contract verification and marker management
 - Native Prisma Next patterns and best practices
 - ORM client end-to-end examples using `@prisma-next/sql-orm-client`
-- **Two workflows**: Emit workflow (JSON-based) and No-Emit workflow (TypeScript-based)
+- **Single contract source**: PSL (`src/prisma/contract.prisma`) emitted to `contract.json` + `contract.d.ts`
 - Client-generated UUID identifiers via `@prisma-next/ids`
 
 ## Comparison
@@ -18,16 +18,12 @@ This demo shows:
 - **`prisma-next-demo`** (this example): Shows Prisma Next native APIs
 - **`prisma-orm-demo`**: Shows using Prisma Next via the compatibility layer (mimics Prisma 7 API)
 
-## Workflows
+## Contract Workflow
 
-This demo includes two runtime implementations demonstrating different approaches:
-
-### 1. Emit Workflow (Default)
-
-Uses emitted `contract.json` and `contract.d.ts` files with the Postgres one-liner client. The emitted workflow uses `Contract` and `TypeMaps` explicitly: `postgres<Contract, TypeMaps>({ contractJson, url })`.
+The contract has a single source of truth: the PSL schema at `src/prisma/contract.prisma`. `prisma-next contract emit` (configured by `prisma-next.config.ts`) validates it and emits the machine-readable artifacts the app consumes — `src/prisma/contract.json` plus its type definitions `src/prisma/contract.d.ts`. The app hands those to the Postgres one-liner client with `Contract` and `TypeMaps` explicit: `postgres<Contract, TypeMaps>({ contractJson, url })`.
 
 - **Files**: `src/prisma/db.ts`, `src/main.ts`
-- **Contract source**: `src/prisma/contract.json` (emitted from `src/prisma/contract.prisma`)
+- **Contract source**: `src/prisma/contract.prisma`
 - **Usage**: `pnpm start -- [command]`
 - **Benefits**:
   - Contract is validated and normalized at emit time
@@ -42,36 +38,7 @@ pnpm seed
 pnpm start -- users
 ```
 
-#### Dual-mode emit validation (TS vs PSL)
-
-This repo maintains two emit configs:
-
-- **PSL emit (default)**: `prisma-next.config.ts`
-- **TypeScript emit**: `prisma-next.config.ts-contract.ts`
-
-To prove the demo test suite passes in both modes:
-
-```bash
-pnpm test:dual-mode
-```
-
-### 2. No-Emit Workflow
-
-Uses contract directly from TypeScript:
-
-- **Files**: `src/prisma-no-emit/runtime.ts`, `src/prisma-no-emit/context.ts`, `src/main-no-emit.ts`
-- **Contract source**: `prisma/contract.ts` (direct import)
-- **Usage**: `pnpm start:no-emit -- [command]`
-- **Benefits**:
-  - No emit step required - contract is used directly
-  - Full type safety from TypeScript
-  - Simpler workflow for development
-
-**Usage**:
-```bash
-# No emit step needed - just run the app
-pnpm start:no-emit -- users
-```
+`pnpm emit:check` re-emits and fails if the committed artifacts have drifted from the PSL source.
 
 ## Architecture
 
@@ -261,17 +228,13 @@ Run `pnpm dev` for the Vite app that visualizes the contract. It renders directl
 
 ## Key Files
 
-- `src/prisma/contract.prisma` - Prisma schema (source of truth for emitted workflow)
-- `prisma/contract.ts` - TypeScript contract (used by no-emit workflow)
-- `src/prisma/contract.json` - Emitted contract (emit workflow only)
-- `src/prisma/contract.d.ts` - Emitted types (emit workflow only)
-- `src/prisma/db.ts` - One-liner Postgres client + query roots (emit workflow)
-- `src/prisma-no-emit/context.ts` - Env-free execution stack/context + query roots (no-emit workflow)
-- `src/prisma-no-emit/runtime.ts` - Runtime factory (no-emit workflow)
+- `src/prisma/contract.prisma` - Prisma schema (single source of truth)
+- `src/prisma/contract.json` - Emitted contract
+- `src/prisma/contract.d.ts` - Emitted types
+- `src/prisma/db.ts` - One-liner Postgres client + query roots
 - `src/orm-client/client.ts` - ORM client + custom collection scopes
 - `src/orm-client/*.ts` - End-to-end ORM client query examples
-- `src/main.ts` - App entrypoint with arktype config validation (emit workflow)
-- `src/main-no-emit.ts` - App entrypoint with arktype config validation (no-emit workflow)
+- `src/main.ts` - App entrypoint with arktype config validation
 - `src/app/` - React browser visualization (validates contract, renders from constructed Contract)
 - `scripts/stamp-marker.ts` - Contract marker management
 - `scripts/seed.ts` - Database seeding (includes vector embeddings)
