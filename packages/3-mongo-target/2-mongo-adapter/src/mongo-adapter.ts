@@ -26,6 +26,7 @@ import {
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
 import { blindCast } from '@prisma-next/utils/casts';
+import { definedProps } from '@prisma-next/utils/defined';
 import { buildStandardCodecRegistry } from './core/codecs';
 import { structuralLowerFilter, structuralLowerPipeline } from './lowering';
 import { resolveDraftDoc } from './resolve-value';
@@ -53,60 +54,22 @@ async function resolveUpdate(
   return resolveDraftDoc(update, codecs, ctx);
 }
 
-function lowerDdlCommand(command: AnyMongoDdlCommand): AnyMongoWireCommand {
+function lowerDdlCommand(command: AnyMongoDdlCommand): AnyMongoDdlWireCommand {
   switch (command.kind) {
-    case 'createCollection': {
-      const options: Record<string, unknown> = {};
-      if (command.capped !== undefined) options['capped'] = command.capped;
-      if (command.size !== undefined) options['size'] = command.size;
-      if (command.max !== undefined) options['max'] = command.max;
-      if (command.timeseries !== undefined) options['timeseries'] = command.timeseries;
-      if (command.collation !== undefined) options['collation'] = command.collation;
-      if (command.clusteredIndex !== undefined) options['clusteredIndex'] = command.clusteredIndex;
-      if (command.validator !== undefined) options['validator'] = command.validator;
-      if (command.validationLevel !== undefined)
-        options['validationLevel'] = command.validationLevel;
-      if (command.validationAction !== undefined)
-        options['validationAction'] = command.validationAction;
-      if (command.changeStreamPreAndPostImages !== undefined)
-        options['changeStreamPreAndPostImages'] = command.changeStreamPreAndPostImages;
-      return new CreateCollectionWireCommand(command.collection, options);
-    }
-    case 'createIndex': {
-      const key = keysToKeySpec(command.keys);
-      const options: Record<string, unknown> = {};
-      if (command.unique !== undefined) options['unique'] = command.unique;
-      if (command.sparse !== undefined) options['sparse'] = command.sparse;
-      if (command.expireAfterSeconds !== undefined)
-        options['expireAfterSeconds'] = command.expireAfterSeconds;
-      if (command.partialFilterExpression !== undefined)
-        options['partialFilterExpression'] = command.partialFilterExpression;
-      if (command.name !== undefined) options['name'] = command.name;
-      if (command.wildcardProjection !== undefined)
-        options['wildcardProjection'] = command.wildcardProjection;
-      if (command.collation !== undefined) options['collation'] = command.collation;
-      if (command.weights !== undefined) options['weights'] = command.weights;
-      if (command.default_language !== undefined)
-        options['default_language'] = command.default_language;
-      if (command.language_override !== undefined)
-        options['language_override'] = command.language_override;
-      return new CreateIndexWireCommand(command.collection, key, options);
-    }
+    case 'createCollection':
+      return new CreateCollectionWireCommand(command.collection, definedProps(command.options));
+    case 'createIndex':
+      return new CreateIndexWireCommand(
+        command.collection,
+        keysToKeySpec(command.keys),
+        definedProps(command.options),
+      );
     case 'dropCollection':
       return new DropCollectionWireCommand(command.collection);
     case 'dropIndex':
       return new DropIndexWireCommand(command.collection, command.name);
-    case 'collMod': {
-      const options: Record<string, unknown> = {};
-      if (command.validator !== undefined) options['validator'] = command.validator;
-      if (command.validationLevel !== undefined)
-        options['validationLevel'] = command.validationLevel;
-      if (command.validationAction !== undefined)
-        options['validationAction'] = command.validationAction;
-      if (command.changeStreamPreAndPostImages !== undefined)
-        options['changeStreamPreAndPostImages'] = command.changeStreamPreAndPostImages;
-      return new CollModWireCommand(command.collection, options);
-    }
+    case 'collMod':
+      return new CollModWireCommand(command.collection, definedProps(command.options));
     // v8 ignore next 4
     default: {
       const _exhaustive: never = command;

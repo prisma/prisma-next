@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ifDefined } from '../src/defined';
+import { definedProps, ifDefined } from '../src/defined';
 
 describe('ifDefined', () => {
   it('returns object with key/value when value is defined', () => {
@@ -42,5 +42,33 @@ describe('ifDefined', () => {
     const context = { path: '/test', config: { debug: true } };
     const result = ifDefined('context', context);
     expect(result).toEqual({ context: { path: '/test', config: { debug: true } } });
+  });
+});
+
+describe('definedProps', () => {
+  it('returns empty object for undefined input', () => {
+    expect(definedProps(undefined)).toEqual({});
+  });
+
+  it('removes undefined-valued keys', () => {
+    const result = definedProps({ a: 1, b: undefined, c: 'x' });
+    expect(result).toEqual({ a: 1, c: 'x' });
+    expect('b' in result).toBe(false);
+  });
+
+  it('preserves null and other falsy values', () => {
+    const result = definedProps({ a: null, b: 0, c: false, d: '' });
+    expect(result).toEqual({ a: null, b: 0, c: false, d: '' });
+  });
+
+  it('returns a new object (no mutation)', () => {
+    const input = { a: 1, b: 2 };
+    const result = definedProps(input);
+    expect(result).not.toBe(input);
+    expect(result).toEqual({ a: 1, b: 2 });
+  });
+
+  it('returns empty object when all values are undefined', () => {
+    expect(definedProps({ a: undefined, b: undefined })).toEqual({});
   });
 });
