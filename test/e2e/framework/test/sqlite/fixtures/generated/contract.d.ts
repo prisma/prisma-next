@@ -30,75 +30,79 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   : _Encoded;
 
 export type FieldOutputTypes = {
-  readonly Comment: {
-    readonly id: CodecTypes['sqlite/integer@1']['output'];
-    readonly body: CodecTypes['sqlite/text@1']['output'];
-    readonly postId: CodecTypes['sqlite/integer@1']['output'];
-  };
-  readonly Item: {
-    readonly id: CodecTypes['sqlite/integer@1']['output'];
-    readonly name: CodecTypes['sqlite/text@1']['output'];
-    readonly label: CodecTypes['sqlite/text@1']['output'];
-  };
-  readonly Post: {
-    readonly id: CodecTypes['sqlite/integer@1']['output'];
-    readonly title: CodecTypes['sqlite/text@1']['output'];
-    readonly userId: CodecTypes['sqlite/integer@1']['output'];
-    readonly views: CodecTypes['sqlite/integer@1']['output'];
-  };
-  readonly Profile: {
-    readonly id: CodecTypes['sqlite/integer@1']['output'];
-    readonly userId: CodecTypes['sqlite/integer@1']['output'];
-    readonly bio: CodecTypes['sqlite/text@1']['output'];
-  };
-  readonly TypedRow: {
-    readonly id: CodecTypes['sqlite/integer@1']['output'];
-    readonly active: CodecTypes['sqlite/integer@1']['output'];
-    readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
-    readonly metadata: CodecTypes['sqlite/json@1']['output'] | null;
-    readonly label: CodecTypes['sqlite/text@1']['output'];
-  };
-  readonly User: {
-    readonly id: CodecTypes['sqlite/integer@1']['output'];
-    readonly name: CodecTypes['sqlite/text@1']['output'];
-    readonly email: CodecTypes['sqlite/text@1']['output'];
-    readonly invitedById: CodecTypes['sqlite/integer@1']['output'] | null;
+  readonly __unbound__: {
+    readonly Comment: {
+      readonly id: CodecTypes['sqlite/integer@1']['output'];
+      readonly body: CodecTypes['sqlite/text@1']['output'];
+      readonly postId: CodecTypes['sqlite/integer@1']['output'];
+    };
+    readonly Item: {
+      readonly id: CodecTypes['sqlite/integer@1']['output'];
+      readonly name: CodecTypes['sqlite/text@1']['output'];
+      readonly label: CodecTypes['sqlite/text@1']['output'];
+    };
+    readonly Post: {
+      readonly id: CodecTypes['sqlite/integer@1']['output'];
+      readonly title: CodecTypes['sqlite/text@1']['output'];
+      readonly userId: CodecTypes['sqlite/integer@1']['output'];
+      readonly views: CodecTypes['sqlite/integer@1']['output'];
+    };
+    readonly Profile: {
+      readonly id: CodecTypes['sqlite/integer@1']['output'];
+      readonly userId: CodecTypes['sqlite/integer@1']['output'];
+      readonly bio: CodecTypes['sqlite/text@1']['output'];
+    };
+    readonly TypedRow: {
+      readonly id: CodecTypes['sqlite/integer@1']['output'];
+      readonly active: CodecTypes['sqlite/integer@1']['output'];
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
+      readonly metadata: CodecTypes['sqlite/json@1']['output'] | null;
+      readonly label: CodecTypes['sqlite/text@1']['output'];
+    };
+    readonly User: {
+      readonly id: CodecTypes['sqlite/integer@1']['output'];
+      readonly name: CodecTypes['sqlite/text@1']['output'];
+      readonly email: CodecTypes['sqlite/text@1']['output'];
+      readonly invitedById: CodecTypes['sqlite/integer@1']['output'] | null;
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly Comment: {
-    readonly id: CodecTypes['sqlite/integer@1']['input'];
-    readonly body: CodecTypes['sqlite/text@1']['input'];
-    readonly postId: CodecTypes['sqlite/integer@1']['input'];
-  };
-  readonly Item: {
-    readonly id: CodecTypes['sqlite/integer@1']['input'];
-    readonly name: CodecTypes['sqlite/text@1']['input'];
-    readonly label: CodecTypes['sqlite/text@1']['input'];
-  };
-  readonly Post: {
-    readonly id: CodecTypes['sqlite/integer@1']['input'];
-    readonly title: CodecTypes['sqlite/text@1']['input'];
-    readonly userId: CodecTypes['sqlite/integer@1']['input'];
-    readonly views: CodecTypes['sqlite/integer@1']['input'];
-  };
-  readonly Profile: {
-    readonly id: CodecTypes['sqlite/integer@1']['input'];
-    readonly userId: CodecTypes['sqlite/integer@1']['input'];
-    readonly bio: CodecTypes['sqlite/text@1']['input'];
-  };
-  readonly TypedRow: {
-    readonly id: CodecTypes['sqlite/integer@1']['input'];
-    readonly active: CodecTypes['sqlite/integer@1']['input'];
-    readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
-    readonly metadata: CodecTypes['sqlite/json@1']['input'] | null;
-    readonly label: CodecTypes['sqlite/text@1']['input'];
-  };
-  readonly User: {
-    readonly id: CodecTypes['sqlite/integer@1']['input'];
-    readonly name: CodecTypes['sqlite/text@1']['input'];
-    readonly email: CodecTypes['sqlite/text@1']['input'];
-    readonly invitedById: CodecTypes['sqlite/integer@1']['input'] | null;
+  readonly __unbound__: {
+    readonly Comment: {
+      readonly id: CodecTypes['sqlite/integer@1']['input'];
+      readonly body: CodecTypes['sqlite/text@1']['input'];
+      readonly postId: CodecTypes['sqlite/integer@1']['input'];
+    };
+    readonly Item: {
+      readonly id: CodecTypes['sqlite/integer@1']['input'];
+      readonly name: CodecTypes['sqlite/text@1']['input'];
+      readonly label: CodecTypes['sqlite/text@1']['input'];
+    };
+    readonly Post: {
+      readonly id: CodecTypes['sqlite/integer@1']['input'];
+      readonly title: CodecTypes['sqlite/text@1']['input'];
+      readonly userId: CodecTypes['sqlite/integer@1']['input'];
+      readonly views: CodecTypes['sqlite/integer@1']['input'];
+    };
+    readonly Profile: {
+      readonly id: CodecTypes['sqlite/integer@1']['input'];
+      readonly userId: CodecTypes['sqlite/integer@1']['input'];
+      readonly bio: CodecTypes['sqlite/text@1']['input'];
+    };
+    readonly TypedRow: {
+      readonly id: CodecTypes['sqlite/integer@1']['input'];
+      readonly active: CodecTypes['sqlite/integer@1']['input'];
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
+      readonly metadata: CodecTypes['sqlite/json@1']['input'] | null;
+      readonly label: CodecTypes['sqlite/text@1']['input'];
+    };
+    readonly User: {
+      readonly id: CodecTypes['sqlite/integer@1']['input'];
+      readonly name: CodecTypes['sqlite/text@1']['input'];
+      readonly email: CodecTypes['sqlite/text@1']['input'];
+      readonly invitedById: CodecTypes['sqlite/integer@1']['input'] | null;
+    };
   };
 };
 export type TypeMaps = TypeMapsType<

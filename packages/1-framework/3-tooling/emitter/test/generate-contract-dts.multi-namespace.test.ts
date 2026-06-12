@@ -76,20 +76,21 @@ describe('generateContractDts domain namespace handling', () => {
       },
     };
     const dts = generateContractDts(contract, mockSqlHook, [], HASHES);
-    // The flattened top-level models type includes auth's User (emailAddress field).
-    // public's User (roleLabel field) is dropped from the flatten — roleLabel must not
-    // appear in the flattened section. It will appear in the per-namespace public block,
-    // so we check that emailAddress is present (it must appear twice: in the flatten and
-    // in the per-namespace auth block) and that roleLabel only appears once (per-namespace
-    // public block only, not in the flattened top-level models).
+    // The flattened top-level models type is still emitted (first-name-wins, auth's User)
+    // because it backs the public `Models` convenience export and the `ContractType<…, models>`
+    // model param. Internal type resolution no longer reads it — column/field types resolve
+    // per-namespace from the FieldOutputTypes / FieldInputTypes maps, which are now nested by
+    // namespace, so each namespace's own fields appear under their coordinate regardless of the
+    // flatten. Retiring the flat top-level models entirely is a separate follow-up.
     const emailCount = (dts.match(/emailAddress/g) ?? []).length;
     const roleLabelCount = (dts.match(/roleLabel/g) ?? []).length;
     // emailAddress appears in: (1) flattened ContractBase models type, (2) per-namespace auth
-    // block, (3) FieldOutputTypes, (4) FieldInputTypes — because auth.User wins the flatten.
+    // domain block, (3) FieldOutputTypes[auth], (4) FieldInputTypes[auth].
     expect(emailCount).toBe(4);
-    // roleLabel appears only in the per-namespace public block; it is NOT promoted into the
-    // flattened models type, FieldOutputTypes, or FieldInputTypes — public.User was dropped.
-    expect(roleLabelCount).toBe(1);
+    // roleLabel is dropped from the flattened top-level models (public.User loses the flatten)
+    // but is now present per-namespace: (1) the per-namespace public domain block,
+    // (2) FieldOutputTypes[public], (3) FieldInputTypes[public].
+    expect(roleLabelCount).toBe(3);
   });
 
   it('throws when the domain has no namespaces', () => {

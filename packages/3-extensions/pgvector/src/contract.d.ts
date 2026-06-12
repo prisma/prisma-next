@@ -43,8 +43,8 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   ? CodecTypes[CodecId]['output']
   : _Encoded;
 
-export type FieldOutputTypes = Record<string, never>;
-export type FieldInputTypes = Record<string, never>;
+export type FieldOutputTypes = { readonly public: Record<string, never> };
+export type FieldInputTypes = { readonly public: Record<string, never> };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,

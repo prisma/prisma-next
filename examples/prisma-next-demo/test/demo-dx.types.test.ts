@@ -38,7 +38,7 @@ test('SPI deserializeContract output is assignable to visualization shape', () =
 });
 
 test('emitted contract.d.ts types Post.priority as the value union, not string', () => {
-  type PriorityOutput = FieldOutputTypes['Post']['priority'];
+  type PriorityOutput = FieldOutputTypes['public']['Post']['priority'];
   expectTypeOf<PriorityOutput>().toEqualTypeOf<'low' | 'high' | 'urgent'>();
   expectTypeOf<PriorityOutput>().not.toEqualTypeOf<string>();
 });

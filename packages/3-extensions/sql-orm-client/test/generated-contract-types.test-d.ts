@@ -21,17 +21,19 @@ type GeneratedLikeCodecTypes = {
 };
 
 type GeneratedLikeFieldOutputTypes = {
-  User: {
-    id: string;
-    name: string;
-    email: string;
-    active: boolean;
-    metadata: unknown;
-  };
-  Post: {
-    id: string;
-    userId: string;
-    title: string;
+  __unbound__: {
+    User: {
+      id: string;
+      name: string;
+      email: string;
+      active: boolean;
+      metadata: unknown;
+    };
+    Post: {
+      id: string;
+      userId: string;
+      title: string;
+    };
   };
 };
 
@@ -388,11 +390,13 @@ type VOCodecTypes = {
 type ExpectedAddressShape = { street: string; city: string; zip: string };
 
 type VOFieldOutputTypes = {
-  User: {
-    id: number;
-    name: string;
-    homeAddress: ExpectedAddressShape | null;
-    workAddress: ExpectedAddressShape;
+  __unbound__: {
+    User: {
+      id: number;
+      name: string;
+      homeAddress: ExpectedAddressShape | null;
+      workAddress: ExpectedAddressShape;
+    };
   };
 };
 

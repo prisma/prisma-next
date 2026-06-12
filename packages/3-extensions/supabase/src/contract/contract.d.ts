@@ -44,59 +44,67 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   : _Encoded;
 
 export type FieldOutputTypes = {
-  readonly AuthIdentity: {
-    readonly id: CodecTypes['pg/uuid@1']['output'];
-    readonly user_id: CodecTypes['pg/uuid@1']['output'];
-    readonly provider: CodecTypes['pg/text@1']['output'];
-    readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
-    readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
+  readonly auth: {
+    readonly AuthIdentity: {
+      readonly id: CodecTypes['pg/uuid@1']['output'];
+      readonly user_id: CodecTypes['pg/uuid@1']['output'];
+      readonly provider: CodecTypes['pg/text@1']['output'];
+      readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
+      readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
+    };
+    readonly AuthUser: {
+      readonly id: CodecTypes['pg/uuid@1']['output'];
+      readonly email: CodecTypes['pg/text@1']['output'];
+      readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
+      readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
+    };
   };
-  readonly AuthUser: {
-    readonly id: CodecTypes['pg/uuid@1']['output'];
-    readonly email: CodecTypes['pg/text@1']['output'];
-    readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
-    readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
-  };
-  readonly StorageBucket: {
-    readonly id: CodecTypes['pg/text@1']['output'];
-    readonly name: CodecTypes['pg/text@1']['output'];
-    readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
-    readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
-  };
-  readonly StorageObject: {
-    readonly id: CodecTypes['pg/uuid@1']['output'];
-    readonly bucket_id: CodecTypes['pg/text@1']['output'];
-    readonly name: CodecTypes['pg/text@1']['output'];
-    readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
-    readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
+  readonly storage: {
+    readonly StorageBucket: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
+      readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
+    };
+    readonly StorageObject: {
+      readonly id: CodecTypes['pg/uuid@1']['output'];
+      readonly bucket_id: CodecTypes['pg/text@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
+      readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly AuthIdentity: {
-    readonly id: CodecTypes['pg/uuid@1']['input'];
-    readonly user_id: CodecTypes['pg/uuid@1']['input'];
-    readonly provider: CodecTypes['pg/text@1']['input'];
-    readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
-    readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
+  readonly auth: {
+    readonly AuthIdentity: {
+      readonly id: CodecTypes['pg/uuid@1']['input'];
+      readonly user_id: CodecTypes['pg/uuid@1']['input'];
+      readonly provider: CodecTypes['pg/text@1']['input'];
+      readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
+      readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
+    };
+    readonly AuthUser: {
+      readonly id: CodecTypes['pg/uuid@1']['input'];
+      readonly email: CodecTypes['pg/text@1']['input'];
+      readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
+      readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
+    };
   };
-  readonly AuthUser: {
-    readonly id: CodecTypes['pg/uuid@1']['input'];
-    readonly email: CodecTypes['pg/text@1']['input'];
-    readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
-    readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
-  };
-  readonly StorageBucket: {
-    readonly id: CodecTypes['pg/text@1']['input'];
-    readonly name: CodecTypes['pg/text@1']['input'];
-    readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
-    readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
-  };
-  readonly StorageObject: {
-    readonly id: CodecTypes['pg/uuid@1']['input'];
-    readonly bucket_id: CodecTypes['pg/text@1']['input'];
-    readonly name: CodecTypes['pg/text@1']['input'];
-    readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
-    readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
+  readonly storage: {
+    readonly StorageBucket: {
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
+      readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
+    };
+    readonly StorageObject: {
+      readonly id: CodecTypes['pg/uuid@1']['input'];
+      readonly bucket_id: CodecTypes['pg/text@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
+      readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
+    };
   };
 };
 export type TypeMaps = TypeMapsType<

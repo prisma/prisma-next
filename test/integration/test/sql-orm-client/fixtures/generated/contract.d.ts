@@ -60,119 +60,123 @@ export type AddressInput = {
   readonly zip: CodecTypes['pg/text@1']['input'] | null;
 };
 export type FieldOutputTypes = {
-  readonly Article: {
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly title: CodecTypes['pg/text@1']['output'];
-    readonly reviewerId: CodecTypes['pg/int4@1']['output'];
-  };
-  readonly Comment: {
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly body: CodecTypes['pg/text@1']['output'];
-    readonly postId: CodecTypes['pg/int4@1']['output'];
-  };
-  readonly Post: {
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly title: CodecTypes['pg/text@1']['output'];
-    readonly userId: CodecTypes['pg/int4@1']['output'];
-    readonly views: CodecTypes['pg/int4@1']['output'];
-    readonly embedding: Vector<3> | null;
-  };
-  readonly Profile: {
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly userId: CodecTypes['pg/int4@1']['output'];
-    readonly bio: CodecTypes['pg/text@1']['output'];
-  };
-  readonly Project: {
-    readonly tenantId: CodecTypes['pg/int4@1']['output'];
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly name: CodecTypes['pg/text@1']['output'];
-  };
-  readonly ProjectLink: {
-    readonly srcTenantId: CodecTypes['pg/int4@1']['output'];
-    readonly srcId: CodecTypes['pg/int4@1']['output'];
-    readonly dstTenantId: CodecTypes['pg/int4@1']['output'];
-    readonly dstId: CodecTypes['pg/int4@1']['output'];
-  };
-  readonly Role: { readonly id: Char<36>; readonly name: CodecTypes['pg/text@1']['output'] };
-  readonly Tag: { readonly id: Char<36>; readonly name: CodecTypes['pg/text@1']['output'] };
-  readonly User: {
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly name: CodecTypes['pg/text@1']['output'];
-    readonly email: CodecTypes['pg/text@1']['output'];
-    readonly invitedById: CodecTypes['pg/int4@1']['output'] | null;
-    readonly address: AddressOutput | null;
-  };
-  readonly UserRole: {
-    readonly userId: CodecTypes['pg/int4@1']['output'];
-    readonly roleId: CodecTypes['pg/text@1']['output'];
-    readonly level: CodecTypes['pg/int4@1']['output'];
-  };
-  readonly UserTag: {
-    readonly userId: CodecTypes['pg/int4@1']['output'];
-    readonly tagId: CodecTypes['pg/text@1']['output'];
-    readonly note: CodecTypes['pg/text@1']['output'] | null;
-    readonly createdAt: CodecTypes['pg/text@1']['output'];
+  readonly public: {
+    readonly Article: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly title: CodecTypes['pg/text@1']['output'];
+      readonly reviewerId: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly Comment: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly body: CodecTypes['pg/text@1']['output'];
+      readonly postId: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly Post: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly title: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/int4@1']['output'];
+      readonly views: CodecTypes['pg/int4@1']['output'];
+      readonly embedding: Vector<3> | null;
+    };
+    readonly Profile: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly userId: CodecTypes['pg/int4@1']['output'];
+      readonly bio: CodecTypes['pg/text@1']['output'];
+    };
+    readonly Project: {
+      readonly tenantId: CodecTypes['pg/int4@1']['output'];
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+    };
+    readonly ProjectLink: {
+      readonly srcTenantId: CodecTypes['pg/int4@1']['output'];
+      readonly srcId: CodecTypes['pg/int4@1']['output'];
+      readonly dstTenantId: CodecTypes['pg/int4@1']['output'];
+      readonly dstId: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly Role: { readonly id: Char<36>; readonly name: CodecTypes['pg/text@1']['output'] };
+    readonly Tag: { readonly id: Char<36>; readonly name: CodecTypes['pg/text@1']['output'] };
+    readonly User: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly email: CodecTypes['pg/text@1']['output'];
+      readonly invitedById: CodecTypes['pg/int4@1']['output'] | null;
+      readonly address: AddressOutput | null;
+    };
+    readonly UserRole: {
+      readonly userId: CodecTypes['pg/int4@1']['output'];
+      readonly roleId: CodecTypes['pg/text@1']['output'];
+      readonly level: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly UserTag: {
+      readonly userId: CodecTypes['pg/int4@1']['output'];
+      readonly tagId: CodecTypes['pg/text@1']['output'];
+      readonly note: CodecTypes['pg/text@1']['output'] | null;
+      readonly createdAt: CodecTypes['pg/text@1']['output'];
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly Article: {
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly title: CodecTypes['pg/text@1']['input'];
-    readonly reviewerId: CodecTypes['pg/int4@1']['input'];
-  };
-  readonly Comment: {
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly body: CodecTypes['pg/text@1']['input'];
-    readonly postId: CodecTypes['pg/int4@1']['input'];
-  };
-  readonly Post: {
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly title: CodecTypes['pg/text@1']['input'];
-    readonly userId: CodecTypes['pg/int4@1']['input'];
-    readonly views: CodecTypes['pg/int4@1']['input'];
-    readonly embedding: CodecTypes['pg/vector@1']['input'] | null;
-  };
-  readonly Profile: {
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly userId: CodecTypes['pg/int4@1']['input'];
-    readonly bio: CodecTypes['pg/text@1']['input'];
-  };
-  readonly Project: {
-    readonly tenantId: CodecTypes['pg/int4@1']['input'];
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly name: CodecTypes['pg/text@1']['input'];
-  };
-  readonly ProjectLink: {
-    readonly srcTenantId: CodecTypes['pg/int4@1']['input'];
-    readonly srcId: CodecTypes['pg/int4@1']['input'];
-    readonly dstTenantId: CodecTypes['pg/int4@1']['input'];
-    readonly dstId: CodecTypes['pg/int4@1']['input'];
-  };
-  readonly Role: {
-    readonly id: CodecTypes['sql/char@1']['input'];
-    readonly name: CodecTypes['pg/text@1']['input'];
-  };
-  readonly Tag: {
-    readonly id: CodecTypes['sql/char@1']['input'];
-    readonly name: CodecTypes['pg/text@1']['input'];
-  };
-  readonly User: {
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly name: CodecTypes['pg/text@1']['input'];
-    readonly email: CodecTypes['pg/text@1']['input'];
-    readonly invitedById: CodecTypes['pg/int4@1']['input'] | null;
-    readonly address: AddressInput | null;
-  };
-  readonly UserRole: {
-    readonly userId: CodecTypes['pg/int4@1']['input'];
-    readonly roleId: CodecTypes['pg/text@1']['input'];
-    readonly level: CodecTypes['pg/int4@1']['input'];
-  };
-  readonly UserTag: {
-    readonly userId: CodecTypes['pg/int4@1']['input'];
-    readonly tagId: CodecTypes['pg/text@1']['input'];
-    readonly note: CodecTypes['pg/text@1']['input'] | null;
-    readonly createdAt: CodecTypes['pg/text@1']['input'];
+  readonly public: {
+    readonly Article: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly reviewerId: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly Comment: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly body: CodecTypes['pg/text@1']['input'];
+      readonly postId: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly Post: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/int4@1']['input'];
+      readonly views: CodecTypes['pg/int4@1']['input'];
+      readonly embedding: CodecTypes['pg/vector@1']['input'] | null;
+    };
+    readonly Profile: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly userId: CodecTypes['pg/int4@1']['input'];
+      readonly bio: CodecTypes['pg/text@1']['input'];
+    };
+    readonly Project: {
+      readonly tenantId: CodecTypes['pg/int4@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+    };
+    readonly ProjectLink: {
+      readonly srcTenantId: CodecTypes['pg/int4@1']['input'];
+      readonly srcId: CodecTypes['pg/int4@1']['input'];
+      readonly dstTenantId: CodecTypes['pg/int4@1']['input'];
+      readonly dstId: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly Role: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+    };
+    readonly Tag: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+    };
+    readonly User: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly email: CodecTypes['pg/text@1']['input'];
+      readonly invitedById: CodecTypes['pg/int4@1']['input'] | null;
+      readonly address: AddressInput | null;
+    };
+    readonly UserRole: {
+      readonly userId: CodecTypes['pg/int4@1']['input'];
+      readonly roleId: CodecTypes['pg/text@1']['input'];
+      readonly level: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly UserTag: {
+      readonly userId: CodecTypes['pg/int4@1']['input'];
+      readonly tagId: CodecTypes['pg/text@1']['input'];
+      readonly note: CodecTypes['pg/text@1']['input'] | null;
+      readonly createdAt: CodecTypes['pg/text@1']['input'];
+    };
   };
 };
 export type TypeMaps = TypeMapsType<

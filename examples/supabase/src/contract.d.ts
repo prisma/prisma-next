@@ -45,17 +45,21 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   : _Encoded;
 
 export type FieldOutputTypes = {
-  readonly Profile: {
-    readonly id: CodecTypes['pg/uuid@1']['output'];
-    readonly username: CodecTypes['pg/text@1']['output'];
-    readonly userId: CodecTypes['pg/uuid@1']['output'];
+  readonly public: {
+    readonly Profile: {
+      readonly id: CodecTypes['pg/uuid@1']['output'];
+      readonly username: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/uuid@1']['output'];
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly Profile: {
-    readonly id: CodecTypes['pg/uuid@1']['input'];
-    readonly username: CodecTypes['pg/text@1']['input'];
-    readonly userId: CodecTypes['pg/uuid@1']['input'];
+  readonly public: {
+    readonly Profile: {
+      readonly id: CodecTypes['pg/uuid@1']['input'];
+      readonly username: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/uuid@1']['input'];
+    };
   };
 };
 export type TypeMaps = TypeMapsType<

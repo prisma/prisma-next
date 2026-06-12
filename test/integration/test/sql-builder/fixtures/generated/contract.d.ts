@@ -51,58 +51,62 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   : _Encoded;
 
 export type FieldOutputTypes = {
-  readonly Article: { readonly id: Char<36>; readonly title: CodecTypes['pg/text@1']['output'] };
-  readonly Comment: {
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly body: CodecTypes['pg/text@1']['output'];
-    readonly postId: CodecTypes['pg/int4@1']['output'];
-  };
-  readonly Post: {
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly title: CodecTypes['pg/text@1']['output'];
-    readonly userId: CodecTypes['pg/int4@1']['output'];
-    readonly views: CodecTypes['pg/int4@1']['output'];
-    readonly embedding: Vector<3> | null;
-  };
-  readonly Profile: {
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly userId: CodecTypes['pg/int4@1']['output'];
-    readonly bio: CodecTypes['pg/text@1']['output'];
-  };
-  readonly User: {
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly name: CodecTypes['pg/text@1']['output'];
-    readonly email: CodecTypes['pg/text@1']['output'];
-    readonly invitedById: CodecTypes['pg/int4@1']['output'] | null;
+  readonly public: {
+    readonly Article: { readonly id: Char<36>; readonly title: CodecTypes['pg/text@1']['output'] };
+    readonly Comment: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly body: CodecTypes['pg/text@1']['output'];
+      readonly postId: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly Post: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly title: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/int4@1']['output'];
+      readonly views: CodecTypes['pg/int4@1']['output'];
+      readonly embedding: Vector<3> | null;
+    };
+    readonly Profile: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly userId: CodecTypes['pg/int4@1']['output'];
+      readonly bio: CodecTypes['pg/text@1']['output'];
+    };
+    readonly User: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly email: CodecTypes['pg/text@1']['output'];
+      readonly invitedById: CodecTypes['pg/int4@1']['output'] | null;
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly Article: {
-    readonly id: CodecTypes['sql/char@1']['input'];
-    readonly title: CodecTypes['pg/text@1']['input'];
-  };
-  readonly Comment: {
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly body: CodecTypes['pg/text@1']['input'];
-    readonly postId: CodecTypes['pg/int4@1']['input'];
-  };
-  readonly Post: {
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly title: CodecTypes['pg/text@1']['input'];
-    readonly userId: CodecTypes['pg/int4@1']['input'];
-    readonly views: CodecTypes['pg/int4@1']['input'];
-    readonly embedding: CodecTypes['pg/vector@1']['input'] | null;
-  };
-  readonly Profile: {
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly userId: CodecTypes['pg/int4@1']['input'];
-    readonly bio: CodecTypes['pg/text@1']['input'];
-  };
-  readonly User: {
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly name: CodecTypes['pg/text@1']['input'];
-    readonly email: CodecTypes['pg/text@1']['input'];
-    readonly invitedById: CodecTypes['pg/int4@1']['input'] | null;
+  readonly public: {
+    readonly Article: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+    };
+    readonly Comment: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly body: CodecTypes['pg/text@1']['input'];
+      readonly postId: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly Post: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/int4@1']['input'];
+      readonly views: CodecTypes['pg/int4@1']['input'];
+      readonly embedding: CodecTypes['pg/vector@1']['input'] | null;
+    };
+    readonly Profile: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly userId: CodecTypes['pg/int4@1']['input'];
+      readonly bio: CodecTypes['pg/text@1']['input'];
+    };
+    readonly User: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly email: CodecTypes['pg/text@1']['input'];
+      readonly invitedById: CodecTypes['pg/int4@1']['input'] | null;
+    };
   };
 };
 export type TypeMaps = TypeMapsType<

@@ -9,9 +9,9 @@ type DbSql = PostgresClient<Contract>['sql'];
 type DbOrm = PostgresClient<Contract>['orm'];
 
 test('db.sql exposes the qualified namespace map', () => {
-  expectTypeOf(db.sql.public.users).toEqualTypeOf<TableProxy<Contract, 'users'>>();
+  expectTypeOf(db.sql.public.users).toEqualTypeOf<TableProxy<Contract, 'public', 'users'>>();
   expectTypeOf<Namespace<Contract, 'public'>['users']>().toEqualTypeOf<
-    TableProxy<Contract, 'users'>
+    TableProxy<Contract, 'public', 'users'>
   >();
 });
 
@@ -26,7 +26,7 @@ test('transaction re-types sql/orm with the same qualified surface', () => {
   expectTypeOf<TxOrm>().toEqualTypeOf<DbOrm>();
 
   db.transaction(async (tx) => {
-    expectTypeOf(tx.sql.public.users).toEqualTypeOf<TableProxy<Contract, 'users'>>();
+    expectTypeOf(tx.sql.public.users).toEqualTypeOf<TableProxy<Contract, 'public', 'users'>>();
     expectTypeOf(tx.orm.public.User).toHaveProperty('all');
     return undefined;
   });
@@ -35,5 +35,7 @@ test('transaction re-types sql/orm with the same qualified surface', () => {
 test('prepare callback receives the qualified sql surface', () => {
   type PrepareSql = Parameters<Parameters<PostgresClient<Contract>['prepare']>[1]>[0];
   expectTypeOf<PrepareSql>().toEqualTypeOf<Db<Contract>>();
-  expectTypeOf<PrepareSql['public']['users']>().toEqualTypeOf<TableProxy<Contract, 'users'>>();
+  expectTypeOf<PrepareSql['public']['users']>().toEqualTypeOf<
+    TableProxy<Contract, 'public', 'users'>
+  >();
 });

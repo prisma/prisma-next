@@ -44,8 +44,10 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   ? CodecTypes[CodecId]['output']
   : _Encoded;
 
-export type FieldOutputTypes = { readonly Note: { readonly id: Char<36> } };
-export type FieldInputTypes = { readonly Note: { readonly id: CodecTypes['sql/char@1']['input'] } };
+export type FieldOutputTypes = { readonly public: { readonly Note: { readonly id: Char<36> } } };
+export type FieldInputTypes = {
+  readonly public: { readonly Note: { readonly id: CodecTypes['sql/char@1']['input'] } };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,

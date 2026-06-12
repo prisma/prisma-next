@@ -23,16 +23,20 @@ type EnumCodecTypes = {
 };
 
 type EnumFieldOutputTypes = {
-  User: {
-    role: 'user' | 'admin';
-    status: 'active' | 'inactive' | null;
+  __unbound__: {
+    User: {
+      role: 'user' | 'admin';
+      status: 'active' | 'inactive' | null;
+    };
   };
 };
 
 type EnumFieldInputTypes = {
-  User: {
-    role: 'user' | 'admin';
-    status: 'active' | 'inactive' | null;
+  __unbound__: {
+    User: {
+      role: 'user' | 'admin';
+      status: 'active' | 'inactive' | null;
+    };
   };
 };
 

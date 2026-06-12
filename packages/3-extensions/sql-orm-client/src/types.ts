@@ -1,7 +1,8 @@
-import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type { AnnotationValue, OperationKind } from '@prisma-next/framework-components/runtime';
 import type {
   ExtractCodecTypes,
+  ExtractFieldOutputTypes,
   ExtractQueryOperationTypes,
   SqlStorage,
   StorageColumn,
@@ -120,6 +121,15 @@ export interface CollectionTypeState {
   readonly hasWhere: boolean;
   readonly hasUniqueFilter: boolean;
   readonly variantName: string | undefined;
+  /**
+   * The namespace coordinate this collection resolves at — set by the
+   * `orm.<ns>.<Model>` facet so the create/update/where input types (and the
+   * read row) resolve the model's fields within its namespace. `never` for a
+   * directly-constructed collection (resolution falls back to the model's own
+   * `storage.namespaceId`). Carried in the type state so it survives chaining
+   * (`.where(...)`, `.variant(...)`, …) automatically.
+   */
+  readonly nsId: string;
 }
 
 export type RelationCardinalityTag = '1:1' | 'N:1' | '1:N' | 'N:M';
@@ -129,7 +139,15 @@ export type DefaultCollectionTypeState = {
   readonly hasWhere: false;
   readonly hasUniqueFilter: false;
   readonly variantName: undefined;
+  readonly nsId: never;
 };
+
+// Stamp a namespace coordinate onto a collection type-state (used by the
+// `orm.<ns>.<Model>` facet). Preserves the rest of the state.
+export type WithNsId<State extends CollectionTypeState, NsId extends string> = Omit<
+  State,
+  'nsId'
+> & { readonly nsId: NsId };
 
 export interface RuntimeConnection extends RuntimeScope {
   release?(): Promise<void>;
@@ -397,12 +415,19 @@ export type RelationFilterAccessor<
   none(predicate?: RelationPredicateInput<TContract, RelatedModelName>): AnyExpression;
 };
 
-type ScalarModelAccessor<TContract extends Contract<SqlStorage>, ModelName extends string> = {
-  [K in keyof FieldsOf<TContract, ModelName> & string]: Expression<{
-    codecId: FieldCodecId<TContract, ModelName, K>;
-    nullable: FieldNullable<TContract, ModelName, K>;
+type ScalarModelAccessor<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> = {
+  [K in keyof FieldsOf<TContract, ModelName, NsId> & string]: Expression<{
+    codecId: FieldCodecId<TContract, ModelName, K, NsId>;
+    nullable: FieldNullable<TContract, ModelName, K, NsId>;
   }> &
-    ComparisonMethods<FieldJsType<TContract, ModelName, K>, FieldTraits<TContract, ModelName, K>> &
+    ComparisonMethods<
+      FieldJsType<TContract, ModelName, K, NsId>,
+      FieldTraits<TContract, ModelName, K, NsId>
+    > &
     FieldOperations<TContract, ModelName, K>;
 };
 
@@ -416,7 +441,8 @@ type RelationModelAccessor<TContract extends Contract<SqlStorage>, ModelName ext
 export type ModelAccessor<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-> = ScalarModelAccessor<TContract, ModelName> & RelationModelAccessor<TContract, ModelName>;
+  NsId extends string = never,
+> = ScalarModelAccessor<TContract, ModelName, NsId> & RelationModelAccessor<TContract, ModelName>;
 
 /**
  * The predicate accessor for a collection narrowed to a variant. When a real
@@ -428,10 +454,11 @@ export type VariantAwareModelAccessor<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   VariantName extends string | undefined,
+  NsId extends string = never,
 > = [VariantName] extends [string]
-  ? VariantName extends VariantNames<TContract, ModelName>
-    ? ScalarModelAccessor<TContract, ModelName> &
-        ScalarModelAccessor<TContract, VariantName> &
+  ? VariantName extends VariantNames<TContract, ModelName, NsId>
+    ? ScalarModelAccessor<TContract, ModelName, NsId> &
+        ScalarModelAccessor<TContract, VariantName, NsId> &
         // Relations are surfaced from the base model only, not the variant.
         // A variant model may declare its own relations in the contract, but
         // the runtime `createModelAccessor` resolves relations against the
@@ -439,8 +466,8 @@ export type VariantAwareModelAccessor<
         // predicate the runtime can't honour. Variant-relation predicates are
         // therefore deliberately not exposed on the variant-narrowed accessor.
         RelationModelAccessor<TContract, ModelName>
-    : ModelAccessor<TContract, ModelName>
-  : ModelAccessor<TContract, ModelName>;
+    : ModelAccessor<TContract, ModelName, NsId>
+  : ModelAccessor<TContract, ModelName, NsId>;
 
 /**
  * The flat default row of a single model: its own declared fields mapped to
@@ -454,37 +481,55 @@ export type VariantAwareModelAccessor<
  * is built from `DefaultModelRow`, not the other way around, so it can't be
  * re-expressed in terms of `InferRootRow`.
  */
-export type DefaultModelRow<TContract extends Contract<SqlStorage>, ModelName extends string> = {
-  [K in keyof FieldsOf<TContract, ModelName> & string]: FieldJsType<TContract, ModelName, K>;
+export type DefaultModelRow<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> = {
+  [K in keyof FieldsOf<TContract, ModelName, NsId> & string]: FieldJsType<
+    TContract,
+    ModelName,
+    K,
+    NsId
+  >;
 };
 
 type Simplify<T> = { [K in keyof T]: T[K] } & {};
 
-type VariantRow<TContract extends Contract<SqlStorage>, ModelName extends string> =
-  ModelDef<TContract, ModelName> extends {
+type VariantRow<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> =
+  ModelDef<TContract, ModelName, NsId> extends {
     readonly discriminator: { readonly field: infer DiscField extends string };
     readonly variants: infer V;
   }
     ? V extends Record<string, { readonly value: string }>
       ? {
-          [VK in keyof V]: VK extends string & keyof ModelsOf<TContract>
+          [VK in keyof V]: VK extends string & CollectionModelName<TContract>
             ? Simplify<
-                Omit<DefaultModelRow<TContract, ModelName>, DiscField> &
-                  DefaultModelRow<TContract, VK> &
+                Omit<DefaultModelRow<TContract, ModelName, NsId>, DiscField> &
+                  DefaultModelRow<TContract, VK, NsId> &
                   Record<DiscField, V[VK]['value']>
               >
             : never;
         }[keyof V]
-      : DefaultModelRow<TContract, ModelName>
-    : DefaultModelRow<TContract, ModelName>;
+      : DefaultModelRow<TContract, ModelName, NsId>
+    : DefaultModelRow<TContract, ModelName, NsId>;
 
 export type InferRootRow<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-> = VariantRow<TContract, ModelName>;
+  NsId extends string = never,
+> = VariantRow<TContract, ModelName, NsId>;
 
-export type VariantNames<TContract extends Contract<SqlStorage>, ModelName extends string> =
-  ModelDef<TContract, ModelName> extends {
+export type VariantNames<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> =
+  ModelDef<TContract, ModelName, NsId> extends {
     readonly variants: infer V extends Record<string, unknown>;
   }
     ? keyof V & string
@@ -494,21 +539,22 @@ export type VariantModelRow<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   VariantName extends string,
+  NsId extends string = never,
 > =
-  ModelDef<TContract, ModelName> extends {
+  ModelDef<TContract, ModelName, NsId> extends {
     readonly discriminator: { readonly field: infer DiscField extends string };
     readonly variants: infer V;
   }
     ? V extends Record<string, { readonly value: string }>
-      ? VariantName extends keyof V & string & keyof ModelsOf<TContract>
+      ? VariantName extends keyof V & string & CollectionModelName<TContract>
         ? Simplify<
-            Omit<DefaultModelRow<TContract, ModelName>, DiscField> &
-              DefaultModelRow<TContract, VariantName> &
+            Omit<DefaultModelRow<TContract, ModelName, NsId>, DiscField> &
+              DefaultModelRow<TContract, VariantName, NsId> &
               Record<DiscField, V[VariantName]['value']>
           >
-        : DefaultModelRow<TContract, ModelName>
-      : DefaultModelRow<TContract, ModelName>
-    : DefaultModelRow<TContract, ModelName>;
+        : DefaultModelRow<TContract, ModelName, NsId>
+      : DefaultModelRow<TContract, ModelName, NsId>
+    : DefaultModelRow<TContract, ModelName, NsId>;
 
 declare const aggregateResultBrand: unique symbol;
 
@@ -568,29 +614,104 @@ export interface HavingBuilder<TContract extends Contract<SqlStorage>, ModelName
 export type ShorthandWhereFilter<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
+  NsId extends string = never,
 > = Partial<{
-  [K in keyof DefaultModelRow<TContract, ModelName> & string]:
-    | DefaultModelRow<TContract, ModelName>[K]
+  [K in keyof DefaultModelRow<TContract, ModelName, NsId> & string]:
+    | DefaultModelRow<TContract, ModelName, NsId>[K]
     | null
     | undefined;
 }>;
 
-type ModelsOf<TContract extends Contract<SqlStorage>> = ContractModelDefinitions<TContract>;
+// The model map at an explicit namespace coordinate (the per-namespace domain
+// block). Used by the facet resolution path so same-named models across
+// namespaces resolve to each namespace's own model.
+type NamespaceModelsOf<
+  TContract extends Contract<SqlStorage>,
+  NsId extends string,
+> = NsId extends keyof TContract['domain']['namespaces']
+  ? TContract['domain']['namespaces'][NsId]['models'] extends infer M extends Record<
+      string,
+      unknown
+    >
+    ? M
+    : Record<string, never>
+  : Record<string, never>;
 
+// The model definition for `ModelName` found by scanning every domain namespace
+// block — never the flat cross-namespace model map. For a single-namespace
+// contract this is exactly the sole namespace's model (byte-for-byte identical
+// to the old flat read); under a same-bare-name collision it unions the
+// same-named models.
+type ScannedModelDef<TContract extends Contract<SqlStorage>, ModelName extends string> = {
+  [Ns in keyof TContract['domain']['namespaces']]: ModelName extends keyof TContract['domain']['namespaces'][Ns]['models']
+    ? TContract['domain']['namespaces'][Ns]['models'][ModelName]
+    : never;
+}[keyof TContract['domain']['namespaces']];
+
+// Resolve a model definition. With an explicit namespace coordinate it reads the
+// per-namespace domain block; without one (`never`) it scans every namespace
+// block (flat-map-free) for non-facet / single-namespace callers.
 type ModelDef<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-> = ModelName extends keyof ModelsOf<TContract> ? ModelsOf<TContract>[ModelName] : never;
+  NsId extends string = never,
+> = [NsId] extends [never]
+  ? ScannedModelDef<TContract, ModelName>
+  : ModelName extends keyof NamespaceModelsOf<TContract, NsId>
+    ? NamespaceModelsOf<TContract, NsId>[ModelName]
+    : never;
 
-type FieldsOf<TContract extends Contract<SqlStorage>, ModelName extends string> =
-  ModelDef<TContract, ModelName> extends { readonly fields: infer F }
+// The storage namespace id that declares a given table, found by scanning the
+// storage namespaces. Used as a fallback when a (flat) model definition does
+// not carry its own `storage.namespaceId`.
+type NamespaceContainingTable<TContract extends Contract<SqlStorage>, TableName extends string> = {
+  [K in keyof TContract['storage']['namespaces'] &
+    string]: TContract['storage']['namespaces'][K] extends {
+    readonly entries: { readonly table: infer Tables };
+  }
+    ? TableName extends keyof Tables
+      ? K
+      : never
+    : never;
+}[keyof TContract['storage']['namespaces'] & string];
+
+// The namespace coordinate to resolve a model's storage columns at: the
+// explicit `NsId` when threaded from a facet, else the model's own
+// `storage.namespaceId`, else the namespace whose storage block declares the
+// model's table (the sole namespace for single-namespace contracts).
+type ResolvedNsId<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> = [NsId] extends [never]
+  ? ModelDef<TContract, ModelName> extends {
+      readonly storage: { readonly namespaceId: infer N extends string };
+    }
+    ? N
+    : ModelDef<TContract, ModelName> extends {
+          readonly storage: { readonly table: infer T extends string };
+        }
+      ? NamespaceContainingTable<TContract, T>
+      : never
+  : NsId;
+
+type FieldsOf<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> =
+  ModelDef<TContract, ModelName, NsId> extends { readonly fields: infer F }
     ? F extends Record<string, unknown>
       ? F
       : Record<string, never>
     : Record<string, never>;
 
-type ModelStorageFields<TContract extends Contract<SqlStorage>, ModelName extends string> =
-  ModelDef<TContract, ModelName> extends {
+type ModelStorageFields<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> =
+  ModelDef<TContract, ModelName, NsId> extends {
     readonly storage: { readonly fields: infer Fields };
   }
     ? Fields extends Record<string, { readonly column: string }>
@@ -598,20 +719,32 @@ type ModelStorageFields<TContract extends Contract<SqlStorage>, ModelName extend
       : never
     : never;
 
-type ModelFieldToColumnMap<TContract extends Contract<SqlStorage>, ModelName extends string> =
-  ModelStorageFields<TContract, ModelName> extends infer Fields
+type ModelFieldToColumnMap<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> =
+  ModelStorageFields<TContract, ModelName, NsId> extends infer Fields
     ? Fields extends Record<string, { readonly column: string }>
       ? { readonly [F in keyof Fields]: Fields[F]['column'] }
       : never
     : never;
 
-type FieldToColumnMapSafe<TContract extends Contract<SqlStorage>, ModelName extends string> =
-  ModelFieldToColumnMap<TContract, ModelName> extends Record<string, string>
-    ? ModelFieldToColumnMap<TContract, ModelName>
+type FieldToColumnMapSafe<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> =
+  ModelFieldToColumnMap<TContract, ModelName, NsId> extends Record<string, string>
+    ? ModelFieldToColumnMap<TContract, ModelName, NsId>
     : never;
 
-type ModelTableName<TContract extends Contract<SqlStorage>, ModelName extends string> =
-  ModelDef<TContract, ModelName> extends {
+type ModelTableName<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> =
+  ModelDef<TContract, ModelName, NsId> extends {
     readonly storage: { readonly table: infer T extends string };
   }
     ? T
@@ -621,31 +754,51 @@ type FieldColumnName<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
-> = (FieldToColumnMapSafe<TContract, ModelName> extends never
+  NsId extends string = never,
+> = (FieldToColumnMapSafe<TContract, ModelName, NsId> extends never
   ? FieldName
-  : FieldName extends keyof FieldToColumnMapSafe<TContract, ModelName>
-    ? FieldToColumnMapSafe<TContract, ModelName>[FieldName]
+  : FieldName extends keyof FieldToColumnMapSafe<TContract, ModelName, NsId>
+    ? FieldToColumnMapSafe<TContract, ModelName, NsId>[FieldName]
     : FieldName) &
   string;
 
-type NamespaceTableDef<TContract extends Contract<SqlStorage>, TableName extends string> = {
-  [K in keyof TContract['storage']['namespaces']]: TContract['storage']['namespaces'][K] extends {
-    readonly entries: { readonly table: infer Tables };
-  }
-    ? TableName extends keyof Tables
-      ? Tables[TableName]
+// The storage table for a table name at an explicit namespace coordinate. With
+// `never` it scans every namespace for the table (single-namespace / flat).
+type NamespaceTableDef<
+  TContract extends Contract<SqlStorage>,
+  TableName extends string,
+  NsId extends string = never,
+> = [NsId] extends [never]
+  ? {
+      [K in keyof TContract['storage']['namespaces']]: TContract['storage']['namespaces'][K] extends {
+        readonly entries: { readonly table: infer Tables };
+      }
+        ? TableName extends keyof Tables
+          ? Tables[TableName]
+          : never
+        : never;
+    }[keyof TContract['storage']['namespaces']]
+  : NsId extends keyof TContract['storage']['namespaces']
+    ? TContract['storage']['namespaces'][NsId] extends {
+        readonly entries: { readonly table: infer Tables };
+      }
+      ? TableName extends keyof Tables
+        ? Tables[TableName]
+        : never
       : never
     : never;
-}[keyof TContract['storage']['namespaces']];
 
 type ResolvedStorageColumn<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
+  NsId extends string = never,
 > =
-  ModelTableName<TContract, ModelName> extends infer TableName extends string
-    ? FieldColumnName<TContract, ModelName, FieldName> extends infer ColName extends string
-      ? NamespaceTableDef<TContract, TableName> extends { readonly columns: infer Columns }
+  ModelTableName<TContract, ModelName, NsId> extends infer TableName extends string
+    ? FieldColumnName<TContract, ModelName, FieldName, NsId> extends infer ColName extends string
+      ? NamespaceTableDef<TContract, TableName, ResolvedNsId<TContract, ModelName, NsId>> extends {
+          readonly columns: infer Columns;
+        }
         ? ColName extends keyof Columns
           ? Columns[ColName] extends StorageColumn
             ? Columns[ColName]
@@ -659,37 +812,77 @@ type FieldStorageJsType<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
+  NsId extends string = never,
 > =
-  ResolvedStorageColumn<TContract, ModelName, FieldName> extends infer Col extends StorageColumn
-    ? ComputeColumnJsType<
-        TContract,
-        ModelTableName<TContract, ModelName> & string,
-        FieldColumnName<TContract, ModelName, FieldName> & string,
-        Col,
-        ExtractCodecTypes<TContract>
-      >
+  ResolvedStorageColumn<TContract, ModelName, FieldName, NsId> extends infer Col extends
+    StorageColumn
+    ? Col extends StorageColumn
+      ? ComputeColumnJsType<
+          TContract,
+          ResolvedNsId<TContract, ModelName, NsId>,
+          ModelTableName<TContract, ModelName, NsId> & string,
+          FieldColumnName<TContract, ModelName, FieldName, NsId> & string,
+          ExtractCodecTypes<TContract>
+        >
+      : never
     : never;
 
+// The refined output type of a field, read directly from the emitter's
+// namespace-nested `FieldOutputTypes[ns][model][field]` map. This carries every
+// field of the model (including value-object fields, which have no single
+// storage column), already typeParam-refined and nullability-applied. Resolves
+// to `never` when the namespace coordinate is absent from the map.
+type NamespaceFieldOutputType<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+  NsId extends string = never,
+> =
+  ResolvedNsId<TContract, ModelName, NsId> extends infer Ns extends string
+    ? ExtractFieldOutputTypes<TContract> extends infer Outputs
+      ? Ns extends keyof Outputs
+        ? Outputs[Ns] extends infer NamespaceOutputs
+          ? ModelName extends keyof NamespaceOutputs
+            ? NamespaceOutputs[ModelName] extends infer ModelOutputs
+              ? FieldName extends keyof ModelOutputs
+                ? ModelOutputs[FieldName]
+                : never
+              : never
+            : never
+          : never
+        : never
+      : never
+    : never;
+
+// The JS type of a model field. The emitter's per-namespace `FieldOutputTypes`
+// is the source of truth (refined codecs + value objects + nullability); for a
+// column-mapped field absent from that map (e.g. a namespace not present in the
+// emitted output map) it falls back to the codec-based storage resolution.
 type FieldJsType<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
-> = [FieldStorageJsType<TContract, ModelName, FieldName>] extends [never]
-  ? unknown
-  : FieldStorageJsType<TContract, ModelName, FieldName>;
+  NsId extends string = never,
+> = [NamespaceFieldOutputType<TContract, ModelName, FieldName, NsId>] extends [never]
+  ? [FieldStorageJsType<TContract, ModelName, FieldName, NsId>] extends [never]
+    ? unknown
+    : FieldStorageJsType<TContract, ModelName, FieldName, NsId>
+  : NamespaceFieldOutputType<TContract, ModelName, FieldName, NsId>;
 
 type FieldStorageColumn<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
-> = ResolvedStorageColumn<TContract, ModelName, FieldName>;
+  NsId extends string = never,
+> = ResolvedStorageColumn<TContract, ModelName, FieldName, NsId>;
 
 type FieldCodecId<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
+  NsId extends string = never,
 > =
-  FieldStorageColumn<TContract, ModelName, FieldName> extends {
+  FieldStorageColumn<TContract, ModelName, FieldName, NsId> extends {
     readonly codecId: infer Id extends string;
   }
     ? Id
@@ -699,8 +892,9 @@ type FieldNullable<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
+  NsId extends string = never,
 > =
-  FieldStorageColumn<TContract, ModelName, FieldName> extends {
+  FieldStorageColumn<TContract, ModelName, FieldName, NsId> extends {
     readonly nullable: infer N extends boolean;
   }
     ? N
@@ -710,8 +904,9 @@ type FieldTraits<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
+  NsId extends string = never,
 > =
-  FieldCodecId<TContract, ModelName, FieldName> extends infer Id extends string
+  FieldCodecId<TContract, ModelName, FieldName, NsId> extends infer Id extends string
     ? Id extends keyof ExtractCodecTypes<TContract>
       ? ExtractCodecTypes<TContract>[Id] extends { readonly traits: infer T }
         ? T
@@ -719,15 +914,20 @@ type FieldTraits<
       : never
     : never;
 
-export type NumericFieldNames<TContract extends Contract<SqlStorage>, ModelName extends string> = {
-  [K in keyof DefaultModelRow<TContract, ModelName> & string]: 'numeric' extends FieldTraits<
+export type NumericFieldNames<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> = {
+  [K in keyof DefaultModelRow<TContract, ModelName, NsId> & string]: 'numeric' extends FieldTraits<
     TContract,
     ModelName,
-    K
+    K,
+    NsId
   >
     ? K
     : never;
-}[keyof DefaultModelRow<TContract, ModelName> & string];
+}[keyof DefaultModelRow<TContract, ModelName, NsId> & string];
 
 type ExecutionDefaultEntry<TContract extends Contract<SqlStorage>> =
   TContract['execution'] extends {
@@ -744,13 +944,14 @@ type HasExecutionCreateDefault<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
+  NsId extends string = never,
 > = [
   Extract<
     ExecutionDefaultEntry<TContract>,
     {
       readonly ref: {
-        readonly table: ModelTableName<TContract, ModelName>;
-        readonly column: FieldColumnName<TContract, ModelName, FieldName>;
+        readonly table: ModelTableName<TContract, ModelName, NsId>;
+        readonly column: FieldColumnName<TContract, ModelName, FieldName, NsId>;
       };
       readonly onCreate?: unknown;
     }
@@ -763,61 +964,88 @@ type IsOptionalCreateField<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
+  NsId extends string = never,
 > =
-  FieldStorageColumn<TContract, ModelName, FieldName> extends infer Column
+  FieldStorageColumn<TContract, ModelName, FieldName, NsId> extends infer Column
     ? Column extends StorageColumn
       ? Column['nullable'] extends true
         ? true
         : Column extends { readonly default: unknown }
           ? true
-          : HasExecutionCreateDefault<TContract, ModelName, FieldName>
-      : HasExecutionCreateDefault<TContract, ModelName, FieldName>
-    : HasExecutionCreateDefault<TContract, ModelName, FieldName>;
+          : HasExecutionCreateDefault<TContract, ModelName, FieldName, NsId>
+      : HasExecutionCreateDefault<TContract, ModelName, FieldName, NsId>
+    : HasExecutionCreateDefault<TContract, ModelName, FieldName, NsId>;
 
 type CreateFieldNames<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-> = keyof DefaultModelRow<TContract, ModelName> & string;
+  NsId extends string = never,
+> = keyof DefaultModelRow<TContract, ModelName, NsId> & string;
 
-type RequiredCreateFieldNames<TContract extends Contract<SqlStorage>, ModelName extends string> = {
-  [K in CreateFieldNames<TContract, ModelName>]-?: IsOptionalCreateField<
+type RequiredCreateFieldNames<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> = {
+  [K in CreateFieldNames<TContract, ModelName, NsId>]-?: IsOptionalCreateField<
     TContract,
     ModelName,
-    K
+    K,
+    NsId
   > extends true
     ? never
     : K;
-}[CreateFieldNames<TContract, ModelName>];
+}[CreateFieldNames<TContract, ModelName, NsId>];
 
-type OptionalCreateFieldNames<TContract extends Contract<SqlStorage>, ModelName extends string> = {
-  [K in CreateFieldNames<TContract, ModelName>]-?: IsOptionalCreateField<
+type OptionalCreateFieldNames<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> = {
+  [K in CreateFieldNames<TContract, ModelName, NsId>]-?: IsOptionalCreateField<
     TContract,
     ModelName,
-    K
+    K,
+    NsId
   > extends true
     ? K
     : never;
-}[CreateFieldNames<TContract, ModelName>];
+}[CreateFieldNames<TContract, ModelName, NsId>];
 
-export type CreateInput<TContract extends Contract<SqlStorage>, ModelName extends string> = Pick<
-  DefaultModelRow<TContract, ModelName>,
-  RequiredCreateFieldNames<TContract, ModelName>
+export type CreateInput<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> = Pick<
+  DefaultModelRow<TContract, ModelName, NsId>,
+  RequiredCreateFieldNames<TContract, ModelName, NsId>
 > &
   Partial<
-    Pick<DefaultModelRow<TContract, ModelName>, OptionalCreateFieldNames<TContract, ModelName>>
+    Pick<
+      DefaultModelRow<TContract, ModelName, NsId>,
+      OptionalCreateFieldNames<TContract, ModelName, NsId>
+    >
   > &
   RelationMutationFields<TContract, ModelName>;
 
-type IsPolymorphicBase<TContract extends Contract<SqlStorage>, ModelName extends string> =
-  ModelDef<TContract, ModelName> extends {
+type IsPolymorphicBase<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> =
+  ModelDef<TContract, ModelName, NsId> extends {
     readonly discriminator: unknown;
     readonly variants: Record<string, unknown>;
   }
     ? true
     : false;
 
-type DiscriminatorFieldName<TContract extends Contract<SqlStorage>, ModelName extends string> =
-  ModelDef<TContract, ModelName> extends {
+type DiscriminatorFieldName<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> =
+  ModelDef<TContract, ModelName, NsId> extends {
     readonly discriminator: { readonly field: infer F extends string };
   }
     ? F
@@ -827,19 +1055,24 @@ export type VariantCreateInput<
   TContract extends Contract<SqlStorage>,
   BaseModelName extends string,
   VariantName extends string,
-> = Omit<CreateInput<TContract, BaseModelName>, DiscriminatorFieldName<TContract, BaseModelName>> &
-  CreateInput<TContract, VariantName>;
+  NsId extends string = never,
+> = Omit<
+  CreateInput<TContract, BaseModelName, NsId>,
+  DiscriminatorFieldName<TContract, BaseModelName, NsId>
+> &
+  CreateInput<TContract, VariantName, NsId>;
 
 export type ResolvedCreateInput<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   VName extends string | undefined,
+  NsId extends string = never,
 > =
-  IsPolymorphicBase<TContract, ModelName> extends true
+  IsPolymorphicBase<TContract, ModelName, NsId> extends true
     ? VName extends string
-      ? VariantCreateInput<TContract, ModelName, VName>
+      ? VariantCreateInput<TContract, ModelName, VName, NsId>
       : never
-    : CreateInput<TContract, ModelName>;
+    : CreateInput<TContract, ModelName, NsId>;
 
 type ModelStorageTableDef<TContract extends Contract<SqlStorage>, ModelName extends string> =
   ModelTableName<TContract, ModelName> extends infer TableName extends string
@@ -988,12 +1221,14 @@ type RelationMutationFields<
 }>;
 
 type AllModelRelationEntries<TContract extends Contract<SqlStorage>> = {
-  [M in keyof ModelsOf<TContract>]: ModelsOf<TContract>[M] extends {
-    readonly relations: infer R extends Record<string, unknown>;
-  }
-    ? R[keyof R]
-    : never;
-}[keyof ModelsOf<TContract>];
+  [Ns in keyof TContract['domain']['namespaces']]: {
+    [M in keyof TContract['domain']['namespaces'][Ns]['models']]: TContract['domain']['namespaces'][Ns]['models'][M] extends {
+      readonly relations: infer R extends Record<string, unknown>;
+    }
+      ? R[keyof R]
+      : never;
+  }[keyof TContract['domain']['namespaces'][Ns]['models']];
+}[keyof TContract['domain']['namespaces']];
 
 type RelationDefWithTargetFields = {
   readonly to: { readonly model: string };
@@ -1017,29 +1252,35 @@ type ChildForeignKeyFieldNames<TContract extends Contract<SqlStorage>, ModelName
 type NestedOptionalCreateFieldNames<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
+  NsId extends string = never,
 > =
-  | OptionalCreateFieldNames<TContract, ModelName>
+  | OptionalCreateFieldNames<TContract, ModelName, NsId>
   | Extract<
       ChildForeignKeyFieldNames<TContract, ModelName>,
-      CreateFieldNames<TContract, ModelName>
+      CreateFieldNames<TContract, ModelName, NsId>
     >;
 
 type NestedRequiredCreateFieldNames<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
+  NsId extends string = never,
 > = Exclude<
-  CreateFieldNames<TContract, ModelName>,
-  NestedOptionalCreateFieldNames<TContract, ModelName>
+  CreateFieldNames<TContract, ModelName, NsId>,
+  NestedOptionalCreateFieldNames<TContract, ModelName, NsId>
 >;
 
-type NestedCreateInput<TContract extends Contract<SqlStorage>, ModelName extends string> = Pick<
-  DefaultModelRow<TContract, ModelName>,
-  NestedRequiredCreateFieldNames<TContract, ModelName>
+type NestedCreateInput<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> = Pick<
+  DefaultModelRow<TContract, ModelName, NsId>,
+  NestedRequiredCreateFieldNames<TContract, ModelName, NsId>
 > &
   Partial<
     Pick<
-      DefaultModelRow<TContract, ModelName>,
-      NestedOptionalCreateFieldNames<TContract, ModelName>
+      DefaultModelRow<TContract, ModelName, NsId>,
+      NestedOptionalCreateFieldNames<TContract, ModelName, NsId>
     >
   >;
 
@@ -1052,21 +1293,29 @@ type AtLeastOne<T> = keyof T extends never
 export type MutationCreateInput<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-> = NestedCreateInput<TContract, ModelName> & RelationMutationFields<TContract, ModelName>;
+  NsId extends string = never,
+> = NestedCreateInput<TContract, ModelName, NsId> & RelationMutationFields<TContract, ModelName>;
 
 export type MutationCreateInputWithRelations<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-> = NestedCreateInput<TContract, ModelName> &
+  NsId extends string = never,
+> = NestedCreateInput<TContract, ModelName, NsId> &
   AtLeastOne<RelationMutationFields<TContract, ModelName>>;
 
 export type MutationUpdateInput<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-> = Partial<DefaultModelRow<TContract, ModelName>> & RelationMutationFields<TContract, ModelName>;
+  NsId extends string = never,
+> = Partial<DefaultModelRow<TContract, ModelName, NsId>> &
+  RelationMutationFields<TContract, ModelName>;
 
-type ModelRelations<TContract extends Contract<SqlStorage>, ModelName extends string> =
-  ModelDef<TContract, ModelName> extends { readonly relations: infer R }
+type ModelRelations<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> =
+  ModelDef<TContract, ModelName, NsId> extends { readonly relations: infer R }
     ? R extends Record<string, unknown>
       ? R
       : Record<string, never>
@@ -1082,25 +1331,28 @@ type ExactRecord<T> =
 export type RelationsOf<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-> = ExactRecord<ModelRelations<TContract, ModelName>>;
+  NsId extends string = never,
+> = ExactRecord<ModelRelations<TContract, ModelName, NsId>>;
 
 export type RelationNames<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-> = (string extends keyof RelationsOf<TContract, ModelName>
+  NsId extends string = never,
+> = (string extends keyof RelationsOf<TContract, ModelName, NsId>
   ? never
   : {
       // Filter out relation keys whose type is `never` — those are cross-space
       // relations (Option B): declared in the contract but non-navigable via
       // `include`. Emitting the relation as `never` in the `.d.ts` and
       // excluding it here makes `include('relName')` a compile error.
-      [K in keyof RelationsOf<TContract, ModelName>]: RelationsOf<
+      [K in keyof RelationsOf<TContract, ModelName, NsId>]: RelationsOf<
         TContract,
-        ModelName
+        ModelName,
+        NsId
       >[K] extends never
         ? never
         : K;
-    }[keyof RelationsOf<TContract, ModelName>]) &
+    }[keyof RelationsOf<TContract, ModelName, NsId>]) &
   string;
 
 type RelationModelName<Relation> = Relation extends {
@@ -1113,11 +1365,35 @@ export type RelatedModelName<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   RelName extends string,
+  NsId extends string = never,
 > =
-  RelationsOf<TContract, ModelName> extends infer Rels
+  RelationsOf<TContract, ModelName, NsId> extends infer Rels
     ? Rels extends Record<string, unknown>
       ? RelName extends keyof Rels
         ? RelationModelName<Rels[RelName]>
+        : never
+      : never
+    : never;
+
+// The namespace coordinate the relation's target model lives in, read from the
+// relation's `to.namespace`. Lets a relation reached through an explicit
+// namespace facet resolve its included row at the target namespace rather than
+// the parent facet's. Without a facet coordinate (`never`) it stays `never` so
+// the included row resolves through the same default path as before — a
+// non-facet collection's include shape is unchanged.
+export type RelationTargetNamespace<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  RelName extends string,
+  NsId extends string = never,
+> = [NsId] extends [never]
+  ? never
+  : RelationsOf<TContract, ModelName, NsId> extends infer Rels
+    ? Rels extends Record<string, unknown>
+      ? RelName extends keyof Rels
+        ? Rels[RelName] extends { readonly to: { readonly namespace: infer N extends string } }
+          ? N
+          : never
         : never
       : never
     : never;
@@ -1132,8 +1408,9 @@ export type RelationCardinality<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   RelName extends string,
+  NsId extends string = never,
 > =
-  RelationsOf<TContract, ModelName> extends infer Rels
+  RelationsOf<TContract, ModelName, NsId> extends infer Rels
     ? Rels extends Record<string, unknown>
       ? RelName extends keyof Rels
         ? RelationCardinalityFromRelation<Rels[RelName]>
@@ -1193,10 +1470,15 @@ type IsToOneRelationNullable<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   RelName extends string,
+  NsId extends string = never,
 > =
-  ModelTableName<TContract, ModelName> extends infer TableName extends string
-    ? NamespaceTableDef<TContract, TableName> extends infer Table extends StorageTable
-      ? RelationsOf<TContract, ModelName> extends infer Rels extends Record<string, unknown>
+  ModelTableName<TContract, ModelName, NsId> extends infer TableName extends string
+    ? NamespaceTableDef<
+        TContract,
+        TableName,
+        ResolvedNsId<TContract, ModelName, NsId>
+      > extends infer Table extends StorageTable
+      ? RelationsOf<TContract, ModelName, NsId> extends infer Rels extends Record<string, unknown>
         ? RelName extends keyof Rels
           ? RelationLocalFieldColumns<
               TContract,
@@ -1217,12 +1499,20 @@ export type IncludeRelationValue<
   ModelName extends string,
   RelName extends string,
   IncludedRow,
+  NsId extends string = never,
 > =
-  RelationCardinality<TContract, ModelName, RelName> extends '1:1' | 'N:1'
-    ? IsToOneRelationNullable<TContract, ModelName, RelName> extends true
+  RelationCardinality<TContract, ModelName, RelName, NsId> extends '1:1' | 'N:1'
+    ? IsToOneRelationNullable<TContract, ModelName, RelName, NsId> extends true
       ? IncludedRow | null
       : IncludedRow
     : IncludedRow[];
 
-export type CollectionModelName<TContract extends Contract<SqlStorage>> =
-  keyof ModelsOf<TContract> & string;
+// The union of model names across every domain namespace. Reading the flat
+// `ModelsOf` map instead collapses to the *intersection* of names when
+// namespaces declare different models (a union of object types keys to its
+// shared keys), which would drop a model unique to one namespace under a
+// same-bare-name collision.
+export type CollectionModelName<TContract extends Contract<SqlStorage>> = {
+  [Ns in keyof TContract['domain']['namespaces']]: keyof TContract['domain']['namespaces'][Ns]['models'] &
+    string;
+}[keyof TContract['domain']['namespaces']];
