@@ -11,11 +11,11 @@ Demonstrate the M:N ORM API end-to-end in the **SQLite** demo (`examples/prisma-
 `Post ↔ Tag` (+ reverse `Tag.posts`) M:N via a **pure** `PostTag` junction (`postId`/`tagId`, composite PK, no payload), authored in `prisma/contract.ts` with `rel.manyToMany(() => Tag, { through: () => PostTag, from, to })`. Emitted contract carries `cardinality:'N:M'` + `through`. ORM client modules:
 
 - `get-post-tags.ts` — `.include('tags', t => t.select('id','label')…)`.
-- `get-posts-by-tag-filter.ts` — `.where(p => p.tags.some/none/every(t => t.label.eq(...)))`.
+- `get-posts-by-tag-filter.ts` — `.where(p => p.tags.some/none(t => t.label.eq(...)))` plus `.every(t => t.label.neq(...))`; the `every` demo includes posts with no tags by vacuous truth.
 - `connect-post-tags.ts` / `disconnect-post-tags.ts` — `.update({ tags: t => t.connect/disconnect([{ id }]) })` + readback.
 - `create-post-with-tags.ts` — `.create({ …, tags: t => t.create([{ label }]) })`.
 
-Wired as 6 CLI commands in `src/main.ts`; seed adds tags + junction rows. Smoke-tested end-to-end (SQLite is offline-runnable).
+Wired as 7 CLI commands in `src/main.ts`; seed adds tags + junction rows. Smoke-tested end-to-end (SQLite is offline-runnable).
 
 ## Scope
 
@@ -28,4 +28,4 @@ Wired as 6 CLI commands in `src/main.ts`; seed adds tags + junction rows. Smoke-
 
 ## References
 
-- Parent: `projects/sql-orm-many-to-many/spec.md`. Commits: `72ef8b793` (contract+emit), `883309ecc` (modules/CLI/seed).
+- Parent: `projects/sql-orm-many-to-many/spec.md`.
