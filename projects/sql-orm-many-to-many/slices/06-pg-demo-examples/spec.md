@@ -1,6 +1,6 @@
 # Slice 6: PG demo M:N examples + dual-mode reconciliation
 
-_Parent project: `projects/sql-orm-many-to-many/`. Linear: [TML-2795](https://linear.app/prisma-company/issue/TML-2795). Status: **planned**; M:N-examples half **blocked by slice 5** (TML-2794)._
+_Parent project: `projects/sql-orm-many-to-many/`. Linear: [TML-2795](https://linear.app/prisma-company/issue/TML-2795). Status: **complete** (branch `tml-2795-slice-6-pg-demo-mn-examples`, stacked on slice 5)._
 
 ## At a glance
 
@@ -30,8 +30,8 @@ Two separable halves:
 
 ## Slice-specific done conditions
 
-- [ ] `test:dual-mode` green (both legs pass, or the TS source is removed and the demo is cleanly PSL-only).
-- [ ] PG demo demonstrates the M:N API (include / filter / nested write) — mirroring slice 4 — via CLI commands, seeded, with integration tests per the standard.
+- [x] Dual-mode resolved via the **PSL-only** arm (decision: `wip/unattended-decisions.md` #16–17): TS contract source + no-emit workflow removed; demo suite green (commits `f4483461e`..`84657a77c`).
+- [x] PG demo demonstrates the M:N API — all nine surfaces mirroring slice 4 — via `repo-*` CLI commands, seeded, with 8 integration tests per the standard (commits `12def8961`, `d591575c1`, `9f26fe679`).
 
 ## Open Questions
 
