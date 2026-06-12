@@ -226,9 +226,19 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
         return {};
       }
       return Object.fromEntries(
-        Object.entries(innerMap as Record<string, unknown>).map(([tableName, table]) => [
+        Object.entries(
+          blindCast<
+            Record<string, unknown>,
+            'table inner map is a plain record after object check'
+          >(innerMap),
+        ).map(([tableName, table]) => [
           tableName,
-          new StorageTable(table as StorageTableInput),
+          new StorageTable(
+            blindCast<
+              StorageTableInput,
+              'each table value is StorageTableInput by contract schema'
+            >(table),
+          ),
         ]),
       );
     }
