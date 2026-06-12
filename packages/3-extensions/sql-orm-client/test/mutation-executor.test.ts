@@ -639,6 +639,39 @@ describe('mutation-executor', () => {
     ).rejects.toThrow(/childColumns.*targetColumns/);
   });
 
+  it('executeNestedCreateMutation() rejects duplicate resolved connect targets before any write', async () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+    });
+    const runtime = createMockRuntime();
+    runtime.setNextResults([[{ id: 10 }], [{ id: 10 }]]);
+
+    await expect(
+      executeNestedCreateMutation({
+        context: { ...getTestContext(), contract },
+        runtime,
+        namespaceId: 'public',
+        modelName: 'Parent',
+        data: {
+          id: 1,
+          children: (children: {
+            connect: (criteria: readonly Record<string, unknown>[]) => unknown;
+          }) => children.connect([{ id: 10 }, { id: 10 }]),
+        } as never,
+      }),
+    ).rejects.toThrow(
+      /connect\(\) nested mutation for relation "children" resolved duplicate junction link targets/,
+    );
+
+    const inserts = runtime.executions.filter(
+      (execution) => (execution.plan as { ast?: { kind?: string } }).ast?.kind === 'insert',
+    );
+    expect(inserts).toEqual([]);
+  });
+
   it('executeNestedCreateMutation() rejects conflicting values for shared junction columns', async () => {
     const contract = buildManyToManyContract({
       junctionTable: 'parent_child',
