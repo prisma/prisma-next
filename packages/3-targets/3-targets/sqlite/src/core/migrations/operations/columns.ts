@@ -2,14 +2,29 @@ import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
 import { buildTargetDetails } from '../planner-target-details';
 import { type Op, type SqliteColumnSpec, step } from './shared';
 
-export function addColumn(tableName: string, column: SqliteColumnSpec): Op {
+export function addColumnExecuteSql(tableName: string, column: SqliteColumnSpec): string {
   const parts = [
     `ALTER TABLE ${quoteIdentifier(tableName)}`,
     `ADD COLUMN ${quoteIdentifier(column.name)} ${column.typeSql}`,
     column.defaultSql,
     column.nullable ? '' : 'NOT NULL',
   ].filter(Boolean);
-  const addSql = parts.join(' ');
+  return parts.join(' ');
+}
+
+export function dropColumnExecuteSql(tableName: string, columnName: string): string {
+  return `ALTER TABLE ${quoteIdentifier(tableName)} DROP COLUMN ${quoteIdentifier(columnName)}`;
+}
+
+/**
+ * Legacy raw-string copy for the authored-migration facade
+ * (`@prisma-next/sqlite/migration`). The planner path uses
+ * `AddColumnCall.toOp(lowerer)`, which binds the pragma_table_info checks as
+ * typed, parameterized ASTs. Converting this sync, lowerer-less factory is
+ * deferred to D3 of the typed-migration-verification-queries slice.
+ */
+export function addColumn(tableName: string, column: SqliteColumnSpec): Op {
+  const addSql = addColumnExecuteSql(tableName, column);
 
   return {
     id: `column.${tableName}.${column.name}`,
@@ -33,6 +48,13 @@ export function addColumn(tableName: string, column: SqliteColumnSpec): Op {
   };
 }
 
+/**
+ * Legacy raw-string copy for the authored-migration facade
+ * (`@prisma-next/sqlite/migration`). The planner path uses
+ * `DropColumnCall.toOp(lowerer)`, which binds the pragma_table_info checks as
+ * typed, parameterized ASTs. Converting this sync, lowerer-less factory is
+ * deferred to D3 of the typed-migration-verification-queries slice.
+ */
 export function dropColumn(tableName: string, columnName: string): Op {
   return {
     id: `dropColumn.${tableName}.${columnName}`,
@@ -49,7 +71,7 @@ export function dropColumn(tableName: string, columnName: string): Op {
     execute: [
       step(
         `drop column "${columnName}" from "${tableName}"`,
-        `ALTER TABLE ${quoteIdentifier(tableName)} DROP COLUMN ${quoteIdentifier(columnName)}`,
+        dropColumnExecuteSql(tableName, columnName),
       ),
     ],
     postcheck: [

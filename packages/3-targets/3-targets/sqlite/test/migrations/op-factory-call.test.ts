@@ -1,6 +1,7 @@
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { col, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import { describe, expect, it } from 'vitest';
+import { columnExistsAst } from '../../src/contract-free/checks';
 import {
   AddColumnCall,
   CreateIndexCall,
@@ -131,8 +132,24 @@ describe('DropTableCall', () => {
   });
 });
 
+function recordingCheckLowerer(): { lowerer: ExecuteRequestLowerer; received: unknown[] } {
+  const received: unknown[] = [];
+  const lowerer: ExecuteRequestLowerer = {
+    lower: () => Object.freeze({ sql: 'UNUSED', params: Object.freeze([]) }),
+    lowerToExecuteRequest: async (ast) => {
+      received.push(ast);
+      return Object.freeze({
+        sql: `LOWERED CHECK ${received.length}`,
+        params: Object.freeze([`p${received.length}`]),
+      });
+    },
+  };
+  return { lowerer, received };
+}
+
 describe('AddColumnCall', () => {
-  it('produces an additive op with ALTER TABLE ADD COLUMN', () => {
+  it('produces an additive op with ALTER TABLE ADD COLUMN and lowered typed checks', async () => {
+    const { lowerer, received } = recordingCheckLowerer();
     const call = new AddColumnCall(
       'user',
       colSpec({ name: 'bio', typeSql: 'TEXT', nullable: true }),
@@ -140,13 +157,25 @@ describe('AddColumnCall', () => {
     expect(call.factoryName).toBe('addColumn');
     expect(call.operationClass).toBe('additive');
 
-    const op = call.toOp();
+    const op = await call.toOp(lowerer);
     expect(op.id).toBe('column.user.bio');
     expect(op.execute[0]?.sql).toContain('ALTER TABLE "user"');
     expect(op.execute[0]?.sql).toContain('ADD COLUMN "bio" TEXT');
+
+    expect(received).toEqual([
+      columnExistsAst('user', 'bio').columnAbsent(),
+      columnExistsAst('user', 'bio').columnPresent(),
+    ]);
+    expect(op.precheck).toEqual([
+      { description: 'ensure column "bio" is missing', sql: 'LOWERED CHECK 1', params: ['p1'] },
+    ]);
+    expect(op.postcheck).toEqual([
+      { description: 'verify column "bio" exists', sql: 'LOWERED CHECK 2', params: ['p2'] },
+    ]);
   });
 
-  it('includes default and NOT NULL', () => {
+  it('includes default and NOT NULL', async () => {
+    const { lowerer } = recordingCheckLowerer();
     const call = new AddColumnCall(
       'user',
       colSpec({
@@ -156,19 +185,49 @@ describe('AddColumnCall', () => {
         nullable: false,
       }),
     );
-    const op = call.toOp();
+    const op = await call.toOp(lowerer);
     expect(op.execute[0]?.sql).toContain("DEFAULT 'user'");
     expect(op.execute[0]?.sql).toContain('NOT NULL');
+  });
+
+  it('toOp() throws when no lowerer is provided', async () => {
+    const call = new AddColumnCall('user', colSpec({ name: 'bio' }));
+    await expect(async () => call.toOp()).rejects.toThrow('createSqliteMigrationPlanner');
   });
 });
 
 describe('DropColumnCall', () => {
-  it('produces a destructive op with ALTER TABLE DROP COLUMN', () => {
+  it('produces a destructive op with ALTER TABLE DROP COLUMN and lowered typed checks', async () => {
+    const { lowerer, received } = recordingCheckLowerer();
     const call = new DropColumnCall('user', 'old');
-    const op = call.toOp();
+    const op = await call.toOp(lowerer);
     expect(op.id).toBe('dropColumn.user.old');
     expect(op.operationClass).toBe('destructive');
     expect(op.execute[0]?.sql).toBe('ALTER TABLE "user" DROP COLUMN "old"');
+
+    expect(received).toEqual([
+      columnExistsAst('user', 'old').columnPresent(),
+      columnExistsAst('user', 'old').columnAbsent(),
+    ]);
+    expect(op.precheck).toEqual([
+      {
+        description: 'ensure column "old" exists on "user"',
+        sql: 'LOWERED CHECK 1',
+        params: ['p1'],
+      },
+    ]);
+    expect(op.postcheck).toEqual([
+      {
+        description: 'verify column "old" is gone from "user"',
+        sql: 'LOWERED CHECK 2',
+        params: ['p2'],
+      },
+    ]);
+  });
+
+  it('toOp() throws when no lowerer is provided', async () => {
+    const call = new DropColumnCall('user', 'old');
+    await expect(async () => call.toOp()).rejects.toThrow('createSqliteMigrationPlanner');
   });
 });
 

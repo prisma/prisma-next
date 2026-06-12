@@ -37,6 +37,7 @@ import { FunctionColumnDefault, LiteralColumnDefault } from '@prisma-next/sql-re
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { tableExistsAst } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
@@ -62,7 +63,7 @@ import { createIndex, dropIndex } from './operations/indexes';
 import type { ForeignKeySpec } from './operations/shared';
 import { step, targetDetails } from './operations/shared';
 import { dropTable } from './operations/tables';
-import { columnExistsCheck, toRegclassLiteral } from './planner-sql-checks';
+import { columnExistsCheck } from './planner-sql-checks';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
@@ -232,18 +233,16 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
     const statement = await lowerer.lowerToExecuteRequest(ddlNode);
     const schemaName = this.schemaName;
     const tableName = this.tableName;
+    const checks = tableExistsAst(schemaName, tableName);
+    const absent = await lowerer.lowerToExecuteRequest(checks.tableAbsent());
+    const present = await lowerer.lowerToExecuteRequest(checks.tablePresent());
     return {
       id: `table.${tableName}`,
       label: `Create table "${tableName}"`,
       summary: `Creates table "${tableName}"`,
       operationClass: 'additive',
       target: targetDetails('table', tableName, schemaName),
-      precheck: [
-        step(
-          `ensure table "${tableName}" does not exist`,
-          `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NULL`,
-        ),
-      ],
+      precheck: [step(`ensure table "${tableName}" does not exist`, absent.sql, absent.params)],
       execute: [
         {
           description: `create table "${tableName}"`,
@@ -251,12 +250,7 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
           params: statement.params ?? [],
         },
       ],
-      postcheck: [
-        step(
-          `verify table "${tableName}" exists`,
-          `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NOT NULL`,
-        ),
-      ],
+      postcheck: [step(`verify table "${tableName}" exists`, present.sql, present.params)],
     };
   }
 

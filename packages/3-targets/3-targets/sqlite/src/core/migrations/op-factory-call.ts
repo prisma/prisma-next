@@ -23,9 +23,10 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { columnExistsAst } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
 import { escapeLiteral } from '../sql-utils';
-import { addColumn, dropColumn } from './operations/columns';
+import { addColumnExecuteSql, dropColumnExecuteSql } from './operations/columns';
 import { createIndex, dropIndex } from './operations/indexes';
 import type { SqliteColumnSpec, SqliteIndexSpec, SqliteTableSpec } from './operations/shared';
 import { step } from './operations/shared';
@@ -311,8 +312,30 @@ export class AddColumnCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(_lowerer?: Lowerer): Op {
-    return addColumn(this.tableName, this.column);
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `AddColumnCall.toOp: a lowerer is required on the SQLite planner path (column "${this.column.name}" on table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+      );
+    }
+    const checks = columnExistsAst(this.tableName, this.column.name);
+    const absent = await lowerer.lowerToExecuteRequest(checks.columnAbsent());
+    const present = await lowerer.lowerToExecuteRequest(checks.columnPresent());
+    return {
+      id: `column.${this.tableName}.${this.column.name}`,
+      label: `Add column ${this.column.name} on ${this.tableName}`,
+      summary: `Adds column ${this.column.name} on ${this.tableName}`,
+      operationClass: 'additive',
+      target: {
+        id: 'sqlite',
+        details: buildTargetDetails('column', this.column.name, this.tableName),
+      },
+      precheck: [step(`ensure column "${this.column.name}" is missing`, absent.sql, absent.params)],
+      execute: [
+        step(`add column "${this.column.name}"`, addColumnExecuteSql(this.tableName, this.column)),
+      ],
+      postcheck: [step(`verify column "${this.column.name}" exists`, present.sql, present.params)],
+    };
   }
 
   renderTypeScript(): string {
@@ -335,8 +358,45 @@ export class DropColumnCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(_lowerer?: Lowerer): Op {
-    return dropColumn(this.tableName, this.columnName);
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `DropColumnCall.toOp: a lowerer is required on the SQLite planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+      );
+    }
+    const checks = columnExistsAst(this.tableName, this.columnName);
+    const present = await lowerer.lowerToExecuteRequest(checks.columnPresent());
+    const absent = await lowerer.lowerToExecuteRequest(checks.columnAbsent());
+    return {
+      id: `dropColumn.${this.tableName}.${this.columnName}`,
+      label: `Drop column ${this.columnName} on ${this.tableName}`,
+      summary: `Drops column ${this.columnName} on ${this.tableName} which is not in the contract`,
+      operationClass: 'destructive',
+      target: {
+        id: 'sqlite',
+        details: buildTargetDetails('column', this.columnName, this.tableName),
+      },
+      precheck: [
+        step(
+          `ensure column "${this.columnName}" exists on "${this.tableName}"`,
+          present.sql,
+          present.params,
+        ),
+      ],
+      execute: [
+        step(
+          `drop column "${this.columnName}" from "${this.tableName}"`,
+          dropColumnExecuteSql(this.tableName, this.columnName),
+        ),
+      ],
+      postcheck: [
+        step(
+          `verify column "${this.columnName}" is gone from "${this.tableName}"`,
+          absent.sql,
+          absent.params,
+        ),
+      ],
+    };
   }
 
   renderTypeScript(): string {

@@ -1,13 +1,21 @@
-import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
+import type {
+  SqlMigrationPlanOperation,
+  SqlMigrationPlanOperationStep,
+} from '@prisma-next/family-sql/control';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { quoteIdentifier } from '../../sql-utils';
 import type { SqlitePlanTargetDetails } from '../planner-target-details';
 
 export type Op = SqlMigrationPlanOperation<SqlitePlanTargetDetails>;
 
-export function step(description: string, sql: string): { description: string; sql: string } {
-  return { description, sql };
+export function step(
+  description: string,
+  sql: string,
+  params?: readonly unknown[],
+): SqlMigrationPlanOperationStep {
+  return { description, sql, ...ifDefined('params', params) };
 }
 
 /**
