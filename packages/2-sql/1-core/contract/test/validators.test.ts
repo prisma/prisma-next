@@ -1389,4 +1389,31 @@ describe('SQL contract validators', () => {
       expect(result).toBeInstanceOf(type.errors);
     });
   });
+
+  describe('createSqlEntrySchemaRegistry', () => {
+    it('throws when a pack schema collides with a core kind (table)', () => {
+      const packSchemas = new Map([[' table', type('unknown')]]);
+      expect(() => createSqlEntrySchemaRegistry(packSchemas)).not.toThrow();
+
+      const collidingPackSchemas = new Map([['table', type('unknown')]]);
+      expect(() => createSqlEntrySchemaRegistry(collidingPackSchemas)).toThrow(
+        /collides with a core kind/,
+      );
+    });
+
+    it('throws when a pack schema collides with a core kind (valueSet)', () => {
+      const collidingPackSchemas = new Map([['valueSet', type('unknown')]]);
+      expect(() => createSqlEntrySchemaRegistry(collidingPackSchemas)).toThrow(
+        /collides with a core kind/,
+      );
+    });
+
+    it('registers non-colliding pack schemas', () => {
+      const packSchemas = new Map([['type', type('unknown')]]);
+      const registry = createSqlEntrySchemaRegistry(packSchemas);
+      expect(registry.has('type')).toBe(true);
+      expect(registry.has('table')).toBe(true);
+      expect(registry.has('valueSet')).toBe(true);
+    });
+  });
 });

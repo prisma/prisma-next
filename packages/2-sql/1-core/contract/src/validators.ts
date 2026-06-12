@@ -235,6 +235,11 @@ export function createSqlEntrySchemaRegistry(
   ]);
   if (packSchemas !== undefined) {
     for (const [kind, schema] of packSchemas) {
+      if (registry.has(kind)) {
+        throw new Error(
+          `createSqlEntrySchemaRegistry: pack schema "${kind}" collides with a core kind — pack schemas cannot override "table" or "valueSet"`,
+        );
+      }
       registry.set(kind, schema);
     }
   }
