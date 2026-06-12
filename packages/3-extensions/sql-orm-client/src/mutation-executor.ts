@@ -783,8 +783,22 @@ async function preflightJunctionOwnedCreateMutation(
     return;
   }
 
+  const seenTargetKeys = new Set<string>();
   for (const criterion of mutation.criteria) {
-    await resolveJunctionTargetValues(scope, context, relation, 'connect', criterion);
+    const targetValues = await resolveJunctionTargetValues(
+      scope,
+      context,
+      relation,
+      'connect',
+      criterion,
+    );
+    const targetKey = JSON.stringify([...targetValues.entries()]);
+    if (seenTargetKeys.has(targetKey)) {
+      throw new Error(
+        `connect() nested mutation for relation "${relation.relationName}" resolved duplicate junction link targets; remove the duplicate criteria`,
+      );
+    }
+    seenTargetKeys.add(targetKey);
   }
 }
 
