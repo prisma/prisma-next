@@ -17,9 +17,9 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:5736eda44575a2e995e8c1d5ed6d7884859a882e9551844f776d2a497c6d0154'>;
+  StorageHashBase<'sha256:664e11eed7f1d28dcf79412d71801ffa7c0a6369c717c38a0aa655b033e2213e'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:aa79980d83d295977c2ca3fd5a1407ea2bc67b4538b19971512d2f47ff71338e'>;
+  ExecutionHashBase<'sha256:70c6ceb0ed79d5888519ec84bf32e31a056283fa8d5c7b5c1ba65b709f8595c8'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:3cc333ecad9f3f4c7229370a9d2c37e908cdce0f8d2e9fb132d50605b024eff2'>;
 
@@ -37,6 +37,14 @@ export type FieldOutputTypes = {
     readonly userId: CodecTypes['sql/char@1']['output'];
     readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
   };
+  readonly PostTag: {
+    readonly postId: CodecTypes['sql/char@1']['output'];
+    readonly tagId: CodecTypes['sql/char@1']['output'];
+  };
+  readonly Tag: {
+    readonly id: CodecTypes['sql/char@1']['output'];
+    readonly label: CodecTypes['sqlite/text@1']['output'];
+  };
   readonly User: {
     readonly id: CodecTypes['sql/char@1']['output'];
     readonly email: CodecTypes['sqlite/text@1']['output'];
@@ -50,6 +58,14 @@ export type FieldInputTypes = {
     readonly title: CodecTypes['sqlite/text@1']['input'];
     readonly userId: CodecTypes['sql/char@1']['input'];
     readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
+  };
+  readonly PostTag: {
+    readonly postId: CodecTypes['sql/char@1']['input'];
+    readonly tagId: CodecTypes['sql/char@1']['input'];
+  };
+  readonly Tag: {
+    readonly id: CodecTypes['sql/char@1']['input'];
+    readonly label: CodecTypes['sqlite/text@1']['input'];
   };
   readonly User: {
     readonly id: CodecTypes['sql/char@1']['input'];
@@ -120,6 +136,79 @@ type ContractBase = Omit<
                     readonly index: true;
                   },
                 ];
+              };
+              readonly post_tag: {
+                columns: {
+                  readonly postId: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
+                  };
+                  readonly tagId: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
+                  };
+                };
+                primaryKey: {
+                  readonly columns: readonly ['postId', 'tagId'];
+                  readonly name: 'post_tag_pkey';
+                };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [
+                  {
+                    readonly source: {
+                      readonly namespaceId: '__unbound__' & NamespaceId;
+                      readonly tableName: 'post_tag';
+                      readonly columns: readonly ['postId'];
+                    };
+                    readonly target: {
+                      readonly namespaceId: '__unbound__' & NamespaceId;
+                      readonly tableName: 'post';
+                      readonly columns: readonly ['id'];
+                    };
+                    readonly name: 'post_tag_postId_fkey';
+                    readonly constraint: true;
+                    readonly index: true;
+                  },
+                  {
+                    readonly source: {
+                      readonly namespaceId: '__unbound__' & NamespaceId;
+                      readonly tableName: 'post_tag';
+                      readonly columns: readonly ['tagId'];
+                    };
+                    readonly target: {
+                      readonly namespaceId: '__unbound__' & NamespaceId;
+                      readonly tableName: 'tag';
+                      readonly columns: readonly ['id'];
+                    };
+                    readonly name: 'post_tag_tagId_fkey';
+                    readonly constraint: true;
+                    readonly index: true;
+                  },
+                ];
+              };
+              readonly tag: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
+                  };
+                  readonly label: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
+                  };
+                };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
               };
               readonly user: {
                 columns: {
@@ -197,6 +286,21 @@ type ContractBase = Omit<
               readonly targetFields: readonly ['id'];
             };
           };
+          readonly tags: {
+            readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Tag' };
+            readonly cardinality: 'N:M';
+            readonly on: {
+              readonly localFields: readonly ['id'];
+              readonly targetFields: readonly ['postId'];
+            };
+            readonly through: {
+              readonly table: 'post_tag';
+              readonly namespaceId: '__unbound__';
+              readonly parentColumns: readonly ['postId'];
+              readonly childColumns: readonly ['tagId'];
+              readonly targetColumns: readonly ['id'];
+            };
+          };
         };
         readonly storage: {
           readonly table: 'post';
@@ -206,6 +310,79 @@ type ContractBase = Omit<
             readonly title: { readonly column: 'title' };
             readonly userId: { readonly column: 'userId' };
             readonly createdAt: { readonly column: 'createdAt' };
+          };
+        };
+      };
+      readonly PostTag: {
+        readonly fields: {
+          readonly postId: {
+            readonly nullable: false;
+            readonly type: {
+              readonly kind: 'scalar';
+              readonly codecId: 'sql/char@1';
+              readonly typeParams: { readonly length: 36 };
+            };
+          };
+          readonly tagId: {
+            readonly nullable: false;
+            readonly type: {
+              readonly kind: 'scalar';
+              readonly codecId: 'sql/char@1';
+              readonly typeParams: { readonly length: 36 };
+            };
+          };
+        };
+        readonly relations: Record<string, never>;
+        readonly storage: {
+          readonly table: 'post_tag';
+          readonly namespaceId: '__unbound__';
+          readonly fields: {
+            readonly postId: { readonly column: 'postId' };
+            readonly tagId: { readonly column: 'tagId' };
+          };
+        };
+      };
+      readonly Tag: {
+        readonly fields: {
+          readonly id: {
+            readonly nullable: false;
+            readonly type: {
+              readonly kind: 'scalar';
+              readonly codecId: 'sql/char@1';
+              readonly typeParams: { readonly length: 36 };
+            };
+          };
+          readonly label: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
+          };
+        };
+        readonly relations: {
+          readonly posts: {
+            readonly to: {
+              readonly namespace: '__unbound__' & NamespaceId;
+              readonly model: 'Post';
+            };
+            readonly cardinality: 'N:M';
+            readonly on: {
+              readonly localFields: readonly ['id'];
+              readonly targetFields: readonly ['tagId'];
+            };
+            readonly through: {
+              readonly table: 'post_tag';
+              readonly namespaceId: '__unbound__';
+              readonly parentColumns: readonly ['tagId'];
+              readonly childColumns: readonly ['postId'];
+              readonly targetColumns: readonly ['id'];
+            };
+          };
+        };
+        readonly storage: {
+          readonly table: 'tag';
+          readonly namespaceId: '__unbound__';
+          readonly fields: {
+            readonly id: { readonly column: 'id' };
+            readonly label: { readonly column: 'label' };
           };
         };
       };
@@ -265,6 +442,11 @@ type ContractBase = Omit<
   readonly roots: {
     readonly user: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
     readonly post: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
+    readonly tag: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Tag' };
+    readonly post_tag: {
+      readonly namespace: '__unbound__' & NamespaceId;
+      readonly model: 'PostTag';
+    };
   };
   readonly domain: {
     readonly namespaces: {
@@ -309,6 +491,24 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['id'];
                 };
               };
+              readonly tags: {
+                readonly to: {
+                  readonly namespace: '__unbound__' & NamespaceId;
+                  readonly model: 'Tag';
+                };
+                readonly cardinality: 'N:M';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['postId'];
+                };
+                readonly through: {
+                  readonly table: 'post_tag';
+                  readonly namespaceId: '__unbound__';
+                  readonly parentColumns: readonly ['postId'];
+                  readonly childColumns: readonly ['tagId'];
+                  readonly targetColumns: readonly ['id'];
+                };
+              };
             };
             readonly storage: {
               readonly table: 'post';
@@ -318,6 +518,79 @@ type ContractBase = Omit<
                 readonly title: { readonly column: 'title' };
                 readonly userId: { readonly column: 'userId' };
                 readonly createdAt: { readonly column: 'createdAt' };
+              };
+            };
+          };
+          readonly PostTag: {
+            readonly fields: {
+              readonly postId: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
+              };
+              readonly tagId: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'post_tag';
+              readonly namespaceId: '__unbound__';
+              readonly fields: {
+                readonly postId: { readonly column: 'postId' };
+                readonly tagId: { readonly column: 'tagId' };
+              };
+            };
+          };
+          readonly Tag: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
+              };
+              readonly label: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
+              };
+            };
+            readonly relations: {
+              readonly posts: {
+                readonly to: {
+                  readonly namespace: '__unbound__' & NamespaceId;
+                  readonly model: 'Post';
+                };
+                readonly cardinality: 'N:M';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['tagId'];
+                };
+                readonly through: {
+                  readonly table: 'post_tag';
+                  readonly namespaceId: '__unbound__';
+                  readonly parentColumns: readonly ['tagId'];
+                  readonly childColumns: readonly ['postId'];
+                  readonly targetColumns: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'tag';
+              readonly namespaceId: '__unbound__';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly label: { readonly column: 'label' };
               };
             };
           };
@@ -390,6 +663,10 @@ type ContractBase = Omit<
       readonly defaults: readonly [
         {
           readonly ref: { readonly table: 'post'; readonly column: 'id' };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
+        },
+        {
+          readonly ref: { readonly table: 'tag'; readonly column: 'id' };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
         {

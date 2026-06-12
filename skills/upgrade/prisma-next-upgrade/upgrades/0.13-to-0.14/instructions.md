@@ -80,14 +80,18 @@ changes:
 ---
 
 <!--
+TML-2790: adds many-to-many ORM-client examples (connect / disconnect /
+nested create through a junction) and a `Post`↔`Tag` M:N relation to the
+`prisma-next-demo-sqlite` example, with the re-emitted demo contract.
+Purely additive demo material — existing contracts are unaffected. No
+user-side action required.
+
 TML-2867: codec-routed DDL defaults. The migration planner now resolves each plan
 operation lazily (operations are `Promise<Op>[]`), and DDL execute steps carry a
 `params` array. The example migration fixtures (`prisma-next-demo`,
 `prisma-next-postgis-demo`) were regenerated to reflect the added `params` field.
 No user-side API change. Incidental substrate diff only.
--->
 
-<!--
 TML-2852: the enum read surface. `enumType`-authored enums become first-class in
 application code — an enum-restricted field's value union flows into the static
 read/write types of both query lanes, `db.enums.<namespace>.<Name>` exposes the

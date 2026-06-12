@@ -1,0 +1,48 @@
+# Slice 5: PSL many-to-many authoring
+
+_Parent project: `projects/sql-orm-many-to-many/`. Linear: [TML-2794](https://linear.app/prisma-company/issue/TML-2794). Status: **planned** (not started)._
+
+> **Sizing flag:** this is framework-scoped (the PSL interpreter), not an `sql-orm-client` change. It may fail slice-INVEST *Small* and warrant **promotion to its own project**. Re-check at pickup (`drive-triage-work`); the dispatch plan below is provisional pending PSL-pipeline grounding.
+
+## At a glance
+
+PSL can't author a navigable M:N relation. The PSL relation resolver emits only `cardinality:'N:1'`/`'1:N'`; `'N:M'` + `through` comes only from the TS builder (`rel.manyToMany`). PSL routes M:N to explicit junction models (`PSL_ORPHANED_BACKRELATION_LIST`). This slice teaches PSL to lower a junction to a navigable `N:M` + `through`, so PSL-authored schemas get the same M:N ORM API (and the PG demo, slice 6, becomes possible).
+
+## Chosen design (intent — to be firmed at pickup)
+
+Teach the PSL interpreter / lowering to recognise a many-to-many shape and emit a relation with `cardinality:'N:M'` + a `through` descriptor (`{ table, parentColumns, childColumns, targetColumns }`) — the exact shape slice 0 put in the contract and `sql-orm-client`'s `resolveThrough` consumes. Two candidate authoring forms (decide at spec-firm-up):
+
+1. **Explicit junction model** — an `@@id([a, b])` join model with two FK relations (the shape PSL currently emits as three `1:N`/`N:1` relations) is recognised and *additionally* surfaced as a navigable `N:M` on each side. Lowest-magic; matches what the diagnostic already steers authors toward.
+2. **Prisma-style implicit list** — `tags Tag[]` / `posts Post[]` with no explicit junction, lowered to an implicit junction table. More ergonomic, more interpreter work.
+
+Primary surface: `packages/2-sql/2-authoring/contract-psl/src/psl-relation-resolution.ts` (today emits `N:1` at ~line 255, `1:N` at ~line 322 — no `N:M`/`through`) + the PSL→RelationNode lowering + the `PSL_ORPHANED_BACKRELATION_LIST` diagnostic (relax/replace when the junction is recognised).
+
+## Scope
+
+**In:** PSL relation resolution + lowering to emit `N:M` + `through`; the M:N PSL diagnostic; PSL-authored M:N fixtures/tests; round-trip through `validateContract`.
+
+**Out:** `sql-orm-client` runtime (already done, slices 0–3 — consumes `through` regardless of author); the TS builder (already emits `through`); the PG demo (slice 6).
+
+## Pre-investigated edge cases
+
+| Edge case | Disposition |
+|---|---|
+| Composite-key junctions | `through.{parentColumns,childColumns,targetColumns}` are arrays — lowering must handle multi-column FKs (parity with the TS builder) |
+| Self-referential M:N (e.g. User↔User followers) | confirm the lowering handles same-model both-sides |
+| Existing `PSL_ORPHANED_BACKRELATION_LIST` consumers | relaxing the diagnostic must not regress schemas that legitimately want explicit-junction 1:N modelling |
+
+## Slice-specific done conditions
+
+- [ ] A PSL schema with a junction (form decided at firm-up) emits a relation with `cardinality:'N:M'` + populated `through`, round-tripping `validateContract`.
+- [ ] ORM-API parity: `include` / `some`/`none`/`every` / nested write work from a PSL-authored M:N contract (a PSL fixture mirroring the TS `User↔Tag` fixture).
+- [ ] `fixtures:check` green; the M:N diagnostic behaves correctly (no false `PSL_ORPHANED_BACKRELATION_LIST` on a recognised junction).
+
+## Open Questions
+
+1. **Authoring form** — explicit-junction recognition (form 1) vs implicit-list (form 2) vs both. Working position: **start with explicit-junction recognition** (form 1) — smallest, matches the existing diagnostic's guidance; add implicit-list as a follow-up if desired.
+2. **Project vs slice** — likely promote to its own project. Working position: re-triage at pickup.
+
+## References
+
+- Parent: `projects/sql-orm-many-to-many/spec.md` (§ Follow-on scope). Slice 0's contract `through` shape is the lowering target.
+- `packages/2-sql/2-authoring/contract-psl/src/psl-relation-resolution.ts`; the TS builder's `rel.manyToMany` lowering (`contract-lowering.ts`) as the parity reference.

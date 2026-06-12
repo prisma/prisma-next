@@ -39,6 +39,16 @@ The whole project hangs off one new primitive: a uniform **`through` descriptor*
 - **LATERAL / multi-query read strategies.** Removed by TML-2729 / TML-2657; the read path is correlated-only and stays that way.
 - **Wiring the Pothos plugin itself.** This project makes the runtime M:N API shape match what the plugin needs (`{ connect: { id } }` / `{ disconnect: { id } }`); the plugin-side wiring is downstream.
 
+## Follow-on scope (expanded 2026-06-02)
+
+After the runtime core (slices 0–3) shipped, scope expanded to **demonstrate the M:N API end-to-end in the example apps** — and that surfaced a real authoring-surface gap. These are slices 4–6 (see the plan):
+
+- **Demo examples** (previously implicit, now explicit scope). The SQLite demo (`examples/prisma-next-demo-sqlite`, TS-authored) demonstrates include / filter / nested-write M:N — **done** (slice 4 / TML-2790).
+- **PSL many-to-many authoring** (newly in scope — slice 5 / TML-2794). The navigable M:N API is authorable **only via the TS contract builder** (`rel.manyToMany`); PSL emits only `1:N`/`N:1` and routes M:N to explicit junction models. Teaching PSL to lower a junction to `cardinality:'N:M'` + `through` completes the authoring surface. _(Framework-scoped — may be promoted to its own project at pickup.)_
+- **PG demo examples + dual-mode reconciliation** (slice 6 / TML-2795, **blocked by slice 5**). The PG demo emits from PSL, so it can't show M:N until slice 5 lands; it also carries pre-existing dual-mode contract drift (stale TS source) to reconcile.
+
+_Note: the original Non-goal "auto-synthesised junction models" still holds for the **TS** builder; slice 5's PSL implicit-list support (if pursued) is a PSL-authoring convenience, not auto-synthesis in the runtime contract._
+
 ## Place in the larger world
 
 - **sql-orm-client** (`packages/3-extensions/sql-orm-client`) is an optional extension over the SQL contract + query lane — ADR 015 (ORM as Optional Extension).
@@ -70,6 +80,12 @@ Inherits the team-DoD floor ([`drive/calibration/dod.md`](../../drive/calibratio
 - [ ] Nested `.create` over a **required-payload junction** (junction with required non-FK columns) is disabled **at types AND at runtime**, with a message pointing to the junction model's 1:N relations / the SQL builder. (No-required-payload junctions allow ergonomic nested `create`.)
 - [ ] The runtime M:N callback shape matches what the Pothos plugin needs (`{ connect: { id } }` / `{ disconnect: { id } }`).
 - [ ] ADR for the `through` relation contract extension authored or ADR 121 amended (see ADR pointer).
+
+_Follow-on (slices 4–6):_
+
+- [x] **SQLite demo** demonstrates the M:N API (include / filter / nested write) end-to-end (slice 4 / TML-2790).
+- [ ] **PSL authors M:N** — a PSL junction lowers to `cardinality:'N:M'` + `through`, with ORM-API parity to TS-authored contracts (slice 5 / TML-2794). _(May be promoted to its own project.)_
+- [ ] **PG demo** demonstrates the M:N API and its dual-mode contract sources are reconciled (`test:dual-mode` green) (slice 6 / TML-2795; blocked by slice 5).
 
 ## Contract-impact
 
