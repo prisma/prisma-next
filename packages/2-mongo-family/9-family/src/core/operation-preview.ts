@@ -17,41 +17,21 @@ function formatKeySpec(keys: ReadonlyArray<MongoIndexKey>): string {
   return `{ ${entries.join(', ')} }`;
 }
 
-function formatOptions(cmd: CreateIndexCommand): string | undefined {
-  const parts: string[] = [];
-  if (cmd.unique) parts.push('unique: true');
-  if (cmd.sparse) parts.push('sparse: true');
-  if (cmd.expireAfterSeconds !== undefined)
-    parts.push(`expireAfterSeconds: ${cmd.expireAfterSeconds}`);
-  if (cmd.name) parts.push(`name: ${JSON.stringify(cmd.name)}`);
-  if (cmd.collation) parts.push(`collation: ${JSON.stringify(cmd.collation)}`);
-  if (cmd.weights) parts.push(`weights: ${JSON.stringify(cmd.weights)}`);
-  if (cmd.default_language) parts.push(`default_language: ${JSON.stringify(cmd.default_language)}`);
-  if (cmd.language_override)
-    parts.push(`language_override: ${JSON.stringify(cmd.language_override)}`);
-  if (cmd.wildcardProjection)
-    parts.push(`wildcardProjection: ${JSON.stringify(cmd.wildcardProjection)}`);
-  if (cmd.partialFilterExpression)
-    parts.push(`partialFilterExpression: ${JSON.stringify(cmd.partialFilterExpression)}`);
+function formatOptionEntries(options: object | undefined): string | undefined {
+  if (options === undefined) return undefined;
+  const parts = Object.entries(options)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) => `${key}: ${JSON.stringify(value)}`);
   if (parts.length === 0) return undefined;
   return `{ ${parts.join(', ')} }`;
 }
 
+function formatOptions(cmd: CreateIndexCommand): string | undefined {
+  return formatOptionEntries(cmd.options());
+}
+
 function formatCreateCollectionOptions(cmd: CreateCollectionCommand): string | undefined {
-  const parts: string[] = [];
-  if (cmd.capped) parts.push('capped: true');
-  if (cmd.size !== undefined) parts.push(`size: ${cmd.size}`);
-  if (cmd.max !== undefined) parts.push(`max: ${cmd.max}`);
-  if (cmd.timeseries) parts.push(`timeseries: ${JSON.stringify(cmd.timeseries)}`);
-  if (cmd.collation) parts.push(`collation: ${JSON.stringify(cmd.collation)}`);
-  if (cmd.clusteredIndex) parts.push(`clusteredIndex: ${JSON.stringify(cmd.clusteredIndex)}`);
-  if (cmd.validator) parts.push(`validator: ${JSON.stringify(cmd.validator)}`);
-  if (cmd.validationLevel) parts.push(`validationLevel: ${JSON.stringify(cmd.validationLevel)}`);
-  if (cmd.validationAction) parts.push(`validationAction: ${JSON.stringify(cmd.validationAction)}`);
-  if (cmd.changeStreamPreAndPostImages)
-    parts.push(`changeStreamPreAndPostImages: ${JSON.stringify(cmd.changeStreamPreAndPostImages)}`);
-  if (parts.length === 0) return undefined;
-  return `{ ${parts.join(', ')} }`;
+  return formatOptionEntries(cmd.options());
 }
 
 class MongoDdlCommandFormatter implements MongoDdlCommandVisitor<string> {
@@ -80,14 +60,9 @@ class MongoDdlCommandFormatter implements MongoDdlCommandVisitor<string> {
 
   collMod(cmd: CollModCommand): string {
     const parts: string[] = [`collMod: ${JSON.stringify(cmd.collection)}`];
-    if (cmd.validator) parts.push(`validator: ${JSON.stringify(cmd.validator)}`);
-    if (cmd.validationLevel) parts.push(`validationLevel: ${JSON.stringify(cmd.validationLevel)}`);
-    if (cmd.validationAction)
-      parts.push(`validationAction: ${JSON.stringify(cmd.validationAction)}`);
-    if (cmd.changeStreamPreAndPostImages)
-      parts.push(
-        `changeStreamPreAndPostImages: ${JSON.stringify(cmd.changeStreamPreAndPostImages)}`,
-      );
+    for (const [key, value] of Object.entries(cmd.options())) {
+      if (value !== undefined) parts.push(`${key}: ${JSON.stringify(value)}`);
+    }
     return `db.runCommand({ ${parts.join(', ')} })`;
   }
 }

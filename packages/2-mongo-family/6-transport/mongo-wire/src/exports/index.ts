@@ -6,15 +6,25 @@ export type {
   UpdateManyResult,
   UpdateOneResult,
 } from '../results';
-export type { AnyMongoWireCommand } from '../wire-commands';
+export type {
+  AnyMongoDdlWireCommand,
+  AnyMongoDmlWireCommand,
+  AnyMongoWireCommand,
+} from '../wire-commands';
 export {
   AggregateWireCommand,
+  CollModWireCommand,
+  CreateCollectionWireCommand,
+  CreateIndexWireCommand,
   DeleteManyWireCommand,
   DeleteOneWireCommand,
+  DropCollectionWireCommand,
+  DropIndexWireCommand,
   FindOneAndDeleteWireCommand,
   FindOneAndUpdateWireCommand,
   InsertManyWireCommand,
   InsertOneWireCommand,
+  isDdlWireCommand,
   UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '../wire-commands';

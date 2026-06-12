@@ -1,1 +1,2 @@
-export { ifDefined } from '../defined';
+export type { DefinedProps } from '../defined';
+export { definedProps, ifDefined } from '../defined';

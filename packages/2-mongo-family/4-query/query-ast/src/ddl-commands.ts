@@ -51,6 +51,21 @@ export class CreateIndexCommand extends MongoAstNode {
     this.freeze();
   }
 
+  options(): CreateIndexOptions {
+    return {
+      unique: this.unique,
+      sparse: this.sparse,
+      expireAfterSeconds: this.expireAfterSeconds,
+      partialFilterExpression: this.partialFilterExpression,
+      name: this.name,
+      wildcardProjection: this.wildcardProjection,
+      collation: this.collation,
+      weights: this.weights,
+      default_language: this.default_language,
+      language_override: this.language_override,
+    };
+  }
+
   accept<R>(visitor: MongoDdlCommandVisitor<R>): R {
     return visitor.createIndex(this);
   }
@@ -140,6 +155,21 @@ export class CreateCollectionCommand extends MongoAstNode {
     this.freeze();
   }
 
+  options(): CreateCollectionOptions {
+    return {
+      validator: this.validator,
+      validationLevel: this.validationLevel,
+      validationAction: this.validationAction,
+      capped: this.capped,
+      size: this.size,
+      max: this.max,
+      timeseries: this.timeseries,
+      collation: this.collation,
+      changeStreamPreAndPostImages: this.changeStreamPreAndPostImages,
+      clusteredIndex: this.clusteredIndex,
+    };
+  }
+
   accept<R>(visitor: MongoDdlCommandVisitor<R>): R {
     return visitor.createCollection(this);
   }
@@ -183,6 +213,15 @@ export class CollModCommand extends MongoAstNode {
     this.validationAction = options.validationAction;
     this.changeStreamPreAndPostImages = options.changeStreamPreAndPostImages;
     this.freeze();
+  }
+
+  options(): CollModOptions {
+    return {
+      validator: this.validator,
+      validationLevel: this.validationLevel,
+      validationAction: this.validationAction,
+      changeStreamPreAndPostImages: this.changeStreamPreAndPostImages,
+    };
   }
 
   accept<R>(visitor: MongoDdlCommandVisitor<R>): R {

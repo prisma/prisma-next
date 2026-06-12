@@ -29,6 +29,7 @@ describe('CreateIndexCommand', () => {
     expect(cmd.collection).toBe('users');
     expect(cmd.keys).toEqual([{ field: 'email', direction: 1 }]);
     expect(cmd.unique).toBeUndefined();
+    expect(cmd.name).toBeUndefined();
   });
 
   it('constructs with all options', () => {
@@ -64,6 +65,29 @@ describe('CreateIndexCommand', () => {
       wildcardProjection: { name: 1, email: 1 },
     });
     expect(cmd.wildcardProjection).toEqual({ name: 1, email: 1 });
+  });
+
+  it('options() returns the typed options object', () => {
+    const cmd = new CreateIndexCommand('users', [{ field: 'email', direction: 1 }], {
+      unique: true,
+      name: 'email_1',
+    });
+    expect(cmd.options()).toMatchObject({ unique: true, name: 'email_1' });
+  });
+
+  it('JSON.stringify yields flat shape with no options key', () => {
+    const cmd = new CreateIndexCommand('users', [{ field: 'email', direction: 1 }], {
+      unique: true,
+      name: 'email_1',
+    });
+    const json = JSON.parse(JSON.stringify(cmd));
+    expect(json).toMatchObject({
+      kind: 'createIndex',
+      collection: 'users',
+      unique: true,
+      name: 'email_1',
+    });
+    expect(json).not.toHaveProperty('options');
   });
 
   it('is frozen', () => {
@@ -141,14 +165,22 @@ describe('CreateCollectionCommand', () => {
     const cmd = new CreateCollectionCommand('metrics', {
       timeseries: { timeField: 'ts', metaField: 'meta', granularity: 'hours' },
     });
-    expect(cmd.timeseries).toEqual({ timeField: 'ts', metaField: 'meta', granularity: 'hours' });
+    expect(cmd.timeseries).toEqual({
+      timeField: 'ts',
+      metaField: 'meta',
+      granularity: 'hours',
+    });
   });
 
   it('constructs with clusteredIndex', () => {
     const cmd = new CreateCollectionCommand('items', {
       clusteredIndex: { key: { _id: 1 }, unique: true, name: 'myCluster' },
     });
-    expect(cmd.clusteredIndex).toEqual({ key: { _id: 1 }, unique: true, name: 'myCluster' });
+    expect(cmd.clusteredIndex).toEqual({
+      key: { _id: 1 },
+      unique: true,
+      name: 'myCluster',
+    });
   });
 
   it('constructs with collation and changeStreamPreAndPostImages', () => {
@@ -158,6 +190,29 @@ describe('CreateCollectionCommand', () => {
     });
     expect(cmd.collation).toEqual({ locale: 'en' });
     expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: true });
+  });
+
+  it('options() returns the typed options object', () => {
+    const cmd = new CreateCollectionCommand('events', { capped: true, size: 1048576 });
+    expect(cmd.options()).toMatchObject({ capped: true, size: 1048576 });
+  });
+
+  it('JSON.stringify yields flat shape with no options key', () => {
+    const cmd = new CreateCollectionCommand('events', { capped: true, size: 1048576 });
+    const json = JSON.parse(JSON.stringify(cmd));
+    expect(json).toMatchObject({
+      kind: 'createCollection',
+      collection: 'events',
+      capped: true,
+      size: 1048576,
+    });
+    expect(json).not.toHaveProperty('options');
+  });
+
+  it('serializes with no options as plain kind+collection', () => {
+    const cmd = new CreateCollectionCommand('events');
+    const json = JSON.parse(JSON.stringify(cmd));
+    expect(json).toEqual({ kind: 'createCollection', collection: 'events' });
   });
 
   it('is frozen', () => {
@@ -214,6 +269,32 @@ describe('CollModCommand', () => {
       changeStreamPreAndPostImages: { enabled: true },
     });
     expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: true });
+  });
+
+  it('options() returns the typed options object', () => {
+    const cmd = new CollModCommand('users', {
+      validator: { $jsonSchema: { bsonType: 'object' } },
+      validationLevel: 'strict',
+    });
+    expect(cmd.options()).toMatchObject({
+      validator: { $jsonSchema: { bsonType: 'object' } },
+      validationLevel: 'strict',
+    });
+  });
+
+  it('JSON.stringify yields flat shape with no options key', () => {
+    const cmd = new CollModCommand('users', {
+      validator: { $jsonSchema: { bsonType: 'object' } },
+      validationLevel: 'strict',
+    });
+    const json = JSON.parse(JSON.stringify(cmd));
+    expect(json).toMatchObject({
+      kind: 'collMod',
+      collection: 'users',
+      validator: { $jsonSchema: { bsonType: 'object' } },
+      validationLevel: 'strict',
+    });
+    expect(json).not.toHaveProperty('options');
   });
 
   it('is frozen', () => {

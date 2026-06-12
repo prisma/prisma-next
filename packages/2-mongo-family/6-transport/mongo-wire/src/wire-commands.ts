@@ -1,4 +1,10 @@
+import type {
+  CollModOptions,
+  CreateCollectionOptions,
+  CreateIndexOptions,
+} from '@prisma-next/mongo-query-ast/control';
 import type { Document, RawPipeline } from '@prisma-next/mongo-value';
+import type { DefinedProps } from '@prisma-next/utils/defined';
 
 abstract class MongoWireCommand {
   abstract readonly kind: string;
@@ -151,7 +157,66 @@ export class AggregateWireCommand extends MongoWireCommand {
   }
 }
 
-export type AnyMongoWireCommand =
+export class CreateCollectionWireCommand extends MongoWireCommand {
+  readonly kind = 'createCollection' as const;
+  readonly options: DefinedProps<CreateCollectionOptions>;
+
+  constructor(collection: string, options: DefinedProps<CreateCollectionOptions>) {
+    super(collection);
+    this.options = options;
+    this.freeze();
+  }
+}
+
+export class CreateIndexWireCommand extends MongoWireCommand {
+  readonly kind = 'createIndex' as const;
+  readonly key: Record<string, number | string>;
+  readonly options: DefinedProps<CreateIndexOptions>;
+
+  constructor(
+    collection: string,
+    key: Record<string, number | string>,
+    options: DefinedProps<CreateIndexOptions>,
+  ) {
+    super(collection);
+    this.key = key;
+    this.options = options;
+    this.freeze();
+  }
+}
+
+export class DropCollectionWireCommand extends MongoWireCommand {
+  readonly kind = 'dropCollection' as const;
+
+  constructor(collection: string) {
+    super(collection);
+    this.freeze();
+  }
+}
+
+export class DropIndexWireCommand extends MongoWireCommand {
+  readonly kind = 'dropIndex' as const;
+  readonly name: string;
+
+  constructor(collection: string, name: string) {
+    super(collection);
+    this.name = name;
+    this.freeze();
+  }
+}
+
+export class CollModWireCommand extends MongoWireCommand {
+  readonly kind = 'collMod' as const;
+  readonly options: DefinedProps<CollModOptions>;
+
+  constructor(collection: string, options: DefinedProps<CollModOptions>) {
+    super(collection);
+    this.options = options;
+    this.freeze();
+  }
+}
+
+export type AnyMongoDmlWireCommand =
   | InsertOneWireCommand
   | InsertManyWireCommand
   | UpdateOneWireCommand
@@ -161,3 +226,24 @@ export type AnyMongoWireCommand =
   | FindOneAndUpdateWireCommand
   | FindOneAndDeleteWireCommand
   | AggregateWireCommand;
+
+export type AnyMongoDdlWireCommand =
+  | CreateCollectionWireCommand
+  | CreateIndexWireCommand
+  | DropCollectionWireCommand
+  | DropIndexWireCommand
+  | CollModWireCommand;
+
+export type AnyMongoWireCommand = AnyMongoDmlWireCommand | AnyMongoDdlWireCommand;
+
+const DDL_KINDS: ReadonlySet<string> = new Set([
+  'createCollection',
+  'createIndex',
+  'dropCollection',
+  'dropIndex',
+  'collMod',
+]);
+
+export function isDdlWireCommand(cmd: AnyMongoWireCommand): cmd is AnyMongoDdlWireCommand {
+  return DDL_KINDS.has(cmd.kind);
+}

@@ -1,11 +1,17 @@
 import type { MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
   AggregateWireCommand,
-  AnyMongoWireCommand,
+  AnyMongoDdlWireCommand,
+  AnyMongoDmlWireCommand,
+  CollModWireCommand,
+  CreateCollectionWireCommand,
+  CreateIndexWireCommand,
   DeleteManyResult,
   DeleteManyWireCommand,
   DeleteOneResult,
   DeleteOneWireCommand,
+  DropCollectionWireCommand,
+  DropIndexWireCommand,
   FindOneAndDeleteWireCommand,
   FindOneAndUpdateWireCommand,
   InsertManyResult,
@@ -17,6 +23,8 @@ import type {
   UpdateOneResult,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
+import { blindCast } from '@prisma-next/utils/casts';
+import type { CreateCollectionOptions, CreateIndexesOptions, IndexSpecification } from 'mongodb';
 import { type Db, MongoClient } from 'mongodb';
 import { DRIVER_INFO } from './core/driver-info';
 
@@ -39,7 +47,7 @@ export class MongoDriverImpl implements MongoDriver {
     return new MongoDriverImpl(db, undefined);
   }
 
-  execute<Row = Record<string, unknown>>(wireCommand: AnyMongoWireCommand): AsyncIterable<Row> {
+  execute<Row = Record<string, unknown>>(wireCommand: AnyMongoDmlWireCommand): AsyncIterable<Row> {
     switch (wireCommand.kind) {
       case 'insertOne':
         return this.executeInsertOneCommand(wireCommand) as AsyncIterable<Row>;
@@ -63,6 +71,26 @@ export class MongoDriverImpl implements MongoDriver {
       default: {
         const _exhaustive: never = wireCommand;
         throw new Error(`Unknown wire command kind: ${(_exhaustive as { kind: string }).kind}`);
+      }
+    }
+  }
+
+  async run(wireCommand: AnyMongoDdlWireCommand): Promise<void> {
+    switch (wireCommand.kind) {
+      case 'createCollection':
+        return this.executeCreateCollectionCommand(wireCommand);
+      case 'createIndex':
+        return this.executeCreateIndexCommand(wireCommand);
+      case 'dropCollection':
+        return this.executeDropCollectionCommand(wireCommand);
+      case 'dropIndex':
+        return this.executeDropIndexCommand(wireCommand);
+      case 'collMod':
+        return this.executeCollModCommand(wireCommand);
+      // v8 ignore next 4
+      default: {
+        const _exhaustive: never = wireCommand;
+        throw new Error(`Unknown DDL wire command kind: ${(_exhaustive as { kind: string }).kind}`);
       }
     }
   }
@@ -160,6 +188,41 @@ export class MongoDriverImpl implements MongoDriver {
     const collection = this.db.collection(cmd.collection);
     const cursor = collection.aggregate(cmd.pipeline as Record<string, unknown>[]);
     yield* cursor as AsyncIterable<Row>;
+  }
+
+  protected async executeCreateCollectionCommand(cmd: CreateCollectionWireCommand): Promise<void> {
+    await this.db.createCollection(
+      cmd.collection,
+      blindCast<
+        CreateCollectionOptions,
+        'DefinedProps strips undefined; driver accepts undefined-valued opts'
+      >(cmd.options),
+    );
+  }
+
+  protected async executeCreateIndexCommand(cmd: CreateIndexWireCommand): Promise<void> {
+    await this.db
+      .collection(cmd.collection)
+      .createIndex(
+        blindCast<IndexSpecification, 'key satisfies {[k:string]:IndexDirection}'>(cmd.key),
+        blindCast<
+          CreateIndexesOptions,
+          'DefinedProps strips undefined; driver accepts undefined-valued opts'
+        >(cmd.options),
+      );
+  }
+
+  protected async executeDropCollectionCommand(cmd: DropCollectionWireCommand): Promise<void> {
+    await this.db.collection(cmd.collection).drop();
+  }
+
+  protected async executeDropIndexCommand(cmd: DropIndexWireCommand): Promise<void> {
+    await this.db.collection(cmd.collection).dropIndex(cmd.name);
+  }
+
+  protected async executeCollModCommand(cmd: CollModWireCommand): Promise<void> {
+    // The command name must be the first key in a MongoDB command document.
+    await this.db.command({ collMod: cmd.collection, ...cmd.options });
   }
 }
 

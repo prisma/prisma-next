@@ -6,13 +6,13 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
-  MongoDdlCommandVisitor,
+  AnyMongoDdlCommand,
   MongoInspectionCommandVisitor,
 } from '@prisma-next/mongo-query-ast/control';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import type { Db } from 'mongodb';
 import { createMongoAdapter } from '../mongo-adapter';
-import { MongoCommandExecutor, MongoInspectionExecutor } from './command-executor';
+import { MongoInspectionExecutor } from './inspection-executor';
 import { MongoControlAdapterImpl } from './mongo-control-adapter';
 import { isMongoControlDriver } from './mongo-control-driver';
 
@@ -65,10 +65,10 @@ export interface MarkerOperations {
 }
 
 export interface MongoRunnerDependencies {
-  readonly commandExecutor: MongoDdlCommandVisitor<Promise<void>>;
   readonly inspectionExecutor: MongoInspectionCommandVisitor<Promise<Record<string, unknown>[]>>;
   readonly adapter: MongoAdapter;
   readonly driver: MongoDriver;
+  readonly executeDdl: (command: AnyMongoDdlCommand) => Promise<void>;
   readonly markerOps: MarkerOperations;
   readonly introspectSchema: () => Promise<MongoSchemaIR>;
 }
@@ -93,11 +93,12 @@ export function createMongoRunnerDeps(
   _family: ControlFamilyInstance<'mongo', MongoSchemaIR>,
   controlAdapter: MongoControlAdapter<'mongo'> = new MongoControlAdapterImpl(),
 ): MongoRunnerDependencies {
+  const adapter = createMongoAdapter();
   return {
-    commandExecutor: new MongoCommandExecutor(extractDb(controlDriver)),
     inspectionExecutor: new MongoInspectionExecutor(extractDb(controlDriver)),
-    adapter: createMongoAdapter(),
+    adapter,
     driver,
+    executeDdl: (command) => adapter.lower({ command }, {}).then((wire) => driver.run(wire)),
     markerOps: {
       readMarker: (space) => controlAdapter.readMarker(controlDriver, space),
       initMarker: (space, dest) => controlAdapter.initMarker(controlDriver, space, dest),

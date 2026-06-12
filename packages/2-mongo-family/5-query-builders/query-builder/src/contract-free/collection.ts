@@ -1,4 +1,11 @@
 import {
+  CreateCollectionCommand,
+  type CreateCollectionOptions,
+  CreateIndexCommand,
+  type CreateIndexOptions,
+  type MongoIndexKey,
+} from '@prisma-next/mongo-query-ast/control';
+import {
   AggregateCommand,
   FindOneAndUpdateCommand,
   InsertOneCommand,
@@ -140,6 +147,8 @@ export interface CollectionBuilder<Shape extends DocShape> {
   aggregate(): AggregateChain<Shape>;
   insertOne(document: Record<string, MongoValue>): InsertOneCommand;
   match(filterFn: (fields: FieldAccessor<Shape>) => MongoFilterExpr): FilteredBuilder<Shape>;
+  createCollection(options?: CreateCollectionOptions): CreateCollectionCommand;
+  createIndex(keys: ReadonlyArray<MongoIndexKey>, options?: CreateIndexOptions): CreateIndexCommand;
 }
 
 class CollectionBuilderImpl<Shape extends DocShape> implements CollectionBuilder<Shape> {
@@ -161,6 +170,17 @@ class CollectionBuilderImpl<Shape extends DocShape> implements CollectionBuilder
     const f = createFieldAccessor<Shape>();
     const filter = filterFn(f);
     return new FilteredBuilder<Shape>(this.#name, [filter]);
+  }
+
+  createCollection(options?: CreateCollectionOptions): CreateCollectionCommand {
+    return new CreateCollectionCommand(this.#name, options);
+  }
+
+  createIndex(
+    keys: ReadonlyArray<MongoIndexKey>,
+    options?: CreateIndexOptions,
+  ): CreateIndexCommand {
+    return new CreateIndexCommand(this.#name, keys, options);
   }
 }
 

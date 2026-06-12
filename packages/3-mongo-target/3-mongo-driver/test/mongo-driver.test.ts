@@ -1,7 +1,12 @@
 import {
   AggregateWireCommand,
+  CollModWireCommand,
+  CreateCollectionWireCommand,
+  CreateIndexWireCommand,
   DeleteManyWireCommand,
   DeleteOneWireCommand,
+  DropCollectionWireCommand,
+  DropIndexWireCommand,
   FindOneAndDeleteWireCommand,
   FindOneAndUpdateWireCommand,
   InsertManyWireCommand,
@@ -321,11 +326,147 @@ describe('MongoDriver', () => {
     it('close() is a no-op — does not close the external client', async () => {
       const driver = MongoDriverImpl.fromDb(seedClient.db(dbName));
       await expect(driver.close()).resolves.toBeUndefined();
-      // Explicit readiness check: seedClient must still respond after
-      // driver.close(). Catches regressions where fromDb() starts closing
-      // the caller-owned client.
       const pingResult = await seedClient.db(dbName).command({ ping: 1 });
       expect(pingResult).toMatchObject({ ok: 1 });
+    });
+  });
+
+  describe('createCollection', () => {
+    it('creates the collection', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_create_col';
+
+      await db.dropCollection(col).catch(() => undefined);
+
+      await driver.run(new CreateCollectionWireCommand(col, {}));
+
+      const colls = await db.listCollections({ name: col }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]).toMatchObject({ name: col });
+    });
+
+    it('creates the collection with options', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_create_col_opts';
+
+      await db.dropCollection(col).catch(() => undefined);
+
+      await driver.run(new CreateCollectionWireCommand(col, { capped: true, size: 1024 * 1024 }));
+
+      const colls = await db.listCollections({ name: col }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]).toMatchObject({ name: col, options: { capped: true, size: 1024 * 1024 } });
+    });
+  });
+
+  describe('createIndex', () => {
+    it('creates an index with a key spec', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_create_idx';
+
+      await db.dropCollection(col).catch(() => undefined);
+      await db.createCollection(col);
+
+      await driver.run(new CreateIndexWireCommand(col, { email: 1 }, {}));
+
+      const indexes = await db.collection(col).indexes();
+      expect(indexes.some((idx) => Object.hasOwn(idx.key, 'email'))).toBe(true);
+    });
+
+    it('creates a unique index with options', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_create_idx_opts';
+
+      await db.dropCollection(col).catch(() => undefined);
+      await db.createCollection(col);
+
+      await driver.run(
+        new CreateIndexWireCommand(col, { username: 1 }, { unique: true, name: 'uniq_username' }),
+      );
+
+      const indexes = await db.collection(col).indexes();
+      const idx = indexes.find((i) => i.name === 'uniq_username');
+      expect(idx).toBeDefined();
+      expect(idx).toMatchObject({ unique: true, key: { username: 1 } });
+    });
+  });
+
+  describe('dropCollection', () => {
+    it('drops the collection', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_drop_col';
+
+      await db.dropCollection(col).catch(() => undefined);
+      await db.createCollection(col);
+
+      await driver.run(new DropCollectionWireCommand(col));
+
+      const colls = await db.listCollections({ name: col }).toArray();
+      expect(colls).toHaveLength(0);
+    });
+  });
+
+  describe('dropIndex', () => {
+    it('drops a named index', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_drop_idx';
+
+      await db.dropCollection(col).catch(() => undefined);
+      await db.createCollection(col);
+      await db.collection(col).createIndex({ score: 1 }, { name: 'score_idx' });
+
+      await driver.run(new DropIndexWireCommand(col, 'score_idx'));
+
+      const indexes = await db.collection(col).indexes();
+      expect(indexes.every((idx) => idx.name !== 'score_idx')).toBe(true);
+    });
+  });
+
+  describe('collMod', () => {
+    it('applies collMod options to the collection', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_collmod';
+
+      await db.dropCollection(col).catch(() => undefined);
+      await db.createCollection(col);
+
+      const validator = { $jsonSchema: { bsonType: 'object' } };
+      await driver.run(
+        new CollModWireCommand(col, {
+          validator,
+          validationLevel: 'strict',
+        }),
+      );
+
+      const colls = await db.listCollections({ name: col }, { nameOnly: false }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]).toMatchObject({
+        name: col,
+        options: {
+          validator,
+          validationLevel: 'strict',
+        },
+      });
+    });
+  });
+
+  describe('run() error propagation', () => {
+    it('rejects when the server returns an error', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+
+      await expect(
+        driver.run(
+          new CollModWireCommand('nonexistent_collection_xyz', { validationLevel: 'strict' }),
+        ),
+      ).rejects.toThrow();
     });
   });
 });
