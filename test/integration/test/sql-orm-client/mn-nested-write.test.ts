@@ -199,7 +199,7 @@ describe('integration/mn-nested-write', () => {
             .update({
               tags: (t) => t.connect({ id: TAG_RUST }),
             }),
-        ).rejects.toThrow(/already exists/);
+        ).rejects.toThrow(/violated a unique constraint on junction "user_tags"/);
 
         const junctionRows = await runtime.query<{ user_id: number; tag_id: string }>(
           'select user_id, tag_id from user_tags',

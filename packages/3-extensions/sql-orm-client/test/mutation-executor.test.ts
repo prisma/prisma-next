@@ -758,7 +758,9 @@ describe('mutation-executor', () => {
             children.connect({ id: 10 }),
         } as never,
       }),
-    ).rejects.toThrow(/relation "children" already exists/);
+    ).rejects.toThrow(
+      /relation "children" violated a unique constraint on junction "parent_child"/,
+    );
   });
 
   it('executeNestedUpdateMutation() passes a NOT NULL junction constraint failure through unwrapped', async () => {
@@ -830,7 +832,9 @@ describe('mutation-executor', () => {
             children.connect({ id: 10 }),
         } as never,
       }),
-    ).rejects.toThrow(/relation "children" already exists/);
+    ).rejects.toThrow(
+      /relation "children" violated a unique constraint on junction "parent_child"/,
+    );
   });
 
   it('executeNestedUpdateMutation() routes M:N disconnect through a junction DELETE', async () => {

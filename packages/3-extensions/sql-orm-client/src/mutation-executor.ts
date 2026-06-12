@@ -1031,9 +1031,12 @@ async function insertJunctionLink(
   try {
     await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
   } catch (error) {
+    // The junction PK is the common unique constraint here, but the table may
+    // carry others — say a unique constraint was violated rather than
+    // asserting the link itself already exists.
     if (mutationKind === 'connect' && isUniqueConstraintError(error)) {
       throw new Error(
-        `connect() nested mutation for relation "${relation.relationName}" already exists; the junction link is already present`,
+        `connect() nested mutation for relation "${relation.relationName}" violated a unique constraint on junction "${through.table}"; the junction link may already be present`,
         { cause: error },
       );
     }
