@@ -13,7 +13,6 @@ export type {
 } from '../wire-commands';
 export {
   AggregateWireCommand,
-  isDdlWireCommand,
   CollModWireCommand,
   CreateCollectionWireCommand,
   CreateIndexWireCommand,
@@ -25,6 +24,7 @@ export {
   FindOneAndUpdateWireCommand,
   InsertManyWireCommand,
   InsertOneWireCommand,
+  isDdlWireCommand,
   UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '../wire-commands';

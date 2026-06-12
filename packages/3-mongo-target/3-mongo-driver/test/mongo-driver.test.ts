@@ -463,7 +463,9 @@ describe('MongoDriver', () => {
       const driver = MongoDriverImpl.fromDb(db);
 
       await expect(
-        driver.run(new CollModWireCommand('nonexistent_collection_xyz', { validationLevel: 'strict' })),
+        driver.run(
+          new CollModWireCommand('nonexistent_collection_xyz', { validationLevel: 'strict' }),
+        ),
       ).rejects.toThrow();
     });
   });

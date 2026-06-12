@@ -1,3 +1,5 @@
+import { blindCast } from './casts';
+
 /**
  * Returns an object with the key/value if value is defined, otherwise an empty object.
  *
@@ -24,7 +26,9 @@ export function ifDefined<K extends string, V>(
   key: K,
   value: V | undefined,
 ): Record<never, never> | { [P in K]: V } {
-  return value !== undefined ? ({ [key]: value } as { [P in K]: V }) : {};
+  return value !== undefined
+    ? blindCast<{ [P in K]: V }, 'computed key K; value is defined'>({ [key]: value })
+    : {};
 }
 
 /**
@@ -41,12 +45,12 @@ export type DefinedProps<T> = { [K in keyof T]?: Exclude<T[K], undefined> };
  */
 export function definedProps<T extends object>(obj: T | undefined): DefinedProps<T> {
   if (obj === undefined) return {};
-  const result: DefinedProps<T> = {};
+  const result: Partial<Record<keyof T, unknown>> = {};
   for (const key of Object.keys(obj) as (keyof T)[]) {
     const value = obj[key];
     if (value !== undefined) {
       result[key] = value;
     }
   }
-  return result;
+  return blindCast<DefinedProps<T>, 'all undefined values filtered above'>(result);
 }
