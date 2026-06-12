@@ -13,6 +13,31 @@ import type { SqlExecutionPlan } from './sql-execution-plan';
 export type Expr = ColumnRef | ParamRef;
 
 /**
+ * The minimal contract shape the per-namespace column resolver needs: the
+ * application-domain models and the storage tables, both keyed by namespace
+ * coordinate, plus (via the optional TypeMaps phantom key, read structurally by
+ * {@link ExtractFieldOutputTypes}) the refined field-output map. Every emitted
+ * `Contract<SqlStorage>` satisfies it, as does `sql-builder`'s `TableProxyContract`
+ * — so the resolver indexes the coordinate directly without forcing callers to
+ * carry the full `Contract`. Resolution stays per-namespace; no flat map is read.
+ */
+export type ColumnResolutionContract = {
+  readonly domain: {
+    readonly namespaces: Readonly<
+      Record<string, { readonly models: Readonly<Record<string, unknown>> }>
+    >;
+  };
+  readonly storage: {
+    readonly namespaces: Readonly<
+      Record<
+        string,
+        { readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>> }
+      >
+    >;
+  };
+};
+
+/**
  * The application-domain models declared within a single namespace coordinate,
  * read from the per-namespace `domain` block the emitter stamps for each
  * namespace. Resolving here keeps table/column resolution anchored to the
@@ -20,7 +45,7 @@ export type Expr = ColumnRef | ParamRef;
  * collapses same-named tables across namespaces.
  */
 type NamespaceModels<
-  TContract extends Contract<SqlStorage>,
+  TContract extends ColumnResolutionContract,
   NsId extends string,
 > = TContract['domain']['namespaces'][NsId] extends {
   readonly models: infer Models extends Record<string, unknown>;
@@ -33,7 +58,7 @@ type NamespaceModels<
  * finding the namespace's model whose `storage.table` matches.
  */
 type ExtractTableToModel<
-  TContract extends Contract<SqlStorage>,
+  TContract extends ColumnResolutionContract,
   NsId extends string,
   TableName extends string,
 > =
@@ -53,7 +78,7 @@ type ExtractTableToModel<
  * matches.
  */
 type ExtractColumnToField<
-  TContract extends Contract<SqlStorage>,
+  TContract extends ColumnResolutionContract,
   NsId extends string,
   TableName extends string,
   ColumnName extends string,
@@ -81,7 +106,7 @@ type ExtractColumnToField<
  * does not leak in through a flat cross-namespace view.
  */
 type NamespaceStorageColumn<
-  TContract extends Contract<SqlStorage>,
+  TContract extends ColumnResolutionContract,
   NsId extends string,
   TableName extends string,
   ColumnName extends string,
@@ -122,7 +147,7 @@ type FallbackCodecLookup<
  * would drop. Resolves to `never` when the coordinate is absent from the map.
  */
 type NamespaceFieldOutput<
-  TContract extends Contract<SqlStorage>,
+  TContract extends ColumnResolutionContract,
   NsId extends string,
   ModelName extends string,
   FieldName extends string,
@@ -149,7 +174,7 @@ type NamespaceFieldOutput<
  * {@link NamespaceFieldOutput}.
  */
 type ColumnCodecFallback<
-  TContract extends Contract<SqlStorage>,
+  TContract extends ColumnResolutionContract,
   NsId extends string,
   TableName extends string,
   ColumnName extends string,
@@ -237,7 +262,7 @@ export type OperationsForTypeId<TypeId extends string, Operations extends Operat
  * codec-output lookup; a column absent in the namespace resolves to `never`.
  */
 export type ComputeColumnJsType<
-  TContract extends Contract<SqlStorage>,
+  TContract extends ColumnResolutionContract,
   NsId extends string,
   TableName extends string,
   ColumnName extends string,
