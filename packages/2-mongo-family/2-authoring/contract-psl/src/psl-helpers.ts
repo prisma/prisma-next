@@ -1,11 +1,24 @@
-import type { PslAttribute, PslAttributeArgument } from '@prisma-next/psl-parser';
-import { getPositionalArgument, parseQuotedStringLiteral } from '@prisma-next/psl-parser';
+import type { ExpressionAst, ResolvedAttribute } from '@prisma-next/psl-parser/syntax';
 
-export { getPositionalArgument, parseQuotedStringLiteral };
+/**
+ * Raw source text of an argument expression — the concatenated token text of the
+ * CST node, which reproduces the source slice the node spans (leaf expression
+ * nodes carry no leading/trailing trivia, so this is already trimmed). This is
+ * the value the downstream string parsers expect: it matches the raw, trimmed
+ * argument text the legacy parser exposed as its positional/named arg value
+ * (quotes and brackets preserved; the parsers strip them as needed).
+ */
+export function argText(value: ExpressionAst): string {
+  let text = '';
+  for (const token of value.syntax.tokens()) {
+    text += token.text;
+  }
+  return text;
+}
 
-export function getNamedArgument(attr: PslAttribute, name: string): string | undefined {
-  const arg = attr.args.find((a) => a.kind === 'named' && a.name === name);
-  return arg?.value;
+export function getNamedArgument(attr: ResolvedAttribute, name: string): string | undefined {
+  const arg = attr.args.find((a) => a.name === name);
+  return arg === undefined ? undefined : argText(arg.value);
 }
 
 export function parseFieldList(value: string): readonly string[] {
@@ -72,18 +85,18 @@ export function lowerFirst(value: string): string {
 }
 
 export function getAttribute(
-  attributes: readonly PslAttribute[],
+  attributes: readonly ResolvedAttribute[],
   name: string,
-): PslAttribute | undefined {
+): ResolvedAttribute | undefined {
   return attributes.find((attr) => attr.name === name);
 }
 
-export function getMapName(attributes: readonly PslAttribute[]): string | undefined {
+export function getMapName(attributes: readonly ResolvedAttribute[]): string | undefined {
   const mapAttr = getAttribute(attributes, 'map');
   if (!mapAttr) return undefined;
-  const arg = mapAttr.args[0];
+  const arg = mapAttr.positionalArg(0);
   if (!arg) return undefined;
-  return stripQuotes(arg.value);
+  return stripQuotes(argText(arg));
 }
 
 export interface ParsedRelationAttribute {
@@ -93,29 +106,29 @@ export interface ParsedRelationAttribute {
 }
 
 export function parseRelationAttribute(
-  attributes: readonly PslAttribute[],
+  attributes: readonly ResolvedAttribute[],
 ): ParsedRelationAttribute | undefined {
   const relationAttr = getAttribute(attributes, 'relation');
   if (!relationAttr) return undefined;
 
   let relationName: string | undefined;
-  let fieldsArg: PslAttributeArgument | undefined;
-  let referencesArg: PslAttributeArgument | undefined;
+  let fieldsArg: ExpressionAst | undefined;
+  let referencesArg: ExpressionAst | undefined;
 
   for (const arg of relationAttr.args) {
-    if (arg.kind === 'positional') {
-      relationName = stripQuotes(arg.value);
+    if (arg.name === undefined) {
+      relationName = stripQuotes(argText(arg.value));
     } else if (arg.name === 'name') {
-      relationName = stripQuotes(arg.value);
+      relationName = stripQuotes(argText(arg.value));
     } else if (arg.name === 'fields') {
-      fieldsArg = arg;
+      fieldsArg = arg.value;
     } else if (arg.name === 'references') {
-      referencesArg = arg;
+      referencesArg = arg.value;
     }
   }
 
-  const fields = fieldsArg ? parseFieldList(fieldsArg.value) : undefined;
-  const references = referencesArg ? parseFieldList(referencesArg.value) : undefined;
+  const fields = fieldsArg ? parseFieldList(argText(fieldsArg)) : undefined;
+  const references = referencesArg ? parseFieldList(argText(referencesArg)) : undefined;
 
   return {
     ...(relationName !== undefined ? { relationName } : {}),
@@ -129,4 +142,19 @@ function stripQuotes(value: string): string {
     return value.slice(1, -1);
   }
   return value;
+}
+
+/**
+ * Reads a positional argument as an unquoted string literal: a value wrapped in
+ * matching single or double quotes yields its inner text, anything else yields
+ * `undefined`. Used for `@@base`'s discriminator value, which must be a quoted
+ * string.
+ */
+export function quotedStringArg(attr: ResolvedAttribute, index: number): string | undefined {
+  const value = attr.positionalArg(index);
+  if (value === undefined) return undefined;
+  const trimmed = argText(value).trim();
+  const match = trimmed.match(/^(['"])(.*)\1$/);
+  if (!match) return undefined;
+  return match[2] ?? '';
 }
