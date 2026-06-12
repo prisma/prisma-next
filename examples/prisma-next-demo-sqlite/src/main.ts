@@ -24,6 +24,7 @@
  *
  * Many-to-many commands (Post ↔ Tag via PostTag junction):
  * - post-tags <postId>                     Include a post's tags (N:M read)
+ * - tag-posts <tagId>                      Include a tag's posts (N:M read, reverse direction)
  * - posts-with-tag-some <label>            Posts that have at least one tag matching label
  * - posts-with-tag-none <label>            Posts that have no tag matching label
  * - posts-with-tag-every <label>           Posts where every tag differs from label
@@ -32,6 +33,8 @@
  * - disconnect-post-tags <postId> <tagId...>  Unlink tags from a post
  * - create-post-with-tags <id> <userId> <title> <label...>
  *                                          Create post + new tags in one nested mutation
+ * - create-post-connect-tags <id> <userId> <title> <tagId...>
+ *                                          Create post + link existing tags in one nested mutation
  *
  * Each command opens a connection, runs the operation, prints the result as
  * JSON, and closes. Exits non-zero on usage errors or runtime failures.
@@ -39,12 +42,14 @@
 import 'dotenv/config';
 import { loadAppConfig } from './app-config';
 import { ormClientConnectPostTags } from './orm-client/connect-post-tags';
+import { ormClientCreatePostConnectTags } from './orm-client/create-post-connect-tags';
 import { ormClientCreatePostWithTags } from './orm-client/create-post-with-tags';
 import { ormClientCreateUser } from './orm-client/create-user';
 import { ormClientDisconnectPostTags } from './orm-client/disconnect-post-tags';
 import { ormClientFindUserById } from './orm-client/find-user-by-id';
 import { ormClientGetPostTags } from './orm-client/get-post-tags';
 import { ormClientGetPostsByTagFilter } from './orm-client/get-posts-by-tag-filter';
+import { ormClientGetTagPosts } from './orm-client/get-tag-posts';
 import { ormClientGetUserPosts } from './orm-client/get-user-posts';
 import { db } from './prisma/db';
 import { insertUser } from './queries/dml-operations';
@@ -146,6 +151,15 @@ async function main() {
       }
       const result = await ormClientGetPostTags(postId, runtime);
       console.log(JSON.stringify(result, null, 2));
+    } else if (cmd === 'tag-posts') {
+      const [tagId] = args;
+      if (!tagId) {
+        console.error('Usage: pnpm start -- tag-posts <tagId>');
+        process.exitCode = 1;
+        return;
+      }
+      const result = await ormClientGetTagPosts(tagId, runtime);
+      console.log(JSON.stringify(result, null, 2));
     } else if (
       cmd === 'posts-with-tag-some' ||
       cmd === 'posts-with-tag-none' ||
@@ -193,17 +207,29 @@ async function main() {
         runtime,
       );
       console.log(JSON.stringify(result, null, 2));
+    } else if (cmd === 'create-post-connect-tags') {
+      const [id, userId, title, ...tagIds] = args;
+      if (!id || !userId || !title || tagIds.length === 0) {
+        console.error(
+          'Usage: pnpm start -- create-post-connect-tags <id> <userId> <title> <tagId...>',
+        );
+        process.exitCode = 1;
+        return;
+      }
+      const result = await ormClientCreatePostConnectTags({ id, userId, title, tagIds }, runtime);
+      console.log(JSON.stringify(result, null, 2));
     } else {
       console.log(
         'Usage: pnpm start -- [users [limit] | repo-user <id> | repo-user-posts <id> [limit] |\n' +
           '  repo-create-user <id> <email> <displayName> | insert-user <email> <displayName> |\n' +
           '  user-by-email-prepared <email> [<email> ...] |\n' +
           '  add-posts <userId> <title> [...moreTitles] |\n' +
-          '  post-tags <postId> |\n' +
+          '  post-tags <postId> | tag-posts <tagId> |\n' +
           '  posts-with-tag-some <label> | posts-with-tag-none <label> | posts-with-tag-every <label> |\n' +
           '  connect-post-tags <postId> <tagId...> |\n' +
           '  disconnect-post-tags <postId> <tagId...> |\n' +
-          '  create-post-with-tags <id> <userId> <title> <label...>]',
+          '  create-post-with-tags <id> <userId> <title> <label...> |\n' +
+          '  create-post-connect-tags <id> <userId> <title> <tagId...>]',
       );
       process.exitCode = 1;
       return;
