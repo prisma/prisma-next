@@ -14,7 +14,7 @@ import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { createPrismaNextControlClient, initTestDatabase } from './utils/control-client';
 
 // Use the emitted JSON contract which has the real computed hashes
-const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
+const contract = new PostgresContractSerializer().deserializeContract<Contract>(contractJson);
 
 describe('control client integration', () => {
   it(

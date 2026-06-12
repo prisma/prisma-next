@@ -1,4 +1,4 @@
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Contract } from '../prisma/contract.d';
@@ -6,7 +6,7 @@ import contractJson from '../prisma/contract.json' with { type: 'json' };
 import { App } from './App';
 
 function renderApp(json: unknown) {
-  const contract = new SqlContractSerializer().deserializeContract(json) as Contract;
+  const contract = new PostgresContractSerializer().deserializeContract<Contract>(json);
   root.render(
     <StrictMode>
       <App contract={contract} />

@@ -112,7 +112,7 @@ The coordinate `(plane, namespaceId, entityKind, entityName)` is the payoff. Wit
 
 The `kind` is part of the address, not derived from the entity instance's runtime type. This matters in two places: consumers that diff raw JSON envelopes (without rehydrating to classes) can still dispatch, and two packs that happen to use overlapping name conventions for different kinds stay distinct.
 
-The `plane` axis rides on the coordinate rather than being split across two separate per-plane coordinate types. This lets a cross-plane consumer address either side through one tuple type — most importantly the directional reference invariant (a storage entity may reference a domain entity, but not the reverse). That invariant is enforced by a dedicated validator; the coordinate simply carries the axis the validator reads.
+The `plane` axis rides on the coordinate rather than being split across two separate per-plane coordinate types. This lets a cross-plane consumer address either side through one tuple type — most importantly the directional reference invariant (a domain entity may reference a storage entity, but not the reverse — the storage plane must remain independently consumable by the migration planner/runner). That invariant is enforced by a dedicated validator; the coordinate simply carries the axis the validator reads.
 
 ### The walk is a free function, not an interface method
 

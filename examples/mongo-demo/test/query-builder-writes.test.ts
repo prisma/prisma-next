@@ -16,7 +16,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 
-const contract = new MongoContractSerializer().deserializeContract(contractJson) as Contract;
+const contract = new MongoContractSerializer().deserializeContract<Contract>(contractJson);
 
 const q = mongoQuery<Contract>({ contractJson: contract });
 

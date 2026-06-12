@@ -4,7 +4,7 @@ import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-compon
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   createMongoContractSchema,
-  MongoCollection,
+  type MongoCollection,
   type MongoContract,
   type MongoStorageShape,
 } from '@prisma-next/mongo-contract';
@@ -33,13 +33,11 @@ function unboundCollections(storage: MongoStorageShape): Record<string, MongoCol
   if (!namespace) {
     throw new Error(`expected namespace ${UNBOUND_NAMESPACE_ID}`);
   }
-  const collections = namespace.entries.collection;
-  const result: Record<string, MongoCollection> = {};
-  for (const [name, collection] of Object.entries(collections)) {
-    result[name] =
-      collection instanceof MongoCollection ? collection : new MongoCollection(collection);
-  }
-  return result;
+  return {
+    ...((namespace.entries['collection'] as
+      | Readonly<Record<string, MongoCollection>>
+      | undefined) ?? {}),
+  };
 }
 
 function collectionEffectiveControl(

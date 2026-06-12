@@ -8,7 +8,6 @@ import type {
   StorageBase,
 } from '@prisma-next/contract/types';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import type { MongoCollection } from './ir/mongo-collection';
 import type { MongoIndexOptionsInput } from './ir/mongo-index-options';
 
 export type MongoIndexFieldValue = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
@@ -59,13 +58,17 @@ export type MongoModelDefinition = ContractModel<MongoModelStorage>;
  * `namespaces` field) or a fully-constructed class instance (with
  * `namespaces`). The class structurally satisfies this shape.
  */
+import type { MongoCollection } from './ir/mongo-collection';
+
+type MongoNamespaceEntries = Readonly<Record<string, Readonly<Record<string, unknown>>>> & {
+  readonly collection?: Readonly<Record<string, MongoCollection>>;
+};
+
 export type MongoStorageShape<THash extends string = string> = StorageBase<THash> & {
   readonly namespaces: Record<
     string,
     Namespace & {
-      readonly entries: Readonly<{
-        readonly collection: Readonly<Record<string, MongoCollection>>;
-      }>;
+      readonly entries: MongoNamespaceEntries;
     }
   >;
 };

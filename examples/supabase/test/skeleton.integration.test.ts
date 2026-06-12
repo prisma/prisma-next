@@ -50,6 +50,7 @@ import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 import { createDb } from '../src/prisma/db';
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
@@ -185,7 +186,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
         //
         // With the shim in place the verifier confirms all declared `external`
         // tables exist. Without the shim this would fail with `declaredMissing`.
-        const deserializedContract = new PostgresContractSerializer().deserializeContract(
+        const deserializedContract = new PostgresContractSerializer().deserializeContract<Contract>(
           contractJson,
         );
         const verifyResult = await client.dbVerify({

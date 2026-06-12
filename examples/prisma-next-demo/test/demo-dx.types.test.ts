@@ -23,7 +23,7 @@ test('contract.d.ts exports Contract and TypeMaps separately', () => {
 });
 
 test('SPI deserializeContract output is assignable to visualization shape', () => {
-  const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
+  const contract = new PostgresContractSerializer().deserializeContract<Contract>(contractJson);
 
   expectTypeOf<Models>().toHaveProperty('User');
   expectTypeOf<Models>().toHaveProperty('Post');

@@ -81,7 +81,7 @@ function locateNamespaceTypeInStorage(
   typeName: string,
 ): unknown {
   const ns = storage.namespaces[namespaceId];
-  return isPostgresSchema(ns) ? ns.entries.type[typeName] : undefined;
+  return isPostgresSchema(ns) ? ns.type[typeName] : undefined;
 }
 
 // ============================================================================

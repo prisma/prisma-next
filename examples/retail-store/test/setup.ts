@@ -18,7 +18,7 @@ import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 import type { Db } from '../src/db';
 
-const contract = new MongoContractSerializer().deserializeContract(contractJson) as Contract;
+const contract = new MongoContractSerializer().deserializeContract<Contract>(contractJson);
 const query = mongoQuery<Contract>({ contractJson });
 const raw = mongoRaw({ contract });
 

@@ -129,7 +129,7 @@ namespace auth {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    const postTable = storage.namespaces['public']?.entries.table?.['post'];
+    const postTable = storage.namespaces['public']!.entries.table?.['post'];
     expect(postTable).toBeDefined();
 
     const fks: readonly ForeignKey[] = postTable?.foreignKeys ?? [];
@@ -165,7 +165,7 @@ namespace auth {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    const postTable = storage.namespaces['public']?.entries.table?.['post'];
+    const postTable = storage.namespaces['public']!.entries.table?.['post'];
     const fks: readonly ForeignKey[] = postTable?.foreignKeys ?? [];
     expect(fks.length).toBe(1);
     expect(fks[0]).toMatchObject({
@@ -206,13 +206,13 @@ namespace auth {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    const publicUsers = storage.namespaces['public']?.entries.table['users'];
-    const authUsers = storage.namespaces['auth']?.entries.table['users'];
+    const publicUsers = storage.namespaces['public']!.entries.table?.['users'];
+    const authUsers = storage.namespaces['auth']!.entries.table?.['users'];
     expect(Object.keys(publicUsers?.columns ?? {}).sort()).toEqual(['email', 'id']);
     expect(Object.keys(authUsers?.columns ?? {}).sort()).toEqual(['id', 'token']);
 
     const fks: readonly ForeignKey[] =
-      storage.namespaces['public']?.entries.table['profile']?.foreignKeys ?? [];
+      storage.namespaces['public']!.entries.table?.['profile']?.foreignKeys ?? [];
     expect(fks.length).toBe(1);
     expect(fks[0]).toMatchObject({ target: { namespaceId: 'auth', tableName: 'users' } });
 

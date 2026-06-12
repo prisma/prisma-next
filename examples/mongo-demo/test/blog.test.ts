@@ -16,7 +16,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 
-const contract = new MongoContractSerializer().deserializeContract(contractJson) as Contract;
+const contract = new MongoContractSerializer().deserializeContract<Contract>(contractJson);
 
 describe('mongo-demo blog integration', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   let replSet: MongoMemoryReplSet;

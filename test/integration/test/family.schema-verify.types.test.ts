@@ -11,11 +11,11 @@ import {
   findNodeByStatusAndCode,
   int4Column,
   model,
+  PostgresContractSerializer,
   pgvector,
   postgres,
   postgresAdapter,
   runSchemaVerify,
-  SqlContractSerializer,
   type SqlStorage,
   textColumn,
   timeouts,
@@ -239,7 +239,7 @@ describe('family instance schemaVerify - types', () => {
 
         await withDriver(getConnectionString(), async (driver) => {
           const familyInstance = createFamilyInstance();
-          const validatedContract = new SqlContractSerializer().deserializeContract(
+          const validatedContract = new PostgresContractSerializer().deserializeContract(
             contractWithUnknownType,
           ) as Contract<SqlStorage>;
           const schema = await familyInstance.introspect({

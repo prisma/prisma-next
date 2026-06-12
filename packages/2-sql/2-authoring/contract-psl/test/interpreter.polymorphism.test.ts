@@ -214,7 +214,7 @@ model Feature {
       // the shared primary key (`tasks.id = features.id`). That requires the
       // base PK column to be materialised on the variant storage table.
       const storage = result.value.storage as SqlStorage;
-      const featureTable = storage.namespaces['public']?.entries.table['features'];
+      const featureTable = storage.namespaces['public']!.entries.table?.['features'];
       expect(featureTable?.columns['id']).toMatchObject({ nullable: false });
       expect(featureTable?.columns['priority']).toBeDefined();
       expect(featureTable?.primaryKey).toMatchObject({ columns: ['id'] });
@@ -271,7 +271,7 @@ model Feature {
       // carry the base's namespace (`auth`), not silently fall back to the
       // default namespace — mirroring the regular relation-FK path.
       const storage = result.value.storage as SqlStorage;
-      const featureTable = storage.namespaces['auth']?.entries.table['features'];
+      const featureTable = storage.namespaces['auth']!.entries.table?.['features'];
       expect(featureTable?.foreignKeys).toEqual([
         expect.objectContaining({
           source: expect.objectContaining({
@@ -399,7 +399,8 @@ model Bug {
   describe('STI variant storage columns', () => {
     function tablesOf(contract: { storage: unknown }) {
       const storage = contract.storage as SqlStorage;
-      return storage.namespaces['public']?.entries.table ?? {};
+      const ns = storage.namespaces['public'];
+      return ns !== undefined ? (ns.entries.table ?? {}) : {};
     }
 
     it('materializes an STI variant column onto the base table (nullable in storage)', () => {

@@ -243,7 +243,8 @@ describe('PSL authoring → migration E2E', { timeout: timeouts.spinUpMongoMemor
       }
     `);
 
-    const postColl = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.entries.collection['post'];
+    const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    const postColl = ns ? ns.entries.collection?.['post'] : undefined;
     expect(postColl?.indexes).toBeDefined();
     expect(postColl?.validator).toBeDefined();
 

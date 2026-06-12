@@ -64,6 +64,19 @@ changes:
       glob: "**/*.{ts,tsx}"
       contains:
         - "createRuntime"
+  - id: postgres-contract-serializer
+    summary: |
+      `SqlContractSerializer` (from `@prisma-next/family-sql/ir`) can no longer
+      deserialize Postgres contracts. The family serializer has an empty entries
+      registry and now rejects the `type` key that every Postgres namespace carries.
+      Any migration file or app code that calls
+      `new SqlContractSerializer().deserializeContract(postgresContractJson)` must
+      switch to `new PostgresContractSerializer()` imported from
+      `@prisma-next/target-postgres/runtime`.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "SqlContractSerializer"
 ---
 
 <!--
@@ -210,6 +223,24 @@ const runtime = new PostgresRuntimeImpl({ adapter: stackInstance.adapter, contex
 ```
 
 The constructor options are identical to what `createRuntime` accepted, except `stackInstance` is not taken: pass `adapter` from `stackInstance.adapter` directly.
+
+## `postgres-contract-serializer`
+
+`SqlContractSerializer` (from `@prisma-next/family-sql/ir`) now rejects Postgres contracts. The family serializer validates entries against a registry of known entity kinds; it only knows the SQL-family built-ins (`table`, `valueSet`) and has no knowledge of the Postgres-specific `type` key (Postgres enum types). Every Postgres namespace carries `"type": {}` in its `entries`, so the family serializer throws a `ContractValidationError` naming `type` as an unregistered kind.
+
+Replace `SqlContractSerializer` with `PostgresContractSerializer` in any migration file or app code that deserializes a Postgres-emitted contract:
+
+```ts
+// Before
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+
+// After
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
+```
+
+SQLite and family-only (non-Postgres) contracts are unaffected — their namespaces carry only `table` entries, which the family serializer knows about.
 
 <!--
 TML-2882: transitional PSL `enum2` block (PR #805). The demo authors `enum2 Priority`

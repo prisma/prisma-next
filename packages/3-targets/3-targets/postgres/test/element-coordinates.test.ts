@@ -1,5 +1,9 @@
 import { coreHash } from '@prisma-next/contract/types';
-import { elementCoordinates, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  elementCoordinates,
+  entityAt,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { PostgresSchema, PostgresUnboundSchema } from '../src/core/postgres-schema';
@@ -34,5 +38,32 @@ describe('elementCoordinates with PostgresSchema', () => {
       entityKind: 'table',
       entityName: 'users',
     });
+  });
+});
+
+describe('coordinate-resolution acceptance — every elementCoordinates tuple resolves', () => {
+  it('every coordinate from a postgres storage resolves through entityAt', () => {
+    const storage = new SqlStorage({
+      storageHash: coreHash('sha256:coord-resolution-postgres'),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
+        public: new PostgresSchema({
+          id: 'public',
+          entries: {
+            table: { users: emptyTableInput, posts: emptyTableInput },
+            type: { role: { name: 'Role', values: ['admin', 'member'] } },
+            valueSet: { status: { kind: 'valueSet', values: ['active', 'inactive'] } },
+          },
+        }),
+      },
+    });
+
+    const coordinates = [...elementCoordinates(storage)];
+    expect(coordinates.length).toBeGreaterThan(0);
+
+    for (const coordinate of coordinates) {
+      const entity = entityAt(storage, coordinate);
+      expect(entity, `entityAt did not resolve ${JSON.stringify(coordinate)}`).toBeDefined();
+    }
   });
 });

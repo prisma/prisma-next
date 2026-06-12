@@ -41,7 +41,6 @@ import {
   SqlStorage,
   type SqlStorageInput,
   type StorageColumn,
-  StorageTable,
   type StorageTableInput,
   type StorageTypeInstance,
   type StorageValueSetInput,
@@ -389,7 +388,7 @@ export function buildSqlContractFromDefinition(
     definition.models.map((m) => [`${resolveNamespaceId(m)}:${m.modelName}`, m]),
   );
 
-  const tablesByNamespace: Record<string, Record<string, StorageTable>> = {};
+  const tablesByNamespace: Record<string, Record<string, StorageTableInput>> = {};
   const modelNameToNamespaceId = new Map<string, string>();
   const executionDefaults: ExecutionMutationDefault[] = [];
   const modelsByNamespace: Record<string, Record<string, ContractModel>> = {};
@@ -602,7 +601,7 @@ export function buildSqlContractFromDefinition(
           `buildSqlContractFromDefinition: duplicate table "${tableName}" in namespace "${namespaceId}".`,
         );
       }
-      nsTables[tableName] = new StorageTable(tableInput);
+      nsTables[tableName] = tableInput;
     }
 
     // --- Build contract model ---

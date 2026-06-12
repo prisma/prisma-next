@@ -80,8 +80,8 @@ describe('same bare table name across namespaces with a cross-namespace FK', () 
   const storage = contract.storage as SqlStorage;
 
   it('lowers both same-named tables into their own namespace with differing columns', () => {
-    const publicUsers = storage.namespaces['public']?.entries.table['users'];
-    const authUsers = storage.namespaces['auth']?.entries.table['users'];
+    const publicUsers = storage.namespaces['public']!.entries.table?.['users'];
+    const authUsers = storage.namespaces['auth']!.entries.table?.['users'];
     expect(publicUsers).toBeDefined();
     expect(authUsers).toBeDefined();
 
@@ -91,7 +91,7 @@ describe('same bare table name across namespaces with a cross-namespace FK', () 
 
   it('lowers the cross-namespace FK with a target coordinate pointing at the other namespace', () => {
     const fks: readonly ForeignKey[] =
-      storage.namespaces['public']?.entries.table['profile']?.foreignKeys ?? [];
+      storage.namespaces['public']!.entries.table?.['profile']?.foreignKeys ?? [];
     expect(fks.length).toBe(1);
     expect(fks[0]).toMatchObject({
       target: { namespaceId: 'auth', tableName: 'users', columns: ['id'] },

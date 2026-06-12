@@ -167,15 +167,19 @@ model Post {
     const tsDomainNs = (tsContract as unknown as Contract).domain.namespaces['public'];
 
     expect(pslDomainNs?.enum?.['Priority']).toEqual(tsDomainNs?.enum?.['Priority']);
-    expect(pslNs?.entries.valueSet?.['Priority']).toEqual(tsNs?.entries.valueSet?.['Priority']);
+    expect(pslNs !== undefined ? pslNs.entries.valueSet?.['Priority'] : undefined).toEqual(
+      tsNs !== undefined ? tsNs.entries.valueSet?.['Priority'] : undefined,
+    );
     expect(pslDomainNs?.models?.['Post']?.fields?.['priority']).toEqual(
       tsDomainNs?.models?.['Post']?.fields?.['priority'],
     );
     // Strict equality on the storage column catches extra properties (e.g. a stray typeRef).
-    expect(pslNs?.entries.table?.['post']?.columns?.['priority']).toEqual(
-      tsNs?.entries.table?.['post']?.columns?.['priority'],
+    expect(
+      pslNs !== undefined ? pslNs.entries.table?.['post']?.columns?.['priority'] : undefined,
+    ).toEqual(tsNs !== undefined ? tsNs.entries.table?.['post']?.columns?.['priority'] : undefined);
+    expect(pslNs !== undefined ? pslNs.entries.table?.['post']?.checks : undefined).toEqual(
+      tsNs !== undefined ? tsNs.entries.table?.['post']?.checks : undefined,
     );
-    expect(pslNs?.entries.table?.['post']?.checks).toEqual(tsNs?.entries.table?.['post']?.checks);
     // Both authoring paths must produce the same storageHash.
     expect((pslResult.value.storage as unknown as SqlStorage).storageHash).toEqual(
       (tsContract.storage as unknown as SqlStorage).storageHash,
@@ -503,10 +507,14 @@ model User {
     const nativeNs = (nativeOnlyResult.value.storage as unknown as SqlStorage).namespaces['public'];
     const mixedNs = (mixedResult.value.storage as unknown as SqlStorage).namespaces['public'];
 
-    expect(mixedNs?.entries.table?.['user']?.columns?.['role']).toMatchObject(
-      nativeNs?.entries.table?.['user']?.columns?.['role'] as object,
+    expect(
+      mixedNs !== undefined ? mixedNs.entries.table?.['user']?.columns?.['role'] : undefined,
+    ).toMatchObject(
+      nativeNs !== undefined ? (nativeNs.entries.table?.['user']?.columns?.['role'] as object) : {},
     );
-    expect(mixedNs?.entries.valueSet?.['Priority']).toMatchObject({
+    expect(
+      mixedNs !== undefined ? mixedNs.entries.valueSet?.['Priority'] : undefined,
+    ).toMatchObject({
       kind: 'valueSet',
       values: ['low', 'high'],
     });
@@ -536,7 +544,7 @@ model Post {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const ns = (result.value.storage as unknown as SqlStorage).namespaces['public'];
-    expect(ns?.entries.valueSet?.['Priority']).toMatchObject({
+    expect(ns !== undefined ? ns.entries.valueSet?.['Priority'] : undefined).toMatchObject({
       kind: 'valueSet',
       values: [1, 10],
     });

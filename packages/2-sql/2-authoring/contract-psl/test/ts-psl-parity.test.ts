@@ -542,9 +542,9 @@ model Post {
     const pslStorage = pslContract.value.storage as unknown as SqlStorage;
     const tsStorage = tsContract.storage as unknown as SqlStorage;
     const pslFks: readonly ForeignKey[] =
-      pslStorage.namespaces['public']?.entries.table?.['post']?.foreignKeys ?? [];
+      pslStorage.namespaces['public']!.entries.table?.['post']?.foreignKeys ?? [];
     const tsFks: readonly ForeignKey[] =
-      tsStorage.namespaces['public']?.entries.table?.['post']?.foreignKeys ?? [];
+      tsStorage.namespaces['public']!.entries.table?.['post']?.foreignKeys ?? [];
 
     expect(tsFks.length).toBe(1);
     expect(pslFks.length).toBe(1);
