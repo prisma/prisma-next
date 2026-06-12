@@ -11,7 +11,6 @@
     "src/**/*.tsx",
     "test/**/*.ts",
     "scripts/**/*.ts",
-    "prisma/**/*.ts",
     "prisma-next.config.ts"
   ],
   "exclude": ["dist"]
