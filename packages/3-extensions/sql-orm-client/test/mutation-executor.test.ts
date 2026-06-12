@@ -761,6 +761,78 @@ describe('mutation-executor', () => {
     ).rejects.toThrow(/relation "children" already exists/);
   });
 
+  it('executeNestedUpdateMutation() passes a NOT NULL junction constraint failure through unwrapped', async () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+    });
+    const runtime = createMockRuntime();
+    const execute = runtime.execute.bind(runtime);
+    vi.spyOn(runtime, 'execute').mockImplementation((plan) => {
+      const ast = (plan as { ast?: { kind: string; table?: { name: string } } }).ast;
+      if (ast?.kind === 'insert' && ast.table?.name === 'parent_child') {
+        throw Object.assign(new Error('NOT NULL constraint failed: parent_child.level'), {
+          code: 'SQLITE_CONSTRAINT_NOTNULL',
+        });
+      }
+      return execute(plan);
+    });
+    runtime.setNextResults([[{ id: 1 }], [{ id: 10 }], [{ id: 10 }]]);
+
+    await expect(
+      executeNestedUpdateMutation({
+        context: { ...getTestContext(), contract },
+        runtime,
+        namespaceId: 'public',
+        modelName: 'Parent',
+        filters: [BinaryExpr.eq(ColumnRef.of('parents', 'id'), LiteralExpr.of(1))],
+        data: {
+          children: (children: { connect: (criterion: Record<string, unknown>) => unknown }) =>
+            children.connect({ id: 10 }),
+        } as never,
+      }),
+    ).rejects.toThrow(/NOT NULL constraint failed: parent_child\.level/);
+  });
+
+  it('executeNestedUpdateMutation() wraps SQLITE_CONSTRAINT_PRIMARYKEY junction connect errors', async () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+    });
+    const runtime = createMockRuntime();
+    const execute = runtime.execute.bind(runtime);
+    vi.spyOn(runtime, 'execute').mockImplementation((plan) => {
+      const ast = (plan as { ast?: { kind: string; table?: { name: string } } }).ast;
+      if (ast?.kind === 'insert' && ast.table?.name === 'parent_child') {
+        // Message deliberately matches none of the string arms so the test
+        // pins the code-based recognition on its own.
+        throw Object.assign(new Error('constraint violation'), {
+          code: 'SQLITE_CONSTRAINT_PRIMARYKEY',
+        });
+      }
+      return execute(plan);
+    });
+    runtime.setNextResults([[{ id: 1 }], [{ id: 10 }], [{ id: 10 }]]);
+
+    await expect(
+      executeNestedUpdateMutation({
+        context: { ...getTestContext(), contract },
+        runtime,
+        namespaceId: 'public',
+        modelName: 'Parent',
+        filters: [BinaryExpr.eq(ColumnRef.of('parents', 'id'), LiteralExpr.of(1))],
+        data: {
+          children: (children: { connect: (criterion: Record<string, unknown>) => unknown }) =>
+            children.connect({ id: 10 }),
+        } as never,
+      }),
+    ).rejects.toThrow(/relation "children" already exists/);
+  });
+
   it('executeNestedUpdateMutation() routes M:N disconnect through a junction DELETE', async () => {
     const contract = buildManyToManyContract({
       junctionTable: 'parent_child',
