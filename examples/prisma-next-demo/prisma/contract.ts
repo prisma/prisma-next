@@ -11,7 +11,7 @@ const Priority = enumType(
   member('Urgent', 'urgent'),
 );
 
-const UserType = enumType('user_type', pgText, member('admin'), member('user'));
+const UserEnum = enumType('user_type', pgText, member('admin', 'admin'), member('user', 'user'));
 
 export const contract = defineContract(
   {
@@ -28,7 +28,7 @@ export const contract = defineContract(
         email: field.text(),
         createdAt: field.temporal.createdAt(),
         updatedAt: field.temporal.updatedAt(),
-        kind: field.namedType(UserType),
+        kind: field.namedType(UserEnum),
         address: field.json().optional(),
       },
     });
@@ -46,7 +46,7 @@ export const contract = defineContract(
     });
 
     return {
-      enums: { Priority, user_type: UserType },
+      enums: { Priority, user_type: UserEnum },
       types,
       models: {
         User: User.relations({
