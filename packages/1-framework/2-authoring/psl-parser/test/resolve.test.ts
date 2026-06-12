@@ -57,7 +57,7 @@ namespace auth {
   model User {
     id    String @id
     email Email
-    posts Post[]
+    posts blog.Post[]
   }
 
   enum Role {
@@ -69,7 +69,7 @@ namespace auth {
 namespace blog {
   model Post {
     id       String @id
-    author   User   @relation(fields: [authorId], references: [id])
+    author   auth.User @relation(fields: [authorId], references: [id])
     authorId String
     owner    space:auth.User
     vec      Vector(1536)
@@ -131,7 +131,7 @@ types {
       expect(alias?.target).toEqual({ kind: 'scalar', name: 'String' });
     });
 
-    it('resolves a bare cross-namespace model reference to its declaring namespace', () => {
+    it('resolves a qualified cross-namespace model reference to its declaring namespace', () => {
       expect(fieldTarget(resolveSource(source), 'blog', 'Post', 'author')).toEqual({
         kind: 'ref',
         coord: { kind: 'model', namespaceId: 'auth', name: 'User' },
@@ -204,7 +204,7 @@ types {
     });
   });
 
-  describe('bare-name resolution prefers the referrer namespace', () => {
+  describe('bare-name resolution is scoped to the referrer and ambient namespaces', () => {
     const source = `
 namespace auth {
   model Token {
@@ -236,11 +236,85 @@ namespace billing {
       });
     });
 
-    it('falls back to a document-wide match when the referrer namespace has no such declaration', () => {
-      expect(fieldTarget(resolveSource(source), 'billing', 'Invoice', 'session')).toEqual({
+    it('does not resolve a bare reference into another named namespace; it is unresolved with a qualify hint', () => {
+      const doc = resolveSource(source);
+      expect(fieldTarget(doc, 'billing', 'Invoice', 'session')).toEqual({
+        kind: 'unresolved',
+        typeName: 'Session',
+      });
+      expect(doc.diagnostics).toContainEqual(
+        expect.objectContaining({
+          code: 'PSL_UNRESOLVED_TYPE_REFERENCE',
+          message:
+            'Type "Session" does not resolve to a known declaration; did you mean "auth.Session"?',
+        }),
+      );
+    });
+
+    it('resolves a bare reference into another named namespace once it is qualified', () => {
+      const qualified = source.replace('session Session', 'session auth.Session');
+      expect(fieldTarget(resolveSource(qualified), 'billing', 'Invoice', 'session')).toEqual({
         kind: 'ref',
         coord: { kind: 'model', namespaceId: 'auth', name: 'Session' },
       });
+    });
+  });
+
+  describe('bare-name resolution reaches the ambient top-level namespace', () => {
+    const source = `
+model AuditLog {
+  id String @id
+}
+
+namespace billing {
+  model Invoice {
+    id    String @id
+    audit AuditLog
+  }
+}
+`;
+
+    it('resolves a namespaced bare reference to a top-level un-namespaced declaration', () => {
+      expect(fieldTarget(resolveSource(source), 'billing', 'Invoice', 'audit')).toEqual({
+        kind: 'ref',
+        coord: { kind: 'model', namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID, name: 'AuditLog' },
+      });
+    });
+  });
+
+  describe('bare-name require-qualification error', () => {
+    const source = `
+namespace auth {
+  model Account {
+    id String @id
+  }
+}
+
+namespace billing {
+  model Invoice {
+    id      String @id
+    account Account
+  }
+}
+`;
+
+    it('leaves a bare reference to an only-other-named-namespace declaration unresolved', () => {
+      const doc = resolveSource(source);
+      expect(fieldTarget(doc, 'billing', 'Invoice', 'account')).toEqual({
+        kind: 'unresolved',
+        typeName: 'Account',
+      });
+    });
+
+    it('hints at the qualified spelling that would resolve', () => {
+      const doc = resolveSource(source);
+      expect(doc.diagnostics).toContainEqual(
+        expect.objectContaining({
+          code: 'PSL_UNRESOLVED_TYPE_REFERENCE',
+          message:
+            'Type "Account" does not resolve to a known declaration; did you mean "auth.Account"?',
+        }),
+      );
     });
   });
 

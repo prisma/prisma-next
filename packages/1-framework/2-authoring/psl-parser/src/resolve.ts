@@ -204,14 +204,20 @@ function identifierText(identifier: IdentifierAst | undefined): string | undefin
 
 /**
  * The set of declaration names visible while binding a written type reference to
- * a kind-ful coordinate. The chosen bare-name policy is current-namespace first,
- * then document-wide first-match; a qualified `ns.Type` reference resolves against
- * the named namespace exactly.
+ * a kind-ful coordinate. A bare (unqualified) name resolves in, and only in:
+ * scalars ∪ document-level named types ∪ the current namespace ∪ the top-level /
+ * unspecified namespace ({@link UNSPECIFIED_PSL_NAMESPACE_ID}, which is ambient —
+ * it has no prefix to qualify with). A declaration that lives only in some other
+ * *named* namespace must be referenced fully-qualified (`ns.Name`); a bare name
+ * found in none of the allowed scopes is `unresolved`. A qualified `ns.Type`
+ * reference resolves against the named namespace exactly.
  *
  * The live SQL interpreter's bare-name path is instead flat document-wide
  * last-wins (`modelMappings.set(name, …)` over the coordinate-keyed map), so a
  * bare name shared across namespaces resolves differently there. That divergence
- * is to be reconciled when the interpreter migrates onto this resolver.
+ * is deliberate: cross-namespace bare references the legacy path accepted now
+ * require qualification under this resolver, to be reconciled when the
+ * interpreter migrates onto it.
  */
 interface NameTable {
   readonly byNamespace: ReadonlyMap<string, ReadonlyMap<string, DeclKind>>;
@@ -305,16 +311,19 @@ class Resolver {
       };
     }
 
-    for (const [namespaceId, decls] of nameTable.byNamespace) {
-      const kind = decls.get(typeName);
-      if (kind !== undefined) {
-        return { kind: 'ref', coord: { kind, namespaceId, name: typeName } };
+    if (currentNamespaceId !== UNSPECIFIED_PSL_NAMESPACE_ID) {
+      const ambientKind = nameTable.byNamespace.get(UNSPECIFIED_PSL_NAMESPACE_ID)?.get(typeName);
+      if (ambientKind !== undefined) {
+        return {
+          kind: 'ref',
+          coord: { kind: ambientKind, namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID, name: typeName },
+        };
       }
     }
 
     this.diagnostic(
       'PSL_UNRESOLVED_TYPE_REFERENCE',
-      `Type "${typeName}" does not resolve to a known declaration`,
+      unresolvedBareNameMessage(typeName, currentNamespaceId, nameTable),
       annotation.syntax,
     );
     return { kind: 'unresolved', typeName };
@@ -331,6 +340,29 @@ class Resolver {
       target: this.resolveTypeTarget(annotation, currentNamespaceId, nameTable),
     };
   }
+}
+
+/**
+ * Message for a bare name that resolves in none of the allowed scopes. When the
+ * name is declared in exactly one *other named* namespace, the message carries a
+ * "did you mean `ns.Name`?" hint pointing at the qualification it now requires;
+ * otherwise it is the plain unresolved message.
+ */
+function unresolvedBareNameMessage(
+  typeName: string,
+  currentNamespaceId: string,
+  nameTable: NameTable,
+): string {
+  const otherNamespaces: string[] = [];
+  for (const [namespaceId, decls] of nameTable.byNamespace) {
+    if (namespaceId === currentNamespaceId || namespaceId === UNSPECIFIED_PSL_NAMESPACE_ID)
+      continue;
+    if (decls.has(typeName)) otherNamespaces.push(namespaceId);
+  }
+  const base = `Type "${typeName}" does not resolve to a known declaration`;
+  return otherNamespaces.length === 1
+    ? `${base}; did you mean "${otherNamespaces[0]}.${typeName}"?`
+    : base;
 }
 
 function resolveFieldAttributes(attributes: Iterable<FieldAttributeAst>): ResolvedAttribute[] {
