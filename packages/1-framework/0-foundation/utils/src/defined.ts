@@ -26,3 +26,18 @@ export function ifDefined<K extends string, V>(
 ): Record<never, never> | { [P in K]: V } {
   return value !== undefined ? ({ [key]: value } as { [P in K]: V }) : {};
 }
+
+/**
+ * Returns a copy of `obj` with all `undefined`-valued keys removed.
+ * Keys whose values are `null` or any other defined value are kept.
+ */
+export function definedProps<T extends object>(obj: T | undefined): Partial<T> {
+  if (obj === undefined) return {};
+  const result: Partial<T> = {};
+  for (const key of Object.keys(obj) as (keyof T)[]) {
+    if (obj[key] !== undefined) {
+      result[key] = obj[key];
+    }
+  }
+  return result;
+}

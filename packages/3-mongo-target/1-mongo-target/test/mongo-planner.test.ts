@@ -599,8 +599,8 @@ describe('MongoMigrationPlanner', () => {
       );
       expect(collModOps).toHaveLength(1);
       const cmd = collModOps[0]!.execute[0]!.command as CollModCommand;
-      expect(cmd.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
-      expect(cmd.validationLevel).toBe('strict');
+      expect(cmd.options.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
+      expect(cmd.options.validationLevel).toBe('strict');
     });
 
     it('validator add has precheck (collection exists) and postcheck (validator applied)', () => {
@@ -1071,8 +1071,8 @@ describe('MongoMigrationPlanner', () => {
       expect(createOps).toHaveLength(1);
       const cmd = createOps[0]!.execute[0]!.command as CreateCollectionCommand;
       expect(cmd.collection).toBe('events');
-      expect(cmd.capped).toBe(true);
-      expect(cmd.size).toBe(1048576);
+      expect(cmd.options?.capped).toBe(true);
+      expect(cmd.options?.size).toBe(1048576);
     });
 
     // TML-2486: bare collections (no validator/options/indexes) must still
@@ -1098,8 +1098,7 @@ describe('MongoMigrationPlanner', () => {
       for (const op of createOps) {
         expect(op.operationClass).toBe('additive');
         const cmd = op.execute[0]!.command as CreateCollectionCommand;
-        expect(cmd.capped).toBeUndefined();
-        expect(cmd.validator).toBeUndefined();
+        expect(cmd.options).toBeUndefined();
       }
     });
 

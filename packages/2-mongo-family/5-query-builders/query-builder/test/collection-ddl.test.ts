@@ -31,18 +31,18 @@ describe('collection().createCollection()', () => {
     };
     const cmd = col.createCollection(opts);
     expect(cmd).toEqual(new CreateCollectionCommand(COLL, opts));
-    expect(cmd.validator).toEqual(opts.validator);
-    expect(cmd.validationLevel).toBe('strict');
-    expect(cmd.validationAction).toBe('error');
+    expect(cmd.options?.validator).toEqual(opts.validator);
+    expect(cmd.options?.validationLevel).toBe('strict');
+    expect(cmd.options?.validationAction).toBe('error');
   });
 
   it('passes capped/size/max options through', () => {
     const opts = { capped: true, size: 1_000_000, max: 5_000 };
     const cmd = col.createCollection(opts);
     expect(cmd).toEqual(new CreateCollectionCommand(COLL, opts));
-    expect(cmd.capped).toBe(true);
-    expect(cmd.size).toBe(1_000_000);
-    expect(cmd.max).toBe(5_000);
+    expect(cmd.options?.capped).toBe(true);
+    expect(cmd.options?.size).toBe(1_000_000);
+    expect(cmd.options?.max).toBe(5_000);
   });
 
   it('passes timeseries options through', () => {
@@ -51,7 +51,7 @@ describe('collection().createCollection()', () => {
     };
     const cmd = col.createCollection(opts);
     expect(cmd).toEqual(new CreateCollectionCommand(COLL, opts));
-    expect(cmd.timeseries).toEqual(opts.timeseries);
+    expect(cmd.options?.timeseries).toEqual(opts.timeseries);
   });
 
   it('passes clusteredIndex and collation through', () => {
@@ -86,17 +86,17 @@ describe('collection().createIndex()', () => {
     const opts = { unique: true, name };
     const cmd = col.createIndex(keys, opts);
     expect(cmd).toEqual(new CreateIndexCommand(COLL, keys, opts));
-    expect(cmd.unique).toBe(true);
-    expect(cmd.name).toBe(name);
+    expect(cmd.options?.unique).toBe(true);
+    expect(cmd.options?.name).toBe(name);
   });
 
   it('passes sparse/expireAfterSeconds/collation options through', () => {
     const opts = { sparse: true, expireAfterSeconds: 3600, collation: { locale: 'en' } };
     const cmd = col.createIndex(keys, opts);
     expect(cmd).toEqual(new CreateIndexCommand(COLL, keys, opts));
-    expect(cmd.sparse).toBe(true);
-    expect(cmd.expireAfterSeconds).toBe(3600);
-    expect(cmd.collation).toEqual({ locale: 'en' });
+    expect(cmd.options?.sparse).toBe(true);
+    expect(cmd.options?.expireAfterSeconds).toBe(3600);
+    expect(cmd.options?.collation).toEqual({ locale: 'en' });
   });
 
   it('passes text-index options through (weights, default_language, language_override)', () => {
@@ -104,23 +104,23 @@ describe('collection().createIndex()', () => {
     const opts = { weights: { body: 10 }, default_language: 'english', language_override: 'lang' };
     const cmd = col.createIndex(textKeys, opts);
     expect(cmd).toEqual(new CreateIndexCommand(COLL, textKeys, opts));
-    expect(cmd.weights).toEqual({ body: 10 });
-    expect(cmd.default_language).toBe('english');
-    expect(cmd.language_override).toBe('lang');
+    expect(cmd.options?.weights).toEqual({ body: 10 });
+    expect(cmd.options?.default_language).toBe('english');
+    expect(cmd.options?.language_override).toBe('lang');
   });
 
   it('passes wildcardProjection through', () => {
     const opts = { wildcardProjection: { a: 1, b: 0 } as Record<string, 0 | 1> };
     const cmd = col.createIndex(keys, opts);
     expect(cmd).toEqual(new CreateIndexCommand(COLL, keys, opts));
-    expect(cmd.wildcardProjection).toEqual({ a: 1, b: 0 });
+    expect(cmd.options?.wildcardProjection).toEqual({ a: 1, b: 0 });
   });
 
   it('passes partialFilterExpression through', () => {
     const opts = { partialFilterExpression: { status: { $eq: 'active' } } };
     const cmd = col.createIndex(keys, opts);
     expect(cmd).toEqual(new CreateIndexCommand(COLL, keys, opts));
-    expect(cmd.partialFilterExpression).toEqual(opts.partialFilterExpression);
+    expect(cmd.options?.partialFilterExpression).toEqual(opts.partialFilterExpression);
   });
 
   it('compound keys produce the correct command', () => {

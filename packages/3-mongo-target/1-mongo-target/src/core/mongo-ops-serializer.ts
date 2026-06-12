@@ -5,8 +5,11 @@ import {
   type AnyMongoInspectionCommand,
   type AnyMongoMigrationOperation,
   CollModCommand,
+  type CollModOptions,
   CreateCollectionCommand,
+  type CreateCollectionOptions,
   CreateIndexCommand,
+  type CreateIndexOptions,
   DropCollectionCommand,
   DropIndexCommand,
   ListCollectionsCommand,
@@ -488,7 +491,7 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
   switch (kind) {
     case 'createIndex': {
       const data = validate(CreateIndexJson, json, 'createIndex command');
-      return new CreateIndexCommand(data.collection, data.keys, {
+      const opts: CreateIndexOptions = {
         ...ifDefined('unique', data.unique),
         ...ifDefined('sparse', data.sparse),
         ...ifDefined('expireAfterSeconds', data.expireAfterSeconds),
@@ -502,7 +505,12 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
         ...ifDefined('weights', data.weights as Record<string, number> | undefined),
         ...ifDefined('default_language', data.default_language),
         ...ifDefined('language_override', data.language_override),
-      });
+      };
+      return new CreateIndexCommand(
+        data.collection,
+        data.keys,
+        Object.keys(opts).length > 0 ? opts : undefined,
+      );
     }
     case 'dropIndex': {
       const data = validate(DropIndexJson, json, 'dropIndex command');
@@ -510,20 +518,28 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
     }
     case 'createCollection': {
       const data = validate(CreateCollectionJson, json, 'createCollection command');
-      return new CreateCollectionCommand(data.collection, {
-        validator: data.validator,
-        validationLevel: data.validationLevel,
-        validationAction: data.validationAction,
-        capped: data.capped,
-        size: data.size,
-        max: data.max,
-        timeseries: data.timeseries as CreateCollectionCommand['timeseries'],
-        collation: data.collation,
-        changeStreamPreAndPostImages: data.changeStreamPreAndPostImages as
-          | { enabled: boolean }
-          | undefined,
-        clusteredIndex: data.clusteredIndex as CreateCollectionCommand['clusteredIndex'],
-      });
+      const opts: CreateCollectionOptions = {
+        ...ifDefined('validator', data.validator),
+        ...ifDefined('validationLevel', data.validationLevel),
+        ...ifDefined('validationAction', data.validationAction),
+        ...ifDefined('capped', data.capped),
+        ...ifDefined('size', data.size),
+        ...ifDefined('max', data.max),
+        ...ifDefined('timeseries', data.timeseries as CreateCollectionOptions['timeseries']),
+        ...ifDefined('collation', data.collation),
+        ...ifDefined(
+          'changeStreamPreAndPostImages',
+          data.changeStreamPreAndPostImages as CreateCollectionOptions['changeStreamPreAndPostImages'],
+        ),
+        ...ifDefined(
+          'clusteredIndex',
+          data.clusteredIndex as CreateCollectionOptions['clusteredIndex'],
+        ),
+      };
+      return new CreateCollectionCommand(
+        data.collection,
+        Object.keys(opts).length > 0 ? opts : undefined,
+      );
     }
     case 'dropCollection': {
       const data = validate(DropCollectionJson, json, 'dropCollection command');
@@ -531,14 +547,16 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
     }
     case 'collMod': {
       const data = validate(CollModJson, json, 'collMod command');
-      return new CollModCommand(data.collection, {
-        validator: data.validator,
-        validationLevel: data.validationLevel,
-        validationAction: data.validationAction,
-        changeStreamPreAndPostImages: data.changeStreamPreAndPostImages as
-          | { enabled: boolean }
-          | undefined,
-      });
+      const opts: CollModOptions = {
+        ...ifDefined('validator', data.validator),
+        ...ifDefined('validationLevel', data.validationLevel),
+        ...ifDefined('validationAction', data.validationAction),
+        ...ifDefined(
+          'changeStreamPreAndPostImages',
+          data.changeStreamPreAndPostImages as CollModOptions['changeStreamPreAndPostImages'],
+        ),
+      };
+      return new CollModCommand(data.collection, opts);
     }
     default:
       throw new Error(`Unknown DDL command kind: ${kind}`);

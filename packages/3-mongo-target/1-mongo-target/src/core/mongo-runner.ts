@@ -81,7 +81,7 @@ export class MongoMigrationRunner {
   constructor(private readonly deps: MongoRunnerDependencies) {}
 
   async execute(options: MongoMigrationRunnerExecuteOptions): Promise<MongoMigrationRunnerResult> {
-    const { inspectionExecutor, adapter, driver, markerOps } = this.deps;
+    const { inspectionExecutor, adapter, driver, executeDdl, markerOps } = this.deps;
     const operations = deserializeMongoOps(options.plan.operations as readonly unknown[]);
     // Plans produced by the contract-space-aware planner stamp `spaceId`
     // onto the plan; plans without one fall through to the application's
@@ -152,8 +152,7 @@ export class MongoMigrationRunner {
         }
 
         for (const step of ddlOp.execute) {
-          const wire = await adapter.lower({ command: step.command }, {});
-          await driver.run(wire);
+          await executeDdl(step.command);
         }
 
         if (runPostchecks) {

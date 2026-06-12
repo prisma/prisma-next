@@ -207,6 +207,7 @@ interface Harness {
   readonly adapter: StubMongoAdapter;
   readonly inspectionExecutor: StubInspectionExecutor;
   readonly log: EventLog;
+  readonly ddlCalls: string[];
 }
 
 function makeHarness(): Harness {
@@ -214,10 +215,15 @@ function makeHarness(): Harness {
   const driver = new StubMongoDriver(log);
   const adapter = new StubMongoAdapter();
   const inspectionExecutor = new StubInspectionExecutor();
+  const ddlCalls: string[] = [];
   const deps: MongoRunnerDependencies = {
     inspectionExecutor,
     adapter,
     driver,
+    executeDdl: async (command) => {
+      ddlCalls.push(`ddl:${command.kind}:${command.collection}`);
+      log.record(`ddl:${command.kind}:${command.collection}`);
+    },
     markerOps: NOOP_MARKER_OPS,
     introspectSchema: async () => new MongoSchemaIR([]),
   };
@@ -227,6 +233,7 @@ function makeHarness(): Harness {
     adapter,
     inspectionExecutor,
     log,
+    ddlCalls,
   };
 }
 
@@ -373,7 +380,7 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
     expect(harness.driver.executeCalls).toEqual([]);
   });
 
-  it('dispatches DDL ops through adapter.lower + driver.execute and data ops through the same path, in plan order', async () => {
+  it('dispatches DDL ops through executeDdl seam and data ops through adapter.lower + driver.execute, in plan order', async () => {
     const harness = makeHarness();
     const ddlOp = createCollection('orders');
     const dataOp = dataTransform('seed-orders', { run: () => makeRunPlan() });
@@ -385,17 +392,14 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
     });
 
     expect(result.assertOk()).toEqual({ operationsPlanned: 2, operationsExecuted: 2 });
-    expect(harness.driver.executeCalls).toHaveLength(2);
+    expect(harness.ddlCalls).toEqual(['ddl:createCollection:orders']);
+    expect(harness.driver.executeCalls).toHaveLength(1);
     expect(harness.driver.executeCalls[0]).toMatchObject({
-      kind: 'createCollection',
-      collection: 'orders',
-    });
-    expect(harness.driver.executeCalls[1]).toMatchObject({
       kind: 'updateMany',
       collection: RUN_COLLECTION,
     });
     expect(harness.log.entries).toEqual([
-      'dml:createCollection:orders',
+      'ddl:createCollection:orders',
       `dml:updateMany:${RUN_COLLECTION}`,
     ]);
   });
