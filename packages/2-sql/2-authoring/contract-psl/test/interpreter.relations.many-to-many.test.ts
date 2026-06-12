@@ -155,6 +155,105 @@ model ProjectLabel {
     });
   });
 
+  it('reorders through child columns to the target id order when FK references are swapped', () => {
+    const result = interpretSchema(`model Project {
+  tenantId Int
+  id Int
+  labels Label[]
+
+  @@id([tenantId, id])
+}
+
+model Label {
+  id Int @id
+  projects Project[]
+}
+
+model ProjectLabel {
+  projectId Int
+  projectTenantId Int
+  labelId Int
+  project Project @relation(fields: [projectId, projectTenantId], references: [id, tenantId])
+  label Label @relation(fields: [labelId], references: [id])
+
+  @@id([projectTenantId, projectId, labelId])
+}
+`);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const models = relationsOf(result.value);
+    expect(models['Label']?.relations).toEqual({
+      projects: {
+        to: crossRef('Project', 'public'),
+        cardinality: 'N:M',
+        on: { localFields: ['id'], targetFields: ['labelId'] },
+        through: {
+          table: 'projectLabel',
+          namespaceId: 'public',
+          parentColumns: ['labelId'],
+          childColumns: ['projectTenantId', 'projectId'],
+          targetColumns: ['tenantId', 'id'],
+        },
+      },
+    });
+    expect(models['Project']?.relations).toEqual({
+      labels: {
+        to: crossRef('Label', 'public'),
+        cardinality: 'N:M',
+        on: {
+          localFields: ['id', 'tenantId'],
+          targetFields: ['projectId', 'projectTenantId'],
+        },
+        through: {
+          table: 'projectLabel',
+          namespaceId: 'public',
+          parentColumns: ['projectId', 'projectTenantId'],
+          childColumns: ['labelId'],
+          targetColumns: ['id'],
+        },
+      },
+    });
+
+    const envelope = JSON.parse(JSON.stringify(result.value)) as unknown;
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(envelope)).not.toThrow();
+  });
+
+  it('keeps the orphaned diagnostic when the junction child FK references a non-id unique', () => {
+    const result = interpretSchema(`model Post {
+  id Int @id
+  tags Tag[]
+}
+
+model Tag {
+  id Int @id
+  slug String @unique
+}
+
+model PostTag {
+  postId Int
+  tagSlug String
+  post Post @relation(fields: [postId], references: [id])
+  tag Tag @relation(fields: [tagSlug], references: [slug])
+
+  @@id([postId, tagSlug])
+}
+`);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_ORPHANED_BACKRELATION_LIST',
+          message: expect.stringContaining('Post.tags'),
+        }),
+      ]),
+    );
+  });
+
   it('resolves self-referential junction lists disambiguated by relation name', () => {
     const result = interpretSchema(`model User {
   id Int @id
