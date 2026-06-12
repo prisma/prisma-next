@@ -10,15 +10,31 @@ import { errorPostgresMigrationStackMissing } from '../errors';
 import {
   AddCheckConstraintCall,
   AddColumnCall,
+  AddEnumValuesCall,
   AddForeignKeyCall,
   AddPrimaryKeyCall,
   AddUniqueCall,
+  AlterColumnTypeCall,
+  type AlterColumnTypeOptions,
+  CreateEnumTypeCall,
+  CreateIndexCall,
   CreateSchemaCall,
   CreateTableCall,
   DropCheckConstraintCall,
+  DropColumnCall,
   DropConstraintCall,
+  DropDefaultCall,
+  DropEnumTypeCall,
+  DropIndexCall,
+  DropNotNullCall,
+  DropTableCall,
+  RenameTypeCall,
+  SetDefaultCall,
+  SetNotNullCall,
 } from './op-factory-call';
 import { type DataTransformOptions, dataTransform } from './operations/data-transform';
+import { installExtension } from './operations/dependencies';
+import type { CreateIndexExtras } from './operations/indexes';
 import type { ForeignKeySpec } from './operations/shared';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
@@ -233,5 +249,220 @@ export abstract class PostgresMigration extends SqlMigration<
       options.constraint,
       options.kind ?? 'unique',
     ).toOp(this.controlAdapter);
+  }
+
+  protected dropTable(options: {
+    readonly schema?: string;
+    readonly table: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new DropTableCall(options.schema ?? UNBOUND_NAMESPACE_ID, options.table).toOp(
+      this.controlAdapter,
+    );
+  }
+
+  protected dropColumn(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly column: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new DropColumnCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.column,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected alterColumnType(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly column: string;
+    readonly options: AlterColumnTypeOptions;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new AlterColumnTypeCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.column,
+      options.options,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected setNotNull(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly column: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new SetNotNullCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.column,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected dropNotNull(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly column: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new DropNotNullCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.column,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected setDefault(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly column: string;
+    readonly defaultSql: string;
+    readonly operationClass?: 'additive' | 'widening';
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new SetDefaultCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.column,
+      options.defaultSql,
+      options.operationClass,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected dropDefault(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly column: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new DropDefaultCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.column,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected createIndex(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly index: string;
+    readonly columns: readonly string[];
+    readonly extras?: CreateIndexExtras;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new CreateIndexCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.index,
+      options.columns,
+      options.extras,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected dropIndex(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly index: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new DropIndexCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.index,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected createEnumType(options: {
+    readonly schema?: string;
+    readonly typeName: string;
+    readonly values: readonly string[];
+    readonly nativeType?: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new CreateEnumTypeCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.typeName,
+      options.values,
+      options.nativeType,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected addEnumValues(options: {
+    readonly schema?: string;
+    readonly typeName: string;
+    readonly nativeType: string;
+    readonly values: readonly string[];
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new AddEnumValuesCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.typeName,
+      options.nativeType,
+      options.values,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected dropEnumType(options: {
+    readonly schema?: string;
+    readonly typeName: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new DropEnumTypeCall(options.schema ?? UNBOUND_NAMESPACE_ID, options.typeName).toOp(
+      this.controlAdapter,
+    );
+  }
+
+  protected renameType(options: {
+    readonly schema?: string;
+    readonly fromName: string;
+    readonly toName: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new RenameTypeCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.fromName,
+      options.toName,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected installExtension(options: {
+    readonly extensionName: string;
+    readonly invariantId: string;
+    readonly id: string;
+    readonly label?: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return installExtension(options, this.controlAdapter);
   }
 }

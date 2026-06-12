@@ -22,7 +22,7 @@
  * by hand; `pnpm tsx migrations/<dirName>/migration.ts` then
  * re-emits `ops.json` + `migration.json` deterministically.
  */
-import { installExtension, Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
+import { Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
 import { PARADEDB_INVARIANTS } from '../../src/core/constants';
 
 export default class M extends Migration {
@@ -35,7 +35,7 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      installExtension({
+      this.installExtension({
         id: 'paradedb.install-pg-search-extension',
         extensionName: 'pg_search',
         invariantId: PARADEDB_INVARIANTS.installPgSearch,

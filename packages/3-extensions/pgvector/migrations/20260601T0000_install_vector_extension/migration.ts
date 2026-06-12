@@ -24,7 +24,7 @@
  * seed `migration.json` were authored by hand; `node migration.ts`
  * then re-emits `ops.json` + `migration.json` deterministically.
  */
-import { installExtension, Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
+import { Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
 import { PGVECTOR_INVARIANTS } from '../../src/core/contract-space-constants';
 
 export default class M extends Migration {
@@ -37,7 +37,7 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      installExtension({
+      this.installExtension({
         id: 'pgvector.install-vector-extension',
         extensionName: 'vector',
         invariantId: PGVECTOR_INVARIANTS.installVector,

@@ -161,7 +161,7 @@ describe('NOT NULL column without default uses temporary default', () => {
 
     // No empty-table precheck
     expect(addCol.precheck.map((p) => p.sql)).not.toContain(
-      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+      `SELECT NOT EXISTS (SELECT 1 AS "one" FROM ${qualifiedUserTable} LIMIT 1) AS "result"`,
     );
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
@@ -278,7 +278,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     );
 
     expect(addCol.precheck.map((p) => p.sql)).not.toContain(
-      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+      `SELECT NOT EXISTS (SELECT 1 AS "one" FROM ${qualifiedUserTable} LIMIT 1) AS "result"`,
     );
     expect(addCol.execute.map((step) => step.sql)).toEqual([
       `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "embedding" vector(3) DEFAULT '[0,0,0]'::vector NOT NULL`,
@@ -309,7 +309,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     );
 
     expect(addCol.precheck.map((p) => p.sql)).not.toContain(
-      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+      `SELECT NOT EXISTS (SELECT 1 AS "one" FROM ${qualifiedUserTable} LIMIT 1) AS "result"`,
     );
     expect(addCol.execute.map((step) => step.sql)).toEqual([
       `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "embedding" vector(3) DEFAULT '[0,0,0]'::vector NOT NULL`,
@@ -335,7 +335,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     );
 
     expect(addCol.precheck.map((p) => p.sql)).toContain(
-      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+      `SELECT NOT EXISTS (SELECT 1 AS "one" FROM ${qualifiedUserTable} LIMIT 1) AS "result"`,
     );
     expect(addCol.execute.map((step) => step.sql)).toEqual([
       `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "name" text NOT NULL`,
@@ -365,7 +365,7 @@ describe('NOT NULL column without default uses temporary default', () => {
 
     const addCol = await getRequiredOperation(operationsPromise, 'column.user.slug');
     expect(addCol.precheck.map((p) => p.sql)).toContain(
-      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+      `SELECT NOT EXISTS (SELECT 1 AS "one" FROM ${qualifiedUserTable} LIMIT 1) AS "result"`,
     );
     expect(addCol.execute.map((step) => step.sql)).toEqual([
       `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "slug" text NOT NULL`,
@@ -391,7 +391,7 @@ describe('NOT NULL column without default uses temporary default', () => {
 
     const addCol = await getRequiredOperation(operationsPromise, 'column.user.slug');
     expect(addCol.precheck.map((p) => p.sql)).toContain(
-      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+      `SELECT NOT EXISTS (SELECT 1 AS "one" FROM ${qualifiedUserTable} LIMIT 1) AS "result"`,
     );
     expect(addCol.execute.map((step) => step.sql)).toEqual([
       `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "slug" text NOT NULL`,
@@ -457,7 +457,7 @@ describe('NOT NULL column without default uses temporary default', () => {
 
     const addCol = await getRequiredOperation(operationsPromise, 'column.user.orgId');
     expect(addCol.precheck.map((p) => p.sql)).toContain(
-      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+      `SELECT NOT EXISTS (SELECT 1 AS "one" FROM ${qualifiedUserTable} LIMIT 1) AS "result"`,
     );
     expect(addCol.execute.map((step) => step.sql)).toEqual([
       `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "orgId" uuid NOT NULL`,

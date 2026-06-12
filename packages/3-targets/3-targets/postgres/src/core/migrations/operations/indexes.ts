@@ -1,6 +1,21 @@
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
+import { indexExistsAst } from '../../../contract-free/checks';
 import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
-import { qualifyTableName, toRegclassLiteral } from '../planner-sql-checks';
+import { qualifyTableName } from '../planner-sql-checks';
 import { type Op, step, targetDetails } from './shared';
+
+type CheckStep = { sql: string; params?: readonly unknown[] };
+
+async function indexExistsSteps(
+  lowerer: ExecuteRequestLowerer,
+  schemaName: string,
+  indexName: string,
+): Promise<{ present: CheckStep; absent: CheckStep }> {
+  const checks = indexExistsAst(schemaName, indexName);
+  const present = await lowerer.lowerToExecuteRequest(checks.indexPresent());
+  const absent = await lowerer.lowerToExecuteRequest(checks.indexAbsent());
+  return { present, absent };
+}
 
 export interface CreateIndexExtras {
   readonly type?: string;
@@ -22,65 +37,53 @@ function renderIndexOptions(options: Record<string, unknown>): string {
     .join(', ');
 }
 
-export function createIndex(
+export async function createIndex(
   schemaName: string,
   tableName: string,
   indexName: string,
   columns: readonly string[],
+  lowerer: ExecuteRequestLowerer,
   extras?: CreateIndexExtras,
-): Op {
+): Promise<Op> {
   const qualified = qualifyTableName(schemaName, tableName);
   const columnList = columns.map(quoteIdentifier).join(', ');
   const using = extras?.type ? ` USING ${quoteIdentifier(extras.type)}` : '';
   const options = extras?.options;
   const withClause =
     options && Object.keys(options).length > 0 ? ` WITH (${renderIndexOptions(options)})` : '';
+  const { present, absent } = await indexExistsSteps(lowerer, schemaName, indexName);
   return {
     id: `index.${tableName}.${indexName}`,
     label: `Create index "${indexName}" on "${tableName}"`,
     operationClass: 'additive',
     target: targetDetails('index', indexName, schemaName, tableName),
-    precheck: [
-      step(
-        `ensure index "${indexName}" does not exist`,
-        `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NULL`,
-      ),
-    ],
+    precheck: [step(`ensure index "${indexName}" does not exist`, absent.sql, absent.params)],
     execute: [
       step(
         `create index "${indexName}"`,
         `CREATE INDEX ${quoteIdentifier(indexName)} ON ${qualified}${using} (${columnList})${withClause}`,
       ),
     ],
-    postcheck: [
-      step(
-        `verify index "${indexName}" exists`,
-        `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NOT NULL`,
-      ),
-    ],
+    postcheck: [step(`verify index "${indexName}" exists`, present.sql, present.params)],
   };
 }
 
-export function dropIndex(schemaName: string, tableName: string, indexName: string): Op {
+export async function dropIndex(
+  schemaName: string,
+  tableName: string,
+  indexName: string,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
+  const { present, absent } = await indexExistsSteps(lowerer, schemaName, indexName);
   return {
     id: `dropIndex.${tableName}.${indexName}`,
     label: `Drop index "${indexName}"`,
     operationClass: 'destructive',
     target: targetDetails('index', indexName, schemaName, tableName),
-    precheck: [
-      step(
-        `ensure index "${indexName}" exists`,
-        `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NOT NULL`,
-      ),
-    ],
+    precheck: [step(`ensure index "${indexName}" exists`, present.sql, present.params)],
     execute: [
       step(`drop index "${indexName}"`, `DROP INDEX ${qualifyTableName(schemaName, indexName)}`),
     ],
-    postcheck: [
-      step(
-        `verify index "${indexName}" does not exist`,
-        `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NULL`,
-      ),
-    ],
+    postcheck: [step(`verify index "${indexName}" does not exist`, absent.sql, absent.params)],
   };
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env -S node
-import { col, Migration, MigrationCLI, setNotNull } from '@prisma-next/postgres/migration';
+import { col, Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 
 export default class M extends Migration {
   override describe() {
@@ -29,9 +29,9 @@ export default class M extends Migration {
       // plan` scaffolds dataTransform backfill placeholders for the new NOT NULL
       // columns; they are stripped here for exactly this reason.)
       this.addColumn({ schema: 'public', table: 'bug', column: col('id', 'character(36)') }),
-      setNotNull('public', 'bug', 'id'),
+      this.setNotNull({ schema: 'public', table: 'bug', column: 'id' }),
       this.addColumn({ schema: 'public', table: 'feature', column: col('id', 'character(36)') }),
-      setNotNull('public', 'feature', 'id'),
+      this.setNotNull({ schema: 'public', table: 'feature', column: 'id' }),
       this.addPrimaryKey({
         schema: 'public',
         table: 'bug',

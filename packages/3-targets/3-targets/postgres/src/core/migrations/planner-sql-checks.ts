@@ -92,6 +92,30 @@ export function columnHasNoDefaultCheck(opts: {
 )`;
 }
 
+export function tableHasPrimaryKeyCheck(
+  schema: string,
+  table: string,
+  exists: boolean,
+  constraintName?: string,
+): string {
+  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
+  const comparison = exists ? '' : 'NOT ';
+  const constraintFilter = constraintName
+    ? `AND c2.relname = '${escapeLiteral(constraintName)}'`
+    : '';
+  return `SELECT ${comparison}EXISTS (
+  SELECT 1
+  FROM pg_index i
+  JOIN pg_class c ON c.oid = i.indrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  LEFT JOIN pg_class c2 ON c2.oid = i.indexrelid
+  WHERE n.nspname = ${namespace.schemaSqlExpression()}
+    AND c.relname = '${escapeLiteral(table)}'
+    AND i.indisprimary
+    ${constraintFilter}
+)`;
+}
+
 const FORMAT_TYPE_DISPLAY: ReadonlyMap<string, string> = new Map([
   ['int2', 'smallint'],
   ['int4', 'integer'],
@@ -239,76 +263,4 @@ export function buildExpectedFormatType(
   }
 
   return FORMAT_TYPE_DISPLAY.get(resolved.nativeType) ?? resolved.nativeType;
-}
-
-export function columnTypeCheck({
-  schema,
-  table,
-  column,
-  expectedType,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  expectedType: string;
-}): string {
-  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
-  return `SELECT EXISTS (
-  SELECT 1
-  FROM pg_attribute a
-  JOIN pg_class c ON c.oid = a.attrelid
-  JOIN pg_namespace n ON n.oid = c.relnamespace
-  WHERE n.nspname = ${namespace.schemaSqlExpression()}
-    AND c.relname = '${escapeLiteral(table)}'
-    AND a.attname = '${escapeLiteral(column)}'
-    AND format_type(a.atttypid, a.atttypmod) = '${escapeLiteral(expectedType)}'
-    AND NOT a.attisdropped
-)`;
-}
-
-export function columnDefaultExistsCheck({
-  schema,
-  table,
-  column,
-  exists = true,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  exists?: boolean;
-}): string {
-  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
-  const nullCheck = exists ? 'IS NOT NULL' : 'IS NULL';
-  return `SELECT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = ${namespace.schemaSqlExpression()}
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-    AND column_default ${nullCheck}
-)`;
-}
-
-export function tableHasPrimaryKeyCheck(
-  schema: string,
-  table: string,
-  exists: boolean,
-  constraintName?: string,
-): string {
-  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
-  const comparison = exists ? '' : 'NOT ';
-  const constraintFilter = constraintName
-    ? `AND c2.relname = '${escapeLiteral(constraintName)}'`
-    : '';
-  return `SELECT ${comparison}EXISTS (
-  SELECT 1
-  FROM pg_index i
-  JOIN pg_class c ON c.oid = i.indrelid
-  JOIN pg_namespace n ON n.oid = c.relnamespace
-  LEFT JOIN pg_class c2 ON c2.oid = i.indexrelid
-  WHERE n.nspname = ${namespace.schemaSqlExpression()}
-    AND c.relname = '${escapeLiteral(table)}'
-    AND i.indisprimary
-    ${constraintFilter}
-)`;
 }

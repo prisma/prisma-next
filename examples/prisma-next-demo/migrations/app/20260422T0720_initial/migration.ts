@@ -1,7 +1,6 @@
 #!/usr/bin/env -S node
 import {
   col,
-  createIndex,
   fn,
   lit,
   Migration,
@@ -130,7 +129,12 @@ export default class M extends Migration {
           references: { schema: 'public', table: 'user', columns: ['id'] },
         },
       }),
-      createIndex('public', 'post', 'post_userId_idx', ['userId']),
+      this.createIndex({
+        schema: 'public',
+        table: 'post',
+        index: 'post_userId_idx',
+        columns: ['userId'],
+      }),
       this.addForeignKey({
         schema: 'public',
         table: 'task',
@@ -140,7 +144,12 @@ export default class M extends Migration {
           references: { schema: 'public', table: 'user', columns: ['id'] },
         },
       }),
-      createIndex('public', 'task', 'task_userId_idx', ['userId']),
+      this.createIndex({
+        schema: 'public',
+        table: 'task',
+        index: 'task_userId_idx',
+        columns: ['userId'],
+      }),
     ];
   }
 }

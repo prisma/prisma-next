@@ -156,7 +156,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
     const addEmailOperation = planOps.find((op) => op.id === 'column.user.email');
     expect(addEmailOperation).toBeDefined();
     expect(addEmailOperation?.precheck.map((step) => step.sql)).toContain(
-      'SELECT NOT EXISTS (SELECT 1 FROM "user" LIMIT 1)',
+      'SELECT NOT EXISTS (SELECT 1 AS "one" FROM "user" LIMIT 1) AS "result"',
     );
     expect(addEmailOperation?.execute.map((step) => step.sql)).toEqual([
       'ALTER TABLE "user" ADD COLUMN "email" text NOT NULL',

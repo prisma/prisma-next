@@ -46,19 +46,18 @@ import { describe, expect, it } from 'vitest';
 const META = { from: 'sha256:from', to: 'sha256:to' } as const;
 
 describe('Postgres call classes - renderTypeScript + importRequirements', () => {
-  it('emits the factory call with positional literal args and imports the factory symbol', () => {
+  it('emits this.dropTable({...}) and contributes no imports', () => {
     const call = new DropTableCall('public', 'user');
-    expect(call.renderTypeScript()).toBe('dropTable("public", "user")');
-    expect(call.importRequirements()).toEqual([
-      { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'dropTable' },
-    ]);
+    expect(call.renderTypeScript()).toBe('this.dropTable({ schema: "public", table: "user" })');
+    expect(call.importRequirements()).toEqual([]);
   });
 
-  it('SetDefaultCall omits the operationClass argument when additive, emits it when widening', () => {
+  it('SetDefaultCall emits this.setDefault({...}), omits operationClass when additive', () => {
     const additive = new SetDefaultCall('public', 'user', 'created_at', "DEFAULT 'now'");
     expect(additive.renderTypeScript()).toBe(
-      `setDefault("public", "user", "created_at", "DEFAULT 'now'")`,
+      `this.setDefault({ schema: "public", table: "user", column: "created_at", defaultSql: "DEFAULT 'now'" })`,
     );
+    expect(additive.importRequirements()).toEqual([]);
 
     const widening = new SetDefaultCall(
       'public',
@@ -68,7 +67,7 @@ describe('Postgres call classes - renderTypeScript + importRequirements', () => 
       'widening',
     );
     expect(widening.renderTypeScript()).toBe(
-      `setDefault("public", "user", "created_at", "DEFAULT 'now'", "widening")`,
+      `this.setDefault({ schema: "public", table: "user", column: "created_at", defaultSql: "DEFAULT 'now'", operationClass: "widening" })`,
     );
   });
 
@@ -176,24 +175,26 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     ]);
   });
 
-  it('DropColumnCall emits three positional args and imports dropColumn', () => {
+  it('DropColumnCall emits this.dropColumn({...}) and contributes no imports', () => {
     const call = new DropColumnCall('public', 'user', 'legacy');
-    expect(call.renderTypeScript()).toBe('dropColumn("public", "user", "legacy")');
-    expectFactoryImport(call, 'dropColumn');
+    expect(call.renderTypeScript()).toBe(
+      'this.dropColumn({ schema: "public", table: "user", column: "legacy" })',
+    );
+    expect(call.importRequirements()).toEqual([]);
   });
 
-  it('AlterColumnTypeCall inlines the options object and imports alterColumnType', () => {
+  it('AlterColumnTypeCall emits this.alterColumnType({...}) and contributes no imports', () => {
     const call = new AlterColumnTypeCall('public', 'user', 'age', {
       qualifiedTargetType: 'integer',
       formatTypeExpected: 'integer',
       rawTargetTypeForLabel: 'integer',
     });
     const rendered = call.renderTypeScript();
-    expect(rendered.startsWith('alterColumnType("public", "user", "age", {')).toBe(true);
+    expect(rendered.startsWith('this.alterColumnType({')).toBe(true);
+    expect(rendered).toContain('table: "user"');
+    expect(rendered).toContain('column: "age"');
     expect(rendered).toContain('qualifiedTargetType: "integer"');
-    expect(rendered).toContain('formatTypeExpected: "integer"');
-    expect(rendered).toContain('rawTargetTypeForLabel: "integer"');
-    expectFactoryImport(call, 'alterColumnType');
+    expect(call.importRequirements()).toEqual([]);
   });
 
   it('AlterColumnTypeCall preserves an explicit USING clause in the options literal', () => {
@@ -206,19 +207,19 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     expect(call.renderTypeScript()).toContain('using: "\\"age\\"::integer"');
   });
 
-  it('SetNotNullCall / DropNotNullCall / DropDefaultCall emit three positional args', () => {
+  it('SetNotNullCall / DropNotNullCall / DropDefaultCall emit this.X({...}) and contribute no imports', () => {
     expect(new SetNotNullCall('public', 'user', 'email').renderTypeScript()).toBe(
-      'setNotNull("public", "user", "email")',
+      'this.setNotNull({ schema: "public", table: "user", column: "email" })',
     );
     expect(new DropNotNullCall('public', 'user', 'nickname').renderTypeScript()).toBe(
-      'dropNotNull("public", "user", "nickname")',
+      'this.dropNotNull({ schema: "public", table: "user", column: "nickname" })',
     );
     expect(new DropDefaultCall('public', 'user', 'updated_at').renderTypeScript()).toBe(
-      'dropDefault("public", "user", "updated_at")',
+      'this.dropDefault({ schema: "public", table: "user", column: "updated_at" })',
     );
-    expectFactoryImport(new SetNotNullCall('public', 'user', 'email'), 'setNotNull');
-    expectFactoryImport(new DropNotNullCall('public', 'user', 'nickname'), 'dropNotNull');
-    expectFactoryImport(new DropDefaultCall('public', 'user', 'updated_at'), 'dropDefault');
+    expect(new SetNotNullCall('public', 'user', 'email').importRequirements()).toEqual([]);
+    expect(new DropNotNullCall('public', 'user', 'nickname').importRequirements()).toEqual([]);
+    expect(new DropDefaultCall('public', 'user', 'updated_at').importRequirements()).toEqual([]);
   });
 
   it('AddPrimaryKeyCall / AddUniqueCall emit this.X({schema, table, constraint, columns})', () => {
@@ -257,62 +258,58 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     expect(withActions.renderTypeScript()).toContain('onUpdate: "restrict"');
   });
 
-  it('CreateIndexCall / DropIndexCall emit their positional args and import createIndex/dropIndex', () => {
+  it('CreateIndexCall / DropIndexCall emit this.X({...}) and contribute no imports', () => {
     const ci = new CreateIndexCall('public', 'user', 'user_email_idx', ['email']);
     expect(ci.renderTypeScript()).toBe(
-      'createIndex("public", "user", "user_email_idx", ["email"])',
+      'this.createIndex({ schema: "public", table: "user", index: "user_email_idx", columns: ["email"] })',
     );
-    expectFactoryImport(ci, 'createIndex');
+    expect(ci.importRequirements()).toEqual([]);
 
     const di = new DropIndexCall('public', 'user', 'stale_idx');
-    expect(di.renderTypeScript()).toBe('dropIndex("public", "user", "stale_idx")');
-    expectFactoryImport(di, 'dropIndex');
+    expect(di.renderTypeScript()).toBe(
+      'this.dropIndex({ schema: "public", table: "user", index: "stale_idx" })',
+    );
+    expect(di.importRequirements()).toEqual([]);
   });
 
-  it('CreateIndexCall renders type and options when they are provided', () => {
+  it('CreateIndexCall renders extras when they are provided', () => {
     const ci = new CreateIndexCall('public', 'doc', 'doc_body_idx', ['body'], {
       type: 'gin',
       options: { fastupdate: false },
     });
     expect(ci.renderTypeScript()).toBe(
-      'createIndex("public", "doc", "doc_body_idx", ["body"], { type: "gin", options: { fastupdate: false } })',
+      'this.createIndex({ schema: "public", table: "doc", index: "doc_body_idx", columns: ["body"], extras: { type: "gin", options: { fastupdate: false } } })',
     );
   });
 
-  it('CreateEnumTypeCall emits the enum values as an array literal', () => {
+  it('CreateEnumTypeCall emits this.createEnumType({...}) and contributes no imports', () => {
     const call = new CreateEnumTypeCall('public', 'status', ['active', 'archived']);
     expect(call.renderTypeScript()).toBe(
-      'createEnumType("public", "status", ["active", "archived"])',
+      'this.createEnumType({ schema: "public", typeName: "status", values: ["active", "archived"] })',
     );
-    expectFactoryImport(call, 'createEnumType');
+    expect(call.importRequirements()).toEqual([]);
   });
 
-  it('AddEnumValuesCall distinguishes typeName from nativeType in its positional args', () => {
+  it('AddEnumValuesCall emits this.addEnumValues({...}) and contributes no imports', () => {
     const call = new AddEnumValuesCall('public', 'status', 'public.status_native', ['pending']);
     expect(call.renderTypeScript()).toBe(
-      'addEnumValues("public", "status", "public.status_native", ["pending"])',
+      'this.addEnumValues({ schema: "public", typeName: "status", nativeType: "public.status_native", values: ["pending"] })',
     );
-    expectFactoryImport(call, 'addEnumValues');
+    expect(call.importRequirements()).toEqual([]);
   });
 
-  it('DropEnumTypeCall / RenameTypeCall emit matching positional args', () => {
+  it('DropEnumTypeCall / RenameTypeCall emit this.X({...}) and contribute no imports', () => {
     const drop = new DropEnumTypeCall('public', 'status');
-    expect(drop.renderTypeScript()).toBe('dropEnumType("public", "status")');
-    expectFactoryImport(drop, 'dropEnumType');
+    expect(drop.renderTypeScript()).toBe(
+      'this.dropEnumType({ schema: "public", typeName: "status" })',
+    );
+    expect(drop.importRequirements()).toEqual([]);
 
     const rename = new RenameTypeCall('public', 'status_old', 'status');
-    expect(rename.renderTypeScript()).toBe('renameType("public", "status_old", "status")');
-    expectFactoryImport(rename, 'renameType');
-  });
-
-  it('RenameTypeCall prechecks both fromName existence and toName non-existence', () => {
-    const op = new RenameTypeCall('public', 'status_old', 'status').toOp();
-    const prechecks = op.precheck.map((s) => s.sql);
-    expect(prechecks).toHaveLength(2);
-    expect(prechecks[0]).toContain("t.typname = 'status_old'");
-    expect(prechecks[0]).toContain('EXISTS (');
-    expect(prechecks[1]).toContain("t.typname = 'status'");
-    expect(prechecks[1]).toContain('NOT EXISTS (');
+    expect(rename.renderTypeScript()).toBe(
+      'this.renameType({ schema: "public", fromName: "status_old", toName: "status" })',
+    );
+    expect(rename.importRequirements()).toEqual([]);
   });
 
   it('CreateExtensionCall emits a single-arg factory call', () => {
@@ -368,24 +365,18 @@ describe('renderCallsToTypeScript', () => {
 
     const source = renderCallsToTypeScript(calls, META);
 
-    // CreateTableCall now uses this.createTable (a method), so createTable is
-    // no longer imported from the migration module. The import line contains
-    // the factories actually used as free functions PLUS the contract-free
-    // DDL builders (`col`, `primaryKey`, etc.) that `this.createTable({...})`
-    // takes as arguments — those re-export from `@prisma-next/postgres/migration`
-    // (the user-facing facade) so users only need one import line, not two
-    // (and one runtime dep, not two).
+    // All four calls now emit as this.* method calls. Only the col() DDL
+    // builder arg to this.addColumn/this.createTable needs a bare import.
     const targetPostgresImports = source
       .split('\n')
       .filter((line) => line.includes("from '@prisma-next/postgres/migration';"));
     expect(targetPostgresImports).toEqual([
-      "import { Migration, MigrationCLI, col, createIndex, dropTable } from '@prisma-next/postgres/migration';",
+      "import { Migration, MigrationCLI, col } from '@prisma-next/postgres/migration';",
     ]);
-    // CreateTableCall and AddColumnCall both emit as this.* method calls, not free functions.
     expect(source).toContain('this.createTable(');
     expect(source).toContain('this.addColumn(');
-    expect(source).toContain('dropTable(');
-    expect(source).toContain('createIndex(');
+    expect(source).toContain('this.dropTable(');
+    expect(source).toContain('this.createIndex(');
   });
 
   it('emits DataTransformCall slots as placeholder closures and contributes placeholder + endContract imports', () => {

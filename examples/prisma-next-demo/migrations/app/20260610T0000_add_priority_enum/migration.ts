@@ -1,5 +1,5 @@
 #!/usr/bin/env -S node
-import { col, Migration, MigrationCLI, setNotNull } from '@prisma-next/postgres/migration';
+import { col, Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 
 export default class M extends Migration {
   override describe() {
@@ -12,7 +12,7 @@ export default class M extends Migration {
   override get operations() {
     return [
       this.addColumn({ schema: 'public', table: 'post', column: col('priority', 'text') }),
-      setNotNull('public', 'post', 'priority'),
+      this.setNotNull({ schema: 'public', table: 'post', column: 'priority' }),
       this.addCheckConstraint({
         schema: 'public',
         table: 'post',

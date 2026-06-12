@@ -1,33 +1,24 @@
-import { qualifyTableName, toRegclassLiteral } from '../planner-sql-checks';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
+import { tableExistsAst } from '../../../contract-free/checks';
+import { qualifyTableName } from '../planner-sql-checks';
 import { type Op, step, targetDetails } from './shared';
 
-/**
- * Legacy raw-string copy: this sync, lowerer-less factory still inlines its
- * to_regclass checks as SQL literals. The typed, parameterized form lives in
- * `tableExistsAst` (src/contract-free/checks.ts) and is used by
- * `CreateTableCall.toOp(lowerer)`. Converting this factory (and its
- * authored-migration facade export) is deferred to D3 of the
- * typed-migration-verification-queries slice.
- */
-export function dropTable(schemaName: string, tableName: string): Op {
+export async function dropTable(
+  schemaName: string,
+  tableName: string,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
   const qualified = qualifyTableName(schemaName, tableName);
+  const checks = tableExistsAst(schemaName, tableName);
+  const present = await lowerer.lowerToExecuteRequest(checks.tablePresent());
+  const absent = await lowerer.lowerToExecuteRequest(checks.tableAbsent());
   return {
     id: `dropTable.${tableName}`,
     label: `Drop table "${tableName}"`,
     operationClass: 'destructive',
     target: targetDetails('table', tableName, schemaName),
-    precheck: [
-      step(
-        `ensure table "${tableName}" exists`,
-        `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NOT NULL`,
-      ),
-    ],
+    precheck: [step(`ensure table "${tableName}" exists`, present.sql, present.params)],
     execute: [step(`drop table "${tableName}"`, `DROP TABLE ${qualified}`)],
-    postcheck: [
-      step(
-        `verify table "${tableName}" does not exist`,
-        `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NULL`,
-      ),
-    ],
+    postcheck: [step(`verify table "${tableName}" does not exist`, absent.sql, absent.params)],
   };
 }

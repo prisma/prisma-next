@@ -1,79 +1,53 @@
-import { quoteIdentifier } from '../../sql-utils';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import {
-  columnDefaultExistsCheck,
-  columnExistsCheck,
-  columnNullabilityCheck,
-  columnTypeCheck,
-  qualifyTableName,
-} from '../planner-sql-checks';
-import { type ColumnSpec, type Op, step, targetDetails } from './shared';
+  columnDefaultAst,
+  columnExistsAst,
+  columnNullabilityAst,
+  columnTypeAst,
+  noNullValuesAst,
+  tableIsEmptyAst,
+} from '../../../contract-free/checks';
+import { quoteIdentifier } from '../../sql-utils';
+import { qualifyTableName } from '../planner-sql-checks';
+import { type Op, step, targetDetails } from './shared';
 
-export function addColumn(schemaName: string, tableName: string, column: ColumnSpec): Op {
-  const qualified = qualifyTableName(schemaName, tableName);
-  const parts = [
-    `ALTER TABLE ${qualified}`,
-    `ADD COLUMN ${quoteIdentifier(column.name)} ${column.typeSql}`,
-    column.defaultSql,
-    column.nullable ? '' : 'NOT NULL',
-  ].filter(Boolean);
-  const addSql = parts.join(' ');
+type CheckStep = { sql: string; params?: readonly unknown[] };
 
-  return {
-    id: `column.${tableName}.${column.name}`,
-    label: `Add column "${column.name}" to "${tableName}"`,
-    operationClass: 'additive',
-    target: targetDetails('column', column.name, schemaName, tableName),
-    precheck: [
-      step(
-        `ensure column "${column.name}" is missing`,
-        columnExistsCheck({
-          schema: schemaName,
-          table: tableName,
-          column: column.name,
-          exists: false,
-        }),
-      ),
-    ],
-    execute: [step(`add column "${column.name}"`, addSql)],
-    postcheck: [
-      step(
-        `verify column "${column.name}" exists`,
-        columnExistsCheck({ schema: schemaName, table: tableName, column: column.name }),
-      ),
-    ],
-  };
+async function columnExistsSteps(
+  lowerer: ExecuteRequestLowerer,
+  options: { schema: string; table: string; column: string },
+): Promise<{ present: CheckStep; absent: CheckStep }> {
+  const checks = columnExistsAst(options);
+  const present = await lowerer.lowerToExecuteRequest(checks.columnPresent());
+  const absent = await lowerer.lowerToExecuteRequest(checks.columnAbsent());
+  return { present, absent };
 }
 
-export function dropColumn(schemaName: string, tableName: string, columnName: string): Op {
+export async function dropColumn(
+  schemaName: string,
+  tableName: string,
+  columnName: string,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
   const qualified = qualifyTableName(schemaName, tableName);
+  const { present, absent } = await columnExistsSteps(lowerer, {
+    schema: schemaName,
+    table: tableName,
+    column: columnName,
+  });
   return {
     id: `dropColumn.${tableName}.${columnName}`,
     label: `Drop column "${columnName}" from "${tableName}"`,
     operationClass: 'destructive',
     target: targetDetails('column', columnName, schemaName, tableName),
-    precheck: [
-      step(
-        `ensure column "${columnName}" exists`,
-        columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-      ),
-    ],
+    precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
     execute: [
       step(
         `drop column "${columnName}"`,
         `ALTER TABLE ${qualified} DROP COLUMN ${quoteIdentifier(columnName)}`,
       ),
     ],
-    postcheck: [
-      step(
-        `verify column "${columnName}" does not exist`,
-        columnExistsCheck({
-          schema: schemaName,
-          table: tableName,
-          column: columnName,
-          exists: false,
-        }),
-      ),
-    ],
+    postcheck: [step(`verify column "${columnName}" does not exist`, absent.sql, absent.params)],
   };
 }
 
@@ -85,7 +59,7 @@ export function dropColumn(schemaName: string, tableName: string, columnName: st
  * string appearing in the human-readable label (typically `toType` when
  * explicit, else the column's native type).
  */
-export function alterColumnType(
+export async function alterColumnType(
   schemaName: string,
   tableName: string,
   columnName: string,
@@ -95,22 +69,31 @@ export function alterColumnType(
     readonly rawTargetTypeForLabel: string;
     readonly using?: string;
   },
-): Op {
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
   const qualified = qualifyTableName(schemaName, tableName);
   const usingClause = options.using
     ? ` USING ${options.using}`
     : ` USING ${quoteIdentifier(columnName)}::${options.qualifiedTargetType}`;
+  const { present } = await columnExistsSteps(lowerer, {
+    schema: schemaName,
+    table: tableName,
+    column: columnName,
+  });
+  const typeCheck = await lowerer.lowerToExecuteRequest(
+    columnTypeAst({
+      schema: schemaName,
+      table: tableName,
+      column: columnName,
+      expectedType: options.formatTypeExpected,
+    }),
+  );
   return {
     id: `alterType.${tableName}.${columnName}`,
     label: `Alter type of "${tableName}"."${columnName}" to ${options.rawTargetTypeForLabel}`,
     operationClass: 'destructive',
     target: targetDetails('column', columnName, schemaName, tableName),
-    precheck: [
-      step(
-        `ensure column "${columnName}" exists`,
-        columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-      ),
-    ],
+    precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
     execute: [
       step(
         `alter type of "${columnName}"`,
@@ -120,34 +103,45 @@ export function alterColumnType(
     postcheck: [
       step(
         `verify column "${columnName}" has type "${options.formatTypeExpected}"`,
-        columnTypeCheck({
-          schema: schemaName,
-          table: tableName,
-          column: columnName,
-          expectedType: options.formatTypeExpected,
-        }),
+        typeCheck.sql,
+        typeCheck.params,
       ),
     ],
     meta: { warning: 'TABLE_REWRITE' },
   };
 }
 
-export function setNotNull(schemaName: string, tableName: string, columnName: string): Op {
+export async function setNotNull(
+  schemaName: string,
+  tableName: string,
+  columnName: string,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
   const qualified = qualifyTableName(schemaName, tableName);
+  const { present } = await columnExistsSteps(lowerer, {
+    schema: schemaName,
+    table: tableName,
+    column: columnName,
+  });
+  const noNulls = await lowerer.lowerToExecuteRequest(
+    noNullValuesAst({ schema: schemaName, table: tableName, column: columnName }),
+  );
+  const notNullable = await lowerer.lowerToExecuteRequest(
+    columnNullabilityAst({
+      schema: schemaName,
+      table: tableName,
+      column: columnName,
+      nullable: false,
+    }),
+  );
   return {
     id: `alterNullability.setNotNull.${tableName}.${columnName}`,
     label: `Set NOT NULL on "${tableName}"."${columnName}"`,
     operationClass: 'destructive',
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [
-      step(
-        `ensure column "${columnName}" exists`,
-        columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-      ),
-      step(
-        `ensure no NULL values in "${columnName}"`,
-        `SELECT NOT EXISTS (SELECT 1 FROM ${qualified} WHERE ${quoteIdentifier(columnName)} IS NULL)`,
-      ),
+      step(`ensure column "${columnName}" exists`, present.sql, present.params),
+      step(`ensure no NULL values in "${columnName}"`, noNulls.sql, noNulls.params),
     ],
     execute: [
       step(
@@ -156,49 +150,44 @@ export function setNotNull(schemaName: string, tableName: string, columnName: st
       ),
     ],
     postcheck: [
-      step(
-        `verify column "${columnName}" is NOT NULL`,
-        columnNullabilityCheck({
-          schema: schemaName,
-          table: tableName,
-          column: columnName,
-          nullable: false,
-        }),
-      ),
+      step(`verify column "${columnName}" is NOT NULL`, notNullable.sql, notNullable.params),
     ],
   };
 }
 
-export function dropNotNull(schemaName: string, tableName: string, columnName: string): Op {
+export async function dropNotNull(
+  schemaName: string,
+  tableName: string,
+  columnName: string,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
   const qualified = qualifyTableName(schemaName, tableName);
+  const { present } = await columnExistsSteps(lowerer, {
+    schema: schemaName,
+    table: tableName,
+    column: columnName,
+  });
+  const nullable = await lowerer.lowerToExecuteRequest(
+    columnNullabilityAst({
+      schema: schemaName,
+      table: tableName,
+      column: columnName,
+      nullable: true,
+    }),
+  );
   return {
     id: `alterNullability.dropNotNull.${tableName}.${columnName}`,
     label: `Drop NOT NULL on "${tableName}"."${columnName}"`,
     operationClass: 'widening',
     target: targetDetails('column', columnName, schemaName, tableName),
-    precheck: [
-      step(
-        `ensure column "${columnName}" exists`,
-        columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-      ),
-    ],
+    precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
     execute: [
       step(
         `drop NOT NULL on "${columnName}"`,
         `ALTER TABLE ${qualified} ALTER COLUMN ${quoteIdentifier(columnName)} DROP NOT NULL`,
       ),
     ],
-    postcheck: [
-      step(
-        `verify column "${columnName}" is nullable`,
-        columnNullabilityCheck({
-          schema: schemaName,
-          table: tableName,
-          column: columnName,
-          nullable: true,
-        }),
-      ),
-    ],
+    postcheck: [step(`verify column "${columnName}" is nullable`, nullable.sql, nullable.params)],
   };
 }
 
@@ -212,25 +201,29 @@ export function dropNotNull(schemaName: string, tableName: string, columnName: s
  * when the column already has a different default — policy enforcement
  * treats that as a widening change rather than an additive one.
  */
-export function setDefault(
+export async function setDefault(
   schemaName: string,
   tableName: string,
   columnName: string,
   defaultSql: string,
+  lowerer: ExecuteRequestLowerer,
   operationClass: 'additive' | 'widening' = 'additive',
-): Op {
+): Promise<Op> {
   const qualified = qualifyTableName(schemaName, tableName);
+  const { present } = await columnExistsSteps(lowerer, {
+    schema: schemaName,
+    table: tableName,
+    column: columnName,
+  });
+  const hasDefault = await lowerer.lowerToExecuteRequest(
+    columnDefaultAst({ schema: schemaName, table: tableName, column: columnName }).defaultPresent(),
+  );
   return {
     id: `setDefault.${tableName}.${columnName}`,
     label: `Set default on "${tableName}"."${columnName}"`,
     operationClass,
     target: targetDetails('column', columnName, schemaName, tableName),
-    precheck: [
-      step(
-        `ensure column "${columnName}" exists`,
-        columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-      ),
-    ],
+    precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
     execute: [
       step(
         `set default on "${columnName}"`,
@@ -238,32 +231,32 @@ export function setDefault(
       ),
     ],
     postcheck: [
-      step(
-        `verify column "${columnName}" has a default`,
-        columnDefaultExistsCheck({
-          schema: schemaName,
-          table: tableName,
-          column: columnName,
-          exists: true,
-        }),
-      ),
+      step(`verify column "${columnName}" has a default`, hasDefault.sql, hasDefault.params),
     ],
   };
 }
 
-export function dropDefault(schemaName: string, tableName: string, columnName: string): Op {
+export async function dropDefault(
+  schemaName: string,
+  tableName: string,
+  columnName: string,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
   const qualified = qualifyTableName(schemaName, tableName);
+  const { present } = await columnExistsSteps(lowerer, {
+    schema: schemaName,
+    table: tableName,
+    column: columnName,
+  });
+  const noDefault = await lowerer.lowerToExecuteRequest(
+    columnDefaultAst({ schema: schemaName, table: tableName, column: columnName }).defaultAbsent(),
+  );
   return {
     id: `dropDefault.${tableName}.${columnName}`,
     label: `Drop default on "${tableName}"."${columnName}"`,
     operationClass: 'destructive',
     target: targetDetails('column', columnName, schemaName, tableName),
-    precheck: [
-      step(
-        `ensure column "${columnName}" exists`,
-        columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-      ),
-    ],
+    precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
     execute: [
       step(
         `drop default on "${columnName}"`,
@@ -271,15 +264,57 @@ export function dropDefault(schemaName: string, tableName: string, columnName: s
       ),
     ],
     postcheck: [
+      step(`verify column "${columnName}" has no default`, noDefault.sql, noDefault.params),
+    ],
+  };
+}
+
+/**
+ * Builds the op for adding a NOT NULL column (no contract default) to a
+ * non-empty table. Prechecks assert the column is absent and the table is
+ * empty; the execute step is the raw ADD COLUMN SQL passed by the caller
+ * (slice-7 deferred); postchecks assert the column exists and is NOT NULL.
+ */
+export async function addNotNullColumnDirect(
+  schemaName: string,
+  tableName: string,
+  columnName: string,
+  executeStepSql: string,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
+  const absent = await lowerer.lowerToExecuteRequest(
+    columnExistsAst({ schema: schemaName, table: tableName, column: columnName }).columnAbsent(),
+  );
+  const tableEmpty = await lowerer.lowerToExecuteRequest(tableIsEmptyAst(schemaName, tableName));
+  const present = await lowerer.lowerToExecuteRequest(
+    columnExistsAst({ schema: schemaName, table: tableName, column: columnName }).columnPresent(),
+  );
+  const notNullable = await lowerer.lowerToExecuteRequest(
+    columnNullabilityAst({
+      schema: schemaName,
+      table: tableName,
+      column: columnName,
+      nullable: false,
+    }),
+  );
+  return {
+    id: `column.${tableName}.${columnName}`,
+    label: `Add column ${columnName} to ${tableName}`,
+    summary: `Adds column ${columnName} to table ${tableName}`,
+    operationClass: 'additive',
+    target: targetDetails('column', columnName, schemaName, tableName),
+    precheck: [
+      step(`ensure column "${columnName}" is missing`, absent.sql, absent.params),
       step(
-        `verify column "${columnName}" has no default`,
-        columnDefaultExistsCheck({
-          schema: schemaName,
-          table: tableName,
-          column: columnName,
-          exists: false,
-        }),
+        `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
+        tableEmpty.sql,
+        tableEmpty.params,
       ),
+    ],
+    execute: [step(`add column "${columnName}"`, executeStepSql)],
+    postcheck: [
+      step(`verify column "${columnName}" exists`, present.sql, present.params),
+      step(`verify column "${columnName}" is NOT NULL`, notNullable.sql, notNullable.params),
     ],
   };
 }

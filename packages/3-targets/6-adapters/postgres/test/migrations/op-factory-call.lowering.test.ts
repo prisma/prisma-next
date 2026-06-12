@@ -244,15 +244,20 @@ describe('renderOps', () => {
 });
 
 describe('TypeScriptRenderablePostgresMigration', () => {
-  it('identifies as postgres, derives destination from meta.to, and materializes operations via renderOps', () => {
+  it('identifies as postgres, derives destination from meta.to, and materializes operations via renderOps', async () => {
     const calls = [new DropTableCall('public', 'stale')];
-    const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
+    const migration = new TypeScriptRenderablePostgresMigration(
+      calls,
+      META,
+      APP_SPACE_ID,
+      testAdapter,
+    );
 
     expect(migration.targetId).toBe('postgres');
     expect(migration.destination).toEqual({ storageHash: 'sha256:to' });
     expect(migration.describe()).toEqual(META);
 
-    const operations = migration.operations;
+    const operations = await Promise.all(migration.operations);
     expect(operations).toHaveLength(1);
     expect(operations[0]).toMatchObject({ id: 'dropTable.stale' });
   });
@@ -263,8 +268,8 @@ describe('TypeScriptRenderablePostgresMigration', () => {
 
     const source = migration.renderTypeScript();
     expect(source).toContain(
-      "import { Migration, MigrationCLI, dropTable } from '@prisma-next/postgres/migration';",
+      "import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';",
     );
-    expect(source).toContain('dropTable("public", "stale")');
+    expect(source).toContain('this.dropTable({ schema: "public", table: "stale" })');
   });
 });

@@ -1,3 +1,5 @@
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
+import { extensionExistsAst } from '../../../contract-free/checks';
 import { quoteIdentifier } from '../../sql-utils';
 import { type Op, step } from './shared';
 
@@ -32,14 +34,20 @@ export function createExtension(extensionName: string): Op {
  * use the bare {@link createExtension} for planner-emitted ops where the
  * caller already controls idempotency through the surrounding plan.
  */
-export function installExtension(options: {
-  readonly extensionName: string;
-  readonly invariantId: string;
-  readonly id: string;
-  readonly label?: string;
-}): Op {
+export async function installExtension(
+  options: {
+    readonly extensionName: string;
+    readonly invariantId: string;
+    readonly id: string;
+    readonly label?: string;
+  },
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
   const { extensionName, invariantId, id } = options;
   const label = options.label ?? `Enable extension "${extensionName}"`;
+  const checks = extensionExistsAst(extensionName);
+  const absent = await lowerer.lowerToExecuteRequest(checks.extensionAbsent());
+  const present = await lowerer.lowerToExecuteRequest(checks.extensionPresent());
   return {
     id,
     label,
@@ -50,10 +58,7 @@ export function installExtension(options: {
       details: { schema: 'public', objectType: 'dependency', name: extensionName },
     },
     precheck: [
-      step(
-        `verify extension "${extensionName}" is not already enabled`,
-        `SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = '${extensionName}')`,
-      ),
+      step(`verify extension "${extensionName}" is not already enabled`, absent.sql, absent.params),
     ],
     execute: [
       step(
@@ -62,10 +67,7 @@ export function installExtension(options: {
       ),
     ],
     postcheck: [
-      step(
-        `confirm extension "${extensionName}" is enabled`,
-        `SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = '${extensionName}')`,
-      ),
+      step(`confirm extension "${extensionName}" is enabled`, present.sql, present.params),
     ],
   };
 }

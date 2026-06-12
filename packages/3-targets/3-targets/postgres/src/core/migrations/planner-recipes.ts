@@ -1,17 +1,19 @@
 import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
   PostgresEnumStorageEntry,
   StorageColumn,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
-import { quoteIdentifier } from '../sql-utils';
-import { buildAddColumnSql } from './planner-ddl-builders';
 import {
-  columnExistsCheck,
-  columnHasNoDefaultCheck,
-  columnNullabilityCheck,
-  qualifyTableName,
-} from './planner-sql-checks';
+  columnDefaultAst,
+  columnExistsAst,
+  columnNullabilityAst,
+} from '../../contract-free/checks';
+import { quoteIdentifier } from '../sql-utils';
+import { step } from './operations/shared';
+import { buildAddColumnSql } from './planner-ddl-builders';
+import { qualifyTableName } from './planner-sql-checks';
 import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
 
 export function buildAddColumnOperationIdentity(
@@ -33,7 +35,7 @@ export function buildAddColumnOperationIdentity(
   };
 }
 
-export function buildAddNotNullColumnWithTemporaryDefaultOperation(options: {
+export async function buildAddNotNullColumnWithTemporaryDefaultOperation(options: {
   readonly schema: string;
   readonly tableName: string;
   readonly columnName: string;
@@ -41,20 +43,37 @@ export function buildAddNotNullColumnWithTemporaryDefaultOperation(options: {
   readonly codecHooks: Map<string, CodecControlHooks>;
   readonly storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
   readonly temporaryDefault: string;
-}): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-  const { schema, tableName, columnName, column, codecHooks, storageTypes, temporaryDefault } =
-    options;
+  readonly lowerer: ExecuteRequestLowerer;
+}): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+  const {
+    schema,
+    tableName,
+    columnName,
+    column,
+    codecHooks,
+    storageTypes,
+    temporaryDefault,
+    lowerer,
+  } = options;
   const qualified = qualifyTableName(schema, tableName);
+
+  const absent = await lowerer.lowerToExecuteRequest(
+    columnExistsAst({ schema, table: tableName, column: columnName }).columnAbsent(),
+  );
+  const present = await lowerer.lowerToExecuteRequest(
+    columnExistsAst({ schema, table: tableName, column: columnName }).columnPresent(),
+  );
+  const notNullable = await lowerer.lowerToExecuteRequest(
+    columnNullabilityAst({ schema, table: tableName, column: columnName, nullable: false }),
+  );
+  const noDefault = await lowerer.lowerToExecuteRequest(
+    columnDefaultAst({ schema, table: tableName, column: columnName }).noDefault(),
+  );
 
   return {
     ...buildAddColumnOperationIdentity(schema, tableName, columnName),
     operationClass: 'additive',
-    precheck: [
-      {
-        description: `ensure column "${columnName}" is missing`,
-        sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
-      },
-    ],
+    precheck: [step(`ensure column "${columnName}" is missing`, absent.sql, absent.params)],
     execute: [
       {
         description: `add column "${columnName}"`,
@@ -73,23 +92,13 @@ export function buildAddNotNullColumnWithTemporaryDefaultOperation(options: {
       },
     ],
     postcheck: [
-      {
-        description: `verify column "${columnName}" exists`,
-        sql: columnExistsCheck({ schema, table: tableName, column: columnName }),
-      },
-      {
-        description: `verify column "${columnName}" is NOT NULL`,
-        sql: columnNullabilityCheck({
-          schema,
-          table: tableName,
-          column: columnName,
-          nullable: false,
-        }),
-      },
-      {
-        description: `verify column "${columnName}" has no default after temporary default removal`,
-        sql: columnHasNoDefaultCheck({ schema, table: tableName, column: columnName }),
-      },
+      step(`verify column "${columnName}" exists`, present.sql, present.params),
+      step(`verify column "${columnName}" is NOT NULL`, notNullable.sql, notNullable.params),
+      step(
+        `verify column "${columnName}" has no default after temporary default removal`,
+        noDefault.sql,
+        noDefault.params,
+      ),
     ],
   };
 }

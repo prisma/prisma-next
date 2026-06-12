@@ -25,7 +25,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
     new PostgresControlAdapter(createPostgresBuiltinCodecLookup()),
   );
 
-  it('plans destructive drop for extra column when policy allows destructive', () => {
+  it('plans destructive drop for extra column when policy allows destructive', async () => {
     const contract = createContract({
       user: {
         columns: {
@@ -69,7 +69,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
     if (result.kind !== 'success') {
       throw new Error(`expected planner success, got: ${JSON.stringify(result)}`);
     }
-    expect(result.plan.operations).toEqual(
+    expect(await Promise.all(result.plan.operations)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: 'dropColumn.user.legacyEmail',
@@ -79,7 +79,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
     );
   });
 
-  it('plans widening operation for nullability relaxation when policy allows widening', () => {
+  it('plans widening operation for nullability relaxation when policy allows widening', async () => {
     const contract = createContract({
       user: {
         columns: {
@@ -122,7 +122,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
     if (result.kind !== 'success') {
       throw new Error(`expected planner success, got: ${JSON.stringify(result)}`);
     }
-    expect(result.plan.operations).toEqual(
+    expect(await Promise.all(result.plan.operations)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: 'alterNullability.dropNotNull.user.email',

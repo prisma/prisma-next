@@ -1,109 +1,20 @@
 import {
   buildExpectedFormatType,
-  columnExistsCheck,
-  columnHasNoDefaultCheck,
-  columnNullabilityCheck,
   qualifyTableName,
-  tableHasPrimaryKeyCheck,
-  tableIsEmptyCheck,
-  toRegclassLiteral,
 } from '@prisma-next/target-postgres/planner-sql-checks';
 import { describe, expect, it } from 'vitest';
+
+// Raw-string check helpers (columnExistsCheck, columnNullabilityCheck,
+// columnTypeCheck, columnDefaultExistsCheck, columnHasNoDefaultCheck,
+// tableHasPrimaryKeyCheck, tableIsEmptyCheck, toRegclassLiteral) were replaced
+// by typed AST builders (columnExistsAst, columnNullabilityAst, etc.) from
+// @prisma-next/target-postgres/contract-free. Construction pins live in
+// target-postgres test/migrations/verification-checks.test.ts and lowering
+// pins in test/verification-checks-lowering.test.ts.
 
 describe('qualifyTableName', () => {
   it('quotes schema and table', () => {
     expect(qualifyTableName('public', 'user')).toBe('"public"."user"');
-  });
-});
-
-describe('toRegclassLiteral', () => {
-  it('produces an escaped regclass literal', () => {
-    expect(toRegclassLiteral('public', 'user')).toBe(`'"public"."user"'`);
-  });
-});
-
-// constraintExistsCheck was replaced by the typed constraintExistsAst builder
-// (@prisma-next/target-postgres/contract-free); construction pins live in
-// target-postgres test/migrations/verification-checks.test.ts and lowering
-// pins in test/verification-checks-lowering.test.ts here.
-
-describe('columnExistsCheck', () => {
-  it('defaults to EXISTS', () => {
-    const sql = columnExistsCheck({ schema: 'public', table: 'user', column: 'email' });
-    expect(sql).toContain('SELECT EXISTS');
-    expect(sql).toContain("table_schema = 'public'");
-    expect(sql).toContain("table_name = 'user'");
-    expect(sql).toContain("column_name = 'email'");
-  });
-
-  it('uses NOT EXISTS when exists=false', () => {
-    const sql = columnExistsCheck({
-      schema: 'public',
-      table: 'user',
-      column: 'email',
-      exists: false,
-    });
-    expect(sql).toContain('SELECT NOT EXISTS');
-  });
-});
-
-describe('columnNullabilityCheck', () => {
-  it('checks for NOT NULL', () => {
-    const sql = columnNullabilityCheck({
-      schema: 'public',
-      table: 'user',
-      column: 'email',
-      nullable: false,
-    });
-    expect(sql).toContain("is_nullable = 'NO'");
-  });
-
-  it('checks for nullable', () => {
-    const sql = columnNullabilityCheck({
-      schema: 'public',
-      table: 'user',
-      column: 'bio',
-      nullable: true,
-    });
-    expect(sql).toContain("is_nullable = 'YES'");
-  });
-});
-
-describe('tableIsEmptyCheck', () => {
-  it('produces NOT EXISTS with LIMIT 1', () => {
-    expect(tableIsEmptyCheck('"public"."user"')).toBe(
-      'SELECT NOT EXISTS (SELECT 1 FROM "public"."user" LIMIT 1)',
-    );
-  });
-});
-
-describe('columnHasNoDefaultCheck', () => {
-  it('checks column_default IS NOT NULL', () => {
-    const sql = columnHasNoDefaultCheck({ schema: 'public', table: 'user', column: 'name' });
-    expect(sql).toContain('SELECT NOT EXISTS');
-    expect(sql).toContain('column_default IS NOT NULL');
-    expect(sql).toContain("column_name = 'name'");
-  });
-});
-
-describe('tableHasPrimaryKeyCheck', () => {
-  it('checks PK exists without constraint name', () => {
-    const sql = tableHasPrimaryKeyCheck('public', 'user', true);
-    expect(sql).toContain('SELECT EXISTS');
-    expect(sql).toContain("n.nspname = 'public'");
-    expect(sql).toContain("c.relname = 'user'");
-    expect(sql).toContain('i.indisprimary');
-    expect(sql).not.toContain('c2.relname');
-  });
-
-  it('checks PK does not exist', () => {
-    const sql = tableHasPrimaryKeyCheck('public', 'user', false);
-    expect(sql).toContain('SELECT NOT EXISTS');
-  });
-
-  it('filters by constraint name when provided', () => {
-    const sql = tableHasPrimaryKeyCheck('public', 'user', true, 'user_pkey');
-    expect(sql).toContain("c2.relname = 'user_pkey'");
   });
 });
 

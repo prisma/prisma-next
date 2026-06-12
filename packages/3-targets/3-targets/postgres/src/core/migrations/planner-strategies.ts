@@ -52,6 +52,8 @@ import {
   AddCheckConstraintCall,
   AddColumnCall,
   AddEnumValuesCall,
+  AddNotNullColumnDirectCall,
+  AddNotNullColumnWithTempDefaultCall,
   AlterColumnTypeCall,
   CreateEnumTypeCall,
   DataTransformCall,
@@ -65,18 +67,8 @@ import {
 } from './op-factory-call';
 import { buildAddColumnSql, buildColumnTypeSql } from './planner-ddl-builders';
 import { resolveIdentityValue } from './planner-identity-values';
-import {
-  buildAddColumnOperationIdentity,
-  buildAddNotNullColumnWithTemporaryDefaultOperation,
-} from './planner-recipes';
 import { buildSchemaLookupMap, hasForeignKey, hasUniqueConstraint } from './planner-schema-lookup';
-import {
-  buildExpectedFormatType,
-  columnExistsCheck,
-  columnNullabilityCheck,
-  qualifyTableName,
-  tableIsEmptyCheck,
-} from './planner-sql-checks';
+import { buildExpectedFormatType, qualifyTableName } from './planner-sql-checks';
 import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
@@ -928,74 +920,34 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
 
     if (canUseSharedTempDefault && temporaryDefault !== null) {
       calls.push(
-        new RawSqlCall(
-          buildAddNotNullColumnWithTemporaryDefaultOperation({
-            schema: schemaForTable,
-            tableName: issue.table,
-            columnName: issue.column,
-            column,
-            codecHooks: mutableCodecHooks,
-            storageTypes: mutableStorageTypes,
-            temporaryDefault,
-          }),
-        ),
+        new AddNotNullColumnWithTempDefaultCall({
+          schemaName: schemaForTable,
+          tableName: issue.table,
+          columnName: issue.column,
+          column,
+          codecHooks: mutableCodecHooks,
+          storageTypes: mutableStorageTypes,
+          temporaryDefault,
+        }),
       );
       continue;
     }
 
     const qualified = qualifyTableName(schemaForTable, issue.table);
     calls.push(
-      new RawSqlCall({
-        ...buildAddColumnOperationIdentity(schemaForTable, issue.table, issue.column),
-        operationClass: 'additive',
-        precheck: [
-          {
-            description: `ensure column "${issue.column}" is missing`,
-            sql: columnExistsCheck({
-              schema: schemaForTable,
-              table: issue.table,
-              column: issue.column,
-              exists: false,
-            }),
-          },
-          {
-            description: `ensure table "${issue.table}" is empty before adding NOT NULL column without default`,
-            sql: tableIsEmptyCheck(qualified),
-          },
-        ],
-        execute: [
-          {
-            description: `add column "${issue.column}"`,
-            sql: buildAddColumnSql(
-              qualified,
-              issue.column,
-              column,
-              mutableCodecHooks,
-              undefined,
-              mutableStorageTypes,
-            ),
-          },
-        ],
-        postcheck: [
-          {
-            description: `verify column "${issue.column}" exists`,
-            sql: columnExistsCheck({
-              schema: schemaForTable,
-              table: issue.table,
-              column: issue.column,
-            }),
-          },
-          {
-            description: `verify column "${issue.column}" is NOT NULL`,
-            sql: columnNullabilityCheck({
-              schema: schemaForTable,
-              table: issue.table,
-              column: issue.column,
-              nullable: false,
-            }),
-          },
-        ],
-      }),
+      new AddNotNullColumnDirectCall(
+        schemaForTable,
+        issue.table,
+        issue.column,
+        buildAddColumnSql(
+          qualified,
+          issue.column,
+          column,
+          mutableCodecHooks,
+          undefined,
+          mutableStorageTypes,
+        ),
+      ),
     );
   }
 
