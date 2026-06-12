@@ -1005,11 +1005,11 @@
               "field": "country"
             }
           ],
-          "name": "city_1_country_1",
           "collation": {
             "locale": "en",
             "strength": 2
-          }
+          },
+          "name": "city_1_country_1"
         }
       }
     ],
@@ -1126,11 +1126,11 @@
               "field": "description"
             }
           ],
-          "name": "name_text_description_text",
           "weights": {
             "description": 1,
             "name": 10
-          }
+          },
+          "name": "name_text_description_text"
         }
       }
     ],
