@@ -177,12 +177,14 @@ function identifierText(identifier: IdentifierAst | undefined): string | undefin
 
 /**
  * The set of declaration names visible while binding a written type reference to
- * a kind-ful coordinate. Bare names resolve current-namespace first, then
- * document-wide; a qualified `ns.Type` reference resolves against the named
- * namespace exactly. This matches the old parser + interpreter policy, where a
- * bare model name resolved document-wide by name (`modelMappings.get(name)`) and
- * a `ns.Type` reference resolved against that namespace's coordinate
- * (`modelCoordinateKey(ns, name)`).
+ * a kind-ful coordinate. The chosen bare-name policy is current-namespace first,
+ * then document-wide first-match; a qualified `ns.Type` reference resolves against
+ * the named namespace exactly.
+ *
+ * The live SQL interpreter's bare-name path is instead flat document-wide
+ * last-wins (`modelMappings.set(name, …)` over the coordinate-keyed map), so a
+ * bare name shared across namespaces resolves differently there. That divergence
+ * is to be reconciled when the interpreter migrates onto this resolver.
  */
 interface NameTable {
   readonly byNamespace: ReadonlyMap<string, ReadonlyMap<string, DeclKind>>;
