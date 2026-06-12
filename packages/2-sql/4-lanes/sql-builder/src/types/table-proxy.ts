@@ -1,9 +1,7 @@
-import type { Contract } from '@prisma-next/contract/types';
 import type {
   ExtractCodecTypes,
   ExtractFieldInputTypes,
   ExtractQueryOperationTypes,
-  SqlStorage,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
@@ -61,29 +59,24 @@ type FindFieldForColumn<
 // Each column resolves through `ComputeColumnJsType` with the coordinate, so
 // refined per-namespace output types (e.g. `Vector<N>`) are preserved and
 // same-named tables across namespaces resolve to each namespace's own columns.
-// The `C extends Contract<SqlStorage>` guard here is not for `domain` access
-// (that now lives on `TableProxyContract`) but to satisfy `ComputeColumnJsType`,
-// whose own constraint is `TContract extends Contract<SqlStorage>`. Dropping the
-// guard would require relaxing that constraint in `sql-relational-core` (a lower
-// layer) to the minimal column-resolution shape; expanding `TableProxyContract`
-// alone cannot remove it without making it the whole `Contract`.
+// `ComputeColumnJsType`'s constraint is the minimal `ColumnResolutionContract`,
+// which `TableProxyContract` satisfies, so `C` is indexed directly — no
+// `C extends Contract<SqlStorage>` guard.
 type ResolvedColumnTypes<
   C extends TableProxyContract,
   NsId extends string,
   TableName extends string,
 > =
-  C extends Contract<SqlStorage>
-    ? NamespaceTable<C, NsId, TableName> extends infer Table extends StorageTable
-      ? {
-          [ColName in keyof Table['columns'] & string]: ComputeColumnJsType<
-            C,
-            NsId,
-            TableName,
-            ColName,
-            ExtractCodecTypes<C>
-          >;
-        }
-      : Record<string, never>
+  NamespaceTable<C, NsId, TableName> extends infer Table extends StorageTable
+    ? {
+        [ColName in keyof Table['columns'] & string]: ComputeColumnJsType<
+          C,
+          NsId,
+          TableName,
+          ColName,
+          ExtractCodecTypes<C>
+        >;
+      }
     : Record<string, never>;
 
 type ResolvedInsertValues<
