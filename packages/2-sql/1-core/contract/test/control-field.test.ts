@@ -3,7 +3,11 @@ import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { StorageColumn } from '../src/ir/storage-column';
 import { StorageTable } from '../src/ir/storage-table';
-import { createSqlContractSchema, validateStorage } from '../src/validators';
+import {
+  createSqlContractSchema,
+  createSqlEntrySchemaRegistry,
+  validateStorage,
+} from '../src/validators';
 
 function storageWithColumn(control?: unknown) {
   return {
@@ -132,7 +136,7 @@ describe('SQL storage validators accept control', () => {
 });
 
 describe('SQL contract schema defaultControlPolicy', () => {
-  const schema = createSqlContractSchema();
+  const schema = createSqlContractSchema(createSqlEntrySchemaRegistry());
 
   it('accepts a contract carrying defaultControlPolicy', () => {
     expect(schema(minimalContract('observed')) instanceof type.errors).toBe(false);

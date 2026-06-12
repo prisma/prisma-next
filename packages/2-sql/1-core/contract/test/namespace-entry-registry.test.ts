@@ -3,6 +3,7 @@ import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import {
   createNamespaceEntrySchema,
+  createSqlEntrySchemaRegistry,
   createSqlStorageSchema,
   StorageValueSetSchema,
 } from '../src/validators';
@@ -44,8 +45,8 @@ function makeStorage(entries: Record<string, unknown>) {
 // ---------------------------------------------------------------------------
 
 describe('createNamespaceEntrySchema — registry-driven validation', () => {
-  it('accepts a namespace with only built-in table entries when no extra registry provided', () => {
-    const schema = createNamespaceEntrySchema(new Map());
+  it('accepts a namespace with core-registered table entries', () => {
+    const schema = createNamespaceEntrySchema(createSqlEntrySchemaRegistry());
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: { table: { users: minimalTable } },
@@ -53,8 +54,8 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
     expect(result).not.toBeInstanceOf(type.errors);
   });
 
-  it('accepts a namespace with built-in valueSet entries', () => {
-    const schema = createNamespaceEntrySchema(new Map());
+  it('accepts a namespace with core-registered valueSet entries', () => {
+    const schema = createNamespaceEntrySchema(createSqlEntrySchemaRegistry());
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
@@ -66,7 +67,7 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
   });
 
   it('rejects a namespace with an unregistered entries key naming the kind', () => {
-    const schema = createNamespaceEntrySchema(new Map());
+    const schema = createNamespaceEntrySchema(createSqlEntrySchemaRegistry());
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
@@ -79,9 +80,9 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
   });
 
   it('accepts a namespace with a pack-registered entries key', () => {
-    const registry = new Map<string, ReturnType<typeof type>>([
-      ['synth', SyntheticPackEntrySchema],
-    ]);
+    const registry = createSqlEntrySchemaRegistry(
+      new Map<string, ReturnType<typeof type>>([['synth', SyntheticPackEntrySchema]]),
+    );
     const schema = createNamespaceEntrySchema(registry);
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
@@ -94,9 +95,9 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
   });
 
   it('rejects a pack-registered entry with a non-conforming value', () => {
-    const registry = new Map<string, ReturnType<typeof type>>([
-      ['synth', SyntheticPackEntrySchema],
-    ]);
+    const registry = createSqlEntrySchemaRegistry(
+      new Map<string, ReturnType<typeof type>>([['synth', SyntheticPackEntrySchema]]),
+    );
     const schema = createNamespaceEntrySchema(registry);
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
@@ -109,9 +110,9 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
   });
 
   it('rejects an unknown entries key even when a pack registry is provided', () => {
-    const registry = new Map<string, ReturnType<typeof type>>([
-      ['synth', SyntheticPackEntrySchema],
-    ]);
+    const registry = createSqlEntrySchemaRegistry(
+      new Map<string, ReturnType<typeof type>>([['synth', SyntheticPackEntrySchema]]),
+    );
     const schema = createNamespaceEntrySchema(registry);
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
@@ -124,6 +125,27 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
     expect(result).toBeInstanceOf(type.errors);
     expect(String(result)).toMatch(/unknown/);
   });
+
+  it('rejects core kinds when given a truly empty registry — no hidden fallback tier', () => {
+    const schema = createNamespaceEntrySchema(new Map());
+    const result = schema({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: { users: minimalTable } },
+    });
+    expect(result).toBeInstanceOf(type.errors);
+    expect(String(result)).toMatch(/table/);
+  });
+
+  it('unregistered-kind error names the kind and the namespace id', () => {
+    const schema = createNamespaceEntrySchema(createSqlEntrySchemaRegistry());
+    const result = schema({
+      id: 'analytics',
+      entries: { bogus: { Foo: {} } },
+    });
+    expect(result).toBeInstanceOf(type.errors);
+    expect(String(result)).toMatch(/bogus/);
+    expect(String(result)).toMatch(/analytics/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -131,8 +153,8 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
 // ---------------------------------------------------------------------------
 
 describe('createSqlStorageSchema — registry-driven storage validation', () => {
-  it('accepts storage with built-in table + valueSet entries', () => {
-    const schema = createSqlStorageSchema(new Map());
+  it('accepts storage with core-registered table + valueSet entries', () => {
+    const schema = createSqlStorageSchema(createSqlEntrySchemaRegistry());
     const result = schema(
       makeStorage({
         table: { users: minimalTable },
@@ -143,7 +165,7 @@ describe('createSqlStorageSchema — registry-driven storage validation', () => 
   });
 
   it('rejects storage with an unregistered entries key, error names the kind', () => {
-    const schema = createSqlStorageSchema(new Map());
+    const schema = createSqlStorageSchema(createSqlEntrySchemaRegistry());
     const result = schema(
       makeStorage({
         table: { users: minimalTable },
@@ -155,9 +177,9 @@ describe('createSqlStorageSchema — registry-driven storage validation', () => 
   });
 
   it('accepts storage with a pack-registered entries key', () => {
-    const registry = new Map<string, ReturnType<typeof type>>([
-      ['synth', SyntheticPackEntrySchema],
-    ]);
+    const registry = createSqlEntrySchemaRegistry(
+      new Map<string, ReturnType<typeof type>>([['synth', SyntheticPackEntrySchema]]),
+    );
     const schema = createSqlStorageSchema(registry);
     const result = schema(
       makeStorage({

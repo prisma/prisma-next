@@ -219,20 +219,38 @@ const StorageTableSchema = type({
   'checks?': CheckConstraintSchema.array().readonly(),
 });
 
-const BUILTIN_ENTRY_SCHEMAS: ReadonlyMap<string, Type<unknown>> = new Map<string, Type<unknown>>([
-  ['table', castAs<Type<unknown>>(StorageTableSchema)],
-  ['valueSet', castAs<Type<unknown>>(StorageValueSetSchema)],
-]);
+/**
+ * Composes the single entry-validator registry consulted during
+ * structural validation. SQL core registers its own kinds (`'table'`,
+ * `'valueSet'`) into the same registry targets extend — there is no
+ * separate built-in fallback tier. Target packs pass their contributed
+ * kinds (e.g. postgres passes `'type'` → the postgres enum schema).
+ */
+export function createSqlEntrySchemaRegistry(
+  packSchemas?: ReadonlyMap<string, Type<unknown>>,
+): ReadonlyMap<string, Type<unknown>> {
+  const registry = new Map<string, Type<unknown>>([
+    ['table', castAs<Type<unknown>>(StorageTableSchema)],
+    ['valueSet', castAs<Type<unknown>>(StorageValueSetSchema)],
+  ]);
+  if (packSchemas !== undefined) {
+    for (const [kind, schema] of packSchemas) {
+      registry.set(kind, schema);
+    }
+  }
+  return registry;
+}
 
 /**
  * Builds the per-namespace entry schema for `storage.namespaces[id]`.
  *
  * Validation is registry-driven: the `registry` parameter maps each
  * entries key to an arktype schema that validates a single inner-map
- * value for that kind. Built-in keys (`'table'`, `'valueSet'`) are always
- * present; target packs contribute additional keys (e.g. postgres
- * registers `'type'` → the postgres enum schema). An unregistered key
- * fails validation naming the key, so validation fails closed.
+ * value for that kind. Compose the registry with
+ * {@link createSqlEntrySchemaRegistry} — SQL core's kinds and pack
+ * contributions live in the same map. An unregistered key fails
+ * validation naming the kind and the namespace id, so validation fails
+ * closed.
  */
 export function createNamespaceEntrySchema(
   registry: ReadonlyMap<string, Type<unknown>>,
@@ -241,44 +259,42 @@ export function createNamespaceEntrySchema(
     '+': 'reject',
     id: 'string',
     'kind?': 'string',
-    entries: type('unknown').narrow((rawEntries, ctx) => {
-      if (typeof rawEntries !== 'object' || rawEntries === null || Array.isArray(rawEntries)) {
-        return ctx.mustBe('an object');
+    entries: 'object',
+  }).narrow((ns, ctx) => {
+    if (!isPlainRecord(ns.entries)) {
+      return ctx.mustBe('an entries object');
+    }
+    for (const [key, innerMap] of Object.entries(ns.entries)) {
+      const entrySchema = registry.get(key);
+      if (entrySchema === undefined) {
+        return ctx.reject({
+          expected: `entries key "${key}" in namespace "${ns.id}" is not a registered entity kind`,
+        });
       }
-      const entries = blindCast<
-        Record<string, unknown>,
-        'checked object, non-null, non-array above'
-      >(rawEntries);
-      for (const [key, innerMap] of Object.entries(entries)) {
-        const entrySchema = BUILTIN_ENTRY_SCHEMAS.get(key) ?? registry.get(key);
-        if (entrySchema === undefined) {
-          return ctx.reject({ expected: `entries key "${key}" is not a registered entity kind` });
-        }
-        if (typeof innerMap !== 'object' || innerMap === null || Array.isArray(innerMap)) {
-          return ctx.reject({ expected: `entries["${key}"] must be an object` });
-        }
-        for (const [, value] of Object.entries(
-          blindCast<Record<string, unknown>, 'checked object, non-null, non-array above'>(innerMap),
-        )) {
-          const parsed = entrySchema(value);
-          if (parsed instanceof type.errors) {
-            return ctx.reject({ expected: parsed.summary });
-          }
+      if (!isPlainRecord(innerMap)) {
+        return ctx.reject({
+          expected: `entries["${key}"] in namespace "${ns.id}" must be an object`,
+        });
+      }
+      for (const [, value] of Object.entries(innerMap)) {
+        const parsed = entrySchema(value);
+        if (parsed instanceof type.errors) {
+          return ctx.reject({ expected: parsed.summary });
         }
       }
-      return true;
-    }),
+    }
+    return true;
   }) as Type<unknown>;
 }
 
 /**
  * Builds the storage schema. Pack contributions reach the per-namespace
  * entry shape through {@link createNamespaceEntrySchema}; the
- * document-scoped `storage.types` slot (codec triples only) and the
+ * document-scoped `storage.types` field (codec triples only) and the
  * storage hash stay family-shared.
  */
 export function createSqlStorageSchema(
-  registry: ReadonlyMap<string, Type<unknown>> = new Map(),
+  registry: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
   const namespaceEntry = createNamespaceEntrySchema(registry);
   return type({
@@ -294,7 +310,7 @@ export function createSqlStorageSchema(
   }) as Type<unknown>;
 }
 
-const StorageSchema = createSqlStorageSchema();
+const StorageSchema = createSqlStorageSchema(createSqlEntrySchemaRegistry());
 
 type NamespacedStorageWalk = {
   readonly namespaces: Readonly<
@@ -437,7 +453,7 @@ const ContractMetaSchema = type({
  * of the contract envelope is family-shared.
  */
 export function createSqlContractSchema(
-  registry: ReadonlyMap<string, Type<unknown>> = new Map(),
+  registry: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
   const storage = createSqlStorageSchema(registry);
   return type({
@@ -465,7 +481,7 @@ export function createSqlContractSchema(
   }) as Type<unknown>;
 }
 
-const SqlContractSchema = createSqlContractSchema();
+const SqlContractSchema = createSqlContractSchema(createSqlEntrySchemaRegistry());
 
 // NOTE: StorageColumnSchema, StorageTableSchema, and StorageSchema use bare type()
 // instead of type.declare<T>().type() because the ColumnDefault union's value field

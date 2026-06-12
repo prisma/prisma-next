@@ -66,9 +66,10 @@ function collectStorageTypesHydrators(
   return registry;
 }
 
-// Validator registry keyed by entries key: postgres registers 'type' → the
-// inner name→entry map schema. Family built-ins ('table', 'valueSet') are
-// always present in the base; this adds the postgres-specific extension.
+// Pack-contributed validator schemas keyed by entries key: postgres registers
+// 'type' → the inner name→entry map schema. The family base composes these
+// into the single registry alongside SQL core's 'table'/'valueSet' via
+// createSqlEntrySchemaRegistry.
 const POSTGRES_VALIDATOR_REGISTRY: ReadonlyMap<string, Type<unknown>> = new Map<
   string,
   Type<unknown>

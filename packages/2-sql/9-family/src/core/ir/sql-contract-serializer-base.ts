@@ -21,6 +21,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import {
   createSqlContractSchema,
+  createSqlEntrySchemaRegistry,
   validateSqlContractFully,
 } from '@prisma-next/sql-contract/validators';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -78,11 +79,15 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     > = new Map(),
     validatorRegistry: ReadonlyMap<string, Type<unknown>> = new Map(),
   ) {
-    // Only build a registry-aware contract schema when pack contributions
-    // exist. The cached module-level default in `validators.ts` covers the
-    // no-contributions case and avoids per-instance schema compilation.
+    // One uniform registry: SQL core's kinds and pack contributions are
+    // composed into the same map. Only build a per-instance contract
+    // schema when pack contributions exist — the cached module-level
+    // default in `validators.ts` is the same composition with no pack
+    // entries and avoids per-instance schema compilation.
     this.contractSchema =
-      validatorRegistry.size > 0 ? createSqlContractSchema(validatorRegistry) : undefined;
+      validatorRegistry.size > 0
+        ? createSqlContractSchema(createSqlEntrySchemaRegistry(validatorRegistry))
+        : undefined;
   }
 
   deserializeContract<T extends TContract = TContract>(json: unknown): T {

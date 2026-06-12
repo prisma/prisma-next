@@ -8,6 +8,7 @@ import { CheckConstraint } from '../src/ir/check-constraint';
 import { StorageTable } from '../src/ir/storage-table';
 import type { ReferentialAction, SqlStorage } from '../src/types';
 import {
+  createSqlEntrySchemaRegistry,
   createSqlStorageSchema,
   StorageValueSetSchema,
   validateModel,
@@ -1277,7 +1278,7 @@ describe('SQL contract validators', () => {
   });
 
   describe('ValueSetRef call-site-narrowed schemas', () => {
-    const storageSchema = createSqlStorageSchema();
+    const storageSchema = createSqlStorageSchema(createSqlEntrySchemaRegistry());
 
     function makeStorageWithCheckRef(ref: Record<string, unknown>) {
       return {
