@@ -30,6 +30,11 @@ import {
   RawUpdateManyCommand,
 } from '@prisma-next/mongo-query-ast/execution';
 import { MongoSchemaCollection, MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
+import type {
+  AnyMongoDdlWireCommand,
+  AnyMongoDmlWireCommand,
+  AnyMongoWireCommand,
+} from '@prisma-next/mongo-wire';
 import { describe, expect, it } from 'vitest';
 import { createCollection, dataTransform } from '../src/core/migration-factories';
 import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
@@ -38,12 +43,6 @@ import {
   MongoMigrationRunner,
   type MongoRunnerDependencies,
 } from '../src/core/mongo-runner';
-
-import type {
-  AnyMongoDdlWireCommand,
-  AnyMongoDmlWireCommand,
-  AnyMongoWireCommand,
-} from '@prisma-next/mongo-wire';
 
 type Row = Record<string, unknown>;
 type WireCommand = AnyMongoWireCommand;
