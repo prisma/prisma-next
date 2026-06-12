@@ -30,11 +30,9 @@ export async function ormClientCreatePostWithTags(
     userId: castAs<PostRow['userId']>(input.userId),
     tags: (t) =>
       t.create(
-        castAs<Array<{ label: TagRow['label'] }>>(
-          input.tags.map((tag) => ({
-            label: tag.label,
-          })),
-        ),
+        input.tags.map((tag) => ({
+          label: castAs<TagRow['label']>(tag.label),
+        })),
       ),
   });
 }

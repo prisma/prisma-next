@@ -27,6 +27,7 @@
  * - posts-with-tag-some <label>            Posts that have at least one tag matching label
  * - posts-with-tag-none <label>            Posts that have no tag matching label
  * - posts-with-tag-every <label>           Posts where every tag differs from label
+ *                                          Includes posts with no tags
  * - connect-post-tags <postId> <tagId...>  Link existing tags to a post
  * - disconnect-post-tags <postId> <tagId...>  Unlink tags from a post
  * - create-post-with-tags <id> <userId> <title> <label...>
