@@ -415,6 +415,40 @@ describe('integration/mn-nested-write', () => {
     timeouts.spinUpPpgDev,
   );
 
+  it(
+    'update(): connect on User.roles rejects before the scalar update persists',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+        await seedRoles(runtime, [{ id: ROLE_ADMIN, name: 'Admin' }]);
+
+        await expect(
+          users.where({ id: 1 }).update({
+            name: 'Alice Updated',
+            // The type gate forbids `connect` on a required-payload junction at
+            // compile time; cast the arg to bypass it and exercise the runtime
+            // guard's preflight ordering (the junction rejection must land
+            // before the scalar UPDATE).
+            roles: (r) => r.connect({ id: ROLE_ADMIN } as never),
+          }),
+        ).rejects.toThrow(/required column.*`level`/);
+
+        const userRows = await runtime.query<{ id: number; name: string }>(
+          'select id, name from users',
+        );
+        expect(userRows).toEqual([{ id: 1, name: 'Alice' }]);
+
+        const junctionRows = await runtime.query<{ user_id: number; role_id: string }>(
+          'select user_id, role_id from user_roles',
+        );
+        expect(junctionRows).toEqual([]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
   // ===========================================================================
   // connect/disconnect on required-payload junction (User.roles) — must succeed
   // ===========================================================================

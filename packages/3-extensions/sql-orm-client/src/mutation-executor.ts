@@ -298,6 +298,10 @@ async function updateFirstGraph(
     );
   }
 
+  for (const relationMutation of junctionOwned) {
+    await preflightJunctionOwnedCreateMutation(scope, context, relationMutation);
+  }
+
   let parentRow = existingRow;
 
   const mappedUpdateData = mapModelDataToStorageRow(contract, namespaceId, modelName, scalarData);

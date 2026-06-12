@@ -631,7 +631,7 @@ describe('mutation-executor', () => {
       targetColumns: ['id'],
     });
     const runtime = createMockRuntime();
-    runtime.setNextResults([[{ id: 1 }], [{ id: 10 }], []]);
+    runtime.setNextResults([[{ id: 1 }], [{ id: 10 }], [{ id: 10 }], []]);
 
     await executeNestedUpdateMutation({
       context: { ...getTestContext(), contract },
@@ -668,7 +668,7 @@ describe('mutation-executor', () => {
       }
       return execute(plan);
     });
-    runtime.setNextResults([[{ id: 1 }], [{ id: 10 }]]);
+    runtime.setNextResults([[{ id: 1 }], [{ id: 10 }], [{ id: 10 }]]);
 
     await expect(
       executeNestedUpdateMutation({
@@ -827,6 +827,34 @@ describe('mutation-executor', () => {
 
     const insert = findJunctionDml(runtime, 'insert', 'user_roles');
     expect(insert.kind).toBe('insert');
+  });
+
+  it('executeNestedUpdateMutation() preflights junction guards before the scalar update', async () => {
+    const contract = getTestContract();
+    const runtime = createMockRuntime();
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
+
+    await expect(
+      executeNestedUpdateMutation({
+        context: { ...getTestContext(), contract },
+        runtime,
+        namespaceId: 'public',
+        modelName: 'User',
+        filters: [userIdFilter],
+        data: {
+          name: 'Alice Updated',
+          roles: (roles: { connect: (criterion: Record<string, unknown>) => unknown }) =>
+            roles.connect({ id: 'admin' }),
+        } as never,
+      }),
+    ).rejects.toThrow(
+      /Cannot `connect` on relation `roles`: its junction `user_roles` has required column\(s\) `level`/,
+    );
+
+    const updates = runtime.executions.filter(
+      (execution) => (execution.plan as { ast?: { kind?: string } }).ast?.kind === 'update',
+    );
+    expect(updates).toEqual([]);
   });
 
   it('executeNestedUpdateMutation() allows disconnect on junction with required payload columns', async () => {
