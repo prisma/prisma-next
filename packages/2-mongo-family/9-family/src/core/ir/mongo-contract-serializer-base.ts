@@ -9,6 +9,7 @@ import {
   validateMongoStorage,
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { type as arktypeType, type Type } from 'arktype';
 
@@ -114,35 +115,41 @@ export abstract class MongoContractSerializerBase<TContract>
   }
 
   /**
-   * Walk a structurally-validated Mongo contract and convert each
-   * `storage.namespaces[nsId].entries.collection[collectionName]` entry from plain
-   * data into `MongoCollection` IR-class instances. Idempotent: already-class
-   * instances pass through unchanged. Fails closed: an entries key other
-   * than `collection` throws naming the kind — never silently dropped.
+   * Walk a structurally-validated Mongo contract and hydrate each
+   * namespace's entries via {@link hydrateEntriesKind} — the same
+   * per-kind extension hook the SQL family base exposes. The family
+   * base hydrates the family-core `collection` kind; targets override
+   * to add pack-contributed kinds. Fails closed: a kind the hook does
+   * not recognise throws naming the kind and the namespace id — never
+   * silently dropped.
    */
   protected hydrateMongoContract(contract: MongoContract): MongoContract {
     const rawNamespaces = contract.storage.namespaces;
     const hydratedNamespaces = Object.fromEntries(
       Object.entries(rawNamespaces).map(([nsId, nsEnvelope]) => {
-        for (const kind of Object.keys(nsEnvelope.entries)) {
-          if (kind !== 'collection') {
+        const entriesOutput: Record<string, Record<string, unknown>> = {};
+        for (const [kind, innerMap] of Object.entries(nsEnvelope.entries)) {
+          const hydrated = this.hydrateEntriesKind(kind, innerMap);
+          if (hydrated === undefined) {
             throw new Error(
               `Unknown entries key "${kind}" in namespace "${nsId}"; no hydration factory registered for this entity kind`,
             );
           }
+          entriesOutput[kind] = hydrated;
         }
-        const hydratedCollections = Object.fromEntries(
-          Object.entries(nsEnvelope.entries.collection ?? {}).map(([name, raw]) => [
-            name,
-            new MongoCollection(raw as MongoCollectionInput),
-          ]),
-        );
+        const { collection, ...carriedKinds } = entriesOutput;
         return [
           nsId,
           {
             ...nsEnvelope,
             id: nsEnvelope.id,
-            entries: { collection: hydratedCollections },
+            entries: {
+              ...carriedKinds,
+              collection: blindCast<
+                Readonly<Record<string, MongoCollection>>,
+                'hydrateEntriesKind constructs MongoCollection instances for the collection kind'
+              >(collection ?? {}),
+            },
           },
         ];
       }),
@@ -154,6 +161,41 @@ export abstract class MongoContractSerializerBase<TContract>
         namespaces: hydratedNamespaces,
       },
     };
+  }
+
+  /**
+   * Per-kind hydration hook — the registry the boundary error refers
+   * to. The family base hydrates `collection` (the Mongo family-core
+   * kind); returns `undefined` for any other kind so the caller fails
+   * closed naming the kind and namespace id. Targets override to add
+   * pack-contributed kinds and delegate unknown kinds to `super`.
+   */
+  protected hydrateEntriesKind(
+    kind: string,
+    innerMap: unknown,
+  ): Record<string, unknown> | undefined {
+    if (kind === 'collection') {
+      if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
+        return {};
+      }
+      return Object.fromEntries(
+        Object.entries(
+          blindCast<
+            Record<string, unknown>,
+            'collection inner map is a plain record after object check'
+          >(innerMap),
+        ).map(([name, raw]) => [
+          name,
+          new MongoCollection(
+            blindCast<
+              MongoCollectionInput,
+              'collection entries validated by the mongo storage schema before hydration'
+            >(raw),
+          ),
+        ]),
+      );
+    }
+    return undefined;
   }
 
   /**
