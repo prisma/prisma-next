@@ -192,6 +192,40 @@ describe('integration/mn-nested-write', () => {
     timeouts.spinUpPpgDev,
   );
 
+  it(
+    'create(): parent insert failure after a successful connect preflight leaves no junction rows',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+        await seedTags(runtime, [{ id: TAG_RUST, name: 'Rust' }]);
+
+        await expect(
+          users.create({
+            // Duplicate primary key: the connect preflight resolves the tag
+            // successfully, then the parent INSERT fails on the users pkey.
+            id: 1,
+            name: 'Alpha',
+            email: 'alpha@example.com',
+            tags: (t) => t.connect({ id: TAG_RUST }),
+          }),
+        ).rejects.toThrow(/duplicate key|unique constraint/i);
+
+        const userRows = await runtime.query<{ id: number; name: string }>(
+          'select id, name from users',
+        );
+        expect(userRows).toEqual([{ id: 1, name: 'Alice' }]);
+
+        const junctionRows = await runtime.query<{ user_id: number; tag_id: string }>(
+          'select user_id, tag_id from user_tags',
+        );
+        expect(junctionRows).toEqual([]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
   // ===========================================================================
   // disconnect — update() parent flow (only supported path)
   // ===========================================================================
