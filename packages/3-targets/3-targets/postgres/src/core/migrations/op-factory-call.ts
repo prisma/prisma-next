@@ -808,8 +808,8 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
   readonly tableName: string;
   readonly indexName: string;
   readonly columns: readonly string[];
-  // Named indexType (not typeName) to avoid collision with CreateEnumTypeCall.typeName,
-  // which identifies a CREATE TYPE target and is read by `locationForCall` in issue-planner.ts.
+  // Named indexType (not typeName): `locationForCall` in issue-planner.ts reads
+  // a call's `typeName` as a CREATE TYPE target location, which an index is not.
   readonly indexType: string | undefined;
   readonly options: Record<string, unknown> | undefined;
   readonly label: string;

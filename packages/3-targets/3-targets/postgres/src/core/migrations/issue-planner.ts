@@ -935,10 +935,10 @@ export function planIssues(
     return notOk(conflicts);
   }
 
-  // Recipe strategies (`nativeEnumPlanCallStrategy`,
-  // `notNullBackfillCallStrategy`, etc.) emit a cohesive sequence that must
+  // Recipe strategies (`notNullBackfillCallStrategy`,
+  // `nullableTighteningCallStrategy`, etc.) emit a cohesive sequence that must
   // stay contiguous. They are inserted at a single pattern slot. Non-recipe
-  // pattern strategies (`dependencyInstallCallStrategy`,
+  // pattern strategies (`checkConstraintPlanCallStrategy`,
   // `storageTypePlanCallStrategy`, `notNullAddColumnCallStrategy`) produce
   // individually classifiable calls that slot into DDL buckets alongside
   // default-mapped calls.
