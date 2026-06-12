@@ -1,3 +1,4 @@
+import { cfExpr, cfTable, exprSelect } from '@prisma-next/sql-relational-core/contract-free';
 import { constraintExistsAst, tableExistsAst } from '@prisma-next/target-postgres/contract-free';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
@@ -76,5 +77,34 @@ describe('constraintExistsAst lowering — pg_constraint EXISTS checks', () => {
         ') AS "result"',
     );
     expect(result.params).toEqual(['user_pkey']);
+  });
+});
+
+describe('exprSelect lowering — leftJoin and limit (D3 catalog-check shapes)', () => {
+  it('renders LEFT JOIN with an expression ON clause', async () => {
+    const inner = exprSelect()
+      .from(cfTable('pg_index', 'i'))
+      .leftJoin(
+        cfTable('pg_class', 'c2'),
+        cfExpr.columnRef('c2', 'oid').eqExpr(cfExpr.columnRef('i', 'indexrelid')),
+      )
+      .project('one', cfExpr.lit(1));
+    const ast = exprSelect().project('result', cfExpr.exists(inner)).build();
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
+    expect(result.sql).toBe(
+      'SELECT EXISTS (SELECT 1 AS "one" FROM "pg_index" AS "i" ' +
+        'LEFT JOIN "pg_class" AS "c2" ON "c2"."oid" = "i"."indexrelid") AS "result"',
+    );
+    expect(result.params).toEqual([]);
+  });
+
+  it('renders LIMIT 1 inside a NOT EXISTS body (tableIsEmptyCheck shape)', async () => {
+    const inner = exprSelect().from(cfTable('user')).project('one', cfExpr.lit(1)).limit(1);
+    const ast = exprSelect().project('result', cfExpr.notExists(inner)).build();
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
+    expect(result.sql).toBe(
+      'SELECT NOT EXISTS (SELECT 1 AS "one" FROM "user" LIMIT 1) AS "result"',
+    );
+    expect(result.params).toEqual([]);
   });
 });

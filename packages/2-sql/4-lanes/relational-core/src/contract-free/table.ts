@@ -153,17 +153,37 @@ export class CfExprSelectQuery {
     private readonly projectionItems: ReadonlyArray<ProjectionItem>,
     private readonly whereExpr: CfExpr | undefined,
     private readonly joinItems: ReadonlyArray<JoinAst> = [],
+    private readonly limitValue: number | undefined = undefined,
   ) {}
 
   from(source: AnyFromSource): CfExprSelectQuery {
-    return new CfExprSelectQuery(source, this.projectionItems, this.whereExpr, this.joinItems);
+    return new CfExprSelectQuery(
+      source,
+      this.projectionItems,
+      this.whereExpr,
+      this.joinItems,
+      this.limitValue,
+    );
   }
 
   join(source: AnyFromSource, on: CfExpr): CfExprSelectQuery {
-    return new CfExprSelectQuery(this.src, this.projectionItems, this.whereExpr, [
-      ...this.joinItems,
-      JoinAst.inner(source, on.ast),
-    ]);
+    return new CfExprSelectQuery(
+      this.src,
+      this.projectionItems,
+      this.whereExpr,
+      [...this.joinItems, JoinAst.inner(source, on.ast)],
+      this.limitValue,
+    );
+  }
+
+  leftJoin(source: AnyFromSource, on: CfExpr): CfExprSelectQuery {
+    return new CfExprSelectQuery(
+      this.src,
+      this.projectionItems,
+      this.whereExpr,
+      [...this.joinItems, JoinAst.left(source, on.ast)],
+      this.limitValue,
+    );
   }
 
   project(alias: string, expr: CfExpr): CfExprSelectQuery {
@@ -172,11 +192,28 @@ export class CfExprSelectQuery {
       [...this.projectionItems, ProjectionItem.of(alias, expr.ast)],
       this.whereExpr,
       this.joinItems,
+      this.limitValue,
     );
   }
 
   where(expr: CfExpr): CfExprSelectQuery {
-    return new CfExprSelectQuery(this.src, this.projectionItems, expr, this.joinItems);
+    return new CfExprSelectQuery(
+      this.src,
+      this.projectionItems,
+      expr,
+      this.joinItems,
+      this.limitValue,
+    );
+  }
+
+  limit(value: number): CfExprSelectQuery {
+    return new CfExprSelectQuery(
+      this.src,
+      this.projectionItems,
+      this.whereExpr,
+      this.joinItems,
+      value,
+    );
   }
 
   build(): SelectAst {
@@ -185,7 +222,9 @@ export class CfExprSelectQuery {
         ? SelectAst.from(this.src).withProjection(this.projectionItems)
         : SelectAst.noFrom().withProjection(this.projectionItems);
     const withJoins = this.joinItems.length > 0 ? base.withJoins(this.joinItems) : base;
-    return this.whereExpr !== undefined ? withJoins.withWhere(this.whereExpr.ast) : withJoins;
+    const withWhere =
+      this.whereExpr !== undefined ? withJoins.withWhere(this.whereExpr.ast) : withJoins;
+    return this.limitValue !== undefined ? withWhere.withLimit(this.limitValue) : withWhere;
   }
 }
 

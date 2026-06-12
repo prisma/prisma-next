@@ -179,6 +179,50 @@ describe('CfExprSelectQuery.join — inner join surface', () => {
     expect((ast.joins?.[0]?.source as TableSource).name).toBe('pg_class');
     expect((ast.joins?.[1]?.source as TableSource).name).toBe('pg_namespace');
   });
+
+  it('leftJoin adds a LEFT JOIN with an expression ON clause', () => {
+    const on = cfExpr.columnRef('c2', 'oid').eqExpr(cfExpr.columnRef('i', 'indexrelid'));
+    const ast = exprSelect()
+      .from(cfTable('pg_index', 'i'))
+      .leftJoin(cfTable('pg_class', 'c2'), on)
+      .project('one', cfExpr.lit(1))
+      .build();
+
+    expect(ast.joins).toHaveLength(1);
+    const join = ast.joins?.[0];
+    expect(join?.joinType).toBe('left');
+    expect(join?.lateral).toBe(false);
+    expect((join?.source as TableSource).alias).toBe('c2');
+    expect(join?.on).toBe(on.ast);
+  });
+
+  it('inner and left joins interleave in call order', () => {
+    const ast = exprSelect()
+      .from(cfTable('pg_index', 'i'))
+      .join(
+        cfTable('pg_class', 'c'),
+        cfExpr.columnRef('c', 'oid').eqExpr(cfExpr.columnRef('i', 'indrelid')),
+      )
+      .leftJoin(
+        cfTable('pg_class', 'c2'),
+        cfExpr.columnRef('c2', 'oid').eqExpr(cfExpr.columnRef('i', 'indexrelid')),
+      )
+      .project('one', cfExpr.lit(1))
+      .build();
+    expect(ast.joins?.map((join) => join.joinType)).toEqual(['inner', 'left']);
+  });
+});
+
+describe('CfExprSelectQuery.limit', () => {
+  it('sets a numeric LIMIT on the built SelectAst', () => {
+    const ast = exprSelect().from(cfTable('user')).project('one', cfExpr.lit(1)).limit(1).build();
+    expect(ast.limit).toBe(1);
+  });
+
+  it('omits LIMIT when not called', () => {
+    const ast = exprSelect().from(cfTable('user')).project('one', cfExpr.lit(1)).build();
+    expect(ast.limit).toBeUndefined();
+  });
 });
 
 describe('cfExpr.exists / notExists — EXISTS projection (OQ4)', () => {
