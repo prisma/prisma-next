@@ -59,6 +59,14 @@ function openConnection(path: string): DatabaseSync {
   try {
     const db = new DatabaseSync(path);
     db.exec('PRAGMA foreign_keys = ON');
+    // WAL mode so readers never block writers. The runtime serves reads from
+    // the main connection and opens a separate connection per transaction
+    // (`acquireConnection`); under the default rollback journal a lingering
+    // read cursor on one connection holds a SHARED lock that blocks the other
+    // connection's write COMMIT until `busy_timeout` expires, surfacing as an
+    // intermittent "database is locked". WAL lets the write proceed. Ignored
+    // (no-op) for `:memory:` databases, which are single-connection anyway.
+    db.exec('PRAGMA journal_mode = WAL');
     db.exec('PRAGMA busy_timeout = 5000');
     return db;
   } catch (error) {
