@@ -13,6 +13,7 @@ import {
   type StorageValueSetInput,
 } from '@prisma-next/sql-contract/types';
 import { type CfExpr, cfExpr } from '@prisma-next/sql-relational-core/contract-free';
+import { PostgresTableSource } from './ast/table-source';
 import { PG_TEXT_CODEC_ID } from './codec-ids';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { escapeLiteral } from './sql-utils';
@@ -155,6 +156,21 @@ export class PostgresSchema extends NamespaceBase {
   }
 
   /**
+   * Typed-AST counterpart of {@link qualifyTable}: the FROM source a
+   * builder-built check uses to address a user table in this namespace.
+   * Named schemas qualify (`"schema"."table"`); the unbound singleton
+   * overrides this to leave the table unqualified so `search_path`
+   * resolves it at runtime.
+   */
+  tableSource(tableName: string, alias?: string): PostgresTableSource {
+    return new PostgresTableSource({
+      name: tableName,
+      schema: this.id,
+      ...(alias !== undefined ? { alias } : {}),
+    });
+  }
+
+  /**
    * The bare schema name a DDL planner should target when emitting
    * statements that need to identify this namespace in the live
    * database (e.g. `CREATE TABLE "<ddlSchemaName>"."<table>" …`,
@@ -210,6 +226,13 @@ export class PostgresUnboundSchema extends PostgresSchema {
 
   override schemaFilterExpression(): CfExpr {
     return cfExpr.raw('current_schema()', { codecId: PG_TEXT_CODEC_ID, nullable: false });
+  }
+
+  override tableSource(tableName: string, alias?: string): PostgresTableSource {
+    return new PostgresTableSource({
+      name: tableName,
+      ...(alias !== undefined ? { alias } : {}),
+    });
   }
 }
 

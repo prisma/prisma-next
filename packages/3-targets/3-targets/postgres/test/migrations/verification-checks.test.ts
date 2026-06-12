@@ -9,7 +9,20 @@ import type {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { constraintExistsAst, tableExistsAst } from '../../src/contract-free/checks';
+import {
+  columnExistsAst,
+  columnNullabilityAst,
+  columnTypeAst,
+  constraintExistsAst,
+  enumTypeExistsAst,
+  extensionExistsAst,
+  indexExistsAst,
+  noNullValuesAst,
+  tableExistsAst,
+  tableIsEmptyAst,
+  tablePrimaryKeyAst,
+} from '../../src/contract-free/checks';
+import type { PostgresTableSource } from '../../src/core/ast/table-source';
 
 describe('tableExistsAst — PG to_regclass check builder', () => {
   describe('tableAbsent()', () => {
@@ -157,6 +170,116 @@ describe('constraintExistsAst — pg_constraint EXISTS check builder', () => {
       expect(exists.notExists).toBe(true);
       expect((exists.subquery.from as TableSource).name).toBe('pg_constraint');
     });
+  });
+});
+
+describe('D3 catalog check builders — construction pins', () => {
+  it('columnExistsAst binds all three names as pg/text@1 params over information_schema.columns', () => {
+    const ast = columnExistsAst({
+      schema: 'public',
+      table: 'user',
+      column: 'email',
+    }).columnPresent();
+    expect(ast.from).toBeUndefined();
+    const exists = ast.projection[0]!.expr as ExistsExpr;
+    expect(exists.kind).toBe('exists');
+    expect(exists.notExists).toBe(false);
+    const from = exists.subquery.from as PostgresTableSource;
+    expect(from.schema).toBe('information_schema');
+    expect(from.name).toBe('columns');
+    const refs = ast.collectParamRefs() as readonly ParamRef[];
+    expect(refs.map((ref) => ref.value)).toEqual(['public', 'user', 'email']);
+    for (const ref of refs) {
+      expect(ref.codec?.codecId).toBe('pg/text@1');
+    }
+  });
+
+  it('columnNullabilityAst binds the YES/NO marker as a param, not a literal', () => {
+    const ast = columnNullabilityAst({
+      schema: 'public',
+      table: 'user',
+      column: 'email',
+      nullable: false,
+    });
+    const values = ast.collectParamRefs().map((ref) => (ref as ParamRef).value);
+    expect(values).toEqual(['public', 'user', 'email', 'NO']);
+  });
+
+  it('columnTypeAst carries format_type as an OperationExpr from cfExpr.fn', () => {
+    const ast = columnTypeAst({
+      schema: 'public',
+      table: 'user',
+      column: 'age',
+      expectedType: 'integer',
+    });
+    const exists = ast.projection[0]!.expr as ExistsExpr;
+    const where = exists.subquery.where as AndExpr;
+    const typeCond = where.exprs[3] as BinaryExpr;
+    const formatType = typeCond.left as OperationExpr;
+    expect(formatType.kind).toBe('operation');
+    expect(formatType.method).toBe('format_type');
+    expect(formatType.lowering.template).toBe('format_type({{self}}, {{arg0}})');
+    expect((typeCond.right as ParamRef).value).toBe('integer');
+    expect(where.exprs[4]?.kind).toBe('not');
+  });
+
+  it('tablePrimaryKeyAst uses a LEFT JOIN for the constraint-name scope', () => {
+    const ast = tablePrimaryKeyAst({
+      schema: 'public',
+      table: 'user',
+      constraintName: 'user_pkey',
+    }).pkPresent();
+    const exists = ast.projection[0]!.expr as ExistsExpr;
+    expect(exists.subquery.joins?.map((join) => join.joinType)).toEqual(['inner', 'inner', 'left']);
+    const values = ast.collectParamRefs().map((ref) => (ref as ParamRef).value);
+    expect(values).toEqual(['public', 'user', 'user_pkey']);
+  });
+
+  it('tableIsEmptyAst targets the schema-qualified user table with LIMIT 1', () => {
+    const ast = tableIsEmptyAst('public', 'user');
+    const exists = ast.projection[0]!.expr as ExistsExpr;
+    expect(exists.notExists).toBe(true);
+    const from = exists.subquery.from as PostgresTableSource;
+    expect(from.schema).toBe('public');
+    expect(from.name).toBe('user');
+    expect(exists.subquery.limit).toBe(1);
+  });
+
+  it('tableIsEmptyAst leaves the unbound table unqualified', () => {
+    const ast = tableIsEmptyAst('__unbound__', 'user');
+    const from = (ast.projection[0]!.expr as ExistsExpr).subquery.from as PostgresTableSource;
+    expect(from.schema).toBeUndefined();
+    expect(from.name).toBe('user');
+  });
+
+  it('enumTypeExistsAst and extensionExistsAst bind names as pg/text@1 params', () => {
+    const enumAst = enumTypeExistsAst({ schema: 'public', typeName: 'status' }).typeAbsent();
+    expect((enumAst.projection[0]!.expr as ExistsExpr).notExists).toBe(true);
+    expect(enumAst.collectParamRefs().map((ref) => (ref as ParamRef).value)).toEqual([
+      'public',
+      'status',
+    ]);
+
+    const extAst = extensionExistsAst('vector').extensionPresent();
+    const extRef = extAst.collectParamRefs()[0] as ParamRef;
+    expect(extRef.value).toBe('vector');
+    expect(extRef.codec?.codecId).toBe('pg/text@1');
+  });
+
+  it('indexExistsAst rides toRegclass with the qualified index name', () => {
+    const ast = indexExistsAst('public', 'user_email_idx').indexAbsent();
+    const nullCheck = ast.projection[0]!.expr as NullCheckExpr;
+    expect(nullCheck.isNull).toBe(true);
+    const op = nullCheck.expr as OperationExpr;
+    expect(op.lowering.template).toBe('to_regclass({{self}})');
+    expect((op.self as ParamRef).value).toBe('"public"."user_email_idx"');
+  });
+
+  it('noNullValuesAst projects NOT EXISTS over the user table', () => {
+    const ast = noNullValuesAst({ schema: 'public', table: 'user', column: 'email' });
+    const exists = ast.projection[0]!.expr as ExistsExpr;
+    expect(exists.notExists).toBe(true);
+    expect(exists.subquery.where?.kind).toBe('null-check');
   });
 });
 
