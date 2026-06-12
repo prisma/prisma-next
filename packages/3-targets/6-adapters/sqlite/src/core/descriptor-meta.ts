@@ -1,5 +1,3 @@
-import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
-
 export const sqliteAdapterDescriptorMeta = {
   kind: 'adapter',
   familyId: 'sql',
@@ -19,7 +17,6 @@ export const sqliteAdapterDescriptorMeta = {
   },
   types: {
     codecTypes: {
-      codecDescriptors: Array.from(sqliteCodecRegistry.values()),
       import: {
         package: '@prisma-next/adapter-sqlite/codec-types',
         named: 'CodecTypes',
