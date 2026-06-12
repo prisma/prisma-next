@@ -1,6 +1,6 @@
 # Slice 5: PSL many-to-many authoring
 
-_Parent project: `projects/sql-orm-many-to-many/`. Linear: [TML-2794](https://linear.app/prisma-company/issue/TML-2794). Status: **planned** (not started)._
+_Parent project: `projects/sql-orm-many-to-many/`. Linear: [TML-2794](https://linear.app/prisma-company/issue/TML-2794). Status: **in progress** (branch `tml-2794-slice-5-psl-mn-authoring`, stacked on `tml-2790-mn-demo-examples`)._
 
 > **Sizing flag:** this is framework-scoped (the PSL interpreter), not an `sql-orm-client` change. It may fail slice-INVEST *Small* and warrant **promotion to its own project**. Re-check at pickup (`drive-triage-work`); the dispatch plan below is provisional pending PSL-pipeline grounding.
 
@@ -37,10 +37,10 @@ Primary surface: `packages/2-sql/2-authoring/contract-psl/src/psl-relation-resol
 - [ ] ORM-API parity: `include` / `some`/`none`/`every` / nested write work from a PSL-authored M:N contract (a PSL fixture mirroring the TS `User↔Tag` fixture).
 - [ ] `fixtures:check` green; the M:N diagnostic behaves correctly (no false `PSL_ORPHANED_BACKRELATION_LIST` on a recognised junction).
 
-## Open Questions
+## Open Questions — RESOLVED at pickup (2026-06-12, unattended; see `wip/unattended-decisions.md` #12)
 
-1. **Authoring form** — explicit-junction recognition (form 1) vs implicit-list (form 2) vs both. Working position: **start with explicit-junction recognition** (form 1) — smallest, matches the existing diagnostic's guidance; add implicit-list as a follow-up if desired.
-2. **Project vs slice** — likely promote to its own project. Working position: re-triage at pickup.
+1. **Authoring form** — **form 1 only** (explicit-junction recognition); implicit-list dropped from this slice (clean follow-up if desired).
+2. **Project vs slice** — built as a slice per operator instruction (stacked PR onto slice 4); halt rather than grow if it exceeds the 2-dispatch plan.
 
 ## References
 
