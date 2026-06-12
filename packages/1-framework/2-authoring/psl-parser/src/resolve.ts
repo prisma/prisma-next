@@ -1,5 +1,13 @@
-import type { PslDiagnosticCode } from '@prisma-next/framework-components/psl-ast';
+import type {
+  AuthoringPslBlockDescriptor,
+  AuthoringPslBlockDescriptorNamespace,
+} from '@prisma-next/framework-components/authoring';
+import { isAuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
+import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import type { PslBlockParam, PslDiagnosticCode } from '@prisma-next/framework-components/psl-ast';
 import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { ParseDiagnostic } from './parse';
 import { type Range, SourceFile } from './source-file';
 import type { FieldAttributeAst, ModelAttributeAst } from './syntax/ast/attributes';
@@ -9,15 +17,34 @@ import {
   EnumDeclarationAst,
   type EnumValueDeclarationAst,
   type FieldDeclarationAst,
+  GenericBlockDeclarationAst,
+  type KeyValuePairAst,
   ModelDeclarationAst,
   type NamedTypeDeclarationAst,
   NamespaceDeclarationAst,
   TypesBlockAst,
 } from './syntax/ast/declarations';
-import { type ExpressionAst, StringLiteralExprAst } from './syntax/ast/expressions';
-import type { IdentifierAst } from './syntax/ast/identifier';
+import {
+  ArrayLiteralAst,
+  type ExpressionAst,
+  StringLiteralExprAst,
+} from './syntax/ast/expressions';
+import { IdentifierAst } from './syntax/ast/identifier';
 import type { TypeAnnotationAst } from './syntax/ast/type-annotation';
 import type { SyntaxNode } from './syntax/red';
+
+/**
+ * Inputs the resolve pass needs to run the descriptor-driven extension-block
+ * validators. Both are optional: with no descriptors registered, generic blocks
+ * in the document are recorded structurally but no parameter-level diagnostic
+ * runs (the keyword is unrecognised by the resolver). `codecLookup` defaults to
+ * {@link emptyCodecLookup}, which rejects every `value`-kind parameter as an
+ * unknown codec — callers with `value` parameters must supply a real lookup.
+ */
+export interface ResolveOptions {
+  readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
+  readonly codecLookup?: CodecLookup;
+}
 
 const SCALAR_TYPES: ReadonlySet<string> = new Set([
   'String',
@@ -350,10 +377,13 @@ interface NamespaceBucket {
   readonly models: ModelDeclarationAst[];
   readonly enums: EnumDeclarationAst[];
   readonly compositeTypes: CompositeTypeDeclarationAst[];
+  readonly genericBlocks: GenericBlockDeclarationAst[];
 }
 
-export function resolve(document: DocumentAst): ResolvedDocument {
+export function resolve(document: DocumentAst, options: ResolveOptions = {}): ResolvedDocument {
   const resolver = new Resolver(reconstructSource(document.syntax));
+  const descriptorsByKeyword = collectBlockDescriptors(options.pslBlockDescriptors);
+  const codecLookup = options.codecLookup ?? emptyCodecLookup;
 
   const bucketOrder: string[] = [];
   const buckets = new Map<string, NamespaceBucket>();
@@ -366,6 +396,7 @@ export function resolve(document: DocumentAst): ResolvedDocument {
       models: [],
       enums: [],
       compositeTypes: [],
+      genericBlocks: [],
     };
     buckets.set(id, bucket);
     bucketOrder.push(id);
@@ -388,6 +419,11 @@ export function resolve(document: DocumentAst): ResolvedDocument {
     const composite = CompositeTypeDeclarationAst.cast(member);
     if (composite) {
       bucket.compositeTypes.push(composite);
+      return;
+    }
+    const genericBlock = GenericBlockDeclarationAst.cast(member);
+    if (genericBlock) {
+      bucket.genericBlocks.push(genericBlock);
     }
   };
 
@@ -427,11 +463,17 @@ export function resolve(document: DocumentAst): ResolvedDocument {
   registerNames(namedTypeStore, namedTypeDecls, 'namedType', resolver);
   const nameTable: NameTable = { byNamespace, namedTypes: new Set(namedTypeStore.keys()) };
 
+  const extensionContext: ExtensionValidationContext = {
+    descriptorsByKeyword,
+    codecLookup,
+    nameTable,
+  };
+
   const namespaces = new Map<string, ResolvedNamespace>();
   for (const id of bucketOrder) {
     const bucket = buckets.get(id);
     if (!bucket) continue;
-    namespaces.set(id, buildNamespace(bucket, nameTable, resolver));
+    namespaces.set(id, buildNamespace(bucket, nameTable, resolver, extensionContext));
   }
 
   const namedTypes = new Map<string, ResolvedNamedType>();
@@ -447,6 +489,8 @@ export function resolve(document: DocumentAst): ResolvedDocument {
       syntax: declaration,
     });
   }
+
+  validateNamedTypeCollisions(namedTypeDecls, nameTable, resolver);
 
   return { namespaces, namedTypes, diagnostics: resolver.diagnostics };
 }
@@ -476,6 +520,7 @@ function buildNamespace(
   bucket: NamespaceBucket,
   nameTable: NameTable,
   resolver: Resolver,
+  extensionContext: ExtensionValidationContext,
 ): ResolvedNamespace {
   const models = new Map<string, ResolvedModel>();
   for (const declaration of bucket.models) {
@@ -526,12 +571,25 @@ function buildNamespace(
     });
   }
 
+  const extensionBlocks = new Map<string, ResolvedExtensionBlock>();
+  for (const block of bucket.genericBlocks) {
+    const name = identifierText(block.name());
+    if (name === undefined) continue;
+    const keyword = block.keyword()?.text;
+    if (keyword === undefined) continue;
+    const descriptor = extensionContext.descriptorsByKeyword.get(keyword);
+    if (descriptor === undefined) continue;
+    validateExtensionBlock(block, name, descriptor, bucket.id, resolver, extensionContext);
+    if (extensionBlocks.has(name)) continue;
+    extensionBlocks.set(name, { name, namespaceId: bucket.id, syntax: block.syntax });
+  }
+
   return {
     id: bucket.id,
     models,
     enums,
     compositeTypes,
-    extensionBlocks: new Map<string, ResolvedExtensionBlock>(),
+    extensionBlocks,
     ...(bucket.syntax ? { syntax: bucket.syntax } : {}),
   };
 }
@@ -554,6 +612,294 @@ function buildFields(
     });
   }
   return result;
+}
+
+/**
+ * Cross-kind named-type collision: a named type whose name matches a scalar, a
+ * model, or an enum declared anywhere in the document. Matches the old parser's
+ * verbatim messages and its scalar → model → enum precedence (first match wins,
+ * one diagnostic per colliding named type). Distinct from the same-kind
+ * duplicate-declaration collision handled in {@link registerNames}.
+ */
+function validateNamedTypeCollisions(
+  namedTypeDecls: readonly NamedTypeDeclarationAst[],
+  nameTable: NameTable,
+  resolver: Resolver,
+): void {
+  const seen = new Set<string>();
+  for (const declaration of namedTypeDecls) {
+    const name = identifierText(declaration.name());
+    if (name === undefined || seen.has(name)) continue;
+    seen.add(name);
+    if (SCALAR_TYPES.has(name)) {
+      resolver.diagnostic(
+        'PSL_INVALID_TYPES_MEMBER',
+        `Named type "${name}" conflicts with scalar type "${name}"`,
+        declaration.syntax,
+      );
+      continue;
+    }
+    if (declaredKindAcrossNamespaces(nameTable, name) === 'model') {
+      resolver.diagnostic(
+        'PSL_INVALID_TYPES_MEMBER',
+        `Named type "${name}" conflicts with model name "${name}"`,
+        declaration.syntax,
+      );
+      continue;
+    }
+    if (declaredKindAcrossNamespaces(nameTable, name) === 'enum') {
+      resolver.diagnostic(
+        'PSL_INVALID_TYPES_MEMBER',
+        `Named type "${name}" conflicts with enum name "${name}"`,
+        declaration.syntax,
+      );
+    }
+  }
+}
+
+function declaredKindAcrossNamespaces(nameTable: NameTable, name: string): DeclKind | undefined {
+  for (const decls of nameTable.byNamespace.values()) {
+    const kind = decls.get(name);
+    if (kind !== undefined) return kind;
+  }
+  return undefined;
+}
+
+interface ExtensionValidationContext {
+  readonly descriptorsByKeyword: ReadonlyMap<string, AuthoringPslBlockDescriptor>;
+  readonly codecLookup: CodecLookup;
+  readonly nameTable: NameTable;
+}
+
+function collectBlockDescriptors(
+  namespace: AuthoringPslBlockDescriptorNamespace | undefined,
+): Map<string, AuthoringPslBlockDescriptor> {
+  const byKeyword = new Map<string, AuthoringPslBlockDescriptor>();
+  const visit = (node: AuthoringPslBlockDescriptorNamespace): void => {
+    for (const value of Object.values(node)) {
+      if (isAuthoringPslBlockDescriptor(value)) {
+        byKeyword.set(value.keyword, value);
+      } else {
+        visit(value);
+      }
+    }
+  };
+  if (namespace) visit(namespace);
+  return byKeyword;
+}
+
+/**
+ * Descriptor-driven validation of one generic block against the descriptor that
+ * claims its keyword, computed directly over the CST {@link KeyValuePairAst}
+ * entries. Reproduces the message/code corpus of the legacy
+ * `validateExtensionBlock` (unknown / missing-required / option-out-of-set /
+ * invalid-value / unresolved-ref) plus first-occurrence-wins duplicate detection
+ * over the parsed entries.
+ */
+function validateExtensionBlock(
+  block: GenericBlockDeclarationAst,
+  blockName: string,
+  descriptor: AuthoringPslBlockDescriptor,
+  namespaceId: string,
+  resolver: Resolver,
+  context: ExtensionValidationContext,
+): void {
+  const entries = new Map<string, KeyValuePairAst>();
+  for (const entry of block.entries()) {
+    const key = identifierText(entry.key());
+    if (key === undefined) continue;
+    if (entries.has(key)) {
+      resolver.diagnostic(
+        'PSL_EXTENSION_DUPLICATE_PARAMETER',
+        `Duplicate parameter "${key}" in "${descriptor.keyword}" block "${blockName}"; first occurrence wins`,
+        entry.syntax,
+      );
+      continue;
+    }
+    entries.set(key, entry);
+  }
+
+  if (!descriptor.variadicParameters) {
+    for (const [key, entry] of entries) {
+      if (!Object.hasOwn(descriptor.parameters, key)) {
+        resolver.diagnostic(
+          'PSL_EXTENSION_UNKNOWN_PARAMETER',
+          `Unknown parameter "${key}" in "${descriptor.keyword}" block "${blockName}". The descriptor does not declare this parameter.`,
+          entry.syntax,
+        );
+      }
+    }
+  }
+
+  for (const [key, param] of Object.entries(descriptor.parameters)) {
+    if (param.required === true && !entries.has(key)) {
+      resolver.diagnostic(
+        'PSL_EXTENSION_MISSING_REQUIRED_PARAMETER',
+        `Required parameter "${key}" is missing from "${descriptor.keyword}" block "${blockName}".`,
+        block.syntax,
+      );
+    }
+  }
+
+  for (const [key, param] of Object.entries(descriptor.parameters)) {
+    const entry = entries.get(key);
+    if (entry === undefined) continue;
+    const value = entry.value();
+    if (value === undefined) continue;
+    validateExtensionParam(
+      blockName,
+      descriptor,
+      key,
+      param,
+      value,
+      namespaceId,
+      resolver,
+      context,
+    );
+  }
+}
+
+function validateExtensionParam(
+  blockName: string,
+  descriptor: AuthoringPslBlockDescriptor,
+  key: string,
+  param: PslBlockParam,
+  value: ExpressionAst,
+  namespaceId: string,
+  resolver: Resolver,
+  context: ExtensionValidationContext,
+): void {
+  switch (param.kind) {
+    case 'option': {
+      const token = nodeText(value.syntax);
+      if (!param.values.includes(token)) {
+        resolver.diagnostic(
+          'PSL_EXTENSION_OPTION_OUT_OF_SET',
+          `Parameter "${key}" in "${descriptor.keyword}" block "${blockName}" has value "${token}" which is not one of the allowed values: ${param.values.map((v) => `"${v}"`).join(', ')}.`,
+          value.syntax,
+        );
+      }
+      return;
+    }
+    case 'value': {
+      const raw = nodeText(value.syntax);
+      const codec = context.codecLookup.get(param.codecId);
+      if (codec === undefined) {
+        resolver.diagnostic(
+          'PSL_EXTENSION_INVALID_VALUE',
+          `Parameter "${key}" in "${descriptor.keyword}" block "${blockName}" references unknown codec "${param.codecId}".`,
+          value.syntax,
+        );
+        return;
+      }
+      let jsonValue: unknown;
+      try {
+        jsonValue = JSON.parse(raw);
+      } catch {
+        resolver.diagnostic(
+          'PSL_EXTENSION_INVALID_VALUE',
+          `Parameter "${key}" in "${descriptor.keyword}" block "${blockName}" is not a valid JSON literal (expected a JSON string, number, boolean, or null): ${raw}`,
+          value.syntax,
+        );
+        return;
+      }
+      try {
+        codec.decodeJson(
+          blindCast<
+            Parameters<Codec['decodeJson']>[0],
+            'JSON.parse returns a JsonValue-compatible value'
+          >(jsonValue),
+        );
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        resolver.diagnostic(
+          'PSL_EXTENSION_INVALID_VALUE',
+          `Parameter "${key}" in "${descriptor.keyword}" block "${blockName}" was rejected by codec "${param.codecId}": ${reason}`,
+          value.syntax,
+        );
+      }
+      return;
+    }
+    case 'ref': {
+      const identifier = nodeText(value.syntax);
+      validateExtensionRef(
+        blockName,
+        descriptor,
+        key,
+        param,
+        identifier,
+        value.syntax,
+        namespaceId,
+        resolver,
+        context,
+      );
+      return;
+    }
+    case 'list': {
+      const array = ArrayLiteralAst.cast(value.syntax);
+      if (!array) return;
+      for (const item of array.elements()) {
+        validateExtensionParam(
+          blockName,
+          descriptor,
+          key,
+          param.of,
+          item,
+          namespaceId,
+          resolver,
+          context,
+        );
+      }
+      return;
+    }
+  }
+}
+
+function validateExtensionRef(
+  blockName: string,
+  descriptor: AuthoringPslBlockDescriptor,
+  key: string,
+  param: Extract<PslBlockParam, { kind: 'ref' }>,
+  identifier: string,
+  node: SyntaxNode,
+  namespaceId: string,
+  resolver: Resolver,
+  context: ExtensionValidationContext,
+): void {
+  if (param.scope === 'cross-space') return;
+
+  const found =
+    param.scope === 'same-namespace'
+      ? declaredKindInNamespace(context.nameTable, namespaceId, identifier, param.refKind)
+      : declaredKindAcrossNamespaces(context.nameTable, identifier) === param.refKind;
+
+  if (!found) {
+    const scopeLabel =
+      param.scope === 'same-namespace' ? 'the same namespace' : 'any namespace in the schema';
+    resolver.diagnostic(
+      'PSL_EXTENSION_UNRESOLVED_REF',
+      `Parameter "${key}" in "${descriptor.keyword}" block "${blockName}" refers to "${identifier}" (expected ${param.refKind}), but no entity with that name and kind was found in ${scopeLabel}.`,
+      node,
+    );
+  }
+}
+
+function declaredKindInNamespace(
+  nameTable: NameTable,
+  namespaceId: string,
+  name: string,
+  refKind: string,
+): boolean {
+  return nameTable.byNamespace.get(namespaceId)?.get(name) === refKind;
+}
+
+function nodeText(node: SyntaxNode): string {
+  if (node.kind === 'Identifier') return IdentifierAst.cast(node)?.token()?.text ?? '';
+  let text = '';
+  for (const token of node.tokens()) {
+    text += token.text;
+  }
+  return text;
 }
 
 function reconstructSource(root: SyntaxNode): string {
