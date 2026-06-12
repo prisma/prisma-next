@@ -1860,10 +1860,20 @@ export function interpretPslDocumentToSqlContract(
     }
   }
 
-  const { modelRelations, fkRelationsByPair } = indexFkRelations({ fkRelationMetadata });
+  const { modelRelations, fkRelationsByPair, fkRelationsByDeclaringModel } = indexFkRelations({
+    fkRelationMetadata,
+  });
+  const modelIdColumns = new Map<string, readonly string[]>();
+  for (const modelNode of modelNodes) {
+    if (modelNode.id) {
+      modelIdColumns.set(modelNode.modelName, modelNode.id.columns);
+    }
+  }
   applyBackrelationCandidates({
     backrelationCandidates,
     fkRelationsByPair,
+    fkRelationsByDeclaringModel,
+    modelIdColumns,
     modelRelations,
     diagnostics,
     sourceId,

@@ -240,11 +240,20 @@ export function indexFkRelations(input: {
 }): {
   readonly modelRelations: Map<string, ModelRelationMetadata[]>;
   readonly fkRelationsByPair: Map<string, FkRelationMetadata[]>;
+  readonly fkRelationsByDeclaringModel: Map<string, FkRelationMetadata[]>;
 } {
   const modelRelations = new Map<string, ModelRelationMetadata[]>();
   const fkRelationsByPair = new Map<string, FkRelationMetadata[]>();
+  const fkRelationsByDeclaringModel = new Map<string, FkRelationMetadata[]>();
 
   for (const relation of input.fkRelationMetadata) {
+    const declaringFkRelations = fkRelationsByDeclaringModel.get(relation.declaringModelName);
+    if (declaringFkRelations) {
+      declaringFkRelations.push(relation);
+    } else {
+      fkRelationsByDeclaringModel.set(relation.declaringModelName, [relation]);
+    }
+
     const existing = modelRelations.get(relation.declaringModelName);
     const current = existing ?? [];
     if (!existing) {
@@ -273,12 +282,114 @@ export function indexFkRelations(input: {
     pairRelations.push(relation);
   }
 
-  return { modelRelations, fkRelationsByPair };
+  return { modelRelations, fkRelationsByPair, fkRelationsByDeclaringModel };
+}
+
+type JunctionFkPair = {
+  readonly parentFk: FkRelationMetadata;
+  readonly childFk: FkRelationMetadata;
+};
+
+function idColumnsAreExactlyFkPair(
+  idColumns: readonly string[],
+  parentColumns: readonly string[],
+  childColumns: readonly string[],
+): boolean {
+  if (idColumns.length !== parentColumns.length + childColumns.length) {
+    return false;
+  }
+  const fkColumns = new Set([...parentColumns, ...childColumns]);
+  if (fkColumns.size !== parentColumns.length + childColumns.length) {
+    return false;
+  }
+  return idColumns.every((column) => fkColumns.has(column));
+}
+
+/**
+ * Finds explicit junction models that connect a bare backrelation list field
+ * to its target model: a model whose composite id columns are exactly the FK
+ * columns of one relation back to the candidate's model (the parent side) and
+ * one relation to the candidate's target model (the child side). A relation
+ * name on the list field pins the parent-side FK relation, which is how
+ * self-referential many-to-many sides are disambiguated.
+ */
+function findJunctionFkPairs(input: {
+  readonly candidate: ModelBackrelationCandidate;
+  readonly fkRelationsByDeclaringModel: ReadonlyMap<string, readonly FkRelationMetadata[]>;
+  readonly modelIdColumns: ReadonlyMap<string, readonly string[]>;
+}): JunctionFkPair[] {
+  const pairs: JunctionFkPair[] = [];
+  for (const [junctionModelName, junctionFks] of input.fkRelationsByDeclaringModel) {
+    const idColumns = input.modelIdColumns.get(junctionModelName);
+    if (!idColumns || idColumns.length < 2) {
+      continue;
+    }
+    for (const parentFk of junctionFks) {
+      if (parentFk.targetModelName !== input.candidate.modelName) {
+        continue;
+      }
+      if (
+        input.candidate.relationName !== undefined &&
+        parentFk.relationName !== input.candidate.relationName
+      ) {
+        continue;
+      }
+      for (const childFk of junctionFks) {
+        if (childFk === parentFk || childFk.targetModelName !== input.candidate.targetModelName) {
+          continue;
+        }
+        if (!idColumnsAreExactlyFkPair(idColumns, parentFk.localColumns, childFk.localColumns)) {
+          continue;
+        }
+        pairs.push({ parentFk, childFk });
+      }
+    }
+  }
+  return pairs;
+}
+
+function manyToManyRelationNode(
+  candidate: ModelBackrelationCandidate,
+  pair: JunctionFkPair,
+): ModelRelationMetadata {
+  return {
+    fieldName: candidate.field.name,
+    toModel: pair.childFk.targetModelName,
+    toTable: pair.childFk.targetTableName,
+    ...ifDefined('toNamespaceId', pair.childFk.targetNamespaceId),
+    cardinality: 'N:M',
+    on: {
+      parentTable: candidate.tableName,
+      parentColumns: pair.parentFk.referencedColumns,
+      childTable: pair.parentFk.declaringTableName,
+      childColumns: pair.parentFk.localColumns,
+    },
+    through: {
+      table: pair.parentFk.declaringTableName,
+      parentColumns: pair.parentFk.localColumns,
+      childColumns: pair.childFk.localColumns,
+    },
+  };
+}
+
+function relationsForModel(
+  modelRelations: Map<string, ModelRelationMetadata[]>,
+  modelName: string,
+): ModelRelationMetadata[] {
+  const existing = modelRelations.get(modelName);
+  if (existing) {
+    return existing;
+  }
+  const created: ModelRelationMetadata[] = [];
+  modelRelations.set(modelName, created);
+  return created;
 }
 
 export function applyBackrelationCandidates(input: {
   readonly backrelationCandidates: readonly ModelBackrelationCandidate[];
   readonly fkRelationsByPair: Map<string, readonly FkRelationMetadata[]>;
+  readonly fkRelationsByDeclaringModel: ReadonlyMap<string, readonly FkRelationMetadata[]>;
+  readonly modelIdColumns: ReadonlyMap<string, readonly string[]>;
   readonly modelRelations: Map<string, ModelRelationMetadata[]>;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
@@ -291,6 +402,27 @@ export function applyBackrelationCandidates(input: {
       : [...pairMatches];
 
     if (matches.length === 0) {
+      const junctionPairs = findJunctionFkPairs({
+        candidate,
+        fkRelationsByDeclaringModel: input.fkRelationsByDeclaringModel,
+        modelIdColumns: input.modelIdColumns,
+      });
+      const junctionPair = junctionPairs[0];
+      if (junctionPairs.length === 1 && junctionPair) {
+        relationsForModel(input.modelRelations, candidate.modelName).push(
+          manyToManyRelationNode(candidate, junctionPair),
+        );
+        continue;
+      }
+      if (junctionPairs.length > 1) {
+        input.diagnostics.push({
+          code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
+          message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple junction FK pairs for a many-to-many relation. Add @relation(name: "...") (or @relation("...")) to the list field and the junction FK-side relation pointing back at "${candidate.modelName}" to disambiguate.`,
+          sourceId: input.sourceId,
+          span: candidate.field.span,
+        });
+        continue;
+      }
       input.diagnostics.push({
         code: 'PSL_ORPHANED_BACKRELATION_LIST',
         message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
@@ -313,12 +445,7 @@ export function applyBackrelationCandidates(input: {
     const matched = matches[0];
     assertDefined(matched, 'Backrelation matching requires a defined relation match');
 
-    const existing = input.modelRelations.get(candidate.modelName);
-    const current = existing ?? [];
-    if (!existing) {
-      input.modelRelations.set(candidate.modelName, current);
-    }
-    current.push({
+    relationsForModel(input.modelRelations, candidate.modelName).push({
       fieldName: candidate.field.name,
       toModel: matched.declaringModelName,
       toTable: matched.declaringTableName,
