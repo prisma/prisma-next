@@ -12,6 +12,8 @@ import {
   StorageValueSet,
   type StorageValueSetInput,
 } from '@prisma-next/sql-contract/types';
+import { type CfExpr, cfExpr } from '@prisma-next/sql-relational-core/contract-free';
+import { PG_TEXT_CODEC_ID } from './codec-ids';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { escapeLiteral } from './sql-utils';
 
@@ -142,6 +144,17 @@ export class PostgresSchema extends NamespaceBase {
   }
 
   /**
+   * Typed-AST counterpart of {@link schemaSqlExpression}: the expression a
+   * builder-built catalog check compares `n.nspname` / `table_schema`
+   * against. Named schemas bind the schema name as a text parameter; the
+   * unbound singleton overrides this to the opaque `current_schema()`
+   * expression so the live connection's `search_path` decides at runtime.
+   */
+  schemaFilterExpression(): CfExpr {
+    return cfExpr.param(this.id, PG_TEXT_CODEC_ID);
+  }
+
+  /**
    * The bare schema name a DDL planner should target when emitting
    * statements that need to identify this namespace in the live
    * database (e.g. `CREATE TABLE "<ddlSchemaName>"."<table>" …`,
@@ -193,6 +206,10 @@ export class PostgresUnboundSchema extends PostgresSchema {
 
   override schemaSqlExpression(): string {
     return 'current_schema()';
+  }
+
+  override schemaFilterExpression(): CfExpr {
+    return cfExpr.raw('current_schema()', { codecId: PG_TEXT_CODEC_ID, nullable: false });
   }
 }
 

@@ -1,6 +1,15 @@
-import type { NullCheckExpr, OperationExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
+import type {
+  AndExpr,
+  BinaryExpr,
+  ExistsExpr,
+  NullCheckExpr,
+  OperationExpr,
+  ParamRef,
+  RawExpr,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { tableExistsAst } from '../../src/contract-free/checks';
+import { constraintExistsAst, tableExistsAst } from '../../src/contract-free/checks';
 
 describe('tableExistsAst — PG to_regclass check builder', () => {
   describe('tableAbsent()', () => {
@@ -51,6 +60,102 @@ describe('tableExistsAst — PG to_regclass check builder', () => {
       const selfParam = opExpr.self as ParamRef;
       // Unbound namespace yields just the quoted table name without schema
       expect(selfParam.value).toBe('"users"');
+    });
+  });
+});
+
+describe('constraintExistsAst — pg_constraint EXISTS check builder', () => {
+  describe('constraintPresent()', () => {
+    it('projects EXISTS over pg_constraint JOIN pg_namespace with bound params', () => {
+      const ast = constraintExistsAst({
+        constraintName: 'user_pkey',
+        schema: 'public',
+        table: 'user',
+      }).constraintPresent();
+
+      expect(ast.kind).toBe('select');
+      expect(ast.from).toBeUndefined();
+      expect(ast.projection).toHaveLength(1);
+      const proj = ast.projection[0]!;
+      expect(proj.alias).toBe('result');
+      expect(proj.codec).toBeUndefined();
+
+      const exists = proj.expr as ExistsExpr;
+      expect(exists.kind).toBe('exists');
+      expect(exists.notExists).toBe(false);
+
+      const inner = exists.subquery;
+      expect((inner.from as TableSource).name).toBe('pg_constraint');
+      expect((inner.from as TableSource).alias).toBe('c');
+      expect(inner.joins).toHaveLength(1);
+      const join = inner.joins?.[0];
+      expect(join?.joinType).toBe('inner');
+      expect((join?.source as TableSource).name).toBe('pg_namespace');
+      expect((join?.source as TableSource).alias).toBe('n');
+
+      const where = inner.where as AndExpr;
+      expect(where.kind).toBe('and');
+      expect(where.exprs).toHaveLength(3);
+
+      const conname = where.exprs[0] as BinaryExpr;
+      expect((conname.right as ParamRef).value).toBe('user_pkey');
+      expect((conname.right as ParamRef).codec?.codecId).toBe('pg/text@1');
+
+      const nspname = where.exprs[1] as BinaryExpr;
+      expect((nspname.right as ParamRef).value).toBe('public');
+
+      const conrelid = where.exprs[2] as BinaryExpr;
+      const regclass = conrelid.right as OperationExpr;
+      expect(regclass.kind).toBe('operation');
+      expect(regclass.lowering.template).toBe('to_regclass({{self}})');
+      expect((regclass.self as ParamRef).value).toBe('"public"."user"');
+    });
+
+    it('omits the conrelid filter when table is not given', () => {
+      const ast = constraintExistsAst({
+        constraintName: 'user_pkey',
+        schema: 'public',
+      }).constraintPresent();
+      const exists = ast.projection[0]!.expr as ExistsExpr;
+      const where = exists.subquery.where as AndExpr;
+      expect(where.exprs).toHaveLength(2);
+    });
+
+    it('uses current_schema() for the unbound namespace instead of a bound param', () => {
+      const ast = constraintExistsAst({
+        constraintName: 'user_pkey',
+        schema: '__unbound__',
+      }).constraintPresent();
+      const exists = ast.projection[0]!.expr as ExistsExpr;
+      const where = exists.subquery.where as AndExpr;
+      const nspname = where.exprs[1] as BinaryExpr;
+      const raw = nspname.right as RawExpr;
+      expect(raw.kind).toBe('raw-expr');
+      expect(raw.parts).toEqual(['current_schema()']);
+    });
+
+    it('collects params in template order: conname, nspname, conrelid', () => {
+      const ast = constraintExistsAst({
+        constraintName: 'user_pkey',
+        schema: 'public',
+        table: 'user',
+      }).constraintPresent();
+      const values = ast.collectParamRefs().map((ref) => (ref as ParamRef).value);
+      expect(values).toEqual(['user_pkey', 'public', '"public"."user"']);
+    });
+  });
+
+  describe('constraintAbsent()', () => {
+    it('uses NOT EXISTS over the same body', () => {
+      const ast = constraintExistsAst({
+        constraintName: 'user_pkey',
+        schema: 'public',
+        table: 'user',
+      }).constraintAbsent();
+      const exists = ast.projection[0]!.expr as ExistsExpr;
+      expect(exists.kind).toBe('exists');
+      expect(exists.notExists).toBe(true);
+      expect((exists.subquery.from as TableSource).name).toBe('pg_constraint');
     });
   });
 });

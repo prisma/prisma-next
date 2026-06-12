@@ -1,4 +1,6 @@
 export {
+  type ConstraintExistsCheckBuilder,
+  constraintExistsAst,
   type TableExistsCheckBuilder,
   tableExistsAst,
   toRegclass,
