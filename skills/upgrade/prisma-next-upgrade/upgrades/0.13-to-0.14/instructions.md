@@ -87,9 +87,11 @@ substrate diff only.
 
 TML-2838: the PGlite-backed example apps (`prisma-next-demo`, `react-router-demo`,
 `supabase`, `bundle-size`, `multi-extension-monorepo`) switched their vitest
-`pool` from `threads` to `forks`. Running PGlite (WebAssembly) across vitest
-worker threads in one process intermittently aborts on Linux (a V8 JIT-page
-race); a process-per-fork avoids it. Test-harness only — no runtime, contract,
+`pool` from `threads` to `forks` and pass `--no-memory-protection-keys`. Running
+PGlite (WebAssembly) across vitest worker threads intermittently aborts on Linux
+with a residual V8 JIT-page race (`jit_page_->allocations_.erase`) that
+`@prisma/dev` 0.24.12 reduced but did not fully eliminate; process-per-fork with
+PKU JIT-hardening disabled removes it. Test-harness only — no runtime, contract,
 or public-API change. Incidental substrate diff only.
 -->
 
