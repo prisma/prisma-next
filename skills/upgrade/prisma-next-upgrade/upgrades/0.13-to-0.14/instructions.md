@@ -64,6 +64,29 @@ changes:
       glob: "**/*.{ts,tsx}"
       contains:
         - "createRuntime"
+  - id: enum-becomes-domain-concept
+    summary: |
+      The PSL `enum` keyword now authors the domain enum (a text-class column whose
+      value set is enforced by a CHECK constraint) — the native Postgres
+      `CREATE TYPE … AS ENUM` semantics are gone. An `enum` block must carry
+      `@@type("<codec-id>")` (e.g. `@@type("pg/text@1")`), members map to database
+      values with `Name = "value"` (a bare member name defaults to itself where the
+      codec accepts it), and `@map` on members is removed — the member value IS the
+      mapping. The transitional `enum2` keyword is retired; rename those blocks to
+      `enum` (emitted contract is identical). The TS authoring equivalent is
+      `enumType(name, codecRef, ...member(name, value))` from
+      `@prisma-next/postgres/contract-builder` returned under the contract's `enums`
+      key; the old native `enumType(name, values[])` / `enumColumn` from
+      `@prisma-next/adapter-postgres/column-types` are deleted. Databases that
+      already carry a native enum type need a one-time converting migration (alter
+      column to text USING ::text, add the value-set CHECK, DROP TYPE) — `contract
+      infer` refuses native enum types by design and names them in its diagnostic.
+    detection:
+      glob: "**/*.prisma"
+      contains:
+        - "enum "
+        - "enum2 "
+      anyMatch: true
 ---
 
 <!--
@@ -210,6 +233,75 @@ const runtime = new PostgresRuntimeImpl({ adapter: stackInstance.adapter, contex
 ```
 
 The constructor options are identical to what `createRuntime` accepted, except `stackInstance` is not taken: pass `adapter` from `stackInstance.adapter` directly.
+
+## `enum-becomes-domain-concept`
+
+The `enum` keyword changed meaning. Before 0.14 a PSL `enum` block authored a **native Postgres enum** (`CREATE TYPE <name> AS ENUM (…)`, columns typed with the named type). Starting at 0.14 the same keyword authors the **domain enum**: the column stores plain values through a declared codec (typically `pg/text@1` → a `text` column) and the value set is enforced by a CHECK constraint the migration planner generates and verifies. The native enum machinery (the `pg/enum@1` codec, native `CREATE TYPE` planning, native-enum introspection adoption) is deleted.
+
+### Who needs to change code
+
+Any project whose `.prisma` schema contains an `enum` block **without** an `@@type(...)` attribute (the old native form), or with `@map` on members, or whose schema uses the transitional `enum2` keyword. Projects that already author enums with `@@type` + member values (the `enum2`-era shape introduced in 0.13) only need the keyword rename described below — the emitted contract is identical.
+
+### 1. Convert the schema syntax
+
+```prisma
+// Before — native enum (0.13)
+enum user_type {
+  admin
+  user
+}
+
+// After — domain enum (0.14)
+enum user_type {
+  @@type("pg/text@1")
+  admin = "admin"
+  user  = "user"
+}
+```
+
+Rules:
+
+- `@@type("<codec-id>")` is **required**. For string-valued enums use `@@type("pg/text@1")`.
+- Each member maps to its database value with `member = "value"`. Under the native semantics the stored label was the member name, so a faithful conversion sets each value to the member's name (`admin = "admin"`). A member that previously carried `@map("dbvalue")` becomes `member = "dbvalue"` — `@map` on enum members is removed; the member value is the mapping.
+- If your schema uses the transitional `enum2` keyword (added in 0.13), rename `enum2` → `enum`. Nothing else changes — that block shape is exactly what `enum` now means.
+
+If you author contracts in TypeScript instead of PSL: the native `enumType(name, values[])` and `enumColumn(...)` helpers from `@prisma-next/adapter-postgres/column-types` are deleted. Author the domain enum with `enumType` + `member` from your target's contract-builder and return it under the `enums` key:
+
+```ts
+import { defineContract, enumType, member } from '@prisma-next/postgres/contract-builder';
+
+const pgText = { codecId: 'pg/text@1', nativeType: 'text' } as const;
+const UserType = enumType('user_type', pgText, member('admin', 'admin'), member('user', 'user'));
+
+export const contract = defineContract({ /* … */ }, ({ field, model }) => ({
+  enums: { user_type: UserType },
+  models: {
+    User: model('User', {
+      fields: { /* … */ kind: field.namedType(UserType) },
+    }),
+  },
+}));
+```
+
+Then re-emit: `prisma-next contract emit`. The emitted contract carries the enum as a domain entity plus a storage `valueSet`; the column becomes `pg/text@1` / `text` with a `valueSet` reference and a table-level check entry.
+
+### 2. Migrate the database off the native type
+
+A database created under 0.13 still has the native enum type and columns typed with it. Author a one-time converting migration — for each native enum type, in order:
+
+1. Alter each column off the native type, casting the stored labels: `ALTER TABLE … ALTER COLUMN <col> TYPE text USING <col>::text`.
+2. Add the value-set CHECK constraint the contract now declares (name it as the contract does, e.g. `<table>_<col>_check`).
+3. Drop the native type: `DROP TYPE "<schema>"."<type>"`.
+
+Because the contract hash does not change (the schema conversion in step 1 and the emitted contract are the end state), scaffold the migration as a data-only edge on the current hash: `prisma-next migration new --name convert-<type>-to-value-set --from <current-storage-hash>`, give the ALTER op `operationClass: 'data'`, and self-emit by running the scaffolded `migration.ts`. The `DROP TYPE` has no op builder — express it as an inline `rawSql` op.
+
+A complete worked example ships in the Prisma Next repo: `examples/prisma-next-demo/migrations/app/20260611T1856_convert_user_type_to_value_set/migration.ts` — three ops (data-class ALTER … USING, `addCheckConstraint`, rawSql `DROP TYPE`), each with pre/postchecks that make replay idempotent.
+
+Note: `prisma-next contract infer` **refuses** databases containing native enum types — it names each offending type and points at this conversion. Convert the database first, then infer.
+
+### 3. Verify
+
+Run `prisma-next db verify` (or your project's test suite) after applying the converting migration: the live schema must now match the contract — `text` column, CHECK constraint present, native type gone.
 
 <!--
 TML-2882: transitional PSL `enum2` block (PR #805). The demo authors `enum2 Priority`
