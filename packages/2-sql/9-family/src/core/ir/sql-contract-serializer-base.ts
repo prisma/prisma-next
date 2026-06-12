@@ -1,11 +1,7 @@
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
-import {
-  type Namespace,
-  NamespaceBase,
-  UNBOUND_NAMESPACE_ID,
-} from '@prisma-next/framework-components/ir';
+import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import {
   buildSqlNamespace,
@@ -130,7 +126,12 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
         'structural',
       );
     }
-    const hydratedNamespaces = this.hydrateSqlNamespaceMap(rawNamespaces);
+    const hydratedNamespaces = this.hydrateSqlNamespaceMap(
+      blindCast<
+        Readonly<Record<string, Record<string, unknown>>>,
+        'namespaces are raw JSON at this point; SqlNamespace class instances only exist after hydration'
+      >(rawNamespaces),
+    );
     // Compatibility shim: production code that addresses `__unbound__` for table
     // metadata lookups (collection-contract, query-plan-mutations, model-accessor,
     // query-plan-meta, where-binding) uses optional chaining and tolerates absence,
@@ -157,33 +158,21 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   }
 
   protected hydrateSqlNamespaceMap(
-    namespaces: Readonly<Record<string, Namespace | Record<string, unknown>>>,
+    namespaces: Readonly<Record<string, Record<string, unknown>>>,
   ): Readonly<Record<string, Namespace>> {
     return Object.fromEntries(
       Object.entries(namespaces).map(([nsId, namespaceEntryRaw]) => {
         // Raw entries passed structural validation; hydrate materialises family IR class instances.
         const namespaceHydrated = this.hydrateSqlNamespaceEntry(nsId, namespaceEntryRaw);
-        const namespaceMaterialised =
-          namespaceHydrated instanceof NamespaceBase
-            ? namespaceHydrated
-            : buildSqlNamespace(
-                blindCast<
-                  SqlNamespaceTablesInput,
-                  'hydrateSqlNamespaceEntry returns SqlNamespaceTablesInput when raw is not a NamespaceBase'
-                >(namespaceHydrated),
-              );
-        return [nsId, namespaceMaterialised];
+        return [nsId, buildSqlNamespace(namespaceHydrated)];
       }),
     );
   }
 
   protected hydrateSqlNamespaceEntry(
     nsId: string,
-    raw: Namespace | Record<string, unknown>,
-  ): Namespace | SqlNamespaceTablesInput {
-    if (raw instanceof NamespaceBase) {
-      return raw;
-    }
+    raw: Record<string, unknown>,
+  ): SqlNamespaceTablesInput {
     const rawRecord = isPlainRecord(raw) ? raw : {};
     const id = typeof rawRecord['id'] === 'string' ? rawRecord['id'] : nsId;
     const parsed = NamespaceRawSchema({ ...rawRecord, id });
