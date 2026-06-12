@@ -90,10 +90,7 @@ class StubMongoDriver implements MongoDriver {
   async close(): Promise<void> {}
 }
 
-type DdlWireCommand = Awaited<
-  ReturnType<{ (p: MongoDdlPlan, c: CodecCallContext): ReturnType<MongoAdapter['lower']> }>
->;
-type DmlWireCommand = Parameters<MongoDriver['execute']>[0];
+type DmlWireCommand = AnyMongoDmlWireCommand;
 
 class StubMongoAdapter implements MongoAdapter {
   readonly loweredPlans: MongoQueryPlan[] = [];
@@ -119,8 +116,8 @@ class StubMongoAdapter implements MongoAdapter {
     return { kind: wireKind, collection: draft.collection } as unknown as DmlWireCommand;
   }
 
-  lower(plan: MongoDdlPlan, ctx: CodecCallContext): Promise<DdlWireCommand>;
-  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<DmlWireCommand>;
+  lower(plan: MongoDdlPlan, ctx: CodecCallContext): Promise<AnyMongoDdlWireCommand>;
+  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoDmlWireCommand>;
   lower(plan: MongoQueryPlan | MongoDdlPlan, ctx: CodecCallContext): Promise<WireCommand> {
     if ('collection' in plan) {
       return this.resolveParams(this.structuralLower(plan), ctx);

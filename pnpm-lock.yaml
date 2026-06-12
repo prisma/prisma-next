@@ -2314,6 +2314,9 @@ importers:
       '@prisma-next/mongo-value':
         specifier: workspace:0.13.0
         version: link:../../1-foundation/mongo-value
+      '@prisma-next/utils':
+        specifier: workspace:0.13.0
+        version: link:../../../1-framework/0-foundation/utils
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:0.13.0
@@ -3739,6 +3742,9 @@ importers:
       '@prisma-next/mongo-contract-psl':
         specifier: workspace:0.13.0
         version: link:../../2-mongo-family/2-authoring/contract-psl
+      '@prisma-next/mongo-wire':
+        specifier: workspace:0.13.0
+        version: link:../../2-mongo-family/6-transport/mongo-wire
       '@prisma-next/psl-parser':
         specifier: workspace:0.13.0
         version: link:../../1-framework/2-authoring/psl-parser

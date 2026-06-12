@@ -24,7 +24,7 @@ import type {
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
 import { blindCast } from '@prisma-next/utils/casts';
-import type { IndexSpecification } from 'mongodb';
+import type { CreateCollectionOptions, CreateIndexesOptions, IndexSpecification } from 'mongodb';
 import { type Db, MongoClient } from 'mongodb';
 import { DRIVER_INFO } from './core/driver-info';
 
@@ -191,7 +191,13 @@ export class MongoDriverImpl implements MongoDriver {
   }
 
   protected async executeCreateCollectionCommand(cmd: CreateCollectionWireCommand): Promise<void> {
-    await this.db.createCollection(cmd.collection, cmd.options);
+    await this.db.createCollection(
+      cmd.collection,
+      blindCast<
+        CreateCollectionOptions,
+        'DefinedProps strips undefined; driver accepts undefined-valued opts'
+      >(cmd.options),
+    );
   }
 
   protected async executeCreateIndexCommand(cmd: CreateIndexWireCommand): Promise<void> {
@@ -199,7 +205,10 @@ export class MongoDriverImpl implements MongoDriver {
       .collection(cmd.collection)
       .createIndex(
         blindCast<IndexSpecification, 'key satisfies {[k:string]:IndexDirection}'>(cmd.key),
-        cmd.options,
+        blindCast<
+          CreateIndexesOptions,
+          'DefinedProps strips undefined; driver accepts undefined-valued opts'
+        >(cmd.options),
       );
   }
 
