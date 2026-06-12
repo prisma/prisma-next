@@ -26,14 +26,6 @@ export {
   setNotNull,
 } from '../core/migrations/operations/columns';
 export {
-  addCheckConstraint,
-  addForeignKey,
-  addPrimaryKey,
-  addUnique,
-  dropCheckConstraint,
-  dropConstraint,
-} from '../core/migrations/operations/constraints';
-export {
   type DataTransformClosure,
   type DataTransformOptions,
   dataTransform,

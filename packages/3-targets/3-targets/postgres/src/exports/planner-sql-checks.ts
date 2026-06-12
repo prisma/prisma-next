@@ -3,7 +3,6 @@ export {
   columnExistsCheck,
   columnHasNoDefaultCheck,
   columnNullabilityCheck,
-  constraintExistsCheck,
   qualifyTableName,
   tableHasPrimaryKeyCheck,
   tableIsEmptyCheck,

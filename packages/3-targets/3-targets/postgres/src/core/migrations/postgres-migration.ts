@@ -7,8 +7,19 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import { errorPostgresMigrationStackMissing } from '../errors';
-import { AddColumnCall, CreateSchemaCall, CreateTableCall } from './op-factory-call';
+import {
+  AddCheckConstraintCall,
+  AddColumnCall,
+  AddForeignKeyCall,
+  AddPrimaryKeyCall,
+  AddUniqueCall,
+  CreateSchemaCall,
+  CreateTableCall,
+  DropCheckConstraintCall,
+  DropConstraintCall,
+} from './op-factory-call';
 import { type DataTransformOptions, dataTransform } from './operations/data-transform';
+import type { ForeignKeySpec } from './operations/shared';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 /**
@@ -121,6 +132,106 @@ export abstract class PostgresMigration extends SqlMigration<
       options.schema ?? UNBOUND_NAMESPACE_ID,
       options.table,
       options.column,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected addPrimaryKey(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly constraint: string;
+    readonly columns: readonly string[];
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new AddPrimaryKeyCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.constraint,
+      options.columns,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected addUnique(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly constraint: string;
+    readonly columns: readonly string[];
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new AddUniqueCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.constraint,
+      options.columns,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected addForeignKey(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly foreignKey: ForeignKeySpec;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new AddForeignKeyCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.foreignKey,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected addCheckConstraint(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly constraint: string;
+    readonly column: string;
+    readonly values: readonly string[];
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new AddCheckConstraintCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.constraint,
+      options.column,
+      options.values,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected dropCheckConstraint(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly constraint: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new DropCheckConstraintCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.constraint,
+    ).toOp(this.controlAdapter);
+  }
+
+  protected dropConstraint(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly constraint: string;
+    readonly kind?: 'foreignKey' | 'unique' | 'primaryKey';
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return new DropConstraintCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.constraint,
+      options.kind ?? 'unique',
     ).toOp(this.controlAdapter);
   }
 }

@@ -1,12 +1,5 @@
 #!/usr/bin/env -S node
-import {
-  addForeignKey,
-  addPrimaryKey,
-  col,
-  Migration,
-  MigrationCLI,
-  setNotNull,
-} from '@prisma-next/postgres/migration';
+import { col, Migration, MigrationCLI, setNotNull } from '@prisma-next/postgres/migration';
 
 export default class M extends Migration {
   override describe() {
@@ -39,19 +32,37 @@ export default class M extends Migration {
       setNotNull('public', 'bug', 'id'),
       this.addColumn({ schema: 'public', table: 'feature', column: col('id', 'character(36)') }),
       setNotNull('public', 'feature', 'id'),
-      addPrimaryKey('public', 'bug', 'bug_pkey', ['id']),
-      addPrimaryKey('public', 'feature', 'feature_pkey', ['id']),
-      addForeignKey('public', 'bug', {
-        name: 'bug_id_fkey',
+      this.addPrimaryKey({
+        schema: 'public',
+        table: 'bug',
+        constraint: 'bug_pkey',
         columns: ['id'],
-        references: { schema: 'public', table: 'task', columns: ['id'] },
-        onDelete: 'cascade',
       }),
-      addForeignKey('public', 'feature', {
-        name: 'feature_id_fkey',
+      this.addPrimaryKey({
+        schema: 'public',
+        table: 'feature',
+        constraint: 'feature_pkey',
         columns: ['id'],
-        references: { schema: 'public', table: 'task', columns: ['id'] },
-        onDelete: 'cascade',
+      }),
+      this.addForeignKey({
+        schema: 'public',
+        table: 'bug',
+        foreignKey: {
+          name: 'bug_id_fkey',
+          columns: ['id'],
+          references: { schema: 'public', table: 'task', columns: ['id'] },
+          onDelete: 'cascade',
+        },
+      }),
+      this.addForeignKey({
+        schema: 'public',
+        table: 'feature',
+        foreignKey: {
+          name: 'feature_id_fkey',
+          columns: ['id'],
+          references: { schema: 'public', table: 'task', columns: ['id'] },
+          onDelete: 'cascade',
+        },
       }),
     ];
   }

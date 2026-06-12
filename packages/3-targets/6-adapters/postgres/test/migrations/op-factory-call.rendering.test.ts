@@ -74,11 +74,14 @@ describe('Postgres call classes - renderTypeScript + importRequirements', () => 
 
   it('DropConstraintCall omits kind when unique, emits it otherwise', () => {
     const unique = new DropConstraintCall('public', 'user', 'user_email_key');
-    expect(unique.renderTypeScript()).toBe('dropConstraint("public", "user", "user_email_key")');
+    expect(unique.renderTypeScript()).toBe(
+      'this.dropConstraint({ schema: "public", table: "user", constraint: "user_email_key" })',
+    );
+    expect(unique.importRequirements()).toEqual([]);
 
     const fk = new DropConstraintCall('public', 'user', 'user_org_fk', 'foreignKey');
     expect(fk.renderTypeScript()).toBe(
-      'dropConstraint("public", "user", "user_org_fk", "foreignKey")',
+      'this.dropConstraint({ schema: "public", table: "user", constraint: "user_org_fk", kind: "foreignKey" })',
     );
   });
 
@@ -218,14 +221,18 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     expectFactoryImport(new DropDefaultCall('public', 'user', 'updated_at'), 'dropDefault');
   });
 
-  it('AddPrimaryKeyCall / AddUniqueCall emit (schema, table, constraint, columns)', () => {
+  it('AddPrimaryKeyCall / AddUniqueCall emit this.X({schema, table, constraint, columns})', () => {
     const pk = new AddPrimaryKeyCall('public', 'user', 'user_pkey', ['id']);
-    expect(pk.renderTypeScript()).toBe('addPrimaryKey("public", "user", "user_pkey", ["id"])');
-    expectFactoryImport(pk, 'addPrimaryKey');
+    expect(pk.renderTypeScript()).toBe(
+      'this.addPrimaryKey({ schema: "public", table: "user", constraint: "user_pkey", columns: ["id"] })',
+    );
+    expect(pk.importRequirements()).toEqual([]);
 
     const uq = new AddUniqueCall('public', 'user', 'user_email_key', ['email']);
-    expect(uq.renderTypeScript()).toBe('addUnique("public", "user", "user_email_key", ["email"])');
-    expectFactoryImport(uq, 'addUnique');
+    expect(uq.renderTypeScript()).toBe(
+      'this.addUnique({ schema: "public", table: "user", constraint: "user_email_key", columns: ["email"] })',
+    );
+    expect(uq.importRequirements()).toEqual([]);
   });
 
   it('AddForeignKeyCall serializes the full ForeignKeySpec including optional referential actions', () => {
@@ -235,9 +242,9 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
       references: { schema: 'public', table: 'u', columns: ['id'] },
     });
     expect(minimal.renderTypeScript()).toBe(
-      'addForeignKey("public", "post", {\n  name: "fk",\n  columns: ["a"],\n  references: { schema: "public", table: "u", columns: ["id"] },\n})',
+      'this.addForeignKey({ schema: "public", table: "post", foreignKey: {\n  name: "fk",\n  columns: ["a"],\n  references: { schema: "public", table: "u", columns: ["id"] },\n} })',
     );
-    expectFactoryImport(minimal, 'addForeignKey');
+    expect(minimal.importRequirements()).toEqual([]);
 
     const withActions = new AddForeignKeyCall('public', 'post', {
       name: 'post_author_fk',

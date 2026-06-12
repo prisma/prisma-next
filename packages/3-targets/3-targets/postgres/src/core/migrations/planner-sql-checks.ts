@@ -27,36 +27,6 @@ export function toRegclassLiteral(schema: string, name: string): string {
   return postgresCreateNamespace({ id: schema, entries: { table: {} } }).regclassLiteral(name);
 }
 
-/**
- * When `table` is omitted the check matches by name + schema across all tables.
- * Pass `table` to scope the check to a single table (prevents false matches on
- * identically-named constraints in different tables).
- */
-export function constraintExistsCheck({
-  constraintName,
-  schema,
-  table,
-  exists = true,
-}: {
-  constraintName: string;
-  schema: string;
-  table?: string;
-  exists?: boolean;
-}): string {
-  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
-  const existsClause = exists ? 'EXISTS' : 'NOT EXISTS';
-  const tableFilter = table
-    ? `AND c.conrelid = to_regclass(${namespace.regclassLiteral(table)})`
-    : '';
-  return `SELECT ${existsClause} (
-  SELECT 1 FROM pg_constraint c
-  JOIN pg_namespace n ON c.connamespace = n.oid
-  WHERE c.conname = '${escapeLiteral(constraintName)}'
-  AND n.nspname = ${namespace.schemaSqlExpression()}
-  ${tableFilter}
-)`;
-}
-
 export function columnExistsCheck({
   schema,
   table,

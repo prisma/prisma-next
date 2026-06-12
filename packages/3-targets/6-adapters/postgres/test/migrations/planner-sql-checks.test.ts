@@ -3,7 +3,6 @@ import {
   columnExistsCheck,
   columnHasNoDefaultCheck,
   columnNullabilityCheck,
-  constraintExistsCheck,
   qualifyTableName,
   tableHasPrimaryKeyCheck,
   tableIsEmptyCheck,
@@ -23,23 +22,10 @@ describe('toRegclassLiteral', () => {
   });
 });
 
-describe('constraintExistsCheck', () => {
-  it('defaults to EXISTS', () => {
-    const sql = constraintExistsCheck({ constraintName: 'user_pkey', schema: 'public' });
-    expect(sql).toContain('SELECT EXISTS');
-    expect(sql).toContain("c.conname = 'user_pkey'");
-    expect(sql).toContain("n.nspname = 'public'");
-  });
-
-  it('uses NOT EXISTS when exists=false', () => {
-    const sql = constraintExistsCheck({
-      constraintName: 'user_pkey',
-      schema: 'public',
-      exists: false,
-    });
-    expect(sql).toContain('SELECT NOT EXISTS');
-  });
-});
+// constraintExistsCheck was replaced by the typed constraintExistsAst builder
+// (@prisma-next/target-postgres/contract-free); construction pins live in
+// target-postgres test/migrations/verification-checks.test.ts and lowering
+// pins in test/verification-checks-lowering.test.ts here.
 
 describe('columnExistsCheck', () => {
   it('defaults to EXISTS', () => {

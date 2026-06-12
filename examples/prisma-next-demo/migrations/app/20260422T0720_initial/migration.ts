@@ -1,6 +1,5 @@
 #!/usr/bin/env -S node
 import {
-  addForeignKey,
   col,
   createIndex,
   fn,
@@ -122,16 +121,24 @@ export default class M extends Migration {
         ],
         constraints: [primaryKey(['id'])],
       }),
-      addForeignKey('public', 'post', {
-        name: 'post_userId_fkey',
-        columns: ['userId'],
-        references: { schema: 'public', table: 'user', columns: ['id'] },
+      this.addForeignKey({
+        schema: 'public',
+        table: 'post',
+        foreignKey: {
+          name: 'post_userId_fkey',
+          columns: ['userId'],
+          references: { schema: 'public', table: 'user', columns: ['id'] },
+        },
       }),
       createIndex('public', 'post', 'post_userId_idx', ['userId']),
-      addForeignKey('public', 'task', {
-        name: 'task_userId_fkey',
-        columns: ['userId'],
-        references: { schema: 'public', table: 'user', columns: ['id'] },
+      this.addForeignKey({
+        schema: 'public',
+        table: 'task',
+        foreignKey: {
+          name: 'task_userId_fkey',
+          columns: ['userId'],
+          references: { schema: 'public', table: 'user', columns: ['id'] },
+        },
       }),
       createIndex('public', 'task', 'task_userId_idx', ['userId']),
     ];
