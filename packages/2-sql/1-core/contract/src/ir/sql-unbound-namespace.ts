@@ -7,8 +7,6 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { SqlNamespaceEntries } from './sql-storage';
 import type { StorageTable } from './storage-table';
 
-const FROZEN_EMPTY_TABLE: Readonly<Record<string, StorageTable>> = Object.freeze({});
-
 /**
  * Family-layer placeholder for the SQL unbound-namespace singleton —
  * the late-bound slot whose binding the target resolves at connection
@@ -45,7 +43,10 @@ export class SqlUnboundNamespace extends NamespaceBase {
 
   readonly id = UNBOUND_NAMESPACE_ID;
   readonly entries: SqlNamespaceEntries = Object.freeze({
-    table: FROZEN_EMPTY_TABLE,
+    table: blindCast<
+      Readonly<Record<string, StorageTable>>,
+      'empty frozen map is a valid Readonly<Record<string, StorageTable>>'
+    >(Object.freeze({})),
   });
   declare readonly kind: string;
 
