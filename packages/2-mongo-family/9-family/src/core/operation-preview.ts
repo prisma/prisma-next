@@ -27,11 +27,11 @@ function formatOptionEntries(options: object | undefined): string | undefined {
 }
 
 function formatOptions(cmd: CreateIndexCommand): string | undefined {
-  return formatOptionEntries(cmd.options);
+  return formatOptionEntries(cmd.options());
 }
 
 function formatCreateCollectionOptions(cmd: CreateCollectionCommand): string | undefined {
-  return formatOptionEntries(cmd.options);
+  return formatOptionEntries(cmd.options());
 }
 
 class MongoDdlCommandFormatter implements MongoDdlCommandVisitor<string> {
@@ -60,7 +60,7 @@ class MongoDdlCommandFormatter implements MongoDdlCommandVisitor<string> {
 
   collMod(cmd: CollModCommand): string {
     const parts: string[] = [`collMod: ${JSON.stringify(cmd.collection)}`];
-    for (const [key, value] of Object.entries(cmd.options)) {
+    for (const [key, value] of Object.entries(cmd.options())) {
       if (value !== undefined) parts.push(`${key}: ${JSON.stringify(value)}`);
     }
     return `db.runCommand({ ${parts.join(', ')} })`;

@@ -28,7 +28,8 @@ describe('CreateIndexCommand', () => {
     expect(cmd.kind).toBe('createIndex');
     expect(cmd.collection).toBe('users');
     expect(cmd.keys).toEqual([{ field: 'email', direction: 1 }]);
-    expect(cmd.options).toBeUndefined();
+    expect(cmd.unique).toBeUndefined();
+    expect(cmd.name).toBeUndefined();
   });
 
   it('constructs with all options', () => {
@@ -39,11 +40,11 @@ describe('CreateIndexCommand', () => {
       partialFilterExpression: { active: true },
       name: 'email_1',
     });
-    expect(cmd.options?.unique).toBe(true);
-    expect(cmd.options?.sparse).toBe(true);
-    expect(cmd.options?.expireAfterSeconds).toBe(3600);
-    expect(cmd.options?.partialFilterExpression).toEqual({ active: true });
-    expect(cmd.options?.name).toBe('email_1');
+    expect(cmd.unique).toBe(true);
+    expect(cmd.sparse).toBe(true);
+    expect(cmd.expireAfterSeconds).toBe(3600);
+    expect(cmd.partialFilterExpression).toEqual({ active: true });
+    expect(cmd.name).toBe('email_1');
   });
 
   it('constructs with M2 index options', () => {
@@ -53,20 +54,28 @@ describe('CreateIndexCommand', () => {
       language_override: 'lang',
       collation: { locale: 'en', strength: 2 },
     });
-    expect(cmd.options?.weights).toEqual({ bio: 10 });
-    expect(cmd.options?.default_language).toBe('english');
-    expect(cmd.options?.language_override).toBe('lang');
-    expect(cmd.options?.collation).toEqual({ locale: 'en', strength: 2 });
+    expect(cmd.weights).toEqual({ bio: 10 });
+    expect(cmd.default_language).toBe('english');
+    expect(cmd.language_override).toBe('lang');
+    expect(cmd.collation).toEqual({ locale: 'en', strength: 2 });
   });
 
   it('constructs with wildcardProjection', () => {
     const cmd = new CreateIndexCommand('users', [{ field: '$**', direction: 1 }], {
       wildcardProjection: { name: 1, email: 1 },
     });
-    expect(cmd.options?.wildcardProjection).toEqual({ name: 1, email: 1 });
+    expect(cmd.wildcardProjection).toEqual({ name: 1, email: 1 });
   });
 
-  it('serializes options as flat top-level fields', () => {
+  it('options() returns the typed options object', () => {
+    const cmd = new CreateIndexCommand('users', [{ field: 'email', direction: 1 }], {
+      unique: true,
+      name: 'email_1',
+    });
+    expect(cmd.options()).toMatchObject({ unique: true, name: 'email_1' });
+  });
+
+  it('JSON.stringify yields flat shape with no options key', () => {
     const cmd = new CreateIndexCommand('users', [{ field: 'email', direction: 1 }], {
       unique: true,
       name: 'email_1',
@@ -126,7 +135,8 @@ describe('CreateCollectionCommand', () => {
     const cmd = new CreateCollectionCommand('events');
     expect(cmd.kind).toBe('createCollection');
     expect(cmd.collection).toBe('events');
-    expect(cmd.options).toBeUndefined();
+    expect(cmd.capped).toBeUndefined();
+    expect(cmd.validator).toBeUndefined();
   });
 
   it('constructs with capped options', () => {
@@ -135,9 +145,9 @@ describe('CreateCollectionCommand', () => {
       size: 1048576,
       max: 1000,
     });
-    expect(cmd.options?.capped).toBe(true);
-    expect(cmd.options?.size).toBe(1048576);
-    expect(cmd.options?.max).toBe(1000);
+    expect(cmd.capped).toBe(true);
+    expect(cmd.size).toBe(1048576);
+    expect(cmd.max).toBe(1000);
   });
 
   it('constructs with validator', () => {
@@ -146,16 +156,16 @@ describe('CreateCollectionCommand', () => {
       validationLevel: 'strict',
       validationAction: 'error',
     });
-    expect(cmd.options?.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
-    expect(cmd.options?.validationLevel).toBe('strict');
-    expect(cmd.options?.validationAction).toBe('error');
+    expect(cmd.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
+    expect(cmd.validationLevel).toBe('strict');
+    expect(cmd.validationAction).toBe('error');
   });
 
   it('constructs with timeseries', () => {
     const cmd = new CreateCollectionCommand('metrics', {
       timeseries: { timeField: 'ts', metaField: 'meta', granularity: 'hours' },
     });
-    expect(cmd.options?.timeseries).toEqual({
+    expect(cmd.timeseries).toEqual({
       timeField: 'ts',
       metaField: 'meta',
       granularity: 'hours',
@@ -166,7 +176,7 @@ describe('CreateCollectionCommand', () => {
     const cmd = new CreateCollectionCommand('items', {
       clusteredIndex: { key: { _id: 1 }, unique: true, name: 'myCluster' },
     });
-    expect(cmd.options?.clusteredIndex).toEqual({
+    expect(cmd.clusteredIndex).toEqual({
       key: { _id: 1 },
       unique: true,
       name: 'myCluster',
@@ -178,11 +188,16 @@ describe('CreateCollectionCommand', () => {
       collation: { locale: 'en' },
       changeStreamPreAndPostImages: { enabled: true },
     });
-    expect(cmd.options?.collation).toEqual({ locale: 'en' });
-    expect(cmd.options?.changeStreamPreAndPostImages).toEqual({ enabled: true });
+    expect(cmd.collation).toEqual({ locale: 'en' });
+    expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: true });
   });
 
-  it('serializes options as flat top-level fields', () => {
+  it('options() returns the typed options object', () => {
+    const cmd = new CreateCollectionCommand('events', { capped: true, size: 1048576 });
+    expect(cmd.options()).toMatchObject({ capped: true, size: 1048576 });
+  });
+
+  it('JSON.stringify yields flat shape with no options key', () => {
     const cmd = new CreateCollectionCommand('events', { capped: true, size: 1048576 });
     const json = JSON.parse(JSON.stringify(cmd));
     expect(json).toMatchObject({
@@ -244,19 +259,30 @@ describe('CollModCommand', () => {
     });
     expect(cmd.kind).toBe('collMod');
     expect(cmd.collection).toBe('users');
-    expect(cmd.options.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
-    expect(cmd.options.validationLevel).toBe('strict');
-    expect(cmd.options.validationAction).toBe('error');
+    expect(cmd.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
+    expect(cmd.validationLevel).toBe('strict');
+    expect(cmd.validationAction).toBe('error');
   });
 
   it('constructs with changeStreamPreAndPostImages', () => {
     const cmd = new CollModCommand('users', {
       changeStreamPreAndPostImages: { enabled: true },
     });
-    expect(cmd.options.changeStreamPreAndPostImages).toEqual({ enabled: true });
+    expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: true });
   });
 
-  it('serializes options as flat top-level fields', () => {
+  it('options() returns the typed options object', () => {
+    const cmd = new CollModCommand('users', {
+      validator: { $jsonSchema: { bsonType: 'object' } },
+      validationLevel: 'strict',
+    });
+    expect(cmd.options()).toMatchObject({
+      validator: { $jsonSchema: { bsonType: 'object' } },
+      validationLevel: 'strict',
+    });
+  });
+
+  it('JSON.stringify yields flat shape with no options key', () => {
     const cmd = new CollModCommand('users', {
       validator: { $jsonSchema: { bsonType: 'object' } },
       validationLevel: 'strict',

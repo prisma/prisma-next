@@ -61,19 +61,19 @@ async function resolveUpdate(
 function lowerDdlCommand(command: AnyMongoDdlCommand): AnyMongoDdlWireCommand {
   switch (command.kind) {
     case 'createCollection':
-      return new CreateCollectionWireCommand(command.collection, definedProps(command.options));
+      return new CreateCollectionWireCommand(command.collection, definedProps(command.options()));
     case 'createIndex':
       return new CreateIndexWireCommand(
         command.collection,
         keysToKeySpec(command.keys),
-        definedProps(command.options),
+        definedProps(command.options()),
       );
     case 'dropCollection':
       return new DropCollectionWireCommand(command.collection);
     case 'dropIndex':
       return new DropIndexWireCommand(command.collection, command.name);
     case 'collMod':
-      return new CollModWireCommand(command.collection, definedProps(command.options));
+      return new CollModWireCommand(command.collection, definedProps(command.options()));
     // v8 ignore next 4
     default: {
       const _exhaustive: never = command;
