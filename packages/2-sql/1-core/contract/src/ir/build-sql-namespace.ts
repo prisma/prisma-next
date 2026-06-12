@@ -5,6 +5,7 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlNamespace, SqlNamespaceEntries, SqlNamespaceTablesInput } from './sql-storage';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
 import { StorageTable, type StorageTableInput } from './storage-table';
@@ -52,7 +53,9 @@ class SqlBoundNamespace extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const builtEntries: Record<string, Readonly<Record<string, unknown>>> = {};
+    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
+    let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
+    let valueSet: Readonly<Record<string, StorageValueSet>> | undefined;
     for (const [kind, rawMap] of Object.entries(input.entries)) {
       if (kind === 'table') {
         const tableMap: Record<string, StorageTable> = {};
@@ -64,7 +67,7 @@ class SqlBoundNamespace extends NamespaceBase {
         )) {
           tableMap[name] = new StorageTable(v);
         }
-        builtEntries['table'] = Object.freeze(tableMap);
+        table = Object.freeze(tableMap);
       } else if (kind === 'valueSet') {
         const vsMap: Record<string, StorageValueSet> = {};
         for (const [name, v] of Object.entries(
@@ -75,17 +78,13 @@ class SqlBoundNamespace extends NamespaceBase {
         )) {
           vsMap[name] = new StorageValueSet(v);
         }
-        builtEntries['valueSet'] = Object.freeze(vsMap);
+        valueSet = Object.freeze(vsMap);
       } else {
-        builtEntries[kind] = Object.freeze(rawMap);
+        carried[kind] = Object.freeze(rawMap);
       }
     }
 
-    if (!Object.hasOwn(builtEntries, 'table')) {
-      builtEntries['table'] = Object.freeze({});
-    }
-
-    this.entries = Object.freeze(builtEntries) as SqlNamespaceEntries;
+    this.entries = Object.freeze({ ...carried, table, ...ifDefined('valueSet', valueSet) });
     Object.defineProperty(this, 'kind', {
       value: SQL_NAMESPACE_KIND,
       writable: false,
