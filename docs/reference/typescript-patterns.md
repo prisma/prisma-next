@@ -103,7 +103,7 @@ The heuristic: ask whether the type *is* a polymorphic data tree (AST/IR) or whe
 
 The framework's `IRNodeBase` declares `kind` as `abstract readonly kind?: string` — **optional at the framework level**. Family bases and concrete classes commit per-leaf as needed:
 
-- **Polymorphic dispatch today** (verifiers / walkers dispatch on `kind`): each leaf class declares an enumerable literal `kind = '<family>-<leaf>' as const`. The leaf literal dominates union narrowing; framework consumers and target consumers both narrow through it. Reference: `PostgresEnumType.kind = 'sql-enum-type' as const`.
+- **Polymorphic dispatch today** (verifiers / walkers dispatch on `kind`): each leaf class declares an enumerable literal `kind = '<family>-<leaf>' as const`. The leaf literal dominates union narrowing; framework consumers and target consumers both narrow through it. Reference: `StorageValueSet.kind = 'valueSet' as const`.
 - **No polymorphic dispatch today** (consumers walk by structural position, not by `kind`): the family base installs a single non-enumerable own `kind` property in its constructor via `Object.defineProperty(this, 'kind', { enumerable: false, … })`. This keeps `JSON.stringify(node)` envelope-compatible with the pre-class shape (no `kind` field on disk), keeps `toEqual({…})` assertions against pre-lift flat shapes passing, and still allows direct access and runtime narrowing. Reference: `SqlNode.kind = 'sql'` non-enumerable on the family base.
 
 The optional framework-level contract is intentional — a required-`kind` contract forced hundreds of edits to literal storage shapes that never carried one, and no framework consumer dispatches on the base type's `kind` anyway. Per-leaf literals are added where polymorphic dispatch earns them.

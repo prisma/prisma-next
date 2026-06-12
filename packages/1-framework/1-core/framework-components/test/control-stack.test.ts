@@ -233,7 +233,7 @@ describe('assembleAuthoringContributions', () => {
           entityTypes: {
             enum: {
               kind: 'entity',
-              discriminator: 'postgres-enum',
+              discriminator: 'test-enum',
               output: { factory: () => ({}) },
             },
           },
@@ -467,7 +467,7 @@ describe('assembleAuthoringContributions', () => {
             entityTypes: {
               enum: {
                 kind: 'entity',
-                discriminator: 'postgres-enum',
+                discriminator: 'test-enum',
                 output: { factory: () => ({}) },
               },
             },
