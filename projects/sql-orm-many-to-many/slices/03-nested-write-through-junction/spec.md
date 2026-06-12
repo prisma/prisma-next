@@ -9,7 +9,7 @@ _Parent project: `projects/sql-orm-many-to-many/`. Outcome: nested `connect`/`di
 ## Chosen design
 
 **Runtime — a third ownership bucket.** `partitionByOwnership` gains `junctionOwned` (relations carrying `through`) alongside `parentOwned`/`childOwned`. The `create()` and `update()` graph flows execute junction mutations **after** the parent row exists (parent PK known):
-- **`connect({criteria})`** → resolve target row(s) by criteria, `INSERT INTO junction (parentCols, childCols) VALUES (parentPk, targetPk)` per pair.
+- **`connect({criteria})`** → resolve target row(s) by criteria, `INSERT INTO junction (parentCols, childCols) VALUES (parentPk, targetPk)` per pair. Connecting an already-linked pair **deliberately errors** (wrapped unique-violation domain error) — an intentional divergence from Prisma-classic implicit-M:N `connect`, which is idempotent (`ON CONFLICT DO NOTHING`); see the edge-case table. _(Recorded during round-3 review.)_
 - **`disconnect({criteria})`** → `DELETE FROM junction WHERE parentCols = parentPk AND childCols = targetPk`.
 - **`create(data)`** → insert the target row, then INSERT the junction link. (Only when the junction has no required payload — see the guard.)
 - `disconnect` stays gated to `update()` (existing rule); `connect`/`create` work in both flows. The currently-passing **rejection unit test flips to a positive assertion**.
@@ -38,6 +38,7 @@ One story: "M:N nested writes go through the junction, with the required-payload
 | Composite-key junction | INSERT/DELETE across all `parentColumns`/`childColumns` pairs | slice 0 arrays |
 | Required-payload junction | **`create` AND `connect` disabled** (both write a junction row that can't satisfy the required NOT-NULL column → DB violation); `disconnect` (DELETE) still allowed | corrected mid-flight — see decision #9 |
 | **Type-level disable feasibility** | the `.d.ts` `through` type may not carry required-payload info — derive from junction field types, or **halt + surface** if infeasible (possible slice-0 contract extension) | the slice's key risk |
+| Duplicate `connect` (junction link already present) | **deliberately errors** — the unique violation from the junction INSERT is wrapped in a domain error ("violated a unique constraint on junction …; the junction link may already be present") rather than silently skipped. Intentional divergence from Prisma-classic implicit-M:N `connect`, which is idempotent (`ON CONFLICT DO NOTHING`): erroring keeps the write path portable (no per-target upsert dialect) and surfaces caller bugs instead of masking them. Revisit only if idempotent connect becomes a requirement | recorded during round-3 review (reviewer asked for the divergence to land in the decision log) |
 
 ## Slice-specific done conditions
 
