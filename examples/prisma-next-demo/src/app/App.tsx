@@ -7,7 +7,7 @@ export function App({ contract }: { contract: Contract }) {
     <>
       <h1>Prisma Next Contract Viewer</h1>
       <p className="subtitle">
-        This page is loaded from contract.json. Edit contract.ts to see changes.
+        This page is loaded from contract.json. Edit contract.prisma and re-emit to see changes.
       </p>
       <ContractView contract={contract} />
     </>
