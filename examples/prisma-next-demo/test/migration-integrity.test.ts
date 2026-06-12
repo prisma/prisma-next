@@ -14,6 +14,7 @@ import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { Contract } from '../src/prisma/contract';
 
 const DEMO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const MIGRATIONS_DIR = join(DEMO_ROOT, 'migrations');
@@ -21,13 +22,15 @@ const CONTRACT_JSON_PATH = join(DEMO_ROOT, 'src', 'prisma', 'contract.json');
 
 const serializer = new PostgresContractSerializer();
 
+// Callback for loadContractSpaceAggregate: deserializes arbitrary migration
+// start/end contracts, so it stays untyped (no single literal contract type).
 function deserializeContract(raw: unknown) {
   return serializer.deserializeContract(raw);
 }
 
 async function loadAppContract() {
   const { default: contractJson } = await import(CONTRACT_JSON_PATH, { with: { type: 'json' } });
-  return deserializeContract(contractJson);
+  return serializer.deserializeContract<Contract>(contractJson);
 }
 
 const PGVECTOR_EXTENSION: { readonly id: string; readonly targetId: string } = {

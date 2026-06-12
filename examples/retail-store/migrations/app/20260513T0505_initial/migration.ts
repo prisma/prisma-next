@@ -3,28 +3,19 @@ import { MigrationCLI } from '@prisma-next/cli/migration-cli';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { createCollection, createIndex } from '@prisma-next/target-mongo/migration';
+import type { Contract } from './end-contract';
 import endContractJson from './end-contract.json' with { type: 'json' };
 
-const endContract = new MongoContractSerializer().deserializeContract(endContractJson);
+const endContract = new MongoContractSerializer().deserializeContract<Contract>(endContractJson);
 
-function requireValidator(collectionName: string) {
-  const ns = endContract.storage.namespaces['__unbound__'];
-  const validator = ns ? ns.entries['collection']?.[collectionName]?.validator : undefined;
-  if (validator === undefined) {
-    throw new Error(
-      `end-contract.json is missing a validator for the ${collectionName} collection`,
-    );
-  }
-  return validator;
-}
-
-const CARTS_VALIDATOR = requireValidator('carts');
-const EVENTS_VALIDATOR = requireValidator('events');
-const INVOICES_VALIDATOR = requireValidator('invoices');
-const LOCATIONS_VALIDATOR = requireValidator('locations');
-const ORDERS_VALIDATOR = requireValidator('orders');
-const PRODUCTS_VALIDATOR = requireValidator('products');
-const USERS_VALIDATOR = requireValidator('users');
+const COLLECTIONS = endContract.storage.namespaces.__unbound__.entries.collection;
+const CARTS_VALIDATOR = COLLECTIONS.carts.validator;
+const EVENTS_VALIDATOR = COLLECTIONS.events.validator;
+const INVOICES_VALIDATOR = COLLECTIONS.invoices.validator;
+const LOCATIONS_VALIDATOR = COLLECTIONS.locations.validator;
+const ORDERS_VALIDATOR = COLLECTIONS.orders.validator;
+const PRODUCTS_VALIDATOR = COLLECTIONS.products.validator;
+const USERS_VALIDATOR = COLLECTIONS.users.validator;
 
 class M extends Migration {
   override describe() {
