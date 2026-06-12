@@ -1,6 +1,5 @@
 import {
   freezeNode,
-  type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
@@ -10,7 +9,7 @@ import {
   StorageTable,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
-import { blindCast, castAs } from '@prisma-next/utils/casts';
+import { blindCast } from '@prisma-next/utils/casts';
 
 export type SqliteDatabaseInput = {
   readonly id: string;
@@ -18,19 +17,6 @@ export type SqliteDatabaseInput = {
 };
 
 const SQLITE_NAMESPACE_KIND = 'sqlite-namespace' as const;
-
-function isMaterializedSqliteNamespace(
-  ns: Namespace | SqlNamespaceTablesInput,
-): ns is SqliteDatabase | SqliteUnboundDatabase {
-  if (typeof ns !== 'object' || ns === null) {
-    return false;
-  }
-  const proto = Object.getPrototypeOf(ns);
-  if (proto === Object.prototype || proto === null) {
-    return false;
-  }
-  return (ns as { kind?: unknown }).kind === SQLITE_NAMESPACE_KIND;
-}
 
 /**
  * SQLite namespace concretion carrying table metadata under
@@ -47,7 +33,8 @@ export class SqliteDatabase extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const builtEntries: Record<string, Readonly<Record<string, unknown>>> = {};
+    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
+    let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
     for (const [kind, rawMap] of Object.entries(input.entries)) {
       if (kind === 'table') {
         const tableMap: Record<string, StorageTable> = {};
@@ -59,17 +46,13 @@ export class SqliteDatabase extends NamespaceBase {
         )) {
           tableMap[name] = new StorageTable(v);
         }
-        builtEntries['table'] = Object.freeze(tableMap);
+        table = Object.freeze(tableMap);
       } else {
-        builtEntries[kind] = Object.freeze(rawMap);
+        carried[kind] = Object.freeze(rawMap);
       }
     }
 
-    if (!Object.hasOwn(builtEntries, 'table')) {
-      builtEntries['table'] = Object.freeze({});
-    }
-
-    this.entries = Object.freeze(builtEntries) as SqlNamespaceEntries;
+    this.entries = Object.freeze({ ...carried, table });
     Object.defineProperty(this, 'kind', {
       value: SQLITE_NAMESPACE_KIND,
       writable: false,
@@ -129,27 +112,9 @@ export function buildSqliteNamespace(
   const tableCount = tableKind !== undefined ? Object.keys(tableKind).length : 0;
   const hasUnknownKinds = Object.keys(input.entries).some((kind) => kind !== 'table');
   if (tableCount === 0 && !hasUnknownKinds) {
-    return castAs<SqliteUnboundDatabase>(SqliteUnboundDatabase.instance);
+    return SqliteUnboundDatabase.instance;
   }
   return new SqliteDatabase({ id: input.id, entries: input.entries });
-}
-
-export function buildSqliteNamespaceMap(
-  namespaces: Readonly<Record<string, Namespace | SqlNamespaceTablesInput>>,
-): Readonly<Record<string, SqliteDatabase | SqliteUnboundDatabase>> {
-  return Object.fromEntries(
-    Object.entries(namespaces).map(([nsKey, ns]) => [
-      nsKey,
-      isMaterializedSqliteNamespace(ns)
-        ? ns
-        : buildSqliteNamespace(
-            blindCast<
-              SqlNamespaceTablesInput,
-              'non-materialized SQLite namespace map entry is a SqlNamespaceTablesInput'
-            >(ns),
-          ),
-    ]),
-  );
 }
 
 /**
