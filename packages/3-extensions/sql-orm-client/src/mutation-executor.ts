@@ -1048,11 +1048,20 @@ async function deleteJunctionLink(
   parentPkValues: Map<string, unknown>,
   targetPkValues: Map<string, unknown>,
 ): Promise<void> {
-  const exprs: AnyExpression[] = [];
+  // Merge through writeJunctionColumn like the INSERT side: a shared junction
+  // column with mismatched parent/target values surfaces the same conflict
+  // error as connect instead of emitting contradictory predicates that make
+  // the DELETE silently match nothing.
+  const junctionRow: Record<string, unknown> = {};
   for (const [column, value] of parentPkValues.entries()) {
-    exprs.push(BinaryExpr.eq(ColumnRef.of(through.table, column), LiteralExpr.of(value)));
+    writeJunctionColumn(junctionRow, through, column, value);
   }
   for (const [column, value] of targetPkValues.entries()) {
+    writeJunctionColumn(junctionRow, through, column, value);
+  }
+
+  const exprs: AnyExpression[] = [];
+  for (const [column, value] of Object.entries(junctionRow)) {
     exprs.push(BinaryExpr.eq(ColumnRef.of(through.table, column), LiteralExpr.of(value)));
   }
 
