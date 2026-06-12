@@ -14,6 +14,7 @@ import {
   type StorageValueSetInput,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { escapeLiteral } from './sql-utils';
 
@@ -58,7 +59,10 @@ export class PostgresSchema extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const builtEntries: Record<string, Readonly<Record<string, unknown>>> = {};
+    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
+    let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
+    let type: Readonly<Record<string, PostgresEnumType>> = Object.freeze({});
+    let valueSet: Readonly<Record<string, StorageValueSet>> | undefined;
     for (const [kind, rawMap] of Object.entries(input.entries)) {
       if (kind === 'table') {
         const tableMap: Record<string, StorageTable> = {};
@@ -70,7 +74,7 @@ export class PostgresSchema extends NamespaceBase {
         )) {
           tableMap[name] = new StorageTable(v);
         }
-        builtEntries['table'] = Object.freeze(tableMap);
+        table = Object.freeze(tableMap);
       } else if (kind === 'type') {
         const typeMap: Record<string, PostgresEnumType> = {};
         for (const [name, v] of Object.entries(
@@ -81,7 +85,7 @@ export class PostgresSchema extends NamespaceBase {
         )) {
           typeMap[name] = new PostgresEnumType(v);
         }
-        builtEntries['type'] = Object.freeze(typeMap);
+        type = Object.freeze(typeMap);
       } else if (kind === 'valueSet') {
         const vsMap: Record<string, StorageValueSet> = {};
         for (const [name, v] of Object.entries(
@@ -92,26 +96,20 @@ export class PostgresSchema extends NamespaceBase {
         )) {
           vsMap[name] = new StorageValueSet(v);
         }
-        builtEntries['valueSet'] = Object.freeze(vsMap);
+        if (Object.keys(vsMap).length > 0) {
+          valueSet = Object.freeze(vsMap);
+        }
       } else {
-        builtEntries[kind] = Object.freeze(rawMap);
+        carried[kind] = Object.freeze(rawMap);
       }
     }
 
-    if (!Object.hasOwn(builtEntries, 'table')) {
-      builtEntries['table'] = Object.freeze({});
-    }
-    if (!Object.hasOwn(builtEntries, 'type')) {
-      builtEntries['type'] = Object.freeze({});
-    }
-
-    const valueSetMap = builtEntries['valueSet'];
-    if (valueSetMap !== undefined && Object.keys(valueSetMap).length > 0) {
-      this.entries = Object.freeze(builtEntries) as PostgresNamespaceEntries;
-    } else {
-      delete builtEntries['valueSet'];
-      this.entries = Object.freeze(builtEntries) as PostgresNamespaceEntries;
-    }
+    this.entries = Object.freeze({
+      ...carried,
+      table,
+      type,
+      ...ifDefined('valueSet', valueSet),
+    });
     Object.defineProperty(this, 'kind', {
       value: 'schema',
       writable: false,
@@ -126,10 +124,7 @@ export class PostgresSchema extends NamespaceBase {
   }
 
   get type(): Readonly<Record<string, PostgresEnumType>> {
-    return blindCast<
-      Readonly<Record<string, PostgresEnumType>>,
-      'entries[type] holds only PostgresEnumType by construction'
-    >(this.entries.type ?? Object.freeze({}));
+    return this.entries.type ?? Object.freeze({});
   }
 
   get valueSet(): Readonly<Record<string, StorageValueSet>> | undefined {
