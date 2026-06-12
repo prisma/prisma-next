@@ -4,6 +4,7 @@ import type {
   CreateIndexOptions,
 } from '@prisma-next/mongo-query-ast/control';
 import type { Document, RawPipeline } from '@prisma-next/mongo-value';
+import type { DefinedProps } from '@prisma-next/utils/defined';
 
 abstract class MongoWireCommand {
   abstract readonly kind: string;
@@ -158,9 +159,9 @@ export class AggregateWireCommand extends MongoWireCommand {
 
 export class CreateCollectionWireCommand extends MongoWireCommand {
   readonly kind = 'createCollection' as const;
-  readonly options: Partial<CreateCollectionOptions>;
+  readonly options: DefinedProps<CreateCollectionOptions>;
 
-  constructor(collection: string, options: Partial<CreateCollectionOptions>) {
+  constructor(collection: string, options: DefinedProps<CreateCollectionOptions>) {
     super(collection);
     this.options = options;
     this.freeze();
@@ -170,12 +171,12 @@ export class CreateCollectionWireCommand extends MongoWireCommand {
 export class CreateIndexWireCommand extends MongoWireCommand {
   readonly kind = 'createIndex' as const;
   readonly key: Record<string, number | string>;
-  readonly options: Partial<CreateIndexOptions>;
+  readonly options: DefinedProps<CreateIndexOptions>;
 
   constructor(
     collection: string,
     key: Record<string, number | string>,
-    options: Partial<CreateIndexOptions>,
+    options: DefinedProps<CreateIndexOptions>,
   ) {
     super(collection);
     this.key = key;
@@ -206,9 +207,9 @@ export class DropIndexWireCommand extends MongoWireCommand {
 
 export class CollModWireCommand extends MongoWireCommand {
   readonly kind = 'collMod' as const;
-  readonly options: Partial<CollModOptions>;
+  readonly options: DefinedProps<CollModOptions>;
 
-  constructor(collection: string, options: Partial<CollModOptions>) {
+  constructor(collection: string, options: DefinedProps<CollModOptions>) {
     super(collection);
     this.options = options;
     this.freeze();

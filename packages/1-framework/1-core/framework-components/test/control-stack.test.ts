@@ -722,12 +722,12 @@ describe('extractCodecLookup', () => {
     expect(codec.id).toBe('a@1');
   });
 
-  it('forCodecRef throws CODEC_DESCRIPTOR_MISSING for unknown codec ids', () => {
+  it('forCodecRef throws CONTRACT.CODEC_DESCRIPTOR_MISSING for unknown codec ids', () => {
     const lookup = extractCodecLookup([
       { id: 'desc', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
     ]);
     expect(() => lookup.forCodecRef({ codecId: 'nope@1' })).toThrow(
-      /CODEC_DESCRIPTOR_MISSING|nope@1/,
+      expect.objectContaining({ code: 'CONTRACT.CODEC_DESCRIPTOR_MISSING' }),
     );
   });
 });
