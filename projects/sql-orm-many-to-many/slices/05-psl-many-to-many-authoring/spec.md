@@ -33,9 +33,9 @@ Primary surface: `packages/2-sql/2-authoring/contract-psl/src/psl-relation-resol
 
 ## Slice-specific done conditions
 
-- [ ] A PSL schema with a junction (form decided at firm-up) emits a relation with `cardinality:'N:M'` + populated `through`, round-tripping `validateContract`.
-- [ ] ORM-API parity: `include` / `some`/`none`/`every` / nested write work from a PSL-authored M:N contract (a PSL fixture mirroring the TS `User↔Tag` fixture).
-- [ ] `fixtures:check` green; the M:N diagnostic behaves correctly (no false `PSL_ORPHANED_BACKRELATION_LIST` on a recognised junction).
+- [x] A PSL schema with a junction (form 1: explicit junction + bare lists) emits a relation with `cardinality:'N:M'` + populated `through`, round-tripping `validateContract` (commits `4be25be61`, `89da059ce`; `interpreter.relations.many-to-many.test.ts`, 10 tests).
+- [x] ORM-API parity: `include` / `some`/`none`/`every` / nested write work from a PSL-authored M:N contract (`fixtures/mn-psl/` + `mn-psl-parity.test.ts`, 8 integration tests; commits `079093820`, `0166dfa03`).
+- [x] `fixtures:check` green with mn-psl wired into the emit pipeline (commit `864b2ad77`); diagnostic correct — orphaned-list kept for unrecognised shapes, ambiguity diagnostic for symmetric self-referential lists.
 
 ## Open Questions — RESOLVED at pickup (2026-06-12, unattended; see `wip/unattended-decisions.md` #12)
 
