@@ -4,7 +4,7 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import { blindCast, castAs } from '@prisma-next/utils/casts';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { SqlNamespace, SqlNamespaceEntries, SqlNamespaceTablesInput } from './sql-storage';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
 import { StorageTable, type StorageTableInput } from './storage-table';
@@ -43,9 +43,9 @@ class SqlBoundNamespace extends NamespaceBase {
       !hasValueSets &&
       !hasUnknownKinds
     ) {
-      return castAs<SqlNamespace>(SqlUnboundNamespace.instance);
+      return SqlUnboundNamespace.instance;
     }
-    return castAs<SqlNamespace>(new SqlBoundNamespace(input));
+    return new SqlBoundNamespace(input);
   }
 
   private constructor(input: SqlNamespaceTablesInput) {
@@ -96,10 +96,7 @@ class SqlBoundNamespace extends NamespaceBase {
   }
 
   get table(): Readonly<Record<string, StorageTable>> {
-    return blindCast<
-      Readonly<Record<string, StorageTable>>,
-      'entries[table] holds only StorageTable by construction'
-    >(this.entries['table'] ?? Object.freeze({}));
+    return this.entries.table ?? Object.freeze({});
   }
 
   get valueSet(): Readonly<Record<string, StorageValueSet>> | undefined {
@@ -125,10 +122,7 @@ export function buildSqlNamespaceMap(
     Object.entries(namespaces).map(([nsKey, ns]) => [
       nsKey,
       isMaterializedSqlNamespace(ns)
-        ? blindCast<
-            SqlNamespace,
-            'a materialised SQL-family namespace entry in a namespace map is a SqlNamespace'
-          >(ns)
+        ? ns
         : SqlBoundNamespace.fromTablesInput(
             blindCast<
               SqlNamespaceTablesInput,
