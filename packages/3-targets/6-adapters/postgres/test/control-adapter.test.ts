@@ -148,9 +148,6 @@ describe('PostgresControlAdapter', () => {
           if (sql.includes('pg_extension')) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('pg_enum')) {
-            return { rows: [] as unknown as Row[] };
-          }
           if (sql.includes('version()')) {
             return {
               rows: [{ version: 'PostgreSQL 15.1 on x86_64-pc-linux-gnu' }] as unknown as Row[],
@@ -215,9 +212,6 @@ describe('PostgresControlAdapter', () => {
           if (sql.includes('pg_extension')) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('pg_enum')) {
-            return { rows: [] as unknown as Row[] };
-          }
           if (sql.includes('version()')) {
             return {
               rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
@@ -273,9 +267,6 @@ describe('PostgresControlAdapter', () => {
           if (sql.includes('pg_extension')) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('pg_enum')) {
-            return { rows: [] as unknown as Row[] };
-          }
           if (sql.includes('version()')) {
             return {
               rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
@@ -329,9 +320,6 @@ describe('PostgresControlAdapter', () => {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_extension')) {
-            return { rows: [] as unknown as Row[] };
-          }
-          if (sql.includes('pg_enum')) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('version()')) {
@@ -454,9 +442,6 @@ describe('PostgresControlAdapter', () => {
           if (sql.includes('pg_extension')) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('pg_enum')) {
-            return { rows: [] as unknown as Row[] };
-          }
           if (sql.includes('version()')) {
             return {
               rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
@@ -498,7 +483,6 @@ describe('PostgresControlAdapter', () => {
         { match: includes('UNIQUE'), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
-        { match: includes('pg_enum'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
       ]);
 
@@ -598,7 +582,6 @@ describe('PostgresControlAdapter', () => {
         { match: includes('UNIQUE'), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
-        { match: includes('pg_enum'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
       ]);
 
@@ -1526,7 +1509,6 @@ describe('PostgresControlAdapter', () => {
         { match: includes('UNIQUE'), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
-        { match: includes('pg_enum'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
       ]);
 
@@ -1564,7 +1546,6 @@ describe('PostgresControlAdapter', () => {
         { match: includes('UNIQUE'), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
-        { match: includes('pg_enum'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
       ]);
 

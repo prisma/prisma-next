@@ -114,8 +114,11 @@ Pack-provided helper presets are available through the callback overload. This i
 ```typescript
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract, enumType, member } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
+
+const pgText = { codecId: 'pg/text@1', nativeType: 'text' } as const;
+const Role = enumType('role', pgText, member('USER', 'user'), member('ADMIN', 'admin'));
 
 export const contract = defineContract(
   {
@@ -123,10 +126,9 @@ export const contract = defineContract(
     target: postgresPack,
     extensionPacks: { pgvector },
   },
-  ({ type, enum: enumEntity, field, model, rel }) => {
+  ({ type, field, model, rel }) => {
     const types = {
       ShortName: type.sql.String(35),
-      Role: enumEntity({ name: 'role', values: ['USER', 'ADMIN'] as const }),
       Embedding1536: type.pgvector.Vector(1536),
     } as const;
 
@@ -134,7 +136,7 @@ export const contract = defineContract(
       fields: {
         id: field.id.uuidv7String().sql({ id: { name: 'user_pkey' } }),
         shortName: field.namedType(types.ShortName),
-        role: field.namedType(types.Role),
+        role: field.namedType(Role),
         embedding: field.namedType(types.Embedding1536).optional(),
         createdAt: field.temporal.createdAt(),
         updatedAt: field.temporal.updatedAt(),
@@ -150,6 +152,7 @@ export const contract = defineContract(
     });
 
     return {
+      enums: { role: Role },
       types,
       models: {
         User: User.relations({

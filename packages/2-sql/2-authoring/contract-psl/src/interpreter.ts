@@ -320,8 +320,8 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
     return { enumHandles, enumTypeDescriptors };
   }
 
-  const enumEntityDescriptor = getAuthoringEntity(input.authoringContributions, ['enum']);
-  if (!enumEntityDescriptor) {
+  const enumDescriptor = getAuthoringEntity(input.authoringContributions, ['enum']);
+  if (!enumDescriptor) {
     for (const decl of input.enumBlocks) {
       input.diagnostics.push({
         code: 'PSL_ENUM_MISSING_FACTORY',
@@ -336,7 +336,7 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
   for (const decl of input.enumBlocks) {
     const handle = instantiateAuthoringEntityType(
       'enum',
-      enumEntityDescriptor,
+      enumDescriptor,
       [decl],
       input.entityContext,
     );

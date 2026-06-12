@@ -23,7 +23,6 @@ export default defineConfig({
         'src/pack-types.ts', // Pure type definitions, no executable code
         // IR classes covered through integration paths today; per-class unit
         // tests are tracked as a follow-up before the 0.9 release ships.
-        'src/ir/postgres-enum-storage-entry.ts',
         'src/ir/sql-storage.ts',
         'src/ir/storage-column.ts',
         'src/ir/storage-table.ts',
