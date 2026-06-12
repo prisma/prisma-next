@@ -15,6 +15,7 @@ import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-la
 import {
   createExecutionContext,
   createSqlExecutionStack,
+  type RuntimeMutationDefaultGenerator,
   type RuntimeParameterizedCodecDescriptor,
   type SqlRuntimeExtensionDescriptor,
 } from '@prisma-next/sql-runtime';
@@ -142,14 +143,48 @@ const pgVectorCodecStubExtension: SqlRuntimeExtensionDescriptor<'postgres'> = ((
   };
 })();
 
-const testContext: ExecutionContext<TestContract> = createExecutionContext({
-  contract: baseTestContract,
-  stack: createSqlExecutionStack({
-    target: postgresTarget,
-    adapter: postgresAdapter,
-    extensionPacks: [pgVectorCodecStubExtension],
-  }),
-});
+/**
+ * Builds an {@link ExecutionContext} from the given contract — unlike
+ * spreading `{ ...getTestContext(), contract }`, this makes
+ * `applyMutationDefaults` observe the patched contract's execution defaults
+ * (the context's defaults applier is a closure over the contract it was
+ * created from). Extra mutation default generators referenced by the
+ * contract can be registered via `options.mutationDefaultGenerators`.
+ */
+export function buildTestContextFromContract(
+  contract: TestContract,
+  options?: {
+    readonly mutationDefaultGenerators?: ReadonlyArray<RuntimeMutationDefaultGenerator>;
+  },
+): ExecutionContext<TestContract> {
+  const generators = options?.mutationDefaultGenerators ?? [];
+  const extensionPacks: SqlRuntimeExtensionDescriptor<'postgres'>[] = [pgVectorCodecStubExtension];
+  if (generators.length > 0) {
+    extensionPacks.push({
+      kind: 'extension',
+      id: 'test-mutation-default-generators',
+      version: '0.0.0',
+      familyId: 'sql',
+      targetId: 'postgres',
+      codecs: () => [],
+      mutationDefaultGenerators: () => generators,
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    });
+  }
+
+  return createExecutionContext({
+    contract,
+    stack: createSqlExecutionStack({
+      target: postgresTarget,
+      adapter: postgresAdapter,
+      extensionPacks,
+    }),
+  });
+}
+
+const testContext: ExecutionContext<TestContract> = buildTestContextFromContract(baseTestContract);
 
 export function getTestContext(): ExecutionContext<TestContract> {
   return testContext;
@@ -401,6 +436,207 @@ export function buildStiPolyContract(): TestContract {
   };
 
   return deserializeTestContract(raw);
+}
+
+type RawColumn = { nativeType: string; codecId: string; nullable: boolean; default?: unknown };
+
+/**
+ * Builds a minimal M:N contract with Parent <-> Child via a junction table.
+ * Used by unit tests that assert M:N include and nested-write behavior.
+ */
+export function buildManyToManyContract(opts: {
+  junctionTable: string;
+  parentColumns: string[];
+  childColumns: string[];
+  targetColumns: string[];
+  localFields?: string[];
+  extraColumns?: Record<string, RawColumn>;
+}): FrameworkContract<SqlStorage> {
+  const {
+    junctionTable,
+    parentColumns,
+    childColumns,
+    targetColumns,
+    localFields = ['id'],
+    extraColumns = {},
+  } = opts;
+
+  const junctionStorageColumns: Record<string, RawColumn> = {};
+  for (const col of parentColumns) {
+    junctionStorageColumns[col] = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
+  }
+  for (const col of childColumns) {
+    junctionStorageColumns[col] = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
+  }
+  for (const [name, col] of Object.entries(extraColumns)) {
+    junctionStorageColumns[name] = col;
+  }
+
+  const parentStorageColumns: Record<string, RawColumn> = {};
+  for (const col of localFields) {
+    parentStorageColumns[col] = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
+  }
+
+  const parentStorageFields: Record<string, { column: string }> = {};
+  for (const col of localFields) {
+    parentStorageFields[col] = { column: col };
+  }
+
+  const parentFields: Record<
+    string,
+    { nullable: boolean; type: { kind: string; codecId: string } }
+  > = {};
+  for (const col of localFields) {
+    parentFields[col] = { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } };
+  }
+
+  return {
+    domain: {
+      namespaces: {
+        public: {
+          id: 'public',
+          models: {
+            Parent: {
+              fields: parentFields,
+              relations: {
+                children: {
+                  to: { model: 'Child', namespace: 'public' },
+                  cardinality: 'N:M',
+                  on: { localFields, targetFields: targetColumns },
+                  through: {
+                    table: junctionTable,
+                    namespaceId: 'public',
+                    parentColumns,
+                    childColumns,
+                    targetColumns,
+                  },
+                },
+              },
+              storage: { namespaceId: 'public', table: 'parents', fields: parentStorageFields },
+            },
+            Child: {
+              fields: Object.fromEntries(
+                targetColumns.map((col) => [
+                  col,
+                  { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+                ]),
+              ),
+              relations: {},
+              storage: {
+                namespaceId: 'public',
+                table: 'children',
+                fields: Object.fromEntries(targetColumns.map((col) => [col, { column: col }])),
+              },
+            },
+            Junction: {
+              fields: {},
+              relations: {},
+              storage: { namespaceId: 'public', table: junctionTable, fields: {} },
+            },
+          },
+        },
+      },
+    },
+    storage: {
+      namespaces: {
+        public: {
+          id: 'public',
+          entries: {
+            table: {
+              parents: {
+                columns: parentStorageColumns,
+                primaryKey: { columns: localFields },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              children: {
+                columns: Object.fromEntries(
+                  targetColumns.map((col) => [
+                    col,
+                    { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  ]),
+                ),
+                primaryKey: { columns: targetColumns },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              [junctionTable]: {
+                columns: junctionStorageColumns,
+                primaryKey: { columns: [...parentColumns, ...childColumns] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      },
+    },
+    capabilities: {},
+  } as unknown as FrameworkContract<SqlStorage>;
+}
+
+/**
+ * Extends {@link buildManyToManyContract} with an `Owner` model and an N:1
+ * `owner` relation on `Child` (children.owner_id → owners.id), so tests can
+ * exercise junction-created targets that carry their own relation mutations.
+ */
+export function buildManyToManyContractWithTargetRelation(): FrameworkContract<SqlStorage> {
+  const contract = buildManyToManyContract({
+    junctionTable: 'parent_child',
+    parentColumns: ['parent_id'],
+    childColumns: ['child_id'],
+    targetColumns: ['id'],
+  });
+
+  const intColumn = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
+  const intField = { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } };
+
+  interface MutableModel {
+    fields: Record<string, unknown>;
+    relations: Record<string, unknown>;
+    storage: { namespaceId: string; table: string; fields: Record<string, unknown> };
+  }
+  interface MutableTable {
+    columns: Record<string, unknown>;
+    primaryKey: { columns: string[] };
+    uniques: unknown[];
+    indexes: unknown[];
+    foreignKeys: unknown[];
+  }
+  const raw = contract as unknown as {
+    domain: { namespaces: { public: { models: Record<string, MutableModel> } } };
+    storage: { namespaces: { public: { entries: { table: Record<string, MutableTable> } } } };
+  };
+
+  const models = raw.domain.namespaces.public.models;
+  models['Owner'] = {
+    fields: { id: intField },
+    relations: {},
+    storage: { namespaceId: 'public', table: 'owners', fields: { id: { column: 'id' } } },
+  };
+  const child = models['Child']!;
+  child.fields['owner_id'] = intField;
+  child.storage.fields['owner_id'] = { column: 'owner_id' };
+  child.relations['owner'] = {
+    to: { model: 'Owner', namespace: 'public' },
+    cardinality: 'N:1',
+    on: { localFields: ['owner_id'], targetFields: ['id'] },
+  };
+
+  const tables = raw.storage.namespaces.public.entries.table;
+  tables['owners'] = {
+    columns: { id: intColumn },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  };
+  tables['children']!.columns['owner_id'] = intColumn;
+
+  return contract;
 }
 
 export function createMockRuntime(): MockRuntime {

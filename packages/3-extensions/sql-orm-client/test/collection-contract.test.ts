@@ -426,6 +426,30 @@ describe('resolveModelRelations() through descriptor', () => {
     ).toEqual([]);
   });
 
+  it('excludes execution-defaulted non-FK columns from requiredPayloadColumns', () => {
+    const contract = getTestContract();
+    const withExecutionDefault = {
+      ...contract,
+      execution: {
+        ...contract.execution,
+        mutations: {
+          defaults: [
+            ...(contract.execution?.mutations.defaults ?? []),
+            {
+              ref: { table: 'user_roles', column: 'level' },
+              onCreate: { kind: 'generator', id: 'test-level' },
+            },
+          ],
+        },
+      },
+    } as unknown as typeof contract;
+
+    expect(
+      resolveModelRelations(withExecutionDefault, 'public', 'User')['roles']?.through
+        ?.requiredPayloadColumns,
+    ).toEqual([]);
+  });
+
   it('omits through when the junction table is absent from its declared namespace', () => {
     const contract = withPatchedDomainModels(getTestContract(), (models) => {
       const user = models['User'] as { relations: Record<string, { through?: unknown }> };
