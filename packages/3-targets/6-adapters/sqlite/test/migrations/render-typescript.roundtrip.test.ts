@@ -146,7 +146,54 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
     const ops = JSON.parse(opsJson);
 
     const expected = JSON.parse(JSON.stringify(await Promise.all(renderOps(calls, testAdapter))));
-    expect(ops).toEqual(expected);
+
+    // D3 pending: the authored-migration facade's bare addColumn() factory
+    // still inlines its pragma_table_info checks as raw SQL strings, while the
+    // planner path (AddColumnCall.toOp(lowerer)) lowers typed, parameterized
+    // checks. Until D3 converts the facade, compare the column op's checks
+    // per-path and everything else exactly.
+    type CheckedOp = {
+      id: string;
+      precheck: unknown[];
+      postcheck: unknown[];
+    };
+    const stripColumnChecks = (op: CheckedOp) =>
+      op.id.startsWith('column.') ? { ...op, precheck: [], postcheck: [] } : op;
+    expect(ops.map(stripColumnChecks)).toEqual(expected.map(stripColumnChecks));
+
+    const renderedAddColumn = ops.find((op: CheckedOp) => op.id === 'column.user.nickname');
+    expect(renderedAddColumn).toMatchObject({
+      precheck: [
+        {
+          description: 'ensure column "nickname" is missing',
+          sql: "SELECT COUNT(*) = 0 FROM pragma_table_info('user') WHERE name = 'nickname'",
+        },
+      ],
+      postcheck: [
+        {
+          description: 'verify column "nickname" exists',
+          sql: "SELECT COUNT(*) > 0 FROM pragma_table_info('user') WHERE name = 'nickname'",
+        },
+      ],
+    });
+
+    const plannedAddColumn = expected.find((op: CheckedOp) => op.id === 'column.user.nickname');
+    expect(plannedAddColumn).toMatchObject({
+      precheck: [
+        {
+          description: 'ensure column "nickname" is missing',
+          sql: 'SELECT COUNT(*) = 0 AS "result" FROM pragma_table_info(?) WHERE "name" = ?',
+          params: ['user', 'nickname'],
+        },
+      ],
+      postcheck: [
+        {
+          description: 'verify column "nickname" exists',
+          sql: 'SELECT COUNT(*) > 0 AS "result" FROM pragma_table_info(?) WHERE "name" = ?',
+          params: ['user', 'nickname'],
+        },
+      ],
+    });
   });
 
   it('renders an empty calls list whose executed scaffold emits []', {

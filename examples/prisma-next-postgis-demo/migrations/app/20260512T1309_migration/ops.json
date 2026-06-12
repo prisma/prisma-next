@@ -15,7 +15,8 @@
     "precheck": [
       {
         "description": "ensure table \"cafe\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"cafe\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"cafe\""]
       }
     ],
     "execute": [
@@ -28,7 +29,8 @@
     "postcheck": [
       {
         "description": "verify table \"cafe\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"cafe\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"cafe\""]
       }
     ]
   },
@@ -48,7 +50,8 @@
     "precheck": [
       {
         "description": "ensure table \"neighborhood\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"neighborhood\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"neighborhood\""]
       }
     ],
     "execute": [
@@ -61,7 +64,8 @@
     "postcheck": [
       {
         "description": "verify table \"neighborhood\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"neighborhood\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"neighborhood\""]
       }
     ]
   },
@@ -81,7 +85,8 @@
     "precheck": [
       {
         "description": "ensure table \"route\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"route\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"route\""]
       }
     ],
     "execute": [
@@ -94,7 +99,8 @@
     "postcheck": [
       {
         "description": "verify table \"route\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"route\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"route\""]
       }
     ]
   }

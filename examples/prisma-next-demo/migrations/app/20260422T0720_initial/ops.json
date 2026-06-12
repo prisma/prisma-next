@@ -74,7 +74,8 @@
     "precheck": [
       {
         "description": "ensure table \"bug\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"bug\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"bug\""]
       }
     ],
     "execute": [
@@ -87,7 +88,8 @@
     "postcheck": [
       {
         "description": "verify table \"bug\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"bug\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"bug\""]
       }
     ]
   },
@@ -107,7 +109,8 @@
     "precheck": [
       {
         "description": "ensure table \"feature\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"feature\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"feature\""]
       }
     ],
     "execute": [
@@ -120,7 +123,8 @@
     "postcheck": [
       {
         "description": "verify table \"feature\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"feature\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"feature\""]
       }
     ]
   },
@@ -140,7 +144,8 @@
     "precheck": [
       {
         "description": "ensure table \"post\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"post\""]
       }
     ],
     "execute": [
@@ -153,7 +158,8 @@
     "postcheck": [
       {
         "description": "verify table \"post\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"post\""]
       }
     ]
   },
@@ -173,7 +179,8 @@
     "precheck": [
       {
         "description": "ensure table \"task\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"task\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"task\""]
       }
     ],
     "execute": [
@@ -186,7 +193,8 @@
     "postcheck": [
       {
         "description": "verify table \"task\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"task\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"task\""]
       }
     ]
   },
@@ -206,7 +214,8 @@
     "precheck": [
       {
         "description": "ensure table \"user\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"user\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"user\""]
       }
     ],
     "execute": [
@@ -219,7 +228,8 @@
     "postcheck": [
       {
         "description": "verify table \"user\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"user\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"user\""]
       }
     ]
   },
