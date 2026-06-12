@@ -51,12 +51,13 @@ export class TableProxyImpl<
     Alias extends string,
     AvailableScope extends Scope,
     QC extends QueryContext,
+    NsId extends string = string,
   >
   extends BuilderBase<C['capabilities']>
-  implements TableProxy<C, string, Name, Alias, AvailableScope, QC>
+  implements TableProxy<C, NsId, Name, Alias, AvailableScope, QC>
 {
   declare readonly [JoinOuterScope]: JoinSource<
-    StorageTableToScopeTable<NamespaceTable<C, string, Name>>,
+    StorageTableToScopeTable<NamespaceTable<C, NsId, Name>>,
     Alias
   >[typeof JoinOuterScope];
 
@@ -97,7 +98,7 @@ export class TableProxyImpl<
     > => {
       return this.#toJoined().lateralJoin(alias, builder);
     },
-  ) as TableProxy<C, string, Name, Alias, AvailableScope, QC>['lateralJoin'];
+  ) as TableProxy<C, NsId, Name, Alias, AvailableScope, QC>['lateralJoin'];
 
   outerLateralJoin = this._gate(
     { sql: { lateral: true } },
@@ -114,7 +115,7 @@ export class TableProxyImpl<
     > => {
       return this.#toJoined().outerLateralJoin(alias, builder);
     },
-  ) as TableProxy<C, string, Name, Alias, AvailableScope, QC>['outerLateralJoin'];
+  ) as TableProxy<C, NsId, Name, Alias, AvailableScope, QC>['outerLateralJoin'];
 
   getJoinOuterScope(): Scope {
     return this.#scope;
@@ -126,8 +127,15 @@ export class TableProxyImpl<
 
   as<NewAlias extends string>(
     newAlias: NewAlias,
-  ): TableProxy<C, string, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>, QC> {
-    return new TableProxyImpl(this.#tableName, this.#table, newAlias, this.ctx, this.#namespaceId);
+  ): TableProxy<C, NsId, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>, QC> {
+    return new TableProxyImpl<
+      C,
+      Name,
+      NewAlias,
+      RebindScope<AvailableScope, Alias, NewAlias>,
+      QC,
+      NsId
+    >(this.#tableName, this.#table, newAlias, this.ctx, this.#namespaceId);
   }
 
   select<Columns extends (keyof AvailableScope['topLevel'] & string)[]>(

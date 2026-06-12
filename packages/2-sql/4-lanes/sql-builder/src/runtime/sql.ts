@@ -46,6 +46,9 @@ export function sql<C extends Contract<SqlStorage> & TableProxyContract>(
             }
             const table = resolveTableInNamespace(storage, namespaceId, tableName);
             if (table) {
+              // `namespaceId` is a dynamic Proxy key with no static literal here, so the
+              // proxy's `NsId` type param lands on its `string` default at this boundary.
+              // `TableProxyImpl` still forwards `NsId` through its `as()`/join chain.
               return new TableProxyImpl(tableName, table, tableName, ctx, namespaceId);
             }
             return undefined;

@@ -76,9 +76,12 @@ describe('generateContractDts domain namespace handling', () => {
       },
     };
     const dts = generateContractDts(contract, mockSqlHook, [], HASHES);
-    // The flattened top-level models type is still first-name-wins (auth's User), but the
-    // FieldOutputTypes / FieldInputTypes maps are now nested by namespace, so each
-    // namespace's own fields appear under their coordinate regardless of the flatten.
+    // The flattened top-level models type is still emitted (first-name-wins, auth's User)
+    // because it backs the public `Models` convenience export and the `ContractType<…, models>`
+    // model param. Internal type resolution no longer reads it — column/field types resolve
+    // per-namespace from the FieldOutputTypes / FieldInputTypes maps, which are now nested by
+    // namespace, so each namespace's own fields appear under their coordinate regardless of the
+    // flatten. Retiring the flat top-level models entirely is a separate follow-up.
     const emailCount = (dts.match(/emailAddress/g) ?? []).length;
     const roleLabelCount = (dts.match(/roleLabel/g) ?? []).length;
     // emailAddress appears in: (1) flattened ContractBase models type, (2) per-namespace auth

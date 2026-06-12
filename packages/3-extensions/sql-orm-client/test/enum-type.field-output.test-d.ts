@@ -22,8 +22,6 @@ type EnumCodecTypes = {
   };
 };
 
-// Field-type maps are nested by namespace coordinate; this fixture's models
-// live under the `__unbound__` storage namespace.
 type EnumFieldOutputTypes = {
   __unbound__: {
     User: {
