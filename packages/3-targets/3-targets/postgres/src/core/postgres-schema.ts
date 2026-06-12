@@ -177,9 +177,9 @@ export class PostgresSchema extends NamespaceBase {
    * catalog filters, planner conflict lookups). Named schemas resolve
    * to their own id. The `PostgresUnboundSchema` singleton inherits
    * this and returns `UNBOUND_NAMESPACE_ID` — callers that dispatch
-   * through `qualifyTableName` / `toRegclassLiteral` route through the
-   * polymorphic `PostgresUnboundSchema` overrides and produce
-   * unqualified (search-path-resolved) output automatically.
+   * through `qualifyTableName` route through the polymorphic
+   * `PostgresUnboundSchema` overrides and produce unqualified
+   * (search-path-resolved) output automatically.
    */
   ddlSchemaName(_storage: SqlStorage): string {
     return this.id;
@@ -201,9 +201,9 @@ export class PostgresSchema extends NamespaceBase {
  * `search_path`).
  *
  * `ddlSchemaName` is inherited from `PostgresSchema` and returns
- * `UNBOUND_NAMESPACE_ID`. Downstream helpers (`qualifyTableName`,
- * `toRegclassLiteral`) route through the polymorphic factory and
- * produce unqualified output automatically.
+ * `UNBOUND_NAMESPACE_ID`. Downstream helpers such as `qualifyTableName`
+ * route through the polymorphic factory and produce unqualified output
+ * automatically.
  */
 export class PostgresUnboundSchema extends PostgresSchema {
   static readonly instance: PostgresUnboundSchema = new PostgresUnboundSchema();

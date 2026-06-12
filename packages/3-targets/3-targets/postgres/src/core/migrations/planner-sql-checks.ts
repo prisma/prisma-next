@@ -5,7 +5,7 @@ import type {
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { postgresCreateNamespace } from '../postgres-schema';
-import { escapeLiteral, quoteIdentifier } from '../sql-utils';
+import { quoteIdentifier } from '../sql-utils';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
 /**
@@ -21,99 +21,6 @@ import { resolveColumnTypeMetadata } from './planner-type-resolution';
  */
 export function qualifyTableName(schema: string, table: string): string {
   return postgresCreateNamespace({ id: schema, entries: { table: {} } }).qualifyTable(table);
-}
-
-export function toRegclassLiteral(schema: string, name: string): string {
-  return postgresCreateNamespace({ id: schema, entries: { table: {} } }).regclassLiteral(name);
-}
-
-export function columnExistsCheck({
-  schema,
-  table,
-  column,
-  exists = true,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  exists?: boolean;
-}): string {
-  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
-  const existsClause = exists ? '' : 'NOT ';
-  return `SELECT ${existsClause}EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = ${namespace.schemaSqlExpression()}
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-)`;
-}
-
-export function columnNullabilityCheck({
-  schema,
-  table,
-  column,
-  nullable,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  nullable: boolean;
-}): string {
-  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
-  const expected = nullable ? 'YES' : 'NO';
-  return `SELECT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = ${namespace.schemaSqlExpression()}
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-    AND is_nullable = '${expected}'
-)`;
-}
-
-export function tableIsEmptyCheck(qualifiedTableName: string): string {
-  return `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedTableName} LIMIT 1)`;
-}
-
-export function columnHasNoDefaultCheck(opts: {
-  schema: string;
-  table: string;
-  column: string;
-}): string {
-  const namespace = postgresCreateNamespace({ id: opts.schema, entries: { table: {} } });
-  return `SELECT NOT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = ${namespace.schemaSqlExpression()}
-    AND table_name = '${escapeLiteral(opts.table)}'
-    AND column_name = '${escapeLiteral(opts.column)}'
-    AND column_default IS NOT NULL
-)`;
-}
-
-export function tableHasPrimaryKeyCheck(
-  schema: string,
-  table: string,
-  exists: boolean,
-  constraintName?: string,
-): string {
-  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
-  const comparison = exists ? '' : 'NOT ';
-  const constraintFilter = constraintName
-    ? `AND c2.relname = '${escapeLiteral(constraintName)}'`
-    : '';
-  return `SELECT ${comparison}EXISTS (
-  SELECT 1
-  FROM pg_index i
-  JOIN pg_class c ON c.oid = i.indrelid
-  JOIN pg_namespace n ON n.oid = c.relnamespace
-  LEFT JOIN pg_class c2 ON c2.oid = i.indexrelid
-  WHERE n.nspname = ${namespace.schemaSqlExpression()}
-    AND c.relname = '${escapeLiteral(table)}'
-    AND i.indisprimary
-    ${constraintFilter}
-)`;
 }
 
 const FORMAT_TYPE_DISPLAY: ReadonlyMap<string, string> = new Map([
