@@ -185,16 +185,6 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       return raw;
     }
     const rawRecord = isPlainRecord(raw) ? raw : {};
-    if (
-      Object.hasOwn(rawRecord, 'tables') ||
-      Object.hasOwn(rawRecord, 'enum') ||
-      Object.hasOwn(rawRecord, 'collections')
-    ) {
-      throw new ContractValidationError(
-        'Namespace envelope uses deprecated flat slot keys; expected `entries: { table? }`',
-        'structural',
-      );
-    }
     const id = typeof rawRecord['id'] === 'string' ? rawRecord['id'] : nsId;
     const parsed = NamespaceRawSchema({ ...rawRecord, id });
     if (parsed instanceof type.errors) {
