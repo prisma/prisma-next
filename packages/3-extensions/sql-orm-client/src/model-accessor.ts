@@ -489,7 +489,7 @@ function firstJoinColumn(columns: readonly string[], label: string): string {
   return first;
 }
 
-function buildPairedColumnExprs(
+export function buildPairedColumnExprs(
   leftTable: string,
   leftColumns: readonly string[],
   rightTable: string,

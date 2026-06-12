@@ -17,7 +17,7 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { createModelAccessor } from '../src/model-accessor';
+import { buildPairedColumnExprs, createModelAccessor } from '../src/model-accessor';
 import {
   buildMixedPolyContract,
   getTestContext,
@@ -698,31 +698,6 @@ describe('createModelAccessor', () => {
       );
     });
 
-    function contractWithProjectRelatedThrough(
-      patch: (through: Record<string, unknown>) => Record<string, unknown>,
-    ) {
-      return withPatchedDomainModels(getTestContract(), (models) => {
-        const project = models['Project'] as {
-          relations: Record<string, { through: Record<string, unknown> }>;
-        };
-        const related = project.relations['related']!;
-
-        return {
-          ...models,
-          Project: {
-            ...project,
-            relations: {
-              ...project.relations,
-              related: {
-                ...related,
-                through: patch(related.through),
-              },
-            },
-          },
-        };
-      });
-    }
-
     it('aliases the related table for self-referential M:N predicates', () => {
       const accessor = createModelAccessor(context, 'public', 'Project') as unknown as Record<
         string,
@@ -755,35 +730,20 @@ describe('createModelAccessor', () => {
     });
 
     it('throws when M:N join metadata column counts differ', () => {
-      const contract = contractWithProjectRelatedThrough((through) => ({
-        ...through,
-        targetColumns: ['tenant_id'],
-      }));
-      const accessor = createModelAccessor(
-        { ...context, contract },
-        'public',
-        'Project',
-      ) as unknown as Record<string, { some: () => unknown }>;
-
-      expect(() => accessor['related']!.some()).toThrow(
-        /Relation metadata has mismatched join column counts/,
-      );
+      expect(() =>
+        buildPairedColumnExprs('project_links', ['dst_tenant_id', 'dst_id'], 'projects', [
+          'tenant_id',
+        ]),
+      ).toThrow(/Relation metadata has mismatched join column counts/);
     });
 
     it('throws when M:N join metadata omits a paired column', () => {
-      const contract = contractWithProjectRelatedThrough((through) => ({
-        ...through,
-        childColumns: ['dst_tenant_id', ''],
-      }));
-      const accessor = createModelAccessor(
-        { ...context, contract },
-        'public',
-        'Project',
-      ) as unknown as Record<string, { some: () => unknown }>;
-
-      expect(() => accessor['related']!.some()).toThrow(
-        /Relation metadata is missing a join column pair/,
-      );
+      expect(() =>
+        buildPairedColumnExprs('project_links', ['dst_tenant_id', ''], 'projects', [
+          'tenant_id',
+          'id',
+        ]),
+      ).toThrow(/Relation metadata is missing a join column pair/);
     });
   });
 
