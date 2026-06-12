@@ -103,7 +103,20 @@ export type PslDiagnosticCode =
   /**
    * A `@@`-prefixed block-attribute line inside an extension block has invalid syntax.
    */
-  | 'PSL_INVALID_EXTENSION_BLOCK_ATTRIBUTE';
+  | 'PSL_INVALID_EXTENSION_BLOCK_ATTRIBUTE'
+  /**
+   * A written type reference (a field type or a named-type alias target) names
+   * no in-document declaration, scalar, named type, constructor, or cross-space
+   * target. The resolver records the reference as an `unresolved` target and
+   * emits this code anchored on the type's span.
+   */
+  | 'PSL_UNRESOLVED_TYPE_REFERENCE'
+  /**
+   * Two declarations share a name within one scope/kind (e.g. `model User`
+   * declared twice in one namespace). The resolver keeps the first declaration
+   * in the name-keyed store and emits this code anchored on the duplicate's span.
+   */
+  | 'PSL_DUPLICATE_DECLARATION';
 
 /**
  * Descriptor vocabulary for a single parameter on a declared block.
