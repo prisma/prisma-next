@@ -78,7 +78,7 @@ function activeUsersOnly(): SqlMiddleware {
     familyId: 'sql',
     async beforeCompile(draft) {
       if (draft.ast.kind !== 'select') return undefined;
-      if (draft.ast.from.kind !== 'table-source') return undefined;
+      if (draft.ast.from?.kind !== 'table-source') return undefined;
       if (draft.ast.from.name !== 'users') return undefined;
       const invitedByPresent = BinaryExpr.gte(ColumnRef.of('users', 'id'), LiteralExpr.of(2));
       const newAst: SelectAst = draft.ast.withWhere(
