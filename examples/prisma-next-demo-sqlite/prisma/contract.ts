@@ -22,15 +22,15 @@ export const contract = defineContract({}, ({ field, model }) => {
 
   const Tag = model('Tag', {
     fields: {
-      id: field.id.uuidv4(),
+      id: field.id.uuidv4String(),
       label: field.column(textColumn),
     },
   });
 
   const PostTag = model('PostTag', {
     fields: {
-      postId: field.uuid(),
-      tagId: field.uuid(),
+      postId: field.uuidString(),
+      tagId: field.uuidString(),
     },
   }).attributes(({ fields, constraints }) => ({
     id: constraints.id([fields.postId, fields.tagId], { name: 'post_tag_pkey' }),
