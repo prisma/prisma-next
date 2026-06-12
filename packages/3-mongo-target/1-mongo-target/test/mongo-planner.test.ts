@@ -573,11 +573,11 @@ describe('MongoMigrationPlanner', () => {
       expect(plan.operations).toHaveLength(1);
       const cmd = (plan.operations[0] as MongoMigrationPlanOperation).execute[0]!
         .command as CreateIndexCommand;
-      expect(cmd.options?.weights).toEqual({ bio: 10 });
-      expect(cmd.options?.default_language).toBe('english');
-      expect(cmd.options?.language_override).toBe('lang');
-      expect(cmd.options?.collation).toEqual({ locale: 'en' });
-      expect(cmd.options?.wildcardProjection).toEqual({ bio: 1 });
+      expect(cmd.weights).toEqual({ bio: 10 });
+      expect(cmd.default_language).toBe('english');
+      expect(cmd.language_override).toBe('lang');
+      expect(cmd.collation).toEqual({ locale: 'en' });
+      expect(cmd.wildcardProjection).toEqual({ bio: 1 });
     });
   });
 
@@ -599,8 +599,8 @@ describe('MongoMigrationPlanner', () => {
       );
       expect(collModOps).toHaveLength(1);
       const cmd = collModOps[0]!.execute[0]!.command as CollModCommand;
-      expect(cmd.options.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
-      expect(cmd.options.validationLevel).toBe('strict');
+      expect(cmd.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
+      expect(cmd.validationLevel).toBe('strict');
     });
 
     it('validator add has precheck (collection exists) and postcheck (validator applied)', () => {
@@ -1071,8 +1071,8 @@ describe('MongoMigrationPlanner', () => {
       expect(createOps).toHaveLength(1);
       const cmd = createOps[0]!.execute[0]!.command as CreateCollectionCommand;
       expect(cmd.collection).toBe('events');
-      expect(cmd.options?.capped).toBe(true);
-      expect(cmd.options?.size).toBe(1048576);
+      expect(cmd.capped).toBe(true);
+      expect(cmd.size).toBe(1048576);
     });
 
     // TML-2486: bare collections (no validator/options/indexes) must still
@@ -1098,7 +1098,8 @@ describe('MongoMigrationPlanner', () => {
       for (const op of createOps) {
         expect(op.operationClass).toBe('additive');
         const cmd = op.execute[0]!.command as CreateCollectionCommand;
-        expect(cmd.options).toBeUndefined();
+        expect(cmd.capped).toBeUndefined();
+        expect(cmd.validator).toBeUndefined();
       }
     });
 
@@ -1345,7 +1346,7 @@ describe('MongoMigrationPlanner', () => {
       expect(collModOps).toHaveLength(1);
       expect(collModOps[0]!.operationClass).toBe('destructive');
       const cmd = collModOps[0]!.execute[0]!.command as CollModCommand;
-      expect(cmd.options.changeStreamPreAndPostImages).toEqual({ enabled: false });
+      expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: false });
     });
 
     it('orders creates before indexes, drops after', () => {

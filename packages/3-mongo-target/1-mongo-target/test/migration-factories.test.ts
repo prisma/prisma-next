@@ -55,8 +55,8 @@ describe('createIndex', () => {
     expect(cmd).toBeInstanceOf(CreateIndexCommand);
     expect(cmd.collection).toBe('users');
     expect(cmd.keys).toEqual(keys);
-    expect(cmd.options?.unique).toBe(true);
-    expect(cmd.options?.name).toBe(defaultMongoIndexName(keys));
+    expect(cmd.unique).toBe(true);
+    expect(cmd.name).toBe(defaultMongoIndexName(keys));
   });
 
   it('includes postcheck that index exists', () => {
@@ -91,9 +91,9 @@ describe('createIndex', () => {
     });
 
     const cmd = op.execute[0]!.command as CreateIndexCommand;
-    expect(cmd.options?.sparse).toBe(true);
-    expect(cmd.options?.expireAfterSeconds).toBe(3600);
-    expect(cmd.options?.collation).toEqual({ locale: 'en' });
+    expect(cmd.sparse).toBe(true);
+    expect(cmd.expireAfterSeconds).toBe(3600);
+    expect(cmd.collation).toEqual({ locale: 'en' });
   });
 
   it('uses key spec filter for non-text indexes', () => {
@@ -195,9 +195,9 @@ describe('createCollection', () => {
     });
 
     const cmd = op.execute[0]!.command as CreateCollectionCommand;
-    expect(cmd.options?.validator).toEqual({ $jsonSchema: { required: ['email'] } });
-    expect(cmd.options?.validationLevel).toBe('strict');
-    expect(cmd.options?.validationAction).toBe('error');
+    expect(cmd.validator).toEqual({ $jsonSchema: { required: ['email'] } });
+    expect(cmd.validationLevel).toBe('strict');
+    expect(cmd.validationAction).toBe('error');
   });
 
   it('passes through capped options', () => {
@@ -208,9 +208,9 @@ describe('createCollection', () => {
     });
 
     const cmd = op.execute[0]!.command as CreateCollectionCommand;
-    expect(cmd.options?.capped).toBe(true);
-    expect(cmd.options?.size).toBe(1000000);
-    expect(cmd.options?.max).toBe(5000);
+    expect(cmd.capped).toBe(true);
+    expect(cmd.size).toBe(1000000);
+    expect(cmd.max).toBe(5000);
   });
 
   it('passes through timeseries options', () => {
@@ -219,7 +219,7 @@ describe('createCollection', () => {
     });
 
     const cmd = op.execute[0]!.command as CreateCollectionCommand;
-    expect(cmd.options?.timeseries).toEqual({
+    expect(cmd.timeseries).toEqual({
       timeField: 'timestamp',
       metaField: 'source',
       granularity: 'minutes',
@@ -233,8 +233,8 @@ describe('createCollection', () => {
     });
 
     const cmd = op.execute[0]!.command as CreateCollectionCommand;
-    expect(cmd.options?.collation).toEqual({ locale: 'en', strength: 2 });
-    expect(cmd.options?.clusteredIndex).toEqual({ key: { _id: 1 }, unique: true });
+    expect(cmd.collation).toEqual({ locale: 'en', strength: 2 });
+    expect(cmd.clusteredIndex).toEqual({ key: { _id: 1 }, unique: true });
   });
 
   it('passes through changeStreamPreAndPostImages', () => {
@@ -243,7 +243,7 @@ describe('createCollection', () => {
     });
 
     const cmd = op.execute[0]!.command as CreateCollectionCommand;
-    expect(cmd.options?.changeStreamPreAndPostImages).toEqual({ enabled: true });
+    expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: true });
   });
 
   it('has empty postcheck', () => {
@@ -292,7 +292,7 @@ describe('setValidation', () => {
     const cmd = op.execute[0]!.command as CollModCommand;
     expect(cmd).toBeInstanceOf(CollModCommand);
     expect(cmd.collection).toBe('users');
-    expect(cmd.options.validator).toEqual({ $jsonSchema: schema });
+    expect(cmd.validator).toEqual({ $jsonSchema: schema });
   });
 
   it('passes through validationLevel and validationAction', () => {
@@ -306,8 +306,8 @@ describe('setValidation', () => {
     );
 
     const cmd = op.execute[0]!.command as CollModCommand;
-    expect(cmd.options.validationLevel).toBe('moderate');
-    expect(cmd.options.validationAction).toBe('warn');
+    expect(cmd.validationLevel).toBe('moderate');
+    expect(cmd.validationAction).toBe('warn');
   });
 
   it('has empty precheck and postcheck', () => {
@@ -335,9 +335,9 @@ describe('validatedCollection', () => {
     expect(ops[0]!.id).toBe('collection.users.create');
 
     const cmd = ops[0]!.execute[0]!.command as CreateCollectionCommand;
-    expect(cmd.options?.validator).toEqual({ $jsonSchema: { required: ['email'] } });
-    expect(cmd.options?.validationLevel).toBe('strict');
-    expect(cmd.options?.validationAction).toBe('error');
+    expect(cmd.validator).toEqual({ $jsonSchema: { required: ['email'] } });
+    expect(cmd.validationLevel).toBe('strict');
+    expect(cmd.validationAction).toBe('error');
   });
 
   it('includes indexes after collection creation', () => {
@@ -351,11 +351,11 @@ describe('validatedCollection', () => {
 
     const idx1 = ops[1]!.execute[0]!.command as CreateIndexCommand;
     expect(idx1.collection).toBe('users');
-    expect(idx1.options?.unique).toBe(true);
+    expect(idx1.unique).toBe(true);
 
     const idx2 = ops[2]!.execute[0]!.command as CreateIndexCommand;
     expect(idx2.collection).toBe('users');
-    expect(idx2.options?.unique).toBeUndefined();
+    expect(idx2.unique).toBeUndefined();
   });
 
   it('returns flat array of operations', () => {
@@ -492,9 +492,9 @@ describe('collMod', () => {
     const cmd = op.execute[0]!.command as CollModCommand;
     expect(cmd).toBeInstanceOf(CollModCommand);
     expect(cmd.collection).toBe('users');
-    expect(cmd.options.validator).toEqual({ $jsonSchema: { required: ['email'] } });
-    expect(cmd.options.validationLevel).toBe('strict');
-    expect(cmd.options.validationAction).toBe('error');
+    expect(cmd.validator).toEqual({ $jsonSchema: { required: ['email'] } });
+    expect(cmd.validationLevel).toBe('strict');
+    expect(cmd.validationAction).toBe('error');
   });
 });
 

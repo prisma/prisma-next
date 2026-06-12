@@ -110,7 +110,7 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
     const cmd = op.execute[0]!.command as CreateIndexCommand;
     expect(cmd.collection).toBe('users');
     expect(cmd.keys).toEqual([{ field: 'email', direction: 1 }]);
-    expect(cmd.options?.unique).toBe(true);
+    expect(cmd.unique).toBe(true);
 
     expect(op.postcheck).toHaveLength(1);
     expect(op.postcheck[0]!.filter.kind).toBe('and');
@@ -475,11 +475,11 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
     };
     const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
     const cmd = asDdlOp(deserialized[0]!).execute[0]!.command as CreateIndexCommand;
-    expect(cmd.options?.unique).toBe(true);
-    expect(cmd.options?.sparse).toBe(true);
-    expect(cmd.options?.expireAfterSeconds).toBe(3600);
-    expect(cmd.options?.partialFilterExpression).toEqual(pfe);
-    expect(cmd.options?.name).toBe('status_1');
+    expect(cmd.unique).toBe(true);
+    expect(cmd.sparse).toBe(true);
+    expect(cmd.expireAfterSeconds).toBe(3600);
+    expect(cmd.partialFilterExpression).toEqual(pfe);
+    expect(cmd.name).toBe('status_1');
   });
 
   it('round-trips createIndex with M2 options', () => {
@@ -504,11 +504,11 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
     };
     const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
     const cmd = asDdlOp(deserialized[0]!).execute[0]!.command as CreateIndexCommand;
-    expect(cmd.options?.weights).toEqual({ bio: 10 });
-    expect(cmd.options?.default_language).toBe('english');
-    expect(cmd.options?.language_override).toBe('lang');
-    expect(cmd.options?.collation).toEqual({ locale: 'en', strength: 2 });
-    expect(cmd.options?.wildcardProjection).toEqual({ name: 1, email: 1 });
+    expect(cmd.weights).toEqual({ bio: 10 });
+    expect(cmd.default_language).toBe('english');
+    expect(cmd.language_override).toBe('lang');
+    expect(cmd.collation).toEqual({ locale: 'en', strength: 2 });
+    expect(cmd.wildcardProjection).toEqual({ name: 1, email: 1 });
   });
 
   // TML-2486: planner → runner ops are passed in-process (no JSON round-trip)
@@ -542,7 +542,8 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
     const cmd = asDdlOp(deserialized!).execute[0]!.command as CreateCollectionCommand;
     expect(cmd.kind).toBe('createCollection');
     expect(cmd.collection).toBe('users');
-    expect(cmd.options).toBeUndefined();
+    expect(cmd.capped).toBeUndefined();
+    expect(cmd.validator).toBeUndefined();
   });
 
   it('round-trips createCollection command', () => {
@@ -577,12 +578,12 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
     const cmd = asDdlOp(deserialized[0]!).execute[0]!.command as CreateCollectionCommand;
     expect(cmd.kind).toBe('createCollection');
     expect(cmd.collection).toBe('events');
-    expect(cmd.options?.capped).toBe(true);
-    expect(cmd.options?.size).toBe(1048576);
-    expect(cmd.options?.max).toBe(1000);
-    expect(cmd.options?.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
-    expect(cmd.options?.validationLevel).toBe('strict');
-    expect(cmd.options?.validationAction).toBe('error');
+    expect(cmd.capped).toBe(true);
+    expect(cmd.size).toBe(1048576);
+    expect(cmd.max).toBe(1000);
+    expect(cmd.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
+    expect(cmd.validationLevel).toBe('strict');
+    expect(cmd.validationAction).toBe('error');
   });
 
   it('round-trips dropCollection command', () => {
@@ -628,10 +629,10 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
     const cmd = asDdlOp(deserialized[0]!).execute[0]!.command as CollModCommand;
     expect(cmd.kind).toBe('collMod');
     expect(cmd.collection).toBe('users');
-    expect(cmd.options.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
-    expect(cmd.options.validationLevel).toBe('strict');
-    expect(cmd.options.validationAction).toBe('error');
-    expect(cmd.options.changeStreamPreAndPostImages).toEqual({ enabled: true });
+    expect(cmd.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
+    expect(cmd.validationLevel).toBe('strict');
+    expect(cmd.validationAction).toBe('error');
+    expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: true });
   });
 
   it('rejects and filter with non-array exprs', () => {
@@ -731,9 +732,9 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
     const cmd = asDdlOp(deserialized[0]!).execute[0]!.command as CreateCollectionCommand;
     expect(cmd.kind).toBe('createCollection');
     expect(cmd.collection).toBe('metrics');
-    expect(cmd.options?.timeseries).toEqual(timeseries);
-    expect(cmd.options?.collation).toEqual(collation);
-    expect(cmd.options?.changeStreamPreAndPostImages).toEqual(changeStreamPreAndPostImages);
-    expect(cmd.options?.clusteredIndex).toEqual(clusteredIndex);
+    expect(cmd.timeseries).toEqual(timeseries);
+    expect(cmd.collation).toEqual(collation);
+    expect(cmd.changeStreamPreAndPostImages).toEqual(changeStreamPreAndPostImages);
+    expect(cmd.clusteredIndex).toEqual(clusteredIndex);
   });
 });
