@@ -38,7 +38,8 @@ export class MongoTargetDatabase extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const builtEntries: Record<string, Readonly<Record<string, unknown>>> = {};
+    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
+    let collection: Readonly<Record<string, MongoCollection>> = Object.freeze({});
     for (const [kind, rawMap] of Object.entries(input.entries ?? {})) {
       if (kind === 'collection') {
         const collectionMap: Record<string, MongoCollection> = {};
@@ -50,19 +51,13 @@ export class MongoTargetDatabase extends NamespaceBase {
         )) {
           collectionMap[name] = new MongoCollection(c);
         }
-        builtEntries['collection'] = Object.freeze(collectionMap);
+        collection = Object.freeze(collectionMap);
       } else {
-        throw new Error(
-          `MongoTargetDatabase: unknown entity kind "${kind}" in entries; expected "collection"`,
-        );
+        carried[kind] = Object.freeze(rawMap);
       }
     }
 
-    if (!Object.hasOwn(builtEntries, 'collection')) {
-      builtEntries['collection'] = Object.freeze({});
-    }
-
-    this.entries = Object.freeze(builtEntries) as MongoNamespaceEntries;
+    this.entries = Object.freeze({ ...carried, collection });
     Object.defineProperty(this, 'kind', {
       value: 'database',
       writable: false,

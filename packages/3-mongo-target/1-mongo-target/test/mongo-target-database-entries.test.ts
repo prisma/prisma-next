@@ -89,25 +89,26 @@ describe('MongoTargetDatabase entries (open dictionary)', () => {
     });
   });
 
-  describe('unknown-key rejection', () => {
-    it('throws naming the kind when entries contains an unknown key', () => {
-      expect(
-        () =>
-          new MongoTargetDatabase({
-            id: 'app_db',
-            entries: { bogus: {} } as never,
-          }),
-      ).toThrow(/unknown entity kind/);
+  describe('unknown-kind carry', () => {
+    it('carries an unknown kind through frozen as-is (permissive-carry)', () => {
+      const bogusMap = Object.freeze({ foo: { x: 1 } });
+      const db = new MongoTargetDatabase({
+        id: 'app_db',
+        entries: { bogus: bogusMap } as never,
+      });
+      expect(db.entries['bogus']).toEqual(bogusMap);
+      expect(Object.isFrozen(db.entries['bogus'])).toBe(true);
     });
 
-    it('error message includes the offending kind name', () => {
-      expect(
-        () =>
-          new MongoTargetDatabase({
-            id: 'app_db',
-            entries: { bogus: {} } as never,
-          }),
-      ).toThrow(/bogus/);
+    it('unknown kind survives JSON.stringify round-trip', () => {
+      const db = new MongoTargetDatabase({
+        id: 'app_db',
+        entries: { bogus: { item: { value: 42 } } } as never,
+      });
+      const parsed = JSON.parse(JSON.stringify(db)) as Record<string, unknown>;
+      expect((parsed['entries'] as Record<string, unknown>)['bogus']).toEqual({
+        item: { value: 42 },
+      });
     });
   });
 
