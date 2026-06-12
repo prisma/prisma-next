@@ -1,4 +1,8 @@
-export { type TableExistsCheckBuilder, tableExistsAst } from '../contract-free/checks';
+export {
+  type TableExistsCheckBuilder,
+  tableExistsAst,
+  toRegclass,
+} from '../contract-free/checks';
 export { int4, int8, jsonb, pgTable, text, textArray, timestamptz } from '../contract-free/columns';
 export {
   buildControlTableBootstrapQueries,

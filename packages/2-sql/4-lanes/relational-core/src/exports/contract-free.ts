@@ -11,6 +11,7 @@ export {
   CfConflictClause,
   CfExpr,
   CfExprSelectQuery,
+  type CfFnOptions,
   CfInsertQuery,
   CfSelectQuery,
   CfUpdateQuery,

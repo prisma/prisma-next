@@ -36,6 +36,60 @@ describe('FunctionSource', () => {
   });
 });
 
+describe('cfExpr.fn — catalog function-call helper', () => {
+  it('assembles an OperationExpr with function strategy from template + self', () => {
+    const expr = cfExpr.fn({
+      method: 'to_regclass',
+      template: 'to_regclass({{self}})',
+      self: cfExpr.param('"public"."users"', 'pg/text@1'),
+      returns: { codecId: 'pg/text@1', nullable: true },
+    });
+
+    const op = expr.ast as OperationExpr;
+    expect(op.kind).toBe('operation');
+    expect(op.method).toBe('to_regclass');
+    expect(op.lowering).toEqual({
+      targetFamily: 'sql',
+      strategy: 'function',
+      template: 'to_regclass({{self}})',
+    });
+    expect(op.returns).toEqual({ codecId: 'pg/text@1', nullable: true });
+    const self = op.self as ParamRef;
+    expect(self.kind).toBe('param-ref');
+    expect(self.value).toBe('"public"."users"');
+    expect(self.codec?.codecId).toBe('pg/text@1');
+    expect(op.args).toEqual([]);
+  });
+
+  it('threads optional args as expressions', () => {
+    const expr = cfExpr.fn({
+      method: 'format_type',
+      template: 'format_type({{self}}, {{arg0}})',
+      self: cfExpr.identifierRef('atttypid'),
+      args: [cfExpr.identifierRef('atttypmod')],
+      returns: { codecId: 'pg/text@1', nullable: false },
+    });
+    const op = expr.ast as OperationExpr;
+    expect(op.args).toHaveLength(1);
+    expect((op.args[0] as IdentifierRef).name).toBe('atttypmod');
+  });
+
+  it('composes with CfExpr combinators (isNull)', () => {
+    const expr = cfExpr
+      .fn({
+        method: 'to_regclass',
+        template: 'to_regclass({{self}})',
+        self: cfExpr.param('"users"', 'pg/text@1'),
+        returns: { codecId: 'pg/text@1', nullable: true },
+      })
+      .isNull();
+    const nullCheck = expr.ast as NullCheckExpr;
+    expect(nullCheck.kind).toBe('null-check');
+    expect(nullCheck.isNull).toBe(true);
+    expect((nullCheck.expr as OperationExpr).kind).toBe('operation');
+  });
+});
+
 describe('SelectAst — optional FROM', () => {
   it('SelectAst.noFrom() builds a FROM-less SelectAst', () => {
     const ast = SelectAst.noFrom();

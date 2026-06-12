@@ -1,3 +1,4 @@
+import type { ParamSpec } from '@prisma-next/operations';
 import { blindCast } from '@prisma-next/utils/casts';
 import {
   AggregateExpr,
@@ -12,6 +13,7 @@ import {
   type InsertValue,
   LiteralExpr,
   NullCheckExpr,
+  OperationExpr,
   OrderByItem,
   OrExpr,
   ParamRef,
@@ -69,6 +71,14 @@ export class CfExpr {
   }
 }
 
+export interface CfFnOptions {
+  readonly method: string;
+  readonly template: string;
+  readonly self: CfExpr;
+  readonly args?: ReadonlyArray<CfExpr>;
+  readonly returns: ParamSpec;
+}
+
 export const cfExpr = {
   countStar(): CfExpr {
     return new CfExpr(AggregateExpr.count());
@@ -81,6 +91,27 @@ export const cfExpr = {
   },
   param(value: unknown, codecId: string): CfExpr {
     return new CfExpr(ParamRef.of(value, { codec: { codecId } }));
+  },
+  /**
+   * Catalog function call lowered via a `'function'`-strategy template
+   * (e.g. `to_regclass({{self}})`). Owns the `OperationExpr` assembly so
+   * target packages only supply vocabulary: template, codec'd operands,
+   * and return spec.
+   */
+  fn(options: CfFnOptions): CfExpr {
+    return new CfExpr(
+      new OperationExpr({
+        method: options.method,
+        self: options.self.ast,
+        args: options.args?.map((arg) => arg.ast),
+        returns: options.returns,
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          template: options.template,
+        },
+      }),
+    );
   },
 };
 
