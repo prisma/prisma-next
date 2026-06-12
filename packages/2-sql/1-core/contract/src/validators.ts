@@ -113,8 +113,7 @@ const StorageColumnSchema = type({
 /**
  * Codec-triple entry persisted under `storage.types[name]`. Carries an
  * enumerable literal `kind: 'codec-instance'` discriminator so the
- * polymorphic slot dispatch can distinguish codec triples from
- * class-instance kinds (e.g. `'postgres-enum'`) sharing the slot.
+ * polymorphic slot dispatch can distinguish codec triples.
  */
 const StorageTypeInstanceSchema = type
   .declare<StorageTypeInstanceInput & { kind: 'codec-instance' }>()
@@ -124,19 +123,6 @@ const StorageTypeInstanceSchema = type
     nativeType: 'string',
     'typeParams?': 'Record<string, unknown>',
   });
-
-/**
- * Postgres native enum entry under `storage.namespaces[namespaceId].entries.type[name]`.
- * Document-scoped `storage.types` carries codec aliases only
- * (`DocumentScopedStorageTypeSchema`).
- */
-const PostgresEnumTypeSchema = type({
-  kind: "'postgres-enum'",
-  'name?': 'string',
-  'nativeType?': 'string',
-  values: type.string.array().readonly(),
-  'control?': ControlPolicySchema,
-});
 
 /** Document-scoped `storage.types`: codec triples only. */
 const DocumentScopedStorageTypeSchema = StorageTypeInstanceSchema;
@@ -233,77 +219,13 @@ const StorageTableSchema = type({
 });
 
 /**
- * Re-exported so target packs can register their `validatorSchema`
- * fragment without re-declaring the schema for the kinds the family
- * core already validates. Full extraction of enum-specific schemas
- * into the Postgres pack is a follow-up; today the symbol lives here.
- */
-export { PostgresEnumTypeSchema };
-
-/**
- * Composes a hardcoded family `fallback` schema with optional
- * pack-contributed `fragments` keyed by the entry's `kind`
- * discriminator. The composition is **additive**, not substitutive:
- *
- * - No fragments registered → entries are validated by `fallback`
- *   alone (the unchanged baseline).
- * - An entry's `kind` matches `fallbackKind` AND a fragment for that
- *   kind is registered → the entry must pass **both** `fallback` and
- *   the fragment. This preserves family-owned invariants (e.g. the
- *   built-in `PostgresEnumType` shape) even when a pack contributes
- *   its own schema for the same kind.
- * - An entry's `kind` matches a registered fragment for some
- *   non-fallback kind → the fragment alone validates the entry.
- *   `fallback` is family-specific (validates a single hardcoded kind)
- *   and would reject any other kind, so it does not apply here.
- * - An entry's `kind` matches no fragment → fall through to
- *   `fallback`.
- */
-function namespaceSlotEntrySchema(
-  fallback: Type<unknown>,
-  fallbackKind: string,
-  fragments?: ReadonlyMap<string, Type<unknown>>,
-): Type<unknown> {
-  if (fragments === undefined || fragments.size === 0) {
-    return fallback;
-  }
-  return type('unknown').narrow((entry, ctx) => {
-    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
-      return ctx.mustBe('an object');
-    }
-    const kind = (entry as { kind?: unknown }).kind;
-    if (typeof kind === 'string') {
-      const fragment = fragments.get(kind);
-      if (fragment !== undefined) {
-        if (kind === fallbackKind) {
-          const baseParsed = fallback(entry);
-          if (baseParsed instanceof type.errors) {
-            return ctx.reject({ expected: baseParsed.summary });
-          }
-        }
-        const parsed = fragment(entry);
-        if (parsed instanceof type.errors) {
-          return ctx.reject({ expected: parsed.summary });
-        }
-        return true;
-      }
-    }
-    const parsed = fallback(entry);
-    if (parsed instanceof type.errors) {
-      return ctx.reject({ expected: parsed.summary });
-    }
-    return true;
-  });
-}
-
-/**
  * Builds the per-namespace entry schema for `storage.namespaces[id]`.
  * Pack-contributed `validatorSchema` fragments — keyed by the
  * descriptor's `discriminator` — validate each entry by matching the
  * entry's `kind` field on the `'entries.type'` slot.
  */
 export function createNamespaceEntrySchema(
-  fragments?: ReadonlyMap<string, Type<unknown>>,
+  _fragments?: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
   return type({
     '+': 'reject',
@@ -312,9 +234,7 @@ export function createNamespaceEntrySchema(
     entries: type({
       '+': 'reject',
       'table?': type({ '[string]': StorageTableSchema }),
-      'type?': type({
-        '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),
-      }),
+      'type?': type({ '[string]': 'unknown' }),
       'valueSet?': type({ '[string]': StorageValueSetSchema }),
     }),
   }) as Type<unknown>;

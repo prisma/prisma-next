@@ -33,7 +33,7 @@ type LoweredFieldDefault = {
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
 };
 
-function lowerEnum2DefaultForField(input: {
+function lowerEnumDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
   readonly defaultAttribute: PslAttribute;
@@ -52,8 +52,8 @@ function lowerEnum2DefaultForField(input: {
 
   if (isQuotedString || isFunctionCall) {
     input.diagnostics.push({
-      code: 'PSL_ENUM2_DEFAULT_MUST_BE_MEMBER_NAME',
-      message: `Field "${input.modelName}.${input.fieldName}" @default on an enum2 field must name a member (e.g. @default(Low)), not a raw value or function.`,
+      code: 'PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME',
+      message: `Field "${input.modelName}.${input.fieldName}" @default on an enum field must name a member (e.g. @default(Low)), not a raw value or function.`,
       sourceId: input.sourceId,
       span: input.defaultAttribute.span,
     });
@@ -64,7 +64,7 @@ function lowerEnum2DefaultForField(input: {
   if (!match) {
     const validNames = input.enumHandle.enumMembers.map((m) => m.name).join(', ');
     input.diagnostics.push({
-      code: 'PSL_ENUM2_UNKNOWN_DEFAULT_MEMBER',
+      code: 'PSL_ENUM_UNKNOWN_DEFAULT_MEMBER',
       message: `Field "${input.modelName}.${input.fieldName}" @default(${raw}) does not name a member of ${input.enumHandle.enumName}. Valid members: ${validNames}.`,
       sourceId: input.sourceId,
       span: input.defaultAttribute.span,
@@ -138,7 +138,7 @@ export interface CollectResolvedFieldsInput {
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
-  readonly enum2Handles?: ReadonlyMap<string, EnumTypeHandle>;
+  readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
 }
 
 const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
@@ -288,7 +288,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     diagnostics,
     sourceId,
     scalarTypeDescriptors,
-    enum2Handles,
+    enumHandles,
   } = input;
   const resolvedFields: ResolvedField[] = [];
 
@@ -414,14 +414,14 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       });
       continue;
     }
-    const enum2Handle = enum2Handles?.get(field.typeName);
+    const enumHandle = enumHandles?.get(field.typeName);
     const loweredDefault: LoweredFieldDefault = defaultAttribute
-      ? enum2Handle
-        ? lowerEnum2DefaultForField({
+      ? enumHandle
+        ? lowerEnumDefaultForField({
             modelName: model.name,
             fieldName: field.name,
             defaultAttribute,
-            enumHandle: enum2Handle,
+            enumHandle,
             sourceId,
             diagnostics,
           })

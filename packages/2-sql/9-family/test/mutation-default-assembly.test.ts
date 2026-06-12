@@ -32,7 +32,7 @@ describe('assembleAuthoringContributions', () => {
             kind: 'typeConstructor',
             args: [{ kind: 'string' }, { kind: 'stringArray' }],
             output: {
-              codecId: 'pg/enum@1',
+              codecId: 'app/test-type@1',
               nativeType: { kind: 'arg', index: 0 },
               typeParams: {
                 values: { kind: 'arg', index: 1 },
@@ -89,7 +89,7 @@ describe('assembleAuthoringContributions', () => {
             kind: 'typeConstructor',
             args: [{ kind: 'string' }, { kind: 'stringArray' }],
             output: {
-              codecId: 'pg/enum@1',
+              codecId: 'app/test-type@1',
               nativeType: { kind: 'arg', index: 0 },
             },
           },

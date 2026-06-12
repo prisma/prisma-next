@@ -3,7 +3,6 @@ import type {
   PslAttribute,
   PslAttributeArgument,
   PslDocumentAst,
-  PslEnum,
   PslField,
   PslFieldAttribute,
   PslModel,
@@ -20,11 +19,10 @@ import {
 import type { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import type { DefaultMappingOptions } from './default-mapping';
 import { mapDefault } from './default-mapping';
-import { toEnumName, toFieldName, toModelName, toNamedTypeName } from './name-transforms';
+import { toFieldName, toModelName, toNamedTypeName } from './name-transforms';
 import { createPostgresDefaultMapping } from './postgres-default-mapping';
 import { createPostgresTypeMap, extractEnumInfo } from './postgres-type-map';
 import type {
-  EnumInfo,
   PslNativeTypeAttribute,
   PslPrinterOptions,
   PslTypeMap,
@@ -82,10 +80,19 @@ type TopLevelNameResult = {
  */
 export function sqlSchemaIrToPslAst(schemaIR: SqlSchemaIR): PslDocumentAst {
   const enumInfo = extractEnumInfo(schemaIR.annotations);
+  if (enumInfo.typeNames.size > 0) {
+    const names = [...enumInfo.typeNames].join(', ');
+    throw new Error(
+      `contract infer: the database contains native Postgres enum type(s): ${names}. ` +
+        'Native Postgres enums (CREATE TYPE … AS ENUM) are not adoptable by contract infer. ' +
+        'Drop the native type and replace each column with a text column carrying a CHECK constraint, ' +
+        `then re-run contract infer. The domain enum (enum Name { @@type("pg/text@1") … }) authoring ` +
+        'surface generates the required check automatically.',
+    );
+  }
   const options: PslPrinterOptions = {
-    typeMap: createPostgresTypeMap(enumInfo.typeNames),
+    typeMap: createPostgresTypeMap(new Set()),
     defaultMapping: createPostgresDefaultMapping(),
-    enumInfo,
     parseRawDefault,
   };
 
@@ -93,12 +100,7 @@ export function sqlSchemaIrToPslAst(schemaIR: SqlSchemaIR): PslDocumentAst {
 }
 
 function buildPslDocumentAst(schemaIR: SqlSchemaIR, options: PslPrinterOptions): PslDocumentAst {
-  const { typeMap, defaultMapping, enumInfo, parseRawDefault: rawDefaultParser } = options;
-  const emptyEnumInfo: EnumInfo = {
-    typeNames: new Set<string>(),
-    definitions: new Map<string, readonly string[]>(),
-  };
-  const { typeNames: enumTypeNames, definitions: enumDefinitions } = enumInfo ?? emptyEnumInfo;
+  const { typeMap, defaultMapping, parseRawDefault: rawDefaultParser } = options;
 
   const modelNames = buildTopLevelNameMap(
     Object.keys(schemaIR.tables),
@@ -106,20 +108,15 @@ function buildPslDocumentAst(schemaIR: SqlSchemaIR, options: PslPrinterOptions):
     'model',
     'table',
   );
-  const enumNames = buildTopLevelNameMap(enumTypeNames, toEnumName, 'enum', 'enum type');
-  assertNoCrossKindNameCollisions(modelNames, enumNames);
 
   const modelNameMap = new Map(
     [...modelNames].map(([tableName, result]) => [tableName, result.name]),
   );
-  const enumNameMap = new Map(
-    [...enumNames].map(([pgTypeName, result]) => [pgTypeName, result.name]),
-  );
-  const reservedNamedTypeNames = createReservedNamedTypeNames(modelNames, enumNames);
+  const reservedNamedTypeNames = createReservedNamedTypeNames(modelNames);
 
   const fieldNamesByTable = buildFieldNamesByTable(schemaIR.tables);
   const { relationsByTable } = inferRelations(schemaIR.tables, modelNameMap);
-  const namedTypes = seedNamedTypeRegistry(schemaIR, typeMap, enumNameMap, reservedNamedTypeNames);
+  const namedTypes = seedNamedTypeRegistry(schemaIR, typeMap, new Map(), reservedNamedTypeNames);
 
   const models: PslModel[] = [];
   for (const table of Object.values(schemaIR.tables)) {
@@ -127,7 +124,7 @@ function buildPslDocumentAst(schemaIR: SqlSchemaIR, options: PslPrinterOptions):
       buildModel(
         table,
         typeMap,
-        enumNameMap,
+        new Map(),
         fieldNamesByTable,
         namedTypes,
         defaultMapping,
@@ -138,13 +135,6 @@ function buildPslDocumentAst(schemaIR: SqlSchemaIR, options: PslPrinterOptions):
   }
 
   const sortedModels = topologicalSort(models, schemaIR.tables, modelNameMap);
-
-  const enums: PslEnum[] = [];
-  for (const [pgTypeName, values] of enumDefinitions) {
-    const enumName = enumNames.get(pgTypeName) as TopLevelNameResult;
-    enums.push(buildEnum(enumName, values));
-  }
-  enums.sort((a, b) => a.name.localeCompare(b.name));
 
   const namedTypeEntries = [...namedTypes.entriesByKey.values()].sort((a, b) =>
     a.name.localeCompare(b.name),
@@ -171,7 +161,7 @@ function buildPslDocumentAst(schemaIR: SqlSchemaIR, options: PslPrinterOptions):
       makePslNamespace({
         kind: 'namespace',
         name: UNSPECIFIED_PSL_NAMESPACE_ID,
-        entries: makePslNamespaceEntries(sortedModels, enums, [], []),
+        entries: makePslNamespaceEntries(sortedModels, [], []),
         span: SYNTHETIC_SPAN,
       }),
     ],
@@ -485,24 +475,6 @@ function namedArg(name: string, value: string): PslAttributeArgument {
   return { kind: 'named', name, value, span: SYNTHETIC_SPAN };
 }
 
-function buildEnum(name: TopLevelNameResult, values: readonly string[]): PslEnum {
-  const attrs: PslAttribute[] = [];
-  if (name.map) {
-    attrs.push(buildMapAttribute('enum', name.map));
-  }
-  return {
-    kind: 'enum',
-    name: name.name,
-    values: values.map((value) => ({
-      kind: 'enumValue',
-      name: value,
-      span: SYNTHETIC_SPAN,
-    })),
-    attributes: attrs,
-    span: SYNTHETIC_SPAN,
-  };
-}
-
 function buildNamedTypeDeclaration(entry: NamedTypeRegistryEntry): PslNamedTypeDeclaration {
   const attribute = buildAttribute(
     'namedType',
@@ -647,37 +619,12 @@ function buildTopLevelNameMap(
   return results;
 }
 
-function assertNoCrossKindNameCollisions(
-  modelNames: ReadonlyMap<string, TopLevelNameResult>,
-  enumNames: ReadonlyMap<string, TopLevelNameResult>,
-): void {
-  const enumSourceByName = new Map([...enumNames].map(([source, result]) => [result.name, source]));
-
-  const collisions = [...modelNames.entries()]
-    .map(([tableName, result]) => {
-      const enumSource = enumSourceByName.get(result.name);
-      return enumSource
-        ? `- identifier "${result.name}" from table "${tableName}" collides with enum type "${enumSource}"`
-        : undefined;
-    })
-    .filter((detail): detail is string => detail !== undefined);
-
-  if (collisions.length > 0) {
-    throw new Error(`PSL top-level name collisions detected:\n${collisions.join('\n')}`);
-  }
-}
-
 function createReservedNamedTypeNames(
   modelNames: ReadonlyMap<string, TopLevelNameResult>,
-  enumNames: ReadonlyMap<string, TopLevelNameResult>,
 ): Set<string> {
   const reservedNames = new Set<string>(PSL_SCALAR_TYPE_NAMES);
 
   for (const result of modelNames.values()) {
-    reservedNames.add(result.name);
-  }
-
-  for (const result of enumNames.values()) {
     reservedNames.add(result.name);
   }
 

@@ -5,8 +5,9 @@ types {
 }
 
 enum Role {
-  USER
-  ADMIN
+  @@type("pg/text@1")
+  USER = "USER"
+  ADMIN = "ADMIN"
 }
 
 model User {

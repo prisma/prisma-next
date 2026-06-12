@@ -40,7 +40,6 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import {
-  pgEnumRenderOutputType,
   pgIntervalDecode,
   pgJsonbDecode,
   pgJsonbEncode,
@@ -60,7 +59,6 @@ import {
   PG_BOOL_CODEC_ID,
   PG_BYTEA_CODEC_ID,
   PG_CHAR_CODEC_ID,
-  PG_ENUM_CODEC_ID,
   PG_FLOAT_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
   PG_FLOAT8_CODEC_ID,
@@ -86,7 +84,6 @@ import {
 type LengthParams = { readonly length?: number };
 type PrecisionParams = { readonly precision?: number };
 type NumericParams = { readonly precision: number; readonly scale?: number };
-type EnumParams = { readonly values?: readonly string[] };
 
 const lengthParamsSchema = arktype({
   'length?': 'number.integer > 0',
@@ -875,51 +872,6 @@ export const pgIntervalColumn = (params: PrecisionParams = {}) =>
 pgIntervalColumn satisfies ColumnHelperFor<PgIntervalDescriptor>;
 pgIntervalColumn satisfies ColumnHelperForStrict<PgIntervalDescriptor>;
 
-const enumParamsSchema = arktype({
-  'values?': 'string[]',
-});
-
-export class PgEnumCodec extends CodecImpl<
-  typeof PG_ENUM_CODEC_ID,
-  readonly ['equality', 'order'],
-  string,
-  string
-> {
-  async encode(value: string, _ctx: CodecCallContext): Promise<string> {
-    return value;
-  }
-  async decode(wire: string, _ctx: CodecCallContext): Promise<string> {
-    return wire;
-  }
-  encodeJson(value: string): JsonValue {
-    return value;
-  }
-  decodeJson(json: JsonValue): string {
-    return json as string;
-  }
-}
-
-export class PgEnumDescriptor extends CodecDescriptorImpl<EnumParams> {
-  override readonly codecId = PG_ENUM_CODEC_ID;
-  override readonly traits = ['equality', 'order'] as const;
-  override readonly targetTypes = ['enum'] as const;
-  override readonly paramsSchema = enumParamsSchema satisfies StandardSchemaV1<EnumParams>;
-  override renderOutputType(params: EnumParams): string | undefined {
-    return pgEnumRenderOutputType(params);
-  }
-  override factory(_params: EnumParams): (ctx: CodecInstanceContext) => PgEnumCodec {
-    return () => new PgEnumCodec(this);
-  }
-}
-
-export const pgEnumDescriptor = new PgEnumDescriptor();
-
-export const pgEnumColumn = (params: EnumParams = {}) =>
-  column(pgEnumDescriptor.factory(params), pgEnumDescriptor.codecId, params, 'enum');
-
-pgEnumColumn satisfies ColumnHelperFor<PgEnumDescriptor>;
-pgEnumColumn satisfies ColumnHelperForStrict<PgEnumDescriptor>;
-
 export class PgJsonCodec extends CodecImpl<
   typeof PG_JSON_CODEC_ID,
   readonly [],
@@ -1120,7 +1072,6 @@ export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   pgByteaDescriptor,
   pgUuidDescriptor,
   pgIntervalDescriptor,
-  pgEnumDescriptor,
   pgJsonDescriptor,
   pgJsonbDescriptor,
   pgTextArrayDescriptor,

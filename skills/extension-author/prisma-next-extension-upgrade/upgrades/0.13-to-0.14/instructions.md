@@ -47,6 +47,29 @@ changes:
       glob: "**/*.{ts,tsx}"
       contains:
         - "createRuntime"
+  - id: enum-becomes-domain-concept
+    summary: |
+      The native Postgres enum surface is deleted from the SPI. `PostgresEnumStorageEntry`
+      no longer exists in `@prisma-next/sql-contract/types` — the `SqlStorage.types` slot
+      now holds codec-instance entries only (`StorageTypeInstance`). The `pg/enum@1`
+      codec surface is deleted from `@prisma-next/target-postgres` (`PgEnumDescriptor`,
+      `pgEnumColumn`, `PG_ENUM_CODEC_ID`, the `enum` codec-type-map entry), as are the
+      native `enumType` / `enumColumn` helpers from
+      `@prisma-next/adapter-postgres/column-types`. Enums are domain entities plus a
+      storage `valueSet` enforced by a CHECK constraint; columns reference them as
+      `pg/text@1` (or another codec) with a `valueSet` ref. Extensions that referenced
+      `PostgresEnumStorageEntry` in type constraints drop it (use `StorageTypeInstance`
+      alone); fixtures that used `pg/enum@1` as a codec id must switch to a live codec
+      or an inert fixture id.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "PostgresEnumStorageEntry"
+        - "pg/enum@1"
+        - "pgEnumColumn"
+        - "PgEnumDescriptor"
+        - "PG_ENUM_CODEC_ID"
+      anyMatch: true
 ---
 
 <!--
@@ -183,3 +206,29 @@ const runtime = new SqliteRuntimeImpl({ adapter: stackInstance.adapter, context,
 ```
 
 The options are identical except `stackInstance` is no longer passed: supply `adapter` from `stackInstance.adapter` directly. Depend on the bare-name interfaces (`PostgresRuntime`, `SqliteRuntime`) for type annotations, not the `Impl` classes.
+
+## `enum-becomes-domain-concept`
+
+Native Postgres enums are removed from the framework. Enums are now a **domain concept**: a domain enum entity plus a storage `valueSet` entity, with member values stored through an ordinary codec (typically `pg/text@1` → a `text` column) and the value set enforced by a planner-generated CHECK constraint. The whole native surface is deleted:
+
+- `PostgresEnumStorageEntry` is gone from `@prisma-next/sql-contract/types`. The polymorphic `SqlStorage.types` slot now carries codec-instance entries only. Type constraints that accepted both narrow to `StorageTypeInstance`:
+
+  ```ts
+  // Before
+  import type { PostgresEnumStorageEntry, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+  type TypesConstraint = Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+
+  // After
+  import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+  type TypesConstraint = Record<string, StorageTypeInstance>;
+  ```
+
+- The `pg/enum@1` codec and its registry surface are deleted from `@prisma-next/target-postgres`: `PgEnumDescriptor`, `pgEnumColumn`, `PG_ENUM_CODEC_ID`, and the `enum` entry in the codec type map. Test fixtures that used `'pg/enum@1'` as an opaque codec id must switch to a live codec id or an inert fixture id (e.g. `app/test-enum@1`) — the id no longer resolves to a registered codec.
+- The native `enumType(name, values[])` / `enumColumn(...)` authoring helpers are deleted from `@prisma-next/adapter-postgres/column-types`. The domain authoring surface is `enumType(name, codecRef, ...member(name, value))` + `member` from the target contract-builder, returned under the contract's `enums` key.
+- Introspection no longer adopts native enum types: the adapter records detected native enum type names under `annotations.pg.nativeEnumTypeNames` (names only), and `contract infer` refuses with a diagnostic naming them. The old `annotations.pg.enumTypes` structure is gone.
+
+Columns restricted to an enum now carry `codecId: 'pg/text@1'` (or another codec), `nativeType: 'text'`, and a `valueSet` reference; the owning table carries a check entry. If your extension reads `storage.types` looking for enum shapes, read the namespace's `valueSet` entries instead.
+
+### Validation
+
+`pnpm typecheck` flags every deleted-symbol reference. After fixing, run your extension's standard `pnpm test`.

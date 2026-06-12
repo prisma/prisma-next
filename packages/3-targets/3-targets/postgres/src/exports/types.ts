@@ -1,4 +1,3 @@
-export { PostgresEnumType, type PostgresEnumTypeInput } from '../core/postgres-enum-type';
 export {
   PostgresSchema,
   PostgresUnboundSchema,

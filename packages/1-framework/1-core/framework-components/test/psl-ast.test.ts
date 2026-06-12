@@ -28,7 +28,7 @@ describe('makePslNamespace / makePslNamespaceEntries', () => {
       const ns = makePslNamespace({
         kind: 'namespace',
         name: 'public',
-        entries: makePslNamespaceEntries([user, post], [], [], []),
+        entries: makePslNamespaceEntries([user, post], [], []),
         span: SPAN,
       });
 
@@ -41,7 +41,7 @@ describe('makePslNamespace / makePslNamespaceEntries', () => {
       const ns = makePslNamespace({
         kind: 'namespace',
         name: 'public',
-        entries: makePslNamespaceEntries([], [], [], [block]),
+        entries: makePslNamespaceEntries([], [], [block]),
         span: SPAN,
       });
 
@@ -54,7 +54,7 @@ describe('makePslNamespace / makePslNamespaceEntries', () => {
       const ns = makePslNamespace({
         kind: 'namespace',
         name: 'public',
-        entries: makePslNamespaceEntries([user], [], [], [policy]),
+        entries: makePslNamespaceEntries([user], [], [policy]),
         span: SPAN,
       });
 
@@ -78,24 +78,23 @@ describe('makePslNamespace / makePslNamespaceEntries', () => {
       const ns = makePslNamespace({
         kind: 'namespace',
         name: 'public',
-        entries: makePslNamespaceEntries([user], [], [], []),
+        entries: makePslNamespaceEntries([user], [], []),
         span: SPAN,
       });
 
       expect(ns.models).toEqual([user]);
     });
 
-    it('models/enums/compositeTypes are non-enumerable on the namespace object', () => {
+    it('models/compositeTypes are non-enumerable on the namespace object', () => {
       const ns = makePslNamespace({
         kind: 'namespace',
         name: 'public',
-        entries: makePslNamespaceEntries([makeModel('User')], [], [], []),
+        entries: makePslNamespaceEntries([makeModel('User')], [], []),
         span: SPAN,
       });
 
       const ownKeys = Object.keys(ns);
       expect(ownKeys).not.toContain('models');
-      expect(ownKeys).not.toContain('enums');
       expect(ownKeys).not.toContain('compositeTypes');
       // Only the stored fields are enumerable.
       expect(ownKeys).toContain('kind');
@@ -109,22 +108,24 @@ describe('makePslNamespace / makePslNamespaceEntries', () => {
       const ns = makePslNamespace({
         kind: 'namespace',
         name: 'public',
-        entries: makePslNamespaceEntries([user], [], [], []),
+        entries: makePslNamespaceEntries([user], [], []),
         span: SPAN,
       });
 
       const spread = { ...ns };
       expect(Object.hasOwn(spread, 'models')).toBe(false);
-      expect(Object.hasOwn(spread, 'enums')).toBe(false);
       expect(Object.hasOwn(spread, 'compositeTypes')).toBe(false);
     });
   });
 
   describe('BUILTIN_PSL_KIND_KEYS and namespacePslExtensionBlocks', () => {
-    it('BUILTIN_PSL_KIND_KEYS contains the three reserved kind strings', () => {
+    it('BUILTIN_PSL_KIND_KEYS contains model and compositeType but not enum', () => {
       expect(BUILTIN_PSL_KIND_KEYS.has('model')).toBe(true);
-      expect(BUILTIN_PSL_KIND_KEYS.has('enum')).toBe(true);
       expect(BUILTIN_PSL_KIND_KEYS.has('compositeType')).toBe(true);
+      // 'enum' is now claimed by the extension-block grammar (TML-2853-D1),
+      // so it must NOT be in BUILTIN_PSL_KIND_KEYS — that would cause
+      // namespacePslExtensionBlocks to skip enum extension blocks.
+      expect(BUILTIN_PSL_KIND_KEYS.has('enum')).toBe(false);
     });
 
     it('namespacePslExtensionBlocks returns only extension blocks, not built-ins', () => {
@@ -133,7 +134,7 @@ describe('makePslNamespace / makePslNamespaceEntries', () => {
       const ns = makePslNamespace({
         kind: 'namespace',
         name: 'public',
-        entries: makePslNamespaceEntries([user], [], [], [policy]),
+        entries: makePslNamespaceEntries([user], [], [policy]),
         span: SPAN,
       });
 

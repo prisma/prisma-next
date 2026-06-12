@@ -17,7 +17,6 @@ import {
   pgBoolDescriptor,
   pgByteaDescriptor,
   pgCharDescriptor,
-  pgEnumDescriptor,
   pgFloat4Descriptor,
   pgFloat8Descriptor,
   pgFloatDescriptor,
@@ -69,7 +68,6 @@ const descriptorByScalar = {
   'bit varying': pgVarbitDescriptor,
   bytea: pgByteaDescriptor,
   interval: pgIntervalDescriptor,
-  enum: pgEnumDescriptor,
   json: pgJsonDescriptor,
   jsonb: pgJsonbDescriptor,
   uuid: pgUuidDescriptor,
@@ -94,7 +92,6 @@ describe('adapter-postgres codecs', () => {
       'character',
       'character varying',
       'double precision',
-      'enum',
       'float',
       'float4',
       'float8',
@@ -208,7 +205,6 @@ describe('adapter-postgres codecs', () => {
     it.each([
       { scalar: 'sql-text', value: 'portable text' },
       { scalar: 'text', value: 'hello world' },
-      { scalar: 'enum', value: 'ADMIN' },
       { scalar: 'uuid', value: '550e8400-e29b-41d4-a716-446655440000' },
     ] as const)('keeps $scalar values unchanged', async ({ scalar, value }) => {
       const codec = codecForScalar(scalar) as {
@@ -478,7 +474,6 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'interval' },
       { scalar: 'sql-text' },
       { scalar: 'text' },
-      { scalar: 'enum' },
       { scalar: 'bool' },
       { scalar: 'int4' },
       { scalar: 'uuid' },

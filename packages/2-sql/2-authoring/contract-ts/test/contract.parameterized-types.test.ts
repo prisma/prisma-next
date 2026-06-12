@@ -491,7 +491,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           types: {
             Role: {
               kind: 'codec-instance',
-              codecId: 'pg/enum@1',
+              codecId: 'app/test-enum@1',
               nativeType: 'role',
               typeParams: { values: ['USER'] },
             },
@@ -513,7 +513,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
                 id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
                 role: {
                   nativeType: 'int4',
-                  codecId: 'pg/enum@1',
+                  codecId: 'app/test-enum@1',
                   nullable: false,
                   typeRef: 'Role',
                 },
@@ -527,7 +527,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           types: {
             Role: {
               kind: 'codec-instance',
-              codecId: 'pg/enum@1',
+              codecId: 'app/test-enum@1',
               nativeType: 'role',
               typeParams: { values: ['USER'] },
             },
@@ -549,7 +549,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
                 id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
                 role: {
                   nativeType: 'role',
-                  codecId: 'pg/enum@1',
+                  codecId: 'app/test-enum@1',
                   nullable: false,
                   typeRef: 'Role',
                 },
@@ -563,7 +563,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           types: {
             Role: {
               kind: 'codec-instance',
-              codecId: 'pg/enum@1',
+              codecId: 'app/test-enum@1',
               nativeType: 'role',
               typeParams: { values: ['USER'] },
             },

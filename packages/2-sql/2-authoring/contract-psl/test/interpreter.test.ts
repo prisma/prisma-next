@@ -8,9 +8,7 @@ import {
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
 } from '../src/interpreter';
 import {
-  buildEnumCapturingFactory,
   createBuiltinLikeControlMutationDefaults,
-  documentScopedTypes,
   modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
@@ -407,69 +405,6 @@ model Comment {
               },
             },
           },
-        },
-      },
-    });
-  });
-
-  it('maps enums, named types, defaults, indexes, and foreign keys', () => {
-    const document = parsePslDocument({
-      schema: `types {
-  Email = String
-}
-
-enum Role {
-  USER
-  ADMIN
-}
-
-model User {
-  id Int @id @default(autoincrement())
-  email Email @unique
-  role Role
-  createdAt DateTime @default(now())
-  isActive Boolean @default(true)
-  nickname String?
-}
-
-model Post {
-  id Int @id
-  userId Int
-  title String
-  author User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  @@index([userId])
-  @@unique([title, userId])
-}
-`,
-      sourceId: 'schema.prisma',
-    });
-
-    const result = interpretPslDocumentToSqlContract({
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    expect(result.value.roots).toEqual({
-      user: crossRef('User', 'public'),
-      post: crossRef('Post', 'public'),
-    });
-    expect(documentScopedTypes(result.value)).toMatchObject({
-      Email: { codecId: 'pg/text@1', nativeType: 'text' },
-    });
-    const models = modelsOf(result.value) as Record<
-      string,
-      { relations?: Record<string, unknown> }
-    >;
-    expect(models['Post']?.relations).toMatchObject({
-      author: {
-        to: crossRef('User', 'public'),
-        cardinality: 'N:1',
-        on: {
-          localFields: ['userId'],
-          targetFields: ['id'],
         },
       },
     });
@@ -923,36 +858,6 @@ model OrderItem {
       expect(unboundTables(storage)['user']).toBeUndefined();
       const json = JSON.parse(JSON.stringify(user)) as Record<string, unknown>;
       expect(json).not.toHaveProperty('namespaceId');
-    });
-
-    it('Postgres accumulates enums declared across two namespace blocks with the same name', () => {
-      const document = parsePslDocument({
-        schema: `namespace tenant_a {
-  enum Status {
-    ACTIVE
-    INACTIVE
-  }
-}
-
-namespace tenant_a {
-  enum Tier {
-    FREE
-    PRO
-  }
-}
-`,
-        sourceId: 'schema.prisma',
-      });
-      const { createNamespace, capturedEnumTypes } = buildEnumCapturingFactory();
-      const result = interpretPslDocumentToSqlContract({
-        createNamespace,
-        document,
-        controlMutationDefaults: builtinControlMutationDefaults,
-      });
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(capturedEnumTypes['tenant_a']).toHaveProperty('Status');
-      expect(capturedEnumTypes['tenant_a']).toHaveProperty('Tier');
     });
 
     it('Postgres routes a mixed top-level + multi-namespace document into the right slots', () => {

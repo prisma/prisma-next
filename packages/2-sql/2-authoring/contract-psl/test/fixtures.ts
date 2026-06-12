@@ -18,44 +18,12 @@ import type {
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import { freezeNode } from '@prisma-next/framework-components/ir';
 import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
-import { buildSqlNamespace, SqlNode } from '@prisma-next/sql-contract/types';
+import { buildSqlNamespace } from '@prisma-next/sql-contract/types';
 import { type EnumTypeHandle, enumType } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 
-/**
- * Layer-isolated enum-shaped IR class for `sql-contract-psl` unit tests.
- * Stays in the test fixture so the interpreter package never depends on
- * a real target pack; production targets (e.g. Postgres) ship their own
- * enum IR class and contribute it through `authoring.entityTypes.enum`.
- * Structurally satisfies `PostgresEnumStorageEntry` (carries
- * `kind: 'postgres-enum'`, `name`, `nativeType`, `values`, `codecId`).
- */
-export class TestPostgresEnumType extends SqlNode {
-  override readonly kind = 'postgres-enum' as const;
-  readonly name: string;
-  readonly nativeType: string;
-  readonly values: readonly string[];
-  readonly codecId = 'test/enum@1' as const;
-
-  constructor(input: { name: string; nativeType?: string; values: readonly string[] }) {
-    super();
-    this.name = input.name;
-    this.nativeType = input.nativeType ?? input.name;
-    this.values = Object.freeze([...input.values]);
-    freezeNode(this);
-  }
-
-  get codecBinding() {
-    return {
-      codecId: this.codecId,
-      typeParams: { values: this.values },
-    } as const;
-  }
-}
-
-function testEnum2Factory(
+function testEnumFactory(
   block: PslExtensionBlock,
   ctx: AuthoringEntityContext,
 ): EnumTypeHandle | undefined {
@@ -65,8 +33,8 @@ function testEnum2Factory(
   const typeAttr = block.blockAttributes.find((a) => a.name === 'type');
   if (!typeAttr) {
     diagnostics?.push({
-      code: 'PSL_ENUM2_MISSING_TYPE',
-      message: `enum2 "${block.name}" is missing a @@type("codecId") attribute`,
+      code: 'PSL_ENUM_MISSING_TYPE',
+      message: `enum "${block.name}" is missing a @@type("codecId") attribute`,
       sourceId,
       span: block.span,
     });
@@ -77,8 +45,8 @@ function testEnum2Factory(
   const codecId = rawArg?.startsWith('"') && rawArg.endsWith('"') ? rawArg.slice(1, -1) : undefined;
   if (!codecId) {
     diagnostics?.push({
-      code: 'PSL_ENUM2_MISSING_TYPE',
-      message: `enum2 "${block.name}" @@type attribute must have a quoted codec id argument`,
+      code: 'PSL_ENUM_MISSING_TYPE',
+      message: `enum "${block.name}" @@type attribute must have a quoted codec id argument`,
       sourceId,
       span: typeAttr.span,
     });
@@ -89,7 +57,7 @@ function testEnum2Factory(
   if (nativeType === undefined) {
     diagnostics?.push({
       code: 'PSL_EXTENSION_INVALID_VALUE',
-      message: `enum2 "${block.name}" @@type references unknown codec "${codecId}"`,
+      message: `enum "${block.name}" @@type references unknown codec "${codecId}"`,
       sourceId,
       span: typeAttr.args[0]?.span ?? typeAttr.span,
     });
@@ -100,7 +68,7 @@ function testEnum2Factory(
   if (codec === undefined) {
     diagnostics?.push({
       code: 'PSL_EXTENSION_INVALID_VALUE',
-      message: `enum2 "${block.name}" @@type codec "${codecId}" resolves in targetTypesFor but is absent from codecLookup.get`,
+      message: `enum "${block.name}" @@type codec "${codecId}" resolves in targetTypesFor but is absent from codecLookup.get`,
       sourceId,
       span: typeAttr.args[0]?.span ?? typeAttr.span,
     });
@@ -117,8 +85,8 @@ function testEnum2Factory(
         value = codec.decodeJson(memberName as unknown as JsonValue);
       } catch {
         diagnostics?.push({
-          code: 'PSL_ENUM2_BARE_MEMBER_NON_STRING_CODEC',
-          message: `enum2 "${block.name}" member "${memberName}" has no value and codec "${codecId}" does not accept a bare name as input`,
+          code: 'PSL_ENUM_BARE_MEMBER_NON_STRING_CODEC',
+          message: `enum "${block.name}" member "${memberName}" has no value and codec "${codecId}" does not accept a bare name as input`,
           sourceId,
           span: paramValue.span,
         });
@@ -132,7 +100,7 @@ function testEnum2Factory(
       } catch {
         diagnostics?.push({
           code: 'PSL_EXTENSION_INVALID_VALUE',
-          message: `enum2 "${block.name}" member "${memberName}" value "${paramValue.raw}" is not valid JSON`,
+          message: `enum "${block.name}" member "${memberName}" value "${paramValue.raw}" is not valid JSON`,
           sourceId,
           span: paramValue.span,
         });
@@ -147,7 +115,7 @@ function testEnum2Factory(
         const reason = err instanceof Error ? err.message : String(err);
         diagnostics?.push({
           code: 'PSL_EXTENSION_INVALID_VALUE',
-          message: `enum2 "${block.name}" member "${memberName}" was rejected by codec "${codecId}": ${reason}`,
+          message: `enum "${block.name}" member "${memberName}" was rejected by codec "${codecId}": ${reason}`,
           sourceId,
           span: paramValue.span,
         });
@@ -160,8 +128,8 @@ function testEnum2Factory(
     const valueKey = String(value);
     if (seenValues.has(valueKey)) {
       diagnostics?.push({
-        code: 'PSL_ENUM2_DUPLICATE_MEMBER_VALUE',
-        message: `enum2 "${block.name}": duplicate member value "${valueKey}"`,
+        code: 'PSL_ENUM_DUPLICATE_MEMBER_VALUE',
+        message: `enum "${block.name}": duplicate member value "${valueKey}"`,
         sourceId,
         span: paramValue.span,
       });
@@ -176,8 +144,8 @@ function testEnum2Factory(
 
   if (members.length === 0) {
     diagnostics?.push({
-      code: 'PSL_ENUM2_MISSING_TYPE',
-      message: `enum2 "${block.name}" must have at least one member`,
+      code: 'PSL_ENUM_MISSING_TYPE',
+      message: `enum "${block.name}" must have at least one member`,
       sourceId,
       span: block.span,
     });
@@ -194,16 +162,8 @@ function testEnum2Factory(
 export const testEnumEntityContributions = {
   enum: {
     kind: 'entity' as const,
-    discriminator: 'postgres-enum',
-    output: {
-      factory: (input: { name: string; values: readonly string[] }) =>
-        new TestPostgresEnumType(input),
-    },
-  },
-  enum2: {
-    kind: 'entity' as const,
-    discriminator: 'enum2',
-    output: { factory: testEnum2Factory },
+    discriminator: 'enum',
+    output: { factory: testEnumFactory },
   },
 } as const satisfies AuthoringEntityTypeNamespace;
 

@@ -28,6 +28,21 @@
   "domain": {
     "namespaces": {
       "public": {
+        "enum": {
+          "user_type": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "admin",
+                "value": "admin"
+              },
+              {
+                "name": "user",
+                "value": "user"
+              }
+            ]
+          }
+        },
         "models": {
           "Bug": {
             "fields": {
@@ -299,8 +314,14 @@
               "kind": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/enum@1",
+                  "codecId": "pg/text@1",
                   "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "user_type",
+                  "namespaceId": "public",
+                  "plane": "domain"
                 }
               }
             },
@@ -564,6 +585,18 @@
               "uniques": []
             },
             "user": {
+              "checks": [
+                {
+                  "column": "kind",
+                  "name": "user_kind_check",
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "user_type",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                }
+              ],
               "columns": {
                 "address": {
                   "codecId": "pg/jsonb@1",
@@ -593,10 +626,15 @@
                   }
                 },
                 "kind": {
-                  "codecId": "pg/enum@1",
-                  "nativeType": "user_type",
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
                   "nullable": false,
-                  "typeRef": "user_type"
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "user_type",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
                 }
               },
               "foreignKeys": [],
@@ -607,12 +645,9 @@
               "uniques": []
             }
           },
-          "type": {
+          "valueSet": {
             "user_type": {
-              "codecId": "pg/enum@1",
-              "kind": "postgres-enum",
-              "name": "user_type",
-              "nativeType": "user_type",
+              "kind": "valueSet",
               "values": ["admin", "user"]
             }
           }
@@ -621,7 +656,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:b1fd962de2b19a2a4fdf0dd04fb123a4d7681e318cbef09fdad6f016b5144bd9",
+    "storageHash": "sha256:243450a642aa1368a4ab49b4fcc61bf0b7ae1569e40db03c7510bbd029de64b2",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

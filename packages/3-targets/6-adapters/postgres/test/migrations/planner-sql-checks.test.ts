@@ -204,7 +204,7 @@ describe('buildExpectedFormatType', () => {
     it('returns simple lowercase UDT name unquoted', () => {
       expect(
         buildExpectedFormatType(
-          { nativeType: 'my_status', codecId: 'pg/enum@1', nullable: false, typeRef: 'MyStatus' },
+          { nativeType: 'my_status', codecId: 'app/udt@1', nullable: false, typeRef: 'MyStatus' },
           noHooks,
         ),
       ).toBe('my_status');
@@ -213,7 +213,7 @@ describe('buildExpectedFormatType', () => {
     it('quotes reserved word used as UDT name', () => {
       expect(
         buildExpectedFormatType(
-          { nativeType: 'user', codecId: 'pg/enum@1', nullable: false, typeRef: 'User' },
+          { nativeType: 'user', codecId: 'app/udt@1', nullable: false, typeRef: 'User' },
           noHooks,
         ),
       ).toBe('"user"');
@@ -222,7 +222,7 @@ describe('buildExpectedFormatType', () => {
     it('quotes another reserved word (select)', () => {
       expect(
         buildExpectedFormatType(
-          { nativeType: 'select', codecId: 'pg/enum@1', nullable: false, typeRef: 'Select' },
+          { nativeType: 'select', codecId: 'app/udt@1', nullable: false, typeRef: 'Select' },
           noHooks,
         ),
       ).toBe('"select"');
@@ -233,7 +233,7 @@ describe('buildExpectedFormatType', () => {
         buildExpectedFormatType(
           {
             nativeType: 'OrderStatus',
-            codecId: 'pg/enum@1',
+            codecId: 'app/udt@1',
             nullable: false,
             typeRef: 'OrderStatus',
           },
@@ -247,7 +247,7 @@ describe('buildExpectedFormatType', () => {
         buildExpectedFormatType(
           {
             nativeType: 'order-status',
-            codecId: 'pg/enum@1',
+            codecId: 'app/udt@1',
             nullable: false,
             typeRef: 'OrderStatus',
           },
@@ -261,7 +261,7 @@ describe('buildExpectedFormatType', () => {
         buildExpectedFormatType(
           {
             nativeType: 'order status',
-            codecId: 'pg/enum@1',
+            codecId: 'app/udt@1',
             nullable: false,
             typeRef: 'OrderStatus',
           },
@@ -273,7 +273,7 @@ describe('buildExpectedFormatType', () => {
     it('quotes identifier starting with digit', () => {
       expect(
         buildExpectedFormatType(
-          { nativeType: '2fa_type', codecId: 'pg/enum@1', nullable: false, typeRef: 'TwoFaType' },
+          { nativeType: '2fa_type', codecId: 'app/udt@1', nullable: false, typeRef: 'TwoFaType' },
           noHooks,
         ),
       ).toBe('"2fa_type"');
