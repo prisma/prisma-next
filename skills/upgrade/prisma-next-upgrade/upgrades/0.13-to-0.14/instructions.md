@@ -283,3 +283,14 @@ by-product of the AlterTable IR alignment. The example fixture snapshots are
 regenerated accordingly. No user-facing contract or migration format change.
 Incidental substrate diff only.
 -->
+
+<!--
+#788: enum input types widened to their member union in emitted contract.d.ts (PR
+#797). The emitter now renders an enum-restricted field's input type as the literal
+member union on the write side, matching the existing output side: a `pg/enum@1`
+field's `FieldInputTypes` entry flips from `CodecTypes['pg/enum@1']['input']` (≈
+`string`) to e.g. `'admin' | 'user'`. The example `contract.d.ts` goldens are
+regenerated accordingly. `contract.json` is unchanged — this is a types-only
+addition that makes create/update exhaustiveness-checked. Additive; no existing
+contract shape changes. No consumer action required. Incidental substrate diff only.
+-->

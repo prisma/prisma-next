@@ -46,6 +46,8 @@ export interface CodecLookup {
   targetTypesFor(id: string): readonly string[] | undefined;
   metaFor(id: string): CodecMeta | undefined;
   renderOutputTypeFor(id: string, params: Record<string, unknown>): string | undefined;
+  /** Codec-id-keyed `renderInputType` renderer for the `contract.d.ts` input position. Optional so existing lookups need not provide it; returns `undefined` when the codec renders no custom input type or the id is unknown. */
+  renderInputTypeFor?(id: string, params: Record<string, unknown>): string | undefined;
 }
 
 /**

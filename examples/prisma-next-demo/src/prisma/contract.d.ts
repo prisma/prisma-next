@@ -127,7 +127,7 @@ export type FieldInputTypes = {
     readonly email: CodecTypes['pg/text@1']['input'];
     readonly displayName: CodecTypes['pg/text@1']['input'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
-    readonly kind: CodecTypes['pg/enum@1']['input'];
+    readonly kind: 'admin' | 'user';
     readonly address: AddressInput | null;
   };
 };

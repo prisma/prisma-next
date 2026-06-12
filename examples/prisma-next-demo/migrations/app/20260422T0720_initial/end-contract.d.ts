@@ -123,7 +123,7 @@ export type FieldInputTypes = {
     readonly id: CodecTypes['sql/char@1']['input'];
     readonly email: CodecTypes['pg/text@1']['input'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
-    readonly kind: CodecTypes['pg/enum@1']['input'];
+    readonly kind: 'admin' | 'user';
     readonly address: AddressInput | null;
   };
 };
