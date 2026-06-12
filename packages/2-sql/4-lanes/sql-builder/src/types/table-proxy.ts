@@ -27,18 +27,15 @@ type FindModelForTable<
   C extends TableProxyContract,
   NsId extends string,
   TableName extends string,
-> =
-  C extends Contract<SqlStorage>
-    ? C['domain']['namespaces'][NsId]['models'] extends infer Models extends Record<string, unknown>
-      ? {
-          [M in keyof Models & string]: Models[M] extends {
-            readonly storage: { readonly table: TableName };
-          }
-            ? M
-            : never;
-        }[keyof Models & string]
-      : never
-    : never;
+> = C['domain']['namespaces'][NsId]['models'] extends infer Models extends Record<string, unknown>
+  ? {
+      [M in keyof Models & string]: Models[M] extends {
+        readonly storage: { readonly table: TableName };
+      }
+        ? M
+        : never;
+    }[keyof Models & string]
+  : never;
 
 // Resolve the field name for a column within an explicit namespace coordinate.
 type FindFieldForColumn<
@@ -46,27 +43,30 @@ type FindFieldForColumn<
   NsId extends string,
   ModelName extends string,
   ColumnName extends string,
-> =
-  C extends Contract<SqlStorage>
-    ? C['domain']['namespaces'][NsId]['models'] extends infer Models extends Record<string, unknown>
-      ? ModelName extends keyof Models
-        ? Models[ModelName] extends {
-            readonly storage: { readonly fields: infer Fields extends Record<string, unknown> };
-          }
-          ? {
-              [F in keyof Fields & string]: Fields[F] extends { readonly column: ColumnName }
-                ? F
-                : never;
-            }[keyof Fields & string]
-          : never
-        : never
+> = C['domain']['namespaces'][NsId]['models'] extends infer Models extends Record<string, unknown>
+  ? ModelName extends keyof Models
+    ? Models[ModelName] extends {
+        readonly storage: { readonly fields: infer Fields extends Record<string, unknown> };
+      }
+      ? {
+          [F in keyof Fields & string]: Fields[F] extends { readonly column: ColumnName }
+            ? F
+            : never;
+        }[keyof Fields & string]
       : never
-    : never;
+    : never
+  : never;
 
 // The select-result row's column types for a table at a namespace coordinate.
 // Each column resolves through `ComputeColumnJsType` with the coordinate, so
 // refined per-namespace output types (e.g. `Vector<N>`) are preserved and
 // same-named tables across namespaces resolve to each namespace's own columns.
+// The `C extends Contract<SqlStorage>` guard here is not for `domain` access
+// (that now lives on `TableProxyContract`) but to satisfy `ComputeColumnJsType`,
+// whose own constraint is `TContract extends Contract<SqlStorage>`. Dropping the
+// guard would require relaxing that constraint in `sql-relational-core` (a lower
+// layer) to the minimal column-resolution shape; expanding `TableProxyContract`
+// alone cannot remove it without making it the whole `Contract`.
 type ResolvedColumnTypes<
   C extends TableProxyContract,
   NsId extends string,

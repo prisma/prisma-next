@@ -5,7 +5,20 @@ export type CapabilitiesBase = Record<string, Record<string, boolean>>;
 
 type NamespaceEntries = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
+// The application-domain models the table-proxy helpers read to map a storage
+// table -> model and column -> field within a namespace coordinate. The index
+// signature lets the helpers index `C['domain']['namespaces'][NsId]` by a
+// generic `NsId` directly, so `FindModelForTable` / `FindFieldForColumn` no
+// longer need a `C extends Contract<SqlStorage>` guard to reach the per-namespace
+// models; concrete emitted contracts (whose models are richer) satisfy it.
+type NamespaceDomain = Readonly<
+  Record<string, { readonly models: Readonly<Record<string, unknown>> }>
+>;
+
 export type TableProxyContract = {
+  readonly domain: {
+    readonly namespaces: NamespaceDomain;
+  };
   readonly storage: {
     readonly namespaces: Readonly<Record<string, { readonly entries: NamespaceEntries }>>;
   };
