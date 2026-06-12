@@ -10,7 +10,7 @@ This demo shows:
 - Contract verification and marker management
 - Native Prisma Next patterns and best practices
 - ORM client end-to-end examples using `@prisma-next/sql-orm-client`
-- **Two workflows**: Emit workflow (JSON-based) and No-Emit workflow (TypeScript-based)
+- **Single contract source**: PSL (`src/prisma/contract.prisma`) emitted to `contract.json` + `contract.d.ts`
 - Client-generated UUID identifiers via `@prisma-next/ids`
 
 ## Comparison
@@ -18,16 +18,12 @@ This demo shows:
 - **`prisma-next-demo`** (this example): Shows Prisma Next native APIs
 - **`prisma-orm-demo`**: Shows using Prisma Next via the compatibility layer (mimics Prisma 7 API)
 
-## Workflows
+## Contract Workflow
 
-This demo includes two runtime implementations demonstrating different approaches:
-
-### 1. Emit Workflow (Default)
-
-Uses emitted `contract.json` and `contract.d.ts` files with the Postgres one-liner client. The emitted workflow uses `Contract` and `TypeMaps` explicitly: `postgres<Contract, TypeMaps>({ contractJson, url })`.
+The contract has a single source of truth: the PSL schema at `src/prisma/contract.prisma`. `prisma-next contract emit` (configured by `prisma-next.config.ts`) validates it and emits the machine-readable artifacts the app consumes — `src/prisma/contract.json` plus its type definitions `src/prisma/contract.d.ts`. The app hands those to the Postgres one-liner client with `Contract` and `TypeMaps` explicit: `postgres<Contract, TypeMaps>({ contractJson, url })`.
 
 - **Files**: `src/prisma/db.ts`, `src/main.ts`
-- **Contract source**: `src/prisma/contract.json` (emitted from `src/prisma/contract.prisma`)
+- **Contract source**: `src/prisma/contract.prisma`
 - **Usage**: `pnpm start -- [command]`
 - **Benefits**:
   - Contract is validated and normalized at emit time
@@ -42,36 +38,7 @@ pnpm seed
 pnpm start -- users
 ```
 
-#### Dual-mode emit validation (TS vs PSL)
-
-This repo maintains two emit configs:
-
-- **PSL emit (default)**: `prisma-next.config.ts`
-- **TypeScript emit**: `prisma-next.config.ts-contract.ts`
-
-To prove the demo test suite passes in both modes:
-
-```bash
-pnpm test:dual-mode
-```
-
-### 2. No-Emit Workflow
-
-Uses contract directly from TypeScript:
-
-- **Files**: `src/prisma-no-emit/runtime.ts`, `src/prisma-no-emit/context.ts`, `src/main-no-emit.ts`
-- **Contract source**: `prisma/contract.ts` (direct import)
-- **Usage**: `pnpm start:no-emit -- [command]`
-- **Benefits**:
-  - No emit step required - contract is used directly
-  - Full type safety from TypeScript
-  - Simpler workflow for development
-
-**Usage**:
-```bash
-# No emit step needed - just run the app
-pnpm start:no-emit -- users
-```
+`pnpm emit:check` re-emits and fails if the committed artifacts have drifted from the PSL source.
 
 ## Architecture
 
@@ -104,6 +71,13 @@ The demo includes ORM client examples under `src/orm-client/`:
 - `ormClientGetUserTaskBoard(limit, runtime)` — **polymorphic-target include**: `User.include('tasks')` where `Task` is a discriminated base; each included row is decoded into its variant shape (`Bug` → `severity`/`stepsToRepro`, `Feature` → `priority`/`targetRelease`) in a single read
 - `ormClientGetUserBugTriage(severity, limit, runtime)` — `.variant('Bug')`-narrowed include filtered by the Bug-only `severity` column
 - `ormClientGetFeatureRoadmap(targetRelease, limit, runtime)` — `.variant('Feature')`-narrowed include filtered by the Feature-only `targetRelease` column (a multi-table-inheritance variant column reached through the variant join)
+- `ormClientGetPostTags(postId, runtime)` — **many-to-many include**: `Post.include('tags', …)` traversing the `post_tag` junction transparently
+- `ormClientGetTagPosts(tagId, runtime)` — the same junction walked from the other side (`Tag.include('posts', …)`)
+- `ormClientGetPostsByTagFilter(mode, label, runtime)` — `some`/`none`/`every` relation filter predicates on the N:M `tags` relation (EXISTS through the junction)
+- `ormClientConnectPostTags(postId, tagIds, runtime)` — `update({ tags: (t) => t.connect([…]) })` inserting junction rows
+- `ormClientDisconnectPostTags(postId, tagIds, runtime)` — `update({ tags: (t) => t.disconnect([…]) })` deleting junction rows
+- `ormClientCreatePostWithTags(input, runtime)` — nested `create`: insert a post + new tags + junction rows in one mutation
+- `ormClientCreatePostConnectTags(input, runtime)` — nested `connect` in the create flow: insert a post and link existing tags
 - `ormClientGetUsersByIdCursor(cursor, limit, runtime)` — cursor pagination with `orderBy()` + `cursor()`
 - `ormClientGetLatestUserPerKind(runtime)` — `distinctOn()` with deterministic ordering
 - `ormClientGetUserInsights(limit, runtime)` — `include().combine()` metrics and latest related row
@@ -129,6 +103,16 @@ pnpm start -- repo-latest-per-kind
 pnpm start -- repo-user-insights 5
 pnpm start -- repo-kind-breakdown 1
 pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example.com user
+# Many-to-many (post and tag ids are printed by the seed)
+pnpm start -- repo-post-tags <postId>
+pnpm start -- repo-tag-posts <tagId>
+pnpm start -- repo-posts-with-tag-some typescript
+pnpm start -- repo-posts-with-tag-none typescript
+pnpm start -- repo-posts-with-tag-every typescript
+pnpm start -- repo-connect-post-tags <postId> <tagId>
+pnpm start -- repo-disconnect-post-tags <postId> <tagId>
+pnpm start -- repo-create-post-with-tags <newPostId> <userId> 'Title' label1 label2
+pnpm start -- repo-create-post-connect-tags <newPostId> <userId> 'Title' <tagId>
 ```
 
 ## Polymorphic Includes
@@ -183,6 +167,45 @@ pnpm start -- repo-feature-roadmap v2.0 10
 
 The source files: `src/orm-client/get-user-task-board.ts`,
 `get-user-bug-triage.ts`, and `get-feature-roadmap.ts`.
+
+## Many-to-Many Examples
+
+The PSL source authors a `Post ↔ Tag` many-to-many as an explicit junction
+model: `PostTag` carries a composite `@@id` over its two FK columns plus the
+two N:1 `@relation`s, and both side models declare bare list fields
+(`Post.tags`, `Tag.posts`). The interpreter lowers that shape to navigable
+`N:M` relations, so the ORM client traverses the junction transparently:
+
+```bash
+# Include in both directions (ids are printed by the seed).
+pnpm start -- repo-post-tags <postId>
+pnpm start -- repo-tag-posts <tagId>
+
+# some/none/every relation filters — EXISTS through the junction.
+pnpm start -- repo-posts-with-tag-some typescript
+pnpm start -- repo-posts-with-tag-none typescript
+pnpm start -- repo-posts-with-tag-every typescript
+
+# Nested writes via the callback mutator: junction INSERT / DELETE,
+# and create flows that insert targets + links in one mutation.
+pnpm start -- repo-connect-post-tags <postId> <tagId>
+pnpm start -- repo-disconnect-post-tags <postId> <tagId>
+pnpm start -- repo-create-post-with-tags <newPostId> <userId> 'Title' label1 label2
+pnpm start -- repo-create-post-connect-tags <newPostId> <userId> 'Title' <tagId>
+```
+
+The M:N relation API shown here is available because `PostTag` is a *pure*
+junction (its only columns are the two foreign keys). When a junction carries
+a required non-FK payload column, the relation sugar cannot populate it, so
+nested `create`/`connect` on that relation are disabled at the type level
+(their inputs become `never`) and rejected at runtime; populate such junctions
+through the junction model's own relations or the SQL builder instead. There
+is deliberately no runnable example of that guard — the type-level gate makes
+it uncompilable.
+
+The source files: `src/orm-client/get-post-tags.ts`, `get-tag-posts.ts`,
+`get-posts-by-tag-filter.ts`, `connect-post-tags.ts`, `disconnect-post-tags.ts`,
+`create-post-with-tags.ts`, and `create-post-connect-tags.ts`.
 
 ## Cache Middleware Examples
 
@@ -261,17 +284,13 @@ Run `pnpm dev` for the Vite app that visualizes the contract. It renders directl
 
 ## Key Files
 
-- `src/prisma/contract.prisma` - Prisma schema (source of truth for emitted workflow)
-- `prisma/contract.ts` - TypeScript contract (used by no-emit workflow)
-- `src/prisma/contract.json` - Emitted contract (emit workflow only)
-- `src/prisma/contract.d.ts` - Emitted types (emit workflow only)
-- `src/prisma/db.ts` - One-liner Postgres client + query roots (emit workflow)
-- `src/prisma-no-emit/context.ts` - Env-free execution stack/context + query roots (no-emit workflow)
-- `src/prisma-no-emit/runtime.ts` - Runtime factory (no-emit workflow)
+- `src/prisma/contract.prisma` - Prisma schema (single source of truth)
+- `src/prisma/contract.json` - Emitted contract
+- `src/prisma/contract.d.ts` - Emitted types
+- `src/prisma/db.ts` - One-liner Postgres client + query roots
 - `src/orm-client/client.ts` - ORM client + custom collection scopes
 - `src/orm-client/*.ts` - End-to-end ORM client query examples
-- `src/main.ts` - App entrypoint with arktype config validation (emit workflow)
-- `src/main-no-emit.ts` - App entrypoint with arktype config validation (no-emit workflow)
+- `src/main.ts` - App entrypoint with arktype config validation
 - `src/app/` - React browser visualization (validates contract, renders from constructed Contract)
 - `scripts/stamp-marker.ts` - Contract marker management
 - `scripts/seed.ts` - Database seeding (includes vector embeddings)

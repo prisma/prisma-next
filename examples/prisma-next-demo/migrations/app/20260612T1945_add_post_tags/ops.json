@@ -1,0 +1,196 @@
+[
+  {
+    "id": "table.post_tag",
+    "label": "Create table \"post_tag\"",
+    "summary": "Creates table \"post_tag\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "post_tag"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"post_tag\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"post_tag\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"post_tag\"",
+        "sql": "CREATE TABLE \"public\".\"post_tag\" (\n  \"postId\" text NOT NULL,\n  \"tagId\" text NOT NULL,\n  PRIMARY KEY (\"postId\", \"tagId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"post_tag\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"post_tag\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "table.tag",
+    "label": "Create table \"tag\"",
+    "summary": "Creates table \"tag\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "tag"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"tag\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"tag\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"tag\"",
+        "sql": "CREATE TABLE \"public\".\"tag\" (\n  \"id\" character(36) NOT NULL,\n  \"label\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"tag\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"tag\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "index.post_tag.post_tag_postId_idx",
+    "label": "Create index \"post_tag_postId_idx\" on \"post_tag\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "post_tag_postId_idx",
+        "table": "post_tag"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"post_tag_postId_idx\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"post_tag_postId_idx\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"post_tag_postId_idx\"",
+        "sql": "CREATE INDEX \"post_tag_postId_idx\" ON \"public\".\"post_tag\" (\"postId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"post_tag_postId_idx\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"post_tag_postId_idx\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "index.post_tag.post_tag_tagId_idx",
+    "label": "Create index \"post_tag_tagId_idx\" on \"post_tag\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "post_tag_tagId_idx",
+        "table": "post_tag"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"post_tag_tagId_idx\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"post_tag_tagId_idx\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"post_tag_tagId_idx\"",
+        "sql": "CREATE INDEX \"post_tag_tagId_idx\" ON \"public\".\"post_tag\" (\"tagId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"post_tag_tagId_idx\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"post_tag_tagId_idx\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.post_tag.post_tag_postId_fkey",
+    "label": "Add foreign key \"post_tag_postId_fkey\" on \"post_tag\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "post_tag_postId_fkey",
+        "table": "post_tag"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"post_tag_postId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'post_tag_postId_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"post_tag\"')\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"post_tag_postId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"post_tag\"\nADD CONSTRAINT \"post_tag_postId_fkey\"\nFOREIGN KEY (\"postId\")\nREFERENCES \"public\".\"post\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"post_tag_postId_fkey\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'post_tag_postId_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"post_tag\"')\n)"
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.post_tag.post_tag_tagId_fkey",
+    "label": "Add foreign key \"post_tag_tagId_fkey\" on \"post_tag\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "post_tag_tagId_fkey",
+        "table": "post_tag"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"post_tag_tagId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'post_tag_tagId_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"post_tag\"')\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"post_tag_tagId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"post_tag\"\nADD CONSTRAINT \"post_tag_tagId_fkey\"\nFOREIGN KEY (\"tagId\")\nREFERENCES \"public\".\"tag\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"post_tag_tagId_fkey\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'post_tag_tagId_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"post_tag\"')\n)"
+      }
+    ]
+  }
+]

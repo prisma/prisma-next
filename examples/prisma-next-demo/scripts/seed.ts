@@ -8,6 +8,8 @@
  * Creates:
  * - 2 users (alice, bob)
  * - 3 posts with vector embeddings (for similarity search demos)
+ * - 3 tags (typescript, orm, demo) + post_tag junction rows (for the
+ *   many-to-many demos)
  *
  * Prerequisites:
  * - DATABASE_URL environment variable set
@@ -88,7 +90,7 @@ async function main() {
     };
 
     // Insert posts with embeddings
-    await runtime.execute(
+    const firstPostRows = await runtime.execute(
       db.sql.public.post
         .insert([
           {
@@ -99,10 +101,11 @@ async function main() {
             createdAt: new Date(),
           },
         ])
+        .returning('id', 'title')
         .build(),
     );
 
-    await runtime.execute(
+    const secondPostRows = await runtime.execute(
       db.sql.public.post
         .insert([
           {
@@ -113,6 +116,7 @@ async function main() {
             createdAt: new Date(),
           },
         ])
+        .returning('id', 'title')
         .build(),
     );
 
@@ -129,6 +133,62 @@ async function main() {
         ])
         .build(),
     );
+
+    const firstPost = firstPostRows[0] ?? null;
+    const secondPost = secondPostRows[0] ?? null;
+    if (!firstPost || !secondPost) {
+      throw new Error('Failed to create posts');
+    }
+
+    console.log(`Created post: ${firstPost.title} (id: ${firstPost.id})`);
+    console.log(`Created post: ${secondPost.title} (id: ${secondPost.id})`);
+
+    // Insert tags + junction rows powering the many-to-many demos
+    // (repo-post-tags, repo-tag-posts, repo-posts-with-tag-*, the nested
+    // connect/disconnect/create commands). The third post stays untagged so
+    // the `every` filter's vacuous-truth semantics are observable.
+    const tagTypeScriptRows = await runtime.execute(
+      db.sql.public.tag
+        .insert([{ label: 'typescript' }])
+        .returning('id', 'label')
+        .build(),
+    );
+    const tagOrmRows = await runtime.execute(
+      db.sql.public.tag
+        .insert([{ label: 'orm' }])
+        .returning('id', 'label')
+        .build(),
+    );
+    const tagDemoRows = await runtime.execute(
+      db.sql.public.tag
+        .insert([{ label: 'demo' }])
+        .returning('id', 'label')
+        .build(),
+    );
+
+    const tagTypeScript = tagTypeScriptRows[0] ?? null;
+    const tagOrm = tagOrmRows[0] ?? null;
+    const tagDemo = tagDemoRows[0] ?? null;
+    if (!tagTypeScript || !tagOrm || !tagDemo) {
+      throw new Error('Failed to create tags');
+    }
+
+    console.log(`Created tag: ${tagTypeScript.label} (id: ${tagTypeScript.id})`);
+    console.log(`Created tag: ${tagOrm.label} (id: ${tagOrm.id})`);
+    console.log(`Created tag: ${tagDemo.label} (id: ${tagDemo.id})`);
+
+    await runtime.execute(
+      db.sql.public.post_tag
+        .insert([
+          { postId: firstPost.id, tagId: tagTypeScript.id },
+          { postId: firstPost.id, tagId: tagOrm.id },
+          { postId: secondPost.id, tagId: tagOrm.id },
+          { postId: secondPost.id, tagId: tagDemo.id },
+        ])
+        .build(),
+    );
+
+    console.log('Seeded post_tag junction rows.');
 
     // Insert polymorphic tasks. `Task` is a discriminated base (`@@discriminator(type)`)
     // with `Bug` / `Feature` variants stored in their own tables. The ORM client's
