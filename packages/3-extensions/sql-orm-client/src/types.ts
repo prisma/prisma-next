@@ -1194,15 +1194,26 @@ type RelationThrough<
       : never
     : never;
 
+type HasJunctionThrough<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  RelName extends string,
+> = [RelationThrough<TContract, ModelName, RelName>] extends [never] ? false : true;
+
 /**
  * Resolves a storage table name to its owning domain model by scanning the
- * model map for the model whose `storage.table` matches. Junction tables
- * (e.g. `user_roles`) surface their generated model (e.g. `UserRole`) so the
- * junction's own field nullability/defaults can be inspected.
+ * model map for the model whose `storage.table` and `storage.namespaceId`
+ * match. Junction tables (e.g. `user_roles`) surface their generated model
+ * (e.g. `UserRole`) so the junction's own field nullability/defaults can be
+ * inspected.
  */
-type ModelNameForTable<TContract extends Contract<SqlStorage>, TableName extends string> = {
+type ModelNameForTable<
+  TContract extends Contract<SqlStorage>,
+  NamespaceId extends string,
+  TableName extends string,
+> = {
   [M in keyof ModelsOf<TContract> & string]: ModelsOf<TContract>[M] extends {
-    readonly storage: { readonly table: TableName };
+    readonly storage: { readonly namespaceId: NamespaceId; readonly table: TableName };
   }
     ? M
     : never;
@@ -1241,30 +1252,51 @@ type HasRequiredJunctionPayload<
 > =
   RelationThrough<TContract, ModelName, RelName> extends infer Through extends {
     readonly table: string;
+    readonly namespaceId: string;
     readonly parentColumns: readonly string[];
     readonly childColumns: readonly string[];
   }
-    ? ModelNameForTable<TContract, Through['table']> extends infer JunctionModel extends string
-      ? {
-          [F in JunctionPayloadFieldNames<
-            TContract,
-            JunctionModel,
-            Through['parentColumns'][number] | Through['childColumns'][number]
-          >]: IsOptionalCreateField<TContract, JunctionModel, F> extends true ? never : F;
-        }[JunctionPayloadFieldNames<
+    ? ModelNameForTable<
+        TContract,
+        Through['namespaceId'],
+        Through['table']
+      > extends infer JunctionModel extends string
+      ? JunctionPayloadFieldNames<
           TContract,
           JunctionModel,
           Through['parentColumns'][number] | Through['childColumns'][number]
-        >] extends never
-        ? false
-        : true
+        > extends infer PayloadFields extends string
+        ? {
+            [F in PayloadFields]: IsOptionalCreateField<TContract, JunctionModel, F> extends true
+              ? never
+              : F;
+          }[PayloadFields] extends never
+          ? false
+          : true
+        : false
       : false
     : false;
+
+type DisconnectMutator<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  BareDisconnectDisabled extends boolean,
+> = BareDisconnectDisabled extends true
+  ? (
+      criteria: readonly RelationConnectCriterion<TContract, ModelName>[],
+    ) => RelationMutationDisconnect<TContract, ModelName>
+  : {
+      (): RelationMutationDisconnect<TContract, ModelName>;
+      (
+        criteria: readonly RelationConnectCriterion<TContract, ModelName>[],
+      ): RelationMutationDisconnect<TContract, ModelName>;
+    };
 
 export interface RelationMutator<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   LinkWritesDisabled extends boolean = false,
+  BareDisconnectDisabled extends boolean = false,
 > {
   create(
     data: LinkWritesDisabled extends true ? never : MutationCreateInput<TContract, ModelName>,
@@ -1284,10 +1316,7 @@ export interface RelationMutator<
       ? never
       : readonly RelationConnectCriterion<TContract, ModelName>[],
   ): RelationMutationConnect<TContract, ModelName>;
-  disconnect(): RelationMutationDisconnect<TContract, ModelName>;
-  disconnect(
-    criteria: readonly RelationConnectCriterion<TContract, ModelName>[],
-  ): RelationMutationDisconnect<TContract, ModelName>;
+  readonly disconnect: DisconnectMutator<TContract, ModelName, BareDisconnectDisabled>;
 }
 
 type RelationMutationCallback<
@@ -1298,7 +1327,8 @@ type RelationMutationCallback<
   mutator: RelationMutator<
     TContract,
     RelatedModelName<TContract, ModelName, RelName> & string,
-    HasRequiredJunctionPayload<TContract, ModelName, RelName>
+    HasRequiredJunctionPayload<TContract, ModelName, RelName>,
+    HasJunctionThrough<TContract, ModelName, RelName>
   >,
 ) => RelationMutation<TContract, RelatedModelName<TContract, ModelName, RelName> & string>;
 

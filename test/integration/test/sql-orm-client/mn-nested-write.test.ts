@@ -136,6 +136,62 @@ describe('integration/mn-nested-write', () => {
     timeouts.spinUpPpgDev,
   );
 
+  it(
+    'update(): connect to an already-linked tag rejects and preserves the junction link',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+        await seedTags(runtime, [{ id: TAG_RUST, name: 'Rust' }]);
+        await seedUserTags(runtime, [{ userId: 1, tagId: TAG_RUST }]);
+
+        await expect(
+          users
+            .where({ id: 1 })
+            .select('id', 'name')
+            .include('tags', (tags) => tags.select('id', 'name'))
+            .update({
+              tags: (t) => t.connect({ id: TAG_RUST }),
+            }),
+        ).rejects.toThrow(/already exists/);
+
+        const junctionRows = await runtime.query<{ user_id: number; tag_id: string }>(
+          'select user_id, tag_id from user_tags',
+        );
+        expect(junctionRows).toEqual([{ user_id: 1, tag_id: TAG_RUST }]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'create(): connect to a missing tag rejects and leaves no partial parent or junction write',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        await expect(
+          users.create({
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            tags: (t) => t.connect({ id: TAG_RUST }),
+          }),
+        ).rejects.toThrow(/did not find a matching row/);
+
+        const userRows = await runtime.query<{ id: number }>('select id from users');
+        expect(userRows).toEqual([]);
+
+        const junctionRows = await runtime.query<{ user_id: number; tag_id: string }>(
+          'select user_id, tag_id from user_tags',
+        );
+        expect(junctionRows).toEqual([]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
   // ===========================================================================
   // disconnect — update() parent flow (only supported path)
   // ===========================================================================
@@ -212,6 +268,35 @@ describe('integration/mn-nested-write', () => {
           'select user_id, tag_id from user_tags',
         );
         expect(junctionRows).toEqual([]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'update(): disconnect from a missing tag rejects and preserves existing junction links',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+        await seedTags(runtime, [{ id: TAG_TS, name: 'TypeScript' }]);
+        await seedUserTags(runtime, [{ userId: 1, tagId: TAG_TS }]);
+
+        await expect(
+          users
+            .where({ id: 1 })
+            .select('id', 'name')
+            .include('tags', (tags) => tags.select('id', 'name'))
+            .update({
+              tags: (t) => t.disconnect([{ id: TAG_RUST }]),
+            }),
+        ).rejects.toThrow(/did not find a matching row/);
+
+        const junctionRows = await runtime.query<{ user_id: number; tag_id: string }>(
+          'select user_id, tag_id from user_tags',
+        );
+        expect(junctionRows).toEqual([{ user_id: 1, tag_id: TAG_TS }]);
       });
     },
     timeouts.spinUpPpgDev,
@@ -314,6 +399,17 @@ describe('integration/mn-nested-write', () => {
             roles: (r) => r.create([{ id: ROLE_ADMIN, name: 'Admin' }] as never),
           }),
         ).rejects.toThrow(/required column.*`level`/);
+
+        const userRows = await runtime.query<{ id: number }>('select id from users');
+        expect(userRows).toEqual([]);
+
+        const roleRows = await runtime.query<{ id: string }>('select id from roles');
+        expect(roleRows).toEqual([]);
+
+        const junctionRows = await runtime.query<{ user_id: number; role_id: string }>(
+          'select user_id, role_id from user_roles',
+        );
+        expect(junctionRows).toEqual([]);
       });
     },
     timeouts.spinUpPpgDev,
@@ -342,6 +438,19 @@ describe('integration/mn-nested-write', () => {
             roles: (r) => r.connect({ id: ROLE_ADMIN } as never),
           }),
         ).rejects.toThrow(/required column.*`level`/);
+
+        const userRows = await runtime.query<{ id: number }>('select id from users');
+        expect(userRows).toEqual([]);
+
+        const roleRows = await runtime.query<{ id: string; name: string }>(
+          'select id, name from roles',
+        );
+        expect(roleRows).toEqual([{ id: ROLE_ADMIN, name: 'Admin' }]);
+
+        const junctionRows = await runtime.query<{ user_id: number; role_id: string }>(
+          'select user_id, role_id from user_roles',
+        );
+        expect(junctionRows).toEqual([]);
       });
     },
     timeouts.spinUpPpgDev,
