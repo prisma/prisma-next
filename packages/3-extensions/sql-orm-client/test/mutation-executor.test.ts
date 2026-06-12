@@ -15,6 +15,7 @@ import type { MockRuntime, TestContract } from './helpers';
 import {
   buildManyToManyContract,
   buildManyToManyContractWithTargetRelation,
+  buildTestContextFromContract,
   createMockRuntime,
   getTestContext,
   getTestContract,
@@ -862,14 +863,15 @@ describe('mutation-executor', () => {
     );
   });
 
-  it('executeNestedCreateMutation() allows M:N connect when required payload has an execution default', async () => {
+  it('executeNestedCreateMutation() M:N connect applies the execution default to the junction row', async () => {
+    const base = getTestContract();
     const contract = {
-      ...getTestContract(),
+      ...base,
       execution: {
-        ...getTestContract().execution,
+        ...base.execution,
         mutations: {
           defaults: [
-            ...(getTestContract().execution?.mutations.defaults ?? []),
+            ...(base.execution?.mutations.defaults ?? []),
             {
               ref: { table: 'user_roles', column: 'level' },
               onCreate: { kind: 'generator', id: 'test-level' },
@@ -878,6 +880,12 @@ describe('mutation-executor', () => {
         },
       },
     } as unknown as TestContract;
+    // The defaults applier closes over the contract the context was created
+    // from, so the context must be built from the patched contract — spreading
+    // `{ ...getTestContext(), contract }` would never see the new default.
+    const context = buildTestContextFromContract(contract, {
+      mutationDefaultGenerators: [{ id: 'test-level', generate: () => 5, stability: 'field' }],
+    });
     const runtime = createMockRuntime();
     runtime.setNextResults([
       [{ id: 'admin' }],
@@ -887,7 +895,7 @@ describe('mutation-executor', () => {
     ]);
 
     await executeNestedCreateMutation({
-      context: { ...getTestContext(), contract },
+      context,
       runtime,
       namespaceId: 'public',
       modelName: 'User',
@@ -901,7 +909,9 @@ describe('mutation-executor', () => {
     });
 
     const insert = findJunctionDml(runtime, 'insert', 'user_roles');
-    expect(insert.kind).toBe('insert');
+    const junctionRow = (insert.rows as ReadonlyArray<Record<string, unknown>>)[0]!;
+    expect(Object.keys(junctionRow).sort()).toEqual(['level', 'role_id', 'user_id']);
+    expect((junctionRow['level'] as { value: unknown }).value).toBe(5);
   });
 
   it('executeNestedUpdateMutation() preflights junction guards before the scalar update', async () => {

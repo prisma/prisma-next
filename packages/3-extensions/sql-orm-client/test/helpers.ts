@@ -15,6 +15,7 @@ import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-la
 import {
   createExecutionContext,
   createSqlExecutionStack,
+  type RuntimeMutationDefaultGenerator,
   type RuntimeParameterizedCodecDescriptor,
   type SqlRuntimeExtensionDescriptor,
 } from '@prisma-next/sql-runtime';
@@ -142,14 +143,48 @@ const pgVectorCodecStubExtension: SqlRuntimeExtensionDescriptor<'postgres'> = ((
   };
 })();
 
-const testContext: ExecutionContext<TestContract> = createExecutionContext({
-  contract: baseTestContract,
-  stack: createSqlExecutionStack({
-    target: postgresTarget,
-    adapter: postgresAdapter,
-    extensionPacks: [pgVectorCodecStubExtension],
-  }),
-});
+/**
+ * Builds an {@link ExecutionContext} from the given contract — unlike
+ * spreading `{ ...getTestContext(), contract }`, this makes
+ * `applyMutationDefaults` observe the patched contract's execution defaults
+ * (the context's defaults applier is a closure over the contract it was
+ * created from). Extra mutation default generators referenced by the
+ * contract can be registered via `options.mutationDefaultGenerators`.
+ */
+export function buildTestContextFromContract(
+  contract: TestContract,
+  options?: {
+    readonly mutationDefaultGenerators?: ReadonlyArray<RuntimeMutationDefaultGenerator>;
+  },
+): ExecutionContext<TestContract> {
+  const generators = options?.mutationDefaultGenerators ?? [];
+  const extensionPacks: SqlRuntimeExtensionDescriptor<'postgres'>[] = [pgVectorCodecStubExtension];
+  if (generators.length > 0) {
+    extensionPacks.push({
+      kind: 'extension',
+      id: 'test-mutation-default-generators',
+      version: '0.0.0',
+      familyId: 'sql',
+      targetId: 'postgres',
+      codecs: () => [],
+      mutationDefaultGenerators: () => generators,
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    });
+  }
+
+  return createExecutionContext({
+    contract,
+    stack: createSqlExecutionStack({
+      target: postgresTarget,
+      adapter: postgresAdapter,
+      extensionPacks,
+    }),
+  });
+}
+
+const testContext: ExecutionContext<TestContract> = buildTestContextFromContract(baseTestContract);
 
 export function getTestContext(): ExecutionContext<TestContract> {
   return testContext;

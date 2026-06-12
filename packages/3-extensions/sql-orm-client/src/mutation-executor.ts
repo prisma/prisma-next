@@ -1009,6 +1009,19 @@ async function insertJunctionLink(
     writeJunctionColumn(junctionRow, through, column, value);
   }
 
+  // Mirror insertSingleRow: payload columns whose only source is an
+  // execution-time onCreate default pass both the type gate and the runtime
+  // guard, so the INSERT must populate them here or hit NOT NULL on the
+  // database.
+  const applied = context.applyMutationDefaults({
+    op: 'create',
+    table: through.table,
+    values: junctionRow,
+  });
+  for (const def of applied) {
+    junctionRow[def.column] = def.value;
+  }
+
   const compiled = compileInsertCount(context.contract, through.namespaceId, through.table, [
     junctionRow,
   ]);

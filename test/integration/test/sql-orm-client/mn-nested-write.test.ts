@@ -14,19 +14,64 @@
 //   2. Explicit .select() used in most tests.
 //   3. At least one implicit/default-selection readback.
 
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
+import { Collection } from '@prisma-next/sql-orm-client';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import type { Char } from '@prisma-next/target-postgres/codec-types';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { describe, expect, it } from 'vitest';
+import { withReturningCapability } from './collection-fixtures';
+import type { TestContract } from './helpers';
+import { deserializeTestContract, getTestContract } from './helpers';
 import {
   createReturningUsersCollection,
   timeouts,
   withCollectionRuntime,
 } from './integration-helpers';
 import { seedRoles, seedTags, seedUserRoles, seedUsers, seedUserTags } from './runtime-helpers';
+import { unboundTables } from './unbound-tables';
 
 const TAG_RUST = 'tag-rust' as Char<36>;
 const TAG_TS = 'tag-typescript' as Char<36>;
 const ROLE_ADMIN = 'role-admin' as Char<36>;
 const ROLE_EDITOR = 'role-editor' as Char<36>;
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+// Builds a contract clone where the junction payload column
+// `user_tags.created_at` loses its storage default and instead carries an
+// execution-time `onCreate` default (the `uuidv4` generator the postgres
+// test stack already registers; the column is text). Connect/create on
+// User.tags then pass the required-payload gates *only* via the execution
+// default, so the junction INSERT must apply it or hit NOT NULL on the DB.
+function buildExecutionDefaultedTagsContract(): TestContract {
+  const contract = JSON.parse(
+    JSON.stringify(withReturningCapability(getTestContract())),
+  ) as TestContract;
+
+  const userTagsTable = unboundTables(contract.storage)['user_tags'] as unknown as
+    | { columns: Record<string, Record<string, unknown>> }
+    | undefined;
+  const createdAt = userTagsTable?.columns['created_at'];
+  if (!createdAt) {
+    throw new Error('Test contract is missing user_tags.created_at');
+  }
+  delete createdAt['default'];
+
+  const execution = contract.execution as unknown as
+    | { mutations: { defaults: Array<Record<string, unknown>> } }
+    | undefined;
+  if (!execution) {
+    throw new Error('Test contract is missing the execution block');
+  }
+  execution.mutations.defaults.push({
+    ref: { table: 'user_tags', column: 'created_at' },
+    onCreate: { kind: 'generator', id: 'uuidv4' },
+  });
+
+  return deserializeTestContract(contract);
+}
 
 describe('integration/mn-nested-write', () => {
   // ===========================================================================
@@ -520,6 +565,68 @@ describe('integration/mn-nested-write', () => {
         );
         expect(junctionRows).toEqual([]);
       });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  // ===========================================================================
+  // Execution-defaulted junction payload column — connect must apply defaults
+  // ===========================================================================
+
+  it(
+    'create(): connect applies an execution-time onCreate default to a junction payload column',
+    async () => {
+      const contract = buildExecutionDefaultedTagsContract();
+
+      await withCollectionRuntime(async (runtime) => {
+        // Drop the DB-side default too: if the junction INSERT fails to apply
+        // the execution default, this test dies with a NOT NULL violation
+        // instead of silently passing via the database default.
+        await runtime.query('alter table user_tags alter column created_at drop default');
+
+        // The defaults applier closes over the contract the context was
+        // created from, so build the context from the patched contract.
+        const context = createExecutionContext({
+          contract,
+          stack: createSqlExecutionStack({
+            target: postgresTarget,
+            adapter: postgresAdapter,
+            extensionPacks: [pgvectorRuntime],
+          }),
+        });
+        const users = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
+
+        await seedTags(runtime, [{ id: TAG_RUST, name: 'Rust' }]);
+
+        const created = await users
+          .select('id', 'name')
+          .include('tags', (tags) => tags.select('id', 'name'))
+          .create({
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            tags: (t) => t.connect({ id: TAG_RUST }),
+          });
+
+        expect(created).toEqual({
+          id: 1,
+          name: 'Alice',
+          tags: [{ id: TAG_RUST, name: 'Rust' }],
+        });
+
+        const junctionRows = await runtime.query<{
+          user_id: number;
+          tag_id: string;
+          created_at: string;
+        }>('select user_id, tag_id, created_at from user_tags');
+        expect(junctionRows).toEqual([
+          {
+            user_id: 1,
+            tag_id: TAG_RUST,
+            created_at: expect.stringMatching(UUID_PATTERN),
+          },
+        ]);
+      }, contract);
     },
     timeouts.spinUpPpgDev,
   );
