@@ -283,7 +283,8 @@
     "precheck": [
       {
         "description": "ensure index \"post_userId_idx\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"post_userId_idx\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"post_userId_idx\""]
       }
     ],
     "execute": [
@@ -295,7 +296,8 @@
     "postcheck": [
       {
         "description": "verify index \"post_userId_idx\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"post_userId_idx\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"post_userId_idx\""]
       }
     ]
   },
@@ -349,7 +351,8 @@
     "precheck": [
       {
         "description": "ensure index \"task_userId_idx\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"task_userId_idx\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"task_userId_idx\""]
       }
     ],
     "execute": [
@@ -361,7 +364,8 @@
     "postcheck": [
       {
         "description": "verify index \"task_userId_idx\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"task_userId_idx\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"task_userId_idx\""]
       }
     ]
   }

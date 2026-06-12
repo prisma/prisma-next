@@ -5,9 +5,10 @@ import {
   type IdentifierRef,
   type LiteralExpr,
   type ParamRef,
+  type TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { columnExistsAst } from '../../src/contract-free/checks';
+import { columnExistsAst, indexExistsAst, tableExistsAst } from '../../src/contract-free/checks';
 
 describe('columnExistsAst — SQLite pragma_table_info check builder', () => {
   describe('columnAbsent()', () => {
@@ -70,6 +71,74 @@ describe('columnExistsAst — SQLite pragma_table_info check builder', () => {
     const values = refs.map((r) => (r as ParamRef).value);
     expect(values).toContain('users');
     expect(values).toContain('email');
+  });
+});
+
+describe('tableExistsAst — SQLite sqlite_master check builder', () => {
+  it('tableAbsent() returns a SelectAst FROM sqlite_master projecting COUNT(*) = 0', () => {
+    const ast = tableExistsAst('users').tableAbsent();
+    expect(ast.kind).toBe('select');
+
+    const src = ast.from as TableSource;
+    expect(src.kind).toBe('table-source');
+    expect(src.name).toBe('sqlite_master');
+
+    const proj = ast.projection[0]!;
+    expect(proj.alias).toBe('result');
+    expect(proj.codec).toBeUndefined();
+    const binary = proj.expr as BinaryExpr;
+    expect(binary.op).toBe('eq');
+    expect(binary.left).toBeInstanceOf(AggregateExpr);
+    const right = binary.right as LiteralExpr;
+    expect(right.value).toBe(0);
+  });
+
+  it('tablePresent() projects COUNT(*) > 0', () => {
+    const ast = tableExistsAst('users').tablePresent();
+    const binary = ast.projection[0]!.expr as BinaryExpr;
+    expect(binary.op).toBe('gt');
+  });
+
+  it('WHERE binds type = "table" and name = tableName as text params', () => {
+    const ast = tableExistsAst('orders').tableAbsent();
+    expect(ast.where).toBeDefined();
+    const refs = ast.collectParamRefs();
+    const values = refs.map((r) => (r as ParamRef).value);
+    expect(values).toContain('table');
+    expect(values).toContain('orders');
+  });
+});
+
+describe('indexExistsAst — SQLite sqlite_master index check builder', () => {
+  it('indexAbsent() returns a SelectAst FROM sqlite_master projecting COUNT(*) = 0', () => {
+    const ast = indexExistsAst('idx_users_email').indexAbsent();
+    expect(ast.kind).toBe('select');
+
+    const src = ast.from as TableSource;
+    expect(src.kind).toBe('table-source');
+    expect(src.name).toBe('sqlite_master');
+
+    const proj = ast.projection[0]!;
+    expect(proj.alias).toBe('result');
+    const binary = proj.expr as BinaryExpr;
+    expect(binary.op).toBe('eq');
+    expect(binary.left).toBeInstanceOf(AggregateExpr);
+    const right = binary.right as LiteralExpr;
+    expect(right.value).toBe(0);
+  });
+
+  it('indexPresent() projects COUNT(*) > 0', () => {
+    const ast = indexExistsAst('idx_users_email').indexPresent();
+    const binary = ast.projection[0]!.expr as BinaryExpr;
+    expect(binary.op).toBe('gt');
+  });
+
+  it('WHERE binds type = "index" and name = indexName as text params', () => {
+    const ast = indexExistsAst('idx_users_email').indexAbsent();
+    const refs = ast.collectParamRefs();
+    const values = refs.map((r) => (r as ParamRef).value);
+    expect(values).toContain('index');
+    expect(values).toContain('idx_users_email');
   });
 });
 

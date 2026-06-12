@@ -47,10 +47,8 @@ function tableSpec(
 }
 
 describe('CreateTableCall', () => {
-  it('produces an additive op with correct id, label, and execute/pre/postcheck SQL', async () => {
-    const lowerer = stubLowerer(
-      'CREATE TABLE "user" (\n  "id" INTEGER NOT NULL,\n  "email" TEXT NOT NULL,\n  PRIMARY KEY ("id")\n)',
-    );
+  it('produces an additive op with correct id, label, and execute/pre/postcheck shape', async () => {
+    const { lowerer, received } = recordingCheckLowerer();
     const call = new CreateTableCall(
       'user',
       [col('id', 'INTEGER', { notNull: true }), col('email', 'TEXT', { notNull: true })],
@@ -63,34 +61,17 @@ describe('CreateTableCall', () => {
     const op = await call.toOp(lowerer);
     expect(op.id).toBe('table.user');
     expect(op.label).toBe('Create table user');
-    expect(op.execute[0]?.sql).toContain('CREATE TABLE "user"');
-    expect(op.execute[0]?.sql).toContain('PRIMARY KEY ("id")');
-    expect(op.execute[0]?.sql).toContain('"email" TEXT NOT NULL');
-    expect(op.precheck[0]?.sql).toContain("name = 'user'");
-    expect(op.postcheck[0]?.sql).toContain("name = 'user'");
+    expect(received).toHaveLength(3);
+    expect(op.precheck).toHaveLength(1);
+    expect(op.execute).toHaveLength(1);
+    expect(op.postcheck).toHaveLength(1);
   });
 
-  it('passes columns and constraints to the lowerer', async () => {
-    const received: unknown[] = [];
-    const capturingLowerer: ExecuteRequestLowerer = {
-      lower: (ast) => {
-        received.push(ast);
-        return Object.freeze({
-          sql: 'CREATE TABLE "user" (\n  "id" INTEGER PRIMARY KEY AUTOINCREMENT\n)',
-          params: Object.freeze([]),
-        });
-      },
-      lowerToExecuteRequest: async (ast) => {
-        received.push(ast);
-        return Object.freeze({
-          sql: 'CREATE TABLE "user" (\n  "id" INTEGER PRIMARY KEY AUTOINCREMENT\n)',
-          params: Object.freeze([]),
-        });
-      },
-    };
+  it('lowers DDL + two typed check ASTs via lowerToExecuteRequest', async () => {
+    const { lowerer, received } = recordingCheckLowerer();
     const call = new CreateTableCall('user', [col('id', 'INTEGER PRIMARY KEY AUTOINCREMENT')]);
-    await call.toOp(capturingLowerer);
-    expect(received).toHaveLength(1);
+    await call.toOp(lowerer);
+    expect(received).toHaveLength(3);
   });
 
   it('toOp() throws when no lowerer is provided', async () => {
@@ -116,19 +97,27 @@ describe('CreateTableCall', () => {
 });
 
 describe('DropTableCall', () => {
-  it('produces a destructive op with DROP TABLE', () => {
+  it('produces a destructive op with DROP TABLE', async () => {
+    const lowerer = stubLowerer('CHECK SQL');
     const call = new DropTableCall('orphan');
     expect(call.factoryName).toBe('dropTable');
     expect(call.operationClass).toBe('destructive');
     expect(call.label).toBe('Drop table orphan');
 
-    const op = call.toOp();
+    const op = await call.toOp(lowerer);
     expect(op.id).toBe('dropTable.orphan');
     expect(op.execute[0]?.sql).toBe('DROP TABLE "orphan"');
   });
 
-  it('renderTypeScript() emits dropTable("orphan")', () => {
-    expect(new DropTableCall('orphan').renderTypeScript()).toBe('dropTable("orphan")');
+  it('toOp() throws when no lowerer is provided', async () => {
+    const call = new DropTableCall('orphan');
+    await expect(call.toOp()).rejects.toThrow('createSqliteMigrationPlanner');
+  });
+
+  it('renderTypeScript() emits this.dropTable({...})', () => {
+    expect(new DropTableCall('orphan').renderTypeScript()).toBe(
+      'this.dropTable({ table: "orphan" })',
+    );
   });
 });
 
@@ -232,28 +221,53 @@ describe('DropColumnCall', () => {
 });
 
 describe('CreateIndexCall', () => {
-  it('produces a CREATE INDEX op (same shape regardless of FK-backing origin)', () => {
+  it('produces a CREATE INDEX op (same shape regardless of FK-backing origin)', async () => {
+    const lowerer = stubLowerer('CHECK SQL');
     const call = new CreateIndexCall('user', 'idx_email', ['email']);
     expect(call.label).toBe('Create index idx_email on user');
-    const op = call.toOp();
+    const op = await call.toOp(lowerer);
     expect(op.id).toBe('index.user.idx_email');
     expect(op.execute[0]?.description).toBe('create index "idx_email"');
     expect(op.execute[0]?.sql).toBe('CREATE INDEX "idx_email" ON "user" ("email")');
   });
+
+  it('toOp() throws when no lowerer is provided', async () => {
+    const call = new CreateIndexCall('user', 'idx_email', ['email']);
+    await expect(call.toOp()).rejects.toThrow('createSqliteMigrationPlanner');
+  });
+
+  it('renderTypeScript() emits this.createIndex({...})', () => {
+    const call = new CreateIndexCall('user', 'idx_email', ['email']);
+    expect(call.renderTypeScript()).toBe(
+      'this.createIndex({ table: "user", index: "idx_email", columns: ["email"] })',
+    );
+  });
 });
 
 describe('DropIndexCall', () => {
-  it('produces a destructive DROP INDEX IF EXISTS op', () => {
+  it('produces a destructive DROP INDEX IF EXISTS op', async () => {
+    const lowerer = stubLowerer('CHECK SQL');
     const call = new DropIndexCall('user', 'idx_email');
-    const op = call.toOp();
+    const op = await call.toOp(lowerer);
     expect(op.id).toBe('dropIndex.user.idx_email');
     expect(op.operationClass).toBe('destructive');
     expect(op.execute[0]?.sql).toBe('DROP INDEX IF EXISTS "idx_email"');
   });
+
+  it('toOp() throws when no lowerer is provided', async () => {
+    const call = new DropIndexCall('user', 'idx_email');
+    await expect(call.toOp()).rejects.toThrow('createSqliteMigrationPlanner');
+  });
+
+  it('renderTypeScript() emits this.dropIndex({...})', () => {
+    const call = new DropIndexCall('user', 'idx_email');
+    expect(call.renderTypeScript()).toBe('this.dropIndex({ table: "user", index: "idx_email" })');
+  });
 });
 
 describe('RecreateTableCall', () => {
-  it('produces a single op with the four core execute steps + index recreation', () => {
+  it('produces a single op with the four core execute steps + index recreation', async () => {
+    const lowerer = stubLowerer('CHECK SQL');
     const contractSpec = tableSpec(
       [
         colSpec({ name: 'id', typeSql: 'INTEGER', nullable: false }),
@@ -278,12 +292,11 @@ describe('RecreateTableCall', () => {
     });
 
     expect(call.factoryName).toBe('recreateTable');
-    const op = call.toOp();
+    const op = await call.toOp(lowerer);
     expect(op.id).toBe('recreateTable.user');
     expect(op.operationClass).toBe('destructive');
     expect(op.summary).toBe('Recreates table user to apply schema changes: type mismatch on email');
 
-    // Execute order: temp-create → copy → drop → rename → index
     const descriptions = op.execute.map((s) => s.description);
     expect(descriptions[0]).toContain('create new table "_prisma_new_user"');
     expect(descriptions[1]).toContain('copy data');
@@ -291,11 +304,11 @@ describe('RecreateTableCall', () => {
     expect(descriptions[3]).toContain('rename');
     expect(descriptions[4]).toContain('idx_email');
 
-    // Pre-built postcheck flows through to the produced op.
     expect(op.postcheck.some((s) => s.description.includes('type'))).toBe(true);
   });
 
-  it('skips columns missing from the live schema in the data-copy column list', () => {
+  it('skips columns missing from the live schema in the data-copy column list', async () => {
+    const lowerer = stubLowerer('CHECK SQL');
     const contractSpec = tableSpec(
       [
         colSpec({ name: 'id', typeSql: 'INTEGER', nullable: false }),
@@ -315,9 +328,23 @@ describe('RecreateTableCall', () => {
       operationClass: 'widening',
     });
 
-    const copyStep = call.toOp().execute.find((s) => s.description.startsWith('copy data'));
+    const op = await call.toOp(lowerer);
+    const copyStep = op.execute.find((s) => s.description.startsWith('copy data'));
     expect(copyStep?.sql).toContain('"id", "old_col"');
     expect(copyStep?.sql).not.toContain('"new_col"');
+  });
+
+  it('toOp() throws when no lowerer is provided', async () => {
+    const call = new RecreateTableCall({
+      tableName: 'user',
+      contractTable: tableSpec([colSpec({ name: 'id', typeSql: 'INTEGER', nullable: false })]),
+      schemaColumnNames: ['id'],
+      indexes: [],
+      summary: 'Recreates table user',
+      postchecks: [],
+      operationClass: 'widening',
+    });
+    await expect(call.toOp()).rejects.toThrow('createSqliteMigrationPlanner');
   });
 });
 

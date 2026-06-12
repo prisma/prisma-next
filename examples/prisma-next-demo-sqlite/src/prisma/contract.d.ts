@@ -32,13 +32,13 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type FieldOutputTypes = {
   readonly Post: {
-    readonly id: CodecTypes['sql/char@1']['output'];
+    readonly id: Char<36>;
     readonly title: CodecTypes['sqlite/text@1']['output'];
-    readonly userId: CodecTypes['sql/char@1']['output'];
+    readonly userId: Char<36>;
     readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
   };
   readonly User: {
-    readonly id: CodecTypes['sql/char@1']['output'];
+    readonly id: Char<36>;
     readonly email: CodecTypes['sqlite/text@1']['output'];
     readonly displayName: CodecTypes['sqlite/text@1']['output'];
     readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];

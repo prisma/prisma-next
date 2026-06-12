@@ -15,7 +15,8 @@
     "precheck": [
       {
         "description": "ensure column \"id\" is missing",
-        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'bug'\n    AND column_name = 'id'\n)"
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": ["public", "bug", "id"]
       }
     ],
     "execute": [
@@ -27,7 +28,8 @@
     "postcheck": [
       {
         "description": "verify column \"id\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'bug'\n    AND column_name = 'id'\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": ["public", "bug", "id"]
       }
     ]
   },
@@ -47,11 +49,13 @@
     "precheck": [
       {
         "description": "ensure column \"id\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'bug'\n    AND column_name = 'id'\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": ["public", "bug", "id"]
       },
       {
         "description": "ensure no NULL values in \"id\"",
-        "sql": "SELECT NOT EXISTS (SELECT 1 FROM \"public\".\"bug\" WHERE \"id\" IS NULL)"
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"public\".\"bug\" WHERE \"id\" IS NULL) AS \"result\"",
+        "params": []
       }
     ],
     "execute": [
@@ -63,7 +67,8 @@
     "postcheck": [
       {
         "description": "verify column \"id\" is NOT NULL",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'bug'\n    AND column_name = 'id'\n    AND is_nullable = 'NO'\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": ["public", "bug", "id", "NO"]
       }
     ]
   },
@@ -83,7 +88,8 @@
     "precheck": [
       {
         "description": "ensure column \"id\" is missing",
-        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'feature'\n    AND column_name = 'id'\n)"
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": ["public", "feature", "id"]
       }
     ],
     "execute": [
@@ -95,7 +101,8 @@
     "postcheck": [
       {
         "description": "verify column \"id\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'feature'\n    AND column_name = 'id'\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": ["public", "feature", "id"]
       }
     ]
   },
@@ -115,11 +122,13 @@
     "precheck": [
       {
         "description": "ensure column \"id\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'feature'\n    AND column_name = 'id'\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": ["public", "feature", "id"]
       },
       {
         "description": "ensure no NULL values in \"id\"",
-        "sql": "SELECT NOT EXISTS (SELECT 1 FROM \"public\".\"feature\" WHERE \"id\" IS NULL)"
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"public\".\"feature\" WHERE \"id\" IS NULL) AS \"result\"",
+        "params": []
       }
     ],
     "execute": [
@@ -131,7 +140,8 @@
     "postcheck": [
       {
         "description": "verify column \"id\" is NOT NULL",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'feature'\n    AND column_name = 'id'\n    AND is_nullable = 'NO'\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": ["public", "feature", "id", "NO"]
       }
     ]
   },

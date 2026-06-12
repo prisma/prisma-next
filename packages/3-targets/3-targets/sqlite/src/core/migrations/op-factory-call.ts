@@ -23,14 +23,14 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { columnExistsAst } from '../../contract-free/checks';
+import { columnExistsAst, indexExistsAst, tableExistsAst } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
-import { escapeLiteral } from '../sql-utils';
+import { quoteIdentifier } from '../sql-utils';
 import { addColumnExecuteSql, dropColumnExecuteSql } from './operations/columns';
-import { createIndex, dropIndex } from './operations/indexes';
 import type { SqliteColumnSpec, SqliteIndexSpec, SqliteTableSpec } from './operations/shared';
 import { step } from './operations/shared';
-import { dropTable, recreateTable } from './operations/tables';
+import { recreateTable } from './operations/tables';
+import { buildCreateIndexSql, buildDropIndexSql } from './planner-ddl-builders';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 import { buildTargetDetails } from './planner-target-details';
 
@@ -153,19 +153,16 @@ export class CreateTableCall extends SqliteOpFactoryCallNode {
     });
     const statement = await lowerer.lowerToExecuteRequest(ddlNode);
     const tableName = this.tableName;
-    const escapedName = escapeLiteral(tableName);
+    const tableChecks = tableExistsAst(tableName);
+    const absent = await lowerer.lowerToExecuteRequest(tableChecks.tableAbsent());
+    const present = await lowerer.lowerToExecuteRequest(tableChecks.tablePresent());
     return {
       id: `table.${tableName}`,
       label: `Create table ${tableName}`,
       summary: `Creates table ${tableName} with required columns`,
       operationClass: 'additive',
       target: { id: 'sqlite', details: buildTargetDetails('table', tableName) },
-      precheck: [
-        step(
-          `ensure table "${tableName}" does not exist`,
-          `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapedName}'`,
-        ),
-      ],
+      precheck: [step(`ensure table "${tableName}" does not exist`, absent.sql, absent.params)],
       execute: [
         {
           description: `create table "${tableName}"`,
@@ -173,12 +170,7 @@ export class CreateTableCall extends SqliteOpFactoryCallNode {
           params: statement.params ?? [],
         },
       ],
-      postcheck: [
-        step(
-          `verify table "${tableName}" exists`,
-          `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapedName}'`,
-        ),
-      ],
+      postcheck: [step(`verify table "${tableName}" exists`, present.sql, present.params)],
     };
   }
 
@@ -224,12 +216,35 @@ export class DropTableCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(_lowerer?: Lowerer): Op {
-    return dropTable(this.tableName);
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `DropTableCall.toOp: a lowerer is required on the SQLite planner path (table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+      );
+    }
+    const checks = tableExistsAst(this.tableName);
+    const present = await lowerer.lowerToExecuteRequest(checks.tablePresent());
+    const absent = await lowerer.lowerToExecuteRequest(checks.tableAbsent());
+    return {
+      id: `dropTable.${this.tableName}`,
+      label: `Drop table ${this.tableName}`,
+      summary: `Drops table ${this.tableName} which is not in the contract`,
+      operationClass: 'destructive',
+      target: { id: 'sqlite', details: buildTargetDetails('table', this.tableName) },
+      precheck: [step(`ensure table "${this.tableName}" exists`, present.sql, present.params)],
+      execute: [
+        step(`drop table "${this.tableName}"`, `DROP TABLE ${quoteIdentifier(this.tableName)}`),
+      ],
+      postcheck: [step(`verify table "${this.tableName}" is gone`, absent.sql, absent.params)],
+    };
   }
 
   renderTypeScript(): string {
-    return `dropTable(${jsonToTsSource(this.tableName)})`;
+    return `this.dropTable({ table: ${jsonToTsSource(this.tableName)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
@@ -265,16 +280,24 @@ export class RecreateTableCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(_lowerer?: Lowerer): Op {
-    return recreateTable({
-      tableName: this.tableName,
-      contractTable: this.contractTable,
-      schemaColumnNames: this.schemaColumnNames,
-      indexes: this.indexes,
-      summary: this.summary,
-      postchecks: this.postchecks,
-      operationClass: this.operationClass,
-    });
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `RecreateTableCall.toOp: a lowerer is required on the SQLite planner path (table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+      );
+    }
+    return recreateTable(
+      {
+        tableName: this.tableName,
+        contractTable: this.contractTable,
+        schemaColumnNames: this.schemaColumnNames,
+        indexes: this.indexes,
+        summary: this.summary,
+        postchecks: this.postchecks,
+        operationClass: this.operationClass,
+      },
+      lowerer,
+    );
   }
 
   renderTypeScript(): string {
@@ -287,7 +310,11 @@ export class RecreateTableCall extends SqliteOpFactoryCallNode {
       postchecks: this.postchecks,
       operationClass: this.operationClass,
     };
-    return `recreateTable(${jsonToTsSource(args)})`;
+    return `this.recreateTable(${jsonToTsSource(args)})`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
@@ -339,7 +366,11 @@ export class AddColumnCall extends SqliteOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `addColumn(${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.column)})`;
+    return `this.addColumn({ table: ${jsonToTsSource(this.tableName)}, column: ${jsonToTsSource(this.column)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
@@ -400,7 +431,11 @@ export class DropColumnCall extends SqliteOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `dropColumn(${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.columnName)})`;
+    return `this.dropColumn({ table: ${jsonToTsSource(this.tableName)}, column: ${jsonToTsSource(this.columnName)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
@@ -425,12 +460,41 @@ export class CreateIndexCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(_lowerer?: Lowerer): Op {
-    return createIndex(this.tableName, this.indexName, this.columns);
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `CreateIndexCall.toOp: a lowerer is required on the SQLite planner path (index "${this.indexName}" on table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+      );
+    }
+    const checks = indexExistsAst(this.indexName);
+    const absent = await lowerer.lowerToExecuteRequest(checks.indexAbsent());
+    const present = await lowerer.lowerToExecuteRequest(checks.indexPresent());
+    return {
+      id: `index.${this.tableName}.${this.indexName}`,
+      label: `Create index ${this.indexName} on ${this.tableName}`,
+      summary: `Creates index ${this.indexName} on ${this.tableName}`,
+      operationClass: 'additive',
+      target: {
+        id: 'sqlite',
+        details: buildTargetDetails('index', this.indexName, this.tableName),
+      },
+      precheck: [step(`ensure index "${this.indexName}" is missing`, absent.sql, absent.params)],
+      execute: [
+        step(
+          `create index "${this.indexName}"`,
+          buildCreateIndexSql(this.tableName, this.indexName, this.columns),
+        ),
+      ],
+      postcheck: [step(`verify index "${this.indexName}" exists`, present.sql, present.params)],
+    };
   }
 
   renderTypeScript(): string {
-    return `createIndex(${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.indexName)}, ${jsonToTsSource(this.columns)})`;
+    return `this.createIndex({ table: ${jsonToTsSource(this.tableName)}, index: ${jsonToTsSource(this.indexName)}, columns: ${jsonToTsSource(this.columns)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
@@ -449,12 +513,36 @@ export class DropIndexCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(_lowerer?: Lowerer): Op {
-    return dropIndex(this.tableName, this.indexName);
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `DropIndexCall.toOp: a lowerer is required on the SQLite planner path (index "${this.indexName}" on table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+      );
+    }
+    const checks = indexExistsAst(this.indexName);
+    const present = await lowerer.lowerToExecuteRequest(checks.indexPresent());
+    const absent = await lowerer.lowerToExecuteRequest(checks.indexAbsent());
+    return {
+      id: `dropIndex.${this.tableName}.${this.indexName}`,
+      label: `Drop index ${this.indexName} on ${this.tableName}`,
+      summary: `Drops index ${this.indexName} on ${this.tableName} which is not in the contract`,
+      operationClass: 'destructive',
+      target: {
+        id: 'sqlite',
+        details: buildTargetDetails('index', this.indexName, this.tableName),
+      },
+      precheck: [step(`ensure index "${this.indexName}" exists`, present.sql, present.params)],
+      execute: [step(`drop index "${this.indexName}"`, buildDropIndexSql(this.indexName))],
+      postcheck: [step(`verify index "${this.indexName}" is gone`, absent.sql, absent.params)],
+    };
   }
 
   renderTypeScript(): string {
-    return `dropIndex(${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.indexName)})`;
+    return `this.dropIndex({ table: ${jsonToTsSource(this.tableName)}, index: ${jsonToTsSource(this.indexName)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
