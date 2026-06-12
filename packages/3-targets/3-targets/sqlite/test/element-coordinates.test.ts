@@ -1,5 +1,9 @@
 import { coreHash } from '@prisma-next/contract/types';
-import { elementCoordinates, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  elementCoordinates,
+  entityAt,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { SqliteDatabase, SqliteUnboundDatabase } from '../src/core/sqlite-unbound-database';
@@ -32,7 +36,7 @@ describe('elementCoordinates with SqliteDatabase', () => {
 });
 
 describe('coordinate-resolution acceptance — every elementCoordinates tuple resolves', () => {
-  it('every coordinate from a sqlite storage resolves through entries[entityKind][entityName]', () => {
+  it('every coordinate from a sqlite storage resolves through entityAt', () => {
     const storage = new SqlStorage({
       storageHash: coreHash('sha256:coord-resolution-sqlite'),
       namespaces: {
@@ -47,19 +51,9 @@ describe('coordinate-resolution acceptance — every elementCoordinates tuple re
     const coordinates = [...elementCoordinates(storage)];
     expect(coordinates.length).toBeGreaterThan(0);
 
-    for (const { namespaceId, entityKind, entityName } of coordinates) {
-      const ns = storage.namespaces[namespaceId];
-      expect(ns, `namespace "${namespaceId}" not found`).toBeDefined();
-      const kindMap = ns!.entries[entityKind];
-      expect(
-        kindMap,
-        `entries["${entityKind}"] not found in namespace "${namespaceId}"`,
-      ).toBeDefined();
-      const entity = (kindMap as Record<string, unknown>)[entityName];
-      expect(
-        entity,
-        `entries["${entityKind}"]["${entityName}"] not found in namespace "${namespaceId}"`,
-      ).toBeDefined();
+    for (const coordinate of coordinates) {
+      const entity = entityAt(storage, coordinate);
+      expect(entity, `entityAt did not resolve ${JSON.stringify(coordinate)}`).toBeDefined();
     }
   });
 });

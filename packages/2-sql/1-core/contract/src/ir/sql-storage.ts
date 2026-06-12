@@ -100,16 +100,6 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
   }
 }
 
-export function storageTableAt(
-  storage: SqlStorage,
-  namespaceId: string,
-  tableName: string,
-): StorageTable | undefined {
-  const ns = storage.namespaces[namespaceId];
-  if (ns === undefined) return undefined;
-  return ns.entries.table?.[tableName];
-}
-
 /**
  * Strict polymorphic-slot dispatch for `SqlStorage.types` entries.
  * Every entry must carry a `kind: 'codec-instance'` discriminator or

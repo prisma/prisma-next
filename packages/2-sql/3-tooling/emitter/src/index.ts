@@ -8,7 +8,11 @@ import type {
   GenerateContractTypesOptions,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
-import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  entityAt,
+  type Namespace,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
@@ -16,7 +20,6 @@ import {
   type SqlStorage,
   type StorageTable,
   type StorageTypeInstance,
-  storageTableAt,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 
@@ -111,7 +114,11 @@ export const sqlEmission = {
         }
 
         const tableName = model.storage.table;
-        const table = storageTableAt(storage, namespaceId, tableName);
+        const table = entityAt<StorageTable>(storage, {
+          namespaceId,
+          entityKind: 'table',
+          entityName: tableName,
+        });
         if (!table) {
           throw new Error(
             `Model "${qualifiedName}" references non-existent table "${namespaceId}.${tableName}"`,
@@ -204,11 +211,11 @@ export const sqlEmission = {
             }
           }
 
-          const referencedTable = storageTableAt(
-            storage,
-            fk.target.namespaceId,
-            fk.target.tableName,
-          );
+          const referencedTable = entityAt<StorageTable>(storage, {
+            namespaceId: fk.target.namespaceId,
+            entityKind: 'table',
+            entityName: fk.target.tableName,
+          });
           if (!referencedTable) {
             throw new Error(
               `Table "${tableName}" foreignKey references non-existent table "${fk.target.tableName}" in namespace "${fk.target.namespaceId}"`,
@@ -281,7 +288,11 @@ export const sqlEmission = {
     const storageNamespaceId = sqlModel.storage.namespaceId;
     if (!storageNamespaceId) return undefined;
 
-    const table = storageTableAt(storage, storageNamespaceId, tableName);
+    const table = entityAt<StorageTable>(storage, {
+      namespaceId: storageNamespaceId,
+      entityKind: 'table',
+      entityName: tableName,
+    });
     if (!table) return undefined;
 
     const column = table.columns[storageField.column];

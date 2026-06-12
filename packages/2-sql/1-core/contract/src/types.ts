@@ -36,7 +36,6 @@ export {
   SqlStorage,
   type SqlStorageInput,
   type SqlStorageTypeEntry,
-  storageTableAt,
 } from './ir/sql-storage';
 export { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';

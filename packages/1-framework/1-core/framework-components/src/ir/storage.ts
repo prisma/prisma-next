@@ -52,26 +52,29 @@ export function* elementCoordinates(
   }
 }
 
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null;
+}
+
 /**
  * Looks up a single entity in a `Storage`-shaped value by its full coordinate.
  * Returns `undefined` if the namespace, entity kind, or entity name is absent.
- * Generic/walker code that needs a typed result should cast after calling this.
+ * The type parameter is a caller assertion — the walk itself is structural
+ * and cannot verify the entity's shape.
  */
-export function entityAt(
+export function entityAt<T = unknown>(
   storage: Pick<StorageBase, 'namespaces'>,
   coord: Pick<EntityCoordinate, 'namespaceId' | 'entityKind' | 'entityName'>,
-): unknown {
+): T | undefined {
   const ns = storage.namespaces[coord.namespaceId];
   if (ns === undefined) return undefined;
   const entries = ns.entries;
-  if (entries === null || typeof entries !== 'object') return undefined;
-  const kindMap = blindCast<Record<string, unknown>, 'checked object, non-null above'>(entries)[
-    coord.entityKind
-  ];
-  if (kindMap === null || typeof kindMap !== 'object') return undefined;
-  return blindCast<Record<string, unknown>, 'checked object, non-null above'>(kindMap)[
-    coord.entityName
-  ];
+  if (!isRecord(entries)) return undefined;
+  const kindMap = entries[coord.entityKind];
+  if (!isRecord(kindMap)) return undefined;
+  return blindCast<T | undefined, 'caller asserts the entity type at this coordinate'>(
+    kindMap[coord.entityName],
+  );
 }
 
 /**

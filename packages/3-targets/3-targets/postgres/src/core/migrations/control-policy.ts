@@ -1,11 +1,11 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { ControlPolicySubject } from '@prisma-next/family-sql/control';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { entityAt, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
   type SqlStorage,
-  storageTableAt,
+  type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { isPostgresSchema } from '../postgres-schema';
@@ -43,7 +43,11 @@ function resolveNamespaceIdForTable(
   ddlSchemaName: string | undefined,
 ): string {
   for (const namespaceId of Object.keys(contract.storage.namespaces)) {
-    const table = storageTableAt(contract.storage, namespaceId, tableName);
+    const table = entityAt<StorageTable>(contract.storage, {
+      namespaceId,
+      entityKind: 'table',
+      entityName: tableName,
+    });
     if (!table) continue;
     if (
       ddlSchemaName === undefined ||
@@ -138,7 +142,11 @@ export function resolvePostgresCallControlPolicySubject(
       callFields.tableName,
       callFields.schemaName,
     );
-    const table = storageTableAt(contract.storage, namespaceId, callFields.tableName);
+    const table = entityAt<StorageTable>(contract.storage, {
+      namespaceId,
+      entityKind: 'table',
+      entityName: callFields.tableName,
+    });
     const tableControlPolicy = table?.control;
     return {
       namespaceId,
@@ -220,7 +228,11 @@ export function resolvePostgresIssueControlPolicySubject(
       'namespaceId' in issue && issue.namespaceId
         ? issue.namespaceId
         : resolveNamespaceIdForTable(contract, issue.table, undefined);
-    const table = storageTableAt(contract.storage, namespaceId, issue.table);
+    const table = entityAt<StorageTable>(contract.storage, {
+      namespaceId,
+      entityKind: 'table',
+      entityName: issue.table,
+    });
     return {
       namespaceId,
       ...ifDefined('explicitNodeControlPolicy', table?.control),
