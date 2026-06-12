@@ -239,8 +239,9 @@ const representativePslSchema = `types {
 }
 
 enum Role {
-  USER
-  ADMIN
+  @@type("pg/text@1")
+  USER  = "user"
+  ADMIN = "admin"
 }
 
 model User {
@@ -261,18 +262,18 @@ model Post {
 }
 `;
 
-const representativeTsAuthoring = `defineContract(
+const representativeTsAuthoring = `const Role = enumType('Role', pgText, member('USER', 'user'), member('ADMIN', 'admin'));
+defineContract(
   { family: sqlFamilyPack, target: portablePostgresTargetPack, extensionPacks: { pgvector: pgvectorExtensionPack } },
-  ({ enum: enumEntity, type, field, model, rel }) => {
+  ({ type, field, model, rel }) => {
     const types = {
-      Role: enumEntity({ name: 'Role', values: ['USER', 'ADMIN'] as const }),
       Embedding1536: type.pgvector.Vector(1536),
     } as const;
     const User = model('User', {
       fields: {
         id: field.column(int4Column).id({ name: 'user_pkey' }),
         email: field.text().unique({ name: 'user_email_key' }),
-        role: field.namedType(types.Role),
+        role: field.namedType(Role),
         embedding: field.namedType(types.Embedding1536).optional(),
         createdAt: field.temporal.createdAt(),
       },
@@ -290,7 +291,7 @@ const representativeTsAuthoring = `defineContract(
       indexes: [constraints.index([cols.authorId], { name: 'post_author_id_idx' })],
       foreignKeys: [constraints.foreignKey(cols.authorId, User.refs.id, { name: 'post_author_id_fkey', onDelete: 'cascade' })],
     }));
-    return { types, models: { User, Post } };
+    return { enums: { Role }, types, models: { User, Post } };
   },
 )`;
 

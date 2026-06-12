@@ -211,8 +211,6 @@ export const contractFixtures = {
     JOURNEY_FIXTURES_DIR,
     'contract-nullable-name-required.ts',
   ),
-  'contract-status-enum': join(JOURNEY_FIXTURES_DIR, 'contract-status-enum.ts'),
-  'contract-status-enum-shrunk': join(JOURNEY_FIXTURES_DIR, 'contract-status-enum-shrunk.ts'),
 } as const;
 
 export type ContractVariant = keyof typeof contractFixtures;

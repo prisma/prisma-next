@@ -11,7 +11,7 @@
  * two journeys differ only in `policy.allowedOperationClasses`:
  *
  * - When `'data'` is in the policy, data-safe strategies (NOT NULL backfill,
- *   nullability tightening, unsafe type changes, enum shrink/rebuild) emit
+ *   nullability tightening, unsafe type changes) emit
  *   `DataTransformCall` placeholders that the user fills in.
  * - When `'data'` is excluded, those strategies short-circuit so the
  *   downstream walk-schema strategies (codec-hook type ops and temp-default

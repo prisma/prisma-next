@@ -63,7 +63,6 @@
     "./data-transform": "./dist/data-transform.mjs",
     "./ddl": "./dist/ddl.mjs",
     "./default-normalizer": "./dist/default-normalizer.mjs",
-    "./enum-planning": "./dist/enum-planning.mjs",
     "./errors": "./dist/errors.mjs",
     "./issue-planner": "./dist/issue-planner.mjs",
     "./migration": "./dist/migration.mjs",
