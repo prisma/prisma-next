@@ -287,6 +287,12 @@ export function indexFkRelations(input: {
 type JunctionFkPair = {
   readonly parentFk: FkRelationMetadata;
   readonly childFk: FkRelationMetadata;
+  /**
+   * The child FK's junction columns reordered to the target model's
+   * id-column order, so positional pairing against the target id stays
+   * faithful to the authored references regardless of declaration order.
+   */
+  readonly childColumnsInTargetIdOrder: readonly string[];
 };
 
 function idColumnsAreExactlyFkPair(
@@ -305,18 +311,60 @@ function idColumnsAreExactlyFkPair(
 }
 
 /**
+ * Reorders the child FK's junction columns into the target model's id-column
+ * order. Returns undefined unless the FK references exactly the target's full
+ * id, because downstream consumers pair `through.childColumns` positionally
+ * against the target id columns — an FK referencing anything else (a non-id
+ * unique, a partial id) would produce a silently wrong join.
+ */
+function childColumnsInTargetIdOrder(
+  childFk: FkRelationMetadata,
+  targetIdColumns: readonly string[],
+): readonly string[] | undefined {
+  if (childFk.referencedColumns.length !== targetIdColumns.length) {
+    return undefined;
+  }
+  const localByReferenced = new Map<string, string>();
+  for (const [index, referencedColumn] of childFk.referencedColumns.entries()) {
+    const localColumn = childFk.localColumns[index];
+    if (localColumn === undefined) {
+      return undefined;
+    }
+    localByReferenced.set(referencedColumn, localColumn);
+  }
+  if (localByReferenced.size !== targetIdColumns.length) {
+    return undefined;
+  }
+  const ordered: string[] = [];
+  for (const idColumn of targetIdColumns) {
+    const localColumn = localByReferenced.get(idColumn);
+    if (localColumn === undefined) {
+      return undefined;
+    }
+    ordered.push(localColumn);
+  }
+  return ordered;
+}
+
+/**
  * Finds explicit junction models that connect a bare backrelation list field
  * to its target model: a model whose composite id columns are exactly the FK
  * columns of one relation back to the candidate's model (the parent side) and
- * one relation to the candidate's target model (the child side). A relation
- * name on the list field pins the parent-side FK relation, which is how
- * self-referential many-to-many sides are disambiguated.
+ * one relation to the candidate's target model (the child side). The child
+ * FK must reference exactly the target model's id columns; its junction
+ * columns are carried in target-id order on the pair. A relation name on the
+ * list field pins the parent-side FK relation, which is how self-referential
+ * many-to-many sides are disambiguated.
  */
 function findJunctionFkPairs(input: {
   readonly candidate: ModelBackrelationCandidate;
   readonly fkRelationsByDeclaringModel: ReadonlyMap<string, readonly FkRelationMetadata[]>;
   readonly modelIdColumns: ReadonlyMap<string, readonly string[]>;
 }): JunctionFkPair[] {
+  const targetIdColumns = input.modelIdColumns.get(input.candidate.targetModelName);
+  if (!targetIdColumns || targetIdColumns.length === 0) {
+    return [];
+  }
   const pairs: JunctionFkPair[] = [];
   for (const [junctionModelName, junctionFks] of input.fkRelationsByDeclaringModel) {
     const idColumns = input.modelIdColumns.get(junctionModelName);
@@ -340,7 +388,11 @@ function findJunctionFkPairs(input: {
         if (!idColumnsAreExactlyFkPair(idColumns, parentFk.localColumns, childFk.localColumns)) {
           continue;
         }
-        pairs.push({ parentFk, childFk });
+        const orderedChildColumns = childColumnsInTargetIdOrder(childFk, targetIdColumns);
+        if (!orderedChildColumns) {
+          continue;
+        }
+        pairs.push({ parentFk, childFk, childColumnsInTargetIdOrder: orderedChildColumns });
       }
     }
   }
@@ -366,7 +418,7 @@ function manyToManyRelationNode(
     through: {
       table: pair.parentFk.declaringTableName,
       parentColumns: pair.parentFk.localColumns,
-      childColumns: pair.childFk.localColumns,
+      childColumns: pair.childColumnsInTargetIdOrder,
     },
   };
 }
