@@ -115,8 +115,8 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true }, timeouts.databaseOperation);
-  });
+    await rm(tmpDir, { recursive: true, force: true });
+  }, timeouts.databaseOperation);
 
   it('renders TS that re-parses to operations matching renderOps(calls) exactly', {
     timeout: timeouts.typeScriptCompilation,
