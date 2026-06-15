@@ -83,7 +83,7 @@ describe('composed runtime mutation default generators', () => {
           mutations: {
             defaults: [
               {
-                ref: { table: 'user', column: 'id' },
+                ref: { namespace: '__unbound__', table: 'user', column: 'id' },
                 onCreate: { kind: 'generator', id: 'slugid' },
               },
             ],
@@ -125,7 +125,7 @@ describe('composed runtime mutation default generators', () => {
           mutations: {
             defaults: [
               {
-                ref: { table: 'user', column: 'id' },
+                ref: { namespace: '__unbound__', table: 'user', column: 'id' },
                 onCreate: { kind: 'generator', id: 'slugid' },
               },
             ],
@@ -199,7 +199,7 @@ describe('composed runtime mutation default generators', () => {
             mutations: {
               defaults: [
                 {
-                  ref: { table: 'user', column: 'id' },
+                  ref: { namespace: '__unbound__', table: 'user', column: 'id' },
                   onCreate: { kind: 'generator', id: 'unknown-generator' },
                 },
               ],
@@ -233,7 +233,7 @@ describe('composed runtime mutation default generators', () => {
             mutations: {
               defaults: [
                 {
-                  ref: { table: 'user', column: 'id' },
+                  ref: { namespace: '__unbound__', table: 'user', column: 'id' },
                   onCreate: { kind: 'generator', id: 'uuidv4' },
                 },
               ],

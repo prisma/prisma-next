@@ -328,7 +328,7 @@ describe('contract/stack validation errors', () => {
         mutations: {
           defaults: [
             {
-              ref: { table: 'user', column: 'id' },
+              ref: { namespace: '__unbound__', table: 'user', column: 'id' },
               onCreate: { kind: 'generator', id: 'unregistered' },
             },
           ],
@@ -379,11 +379,11 @@ describe('contract/stack validation errors', () => {
         mutations: {
           defaults: [
             {
-              ref: { table: 'user', column: 'id' },
+              ref: { namespace: '__unbound__', table: 'user', column: 'id' },
               onCreate: { kind: 'generator', id: 'gen-a' },
             },
             {
-              ref: { table: 'user', column: 'slug' },
+              ref: { namespace: '__unbound__', table: 'user', column: 'slug' },
               onUpdate: { kind: 'generator', id: 'gen-b' },
             },
           ],
@@ -431,7 +431,7 @@ describe('contract/stack validation errors', () => {
         mutations: {
           defaults: [
             {
-              ref: { table: 'user', column: 'id' },
+              ref: { namespace: '__unbound__', table: 'user', column: 'id' },
               onCreate: { kind: 'generator', id: 'nanoid' },
             },
           ],
@@ -475,11 +475,11 @@ describe('applyMutationDefaults', () => {
       mutations: {
         defaults: [
           {
-            ref: { table: 'user', column: 'id' },
+            ref: { namespace: '__unbound__', table: 'user', column: 'id' },
             onCreate: { kind: 'generator', id: 'nanoid', params: { size: 8 } },
           },
           {
-            ref: { table: 'user', column: 'slug' },
+            ref: { namespace: '__unbound__', table: 'user', column: 'slug' },
             onUpdate: { kind: 'generator', id: 'nanoid', params: { size: 6 } },
           },
         ],
@@ -593,7 +593,7 @@ describe('applyMutationDefaults', () => {
         mutations: {
           defaults: [
             {
-              ref: { table: 'user', column: 'touchedAt' },
+              ref: { namespace: '__unbound__', table: 'user', column: 'touchedAt' },
               onCreate: { kind: 'generator', id: 'counter' },
             },
           ],
@@ -691,11 +691,11 @@ describe('applyMutationDefaults', () => {
         mutations: {
           defaults: [
             {
-              ref: { table: 'event', column: 'causation' },
+              ref: { namespace: '__unbound__', table: 'event', column: 'causation' },
               onCreate: { kind: 'generator', id: 'correlationId' },
             },
             {
-              ref: { table: 'event', column: 'correlation' },
+              ref: { namespace: '__unbound__', table: 'event', column: 'correlation' },
               onCreate: { kind: 'generator', id: 'correlationId' },
             },
           ],
@@ -778,7 +778,7 @@ describe('applyMutationDefaults', () => {
         mutations: {
           defaults: [
             {
-              ref: { table: 'user', column: 'id' },
+              ref: { namespace: '__unbound__', table: 'user', column: 'id' },
               onCreate: { kind: 'generator', id: 'perFieldCounter' },
             },
           ],

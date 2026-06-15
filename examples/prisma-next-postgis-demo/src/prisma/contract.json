@@ -274,7 +274,7 @@
     }
   },
   "execution": {
-    "executionHash": "sha256:c4e18220ce0fd45634a6b4bb622451893186000ee5c7dd1bdb3d0567c7047bd9",
+    "executionHash": "sha256:54edb84b4449d91a93a26316d3fdfdf0dc37e4a07930e362682ddd1745d357b5",
     "mutations": {
       "defaults": [
         {
@@ -284,6 +284,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "cafe"
           }
         },
@@ -294,6 +295,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "neighborhood"
           }
         },
@@ -304,6 +306,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "route"
           }
         }

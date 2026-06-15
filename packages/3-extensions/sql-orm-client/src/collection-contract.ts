@@ -373,7 +373,7 @@ function resolveThrough(
       !fkColumnSet.has(colName) &&
       !col.nullable &&
       col.default === undefined &&
-      !hasExecutionCreateDefault(contract, table, colName)
+      !hasExecutionCreateDefault(contract, namespaceId, table, colName)
     ) {
       requiredPayloadColumns.push(colName);
     }
@@ -391,12 +391,14 @@ function resolveThrough(
 
 function hasExecutionCreateDefault(
   contract: Contract<SqlStorage>,
+  namespace: string,
   table: string,
   column: string,
 ): boolean {
   return (
     contract.execution?.mutations.defaults.some(
       (mutationDefault) =>
+        mutationDefault.ref.namespace === namespace &&
         mutationDefault.ref.table === table &&
         mutationDefault.ref.column === column &&
         mutationDefault.onCreate !== undefined,

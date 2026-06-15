@@ -958,7 +958,7 @@ describe('sql-target-family-hook', () => {
         mutations: {
           defaults: [
             {
-              ref: { table: 'tags', column: 'id' },
+              ref: { namespace: 'public', table: 'tags', column: 'id' },
               onCreate: { kind: 'generator', id: 'uuidv4' },
             },
           ],

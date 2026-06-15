@@ -18,7 +18,7 @@ import type {
 export type StorageHash =
   StorageHashBase<'sha256:5736eda44575a2e995e8c1d5ed6d7884859a882e9551844f776d2a497c6d0154'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:aa79980d83d295977c2ca3fd5a1407ea2bc67b4538b19971512d2f47ff71338e'>;
+  ExecutionHashBase<'sha256:fc24f3095f0326cf60b175c98cf8878d3f5637131f9650aff69f396556b6335a'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:3cc333ecad9f3f4c7229370a9d2c37e908cdce0f8d2e9fb132d50605b024eff2'>;
 
@@ -290,11 +290,19 @@ type ContractBase = Omit<
     readonly mutations: {
       readonly defaults: readonly [
         {
-          readonly ref: { readonly table: 'post'; readonly column: 'id' };
+          readonly ref: {
+            readonly namespace: '__unbound__';
+            readonly table: 'post';
+            readonly column: 'id';
+          };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
         {
-          readonly ref: { readonly table: 'user'; readonly column: 'id' };
+          readonly ref: {
+            readonly namespace: '__unbound__';
+            readonly table: 'user';
+            readonly column: 'id';
+          };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
       ];

@@ -182,7 +182,7 @@ describe('computeExecutionHash', () => {
         mutations: {
           defaults: [
             {
-              ref: { table: 'user', column: 'created_at' },
+              ref: { namespace: 'public', table: 'user', column: 'created_at' },
               onCreate: { kind: 'generator', id: 'now' },
             },
           ],
@@ -204,7 +204,7 @@ describe('computeExecutionHash', () => {
         mutations: {
           defaults: [
             {
-              ref: { table: 'user', column: 'id' },
+              ref: { namespace: 'public', table: 'user', column: 'id' },
               onCreate: { kind: 'generator', id: 'uuid' },
             },
           ],

@@ -430,7 +430,7 @@ export function buildSqlContractFromDefinition(
 
       if (executionDefaultPhases) {
         executionDefaults.push({
-          ref: { table: tableName, column: field.columnName },
+          ref: { namespace: namespaceId, table: tableName, column: field.columnName },
           ...ifDefined('onCreate', executionDefaultPhases.onCreate),
           ...ifDefined('onUpdate', executionDefaultPhases.onUpdate),
         });

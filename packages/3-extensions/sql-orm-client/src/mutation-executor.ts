@@ -311,6 +311,7 @@ async function updateFirstGraph(
     const appliedUpdateDefaults = context.applyMutationDefaults({
       op: 'update',
       table: tableName,
+      namespace: namespaceId,
       values: mappedUpdateData,
     });
     for (const def of appliedUpdateDefaults) {
@@ -992,6 +993,7 @@ async function insertJunctionLink(
   const applied = context.applyMutationDefaults({
     op: 'create',
     table: through.table,
+    namespace: through.namespaceId,
     values: junctionRow,
   });
   for (const def of applied) {
@@ -1116,6 +1118,7 @@ async function insertSingleRow(
   const applied = context.applyMutationDefaults({
     op: 'create',
     table: tableName,
+    namespace: namespaceId,
     values: mappedData,
   });
 
