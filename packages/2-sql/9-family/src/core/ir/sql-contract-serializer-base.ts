@@ -8,16 +8,16 @@ import {
 } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import {
+  createSqlEntryConstructionRegistry,
+  type EntryFactory,
+} from '@prisma-next/sql-contract/entry-construction-registry';
+import {
   buildSqlNamespace,
   type SqlNamespaceTablesInput,
   SqlStorage,
   type SqlStorageInput,
   type SqlStorageTypeEntry,
   SqlUnboundNamespace,
-  StorageTable,
-  type StorageTableInput,
-  StorageValueSet,
-  type StorageValueSetInput,
 } from '@prisma-next/sql-contract/types';
 import {
   createSqlContractSchema,
@@ -71,6 +71,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   implements ContractSerializer<TContract>
 {
   private readonly contractSchema: Type<unknown> | undefined;
+  private readonly entriesRegistry: ReadonlyMap<string, EntryFactory>;
 
   constructor(
     protected readonly entityHydrationRegistry: ReadonlyMap<
@@ -78,16 +79,15 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       SqlEntityHydrationFactory
     > = new Map(),
     validatorRegistry: ReadonlyMap<string, Type<unknown>> = new Map(),
+    packEntryFactories: ReadonlyMap<string, EntryFactory> = new Map(),
   ) {
-    // One uniform registry: SQL core's kinds and pack contributions are
-    // composed into the same map. Only build a per-instance contract
-    // schema when pack contributions exist — the cached module-level
-    // default in `validators.ts` is the same composition with no pack
-    // entries and avoids per-instance schema compilation.
     this.contractSchema =
       validatorRegistry.size > 0
         ? createSqlContractSchema(createSqlEntrySchemaRegistry(validatorRegistry))
         : undefined;
+    this.entriesRegistry = createSqlEntryConstructionRegistry(
+      packEntryFactories.size > 0 ? packEntryFactories : undefined,
+    );
   }
 
   deserializeContract<T extends TContract = TContract>(json: unknown): T {
@@ -221,48 +221,20 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     key: string,
     innerMap: unknown,
   ): Record<string, unknown> | undefined {
-    if (key === 'table') {
+    const factory = this.entriesRegistry.get(key);
+    if (factory !== undefined) {
       if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
         return {};
       }
       return Object.fromEntries(
         Object.entries(
-          blindCast<
-            Record<string, unknown>,
-            'table inner map is a plain record after object check'
-          >(innerMap),
-        ).map(([tableName, table]) => [
-          tableName,
-          new StorageTable(
-            blindCast<
-              StorageTableInput,
-              'each table value is StorageTableInput by contract schema'
-            >(table),
+          blindCast<Record<string, unknown>, 'entries inner map is a plain record after check'>(
+            innerMap,
           ),
-        ]),
+        ).map(([name, value]) => [name, factory(value)]),
       );
     }
-    if (key === 'valueSet') {
-      if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
-        return {};
-      }
-      return Object.fromEntries(
-        Object.entries(
-          blindCast<
-            Record<string, unknown>,
-            'valueSet inner map is a plain record after object check'
-          >(innerMap),
-        ).map(([vsName, vs]) => [
-          vsName,
-          new StorageValueSet(
-            blindCast<StorageValueSetInput, 'valueSet entry is StorageValueSetInput after parse'>(
-              vs,
-            ),
-          ),
-        ]),
-      );
-    }
-    // Delegate unknown keys to subclass — return undefined to fail closed.
+    // Unknown key — delegate to subclass. Return undefined to fail closed.
     return undefined;
   }
 

@@ -14,6 +14,7 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
+import type { EntryFactory } from '@prisma-next/sql-contract/entry-construction-registry';
 import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
@@ -76,34 +77,20 @@ const POSTGRES_VALIDATOR_REGISTRY: ReadonlyMap<string, Type<unknown>> = new Map<
 >([['type', castAs<Type<unknown>>(PostgresEnumTypeSchema)]]);
 
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
-  private readonly enumFactory: SqlEntityHydrationFactory | undefined;
-
   constructor() {
     const storageTypesHydrators = collectStorageTypesHydrators(postgresAuthoringEntityTypes);
-    super(storageTypesHydrators, POSTGRES_VALIDATOR_REGISTRY);
-    this.enumFactory = storageTypesHydrators.get('postgres-enum');
-  }
-
-  protected override hydrateEntriesKind(
-    key: string,
-    innerMap: unknown,
-  ): Record<string, unknown> | undefined {
-    if (key === 'type') {
-      if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
-        return {};
-      }
-      return Object.fromEntries(
-        Object.entries(
-          blindCast<Record<string, unknown>, 'checked object, non-null, non-array above'>(innerMap),
-        ).map(([name, entry]) => [
-          name,
-          blindCast<PostgresEnumType, 'postgres-enum factory returns PostgresEnumType'>(
-            this.enumFactory !== undefined ? this.enumFactory(entry) : entry,
-          ),
-        ]),
-      );
-    }
-    return super.hydrateEntriesKind(key, innerMap);
+    const enumFactory = storageTypesHydrators.get('postgres-enum');
+    const typeEntryFactory: EntryFactory = (entry) =>
+      enumFactory !== undefined
+        ? blindCast<PostgresEnumType, 'postgres-enum factory returns PostgresEnumType'>(
+            enumFactory(entry),
+          )
+        : entry;
+    super(
+      storageTypesHydrators,
+      POSTGRES_VALIDATOR_REGISTRY,
+      new Map([['type', typeEntryFactory]]),
+    );
   }
 
   protected override hydrateSqlNamespaceEntry(
