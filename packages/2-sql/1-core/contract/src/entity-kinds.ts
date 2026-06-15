@@ -19,10 +19,12 @@ export const valueSetEntityKind: EntityKindDescriptor<StorageValueSetInput, Stor
 };
 
 /**
- * Builds the descriptor map for SQL namespaces. Core kinds are `table` and
- * `valueSet`; target packs contribute additional kinds via `packKinds`.
- *
- * Throws when a pack kind collides with a core kind.
+ * Assembles the `kind → descriptor` registry for SQL namespaces: the built-in
+ * `table` and `valueSet` kinds plus any target `packKinds`. This builds the
+ * lookup table — it does not touch contract data. `hydrateNamespaceEntities`
+ * later consumes this registry to turn a namespace's raw entries into IR
+ * instances, and `createSqlContractSchema` derives validation from the same
+ * registry. Throws on a duplicate kind.
  */
 export function composeSqlEntityKinds(
   packKinds: readonly AnyEntityKindDescriptor[] = [],
@@ -34,7 +36,7 @@ export function composeSqlEntityKinds(
   for (const descriptor of packKinds) {
     if (kinds.has(descriptor.kind)) {
       throw new Error(
-        `composeSqlEntityKinds: pack kind "${descriptor.kind}" collides with a core kind — pack kinds cannot override "table" or "valueSet"`,
+        `composeSqlEntityKinds: duplicate entity kind "${descriptor.kind}" — each kind may be registered only once`,
       );
     }
     kinds.set(descriptor.kind, descriptor);

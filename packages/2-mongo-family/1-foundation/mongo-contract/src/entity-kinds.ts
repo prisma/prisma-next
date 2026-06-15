@@ -12,10 +12,11 @@ export const collectionEntityKind: EntityKindDescriptor<MongoCollectionInput, Mo
 };
 
 /**
- * Builds the descriptor map for Mongo namespaces. Core kind is `collection`;
- * target packs contribute additional kinds via `packKinds`.
- *
- * Throws when a pack kind collides with a core kind.
+ * Assembles the `kind → descriptor` registry for Mongo namespaces: the built-in
+ * `collection` kind plus any target `packKinds`. This builds the lookup table —
+ * it does not touch contract data. `hydrateNamespaceEntities` later consumes
+ * this registry to turn a namespace's raw entries into IR instances. Throws on
+ * a duplicate kind.
  */
 export function composeMongoEntityKinds(
   packKinds: readonly AnyEntityKindDescriptor[] = [],
@@ -24,7 +25,7 @@ export function composeMongoEntityKinds(
   for (const descriptor of packKinds) {
     if (kinds.has(descriptor.kind)) {
       throw new Error(
-        `composeMongoEntityKinds: pack kind "${descriptor.kind}" collides with a core kind — pack kinds cannot override "collection"`,
+        `composeMongoEntityKinds: duplicate entity kind "${descriptor.kind}" — each kind may be registered only once`,
       );
     }
     kinds.set(descriptor.kind, descriptor);

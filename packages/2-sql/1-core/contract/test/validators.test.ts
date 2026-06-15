@@ -1400,26 +1400,22 @@ describe('SQL contract validators', () => {
       expect(() => composeSqlEntityKinds([packDescriptor])).not.toThrow();
     });
 
-    it('throws when a pack kind collides with a core kind (table)', () => {
+    it('throws on a duplicate entity kind (table)', () => {
       const collidingDescriptor = {
         kind: 'table',
         schema: type('unknown'),
         construct: (v: unknown) => v,
       };
-      expect(() => composeSqlEntityKinds([collidingDescriptor])).toThrow(
-        /collides with a core kind/,
-      );
+      expect(() => composeSqlEntityKinds([collidingDescriptor])).toThrow(/duplicate entity kind/);
     });
 
-    it('throws when a pack kind collides with a core kind (valueSet)', () => {
+    it('throws on a duplicate entity kind (valueSet)', () => {
       const collidingDescriptor = {
         kind: 'valueSet',
         schema: type('unknown'),
         construct: (v: unknown) => v,
       };
-      expect(() => composeSqlEntityKinds([collidingDescriptor])).toThrow(
-        /collides with a core kind/,
-      );
+      expect(() => composeSqlEntityKinds([collidingDescriptor])).toThrow(/duplicate entity kind/);
     });
 
     it('registers non-colliding pack kinds', () => {

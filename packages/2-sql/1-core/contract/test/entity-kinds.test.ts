@@ -47,15 +47,15 @@ describe('composeSqlEntityKinds', () => {
     expect(kinds.has('synthetic')).toBe(true);
   });
 
-  it('throws when a pack kind collides with a core kind', () => {
+  it('throws on a duplicate entity kind', () => {
     const collide = { kind: 'table', schema: tableEntityKind.schema, construct: (v: unknown) => v };
-    expect(() => composeSqlEntityKinds([collide])).toThrow(/collides with a core kind/);
+    expect(() => composeSqlEntityKinds([collide])).toThrow(/duplicate entity kind/);
     const collide2 = {
       kind: 'valueSet',
       schema: tableEntityKind.schema,
       construct: (v: unknown) => v,
     };
-    expect(() => composeSqlEntityKinds([collide2])).toThrow(/collides with a core kind/);
+    expect(() => composeSqlEntityKinds([collide2])).toThrow(/duplicate entity kind/);
   });
 });
 

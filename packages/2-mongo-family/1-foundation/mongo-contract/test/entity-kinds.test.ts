@@ -28,13 +28,13 @@ describe('composeMongoEntityKinds', () => {
     expect(kinds.has('synthetic')).toBe(true);
   });
 
-  it('throws when a pack kind collides with a core kind', () => {
+  it('throws on a duplicate entity kind', () => {
     const collide = {
       kind: 'collection',
       schema: collectionEntityKind.schema,
       construct: (v: unknown) => v,
     };
-    expect(() => composeMongoEntityKinds([collide])).toThrow(/collides with a core kind/);
+    expect(() => composeMongoEntityKinds([collide])).toThrow(/duplicate entity kind/);
   });
 });
 
