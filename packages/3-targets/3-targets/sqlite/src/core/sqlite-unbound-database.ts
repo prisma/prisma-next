@@ -1,13 +1,10 @@
 import {
+  constructEntries,
   freezeNode,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import {
-  createSqlEntryConstructionRegistry,
-  dispatchEntriesToRegistry,
-  type EntryFactory,
-} from '@prisma-next/sql-contract/entry-construction-registry';
+import { tableEntityKind } from '@prisma-next/sql-contract/entity-kinds';
 import type {
   SqlNamespaceEntries,
   SqlNamespaceTablesInput,
@@ -21,12 +18,7 @@ export type SqliteDatabaseInput = {
 };
 
 // SQLite constructs only `table`; valueSet stays carried raw per spec.
-// Build a table-only registry by passing no pack factories — we then
-// filter to just the table entry so valueSet is NOT registered.
-const _fullCoreRegistry = createSqlEntryConstructionRegistry();
-const SQLITE_REGISTRY: ReadonlyMap<string, EntryFactory> = new Map(
-  [..._fullCoreRegistry.entries()].filter(([k]) => k === 'table'),
-);
+const SQLITE_KINDS = new Map([['table', tableEntityKind]]);
 
 const SQLITE_NAMESPACE_KIND = 'sqlite-namespace' as const;
 
@@ -45,17 +37,18 @@ export class SqliteDatabase extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const dispatched = dispatchEntriesToRegistry(
+    const dispatched = constructEntries(
       blindCast<
         Record<string, Readonly<Record<string, unknown>>>,
         'SqliteDatabaseInput.entries values are plain record maps'
       >(input.entries),
-      SQLITE_REGISTRY,
+      SQLITE_KINDS,
+      'carry',
     );
 
     const table = blindCast<
       Readonly<Record<string, StorageTable>>,
-      'SQLITE_REGISTRY constructs StorageTable for the table kind'
+      'SQLITE_KINDS constructs StorageTable for the table kind'
     >(dispatched['table'] ?? Object.freeze({}));
     const { table: _t, ...carried } = dispatched;
 

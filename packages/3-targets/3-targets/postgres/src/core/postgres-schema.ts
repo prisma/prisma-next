@@ -1,13 +1,11 @@
 import {
+  constructEntries,
+  type EntityKindDescriptor,
   freezeNode,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import {
-  createSqlEntryConstructionRegistry,
-  dispatchEntriesToRegistry,
-  type EntryFactory,
-} from '@prisma-next/sql-contract/entry-construction-registry';
+import { composeSqlEntityKinds } from '@prisma-next/sql-contract/entity-kinds';
 import type {
   PostgresEnumStorageEntry,
   SqlNamespaceEntries,
@@ -19,7 +17,14 @@ import type {
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
+import { PostgresEnumTypeSchema } from './postgres-enum-type-schema';
 import { escapeLiteral } from './sql-utils';
+
+export const typeEntityKind: EntityKindDescriptor<PostgresEnumTypeInput, PostgresEnumType> = {
+  kind: 'type',
+  schema: PostgresEnumTypeSchema,
+  construct: (input) => new PostgresEnumType(input),
+};
 
 export type PostgresNamespaceEntries = SqlNamespaceEntries & {
   readonly type?: Readonly<Record<string, PostgresEnumType>>;
@@ -30,15 +35,7 @@ export interface PostgresSchemaInput {
   readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
-const typeFactory: EntryFactory = (v) =>
-  new PostgresEnumType(
-    blindCast<
-      PostgresEnumTypeInput,
-      'postgres-schema: entries[type] holds PostgresEnumTypeInput by construction'
-    >(v),
-  );
-
-const POSTGRES_REGISTRY = createSqlEntryConstructionRegistry(new Map([['type', typeFactory]]));
+const POSTGRES_KINDS = composeSqlEntityKinds([typeEntityKind]);
 
 /**
  * Postgres target `Namespace` concretion — a Postgres schema (`CREATE
@@ -72,22 +69,29 @@ export class PostgresSchema extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const dispatched = dispatchEntriesToRegistry(input.entries, POSTGRES_REGISTRY);
+    const dispatched = constructEntries(
+      blindCast<
+        Record<string, Readonly<Record<string, unknown>>>,
+        'PostgresSchemaInput.entries values are plain record maps'
+      >(input.entries),
+      POSTGRES_KINDS,
+      'carry',
+    );
 
     const table = blindCast<
       Readonly<Record<string, StorageTable>>,
-      'POSTGRES_REGISTRY constructs StorageTable for the table kind'
+      'POSTGRES_KINDS constructs StorageTable for the table kind'
     >(dispatched['table'] ?? Object.freeze({}));
     const type = blindCast<
       Readonly<Record<string, PostgresEnumType>>,
-      'POSTGRES_REGISTRY constructs PostgresEnumType for the type kind'
+      'POSTGRES_KINDS constructs PostgresEnumType for the type kind'
     >(dispatched['type'] ?? Object.freeze({}));
     const valueSetRaw = dispatched['valueSet'];
     const valueSet =
       valueSetRaw !== undefined && Object.keys(valueSetRaw).length > 0
         ? blindCast<
             Readonly<Record<string, StorageValueSet>>,
-            'POSTGRES_REGISTRY constructs StorageValueSet for the valueSet kind'
+            'POSTGRES_KINDS constructs StorageValueSet for the valueSet kind'
           >(valueSetRaw)
         : undefined;
     const { table: _t, type: _ty, valueSet: _vs, ...carried } = dispatched;

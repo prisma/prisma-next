@@ -14,15 +14,12 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import type { EntryFactory } from '@prisma-next/sql-contract/entry-construction-registry';
 import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
-import { blindCast, castAs } from '@prisma-next/utils/casts';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
-import type { Type } from 'arktype';
 import { postgresAuthoringEntityTypes } from './authoring';
 import type { PostgresEnumType } from './postgres-enum-type';
-import { PostgresEnumTypeSchema } from './postgres-enum-type-schema';
-import { isPostgresSchema, PostgresSchema } from './postgres-schema';
+import { isPostgresSchema, PostgresSchema, typeEntityKind } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
   family: 'sql',
@@ -43,7 +40,7 @@ function isAuthoringEntityTypeFactoryOutput(
  * Walks a pack's entity-type namespace tree and emits hydration factories
  * keyed by the descriptor's `discriminator`. Used for `storage.types`
  * (codec-triple hydration). Namespace entries hydration dispatches by
- * entries key, not discriminator — handled by `hydrateEntriesKind`.
+ * entries key, not discriminator — this is handled by `typeEntityKind.construct`.
  */
 function collectStorageTypesHydrators(
   namespace: AuthoringEntityTypeNamespace,
@@ -67,30 +64,10 @@ function collectStorageTypesHydrators(
   return registry;
 }
 
-// Pack-contributed validator schemas keyed by entries key: postgres registers
-// 'type' → the inner name→entry map schema. The family base composes these
-// into the single registry alongside SQL core's 'table'/'valueSet' via
-// createSqlEntrySchemaRegistry.
-const POSTGRES_VALIDATOR_REGISTRY: ReadonlyMap<string, Type<unknown>> = new Map<
-  string,
-  Type<unknown>
->([['type', castAs<Type<unknown>>(PostgresEnumTypeSchema)]]);
-
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor() {
     const storageTypesHydrators = collectStorageTypesHydrators(postgresAuthoringEntityTypes);
-    const enumFactory = storageTypesHydrators.get('postgres-enum');
-    const typeEntryFactory: EntryFactory = (entry) =>
-      enumFactory !== undefined
-        ? blindCast<PostgresEnumType, 'postgres-enum factory returns PostgresEnumType'>(
-            enumFactory(entry),
-          )
-        : entry;
-    super(
-      storageTypesHydrators,
-      POSTGRES_VALIDATOR_REGISTRY,
-      new Map([['type', typeEntryFactory]]),
-    );
+    super(storageTypesHydrators, [typeEntityKind]);
   }
 
   protected override hydrateSqlNamespaceEntry(
