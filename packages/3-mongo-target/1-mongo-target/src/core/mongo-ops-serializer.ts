@@ -46,10 +46,10 @@ import {
   RawUpdateManyCommand,
   RawUpdateOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
+import type { CollationOptions } from '@prisma-next/mongo-value/mongodb-types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
-import type { CollationOptions } from 'mongodb';
 
 const IndexKeyDirection = type('1 | -1 | "text" | "2dsphere" | "2d" | "hashed"');
 const IndexKeyJson = type({ field: 'string', direction: IndexKeyDirection });
@@ -520,20 +520,28 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
     case 'createCollection': {
       const data = validate(CreateCollectionJson, json, 'createCollection command');
       return new CreateCollectionCommand(data.collection, {
-        validator: data.validator,
-        validationLevel: data.validationLevel,
-        validationAction: data.validationAction,
-        capped: data.capped,
-        size: data.size,
-        max: data.max,
-        timeseries: data.timeseries as CreateCollectionCommand['timeseries'],
-        collation: data.collation
-          ? blindCast<CollationOptions, 'collation from serialized ops has locale'>(data.collation)
-          : undefined,
-        changeStreamPreAndPostImages: data.changeStreamPreAndPostImages as
-          | { enabled: boolean }
-          | undefined,
-        clusteredIndex: data.clusteredIndex as CreateCollectionCommand['clusteredIndex'],
+        ...ifDefined('validator', data.validator),
+        ...ifDefined('validationLevel', data.validationLevel),
+        ...ifDefined('validationAction', data.validationAction),
+        ...ifDefined('capped', data.capped),
+        ...ifDefined('size', data.size),
+        ...ifDefined('max', data.max),
+        ...ifDefined('timeseries', data.timeseries as CreateCollectionCommand['timeseries']),
+        ...(data.collation
+          ? {
+              collation: blindCast<CollationOptions, 'collation from serialized ops has locale'>(
+                data.collation,
+              ),
+            }
+          : {}),
+        ...ifDefined(
+          'changeStreamPreAndPostImages',
+          data.changeStreamPreAndPostImages as { enabled: boolean } | undefined,
+        ),
+        ...ifDefined(
+          'clusteredIndex',
+          data.clusteredIndex as CreateCollectionCommand['clusteredIndex'],
+        ),
       });
     }
     case 'dropCollection': {
@@ -543,12 +551,13 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
     case 'collMod': {
       const data = validate(CollModJson, json, 'collMod command');
       return new CollModCommand(data.collection, {
-        validator: data.validator,
-        validationLevel: data.validationLevel,
-        validationAction: data.validationAction,
-        changeStreamPreAndPostImages: data.changeStreamPreAndPostImages as
-          | { enabled: boolean }
-          | undefined,
+        ...ifDefined('validator', data.validator),
+        ...ifDefined('validationLevel', data.validationLevel),
+        ...ifDefined('validationAction', data.validationAction),
+        ...ifDefined(
+          'changeStreamPreAndPostImages',
+          data.changeStreamPreAndPostImages as { enabled: boolean } | undefined,
+        ),
       });
     }
     default:

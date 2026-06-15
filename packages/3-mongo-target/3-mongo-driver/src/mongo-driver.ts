@@ -189,11 +189,57 @@ export class MongoDriverImpl implements MongoDriver {
   }
 
   protected async executeCreateCollectionCommand(cmd: CreateCollectionWireCommand): Promise<void> {
-    await this.db.createCollection(cmd.collection, cmd.options);
+    const {
+      validator,
+      validationLevel,
+      validationAction,
+      capped,
+      size,
+      max,
+      timeseries,
+      collation,
+      changeStreamPreAndPostImages,
+      clusteredIndex,
+    } = cmd;
+    await this.db.createCollection(cmd.collection, {
+      ...(validator !== undefined ? { validator } : {}),
+      ...(validationLevel !== undefined ? { validationLevel } : {}),
+      ...(validationAction !== undefined ? { validationAction } : {}),
+      ...(capped !== undefined ? { capped } : {}),
+      ...(size !== undefined ? { size } : {}),
+      ...(max !== undefined ? { max } : {}),
+      ...(timeseries !== undefined ? { timeseries } : {}),
+      ...(collation !== undefined ? { collation } : {}),
+      ...(changeStreamPreAndPostImages !== undefined ? { changeStreamPreAndPostImages } : {}),
+      ...(clusteredIndex !== undefined ? { clusteredIndex } : {}),
+    });
   }
 
   protected async executeCreateIndexCommand(cmd: CreateIndexWireCommand): Promise<void> {
-    await this.db.collection(cmd.collection).createIndex(cmd.key, cmd.options);
+    const {
+      unique,
+      sparse,
+      expireAfterSeconds,
+      partialFilterExpression,
+      name,
+      wildcardProjection,
+      collation,
+      weights,
+      default_language,
+      language_override,
+    } = cmd;
+    await this.db.collection(cmd.collection).createIndex(cmd.key, {
+      ...(unique !== undefined ? { unique } : {}),
+      ...(sparse !== undefined ? { sparse } : {}),
+      ...(expireAfterSeconds !== undefined ? { expireAfterSeconds } : {}),
+      ...(partialFilterExpression !== undefined ? { partialFilterExpression } : {}),
+      ...(name !== undefined ? { name } : {}),
+      ...(wildcardProjection !== undefined ? { wildcardProjection } : {}),
+      ...(collation !== undefined ? { collation } : {}),
+      ...(weights !== undefined ? { weights } : {}),
+      ...(default_language !== undefined ? { default_language } : {}),
+      ...(language_override !== undefined ? { language_override } : {}),
+    });
   }
 
   protected async executeDropCollectionCommand(cmd: DropCollectionWireCommand): Promise<void> {
@@ -205,8 +251,14 @@ export class MongoDriverImpl implements MongoDriver {
   }
 
   protected async executeCollModCommand(cmd: CollModWireCommand): Promise<void> {
-    // The command name must be the first key in a MongoDB command document.
-    await this.db.command({ collMod: cmd.collection, ...cmd.options });
+    const { validator, validationLevel, validationAction, changeStreamPreAndPostImages } = cmd;
+    await this.db.command({
+      collMod: cmd.collection,
+      ...(validator !== undefined ? { validator } : {}),
+      ...(validationLevel !== undefined ? { validationLevel } : {}),
+      ...(validationAction !== undefined ? { validationAction } : {}),
+      ...(changeStreamPreAndPostImages !== undefined ? { changeStreamPreAndPostImages } : {}),
+    });
   }
 }
 

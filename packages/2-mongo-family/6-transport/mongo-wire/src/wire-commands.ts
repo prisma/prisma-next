@@ -1,11 +1,15 @@
 import type {
   CollModOptions,
-  CreateCollectionOptions,
+  CreateCollectionOptions as CreateCollectionCommandOptions,
   CreateIndexOptions,
   MongoIndexKeyDirection,
 } from '@prisma-next/mongo-query-ast/control';
 import type { Document, RawPipeline } from '@prisma-next/mongo-value';
-import type { DefinedProps } from '@prisma-next/utils/defined';
+import type {
+  CollationOptions,
+  CreateCollectionOptions,
+  CreateIndexesOptions,
+} from '@prisma-next/mongo-value/mongodb-types';
 
 abstract class MongoWireCommand {
   abstract readonly kind: string;
@@ -158,30 +162,81 @@ export class AggregateWireCommand extends MongoWireCommand {
   }
 }
 
-export class CreateCollectionWireCommand extends MongoWireCommand {
+export class CreateCollectionWireCommand
+  extends MongoWireCommand
+  implements CreateCollectionOptions
+{
   readonly kind = 'createCollection' as const;
-  readonly options: DefinedProps<CreateCollectionOptions>;
+  declare readonly validator?: Record<string, unknown>;
+  declare readonly validationLevel?: 'strict' | 'moderate';
+  declare readonly validationAction?: 'error' | 'warn';
+  declare readonly capped?: boolean;
+  declare readonly size?: number;
+  declare readonly max?: number;
+  declare readonly timeseries?: {
+    timeField: string;
+    metaField?: string;
+    granularity?: 'seconds' | 'minutes' | 'hours';
+  };
+  declare readonly collation?: CollationOptions;
+  declare readonly changeStreamPreAndPostImages?: { enabled: boolean };
+  declare readonly clusteredIndex?: {
+    key: Record<string, number>;
+    unique: boolean;
+    name?: string;
+  };
 
-  constructor(collection: string, options: DefinedProps<CreateCollectionOptions>) {
+  constructor(collection: string, options: CreateCollectionCommandOptions) {
     super(collection);
-    this.options = options;
+    if (options.validator !== undefined) this.validator = options.validator;
+    if (options.validationLevel !== undefined) this.validationLevel = options.validationLevel;
+    if (options.validationAction !== undefined) this.validationAction = options.validationAction;
+    if (options.capped !== undefined) this.capped = options.capped;
+    if (options.size !== undefined) this.size = options.size;
+    if (options.max !== undefined) this.max = options.max;
+    if (options.timeseries !== undefined) this.timeseries = options.timeseries;
+    if (options.collation !== undefined) this.collation = options.collation;
+    if (options.changeStreamPreAndPostImages !== undefined)
+      this.changeStreamPreAndPostImages = options.changeStreamPreAndPostImages;
+    if (options.clusteredIndex !== undefined) this.clusteredIndex = options.clusteredIndex;
     this.freeze();
   }
 }
 
-export class CreateIndexWireCommand extends MongoWireCommand {
+export class CreateIndexWireCommand extends MongoWireCommand implements CreateIndexesOptions {
   readonly kind = 'createIndex' as const;
   readonly key: Record<string, MongoIndexKeyDirection>;
-  readonly options: DefinedProps<CreateIndexOptions>;
+  declare readonly unique?: boolean;
+  declare readonly sparse?: boolean;
+  declare readonly expireAfterSeconds?: number;
+  declare readonly partialFilterExpression?: Record<string, unknown>;
+  declare readonly name?: string;
+  declare readonly wildcardProjection?: Record<string, 0 | 1>;
+  declare readonly collation?: CollationOptions;
+  declare readonly weights?: Record<string, number>;
+  declare readonly default_language?: string;
+  declare readonly language_override?: string;
 
   constructor(
     collection: string,
     key: Record<string, MongoIndexKeyDirection>,
-    options: DefinedProps<CreateIndexOptions>,
+    options: CreateIndexOptions,
   ) {
     super(collection);
     this.key = key;
-    this.options = options;
+    if (options.unique !== undefined) this.unique = options.unique;
+    if (options.sparse !== undefined) this.sparse = options.sparse;
+    if (options.expireAfterSeconds !== undefined)
+      this.expireAfterSeconds = options.expireAfterSeconds;
+    if (options.partialFilterExpression !== undefined)
+      this.partialFilterExpression = options.partialFilterExpression;
+    if (options.name !== undefined) this.name = options.name;
+    if (options.wildcardProjection !== undefined)
+      this.wildcardProjection = options.wildcardProjection;
+    if (options.collation !== undefined) this.collation = options.collation;
+    if (options.weights !== undefined) this.weights = options.weights;
+    if (options.default_language !== undefined) this.default_language = options.default_language;
+    if (options.language_override !== undefined) this.language_override = options.language_override;
     this.freeze();
   }
 }
@@ -208,11 +263,18 @@ export class DropIndexWireCommand extends MongoWireCommand {
 
 export class CollModWireCommand extends MongoWireCommand {
   readonly kind = 'collMod' as const;
-  readonly options: DefinedProps<CollModOptions>;
+  declare readonly validator?: Record<string, unknown>;
+  declare readonly validationLevel?: 'strict' | 'moderate';
+  declare readonly validationAction?: 'error' | 'warn';
+  declare readonly changeStreamPreAndPostImages?: { enabled: boolean };
 
-  constructor(collection: string, options: DefinedProps<CollModOptions>) {
+  constructor(collection: string, options: CollModOptions) {
     super(collection);
-    this.options = options;
+    if (options.validator !== undefined) this.validator = options.validator;
+    if (options.validationLevel !== undefined) this.validationLevel = options.validationLevel;
+    if (options.validationAction !== undefined) this.validationAction = options.validationAction;
+    if (options.changeStreamPreAndPostImages !== undefined)
+      this.changeStreamPreAndPostImages = options.changeStreamPreAndPostImages;
     this.freeze();
   }
 }

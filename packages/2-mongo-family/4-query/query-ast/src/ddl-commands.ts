@@ -1,35 +1,39 @@
 import type { MongoIndexKey } from '@prisma-next/mongo-contract';
-import type { CollationOptions } from 'mongodb';
+import type {
+  CollationOptions,
+  CreateIndexesOptions,
+  CreateCollectionOptions as MongoCreateCollectionOptions,
+} from '@prisma-next/mongo-value/mongodb-types';
 import { MongoAstNode } from './ast-node';
 import type { MongoDdlCommandVisitor } from './ddl-visitors';
 
 export interface CreateIndexOptions {
-  readonly unique?: boolean | undefined;
-  readonly sparse?: boolean | undefined;
-  readonly expireAfterSeconds?: number | undefined;
-  readonly partialFilterExpression?: Record<string, unknown> | undefined;
-  readonly name?: string | undefined;
-  readonly wildcardProjection?: Record<string, 0 | 1> | undefined;
-  readonly collation?: CollationOptions | undefined;
-  readonly weights?: Record<string, number> | undefined;
-  readonly default_language?: string | undefined;
-  readonly language_override?: string | undefined;
+  readonly unique?: boolean;
+  readonly sparse?: boolean;
+  readonly expireAfterSeconds?: number;
+  readonly partialFilterExpression?: Record<string, unknown>;
+  readonly name?: string;
+  readonly wildcardProjection?: Record<string, 0 | 1>;
+  readonly collation?: CollationOptions;
+  readonly weights?: Record<string, number>;
+  readonly default_language?: string;
+  readonly language_override?: string;
 }
 
-export class CreateIndexCommand extends MongoAstNode {
+export class CreateIndexCommand extends MongoAstNode implements CreateIndexesOptions {
   readonly kind = 'createIndex' as const;
   readonly collection: string;
   readonly keys: ReadonlyArray<MongoIndexKey>;
-  readonly unique: boolean | undefined;
-  readonly sparse: boolean | undefined;
-  readonly expireAfterSeconds: number | undefined;
-  readonly partialFilterExpression: Record<string, unknown> | undefined;
-  readonly name: string | undefined;
-  readonly wildcardProjection: Record<string, 0 | 1> | undefined;
-  readonly collation: CollationOptions | undefined;
-  readonly weights: Record<string, number> | undefined;
-  readonly default_language: string | undefined;
-  readonly language_override: string | undefined;
+  declare readonly unique?: boolean;
+  declare readonly sparse?: boolean;
+  declare readonly expireAfterSeconds?: number;
+  declare readonly partialFilterExpression?: Record<string, unknown>;
+  declare readonly name?: string;
+  declare readonly wildcardProjection?: Record<string, 0 | 1>;
+  declare readonly collation?: CollationOptions;
+  declare readonly weights?: Record<string, number>;
+  declare readonly default_language?: string;
+  declare readonly language_override?: string;
 
   constructor(
     collection: string,
@@ -39,32 +43,21 @@ export class CreateIndexCommand extends MongoAstNode {
     super();
     this.collection = collection;
     this.keys = keys;
-    this.unique = options?.unique;
-    this.sparse = options?.sparse;
-    this.expireAfterSeconds = options?.expireAfterSeconds;
-    this.partialFilterExpression = options?.partialFilterExpression;
-    this.name = options?.name;
-    this.wildcardProjection = options?.wildcardProjection;
-    this.collation = options?.collation;
-    this.weights = options?.weights;
-    this.default_language = options?.default_language;
-    this.language_override = options?.language_override;
+    if (options?.unique !== undefined) this.unique = options.unique;
+    if (options?.sparse !== undefined) this.sparse = options.sparse;
+    if (options?.expireAfterSeconds !== undefined)
+      this.expireAfterSeconds = options.expireAfterSeconds;
+    if (options?.partialFilterExpression !== undefined)
+      this.partialFilterExpression = options.partialFilterExpression;
+    if (options?.name !== undefined) this.name = options.name;
+    if (options?.wildcardProjection !== undefined)
+      this.wildcardProjection = options.wildcardProjection;
+    if (options?.collation !== undefined) this.collation = options.collation;
+    if (options?.weights !== undefined) this.weights = options.weights;
+    if (options?.default_language !== undefined) this.default_language = options.default_language;
+    if (options?.language_override !== undefined)
+      this.language_override = options.language_override;
     this.freeze();
-  }
-
-  options(): CreateIndexOptions {
-    return {
-      unique: this.unique,
-      sparse: this.sparse,
-      expireAfterSeconds: this.expireAfterSeconds,
-      partialFilterExpression: this.partialFilterExpression,
-      name: this.name,
-      wildcardProjection: this.wildcardProjection,
-      collation: this.collation,
-      weights: this.weights,
-      default_language: this.default_language,
-      language_override: this.language_override,
-    };
   }
 
   accept<R>(visitor: MongoDdlCommandVisitor<R>): R {
@@ -90,85 +83,63 @@ export class DropIndexCommand extends MongoAstNode {
 }
 
 export interface CreateCollectionOptions {
-  readonly validator?: Record<string, unknown> | undefined;
-  readonly validationLevel?: 'strict' | 'moderate' | undefined;
-  readonly validationAction?: 'error' | 'warn' | undefined;
-  readonly capped?: boolean | undefined;
-  readonly size?: number | undefined;
-  readonly max?: number | undefined;
-  readonly timeseries?:
-    | {
-        timeField: string;
-        metaField?: string;
-        granularity?: 'seconds' | 'minutes' | 'hours';
-      }
-    | undefined;
-  readonly collation?: CollationOptions | undefined;
-  readonly changeStreamPreAndPostImages?: { enabled: boolean } | undefined;
-  readonly clusteredIndex?:
-    | {
-        key: Record<string, number>;
-        unique: boolean;
-        name?: string;
-      }
-    | undefined;
+  readonly validator?: Record<string, unknown>;
+  readonly validationLevel?: 'strict' | 'moderate';
+  readonly validationAction?: 'error' | 'warn';
+  readonly capped?: boolean;
+  readonly size?: number;
+  readonly max?: number;
+  readonly timeseries?: {
+    timeField: string;
+    metaField?: string;
+    granularity?: 'seconds' | 'minutes' | 'hours';
+  };
+  readonly collation?: CollationOptions;
+  readonly changeStreamPreAndPostImages?: { enabled: boolean };
+  readonly clusteredIndex?: {
+    key: Record<string, number>;
+    unique: boolean;
+    name?: string;
+  };
 }
 
-export class CreateCollectionCommand extends MongoAstNode {
+export class CreateCollectionCommand extends MongoAstNode implements MongoCreateCollectionOptions {
   readonly kind = 'createCollection' as const;
   readonly collection: string;
-  readonly validator: Record<string, unknown> | undefined;
-  readonly validationLevel: 'strict' | 'moderate' | undefined;
-  readonly validationAction: 'error' | 'warn' | undefined;
-  readonly capped: boolean | undefined;
-  readonly size: number | undefined;
-  readonly max: number | undefined;
-  readonly timeseries:
-    | {
-        timeField: string;
-        metaField?: string;
-        granularity?: 'seconds' | 'minutes' | 'hours';
-      }
-    | undefined;
-  readonly collation: CollationOptions | undefined;
-  readonly changeStreamPreAndPostImages: { enabled: boolean } | undefined;
-  readonly clusteredIndex:
-    | {
-        key: Record<string, number>;
-        unique: boolean;
-        name?: string;
-      }
-    | undefined;
+  declare readonly validator?: Record<string, unknown>;
+  declare readonly validationLevel?: 'strict' | 'moderate';
+  declare readonly validationAction?: 'error' | 'warn';
+  declare readonly capped?: boolean;
+  declare readonly size?: number;
+  declare readonly max?: number;
+  declare readonly timeseries?: {
+    timeField: string;
+    metaField?: string;
+    granularity?: 'seconds' | 'minutes' | 'hours';
+  };
+  declare readonly collation?: CollationOptions;
+  declare readonly changeStreamPreAndPostImages?: { enabled: boolean };
+  declare readonly clusteredIndex?: {
+    key: Record<string, number>;
+    unique: boolean;
+    name?: string;
+  };
 
   constructor(collection: string, options?: CreateCollectionOptions) {
     super();
     this.collection = collection;
-    this.validator = options?.validator;
-    this.validationLevel = options?.validationLevel;
-    this.validationAction = options?.validationAction;
-    this.capped = options?.capped;
-    this.size = options?.size;
-    this.max = options?.max;
-    this.timeseries = options?.timeseries;
-    this.collation = options?.collation;
-    this.changeStreamPreAndPostImages = options?.changeStreamPreAndPostImages;
-    this.clusteredIndex = options?.clusteredIndex;
+    if (options?.validator !== undefined) this.validator = options.validator;
+    if (options?.validationLevel !== undefined) this.validationLevel = options.validationLevel;
+    if (options?.validationAction !== undefined) this.validationAction = options.validationAction;
+    if (options?.capped !== undefined) this.capped = options.capped;
+    if (options?.size !== undefined) this.size = options.size;
+    if (options?.max !== undefined) this.max = options.max;
+    if (options?.timeseries !== undefined) this.timeseries = options.timeseries;
+    if (options?.collation !== undefined) this.collation = options.collation;
+    if (options?.changeStreamPreAndPostImages !== undefined)
+      this.changeStreamPreAndPostImages = options.changeStreamPreAndPostImages;
+    if (options?.clusteredIndex !== undefined) this.clusteredIndex = options.clusteredIndex;
     this.freeze();
-  }
-
-  options(): CreateCollectionOptions {
-    return {
-      validator: this.validator,
-      validationLevel: this.validationLevel,
-      validationAction: this.validationAction,
-      capped: this.capped,
-      size: this.size,
-      max: this.max,
-      timeseries: this.timeseries,
-      collation: this.collation,
-      changeStreamPreAndPostImages: this.changeStreamPreAndPostImages,
-      clusteredIndex: this.clusteredIndex,
-    };
   }
 
   accept<R>(visitor: MongoDdlCommandVisitor<R>): R {
@@ -192,37 +163,29 @@ export class DropCollectionCommand extends MongoAstNode {
 }
 
 export interface CollModOptions {
-  readonly validator?: Record<string, unknown> | undefined;
-  readonly validationLevel?: 'strict' | 'moderate' | undefined;
-  readonly validationAction?: 'error' | 'warn' | undefined;
-  readonly changeStreamPreAndPostImages?: { enabled: boolean } | undefined;
+  readonly validator?: Record<string, unknown>;
+  readonly validationLevel?: 'strict' | 'moderate';
+  readonly validationAction?: 'error' | 'warn';
+  readonly changeStreamPreAndPostImages?: { enabled: boolean };
 }
 
 export class CollModCommand extends MongoAstNode {
   readonly kind = 'collMod' as const;
   readonly collection: string;
-  readonly validator: Record<string, unknown> | undefined;
-  readonly validationLevel: 'strict' | 'moderate' | undefined;
-  readonly validationAction: 'error' | 'warn' | undefined;
-  readonly changeStreamPreAndPostImages: { enabled: boolean } | undefined;
+  declare readonly validator?: Record<string, unknown>;
+  declare readonly validationLevel?: 'strict' | 'moderate';
+  declare readonly validationAction?: 'error' | 'warn';
+  declare readonly changeStreamPreAndPostImages?: { enabled: boolean };
 
   constructor(collection: string, options: CollModOptions) {
     super();
     this.collection = collection;
-    this.validator = options.validator;
-    this.validationLevel = options.validationLevel;
-    this.validationAction = options.validationAction;
-    this.changeStreamPreAndPostImages = options.changeStreamPreAndPostImages;
+    if (options.validator !== undefined) this.validator = options.validator;
+    if (options.validationLevel !== undefined) this.validationLevel = options.validationLevel;
+    if (options.validationAction !== undefined) this.validationAction = options.validationAction;
+    if (options.changeStreamPreAndPostImages !== undefined)
+      this.changeStreamPreAndPostImages = options.changeStreamPreAndPostImages;
     this.freeze();
-  }
-
-  options(): CollModOptions {
-    return {
-      validator: this.validator,
-      validationLevel: this.validationLevel,
-      validationAction: this.validationAction,
-      changeStreamPreAndPostImages: this.changeStreamPreAndPostImages,
-    };
   }
 
   accept<R>(visitor: MongoDdlCommandVisitor<R>): R {

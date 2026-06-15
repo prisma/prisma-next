@@ -6,8 +6,9 @@ import {
   MongoSchemaIR,
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
+import type { CollationOptions } from '@prisma-next/mongo-value/mongodb-types';
 import { blindCast } from '@prisma-next/utils/casts';
-import type { CollationOptions, Db, Document } from 'mongodb';
+import type { Db, Document } from 'mongodb';
 
 const PRISMA_MIGRATIONS_COLLECTION = '_prisma_migrations';
 

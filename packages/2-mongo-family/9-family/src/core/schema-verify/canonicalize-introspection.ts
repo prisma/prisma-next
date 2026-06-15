@@ -26,9 +26,9 @@ import {
   MongoSchemaIndex as MongoSchemaIndexCtor,
   MongoSchemaIR as MongoSchemaIRCtor,
 } from '@prisma-next/mongo-schema-ir';
+import type { CollationOptions } from '@prisma-next/mongo-value/mongodb-types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { CollationOptions } from 'mongodb';
 
 export interface CanonicalizedSchemas {
   readonly live: MongoSchemaIR;
@@ -384,24 +384,14 @@ function stripCollationFields(
 ): CollationOptions {
   return blindCast<
     CollationOptions,
-    'locale is required in CollationOptions so stripUnspecifiedFields always preserves it'
-  >(
-    stripUnspecifiedFields(
-      blindCast<Record<string, unknown>, 'CollationOptions is a plain object'>(live),
-      expected !== undefined
-        ? blindCast<Record<string, unknown>, 'CollationOptions is a plain object'>(expected)
-        : undefined,
-    ),
-  );
+    'locale is required in CollationOptions so stripUnspecifiedFields preserves it when expected is defined'
+  >(stripUnspecifiedFields(live, expected));
 }
 
-function stripUnspecifiedFields(
-  live: Record<string, unknown>,
-  expected: Record<string, unknown> | undefined,
-): Record<string, unknown> {
+function stripUnspecifiedFields<T extends object>(live: T, expected: T | undefined): Partial<T> {
   if (expected === undefined) return live;
-  const out: Record<string, unknown> = {};
-  for (const key of Object.keys(expected)) {
+  const out: Partial<T> = {};
+  for (const key of Object.keys(expected) as (keyof T)[]) {
     if (Object.hasOwn(live, key)) out[key] = live[key];
   }
   return out;

@@ -158,7 +158,6 @@ export function createIndex(
         description: `create index on ${collectionName}`,
         command: collection(collectionName).createIndex(keys, {
           ...options,
-          unique: options?.unique ?? undefined,
           name,
         }),
       },
@@ -269,8 +268,8 @@ export function setValidation(
         description: `set validation on ${collectionName}`,
         command: new CollModCommand(collectionName, {
           validator: { $jsonSchema: schema },
-          validationLevel: options?.validationLevel,
-          validationAction: options?.validationAction,
+          ...ifDefined('validationLevel', options?.validationLevel),
+          ...ifDefined('validationAction', options?.validationAction),
         }),
       },
     ],
@@ -360,6 +359,8 @@ export function validatedCollection(
       validationLevel: 'strict',
       validationAction: 'error',
     }),
-    ...indexes.map((idx) => createIndex(name, idx.keys, { unique: idx.unique })),
+    ...indexes.map((idx) =>
+      createIndex(name, idx.keys, idx.unique !== undefined ? { unique: idx.unique } : undefined),
+    ),
   ];
 }

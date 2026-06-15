@@ -17,21 +17,22 @@ function formatKeySpec(keys: ReadonlyArray<MongoIndexKey>): string {
   return `{ ${entries.join(', ')} }`;
 }
 
-function formatOptionEntries(options: object | undefined): string | undefined {
-  if (options === undefined) return undefined;
-  const parts = Object.entries(options)
-    .filter(([, value]) => value !== undefined)
+const COMMAND_META_KEYS = new Set(['kind', 'collection', 'keys']);
+
+function formatOptionEntries(cmd: object): string | undefined {
+  const parts = Object.entries(cmd)
+    .filter(([key, value]) => !COMMAND_META_KEYS.has(key) && value !== undefined)
     .map(([key, value]) => `${key}: ${JSON.stringify(value)}`);
   if (parts.length === 0) return undefined;
   return `{ ${parts.join(', ')} }`;
 }
 
 function formatOptions(cmd: CreateIndexCommand): string | undefined {
-  return formatOptionEntries(cmd.options());
+  return formatOptionEntries(cmd);
 }
 
 function formatCreateCollectionOptions(cmd: CreateCollectionCommand): string | undefined {
-  return formatOptionEntries(cmd.options());
+  return formatOptionEntries(cmd);
 }
 
 class MongoDdlCommandFormatter implements MongoDdlCommandVisitor<string> {
@@ -60,8 +61,9 @@ class MongoDdlCommandFormatter implements MongoDdlCommandVisitor<string> {
 
   collMod(cmd: CollModCommand): string {
     const parts: string[] = [`collMod: ${JSON.stringify(cmd.collection)}`];
-    for (const [key, value] of Object.entries(cmd.options())) {
-      if (value !== undefined) parts.push(`${key}: ${JSON.stringify(value)}`);
+    for (const [key, value] of Object.entries(cmd)) {
+      if (!COMMAND_META_KEYS.has(key) && value !== undefined)
+        parts.push(`${key}: ${JSON.stringify(value)}`);
     }
     return `db.runCommand({ ${parts.join(', ')} })`;
   }

@@ -12,6 +12,7 @@ import {
   MongoSchemaIR,
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 function convertIndex(index: MongoIndex): MongoSchemaIndex {
   return new MongoSchemaIndex({
@@ -38,35 +39,43 @@ function convertValidator(v: MongoValidator): MongoSchemaValidator {
 
 function convertOptions(o: MongoCollectionOptions): MongoSchemaCollectionOptions {
   return new MongoSchemaCollectionOptions({
-    ...(o.capped !== undefined && { capped: o.capped }),
-    ...(o.timeseries !== undefined && {
-      timeseries: {
-        timeField: o.timeseries.timeField,
-        ...(o.timeseries.metaField !== undefined && { metaField: o.timeseries.metaField }),
-        ...(o.timeseries.granularity !== undefined && { granularity: o.timeseries.granularity }),
-      },
-    }),
-    ...(o.collation !== undefined && {
-      collation: {
-        locale: o.collation.locale,
-        ...(o.collation.caseLevel !== undefined && { caseLevel: o.collation.caseLevel }),
-        ...(o.collation.caseFirst !== undefined && { caseFirst: o.collation.caseFirst }),
-        ...(o.collation.strength !== undefined && { strength: o.collation.strength }),
-        ...(o.collation.numericOrdering !== undefined && {
-          numericOrdering: o.collation.numericOrdering,
-        }),
-        ...(o.collation.alternate !== undefined && { alternate: o.collation.alternate }),
-        ...(o.collation.maxVariable !== undefined && { maxVariable: o.collation.maxVariable }),
-        ...(o.collation.backwards !== undefined && { backwards: o.collation.backwards }),
-        ...(o.collation.normalization !== undefined && {
-          normalization: o.collation.normalization,
-        }),
-      },
-    }),
-    ...(o.changeStreamPreAndPostImages !== undefined && {
-      changeStreamPreAndPostImages: { enabled: o.changeStreamPreAndPostImages.enabled },
-    }),
-    ...(o.clusteredIndex !== undefined && { clusteredIndex: o.clusteredIndex }),
+    ...ifDefined(
+      'capped',
+      o.capped !== undefined
+        ? { size: o.capped.size, ...ifDefined('max', o.capped.max) }
+        : undefined,
+    ),
+    ...(o.timeseries !== undefined
+      ? {
+          timeseries: {
+            timeField: o.timeseries.timeField,
+            ...ifDefined('metaField', o.timeseries.metaField),
+            ...ifDefined('granularity', o.timeseries.granularity),
+          },
+        }
+      : {}),
+    ...(o.collation !== undefined
+      ? {
+          collation: {
+            locale: o.collation.locale,
+            ...ifDefined('caseLevel', o.collation.caseLevel),
+            ...ifDefined('caseFirst', o.collation.caseFirst),
+            ...ifDefined('strength', o.collation.strength),
+            ...ifDefined('numericOrdering', o.collation.numericOrdering),
+            ...ifDefined('alternate', o.collation.alternate),
+            ...ifDefined('maxVariable', o.collation.maxVariable),
+            ...ifDefined('backwards', o.collation.backwards),
+            ...ifDefined('normalization', o.collation.normalization),
+          },
+        }
+      : {}),
+    ...ifDefined(
+      'changeStreamPreAndPostImages',
+      o.changeStreamPreAndPostImages !== undefined
+        ? { enabled: o.changeStreamPreAndPostImages.enabled }
+        : undefined,
+    ),
+    ...ifDefined('clusteredIndex', o.clusteredIndex),
   });
 }
 
@@ -75,8 +84,8 @@ function convertCollection(name: string, def: MongoCollection): MongoSchemaColle
   return new MongoSchemaCollection({
     name,
     indexes,
-    ...(def.validator != null && { validator: convertValidator(def.validator) }),
-    ...(def.options != null && { options: convertOptions(def.options) }),
+    ...ifDefined('validator', def.validator != null ? convertValidator(def.validator) : undefined),
+    ...ifDefined('options', def.options != null ? convertOptions(def.options) : undefined),
   });
 }
 

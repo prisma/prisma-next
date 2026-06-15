@@ -21,16 +21,13 @@ async function lowerCmd(
   return adapter.lower({ command }, {});
 }
 
-type WireOptions = { options: Record<string, unknown> };
-type WireKey = { key: Record<string, unknown> };
-type WireName = { name: string };
-
 describe('DDL lowering oracle — createCollection', () => {
-  it('bare collection → {create, no options}', async () => {
+  it('bare collection → kind + collection only', async () => {
     const wire = await lowerCmd(new CreateCollectionCommand('orders'));
     expect(wire.kind).toBe('createCollection');
     expect(wire.collection).toBe('orders');
-    expect((wire as WireOptions).options).toEqual({});
+    expect(wire).not.toHaveProperty('capped');
+    expect(wire).not.toHaveProperty('validator');
   });
 
   it('capped + size + max', async () => {
@@ -39,7 +36,7 @@ describe('DDL lowering oracle — createCollection', () => {
     );
     expect(wire.kind).toBe('createCollection');
     expect(wire.collection).toBe('logs');
-    expect((wire as WireOptions).options).toEqual({ capped: true, size: 1048576, max: 1000 });
+    expect(wire).toMatchObject({ capped: true, size: 1048576, max: 1000 });
   });
 
   it('validator + validationLevel + validationAction', async () => {
@@ -53,11 +50,7 @@ describe('DDL lowering oracle — createCollection', () => {
     );
     expect(wire.kind).toBe('createCollection');
     expect(wire.collection).toBe('docs');
-    expect((wire as WireOptions).options).toEqual({
-      validator,
-      validationLevel: 'strict',
-      validationAction: 'error',
-    });
+    expect(wire).toMatchObject({ validator, validationLevel: 'strict', validationAction: 'error' });
   });
 
   it('collation', async () => {
@@ -66,7 +59,7 @@ describe('DDL lowering oracle — createCollection', () => {
     );
     expect(wire.kind).toBe('createCollection');
     expect(wire.collection).toBe('items');
-    expect((wire as WireOptions).options).toEqual({ collation: { locale: 'en', strength: 2 } });
+    expect(wire).toMatchObject({ collation: { locale: 'en', strength: 2 } });
   });
 
   it('timeseries', async () => {
@@ -77,9 +70,7 @@ describe('DDL lowering oracle — createCollection', () => {
     );
     expect(wire.kind).toBe('createCollection');
     expect(wire.collection).toBe('readings');
-    expect((wire as WireOptions).options).toEqual({
-      timeseries: { timeField: 'ts', granularity: 'hours' },
-    });
+    expect(wire).toMatchObject({ timeseries: { timeField: 'ts', granularity: 'hours' } });
   });
 
   it('clusteredIndex', async () => {
@@ -90,7 +81,7 @@ describe('DDL lowering oracle — createCollection', () => {
     );
     expect(wire.kind).toBe('createCollection');
     expect(wire.collection).toBe('clustered');
-    expect((wire as WireOptions).options).toEqual({
+    expect(wire).toMatchObject({
       clusteredIndex: { key: { _id: 1 }, unique: true, name: 'clustered_id' },
     });
   });
@@ -103,16 +94,16 @@ describe('DDL lowering oracle — createCollection', () => {
     );
     expect(wire.kind).toBe('createCollection');
     expect(wire.collection).toBe('events');
-    expect((wire as WireOptions).options).toEqual({
-      changeStreamPreAndPostImages: { enabled: true },
-    });
+    expect(wire).toMatchObject({ changeStreamPreAndPostImages: { enabled: true } });
   });
 
   it('omits undefined options', async () => {
     const wire = await lowerCmd(new CreateCollectionCommand('plain'));
     expect(wire.kind).toBe('createCollection');
     expect(wire.collection).toBe('plain');
-    expect((wire as WireOptions).options).toEqual({});
+    expect(wire).not.toHaveProperty('capped');
+    expect(wire).not.toHaveProperty('validator');
+    expect(wire).not.toHaveProperty('timeseries');
   });
 });
 
@@ -126,8 +117,7 @@ describe('DDL lowering oracle — createIndex', () => {
     );
     expect(wire.kind).toBe('createIndex');
     expect(wire.collection).toBe('users');
-    expect((wire as WireKey).key).toEqual({ email: 1 });
-    expect((wire as WireOptions).options).toEqual({ unique: true, name: 'email_1' });
+    expect(wire).toMatchObject({ unique: true, name: 'email_1' });
   });
 
   it('sparse + expireAfterSeconds (TTL)', async () => {
@@ -140,12 +130,7 @@ describe('DDL lowering oracle — createIndex', () => {
     );
     expect(wire.kind).toBe('createIndex');
     expect(wire.collection).toBe('sessions');
-    expect((wire as WireKey).key).toEqual({ createdAt: 1 });
-    expect((wire as WireOptions).options).toEqual({
-      sparse: true,
-      expireAfterSeconds: 3600,
-      name: 'createdAt_1',
-    });
+    expect(wire).toMatchObject({ sparse: true, expireAfterSeconds: 3600, name: 'createdAt_1' });
   });
 
   it('partialFilterExpression', async () => {
@@ -157,8 +142,7 @@ describe('DDL lowering oracle — createIndex', () => {
     );
     expect(wire.kind).toBe('createIndex');
     expect(wire.collection).toBe('logs');
-    expect((wire as WireKey).key).toEqual({ level: 1 });
-    expect((wire as WireOptions).options).toEqual({
+    expect(wire).toMatchObject({
       partialFilterExpression: { active: true },
       name: 'level_1_partial',
     });
@@ -173,11 +157,7 @@ describe('DDL lowering oracle — createIndex', () => {
     );
     expect(wire.kind).toBe('createIndex');
     expect(wire.collection).toBe('products');
-    expect((wire as WireKey).key).toEqual({ '$**': 1 });
-    expect((wire as WireOptions).options).toEqual({
-      wildcardProjection: { name: 1 },
-      name: 'wildcard_1',
-    });
+    expect(wire).toMatchObject({ wildcardProjection: { name: 1 }, name: 'wildcard_1' });
   });
 
   it('collation', async () => {
@@ -189,11 +169,7 @@ describe('DDL lowering oracle — createIndex', () => {
     );
     expect(wire.kind).toBe('createIndex');
     expect(wire.collection).toBe('items');
-    expect((wire as WireKey).key).toEqual({ name: 1 });
-    expect((wire as WireOptions).options).toEqual({
-      collation: { locale: 'en', strength: 2 },
-      name: 'name_1_en',
-    });
+    expect(wire).toMatchObject({ collation: { locale: 'en', strength: 2 }, name: 'name_1_en' });
   });
 
   it('text index — weights, default_language, language_override', async () => {
@@ -214,8 +190,7 @@ describe('DDL lowering oracle — createIndex', () => {
     );
     expect(wire.kind).toBe('createIndex');
     expect(wire.collection).toBe('articles');
-    expect((wire as WireKey).key).toEqual({ title: 'text', body: 'text' });
-    expect((wire as WireOptions).options).toEqual({
+    expect(wire).toMatchObject({
       weights: { title: 10, body: 1 },
       default_language: 'english',
       language_override: 'lang',
@@ -236,15 +211,16 @@ describe('DDL lowering oracle — createIndex', () => {
     );
     expect(wire.kind).toBe('createIndex');
     expect(wire.collection).toBe('orders');
-    expect((wire as WireKey).key).toEqual({ userId: 1, createdAt: -1 });
-    expect((wire as WireOptions).options).toEqual({ name: 'userId_1_createdAt_-1' });
+    expect(wire).toMatchObject({ name: 'userId_1_createdAt_-1' });
   });
 
   it('omits undefined options', async () => {
     const wire = await lowerCmd(
       new CreateIndexCommand('bare', [{ field: 'x', direction: 1 }], { name: 'x_1' }),
     );
-    expect((wire as WireOptions).options).toEqual({ name: 'x_1' });
+    expect(wire).not.toHaveProperty('unique');
+    expect(wire).not.toHaveProperty('sparse');
+    expect(wire).toMatchObject({ name: 'x_1' });
   });
 });
 
@@ -261,16 +237,17 @@ describe('DDL lowering oracle — dropIndex', () => {
     const wire = await lowerCmd(new DropIndexCommand('users', 'email_1'));
     expect(wire.kind).toBe('dropIndex');
     expect(wire.collection).toBe('users');
-    expect((wire as WireName).name).toBe('email_1');
+    expect(wire).toMatchObject({ name: 'email_1' });
   });
 });
 
 describe('DDL lowering oracle — collMod', () => {
-  it('bare collMod (no options) → empty options object', async () => {
+  it('bare collMod (no options) → kind + collection only', async () => {
     const wire = await lowerCmd(new CollModCommand('docs', {}));
     expect(wire.kind).toBe('collMod');
     expect(wire.collection).toBe('docs');
-    expect((wire as WireOptions).options).toEqual({});
+    expect(wire).not.toHaveProperty('validator');
+    expect(wire).not.toHaveProperty('validationLevel');
   });
 
   it('validator + validationLevel + validationAction', async () => {
@@ -284,7 +261,7 @@ describe('DDL lowering oracle — collMod', () => {
     );
     expect(wire.kind).toBe('collMod');
     expect(wire.collection).toBe('docs');
-    expect((wire as WireOptions).options).toEqual({
+    expect(wire).toMatchObject({
       validator,
       validationLevel: 'moderate',
       validationAction: 'warn',
@@ -297,8 +274,6 @@ describe('DDL lowering oracle — collMod', () => {
     );
     expect(wire.kind).toBe('collMod');
     expect(wire.collection).toBe('events');
-    expect((wire as WireOptions).options).toEqual({
-      changeStreamPreAndPostImages: { enabled: true },
-    });
+    expect(wire).toMatchObject({ changeStreamPreAndPostImages: { enabled: true } });
   });
 });

@@ -67,12 +67,13 @@ describe('CreateIndexCommand', () => {
     expect(cmd.wildcardProjection).toEqual({ name: 1, email: 1 });
   });
 
-  it('options() returns the typed options object', () => {
+  it('exposes options as direct properties', () => {
     const cmd = new CreateIndexCommand('users', [{ field: 'email', direction: 1 }], {
       unique: true,
       name: 'email_1',
     });
-    expect(cmd.options()).toMatchObject({ unique: true, name: 'email_1' });
+    expect(cmd.unique).toBe(true);
+    expect(cmd.name).toBe('email_1');
   });
 
   it('JSON.stringify yields flat shape with no options key', () => {
@@ -192,9 +193,10 @@ describe('CreateCollectionCommand', () => {
     expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: true });
   });
 
-  it('options() returns the typed options object', () => {
+  it('exposes options as direct properties', () => {
     const cmd = new CreateCollectionCommand('events', { capped: true, size: 1048576 });
-    expect(cmd.options()).toMatchObject({ capped: true, size: 1048576 });
+    expect(cmd.capped).toBe(true);
+    expect(cmd.size).toBe(1048576);
   });
 
   it('JSON.stringify yields flat shape with no options key', () => {
@@ -271,15 +273,13 @@ describe('CollModCommand', () => {
     expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: true });
   });
 
-  it('options() returns the typed options object', () => {
+  it('exposes options as direct properties', () => {
     const cmd = new CollModCommand('users', {
       validator: { $jsonSchema: { bsonType: 'object' } },
       validationLevel: 'strict',
     });
-    expect(cmd.options()).toMatchObject({
-      validator: { $jsonSchema: { bsonType: 'object' } },
-      validationLevel: 'strict',
-    });
+    expect(cmd.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
+    expect(cmd.validationLevel).toBe('strict');
   });
 
   it('JSON.stringify yields flat shape with no options key', () => {
