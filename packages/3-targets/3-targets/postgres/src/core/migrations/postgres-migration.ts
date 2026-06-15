@@ -3,7 +3,6 @@ import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control'
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { Migration as SqlMigration } from '@prisma-next/family-sql/migration';
 import type { ControlStack } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import { errorPostgresMigrationStackMissing } from '../errors';
@@ -57,6 +56,13 @@ import type { PostgresPlanTargetDetails } from './planner-target-details';
  * instance method forwards to the free `dataTransform` factory with that
  * stored adapter, so user migrations can write `this.dataTransform(...)`
  * without threading the adapter through every call.
+ *
+ * Every method requires an explicit `schema`. Postgres migrations name their
+ * schema deliberately — there is no default and no `search_path`-relative
+ * option. A migration that left the schema unspecified would resolve against
+ * whatever `search_path` the connection happened to carry, and that ambiguity
+ * is an antipattern in a migration. (The unbound/unspecified namespace concept
+ * remains for SQLite, which has no schemas, and for Mongo's connection `db`.)
  */
 export abstract class PostgresMigration extends SqlMigration<
   PostgresPlanTargetDetails,
@@ -104,7 +110,7 @@ export abstract class PostgresMigration extends SqlMigration<
    * Throws if no adapter is present (i.e. migration instantiated without a stack).
    */
   protected createTable(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly ifNotExists?: boolean;
     readonly columns: readonly DdlColumn[];
@@ -114,7 +120,7 @@ export abstract class PostgresMigration extends SqlMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return new CreateTableCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.schema,
       options.table,
       options.columns,
       options.constraints,
@@ -137,22 +143,20 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected addColumn(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly column: DdlColumn;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new AddColumnCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
-      options.table,
-      options.column,
-    ).toOp(this.controlAdapter);
+    return new AddColumnCall(options.schema, options.table, options.column).toOp(
+      this.controlAdapter,
+    );
   }
 
   protected addPrimaryKey(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly constraint: string;
     readonly columns: readonly string[];
@@ -161,7 +165,7 @@ export abstract class PostgresMigration extends SqlMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return new AddPrimaryKeyCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.schema,
       options.table,
       options.constraint,
       options.columns,
@@ -169,7 +173,7 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected addUnique(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly constraint: string;
     readonly columns: readonly string[];
@@ -178,7 +182,7 @@ export abstract class PostgresMigration extends SqlMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return new AddUniqueCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.schema,
       options.table,
       options.constraint,
       options.columns,
@@ -186,22 +190,20 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected addForeignKey(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly foreignKey: ForeignKeySpec;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new AddForeignKeyCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
-      options.table,
-      options.foreignKey,
-    ).toOp(this.controlAdapter);
+    return new AddForeignKeyCall(options.schema, options.table, options.foreignKey).toOp(
+      this.controlAdapter,
+    );
   }
 
   protected addCheckConstraint(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly constraint: string;
     readonly column: string;
@@ -211,7 +213,7 @@ export abstract class PostgresMigration extends SqlMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return new AddCheckConstraintCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.schema,
       options.table,
       options.constraint,
       options.column,
@@ -220,22 +222,20 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected dropCheckConstraint(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly constraint: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new DropCheckConstraintCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
-      options.table,
-      options.constraint,
-    ).toOp(this.controlAdapter);
+    return new DropCheckConstraintCall(options.schema, options.table, options.constraint).toOp(
+      this.controlAdapter,
+    );
   }
 
   protected dropConstraint(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly constraint: string;
     readonly kind?: 'foreignKey' | 'unique' | 'primaryKey';
@@ -244,7 +244,7 @@ export abstract class PostgresMigration extends SqlMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return new DropConstraintCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.schema,
       options.table,
       options.constraint,
       options.kind ?? 'unique',
@@ -252,34 +252,30 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected dropTable(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new DropTableCall(options.schema ?? UNBOUND_NAMESPACE_ID, options.table).toOp(
-      this.controlAdapter,
-    );
+    return new DropTableCall(options.schema, options.table).toOp(this.controlAdapter);
   }
 
   protected dropColumn(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly column: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new DropColumnCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
-      options.table,
-      options.column,
-    ).toOp(this.controlAdapter);
+    return new DropColumnCall(options.schema, options.table, options.column).toOp(
+      this.controlAdapter,
+    );
   }
 
   protected alterColumnType(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly column: string;
     readonly options: AlterColumnTypeOptions;
@@ -288,7 +284,7 @@ export abstract class PostgresMigration extends SqlMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return new AlterColumnTypeCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.schema,
       options.table,
       options.column,
       options.options,
@@ -296,37 +292,33 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected setNotNull(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly column: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new SetNotNullCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
-      options.table,
-      options.column,
-    ).toOp(this.controlAdapter);
+    return new SetNotNullCall(options.schema, options.table, options.column).toOp(
+      this.controlAdapter,
+    );
   }
 
   protected dropNotNull(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly column: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new DropNotNullCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
-      options.table,
-      options.column,
-    ).toOp(this.controlAdapter);
+    return new DropNotNullCall(options.schema, options.table, options.column).toOp(
+      this.controlAdapter,
+    );
   }
 
   protected setDefault(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly column: string;
     readonly defaultSql: string;
@@ -336,7 +328,7 @@ export abstract class PostgresMigration extends SqlMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return new SetDefaultCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.schema,
       options.table,
       options.column,
       options.defaultSql,
@@ -345,22 +337,20 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected dropDefault(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly column: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new DropDefaultCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
-      options.table,
-      options.column,
-    ).toOp(this.controlAdapter);
+    return new DropDefaultCall(options.schema, options.table, options.column).toOp(
+      this.controlAdapter,
+    );
   }
 
   protected createIndex(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly index: string;
     readonly columns: readonly string[];
@@ -370,7 +360,7 @@ export abstract class PostgresMigration extends SqlMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return new CreateIndexCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.schema,
       options.table,
       options.index,
       options.columns,
@@ -379,22 +369,20 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected dropIndex(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly table: string;
     readonly index: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new DropIndexCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
-      options.table,
-      options.index,
-    ).toOp(this.controlAdapter);
+    return new DropIndexCall(options.schema, options.table, options.index).toOp(
+      this.controlAdapter,
+    );
   }
 
   protected createEnumType(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly typeName: string;
     readonly values: readonly string[];
     readonly nativeType?: string;
@@ -403,7 +391,7 @@ export abstract class PostgresMigration extends SqlMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return new CreateEnumTypeCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.schema,
       options.typeName,
       options.values,
       options.nativeType,
@@ -411,7 +399,7 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected addEnumValues(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly typeName: string;
     readonly nativeType: string;
     readonly values: readonly string[];
@@ -420,7 +408,7 @@ export abstract class PostgresMigration extends SqlMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return new AddEnumValuesCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.schema,
       options.typeName,
       options.nativeType,
       options.values,
@@ -428,30 +416,26 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected dropEnumType(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly typeName: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new DropEnumTypeCall(options.schema ?? UNBOUND_NAMESPACE_ID, options.typeName).toOp(
-      this.controlAdapter,
-    );
+    return new DropEnumTypeCall(options.schema, options.typeName).toOp(this.controlAdapter);
   }
 
   protected renameType(options: {
-    readonly schema?: string;
+    readonly schema: string;
     readonly fromName: string;
     readonly toName: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new RenameTypeCall(
-      options.schema ?? UNBOUND_NAMESPACE_ID,
-      options.fromName,
-      options.toName,
-    ).toOp(this.controlAdapter);
+    return new RenameTypeCall(options.schema, options.fromName, options.toName).toOp(
+      this.controlAdapter,
+    );
   }
 
   protected installExtension(options: {
