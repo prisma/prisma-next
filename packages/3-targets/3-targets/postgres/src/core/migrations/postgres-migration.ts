@@ -9,13 +9,11 @@ import { errorPostgresMigrationStackMissing } from '../errors';
 import {
   AddCheckConstraintCall,
   AddColumnCall,
-  AddEnumValuesCall,
   AddForeignKeyCall,
   AddPrimaryKeyCall,
   AddUniqueCall,
   AlterColumnTypeCall,
   type AlterColumnTypeOptions,
-  CreateEnumTypeCall,
   CreateIndexCall,
   CreateSchemaCall,
   CreateTableCall,
@@ -23,11 +21,9 @@ import {
   DropColumnCall,
   DropConstraintCall,
   DropDefaultCall,
-  DropEnumTypeCall,
   DropIndexCall,
   DropNotNullCall,
   DropTableCall,
-  RenameTypeCall,
   SetDefaultCall,
   SetNotNullCall,
 } from './op-factory-call';
@@ -377,63 +373,6 @@ export abstract class PostgresMigration extends SqlMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return new DropIndexCall(options.schema, options.table, options.index).toOp(
-      this.controlAdapter,
-    );
-  }
-
-  protected createEnumType(options: {
-    readonly schema: string;
-    readonly typeName: string;
-    readonly values: readonly string[];
-    readonly nativeType?: string;
-  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
-    return new CreateEnumTypeCall(
-      options.schema,
-      options.typeName,
-      options.values,
-      options.nativeType,
-    ).toOp(this.controlAdapter);
-  }
-
-  protected addEnumValues(options: {
-    readonly schema: string;
-    readonly typeName: string;
-    readonly nativeType: string;
-    readonly values: readonly string[];
-  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
-    return new AddEnumValuesCall(
-      options.schema,
-      options.typeName,
-      options.nativeType,
-      options.values,
-    ).toOp(this.controlAdapter);
-  }
-
-  protected dropEnumType(options: {
-    readonly schema: string;
-    readonly typeName: string;
-  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
-    return new DropEnumTypeCall(options.schema, options.typeName).toOp(this.controlAdapter);
-  }
-
-  protected renameType(options: {
-    readonly schema: string;
-    readonly fromName: string;
-    readonly toName: string;
-  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
-    return new RenameTypeCall(options.schema, options.fromName, options.toName).toOp(
       this.controlAdapter,
     );
   }

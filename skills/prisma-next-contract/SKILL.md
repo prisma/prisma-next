@@ -242,12 +242,13 @@ Canonical worked example: `examples/prisma-next-demo/src/prisma/contract.prisma`
 
 ## Workflow — Enums
 
-The concept: PSL `enum` blocks declare named value-sets. On Postgres the interpreter lowers them to a Postgres native `CREATE TYPE … AS ENUM` type (`pg/enum@1` codec), which the planner emits DDL for. Use the enum name as a field type on any model in the same contract.
+The concept: PSL `enum` blocks declare a domain enum: a named value-set stored through a declared codec (`@@type("pg/text@1")` → a `text` column) and enforced by a planner-generated CHECK constraint. Each member maps to its database value with `Name = "value"`. Use the enum name as a field type on any model in the same contract.
 
 ```prisma
 enum user_type {
-  admin
-  user
+  @@type("pg/text@1")
+  admin = "admin"
+  user  = "user"
 }
 
 model User {

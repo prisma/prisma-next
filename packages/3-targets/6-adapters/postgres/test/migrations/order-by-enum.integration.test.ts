@@ -256,4 +256,67 @@ describe.sequential('ORDER BY on an enum column — declaration order, PGlite', 
     expect(rows.rows.map((r) => r.priority)).toEqual(['low', 'high', null]);
     expect(rows.rows.map((r) => r.id)).toEqual(['c', 'a', 'b']);
   });
+
+  it('distinctOn on a value-set column renders array_position, matching orderBy', {
+    timeout: testTimeout,
+  }, async () => {
+    const contract = makeTaskContract();
+
+    // distinctOn('priority') emits IdentifierRef (string-arg path).
+    // orderBy uses the same IdentifierRef shape but goes through renderOrderByExpr.
+    // Both must render identically so Postgres accepts: DISTINCT ON (X) ... ORDER BY X.
+    const ast = SelectAst.from(TableSource.named('Task', undefined, 'public'))
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('Task', 'id'))])
+      .withDistinctOn([IdentifierRef.of('priority')])
+      .withOrderBy([
+        OrderByItem.asc(IdentifierRef.of('priority')),
+        OrderByItem.asc(IdentifierRef.of('id')),
+      ]);
+
+    const lowered = createPostgresAdapter().lower(ast, { contract });
+    const arrayPositionExpr = `array_position(ARRAY['low', 'high', 'medium']::text[], "priority")`;
+
+    // DISTINCT ON and ORDER BY must emit the same expression.
+    expect(lowered.sql).toContain(`DISTINCT ON (${arrayPositionExpr})`);
+    expect(lowered.sql).toContain(`ORDER BY ${arrayPositionExpr}`);
+  });
+
+  it('distinctOn on a value-set column executes without error', {
+    timeout: testTimeout,
+  }, async () => {
+    const contract = makeTaskContract();
+    await migrate(driver!, contract);
+
+    await driver!.query(`INSERT INTO "Task" (id, priority) VALUES
+      ('a', 'high'), ('b', 'low'), ('c', 'high')`);
+
+    const ast = SelectAst.from(TableSource.named('Task', undefined, 'public'))
+      .withProjection([
+        ProjectionItem.of('id', ColumnRef.of('Task', 'id')),
+        ProjectionItem.of('priority', ColumnRef.of('Task', 'priority')),
+      ])
+      .withDistinctOn([IdentifierRef.of('priority')])
+      .withOrderBy([
+        OrderByItem.asc(IdentifierRef.of('priority')),
+        OrderByItem.asc(IdentifierRef.of('id')),
+      ]);
+
+    const lowered = createPostgresAdapter().lower(ast, { contract });
+    const rows = await driver!.query<{ id: string; priority: string }>(lowered.sql);
+    // One row per distinct priority, in declaration order (low < high < medium).
+    expect(rows.rows.map((r) => r.priority)).toEqual(['low', 'high']);
+  });
+
+  it('distinctOn on a plain scalar column still renders as a bare identifier', () => {
+    const contract = makeTaskContract();
+
+    const ast = SelectAst.from(TableSource.named('Task', undefined, 'public'))
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('Task', 'id'))])
+      .withDistinctOn([IdentifierRef.of('id')])
+      .withOrderBy([OrderByItem.asc(IdentifierRef.of('id'))]);
+
+    const lowered = createPostgresAdapter().lower(ast, { contract });
+    expect(lowered.sql).toContain('DISTINCT ON ("id")');
+    expect(lowered.sql).not.toContain('array_position');
+  });
 });

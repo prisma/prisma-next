@@ -65,7 +65,7 @@ const baseContract = new SqlContractSerializer().deserializeContract({
                 id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
                 tag: { codecId: 'app/test-foo@1', nativeType: 'foo', nullable: false },
                 score: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                note: { codecId: 'pg/enum@1', nativeType: 'tag', nullable: false },
+                note: { codecId: 'app/test-opaque@1', nativeType: 'tag', nullable: false },
                 geo: { codecId: 'app/geography@1', nativeType: 'geography', nullable: false },
                 profile: { codecId: 'arktype/json@1', nativeType: 'jsonb', nullable: false },
               },
@@ -138,18 +138,18 @@ describe('renderLoweredSql cast policy', () => {
 
   it('emits plain $N when the codec carries no nativeType metadata', () => {
     const enumCodec: Codec = defineTestCodec({
-      typeId: 'pg/enum@1',
+      typeId: 'app/test-opaque@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
     });
     const lookup = lookupOf({
-      'pg/enum@1': {
+      'app/test-opaque@1': {
         codec: enumCodec,
         metadata: { targetTypes: ['enum'] },
       },
     });
 
-    const ast = selectWithParam('note', 'pg/enum@1', 'urgent');
+    const ast = selectWithParam('note', 'app/test-opaque@1', 'urgent');
     const lowered = renderLoweredSql(ast, baseContract, lookup);
 
     expect(lowered.sql).toBe('SELECT "user"."id" AS "id" FROM "user" WHERE "user"."note" = $1');

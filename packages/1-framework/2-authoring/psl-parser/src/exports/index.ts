@@ -13,8 +13,6 @@ export type {
   PslDiagnostic,
   PslDiagnosticCode,
   PslDocumentAst,
-  PslEnum,
-  PslEnumValue,
   PslExtensionBlock,
   PslExtensionBlockAttribute,
   PslExtensionBlockAttributeArg,
@@ -36,7 +34,6 @@ export type {
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
 export {
-  flatPslEnums,
   flatPslModels,
   namespacePslExtensionBlocks,
 } from '@prisma-next/framework-components/psl-ast';

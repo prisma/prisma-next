@@ -17,12 +17,10 @@
 import { col, lit, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import {
   AddColumnCall,
-  AddEnumValuesCall,
   AddForeignKeyCall,
   AddPrimaryKeyCall,
   AddUniqueCall,
   AlterColumnTypeCall,
-  CreateEnumTypeCall,
   CreateExtensionCall,
   CreateIndexCall,
   CreateSchemaCall,
@@ -31,12 +29,10 @@ import {
   DropColumnCall,
   DropConstraintCall,
   DropDefaultCall,
-  DropEnumTypeCall,
   DropIndexCall,
   DropNotNullCall,
   DropTableCall,
   RawSqlCall,
-  RenameTypeCall,
   SetDefaultCall,
   SetNotNullCall,
 } from '@prisma-next/target-postgres/op-factory-call';
@@ -280,36 +276,6 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     expect(ci.renderTypeScript()).toBe(
       'this.createIndex({ schema: "public", table: "doc", index: "doc_body_idx", columns: ["body"], extras: { type: "gin", options: { fastupdate: false } } })',
     );
-  });
-
-  it('CreateEnumTypeCall emits this.createEnumType({...}) and contributes no imports', () => {
-    const call = new CreateEnumTypeCall('public', 'status', ['active', 'archived']);
-    expect(call.renderTypeScript()).toBe(
-      'this.createEnumType({ schema: "public", typeName: "status", values: ["active", "archived"] })',
-    );
-    expect(call.importRequirements()).toEqual([]);
-  });
-
-  it('AddEnumValuesCall emits this.addEnumValues({...}) and contributes no imports', () => {
-    const call = new AddEnumValuesCall('public', 'status', 'public.status_native', ['pending']);
-    expect(call.renderTypeScript()).toBe(
-      'this.addEnumValues({ schema: "public", typeName: "status", nativeType: "public.status_native", values: ["pending"] })',
-    );
-    expect(call.importRequirements()).toEqual([]);
-  });
-
-  it('DropEnumTypeCall / RenameTypeCall emit this.X({...}) and contribute no imports', () => {
-    const drop = new DropEnumTypeCall('public', 'status');
-    expect(drop.renderTypeScript()).toBe(
-      'this.dropEnumType({ schema: "public", typeName: "status" })',
-    );
-    expect(drop.importRequirements()).toEqual([]);
-
-    const rename = new RenameTypeCall('public', 'status_old', 'status');
-    expect(rename.renderTypeScript()).toBe(
-      'this.renameType({ schema: "public", fromName: "status_old", toName: "status" })',
-    );
-    expect(rename.importRequirements()).toEqual([]);
   });
 
   it('CreateExtensionCall emits a single-arg factory call', () => {

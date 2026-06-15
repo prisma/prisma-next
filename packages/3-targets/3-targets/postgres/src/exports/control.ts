@@ -10,7 +10,6 @@ import type {
 import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
-import { resolveDdlSchemaForNamespaceStorage } from '../core/migrations/enum-planning';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
@@ -31,12 +30,6 @@ function buildNativeTypeExpander(
     readonly typeParams?: Record<string, unknown>;
   }) => {
     if (!input.typeParams) return input.nativeType;
-    // Mirror `renderExpectedNativeType` in verify-sql-schema: when a codec
-    // has no `expandNativeType` hook (e.g. `pg/enum@1`, whose typeParams
-    // describe the value set rather than a DDL suffix), fall back to the
-    // bare native type rather than throwing. Throwing here would reject
-    // every plan involving an enum-/values-typed column as soon as its
-    // `typeRef` resolved to a `StorageTypeInstance` carrying typeParams.
     if (!input.codecId) return input.nativeType;
     const hooks = codecHooks.get(input.codecId);
     if (!hooks?.expandNativeType) return input.nativeType;
@@ -77,14 +70,6 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
           annotationNamespace: 'pg',
           ...ifDefined('expandNativeType', expander),
           renderDefault: postgresRenderDefault,
-          // Map each namespace to the live DDL schema its enums are stored
-          // under, so the projected "from" IR nests enums by the same schema
-          // `readExistingEnumValues` reads (the contract-to-contract `migration
-          // plan` path). `undefined` schema IR ⇒ the unbound coordinate
-          // resolves to the default `public` landing schema, matching the
-          // read-side fallback.
-          resolveEnumNamespaceSchema: (storage, namespaceId) =>
-            resolveDdlSchemaForNamespaceStorage(storage, namespaceId, undefined),
         });
       },
     },

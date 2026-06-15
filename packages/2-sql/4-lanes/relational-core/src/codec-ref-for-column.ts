@@ -1,11 +1,7 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecRef } from '@prisma-next/framework-components/codec';
 import { resolveStorageTable } from '@prisma-next/sql-contract/resolve-storage-table';
-import {
-  isPostgresEnumStorageEntry,
-  isStorageTypeInstance,
-  type SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import { isStorageTypeInstance, type SqlStorage } from '@prisma-next/sql-contract/types';
 
 /**
  * Derive the canonical {@link CodecRef} for a `(table, column)` pair against a {@link SqlStorage}. This is the build-time path every column-bound `ParamRef` / `ProjectionItem` uses to stamp its `codec` slot before the AST is handed to the runtime — the runtime resolver then materialises a memoised {@link import('@prisma-next/sql-relational-core/ast').Codec} for the same `CodecRef` via `forCodecRef`.
@@ -34,38 +30,9 @@ export function codecRefForStorageColumn(
   const columnDef = tableDef.columns[columnName];
   if (!columnDef) return undefined;
   if (columnDef.typeRef !== undefined) {
-    let instance: unknown = storage.types?.[columnDef.typeRef];
-    if (!instance) {
-      for (const ns of Object.values(storage.namespaces)) {
-        const typeSlot = (ns.entries as { type?: Record<string, unknown> }).type;
-        const nsEntry = typeSlot?.[columnDef.typeRef];
-        if (nsEntry !== undefined) {
-          instance = nsEntry;
-          break;
-        }
-      }
-    }
+    const instance = storage.types?.[columnDef.typeRef];
     if (!instance) return undefined;
-    if (isPostgresEnumStorageEntry(instance)) {
-      // Canonical path: the entry is a live `PostgresEnumType` IR
-      // instance reached through the per-target serializer's
-      // hydration. Raw JSON envelopes carrying `kind: 'postgres-enum'`
-      // never reach this site — `SqlStorage.normaliseTypeEntry`
-      // rejects them upstream (F09). Read `codecId` and `values` off
-      // the structural shape (enumerable own properties on the live
-      // instance) so the dispatch stays layered against the family
-      // alphabet rather than a target-specific class import.
-      return {
-        codecId: instance.codecId,
-        typeParams: { values: instance.values } as unknown as JsonValue,
-      };
-    }
     if (isStorageTypeInstance(instance)) {
-      // Empty-state canonicalization: a `StorageTypeInstance` with absent
-      // (or empty) `typeParams` produces a `CodecRef` with no `typeParams`
-      // field. Equivalent to the non-parameterized-column branch below.
-      // Carrying `{}` here would break content-keyed memoisation and trip
-      // the runtime validator against non-parameterized codec descriptors.
       const instanceParams = instance.typeParams;
       const hasParamKeys = instanceParams !== undefined && Object.keys(instanceParams).length > 0;
       return hasParamKeys

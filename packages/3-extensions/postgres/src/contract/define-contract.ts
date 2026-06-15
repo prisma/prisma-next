@@ -1,9 +1,6 @@
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import type { ExtensionPackRef } from '@prisma-next/framework-components/components';
-import type {
-  PostgresEnumStorageEntry,
-  StorageTypeInstance,
-} from '@prisma-next/sql-contract/types';
+import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type {
   ComposedAuthoringHelpers,
   ContractInput,
@@ -18,7 +15,7 @@ import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 type SqlFamily = typeof sqlFamilyPack;
 type PostgresPack = typeof postgresPack;
 
-type TypesConstraint = Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+type TypesConstraint = Record<string, StorageTypeInstance>;
 type ModelsConstraint = Record<string, ModelLike>;
 type EnumsConstraint = Record<string, EnumTypeHandle>;
 

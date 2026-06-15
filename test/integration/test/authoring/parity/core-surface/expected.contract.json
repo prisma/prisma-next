@@ -16,6 +16,21 @@
   "domain": {
     "namespaces": {
       "public": {
+        "enum": {
+          "Role": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "USER",
+                "value": "USER"
+              },
+              {
+                "name": "ADMIN",
+                "value": "ADMIN"
+              }
+            ]
+          }
+        },
         "models": {
           "Post": {
             "fields": {
@@ -120,8 +135,14 @@
               "role": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/enum@1",
+                  "codecId": "pg/text@1",
                   "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "Role",
+                  "namespaceId": "public",
+                  "plane": "domain"
                 }
               }
             },
@@ -226,6 +247,18 @@
               ]
             },
             "user": {
+              "checks": [
+                {
+                  "column": "role",
+                  "name": "user_role_check",
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Role",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                }
+              ],
               "columns": {
                 "createdAt": {
                   "codecId": "pg/timestamptz@1",
@@ -266,10 +299,15 @@
                   "nullable": true
                 },
                 "role": {
-                  "codecId": "pg/enum@1",
-                  "nativeType": "Role",
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
                   "nullable": false,
-                  "typeRef": "Role"
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Role",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
                 }
               },
               "foreignKeys": [],
@@ -284,12 +322,9 @@
               ]
             }
           },
-          "type": {
+          "valueSet": {
             "Role": {
-              "codecId": "pg/enum@1",
-              "kind": "postgres-enum",
-              "name": "Role",
-              "nativeType": "Role",
+              "kind": "valueSet",
               "values": ["USER", "ADMIN"]
             }
           }
@@ -297,7 +332,7 @@
         "id": "public"
       }
     },
-    "storageHash": "sha256:528ad84abab0c8dd497cbc7b64927b290466b64b951bbea7d2365b411675d43b",
+    "storageHash": "sha256:630275c145f45ee2e67fe0fa4f21324b1e328bdf620a0a3c9dfbacd6509526d4",
     "types": {
       "Email": {
         "codecId": "pg/text@1",

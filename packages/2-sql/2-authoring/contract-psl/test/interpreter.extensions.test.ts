@@ -7,7 +7,6 @@ import {
   pgvectorExtensionPack,
   postgresScalarTypeDescriptors,
   postgresTarget,
-  testEnumEntityContributions,
 } from './fixtures';
 
 const baseInput = {
@@ -134,61 +133,6 @@ model Document {
     expect(result.value.extensionPacks).toMatchObject({
       pgvector: {
         version: pgvectorExtensionPack.version,
-      },
-    });
-  });
-
-  it('instantiates enum and pgvector descriptors from shared authoring contributions', () => {
-    const document = parsePslDocument({
-      schema: `enum Role {
-  USER
-  ADMIN
-}
-
-types {
-  Embedding1536 = pgvector.Vector(1536)
-}
-
-model Document {
-  id Int @id
-  role Role
-  embedding Embedding1536
-}
-`,
-      sourceId: 'schema.prisma',
-    });
-
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      document,
-      composedExtensionPacks: ['pgvector'],
-      authoringContributions: {
-        entityTypes: testEnumEntityContributions,
-        type: {
-          pgvector: {
-            Vector: {
-              kind: 'typeConstructor',
-              args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, maximum: 2000 }],
-              output: {
-                codecId: 'custom/vector@1',
-                nativeType: 'vector',
-                typeParams: {
-                  length: { kind: 'arg', index: 0 },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(documentScopedTypes(result.value)).toMatchObject({
-      Embedding1536: {
-        codecId: 'custom/vector@1',
-        nativeType: 'vector',
-        typeParams: { length: 1536 },
       },
     });
   });

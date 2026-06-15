@@ -1,0 +1,101 @@
+[
+  {
+    "id": "data_migration.convert-user-kind-to-text",
+    "label": "Convert \"user\".\"kind\" from native enum to text",
+    "summary": "Rewrites stored \"user_type\" enum labels as plain text (USING \"kind\"::text); the value set moves to a CHECK constraint",
+    "operationClass": "data",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "kind",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure \"kind\" currently has the native enum type \"user_type\"",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'kind'\n    AND udt_name = 'user_type'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "alter \"kind\" to text, casting stored enum labels",
+        "sql": "ALTER TABLE \"public\".\"user\" ALTER COLUMN \"kind\" TYPE text USING \"kind\"::text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify \"kind\" has type \"text\"",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'kind'\n    AND udt_name = 'text'\n)"
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.user.user_kind_check",
+    "label": "Add check constraint \"user_kind_check\" on \"user\".\"kind\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "user_kind_check",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"user_kind_check\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["user_kind_check", "public", "\"public\".\"user\""]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"user_kind_check\"",
+        "sql": "ALTER TABLE \"public\".\"user\" ADD CONSTRAINT \"user_kind_check\" CHECK (\"kind\" IN ('admin', 'user'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"user_kind_check\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["user_kind_check", "public", "\"public\".\"user\""]
+      }
+    ]
+  },
+  {
+    "id": "dropType.user_type",
+    "label": "Drop type user_type",
+    "summary": "Drops the native enum type \"user_type\"; its value set is now enforced by \"user_kind_check\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "type",
+        "name": "user_type"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure type \"user_type\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM pg_type t\n  JOIN pg_namespace n ON t.typnamespace = n.oid\n  WHERE n.nspname = 'public'\n    AND t.typname = 'user_type'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop type \"user_type\"",
+        "sql": "DROP TYPE \"public\".\"user_type\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify type \"user_type\" does not exist",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM pg_type t\n  JOIN pg_namespace n ON t.typnamespace = n.oid\n  WHERE n.nspname = 'public'\n    AND t.typname = 'user_type'\n)"
+      }
+    ]
+  }
+]

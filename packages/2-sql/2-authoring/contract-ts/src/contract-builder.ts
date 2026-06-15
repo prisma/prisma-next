@@ -7,11 +7,7 @@ import type {
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import type {
-  PostgresEnumStorageEntry,
-  SqlNamespaceTablesInput,
-  StorageTypeInstance,
-} from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceTablesInput, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { buildSqlContractFromDefinition } from './build-contract';
@@ -55,7 +51,7 @@ type ModelLike = {
 type ContractDefinition<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
-  Types extends Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+  Types extends Record<string, StorageTypeInstance>,
   Models extends Record<string, ModelLike>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Naming extends ContractInput['naming'] | undefined,
@@ -107,7 +103,7 @@ type ContractScaffold<
 type ContractFactory<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
-  Types extends Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+  Types extends Record<string, StorageTypeInstance>,
   Models extends Record<string, ModelLike>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Enums extends Record<string, EnumTypeHandle> = Record<string, EnumTypeHandle>,
@@ -304,10 +300,7 @@ function buildContractFromDsl<Definition extends ContractInput>(
 // Input for buildBoundContract — all fields from ContractInput except family/target
 // (those are injected by the builder, pre-bound at the call site).
 type BoundDefinitionInput<
-  Types extends Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = Record<
-    never,
-    never
-  >,
+  Types extends Record<string, StorageTypeInstance> = Record<never, never>,
   Models extends Record<string, ModelLike> = Record<never, never>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
   Naming extends ContractInput['naming'] | undefined = undefined,
@@ -361,7 +354,7 @@ export function buildBoundContract<
   const F extends FamilyPackRef<string>,
   const T extends TargetPackRef<'sql', string>,
   const Definition extends BoundDefinitionInput<
-    Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+    Record<string, StorageTypeInstance>,
     Record<string, ModelLike>,
     Record<string, ExtensionPackRef<'sql', string>> | undefined,
     ContractInput['naming'] | undefined,
@@ -382,7 +375,7 @@ export function buildBoundContract<
   const F extends FamilyPackRef<string>,
   const T extends TargetPackRef<'sql', string>,
   const Definition extends BoundDefinitionInput<
-    Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+    Record<string, StorageTypeInstance>,
     Record<string, ModelLike>,
     Record<string, ExtensionPackRef<'sql', string>> | undefined,
     ContractInput['naming'] | undefined,
@@ -391,7 +384,7 @@ export function buildBoundContract<
     readonly string[] | undefined
   >,
   const Built extends {
-    readonly types?: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+    readonly types?: Record<string, StorageTypeInstance>;
     readonly models?: Record<string, ModelLike>;
     readonly enums?: Record<string, EnumTypeHandle>;
   },
@@ -416,7 +409,7 @@ export function buildBoundContract(
           Record<string, ExtensionPackRef<'sql', string>> | undefined
         >,
       ) => {
-        readonly types?: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+        readonly types?: Record<string, StorageTypeInstance>;
         readonly models?: Record<string, ModelLike>;
         readonly enums?: Record<string, EnumTypeHandle>;
       })
@@ -447,10 +440,7 @@ export function buildBoundContract(
 export function defineContract<
   const Family extends FamilyPackRef<string>,
   const Target extends TargetPackRef<'sql', string>,
-  const Types extends Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = Record<
-    never,
-    never
-  >,
+  const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
   const Models extends Record<string, ModelLike> = Record<never, never>,
   const ExtensionPacks extends
     | Record<string, ExtensionPackRef<'sql', string>>
@@ -490,10 +480,7 @@ export function defineContract<
 export function defineContract<
   const Family extends FamilyPackRef<string>,
   const Target extends TargetPackRef<'sql', string>,
-  const Types extends Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = Record<
-    never,
-    never
-  >,
+  const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
   const Models extends Record<string, ModelLike> = Record<never, never>,
   const ExtensionPacks extends
     | Record<string, ExtensionPackRef<'sql', string>>
@@ -535,7 +522,7 @@ export function defineContract(
   factory?: ContractFactory<
     FamilyPackRef<string>,
     TargetPackRef<'sql', string>,
-    Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+    Record<string, StorageTypeInstance>,
     Record<string, ModelLike>,
     Record<string, ExtensionPackRef<'sql', string>> | undefined
   >,

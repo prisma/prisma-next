@@ -1,10 +1,6 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
-import {
-  buildSqlNamespace,
-  type PostgresEnumStorageEntry,
-  type SqlNamespaceTablesInput,
-} from '@prisma-next/sql-contract/types';
+
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
 import { modelsOf } from './contract-test-helpers';
@@ -27,7 +23,7 @@ describe('shared contract definition lowering', () => {
       storageTypes: {
         Role: {
           kind: 'codec-instance',
-          codecId: 'pg/enum@1',
+          codecId: 'app/test-enum@1',
           nativeType: 'role',
           typeParams: { values: ['USER', 'ADMIN'] },
         },
@@ -52,7 +48,7 @@ describe('shared contract definition lowering', () => {
               fieldName: 'role',
               columnName: 'role',
               descriptor: {
-                codecId: 'pg/enum@1',
+                codecId: 'app/test-enum@1',
                 nativeType: 'role',
                 typeRef: 'Role',
               },
@@ -147,7 +143,7 @@ describe('shared contract definition lowering', () => {
 
     expect(documentScopedTypes(contract)?.['Role']).toEqual({
       kind: 'codec-instance',
-      codecId: 'pg/enum@1',
+      codecId: 'app/test-enum@1',
       nativeType: 'role',
       typeParams: { values: ['USER', 'ADMIN'] },
     });
@@ -365,55 +361,6 @@ describe('shared contract definition lowering', () => {
     ).toThrow(
       /Contract semantic validation failed:.*primary key column "id".*primary key columns must be NOT NULL/,
     );
-  });
-
-  it('routes namespaceTypes enums to the createNamespace factory as second argument', () => {
-    const collectedEnumTypes: Record<string, Record<string, PostgresEnumStorageEntry>> = {};
-    const contract = buildSqlContractFromDefinition({
-      target: postgresTargetPack,
-      createNamespace: (
-        input: SqlNamespaceTablesInput,
-        enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
-      ) => {
-        if (enumTypes && Object.keys(enumTypes).length > 0) {
-          collectedEnumTypes[input.id] = { ...(collectedEnumTypes[input.id] ?? {}), ...enumTypes };
-        }
-        return buildSqlNamespace(input);
-      },
-      namespaceTypes: {
-        auth: {
-          user_type: {
-            kind: 'postgres-enum',
-            name: 'user_type',
-            nativeType: 'user_type',
-            values: ['admin', 'user'],
-            codecId: 'pg/enum@1',
-          },
-        },
-      },
-      models: [
-        {
-          modelName: 'User',
-          tableName: 'users',
-          namespaceId: 'auth',
-          fields: [
-            {
-              fieldName: 'id',
-              columnName: 'id',
-              descriptor: { codecId: 'pg/text@1', nativeType: 'text' },
-              nullable: false,
-            },
-          ],
-          id: { columns: ['id'] },
-        },
-      ],
-    });
-
-    expect(collectedEnumTypes['auth']).toMatchObject({
-      user_type: { kind: 'postgres-enum', values: ['admin', 'user'] },
-    });
-    expect(collectedEnumTypes['public']).toBeUndefined();
-    expect(contract.storage.namespaces['auth']).toBeDefined();
   });
 });
 

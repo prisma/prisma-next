@@ -43,6 +43,8 @@ export interface CodecDescriptor<P = void> {
   readonly isParameterized: boolean;
   /** Emit-path string renderer for `contract.d.ts`. Returns the TypeScript output type expression for given params (e.g. `Vector<1536>`). Optional; absent renderers cause the emitter to fall back to the codec's base output type. Non-parameterized codecs typically omit it. */
   readonly renderOutputType?: (params: P) => string | undefined;
+  /** Emit-path string renderer for the `contract.d.ts` *input* position (create/update values). Returns the TypeScript input type expression for given params. Optional; absent renderers fall back to the codec's base input type. A codec supplies this when its write type is narrower than the generic codec input — e.g. an enum whose input should be the literal member union, not `string`. */
+  readonly renderInputType?: (params: P) => string | undefined;
   /** The curried higher-order codec. For non-parameterized codecs, the factory is constant — every call returns the same shared codec instance. For parameterized codecs, the factory is called once per `storage.types` instance (or once per inline-`typeParams` column), with `ctx` carrying the column set the resulting codec serves. */
   readonly factory: (params: P) => (ctx: CodecInstanceContext) => Codec;
 }
@@ -77,6 +79,9 @@ export abstract class CodecDescriptorImpl<TParams = void> implements CodecDescri
 
   /** Optional emit-path string renderer for `contract.d.ts`. Returns the TypeScript output type expression for the given params (e.g. `Vector<1536>`). Non-parameterized codecs typically omit it. */
   renderOutputType?(params: TParams): string | undefined;
+
+  /** Optional emit-path string renderer for the `contract.d.ts` input position. Returns the TypeScript input type expression for the given params; supplied when the write type is narrower than the generic codec input (e.g. an enum's literal member union). */
+  renderInputType?(params: TParams): string | undefined;
 
   /**
    * Materialize a curried codec factory for the given params. Concrete subclasses override with a typed return type (e.g. `factory<N>(params: { length: N }): (ctx) => VectorCodec<N>`); per-codec helpers read the typed return at the *direct* call site, which is what preserves method-level generics. Type extraction (e.g. `ReturnType<D['factory']>`) widens method generics to their constraint — that's why the column-helper surface is per-codec, not polymorphic.
