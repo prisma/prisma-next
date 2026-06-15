@@ -285,7 +285,7 @@ export function createNamespaceEntrySchema(
           expected: `entries["${key}"] in namespace "${ns.id}" must be an object`,
         });
       }
-      const entrySchema = registry.get(key)!;
+      const entrySchema = castAs<Type<unknown>>(registry.get(key));
       for (const [, value] of Object.entries(innerMap)) {
         const parsed = entrySchema(value);
         if (parsed instanceof type.errors) {
