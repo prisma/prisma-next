@@ -134,7 +134,10 @@ export abstract class MongoContractSerializerBase<TContract>
     const hydratedNamespaces = Object.fromEntries(
       Object.entries(rawNamespaces).map(([nsId, nsEnvelope]) => {
         const hydratedEntries = dispatchMongoEntriesToRegistry(
-          nsEnvelope.entries as Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+          blindCast<
+            Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+            'nsEnvelope.entries has been validated by the Mongo contract schema before hydration'
+          >(nsEnvelope.entries),
           this.entriesRegistry,
           nsId,
         );
