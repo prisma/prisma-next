@@ -1,4 +1,4 @@
-import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
+import type { ContractEnum, ContractField, ContractValueObject } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
 import { deriveJsonSchema, derivePolymorphicJsonSchema } from '../src/derive-json-schema';
@@ -31,6 +31,19 @@ const mongoCodecLookup: CodecLookup = {
 
 function scalarField(codecId: string, nullable = false): ContractField {
   return { type: { kind: 'scalar', codecId }, nullable };
+}
+
+function enumField(codecId: string, enumName: string, nullable = false): ContractField {
+  return {
+    type: { kind: 'scalar', codecId },
+    nullable,
+    valueSet: {
+      plane: 'domain',
+      entityKind: 'enum',
+      namespaceId: '__unbound__',
+      entityName: enumName,
+    },
+  };
 }
 
 function arrayField(codecId: string, nullable = false): ContractField {
@@ -452,5 +465,104 @@ describe('derivePolymorphicJsonSchema', () => {
     const oneOf = result.jsonSchema['oneOf'] as Record<string, Record<string, unknown>>[];
     const branchProps = oneOf[0]!['properties'] as Record<string, unknown>;
     expect(branchProps['_id']).toEqual({ bsonType: 'objectId' });
+  });
+});
+
+describe('deriveJsonSchema — enum fields', () => {
+  const roleEnum: ContractEnum = {
+    codecId: 'mongo/string@1',
+    members: [
+      { name: 'User', value: 'user' },
+      { name: 'Admin', value: 'admin' },
+    ],
+  };
+
+  const enums: Record<string, ContractEnum> = { Role: roleEnum };
+
+  it('emits enum: [...values] in declaration order for an enum-valueSet field', () => {
+    const result = deriveJsonSchema(
+      {
+        _id: scalarField('mongo/objectId@1'),
+        role: enumField('mongo/string@1', 'Role'),
+      },
+      undefined,
+      mongoCodecLookup,
+      enums,
+    );
+
+    const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
+    expect(props['role']).toEqual({ bsonType: 'string', enum: ['user', 'admin'] });
+    expect(result.validationLevel).toBe('strict');
+  });
+
+  it('omits enum keyword for non-enum scalar fields', () => {
+    const result = deriveJsonSchema(
+      {
+        _id: scalarField('mongo/objectId@1'),
+        name: scalarField('mongo/string@1'),
+      },
+      undefined,
+      mongoCodecLookup,
+      enums,
+    );
+
+    const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
+    expect(props['name']).toEqual({ bsonType: 'string' });
+    expect(props['name']).not.toHaveProperty('enum');
+  });
+
+  it('nullable enum field carries enum keyword alongside null bsonType', () => {
+    const result = deriveJsonSchema(
+      {
+        _id: scalarField('mongo/objectId@1'),
+        role: enumField('mongo/string@1', 'Role', true),
+      },
+      undefined,
+      mongoCodecLookup,
+      enums,
+    );
+
+    const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
+    expect(props['role']).toEqual({ bsonType: ['null', 'string'], enum: ['user', 'admin'] });
+  });
+
+  it('preserves member value declaration order', () => {
+    const orderedEnum: ContractEnum = {
+      codecId: 'mongo/string@1',
+      members: [
+        { name: 'C', value: 'c' },
+        { name: 'A', value: 'a' },
+        { name: 'B', value: 'b' },
+      ],
+    };
+
+    const result = deriveJsonSchema(
+      {
+        _id: scalarField('mongo/objectId@1'),
+        status: enumField('mongo/string@1', 'Status'),
+      },
+      undefined,
+      mongoCodecLookup,
+      { Status: orderedEnum },
+    );
+
+    const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
+    expect(props['status']?.['enum']).toEqual(['c', 'a', 'b']);
+  });
+
+  it('skips enum injection when enumResolver does not contain the referenced enum', () => {
+    const result = deriveJsonSchema(
+      {
+        _id: scalarField('mongo/objectId@1'),
+        role: enumField('mongo/string@1', 'UnknownEnum'),
+      },
+      undefined,
+      mongoCodecLookup,
+      enums,
+    );
+
+    const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
+    expect(props['role']).toEqual({ bsonType: 'string' });
+    expect(props['role']).not.toHaveProperty('enum');
   });
 });

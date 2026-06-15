@@ -1237,9 +1237,15 @@ export function interpretPslDocumentToMongoContract(
         variantEntries,
         valueObjects,
         codecLookup,
+        builtEnums,
       );
     } else {
-      coll['validator'] = deriveJsonSchema(modelEntry.fields, valueObjects, codecLookup);
+      coll['validator'] = deriveJsonSchema(
+        modelEntry.fields,
+        valueObjects,
+        codecLookup,
+        builtEnums,
+      );
     }
   }
 

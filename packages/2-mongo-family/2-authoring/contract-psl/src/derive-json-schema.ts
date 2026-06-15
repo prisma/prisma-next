@@ -1,4 +1,4 @@
-import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
+import type { ContractEnum, ContractField, ContractValueObject } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { MongoValidator } from '@prisma-next/mongo-contract';
 
@@ -13,26 +13,36 @@ function fieldToBsonSchema(
   field: ContractField,
   valueObjects: Record<string, ContractValueObject> | undefined,
   codecLookup: CodecLookup | undefined,
+  enums: Record<string, ContractEnum> | undefined,
 ): Record<string, unknown> | undefined {
   if (field.type.kind === 'scalar') {
     const bsonType = resolveBsonType(field.type.codecId, codecLookup);
     if (!bsonType) return undefined;
 
+    let schema: Record<string, unknown>;
+
     if ('many' in field && field.many) {
-      return { bsonType: 'array', items: { bsonType } };
+      schema = { bsonType: 'array', items: { bsonType } };
+    } else if (field.nullable) {
+      schema = { bsonType: ['null', bsonType] };
+    } else {
+      schema = { bsonType };
     }
 
-    if (field.nullable) {
-      return { bsonType: ['null', bsonType] };
+    if (field.valueSet?.entityKind === 'enum') {
+      const contractEnum = enums?.[field.valueSet.entityName];
+      if (contractEnum) {
+        schema['enum'] = contractEnum.members.map((m) => m.value);
+      }
     }
 
-    return { bsonType };
+    return schema;
   }
 
   if (field.type.kind === 'valueObject') {
     const vo = valueObjects?.[field.type.name];
     if (!vo) return undefined;
-    const voSchema = deriveObjectSchema(vo.fields, valueObjects, codecLookup);
+    const voSchema = deriveObjectSchema(vo.fields, valueObjects, codecLookup, enums);
     if ('many' in field && field.many) {
       return { bsonType: 'array', items: voSchema };
     }
@@ -49,12 +59,13 @@ function deriveObjectSchema(
   fields: Record<string, ContractField>,
   valueObjects: Record<string, ContractValueObject> | undefined,
   codecLookup: CodecLookup | undefined,
+  enums: Record<string, ContractEnum> | undefined,
 ): Record<string, unknown> {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
 
   for (const [fieldName, field] of Object.entries(fields)) {
-    const schema = fieldToBsonSchema(field, valueObjects, codecLookup);
+    const schema = fieldToBsonSchema(field, valueObjects, codecLookup, enums);
     if (schema) {
       properties[fieldName] = schema;
       if (!field.nullable) {
@@ -66,8 +77,6 @@ function deriveObjectSchema(
   const result: Record<string, unknown> = {
     bsonType: 'object',
     properties,
-    // Closed by default: documents carrying fields not declared in `properties`
-    // are rejected at every level (top-level collections and nested value objects).
     additionalProperties: false,
   };
   if (required.length > 0) {
@@ -84,9 +93,10 @@ export function deriveJsonSchema(
   fields: Record<string, ContractField>,
   valueObjects?: Record<string, ContractValueObject>,
   codecLookup?: CodecLookup,
+  enums?: Record<string, ContractEnum>,
 ): MongoValidator {
   return new MongoValidator({
-    jsonSchema: deriveObjectSchema(fields, valueObjects, codecLookup),
+    jsonSchema: deriveObjectSchema(fields, valueObjects, codecLookup, enums),
     validationLevel: 'strict',
     validationAction: 'error',
   });
@@ -103,8 +113,9 @@ export function derivePolymorphicJsonSchema(
   variants: readonly PolymorphicVariant[],
   valueObjects?: Record<string, ContractValueObject>,
   codecLookup?: CodecLookup,
+  enums?: Record<string, ContractEnum>,
 ): MongoValidator {
-  const baseSchema = deriveObjectSchema(baseFields, valueObjects, codecLookup);
+  const baseSchema = deriveObjectSchema(baseFields, valueObjects, codecLookup, enums);
   const baseProperties = isRecord(baseSchema['properties']) ? baseSchema['properties'] : {};
 
   const oneOf: Record<string, unknown>[] = [];
@@ -119,7 +130,7 @@ export function derivePolymorphicJsonSchema(
     const variantProperties: Record<string, unknown> = {};
     const variantRequired: string[] = [discriminatorField];
     for (const [name, field] of Object.entries(variantOnlyFields)) {
-      const schema = fieldToBsonSchema(field, valueObjects, codecLookup);
+      const schema = fieldToBsonSchema(field, valueObjects, codecLookup, enums);
       if (schema) {
         variantProperties[name] = schema;
         if (!field.nullable) {
@@ -128,11 +139,6 @@ export function derivePolymorphicJsonSchema(
       }
     }
 
-    // `additionalProperties: false` only sees the `properties` of the schema
-    // object it sits on — it does not look into sibling `oneOf` branches. Each
-    // branch is validated independently, so a closed branch must list the base
-    // properties too; otherwise it would reject the base fields. The
-    // discriminator is constrained to this variant's value.
     const entry: Record<string, unknown> = {
       properties: {
         ...baseProperties,
@@ -146,9 +152,6 @@ export function derivePolymorphicJsonSchema(
     oneOf.push(entry);
   }
 
-  // The top-level schema stays open: closure is enforced by the closed branches.
-  // Keeping `additionalProperties: false` here would reject every variant-only
-  // field, since the top-level `properties` only lists base fields.
   const jsonSchema = { ...baseSchema };
   delete jsonSchema['additionalProperties'];
   if (oneOf.length > 0) {
