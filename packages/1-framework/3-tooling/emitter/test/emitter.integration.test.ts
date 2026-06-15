@@ -233,16 +233,17 @@ describe('emitter integration', () => {
   );
 
   it(
-    'emits an enum-backed field as the codec channel and emits the ref + enum block it resolves from',
+    'emits an enum-backed field as a ref-following union in FieldOutputTypes/FieldInputTypes',
     async () => {
       // Emit-then-consume proof. A real consumer reads the EMITTED contract.d.ts.
-      // After TML-2886 U3 the emitter no longer bakes the enum value union into
-      // `FieldOutputTypes`/`FieldInputTypes`: an enum-backed field's typemap entry
-      // is the plain codec channel, and the value union is supplied at the lane
-      // level by following the emitted `valueSet` ref. This asserts the map carries
-      // the codec channel for the enum field, and that the two ref-following inputs
-      // are present in the emitted text — the storage column's `valueSet` ref and
-      // the domain enum block with literal member tuples.
+      // The emitter renders an enum-backed field's `FieldOutputTypes`/`FieldInputTypes`
+      // entry as a type expression that FOLLOWS the field's domain `valueSet` ref into
+      // the emitted domain enum block — `ContractBase['domain']['namespaces'][ns]
+      // ['enum'][Name]['members'][number]['value']` — so the entry resolves to the
+      // literal member-value union AND is sourced from the ref (TML-2886). This asserts
+      // the map carries that ref-following expression for the enum field (not codec
+      // output, not a baked literal), the non-enum field stays on the codec channel,
+      // and the domain enum block + field ref it resolves through are present.
       const ir = createTestContract({
         models: {
           Post: {
@@ -328,20 +329,24 @@ describe('emitter integration', () => {
         result.contractDts.indexOf('export type TypeMaps'),
       );
 
-      // The enum union is no longer baked into the typemap — the entry is the
-      // plain codec channel, exactly like the non-enum `title` field.
-      expect(outputMap).toContain("readonly priority: CodecTypes['pg/text@1']['output']");
+      // The enum field's entry follows its ref into the emitted domain enum block —
+      // it is neither a baked literal nor codec output. The non-enum `title` field
+      // stays on the codec channel.
+      const priorityUnion =
+        "ContractBase['domain']['namespaces']['__unbound__']['enum']['Priority']['members'][number]['value']";
+      expect(outputMap).toContain(`readonly priority: ${priorityUnion}`);
+      expect(outputMap).not.toContain("readonly priority: CodecTypes['pg/text@1']['output']");
       expect(outputMap).not.toContain("readonly priority: 'low' | 'high' | 'urgent'");
       expect(outputMap).toContain("readonly title: CodecTypes['pg/text@1']['output']");
 
-      expect(inputMap).toContain("readonly priority: CodecTypes['pg/text@1']['input']");
-      expect(inputMap).not.toContain("readonly priority: 'low' | 'high' | 'urgent'");
+      expect(inputMap).toContain(`readonly priority: ${priorityUnion}`);
+      expect(inputMap).not.toContain("readonly priority: CodecTypes['pg/text@1']['input']");
 
       // The ref-following inputs this emitter owns are present: the domain field's
       // `valueSet` ref (the framework emitter renders the model field literal) and
-      // the domain enum block with literal member tuples the ORM lane resolves the
-      // union from. (Storage-column ref rendering belongs to the SQL-family emitter
-      // and is covered there; the mock SPI here emits an empty storage stub.)
+      // the domain enum block with literal member tuples the entry resolves through.
+      // (Storage-column ref rendering belongs to the SQL-family emitter and is
+      // covered there; the mock SPI here emits an empty storage stub.)
       expect(result.contractDts).toContain("readonly entityKind: 'enum'");
       expect(result.contractDts).toContain("readonly entityName: 'Priority'");
       expect(result.contractDts).toContain("{ readonly name: 'Low'; readonly value: 'low' }");

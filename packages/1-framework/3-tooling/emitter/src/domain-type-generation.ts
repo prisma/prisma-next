@@ -296,6 +296,32 @@ export type FieldTypeParamsResolver = (
   model: ContractModelBase,
 ) => Record<string, unknown> | undefined;
 
+/**
+ * The type-name of the contract-base alias the contract.d.ts emitter defines
+ * (see `generate-contract-dts.ts`). Enum field entries in `FieldOutputTypes` /
+ * `FieldInputTypes` follow their domain `valueSet` ref into this alias's emitted
+ * domain enum block, so the entry resolves to the literal member-value union
+ * sourced from the ref — not an emit-time-baked literal and not codec output.
+ * `FieldOutputTypes` is emitted above `ContractBase` in the same module; TS
+ * resolves the forward reference, and `ContractBase` never references the field
+ * maps, so there is no circularity.
+ */
+const CONTRACT_BASE_TYPE_NAME = 'ContractBase';
+
+/**
+ * Renders the type expression that follows a domain enum field's `valueSet` ref
+ * to its member-value union, indexing the emitted domain enum block:
+ * `ContractBase['domain']['namespaces'][ns]['enum'][Name]['members'][number]['value']`.
+ * Returns `undefined` when the field carries no domain-enum ref.
+ */
+function renderEnumRefUnion(field: ContractField): string | undefined {
+  const ref = field.valueSet;
+  if (!ref || ref.entityKind !== 'enum') return undefined;
+  const ns = serializeValue(ref.namespaceId);
+  const name = serializeValue(ref.entityName);
+  return `${CONTRACT_BASE_TYPE_NAME}['domain']['namespaces'][${ns}]['enum'][${name}]['members'][number]['value']`;
+}
+
 export function resolveFieldType(
   field: ContractField,
   codecLookup?: CodecLookup,
@@ -305,6 +331,13 @@ export function resolveFieldType(
 
   switch (type.kind) {
     case 'scalar': {
+      const enumRefUnion = renderEnumRefUnion(field);
+      if (enumRefUnion !== undefined && isSafeTypeExpression(enumRefUnion)) {
+        return {
+          output: applyModifiers(enumRefUnion, field),
+          input: applyModifiers(enumRefUnion, field),
+        };
+      }
       let outputResolved: string | undefined;
       let inputResolved: string | undefined;
       const inlineTypeParams =

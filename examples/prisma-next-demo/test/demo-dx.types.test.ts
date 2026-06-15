@@ -11,7 +11,12 @@ import type { EnumMemberNames, EnumValues } from '@prisma-next/contract/enum-acc
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { expectTypeOf, test } from 'vitest';
-import type { Contract, FieldOutputTypes, TypeMaps } from '../src/prisma/contract.d';
+import type {
+  Contract,
+  FieldInputTypes,
+  FieldOutputTypes,
+  TypeMaps,
+} from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { db } from '../src/prisma/db';
 import type { getPostsByPriority } from '../src/queries/get-posts-by-priority';
@@ -40,15 +45,19 @@ test('SPI deserializeContract output is assignable to visualization shape', () =
   );
 });
 
-test('emitted contract.d.ts: FieldOutputTypes carries the codec channel for Post.priority, not the baked union', () => {
-  // TML-2886 U3 retired the emitter's baked enum override: the enum value union
-  // is no longer baked into FieldOutputTypes. The map entry is now the plain codec
-  // output; the value union is supplied by the lane via ref-following (proved by
-  // the SELECT/getPostsByPriority/INSERT tests below). The map is namespace-nested
-  // (#803), so the entry is read at FieldOutputTypes[ns][model][field].
+test('emitted contract.d.ts: FieldOutputTypes / FieldInputTypes type Post.priority as the value union, not string', () => {
+  // The emitter renders the enum field's typemap entry as a ref-following
+  // expression (it indexes the emitted domain enum block), so the user-facing
+  // `FieldOutputTypes['public']['Post']['priority']` resolves to the literal
+  // member-value union — the enum feature's whole point — sourced from the ref,
+  // not codec output. The map is namespace-nested (#803).
   type PriorityOutput = FieldOutputTypes['public']['Post']['priority'];
-  expectTypeOf<PriorityOutput>().toEqualTypeOf<string>();
-  expectTypeOf<PriorityOutput>().not.toEqualTypeOf<'low' | 'high' | 'urgent'>();
+  expectTypeOf<PriorityOutput>().toEqualTypeOf<'low' | 'high' | 'urgent'>();
+  expectTypeOf<PriorityOutput>().not.toEqualTypeOf<string>();
+
+  type PriorityInput = FieldInputTypes['public']['Post']['priority'];
+  expectTypeOf<PriorityInput>().toEqualTypeOf<'low' | 'high' | 'urgent'>();
+  expectTypeOf<PriorityInput>().not.toEqualTypeOf<string>();
 });
 
 test('emitted contract: db.sql.public.post SELECT priority yields the value union', () => {
@@ -63,6 +72,15 @@ test('emitted contract: getPostsByPriority rows have priority typed as the value
   type RowPriority = Rows[number]['priority'];
   expectTypeOf<RowPriority>().toEqualTypeOf<'low' | 'high' | 'urgent'>();
   expectTypeOf<RowPriority>().not.toEqualTypeOf<string>();
+});
+
+test('emitted contract: db.orm.public.Post ORM read yields priority as the value union', () => {
+  // Through-emit ORM coverage: a real ORM row read through the EMITTED contract.d.ts
+  // (the facade ORM client, not a hand-built fixture) resolves the enum field to its
+  // value union via the ORM lane's domain-enum-block ref-following.
+  type PostRow = NonNullable<Awaited<ReturnType<typeof db.orm.public.Post.first>>>;
+  expectTypeOf<PostRow['priority']>().toEqualTypeOf<'low' | 'high' | 'urgent'>();
+  expectTypeOf<PostRow['priority']>().not.toEqualTypeOf<string>();
 });
 
 test('emitted contract: db.sql.public.post INSERT rejects values outside the union', () => {

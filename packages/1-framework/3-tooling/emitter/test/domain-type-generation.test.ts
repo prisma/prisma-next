@@ -1213,12 +1213,14 @@ describe('resolveFieldType', () => {
   });
 });
 
-describe('resolveFieldType: enum fields are no longer narrowed by the emitter', () => {
-  // The emitter retired its baked enum override (TML-2886 U3). An enum-backed
-  // field's `FieldOutputTypes`/`FieldInputTypes` entry is now the plain codec
-  // channel; the value union is supplied at the lane level by following the
-  // `valueSet` ref (storage column ref for the query lane, domain enum block for
-  // the ORM lane), not baked into the emitted map.
+describe('resolveFieldType: enum fields follow their valueSet ref to the value union', () => {
+  // The emitter renders an enum-backed field's `FieldOutputTypes`/`FieldInputTypes`
+  // entry as a type expression that FOLLOWS the field's domain `valueSet` ref into
+  // the emitted domain enum block (TML-2886). The entry resolves to the literal
+  // member-value union AND is sourced from the ref — not an emit-time-baked literal
+  // (that broke the "type from the ref" invariant) and not codec output (that lost
+  // the union, which is the enum feature's point). The emitted expression indexes
+  // `ContractBase['domain']['namespaces'][ns]['enum'][Name]['members'][number]['value']`.
 
   const priorityRef: ValueSetRef = {
     plane: 'domain',
@@ -1227,29 +1229,33 @@ describe('resolveFieldType: enum fields are no longer narrowed by the emitter', 
     entityName: 'Priority',
   };
 
-  it('emits the codec channel for an enum-backed scalar field, not the value union', () => {
+  const priorityUnion =
+    "ContractBase['domain']['namespaces']['public']['enum']['Priority']['members'][number]['value']";
+
+  it('emits the ref-following union expression for an enum-backed scalar field, not codec output', () => {
     const field: ContractField = {
       nullable: false,
       type: { kind: 'scalar', codecId: 'pg/text@1' },
       valueSet: priorityRef,
     };
     const result = resolveFieldType(field);
-    expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
-    expect(result.input).toBe("CodecTypes['pg/text@1']['input']");
+    expect(result.output).toBe(priorityUnion);
+    expect(result.input).toBe(priorityUnion);
+    expect(result.output).not.toContain("CodecTypes['pg/text@1']");
   });
 
-  it('applies | null to the codec channel for a nullable enum-backed field', () => {
+  it('appends | null to the ref-following union for a nullable enum-backed field', () => {
     const field: ContractField = {
       nullable: true,
       type: { kind: 'scalar', codecId: 'pg/text@1' },
       valueSet: priorityRef,
     };
     const result = resolveFieldType(field);
-    expect(result.output).toBe("CodecTypes['pg/text@1']['output'] | null");
-    expect(result.input).toBe("CodecTypes['pg/text@1']['input'] | null");
+    expect(result.output).toBe(`${priorityUnion} | null`);
+    expect(result.input).toBe(`${priorityUnion} | null`);
   });
 
-  it('emits an enum-backed field across both maps as the codec channel', () => {
+  it('emits an enum-backed field across both maps as the ref-following union', () => {
     const models: Record<string, ContractModel> = {
       Post: {
         fields: {
@@ -1264,9 +1270,9 @@ describe('resolveFieldType: enum fields are no longer narrowed by the emitter', 
       },
     };
     const result = generateBothFieldTypesMaps(models);
-    expect(result.output).toContain("readonly priority: CodecTypes['pg/text@1']['output']");
-    expect(result.input).toContain("readonly priority: CodecTypes['pg/text@1']['input']");
-    expect(result.output).not.toContain("readonly priority: 'low' | 'high' | 'urgent'");
+    expect(result.output).toContain(`readonly priority: ${priorityUnion}`);
+    expect(result.input).toContain(`readonly priority: ${priorityUnion}`);
+    expect(result.output).not.toContain("readonly priority: CodecTypes['pg/text@1']['output']");
   });
 });
 

@@ -74,7 +74,7 @@ export type FieldOutputTypes = {
       readonly id: Char<36>;
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly userId: CodecTypes['pg/text@1']['output'];
-      readonly priority: CodecTypes['pg/text@1']['output'];
+      readonly priority: ContractBase['domain']['namespaces']['public']['enum']['Priority']['members'][number]['value'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly embedding: Vector<1536> | null;
     };
@@ -92,7 +92,7 @@ export type FieldOutputTypes = {
       readonly email: CodecTypes['pg/text@1']['output'];
       readonly displayName: CodecTypes['pg/text@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-      readonly kind: CodecTypes['pg/text@1']['output'];
+      readonly kind: ContractBase['domain']['namespaces']['public']['enum']['user_type']['members'][number]['value'];
       readonly address: AddressOutput | null;
     };
   };
@@ -111,7 +111,7 @@ export type FieldInputTypes = {
       readonly id: CodecTypes['sql/char@1']['input'];
       readonly title: CodecTypes['pg/text@1']['input'];
       readonly userId: CodecTypes['pg/text@1']['input'];
-      readonly priority: CodecTypes['pg/text@1']['input'];
+      readonly priority: ContractBase['domain']['namespaces']['public']['enum']['Priority']['members'][number]['value'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly embedding: CodecTypes['pg/vector@1']['input'] | null;
     };
@@ -129,7 +129,7 @@ export type FieldInputTypes = {
       readonly email: CodecTypes['pg/text@1']['input'];
       readonly displayName: CodecTypes['pg/text@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
-      readonly kind: CodecTypes['pg/text@1']['input'];
+      readonly kind: ContractBase['domain']['namespaces']['public']['enum']['user_type']['members'][number]['value'];
       readonly address: AddressInput | null;
     };
   };
