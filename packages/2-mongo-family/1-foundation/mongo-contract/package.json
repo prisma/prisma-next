@@ -47,6 +47,7 @@
   "exports": {
     ".": "./dist/index.mjs",
     "./canonicalization-hooks": "./dist/canonicalization-hooks.mjs",
+    "./entity-kinds": "./dist/entity-kinds.mjs",
     "./package.json": "./package.json"
   },
   "engines": {

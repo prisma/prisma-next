@@ -1,4 +1,4 @@
-import type { Contract, ContractModel } from '@prisma-next/contract/types';
+import type { Contract, ContractModel, ContractModelBase } from '@prisma-next/contract/types';
 import {
   serializeNamespaceId,
   serializeObjectKey,
@@ -247,7 +247,7 @@ export const sqlEmission = {
     return `{ readonly namespaces: ${namespacesType}${typesClause}; readonly storageHash: ${storageHashTypeName} }`;
   },
 
-  generateModelStorageType(_modelName: string, model: ContractModel): string {
+  generateModelStorageType(_modelName: string, model: ContractModelBase): string {
     const sqlModel = model as ContractModel<SqlModelStorage>;
     const tableName = sqlModel.storage.table;
     const storageFields = sqlModel.storage.fields;
@@ -272,7 +272,7 @@ export const sqlEmission = {
   resolveFieldTypeParams(
     _modelName: string,
     fieldName: string,
-    model: ContractModel,
+    model: ContractModelBase,
     contract: Contract,
   ): Record<string, unknown> | undefined {
     const sqlModel = model as ContractModel<SqlModelStorage>;

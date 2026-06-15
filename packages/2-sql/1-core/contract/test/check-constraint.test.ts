@@ -2,9 +2,10 @@ import type { ValueSetRef } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
+import { composeSqlEntityKinds } from '../src/entity-kinds';
 import { CheckConstraint } from '../src/ir/check-constraint';
 import { StorageTable } from '../src/ir/storage-table';
-import { createSqlEntrySchemaRegistry, createSqlStorageSchema } from '../src/validators';
+import { createSqlStorageSchema } from '../src/validators';
 
 const baseValueSetRef: ValueSetRef = {
   plane: 'storage',
@@ -109,7 +110,7 @@ describe('StorageTable with optional checks', () => {
 });
 
 describe('StorageTableSchema validates checks', () => {
-  const storageSchema = createSqlStorageSchema(createSqlEntrySchemaRegistry());
+  const storageSchema = createSqlStorageSchema(composeSqlEntityKinds());
 
   function makeRawStorage(tableExtra: Record<string, unknown>) {
     return {

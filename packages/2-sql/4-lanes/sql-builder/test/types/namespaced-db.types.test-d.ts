@@ -4,9 +4,9 @@ import type { Contract } from '../fixtures/generated/contract';
 
 declare const db: Db<Contract>;
 
-test('the namespace facet exposes its tables as TableProxy', () => {
-  expectTypeOf(db.public.users).toEqualTypeOf<TableProxy<Contract, 'users'>>();
+test('the namespace facet exposes its tables as TableProxy keyed by namespace coordinate', () => {
+  expectTypeOf(db.public.users).toEqualTypeOf<TableProxy<Contract, 'public', 'users'>>();
   expectTypeOf<Namespace<Contract, 'public'>['users']>().toEqualTypeOf<
-    TableProxy<Contract, 'users'>
+    TableProxy<Contract, 'public', 'users'>
   >();
 });

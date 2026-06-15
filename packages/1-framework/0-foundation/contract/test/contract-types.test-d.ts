@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from 'vitest';
-import type { Contract, ContractModelDefinitions } from '../src/contract-types';
+import type { Contract } from '../src/contract-types';
 import type { CrossReference } from '../src/cross-reference';
 import type { ContractModel, ModelStorageBase } from '../src/domain-types';
 import type { NamespaceId } from '../src/namespace-id';
@@ -58,7 +58,13 @@ type ExampleStorage = StorageBase<'sha256:abc123'> & {
   };
 };
 
-type ExampleContract = Contract<ExampleStorage, ExampleModels>;
+type ExampleContract = Omit<Contract<ExampleStorage>, 'domain'> & {
+  readonly domain: {
+    readonly namespaces: {
+      readonly public: { readonly models: ExampleModels };
+    };
+  };
+};
 
 // ── ContractModel generic storage ────────────────────────────────────────────
 
@@ -78,21 +84,21 @@ test('StorageBase with specific hash extends default StorageBase', () => {
 
 // ── Literal type preservation ────────────────────────────────────────────────
 
-test('preserves model field literal types through TModels', () => {
+test('preserves model field literal types through the domain namespace', () => {
   expectTypeOf<
-    ContractModelDefinitions<ExampleContract>['User']['fields']['id']['type']['kind']
+    ExampleContract['domain']['namespaces']['public']['models']['User']['fields']['id']['type']['kind']
   >().toEqualTypeOf<'scalar'>();
 });
 
-test('preserves relation literal types through TModels', () => {
+test('preserves relation literal types through the domain namespace', () => {
   expectTypeOf<
-    ContractModelDefinitions<ExampleContract>['User']['relations']['posts']['to']
+    ExampleContract['domain']['namespaces']['public']['models']['User']['relations']['posts']['to']
   >().toEqualTypeOf<ExamplePostRef>();
 });
 
-test('preserves model storage bridge literals through TModels', () => {
+test('preserves model storage bridge literals through the domain namespace', () => {
   expectTypeOf<
-    ContractModelDefinitions<ExampleContract>['User']['storage']['table']
+    ExampleContract['domain']['namespaces']['public']['models']['User']['storage']['table']
   >().toEqualTypeOf<'user'>();
 });
 

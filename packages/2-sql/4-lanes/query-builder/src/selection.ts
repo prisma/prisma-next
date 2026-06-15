@@ -1,4 +1,4 @@
-import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   UnboundTables as SqlBuilderUnboundTables,
   TableProxyContract,
@@ -31,7 +31,7 @@ type FieldOutputOverride<
   TContract extends Contract,
   TTableName extends string,
   TColumnName extends string,
-  Models = ContractModelDefinitions<TContract>,
+  Models = TContract['domain']['namespaces'][keyof TContract['domain']['namespaces']]['models'],
   FOT = ExtractFieldOutputTypes<TContract>,
 > = {
   [M in keyof Models & keyof FOT & string]: Models[M] extends {

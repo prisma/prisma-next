@@ -1,15 +1,16 @@
 import {
   freezeNode,
+  hydrateNamespaceEntities,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import {
-  type SqlNamespaceTablesInput,
-  type SqlStorage,
+import { composeSqlEntityKinds } from '@prisma-next/sql-contract/entity-kinds';
+import type {
+  SqlNamespaceEntries,
+  SqlNamespaceTablesInput,
+  SqlStorage,
   StorageTable,
-  type StorageTableInput,
   StorageValueSet,
-  type StorageValueSetInput,
 } from '@prisma-next/sql-contract/types';
 import { type CfExpr, cfExpr } from '@prisma-next/sql-relational-core/contract-free';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -49,50 +50,27 @@ export class PostgresSchema extends NamespaceBase {
 
   declare readonly kind: 'schema';
   readonly id: string;
-  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  readonly entries: SqlNamespaceEntries;
 
   constructor(input: PostgresSchemaInput) {
     super();
     this.id = input.id;
 
-    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
-    let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
-    let valueSet: Readonly<Record<string, StorageValueSet>> | undefined;
-    for (const [kind, rawMap] of Object.entries(input.entries)) {
-      if (kind === 'table') {
-        const tableMap: Record<string, StorageTable> = {};
-        for (const [name, v] of Object.entries(
-          blindCast<
-            Record<string, StorageTableInput>,
-            'entries[table] holds StorageTableInput by construction'
-          >(rawMap),
-        )) {
-          tableMap[name] = new StorageTable(v);
-        }
-        table = Object.freeze(tableMap);
-      } else if (kind === 'valueSet') {
-        const vsMap: Record<string, StorageValueSet> = {};
-        for (const [name, v] of Object.entries(
-          blindCast<
-            Record<string, StorageValueSetInput>,
-            'entries[valueSet] holds StorageValueSetInput by construction'
-          >(rawMap),
-        )) {
-          vsMap[name] = new StorageValueSet(v);
-        }
-        if (Object.keys(vsMap).length > 0) {
-          valueSet = Object.freeze(vsMap);
-        }
-      } else {
-        carried[kind] = Object.freeze(rawMap);
-      }
-    }
+    const dispatched = hydrateNamespaceEntities(input.entries, composeSqlEntityKinds(), 'carry');
 
-    this.entries = Object.freeze({
-      ...carried,
-      table,
-      ...ifDefined('valueSet', valueSet),
-    });
+    // Drop an empty valueSet so presence signals non-emptiness.
+    const valueSetRaw = dispatched['valueSet'];
+    const withPresence =
+      valueSetRaw !== undefined && Object.keys(valueSetRaw).length === 0
+        ? { ...dispatched, valueSet: undefined }
+        : dispatched;
+
+    this.entries = Object.freeze(
+      blindCast<
+        SqlNamespaceEntries,
+        'composeSqlEntityKinds() supplies table→StorageTable and valueSet→StorageValueSet descriptors, so this open-dict result holds exactly the typed members SqlNamespaceEntries declares; the descriptor Map erases those per-kind Node types from the return.'
+      >(withPresence),
+    );
     Object.defineProperty(this, 'kind', {
       value: 'schema',
       writable: false,
@@ -103,11 +81,11 @@ export class PostgresSchema extends NamespaceBase {
   }
 
   get table(): Readonly<Record<string, StorageTable>> {
-    return this.entries['table'] ?? Object.freeze({});
+    return this.entries.table ?? Object.freeze({});
   }
 
   get valueSet(): Readonly<Record<string, StorageValueSet>> | undefined {
-    return this.entries['valueSet'] as Readonly<Record<string, StorageValueSet>> | undefined;
+    return this.entries.valueSet;
   }
 
   /**

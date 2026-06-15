@@ -23,7 +23,6 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   Contract as ContractType,
-  ContractModelDefinitions,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -123,41 +122,7 @@ type ContractBase = Omit<
         };
       };
       readonly storageHash: StorageHash;
-    },
-    {
-      readonly Shop: {
-        readonly fields: {
-          readonly id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          };
-          readonly name: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-          readonly location: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
-          };
-          readonly notes: {
-            readonly nullable: true;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: {
-          readonly table: 'shop';
-          readonly namespaceId: 'public';
-          readonly fields: {
-            readonly id: { readonly column: 'id' };
-            readonly name: { readonly column: 'name' };
-            readonly location: { readonly column: 'location' };
-            readonly notes: { readonly column: 'notes' };
-          };
-        };
-      };
-    }
-  >,
+    }>,
   'roots' | 'domain'
 > & {
   readonly target: 'postgres';
@@ -261,7 +226,6 @@ type ContractBase = Omit<
   readonly profileHash: ProfileHash;
 };
 
-export type Models = ContractModelDefinitions<Contract>;
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 

@@ -1,15 +1,16 @@
 import {
   freezeNode,
+  hydrateNamespaceEntities,
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
-import { ifDefined } from '@prisma-next/utils/defined';
+import { composeSqlEntityKinds } from '../entity-kinds';
 import type { SqlNamespace, SqlNamespaceEntries, SqlNamespaceTablesInput } from './sql-storage';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
-import { StorageTable, type StorageTableInput } from './storage-table';
-import { StorageValueSet, type StorageValueSetInput } from './storage-value-set';
+import type { StorageTable } from './storage-table';
+import type { StorageValueSet } from './storage-value-set';
 
 const SQL_NAMESPACE_KIND = 'sql-namespace' as const;
 
@@ -53,38 +54,14 @@ class SqlBoundNamespace extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
-    let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
-    let valueSet: Readonly<Record<string, StorageValueSet>> | undefined;
-    for (const [kind, rawMap] of Object.entries(input.entries)) {
-      if (kind === 'table') {
-        const tableMap: Record<string, StorageTable> = {};
-        for (const [name, v] of Object.entries(
-          blindCast<
-            Record<string, StorageTableInput>,
-            'entries[table] holds StorageTableInput by construction'
-          >(rawMap),
-        )) {
-          tableMap[name] = new StorageTable(v);
-        }
-        table = Object.freeze(tableMap);
-      } else if (kind === 'valueSet') {
-        const vsMap: Record<string, StorageValueSet> = {};
-        for (const [name, v] of Object.entries(
-          blindCast<
-            Record<string, StorageValueSetInput>,
-            'entries[valueSet] holds StorageValueSetInput by construction'
-          >(rawMap),
-        )) {
-          vsMap[name] = new StorageValueSet(v);
-        }
-        valueSet = Object.freeze(vsMap);
-      } else {
-        carried[kind] = Object.freeze(rawMap);
-      }
-    }
+    const dispatched = hydrateNamespaceEntities(input.entries, composeSqlEntityKinds(), 'carry');
 
-    this.entries = Object.freeze({ ...carried, table, ...ifDefined('valueSet', valueSet) });
+    this.entries = Object.freeze(
+      blindCast<
+        SqlNamespaceEntries,
+        'composeSqlEntityKinds() supplies table→StorageTable and valueSet→StorageValueSet descriptors, so this open-dict result holds exactly the typed members SqlNamespaceEntries declares; the descriptor Map erases those per-kind Node types from the return.'
+      >(dispatched),
+    );
     Object.defineProperty(this, 'kind', {
       value: SQL_NAMESPACE_KIND,
       writable: false,

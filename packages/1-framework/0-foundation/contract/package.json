@@ -47,6 +47,7 @@
     "./enum-accessor": "./dist/enum-accessor.mjs",
     "./hashing": "./dist/hashing.mjs",
     "./hashing-utils": "./dist/hashing-utils.mjs",
+    "./is-plain-record": "./dist/is-plain-record.mjs",
     "./resolve-domain-model": "./dist/resolve-domain-model.mjs",
     "./types": "./dist/types.mjs",
     "./validate-domain": "./dist/validate-domain.mjs",

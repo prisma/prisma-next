@@ -1,7 +1,7 @@
 import type { ControlPolicy } from './control-policy';
 import type { CrossReference } from './cross-reference';
 import type { ApplicationDomain } from './domain-envelope';
-import type { ContractModelBase, ContractValueObject } from './domain-types';
+import type { ContractValueObject } from './domain-types';
 import type {
   ExecutionHashBase,
   ExecutionMutationDefault,
@@ -37,21 +37,15 @@ export type ContractExecutionSection<THash extends string = string> = {
  * here — they are handled at the serialization boundary.
  *
  * @template TStorage  Family-specific storage block (extends {@link StorageBase}).
- * @template TModels   Record of model name → {@link ContractModel} with
- *                     family-specific model storage.
  */
-export interface Contract<
-  TStorage extends StorageBase = StorageBase,
-  TModels extends Record<string, ContractModelBase> = Record<string, ContractModelBase>,
-> {
+export interface Contract<TStorage extends StorageBase = StorageBase> {
   readonly target: string;
   readonly targetFamily: string;
   readonly roots: Record<string, CrossReference>;
   /**
    * Application plane (ADR 221): `domain.namespaces.<nsId>.{ models, valueObjects }`.
-   * `TModels` types the union of model entries across namespaces for family DSL inference.
    */
-  readonly domain: ApplicationDomain<TModels>;
+  readonly domain: ApplicationDomain;
   readonly storage: TStorage;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly extensionPacks: Record<string, unknown>;
@@ -60,10 +54,6 @@ export interface Contract<
   readonly meta: Record<string, unknown>;
   readonly defaultControlPolicy?: ControlPolicy;
 }
-
-/** Model definitions union carried on a {@link Contract}'s `TModels` type parameter. */
-export type ContractModelDefinitions<TContract extends Contract> =
-  TContract extends Contract<StorageBase, infer TModels> ? TModels : never;
 
 type ExactlyOneNamespace<T extends Record<string, unknown>> = keyof T extends infer Only extends
   keyof T

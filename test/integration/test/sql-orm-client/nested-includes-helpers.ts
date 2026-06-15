@@ -10,11 +10,14 @@
 // across multiple files keeps each invocation under that threshold
 // while preserving the breadth of the coverage.
 
-import type { ContractModelDefinitions } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import { Collection } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { getTestContext, getTestContract, type TestContract } from './helpers';
 import type { PgIntegrationRuntime } from './runtime-helpers';
+
+type SoleNamespaceModels<T extends Contract> =
+  T['domain']['namespaces'][keyof T['domain']['namespaces']]['models'];
 
 /**
  * Build a `Collection` whose contract carries the given capability
@@ -25,7 +28,7 @@ import type { PgIntegrationRuntime } from './runtime-helpers';
  * flag is inert for include codegen against the same real database.
  */
 export function collectionWithCapabilities<
-  ModelName extends keyof ContractModelDefinitions<TestContract> & string,
+  ModelName extends keyof SoleNamespaceModels<TestContract> & string,
 >(
   runtime: PgIntegrationRuntime,
   modelName: ModelName,

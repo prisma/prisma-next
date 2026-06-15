@@ -1,13 +1,13 @@
 import type { ContractReferenceRelation } from '@prisma-next/contract/types';
 import type {
   ExtractMongoCodecTypes,
-  ExtractMongoFieldInputTypes,
-  ExtractMongoFieldOutputTypes,
   InferModelRow,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoModelsMap,
   MongoTypeMaps,
+  MongoUnboundFieldInputTypes,
+  MongoUnboundFieldOutputTypes,
 } from '@prisma-next/mongo-contract';
 
 type Simplify<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
@@ -44,22 +44,22 @@ export type EmbedRelationKeys<
 type ResolvedOutputRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
-> = string extends keyof ExtractMongoFieldOutputTypes<TContract>
+> = string extends keyof MongoUnboundFieldOutputTypes<TContract>
   ? InferModelRow<TContract, ModelName>
-  : ModelName extends keyof ExtractMongoFieldOutputTypes<TContract>
+  : ModelName extends keyof MongoUnboundFieldOutputTypes<TContract>
     ? {
-        -readonly [K in keyof ExtractMongoFieldOutputTypes<TContract>[ModelName]]: ExtractMongoFieldOutputTypes<TContract>[ModelName][K];
+        -readonly [K in keyof MongoUnboundFieldOutputTypes<TContract>[ModelName]]: MongoUnboundFieldOutputTypes<TContract>[ModelName][K];
       }
     : InferModelRow<TContract, ModelName>;
 
 type ResolvedInputRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
-> = string extends keyof ExtractMongoFieldInputTypes<TContract>
+> = string extends keyof MongoUnboundFieldInputTypes<TContract>
   ? InferModelRow<TContract, ModelName>
-  : ModelName extends keyof ExtractMongoFieldInputTypes<TContract>
+  : ModelName extends keyof MongoUnboundFieldInputTypes<TContract>
     ? {
-        -readonly [K in keyof ExtractMongoFieldInputTypes<TContract>[ModelName]]: ExtractMongoFieldInputTypes<TContract>[ModelName][K];
+        -readonly [K in keyof MongoUnboundFieldInputTypes<TContract>[ModelName]]: MongoUnboundFieldInputTypes<TContract>[ModelName][K];
       }
     : InferModelRow<TContract, ModelName>;
 

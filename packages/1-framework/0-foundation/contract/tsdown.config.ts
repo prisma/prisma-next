@@ -11,5 +11,6 @@ export default defineConfig({
     'src/exports/contract-validation-error.ts',
     'src/exports/hashing.ts',
     'src/exports/hashing-utils.ts',
+    'src/exports/is-plain-record.ts',
   ],
 });

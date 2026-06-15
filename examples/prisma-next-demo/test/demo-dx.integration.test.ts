@@ -11,8 +11,11 @@ import { domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
-import type { Contract, Models } from '../src/prisma/contract.d';
+import type { Contract } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
+
+// Models resolve per-namespace from the domain plane (no flat top-level Models export).
+type Models = Contract['domain']['namespaces']['public']['models'];
 
 describe('demo contract visualization DX', () => {
   it('validated contract has runtime shape needed for visualization', () => {

@@ -1,8 +1,11 @@
-import type { ContractModelDefinitions } from '@prisma-next/contract/types';
 import mongoFamilyPack from '@prisma-next/family-mongo/pack';
 import mongoTargetPack from '@prisma-next/target-mongo/pack';
 import { expectTypeOf } from 'vitest';
 import { defineContract, field, model } from '../../src/exports/contract-builder';
+
+type SoleNamespaceModels<
+  T extends { domain: { namespaces: Record<string, { models: unknown }> } },
+> = T['domain']['namespaces'][keyof T['domain']['namespaces']]['models'];
 
 // @ts-expect-error — family is no longer accepted; the facade pre-binds it
 defineContract({ family: mongoFamilyPack, extensionPacks: undefined });
@@ -22,7 +25,7 @@ const withModel = defineContract({
   },
 });
 expectTypeOf(withModel.target).toEqualTypeOf<'mongo'>();
-expectTypeOf<ContractModelDefinitions<typeof withModel>['User']>().not.toBeNever();
+expectTypeOf<SoleNamespaceModels<typeof withModel>['User']>().not.toBeNever();
 
 // Model-shape inference flows through the return type (factory form)
 const withFactory = defineContract({}, ({ model: m, field: f }) => ({
@@ -31,4 +34,4 @@ const withFactory = defineContract({}, ({ model: m, field: f }) => ({
   },
 }));
 expectTypeOf(withFactory.target).toEqualTypeOf<'mongo'>();
-expectTypeOf<ContractModelDefinitions<typeof withFactory>['Post']>().not.toBeNever();
+expectTypeOf<SoleNamespaceModels<typeof withFactory>['Post']>().not.toBeNever();

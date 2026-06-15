@@ -5,12 +5,12 @@ import type {
 } from '@prisma-next/contract/types';
 import type {
   ExtractMongoCodecTypes,
-  ExtractMongoFieldOutputTypes,
   InferModelRow,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoModelsMap,
   MongoTypeMaps,
+  MongoUnboundFieldOutputTypes,
 } from '@prisma-next/mongo-contract';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
@@ -63,11 +63,11 @@ type ResolvedModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
-> = string extends keyof ExtractMongoFieldOutputTypes<TContract>
+> = string extends keyof MongoUnboundFieldOutputTypes<TContract>
   ? InferModelRow<TContract, ModelName, MongoModelsMap<TContract>[ModelName]['fields'], TCodecTypes>
-  : ModelName extends keyof ExtractMongoFieldOutputTypes<TContract>
+  : ModelName extends keyof MongoUnboundFieldOutputTypes<TContract>
     ? {
-        -readonly [K in keyof ExtractMongoFieldOutputTypes<TContract>[ModelName]]: ExtractMongoFieldOutputTypes<TContract>[ModelName][K];
+        -readonly [K in keyof MongoUnboundFieldOutputTypes<TContract>[ModelName]]: MongoUnboundFieldOutputTypes<TContract>[ModelName][K];
       }
     : InferModelRow<
         TContract,
