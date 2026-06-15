@@ -195,6 +195,7 @@ export function parseExpression(cursor: Cursor): GreenNode | undefined {
     parseNumberLiteralExpr(cursor) ??
     parseArrayLiteral(cursor) ??
     parseObjectLiteralExpr(cursor) ??
+    parseQualifiedFunctionCallExpr(cursor) ??
     parseFunctionCall(cursor) ??
     parseBooleanLiteralExpr(cursor) ??
     parseIdentifierExpr(cursor)
@@ -294,15 +295,12 @@ export function parseObjectField(cursor: Cursor): GreenNode {
   const keyMark = cursor.mark();
   const keyText = cursor.peekToken().text;
   if (cursor.peekKind() === 'Ident') {
-    parseIdentifier(cursor); // identifier key — the only valid key
+    parseIdentifier(cursor); // identifier key
   } else if (cursor.peekKind() === 'StringLiteral') {
-    // String keys are not valid PSL. Flag the key, then still consume it so the
-    // field stays structured and the object/enclosing block don't desync (F04).
-    cursor.diagnostic(
-      'PSL_INVALID_OBJECT_LITERAL',
-      'Object literal keys must be identifiers',
-      keyMark,
-    );
+    // A string-literal key (e.g. `{ "length": 35 }`) is accepted for parity with
+    // `parsePslDocument`; its logical name is the unquoted string. Consuming it
+    // as a `StringLiteralExpr` keeps the key node structured so the field and
+    // enclosing block stay in sync.
     parseStringLiteralExpr(cursor);
   }
   if (cursor.peekKind() === 'Colon') {
@@ -330,6 +328,27 @@ export function parseFunctionCall(cursor: Cursor): GreenNode | undefined {
 }
 
 /**
+ * Parses a namespace-qualified call (`temporal.updatedAt()`) in expression
+ * position — e.g. inside `@default(...)` — into the same {@link FunctionCall}
+ * node the bare and type-annotation forms produce, so `FunctionCallAst.path()`
+ * reads the full `['temporal', 'updatedAt']` chain. A no-op (returns
+ * `undefined`) unless the lookahead is a dot-qualified call, leaving the
+ * `parseExpression` `??` chain to fall through to the bare {@link
+ * parseFunctionCall} and the identifier forms.
+ */
+export function parseQualifiedFunctionCallExpr(cursor: Cursor): GreenNode | undefined {
+  if (!isQualifiedConstructorCall(cursor)) return undefined;
+  cursor.startNode('FunctionCall');
+  parseIdentifier(cursor); // first namespace segment
+  while (cursor.peekKind() === 'Dot' && cursor.peekKind(1) === 'Ident') {
+    cursor.bump(); // Dot
+    parseIdentifier(cursor); // next segment (the last is the call name)
+  }
+  parseParenArgs(cursor);
+  return cursor.finishNode();
+}
+
+/**
  * Lookahead for a namespace-qualified constructor call — `ns.Ctor(`,
  * `a.b.Ctor(`, … — i.e. an identifier chain joined by `.` with at least one dot
  * segment, followed by `(`. The bare `Ctor(` form is owned by
@@ -345,24 +364,6 @@ function isQualifiedConstructorCall(cursor: Cursor): boolean {
     ahead += 2;
   }
   return dots > 0 && cursor.peekKind(ahead) === 'LParen';
-}
-
-/**
- * Parses a namespace-qualified constructor call (`pgvector.Vector(1536)`) into a
- * {@link FunctionCall} node carrying the full identifier chain — the same node
- * kind the bare `Vector(1536)` form produces, so a single `constructorCall()`
- * accessor reads both; the resolver recovers the multi-segment path from the
- * chained identifiers.
- */
-function parseQualifiedConstructorCall(cursor: Cursor): void {
-  cursor.startNode('FunctionCall');
-  parseIdentifier(cursor); // first namespace segment
-  while (cursor.peekKind() === 'Dot' && cursor.peekKind(1) === 'Ident') {
-    cursor.bump(); // Dot
-    parseIdentifier(cursor); // next segment (the last is the constructor name)
-  }
-  parseParenArgs(cursor);
-  cursor.finishNode();
 }
 
 /**
@@ -438,7 +439,7 @@ export function parseTypeAnnotation(cursor: Cursor): GreenNode {
   if (cursor.peekKind() === 'Ident' && cursor.peekKind(1) === 'LParen') {
     parseFunctionCall(cursor); // inline constructor, e.g. Vector(1536)
   } else if (isQualifiedConstructorCall(cursor)) {
-    parseQualifiedConstructorCall(cursor); // qualified constructor, e.g. pgvector.Vector(1536)
+    parseQualifiedFunctionCallExpr(cursor); // qualified constructor, e.g. pgvector.Vector(1536)
   } else if (cursor.peekKind() === 'Ident') {
     parseIdentifier(cursor); // base name or space/namespace segment
     parseQualifierSegments(cursor, 'Colon');

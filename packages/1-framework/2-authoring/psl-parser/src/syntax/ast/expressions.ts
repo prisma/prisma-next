@@ -107,6 +107,10 @@ function decodeStringLiteral(raw: string): string {
         out += '"';
         i += 2;
         continue;
+      case "'":
+        out += "'";
+        i += 2;
+        continue;
       case '\\':
         out += '\\';
         i += 2;
@@ -248,6 +252,27 @@ export class ObjectFieldAst implements AstNode {
         continue;
       }
       return IdentifierAst.cast(child);
+    }
+    return undefined;
+  }
+
+  /**
+   * The field's logical key name, unquoted. An identifier key (`length:`) yields
+   * its text; a string-literal key (`"length":`, accepted for `parsePslDocument`
+   * parity) yields the decoded string. `undefined` when the field carries no key
+   * node.
+   */
+  keyName(): string | undefined {
+    for (const child of this.syntax.children()) {
+      if (!(child instanceof SyntaxNode)) {
+        if (child.kind === 'Colon') break;
+        continue;
+      }
+      const identifier = IdentifierAst.cast(child);
+      if (identifier) return identifier.token()?.text;
+      const stringKey = StringLiteralExprAst.cast(child);
+      if (stringKey) return stringKey.value();
+      return undefined;
     }
     return undefined;
   }

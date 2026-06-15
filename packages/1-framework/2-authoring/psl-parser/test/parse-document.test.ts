@@ -705,22 +705,12 @@ describe('parse() object-literal missing-colon recovery', () => {
     `);
   });
 
-  it('flags a string-literal key inside a block without corrupting the enclosing block', () => {
+  it('accepts a string-literal key inside a block (parsePslDocument parity)', () => {
     const source = 'datasource db {\n  x = { a: 1, "k": 2 }\n}';
     const result = parse(source);
     expect(greenText(result.document.syntax.green)).toBe(source); // round-trip holds
-    // Exactly one diagnostic, flagging the string key — no cascade into the block.
-    expect(result.diagnostics.map((d) => d.code)).toEqual(['PSL_INVALID_OBJECT_LITERAL']);
-    const [diagnostic] = result.diagnostics;
-    expect(diagnostic!.message).toBe('Object literal keys must be identifiers');
-    expect(highlight(result.sourceFile, diagnostic!.range)).toMatchInlineSnapshot(`
-      "
-      datasource db {
-        x = { a: 1, "k": 2 }
-                    ~~~
-      }
-      "
-    `);
+    // String-literal keys are accepted; no diagnostic, no cascade into the block.
+    expect(result.diagnostics).toEqual([]);
 
     // The enclosing datasource block stays intact: one declaration, a block.
     const decls = Array.from(result.document.declarations());

@@ -84,6 +84,25 @@ export class ModelAttributeAst implements AstNode {
   }
 
   name(): IdentifierAst | undefined {
+    if (this.dot()) {
+      let count = 0;
+      for (const child of this.syntax.childNodes()) {
+        if (child.kind === 'Identifier') {
+          count++;
+          if (count === 2) return new IdentifierAst(child);
+        }
+      }
+      return undefined;
+    }
+    return findFirstChild(this.syntax, IdentifierAst.cast);
+  }
+
+  dot(): Token | undefined {
+    return findChildToken(this.syntax, 'Dot');
+  }
+
+  namespaceName(): IdentifierAst | undefined {
+    if (!this.dot()) return undefined;
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 

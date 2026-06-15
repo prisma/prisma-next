@@ -190,7 +190,8 @@ function scanNumber(source: string, pos: number): Token | undefined {
 }
 
 function scanString(source: string, pos: number): Token | undefined {
-  if (source.charAt(pos) !== '"') return undefined;
+  const quote = source.charAt(pos);
+  if (quote !== '"' && quote !== "'") return undefined;
   let end = pos + 1;
   while (end < source.length) {
     const c = source.charAt(end);
@@ -198,7 +199,7 @@ function scanString(source: string, pos: number): Token | undefined {
       end += 2; // skip escape sequence
       continue;
     }
-    if (c === '"') {
+    if (c === quote) {
       end++; // include closing quote
       return { kind: 'StringLiteral', text: source.slice(pos, end) };
     }
@@ -216,24 +217,28 @@ function scanString(source: string, pos: number): Token | undefined {
  * Whether a `StringLiteral` token's text is properly closed. `scanString` emits
  * the same `StringLiteral` kind for both well-formed and unterminated strings —
  * it stops at a newline or EOF when no closing quote is found — so callers that
- * need to distinguish the two ask here.
+ * need to distinguish the two ask here. Both quote styles (`"…"` and `'…'`) are
+ * recognised; the closing quote must match the opening one.
  *
- * Because `scanString` stops at the *first* unescaped `"`, the only quote whose
- * escaping can be in question is the **last character**: the text is terminated
- * iff it opens with `"`, ends with `"`, and that closing `"` is not escaped.
- * Under the `\\`-escapes-the-next-character rule, a `"` is unescaped iff an
- * **even** number of backslashes immediately precede it — each `\\` pair cancels,
- * and an odd run leaves the final `\` escaping the quote. So it suffices to
- * count the trailing backslash run; no full re-scan is needed:
+ * Because `scanString` stops at the *first* unescaped matching quote, the only
+ * quote whose escaping can be in question is the **last character**: the text is
+ * terminated iff it opens with a quote, ends with the same quote, and that
+ * closing quote is not escaped. Under the `\\`-escapes-the-next-character rule, a
+ * quote is unescaped iff an **even** number of backslashes immediately precede it
+ * — each `\\` pair cancels, and an odd run leaves the final `\` escaping the
+ * quote. So it suffices to count the trailing backslash run; no full re-scan is
+ * needed:
  *
  * - `"ok"`  → 0 backslashes (even) → closing quote stands → terminated
- * - `"a\"`  → 1 backslash  (odd)   → the `"` is escaped     → unterminated
+ * - `'a\'`  → 1 backslash  (odd)   → the quote is escaped  → unterminated
  * - `"a\\"` → 2 backslashes (even) → escaped `\`, real `"`  → terminated
  *
- * A lone `"` (length 1) or a text with no closing `"` is unterminated.
+ * A lone quote (length 1) or a text with no matching closing quote is unterminated.
  */
 export function isTerminatedStringLiteral(text: string): boolean {
-  if (text.length < 2 || text.charAt(0) !== '"' || text.charAt(text.length - 1) !== '"') {
+  const quote = text.charAt(0);
+  if (quote !== '"' && quote !== "'") return false;
+  if (text.length < 2 || text.charAt(text.length - 1) !== quote) {
     return false;
   }
   let backslashes = 0;

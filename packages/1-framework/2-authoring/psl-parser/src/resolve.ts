@@ -384,8 +384,10 @@ function resolveFieldAttributes(attributes: Iterable<FieldAttributeAst>): Resolv
 function resolveModelAttributes(attributes: Iterable<ModelAttributeAst>): ResolvedAttribute[] {
   const result: ResolvedAttribute[] = [];
   for (const attribute of attributes) {
-    const name = identifierText(attribute.name());
-    if (name === undefined) continue;
+    const baseName = identifierText(attribute.name());
+    if (baseName === undefined) continue;
+    const namespaceName = identifierText(attribute.namespaceName());
+    const name = namespaceName === undefined ? baseName : `${namespaceName}.${baseName}`;
     result.push(new ResolvedAttribute(name, collectArgs(attribute.argList()), attribute));
   }
   return result;
