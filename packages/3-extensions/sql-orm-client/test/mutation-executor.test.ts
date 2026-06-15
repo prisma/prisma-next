@@ -15,8 +15,9 @@ import {
   hasNestedMutationCallbacks,
   type JunctionRelationDefinition,
 } from '../src/mutation-executor';
-import type { MockRuntime, TestContract } from './helpers';
+import type { MockRuntime } from './helpers';
 import {
+  buildCustomPrimaryKeyContract,
   buildExecutionDefaultJunctionContract,
   buildManyToManyContract,
   buildManyToManyContractWithTargetRelation,
@@ -156,33 +157,7 @@ describe('mutation-executor', () => {
   });
 
   it('buildPrimaryKeyFilterFromRow() resolves custom primary key columns', () => {
-    const contract = getTestContract();
-
-    // Tables live in 'public' after public-by-default; put the custom-pk
-    // override in the same namespace so the scan-all-namespaces lookup finds it.
-    const publicNs = contract.storage.namespaces['public']!;
-    const withCustomPk = {
-      ...contract,
-      storage: {
-        ...contract.storage,
-        namespaces: {
-          ...contract.storage.namespaces,
-          public: {
-            ...publicNs,
-            entries: {
-              ...publicNs.entries,
-              table: {
-                ...(publicNs.entries.table ?? {}),
-                users: {
-                  ...publicNs.entries.table?.['users'],
-                  primaryKey: { columns: ['pk_id'] },
-                },
-              },
-            },
-          },
-        },
-      },
-    } as unknown as TestContract;
+    const withCustomPk = buildCustomPrimaryKeyContract();
 
     expect(buildPrimaryKeyFilterFromRow(withCustomPk, 'public', 'User', { pk_id: 99 })).toEqual({
       pk_id: 99,

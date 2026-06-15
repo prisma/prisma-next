@@ -643,6 +643,23 @@ export function buildExecutionDefaultJunctionContract() {
   });
 }
 
+/**
+ * Builds a contract whose `User` model (table `users`) keys on a custom
+ * primary-key column `pk_id` instead of the conventional `id`. Authored
+ * through the contract-builder DSL so `buildPrimaryKeyFilterFromRow` reads a
+ * real emitted primary key rather than a hand-patched storage table.
+ */
+export function buildCustomPrimaryKeyContract() {
+  const User = model('User', {
+    fields: {
+      pk_id: field.column(int4Column).id(),
+      name: field.column(textColumn),
+    },
+  }).sql({ table: 'users' });
+
+  return defineContract({ models: { User } });
+}
+
 export function createMockRuntime(): MockRuntime {
   const executions: MockExecution[] = [];
   let nextResult: Record<string, unknown>[][] = [];
