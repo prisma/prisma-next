@@ -16,8 +16,9 @@
  *     → this.createIndex({ schema, table, index: idx, columns: cols })
  *   installExtension({ ... })  →  this.installExtension({ ... })
  *
- * Applies to files importing from '@prisma-next/postgres/migration' or
- * '@prisma-next/target-postgres/migration'. Handles only call-sites where all
+ * Applies to files importing from '@prisma-next/postgres/migration',
+ * '@prisma-next/target-postgres/migration', '@prisma-next/sqlite/migration', or
+ * '@prisma-next/target-sqlite/migration'. Handles only call-sites where all
  * arguments are simple literals or identifiers on a single logical token (no
  * multi-line positional calls). For complex cases the type-checker will flag
  * remaining sites.
@@ -48,7 +49,7 @@ const FACTORY_NAMES = [
  */
 function stripFactoriesFromImports(src: string): string {
   const importRe =
-    /^[^\S\n]*import\s*\{([^}]+)\}\s*from\s*'@prisma-next\/(?:postgres|target-postgres)\/migration'[^\S\n]*;?[^\S\n]*\n?/gms;
+    /^[^\S\n]*import\s*\{([^}]+)\}\s*from\s*'@prisma-next\/(?:postgres|target-postgres|sqlite|target-sqlite)\/migration'[^\S\n]*;?[^\S\n]*\n?/gms;
   return src.replace(importRe, (full, nameBlock) => {
     const names = nameBlock
       .split(',')
@@ -245,7 +246,7 @@ function applyRewrites(src: string): string {
 
 function processFile(src: string): string {
   const MIGRATION_IMPORT_RE =
-    /import\s*\{[^}]+\}\s*from\s*'@prisma-next\/(?:postgres|target-postgres)\/migration'/s;
+    /import\s*\{[^}]+\}\s*from\s*'@prisma-next\/(?:postgres|target-postgres|sqlite|target-sqlite)\/migration'/s;
 
   if (!MIGRATION_IMPORT_RE.test(src)) return src;
 
@@ -274,7 +275,9 @@ for (const file of files) {
   }
   const relevant =
     content.includes("from '@prisma-next/postgres/migration'") ||
-    content.includes("from '@prisma-next/target-postgres/migration'");
+    content.includes("from '@prisma-next/target-postgres/migration'") ||
+    content.includes("from '@prisma-next/sqlite/migration'") ||
+    content.includes("from '@prisma-next/target-sqlite/migration'");
   if (!relevant) continue;
 
   const updated = processFile(content);
