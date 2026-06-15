@@ -2,6 +2,7 @@ export type {
   ContractDefinition,
   ContractFactory,
   ContractScaffold,
+  ExtractCodecTypesFromPack,
   FieldBuilder,
   FieldReference,
   ModelBuilder,
@@ -18,3 +19,5 @@ export {
   rel,
   valueObject,
 } from '../contract-builder';
+export type { BoundEnumType, CodecTypeMap, EnumMember, EnumTypeHandle } from '../enum-type';
+export { bindEnumType, enumType, isEnumTypeHandle, member } from '../enum-type';
