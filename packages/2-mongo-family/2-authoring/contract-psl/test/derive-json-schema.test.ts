@@ -50,6 +50,20 @@ function arrayField(codecId: string, nullable = false): ContractField {
   return { type: { kind: 'scalar', codecId }, nullable, many: true };
 }
 
+function arrayEnumField(codecId: string, enumName: string, nullable = false): ContractField {
+  return {
+    type: { kind: 'scalar', codecId },
+    nullable,
+    many: true,
+    valueSet: {
+      plane: 'domain',
+      entityKind: 'enum',
+      namespaceId: '__unbound__',
+      entityName: enumName,
+    },
+  };
+}
+
 function voField(name: string, nullable = false): ContractField {
   return { type: { kind: 'valueObject', name }, nullable };
 }
@@ -511,7 +525,7 @@ describe('deriveJsonSchema — enum fields', () => {
     expect(props['name']).not.toHaveProperty('enum');
   });
 
-  it('nullable enum field carries enum keyword alongside null bsonType', () => {
+  it('nullable enum field includes null in the enum array so null writes are accepted', () => {
     const result = deriveJsonSchema(
       {
         _id: scalarField('mongo/objectId@1'),
@@ -523,7 +537,48 @@ describe('deriveJsonSchema — enum fields', () => {
     );
 
     const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
-    expect(props['role']).toEqual({ bsonType: ['null', 'string'], enum: ['user', 'admin'] });
+    expect(props['role']).toEqual({ bsonType: ['null', 'string'], enum: ['user', 'admin', null] });
+  });
+
+  it('array enum field emits enum inside items, not on the outer schema', () => {
+    const result = deriveJsonSchema(
+      {
+        _id: scalarField('mongo/objectId@1'),
+        roles: arrayEnumField('mongo/string@1', 'Role'),
+      },
+      undefined,
+      mongoCodecLookup,
+      enums,
+    );
+
+    const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
+    expect(props['roles']).toEqual({
+      bsonType: 'array',
+      items: { bsonType: 'string', enum: ['user', 'admin'] },
+    });
+    expect(props['roles']).not.toHaveProperty('enum');
+  });
+
+  it('nullable array enum field emits enum inside items with no null in items', () => {
+    const result = deriveJsonSchema(
+      {
+        _id: scalarField('mongo/objectId@1'),
+        roles: arrayEnumField('mongo/string@1', 'Role', true),
+      },
+      undefined,
+      mongoCodecLookup,
+      enums,
+    );
+
+    const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
+    // nullable on an array field means the field itself may be absent/null (not that
+    // individual elements are null), so null belongs to the outer bsonType, not items.
+    // The existing nullable+many shape keeps bsonType:'array' on the outer; enum goes in items.
+    expect(props['roles']).toEqual({
+      bsonType: 'array',
+      items: { bsonType: 'string', enum: ['user', 'admin'] },
+    });
+    expect(props['roles']).not.toHaveProperty('enum');
   });
 
   it('preserves member value declaration order', () => {
