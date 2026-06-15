@@ -46,13 +46,23 @@ import {
   RawUpdateManyCommand,
   RawUpdateOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
-import type { CollationOptions } from '@prisma-next/mongo-value/mongodb-types';
-import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 
 const IndexKeyDirection = type('1 | -1 | "text" | "2dsphere" | "2d" | "hashed"');
 const IndexKeyJson = type({ field: 'string', direction: IndexKeyDirection });
+
+const CollationJson = type({
+  locale: 'string',
+  'caseLevel?': 'boolean',
+  'caseFirst?': 'string',
+  'strength?': 'number',
+  'numericOrdering?': 'boolean',
+  'alternate?': 'string',
+  'maxVariable?': 'string',
+  'backwards?': 'boolean',
+  'normalization?': 'boolean',
+});
 
 const CreateIndexJson = type({
   kind: '"createIndex"',
@@ -63,9 +73,9 @@ const CreateIndexJson = type({
   'expireAfterSeconds?': 'number',
   'partialFilterExpression?': 'Record<string, unknown>',
   'name?': 'string',
-  'wildcardProjection?': 'Record<string, unknown>',
-  'collation?': 'Record<string, unknown>',
-  'weights?': 'Record<string, unknown>',
+  'wildcardProjection?': 'Record<string, 0 | 1>',
+  'collation?': CollationJson,
+  'weights?': 'Record<string, number>',
   'default_language?': 'string',
   'language_override?': 'string',
 });
@@ -85,10 +95,18 @@ const CreateCollectionJson = type({
   'capped?': 'boolean',
   'size?': 'number',
   'max?': 'number',
-  'timeseries?': 'Record<string, unknown>',
-  'collation?': 'Record<string, unknown>',
-  'changeStreamPreAndPostImages?': 'Record<string, unknown>',
-  'clusteredIndex?': 'Record<string, unknown>',
+  'timeseries?': {
+    timeField: 'string',
+    'metaField?': 'string',
+    'granularity?': '"seconds" | "minutes" | "hours"',
+  },
+  'collation?': CollationJson,
+  'changeStreamPreAndPostImages?': { enabled: 'boolean' },
+  'clusteredIndex?': {
+    key: 'Record<string, number>',
+    unique: 'boolean',
+    'name?': 'string',
+  },
 });
 
 const DropCollectionJson = type({
@@ -102,7 +120,7 @@ const CollModJson = type({
   'validator?': 'Record<string, unknown>',
   'validationLevel?': '"strict" | "moderate"',
   'validationAction?': '"error" | "warn"',
-  'changeStreamPreAndPostImages?': 'Record<string, unknown>',
+  'changeStreamPreAndPostImages?': { enabled: 'boolean' },
 });
 
 const ListIndexesJson = type({
@@ -496,19 +514,9 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
         ...ifDefined('expireAfterSeconds', data.expireAfterSeconds),
         ...ifDefined('partialFilterExpression', data.partialFilterExpression),
         ...ifDefined('name', data.name),
-        ...ifDefined(
-          'wildcardProjection',
-          data.wildcardProjection as Record<string, 0 | 1> | undefined,
-        ),
-        ...ifDefined(
-          'collation',
-          data.collation
-            ? blindCast<CollationOptions, 'collation from serialized ops has locale'>(
-                data.collation,
-              )
-            : undefined,
-        ),
-        ...ifDefined('weights', data.weights as Record<string, number> | undefined),
+        ...ifDefined('wildcardProjection', data.wildcardProjection),
+        ...ifDefined('collation', data.collation),
+        ...ifDefined('weights', data.weights),
         ...ifDefined('default_language', data.default_language),
         ...ifDefined('language_override', data.language_override),
       });
@@ -526,22 +534,10 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
         ...ifDefined('capped', data.capped),
         ...ifDefined('size', data.size),
         ...ifDefined('max', data.max),
-        ...ifDefined('timeseries', data.timeseries as CreateCollectionCommand['timeseries']),
-        ...(data.collation
-          ? {
-              collation: blindCast<CollationOptions, 'collation from serialized ops has locale'>(
-                data.collation,
-              ),
-            }
-          : {}),
-        ...ifDefined(
-          'changeStreamPreAndPostImages',
-          data.changeStreamPreAndPostImages as { enabled: boolean } | undefined,
-        ),
-        ...ifDefined(
-          'clusteredIndex',
-          data.clusteredIndex as CreateCollectionCommand['clusteredIndex'],
-        ),
+        ...ifDefined('timeseries', data.timeseries),
+        ...ifDefined('collation', data.collation),
+        ...ifDefined('changeStreamPreAndPostImages', data.changeStreamPreAndPostImages),
+        ...ifDefined('clusteredIndex', data.clusteredIndex),
       });
     }
     case 'dropCollection': {
@@ -554,10 +550,7 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
         ...ifDefined('validator', data.validator),
         ...ifDefined('validationLevel', data.validationLevel),
         ...ifDefined('validationAction', data.validationAction),
-        ...ifDefined(
-          'changeStreamPreAndPostImages',
-          data.changeStreamPreAndPostImages as { enabled: boolean } | undefined,
-        ),
+        ...ifDefined('changeStreamPreAndPostImages', data.changeStreamPreAndPostImages),
       });
     }
     default:
