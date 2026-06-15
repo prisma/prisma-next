@@ -1,18 +1,20 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import type { PslAttribute, PslField, PslSpan } from '@prisma-next/psl-parser';
+import type { PslSpan } from '@prisma-next/psl-parser';
+import type { ResolvedAttribute, ResolvedField, SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   getNamedArgument,
-  getPositionalArgumentEntry,
+  getPositionalArgumentExpr,
   parseFieldList,
   parseQuotedStringLiteral,
   unquoteStringLiteral,
 } from './psl-attribute-parsing';
 import { checkUncomposedNamespace, reportUncomposedNamespace } from './psl-column-resolution';
+import { argText, spanOf } from './resolved-read-shims';
 
 export const REFERENTIAL_ACTION_MAP: Record<string, ReferentialAction | undefined> = {
   NoAction: 'noAction',
@@ -52,7 +54,7 @@ export type FkRelationMetadata = {
 export type ModelBackrelationCandidate = {
   readonly modelName: string;
   readonly tableName: string;
-  readonly field: PslField;
+  readonly field: ResolvedField;
   readonly targetModelName: string;
   readonly relationName?: string;
 };
@@ -88,33 +90,35 @@ export function normalizeReferentialAction(input: {
 }
 
 export function parseRelationAttribute(input: {
-  readonly attribute: PslAttribute;
+  readonly attribute: ResolvedAttribute;
+  readonly span: PslSpan;
   readonly modelName: string;
   readonly fieldName: string;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): ParsedRelationAttribute | undefined {
-  const positionalEntries = input.attribute.args.filter((arg) => arg.kind === 'positional');
+  const positionalEntries = input.attribute.args.filter((arg) => arg.name === undefined);
   if (positionalEntries.length > 1) {
     input.diagnostics.push({
       code: 'PSL_INVALID_RELATION_ATTRIBUTE',
       message: `Relation field "${input.modelName}.${input.fieldName}" has too many positional arguments`,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return undefined;
   }
 
   let relationNameFromPositional: string | undefined;
-  const positionalNameEntry = getPositionalArgumentEntry(input.attribute);
-  if (positionalNameEntry) {
-    const parsedName = parseQuotedStringLiteral(positionalNameEntry.value);
+  const positionalNameExpr = getPositionalArgumentExpr(input.attribute);
+  if (positionalNameExpr) {
+    const rawName = argText(positionalNameExpr);
+    const parsedName = parseQuotedStringLiteral(rawName);
     if (!parsedName) {
       input.diagnostics.push({
         code: 'PSL_INVALID_RELATION_ATTRIBUTE',
         message: `Relation field "${input.modelName}.${input.fieldName}" positional relation name must be a quoted string literal`,
         sourceId: input.sourceId,
-        span: positionalNameEntry.span,
+        span: input.span,
       });
       return undefined;
     }
@@ -122,7 +126,7 @@ export function parseRelationAttribute(input: {
   }
 
   for (const arg of input.attribute.args) {
-    if (arg.kind === 'positional') {
+    if (arg.name === undefined) {
       continue;
     }
     if (
@@ -137,7 +141,7 @@ export function parseRelationAttribute(input: {
         code: 'PSL_INVALID_RELATION_ATTRIBUTE',
         message: `Relation field "${input.modelName}.${input.fieldName}" has unsupported argument "${arg.name}"`,
         sourceId: input.sourceId,
-        span: arg.span,
+        span: input.span,
       });
       return undefined;
     }
@@ -152,7 +156,7 @@ export function parseRelationAttribute(input: {
       code: 'PSL_INVALID_RELATION_ATTRIBUTE',
       message: `Relation field "${input.modelName}.${input.fieldName}" named relation name must be a quoted string literal`,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return undefined;
   }
@@ -166,7 +170,7 @@ export function parseRelationAttribute(input: {
       code: 'PSL_INVALID_RELATION_ATTRIBUTE',
       message: `Relation field "${input.modelName}.${input.fieldName}" has conflicting positional and named relation names`,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return undefined;
   }
@@ -181,28 +185,28 @@ export function parseRelationAttribute(input: {
       code: 'PSL_INVALID_RELATION_ATTRIBUTE',
       message: `Relation field "${input.modelName}.${input.fieldName}" map argument must be a quoted string literal`,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return undefined;
   }
 
-  const fieldsRaw = getNamedArgument(input.attribute, 'fields');
-  const referencesRaw = getNamedArgument(input.attribute, 'references');
-  if ((fieldsRaw && !referencesRaw) || (!fieldsRaw && referencesRaw)) {
+  const fieldsExpr = input.attribute.args.find((a) => a.name === 'fields')?.value;
+  const referencesExpr = input.attribute.args.find((a) => a.name === 'references')?.value;
+  if ((fieldsExpr && !referencesExpr) || (!fieldsExpr && referencesExpr)) {
     input.diagnostics.push({
       code: 'PSL_INVALID_RELATION_ATTRIBUTE',
       message: `Relation field "${input.modelName}.${input.fieldName}" requires fields and references arguments`,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return undefined;
   }
 
   let fields: readonly string[] | undefined;
   let references: readonly string[] | undefined;
-  if (fieldsRaw && referencesRaw) {
-    const parsedFields = parseFieldList(fieldsRaw);
-    const parsedReferences = parseFieldList(referencesRaw);
+  if (fieldsExpr && referencesExpr) {
+    const parsedFields = parseFieldList(fieldsExpr);
+    const parsedReferences = parseFieldList(referencesExpr);
     if (
       !parsedFields ||
       !parsedReferences ||
@@ -213,7 +217,7 @@ export function parseRelationAttribute(input: {
         code: 'PSL_INVALID_RELATION_ATTRIBUTE',
         message: `Relation field "${input.modelName}.${input.fieldName}" requires bracketed fields and references lists`,
         sourceId: input.sourceId,
-        span: input.attribute.span,
+        span: input.span,
       });
       return undefined;
     }
@@ -281,6 +285,7 @@ export function applyBackrelationCandidates(input: {
   readonly modelRelations: Map<string, ModelRelationMetadata[]>;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
+  readonly sourceFile: SourceFile;
 }): void {
   for (const candidate of input.backrelationCandidates) {
     const pairKey = fkRelationPairKey(candidate.targetModelName, candidate.modelName);
@@ -289,12 +294,13 @@ export function applyBackrelationCandidates(input: {
       ? pairMatches.filter((relation) => relation.relationName === candidate.relationName)
       : [...pairMatches];
 
+    const fieldSpan = spanOf(candidate.field.syntax.syntax, input.sourceFile);
     if (matches.length === 0) {
       input.diagnostics.push({
         code: 'PSL_ORPHANED_BACKRELATION_LIST',
         message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
         sourceId: input.sourceId,
-        span: candidate.field.span,
+        span: fieldSpan,
       });
       continue;
     }
@@ -303,7 +309,7 @@ export function applyBackrelationCandidates(input: {
         code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
         message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add @relation(name: "...") (or @relation("...")) to both sides to disambiguate.`,
         sourceId: input.sourceId,
-        span: candidate.field.span,
+        span: fieldSpan,
       });
       continue;
     }
@@ -334,7 +340,8 @@ export function applyBackrelationCandidates(input: {
 
 export function validateNavigationListFieldAttributes(input: {
   readonly modelName: string;
-  readonly field: PslField;
+  readonly field: ResolvedField;
+  readonly sourceFile: SourceFile;
   readonly sourceId: string;
   readonly composedExtensions: Set<string>;
   readonly authoringContributions: AuthoringContributions | undefined;
@@ -353,12 +360,13 @@ export function validateNavigationListFieldAttributes(input: {
       targetId: input.targetId,
       authoringContributions: input.authoringContributions,
     });
+    const attrSpan = spanOf(attribute.syntax.syntax, input.sourceFile);
     if (uncomposedNamespace) {
       reportUncomposedNamespace({
         subjectLabel: `Attribute "@${attribute.name}"`,
         namespace: uncomposedNamespace,
         sourceId: input.sourceId,
-        span: attribute.span,
+        span: attrSpan,
         diagnostics: input.diagnostics,
       });
       valid = false;
@@ -368,7 +376,7 @@ export function validateNavigationListFieldAttributes(input: {
       code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
       message: `Field "${input.modelName}.${input.field.name}" uses unsupported attribute "@${attribute.name}"`,
       sourceId: input.sourceId,
-      span: attribute.span,
+      span: attrSpan,
     });
     valid = false;
   }

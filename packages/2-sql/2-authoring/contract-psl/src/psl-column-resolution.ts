@@ -20,18 +20,23 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type {
-  PslAttribute,
-  PslField,
+  PslAttributeArgument,
   PslSpan,
   PslTypeConstructorCall,
 } from '@prisma-next/psl-parser';
+import type {
+  ResolvedAttribute,
+  ResolvedField,
+  SourceFile,
+  TypeTarget,
+} from '@prisma-next/psl-parser/syntax';
 import { blindCast } from '@prisma-next/utils/casts';
 import {
   lowerDefaultFunctionWithRegistry,
   parseDefaultFunctionCall,
 } from './default-function-registry';
 import {
-  getPositionalArgumentEntry,
+  getPositionalArgumentExpr,
   getPositionalArguments,
   parseOptionalNumericArguments,
   parseOptionalSingleIntegerArgument,
@@ -39,6 +44,7 @@ import {
   unquoteStringLiteral,
 } from './psl-attribute-parsing';
 import { mapPslHelperArgs } from './psl-authoring-arguments';
+import { argText, spanOf } from './resolved-read-shims';
 
 export type ColumnDescriptor = {
   readonly codecId: string;
@@ -394,8 +400,30 @@ export type ResolveFieldTypeResult =
     }
   | { readonly ok: false; readonly alreadyReported: boolean };
 
+/**
+ * Adapts a resolved `constructor` TypeTarget into the `PslTypeConstructorCall`
+ * shape that the authoring argument machinery (`mapPslHelperArgs`,
+ * `instantiatePslTypeConstructor`, `instantiatePslFieldPreset`) consumes.
+ * Constructor args from the CST are all positional; their spans are recovered
+ * through `sourceFile`.
+ */
+function buildConstructorCall(
+  target: TypeTarget & { kind: 'constructor' },
+  span: PslSpan,
+  sourceFile: SourceFile,
+): PslTypeConstructorCall {
+  const args: PslAttributeArgument[] = target.args.map((expr) => ({
+    kind: 'positional' as const,
+    value: argText(expr),
+    span: spanOf(expr.syntax, sourceFile),
+  }));
+  return { kind: 'typeConstructor', path: target.path, args, span };
+}
+
 export function resolveFieldTypeDescriptor(input: {
-  readonly field: PslField;
+  readonly field: ResolvedField;
+  readonly span: PslSpan;
+  readonly sourceFile: SourceFile;
   readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
@@ -407,15 +435,17 @@ export function resolveFieldTypeDescriptor(input: {
   readonly sourceId: string;
   readonly entityLabel: string;
 }): ResolveFieldTypeResult {
-  if (input.field.typeConstructor) {
+  const target = input.field.type.target;
+  if (target.kind === 'constructor') {
+    const constructorCall = buildConstructorCall(target, input.span, input.sourceFile);
     // Field presets carry richer semantics than type constructors, so a field preset match is the complete answer. Shared composition rejects exact cross-registry collisions before PSL resolution can observe them.
     const presetDescriptor = getAuthoringFieldPreset(
       input.authoringContributions,
-      input.field.typeConstructor.path,
+      constructorCall.path,
     );
     if (presetDescriptor) {
       const instantiated = instantiatePslFieldPreset({
-        call: input.field.typeConstructor,
+        call: constructorCall,
         descriptor: presetDescriptor,
         diagnostics: input.diagnostics,
         sourceId: input.sourceId,
@@ -436,12 +466,11 @@ export function resolveFieldTypeDescriptor(input: {
       return { ok: true, descriptor: instantiated.descriptor, presetContributions };
     }
 
-    const helperPath = input.field.typeConstructor.path.join('.');
-    const namespacePrefix =
-      input.field.typeConstructor.path.length > 1 ? input.field.typeConstructor.path[0] : undefined;
+    const helperPath = constructorCall.path.join('.');
+    const namespacePrefix = constructorCall.path.length > 1 ? constructorCall.path[0] : undefined;
     const typeDescriptor = getAuthoringTypeConstructor(
       input.authoringContributions,
-      input.field.typeConstructor.path,
+      constructorCall.path,
     );
 
     if (
@@ -454,7 +483,7 @@ export function resolveFieldTypeDescriptor(input: {
         namespace: namespacePrefix,
         helperPath,
         sourceId: input.sourceId,
-        span: input.field.typeConstructor.span,
+        span: constructorCall.span,
         diagnostics: input.diagnostics,
       });
       return { ok: false, alreadyReported: true };
@@ -463,7 +492,7 @@ export function resolveFieldTypeDescriptor(input: {
     const descriptor =
       typeDescriptor ??
       resolvePslTypeConstructorDescriptor({
-        call: input.field.typeConstructor,
+        call: constructorCall,
         authoringContributions: input.authoringContributions,
         composedExtensions: input.composedExtensions,
         familyId: input.familyId,
@@ -478,7 +507,7 @@ export function resolveFieldTypeDescriptor(input: {
     }
 
     const instantiated = instantiatePslTypeConstructor({
-      call: input.field.typeConstructor,
+      call: constructorCall,
       descriptor,
       diagnostics: input.diagnostics,
       sourceId: input.sourceId,
@@ -491,7 +520,7 @@ export function resolveFieldTypeDescriptor(input: {
   }
 
   const descriptor = resolveColumnDescriptor(
-    input.field,
+    target,
     input.enumTypeDescriptors,
     input.namedTypeDescriptors,
     input.scalarTypeDescriptors,
@@ -588,7 +617,8 @@ export const NATIVE_TYPE_SPECS: Readonly<Record<string, NativeTypeSpec>> = {
 };
 
 export function resolveDbNativeTypeAttribute(input: {
-  readonly attribute: PslAttribute;
+  readonly attribute: ResolvedAttribute;
+  readonly span: PslSpan;
   readonly baseType: string;
   readonly baseDescriptor: ColumnDescriptor;
   readonly diagnostics: ContractSourceDiagnostic[];
@@ -601,7 +631,7 @@ export function resolveDbNativeTypeAttribute(input: {
       code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
       message: `${input.entityLabel} uses unsupported attribute "@${input.attribute.name}"`,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return undefined;
   }
@@ -610,7 +640,7 @@ export function resolveDbNativeTypeAttribute(input: {
     return pushInvalidAttributeArgument({
       diagnostics: input.diagnostics,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
       message: `${input.entityLabel} uses @${input.attribute.name} on unsupported base type "${input.baseType}". Expected "${spec.baseType}".`,
     });
   }
@@ -621,7 +651,7 @@ export function resolveDbNativeTypeAttribute(input: {
         return pushInvalidAttributeArgument({
           diagnostics: input.diagnostics,
           sourceId: input.sourceId,
-          span: input.attribute.span,
+          span: input.span,
           message: `${input.entityLabel} @${input.attribute.name} does not accept arguments.`,
         });
       }
@@ -635,6 +665,7 @@ export function resolveDbNativeTypeAttribute(input: {
         attribute: input.attribute,
         diagnostics: input.diagnostics,
         sourceId: input.sourceId,
+        span: input.span,
         entityLabel: input.entityLabel,
         minimum: 1,
         valueLabel: 'positive integer length',
@@ -653,6 +684,7 @@ export function resolveDbNativeTypeAttribute(input: {
         attribute: input.attribute,
         diagnostics: input.diagnostics,
         sourceId: input.sourceId,
+        span: input.span,
         entityLabel: input.entityLabel,
         minimum: 0,
         valueLabel: 'non-negative integer precision',
@@ -671,6 +703,7 @@ export function resolveDbNativeTypeAttribute(input: {
         attribute: input.attribute,
         diagnostics: input.diagnostics,
         sourceId: input.sourceId,
+        span: input.span,
         entityLabel: input.entityLabel,
       });
       if (numeric === undefined) {
@@ -703,7 +736,9 @@ export function parseDefaultLiteralValue(expression: string): ColumnDefault | un
 export function lowerDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
-  readonly defaultAttribute: PslAttribute;
+  readonly defaultAttribute: ResolvedAttribute;
+  readonly span: PslSpan;
+  readonly sourceFile: SourceFile;
   readonly columnDescriptor: ColumnDescriptor;
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly sourceId: string;
@@ -713,42 +748,45 @@ export function lowerDefaultForField(input: {
   readonly defaultValue?: ColumnDefault;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
 } {
-  const positionalEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'positional');
-  const namedEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'named');
+  const positionalEntries = input.defaultAttribute.args.filter((arg) => arg.name === undefined);
+  const namedEntries = input.defaultAttribute.args.filter((arg) => arg.name !== undefined);
 
   if (namedEntries.length > 0 || positionalEntries.length !== 1) {
     input.diagnostics.push({
       code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
       message: `Field "${input.modelName}.${input.fieldName}" requires exactly one positional @default(...) expression.`,
       sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
+      span: input.span,
     });
     return {};
   }
 
-  const expressionEntry = getPositionalArgumentEntry(input.defaultAttribute);
-  if (!expressionEntry) {
+  const expressionAst = getPositionalArgumentExpr(input.defaultAttribute);
+  if (!expressionAst) {
     input.diagnostics.push({
       code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
       message: `Field "${input.modelName}.${input.fieldName}" requires a positional @default(...) expression.`,
       sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
+      span: input.span,
     });
     return {};
   }
 
-  const literalDefault = parseDefaultLiteralValue(expressionEntry.value);
+  const expressionText = argText(expressionAst);
+  const expressionSpan = spanOf(expressionAst.syntax, input.sourceFile);
+
+  const literalDefault = parseDefaultLiteralValue(expressionText);
   if (literalDefault) {
     return { defaultValue: literalDefault };
   }
 
-  const defaultFunctionCall = parseDefaultFunctionCall(expressionEntry.value, expressionEntry.span);
+  const defaultFunctionCall = parseDefaultFunctionCall(expressionText, expressionSpan);
   if (!defaultFunctionCall) {
     input.diagnostics.push({
       code: 'PSL_INVALID_DEFAULT_VALUE',
-      message: `Unsupported default value "${expressionEntry.value}"`,
+      message: `Unsupported default value "${expressionText}"`,
       sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
+      span: input.span,
     });
     return {};
   }
@@ -779,7 +817,7 @@ export function lowerDefaultForField(input: {
       code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
       message: `Default generator "${lowered.value.generated.id}" is not available in the composed mutation default registry.`,
       sourceId: input.sourceId,
-      span: expressionEntry.span,
+      span: expressionSpan,
     });
     return {};
   }
@@ -790,7 +828,7 @@ export function lowerDefaultForField(input: {
       code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
       message: `Default generator "${generatorDescriptor.id}" is not applicable to "@default(...)" lowering. Use the corresponding field preset (e.g. \`temporal.${generatorDescriptor.id === 'timestampNow' ? 'updatedAt' : generatorDescriptor.id}()\`) instead.`,
       sourceId: input.sourceId,
-      span: expressionEntry.span,
+      span: expressionSpan,
     });
     return {};
   }
@@ -800,7 +838,7 @@ export function lowerDefaultForField(input: {
       code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
       message: `Default generator "${generatorDescriptor.id}" is not applicable to "${input.modelName}.${input.fieldName}" with codecId "${input.columnDescriptor.codecId}".`,
       sourceId: input.sourceId,
-      span: expressionEntry.span,
+      span: expressionSpan,
     });
     return {};
   }
@@ -809,19 +847,29 @@ export function lowerDefaultForField(input: {
 }
 
 export function resolveColumnDescriptor(
-  field: PslField,
+  target: TypeTarget,
   enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
   namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
   scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
 ): ColumnDescriptor | undefined {
-  if (field.typeRef && namedTypeDescriptors.has(field.typeRef)) {
-    return namedTypeDescriptors.get(field.typeRef);
+  if (target.kind === 'ref') {
+    if (target.coord.kind === 'namedType') {
+      return namedTypeDescriptors.get(target.coord.name);
+    }
+    if (target.coord.kind === 'enum') {
+      return enumTypeDescriptors.get(target.coord.name);
+    }
+    return undefined;
   }
-  if (namedTypeDescriptors.has(field.typeName)) {
-    return namedTypeDescriptors.get(field.typeName);
+  if (target.kind === 'scalar') {
+    return namedTypeDescriptors.get(target.name) ?? scalarTypeDescriptors.get(target.name);
   }
-  if (enumTypeDescriptors.has(field.typeName)) {
-    return enumTypeDescriptors.get(field.typeName);
+  if (target.kind === 'unresolved') {
+    return (
+      namedTypeDescriptors.get(target.typeName) ??
+      enumTypeDescriptors.get(target.typeName) ??
+      scalarTypeDescriptors.get(target.typeName)
+    );
   }
-  return scalarTypeDescriptors.get(field.typeName);
+  return undefined;
 }

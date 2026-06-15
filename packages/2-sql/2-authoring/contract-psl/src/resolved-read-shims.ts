@@ -1,3 +1,4 @@
+import type { PslSpan } from '@prisma-next/psl-parser';
 import type {
   ExpressionAst,
   ResolvedAttribute,
@@ -5,6 +6,8 @@ import type {
   ResolvedField,
   ResolvedNamedType,
   ResolvedNamespace,
+  SourceFile,
+  SyntaxNode,
   TypeTarget,
 } from '@prisma-next/psl-parser/syntax';
 
@@ -110,4 +113,23 @@ export function argText(value: ExpressionAst): string {
 export function getNamedArgText(attr: ResolvedAttribute, name: string): string | undefined {
   const arg = attr.args.find((a) => a.name === name);
   return arg === undefined ? undefined : argText(arg.value);
+}
+
+// ---------------------------------------------------------------------------
+// Span derivation from CST
+// ---------------------------------------------------------------------------
+
+/**
+ * The diagnostic span of a resolved entity, derived from its CST `syntax`
+ * back-pointer. `ResolvedDocument` entities carry a syntax node rather than
+ * a pre-computed span, so the location is recovered from the node's source
+ * offset through the same `SourceFile` the parse produced.
+ */
+export function spanOf(node: SyntaxNode, sourceFile: SourceFile): PslSpan {
+  const start = sourceFile.positionAt(node.offset);
+  const end = sourceFile.positionAt(node.offset + node.textLength);
+  return {
+    start: { offset: node.offset, line: start.line, column: start.character },
+    end: { offset: node.offset + node.textLength, line: end.line, column: end.character },
+  };
 }
