@@ -1,32 +1,38 @@
 ---
-description: Save the output of long-running commands to a file once, then read the file — don't re-run to re-filter
+description: For slow commands (test/build/lint/typecheck/fixtures), save output to a file once and read the file — don't re-run to re-filter
 alwaysApply: true
 ---
 
 # Capture slow command output
 
-Long-running commands (`pnpm test:packages`, `test:integration`, `build`, `lint`, `fixtures:check`, `turbo typecheck`) take ~30s–3min. Re-running one of them just to extract a different slice of the output is the largest waste of agent time in this repo.
+Applies to these commands only (each takes 30s–3min): `pnpm test:packages`, `test:integration`, `test:e2e`, `build`, `lint`, `lint:deps`, `fixtures:check`, `turbo typecheck`. Short commands (`git status`, single-file `pnpm --filter X test path`, etc.) run normally.
 
-## Do
+## Recipe
 
-Run the command once, save the full output and exit code to a file, then read or grep the file:
+Run from the worktree/repo root. `wip/` is gitignored, so the log is safe to write and won't appear in diffs.
 
 ```bash
 mkdir -p wip
 pnpm test:packages > wip/test-packages.log 2>&1; echo "exit=$?" >> wip/test-packages.log
-grep -E " FAIL |Test Files" wip/test-packages.log
+tail -1 wip/test-packages.log                              # 1. confirm exit=0 (or read the failure)
+grep -E " FAIL |Test Files" wip/test-packages.log          # 2. then inspect details
 ```
 
-After a failure, re-run **only the failing file** — not the whole suite:
+If exit≠0 and the log has no `FAIL` lines, the command crashed before tests ran — read the tail of the log, not just `FAIL` matches.
 
-```bash
-pnpm --filter @prisma-next/cli test test/commands/migration-list-json-golden.test.ts
-```
+**On re-run after a fix**: overwrite the same file with `>` (the snippet above already does this). Don't append, don't write to a new path — stale failures from the prior run will confuse the grep.
+
+After a failure, re-run **only the failing test file** — `pnpm --filter <package> test <path>`. That's seconds, not minutes, and doesn't need to be captured.
 
 ## Don't
 
-- Pipe the command directly to `tail`/`grep`/`head`. That discards the rest of the output *and* hides the exit code (`tail`/`grep` return 0).
-- Re-run the command to refine a filter. Grep the file you already wrote.
-- Pass `--force` to `turbo` reflexively. The cache is correct by default. Only force when there's a concrete cache-staleness reason this run (e.g. you just edited `tsconfig.json` or a lockfile).
+1. **Don't re-run the command to refine a filter.** Grep the file you already wrote. This is the exact pattern this rule exists to prevent.
+2. **Don't pipe the command directly to `tail`/`grep`/`head`.** That discards the rest of the output *and* hides the exit code (`tail`/`grep` return 0).
+3. **Don't pass `--force` to `turbo`.** Run `pnpm turbo typecheck` plain — the cache is correct by default. Only force when this same run edited `tsconfig.json` or a lockfile.
 
-If a pipe is unavoidable, preserve the exit code with `${PIPESTATUS[0]}` or `set -o pipefail`.
+If you must pipe through another tool (e.g. into `jq`), preserve the exit code with `tee` and `PIPESTATUS`:
+
+```bash
+pnpm test:packages 2>&1 | tee wip/test-packages.log | jq …
+echo "exit=${PIPESTATUS[0]}" >> wip/test-packages.log
+```
