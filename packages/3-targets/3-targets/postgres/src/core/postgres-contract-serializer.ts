@@ -39,7 +39,7 @@ function isAuthoringEntityTypeFactoryOutput(
  * Walks a pack's entity-type namespace tree and emits hydration factories
  * keyed by the descriptor's `discriminator`. Used for `storage.types`
  * (codec-triple hydration). Namespace entries hydration dispatches by
- * entries key, not discriminator — handled by `hydrateEntriesKind`.
+ * entries key, not discriminator — handled by `hydrateNamespaceEntities`.
  */
 function collectStorageTypesHydrators(
   namespace: AuthoringEntityTypeNamespace,

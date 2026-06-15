@@ -8,13 +8,10 @@ import {
   type StorageSort,
 } from './canonicalization';
 import type { Contract } from './contract-types';
+import { isPlainRecord } from './is-plain-record';
 import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from './types';
 
 const SCHEMA_VERSION = '1';
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 // Storage hashes fingerprint table/column layout, not which target pack emitted a
 // namespace. Persisted contract.json carries namespace `kind` discriminators;

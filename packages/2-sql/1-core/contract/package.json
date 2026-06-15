@@ -43,6 +43,7 @@
   ],
   "exports": {
     "./canonicalization-hooks": "./dist/canonicalization-hooks.mjs",
+    "./entity-kinds": "./dist/entity-kinds.mjs",
     "./factories": "./dist/factories.mjs",
     "./index-type-validation": "./dist/index-type-validation.mjs",
     "./index-types": "./dist/index-types.mjs",

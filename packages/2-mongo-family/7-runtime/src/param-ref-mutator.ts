@@ -1,3 +1,4 @@
+import { isPlainRecord } from '@prisma-next/contract/is-plain-record';
 import type { ParamRefMutator } from '@prisma-next/framework-components/runtime';
 import type { MongoLoweredDraft } from '@prisma-next/mongo-lowering';
 import { MongoParamRef } from '@prisma-next/mongo-value';
@@ -95,10 +96,6 @@ export interface MongoParamRefMutatorInternal<
 }
 
 type AnyMongoHandle = MongoParamRefHandle<string | undefined>;
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 // ─── Internal tree-walk helpers ────────────────────────────────────────────
 // Descent mirrors resolveDraftSlot in adapter-mongo/resolve-value.ts: recurse

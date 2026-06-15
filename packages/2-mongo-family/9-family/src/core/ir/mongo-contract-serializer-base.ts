@@ -1,15 +1,18 @@
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import {
+  type AnyEntityKindDescriptor,
+  hydrateNamespaceEntities,
+} from '@prisma-next/framework-components/ir';
+import {
   createMongoContractSchema,
-  MongoCollection,
-  type MongoCollectionInput,
   type MongoContract,
   MongoContractSchema,
   type MongoNamespaceEntries,
   validateMongoStorage,
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
+import { composeMongoEntityKinds } from '@prisma-next/mongo-contract/entity-kinds';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { type as arktypeType, type Type } from 'arktype';
@@ -39,11 +42,13 @@ export abstract class MongoContractSerializerBase<TContract>
   implements ContractSerializer<TContract>
 {
   private readonly contractSchema: Type<unknown> | undefined;
+  private readonly entryKinds: ReadonlyMap<string, AnyEntityKindDescriptor>;
 
-  constructor(validatorFragments?: ReadonlyMap<string, Type<unknown>>) {
-    // Mirrors the SQL base: only build a fragments-aware schema when
-    // pack contributions exist; otherwise the cached module-level
-    // default in `contract-schema.ts` covers the validation path.
+  constructor(
+    validatorFragments?: ReadonlyMap<string, Type<unknown>>,
+    packEntityKinds: readonly AnyEntityKindDescriptor[] = [],
+  ) {
+    this.entryKinds = composeMongoEntityKinds(packEntityKinds);
     this.contractSchema =
       validatorFragments !== undefined && validatorFragments.size > 0
         ? createMongoContractSchema(validatorFragments)
@@ -116,22 +121,23 @@ export abstract class MongoContractSerializerBase<TContract>
   }
 
   /**
-   * Walk a structurally-validated Mongo contract and hydrate each
-   * namespace's entries via {@link hydrateEntriesKind} — the same
-   * per-kind extension hook the SQL family base exposes. The family
-   * base hydrates the family-core `collection` kind; targets override
-   * to add pack-contributed kinds. {@link hydrateEntriesKind} is the
-   * single per-kind authority: it throws for unrecognised kinds, so this
-   * walk never silently drops an entry.
+   * Walk a structurally-validated Mongo contract and hydrate each namespace's
+   * entries via the registered entity-kind descriptors. Unknown kinds throw (fail-closed),
+   * preserving the existing Mongo serializer semantics.
    */
   protected hydrateMongoContract(contract: MongoContract): MongoContract {
     const rawNamespaces = contract.storage.namespaces;
     const hydratedNamespaces = Object.fromEntries(
       Object.entries(rawNamespaces).map(([nsId, nsEnvelope]) => {
-        const entriesOutput: Record<string, Record<string, unknown>> = {};
-        for (const [kind, innerMap] of Object.entries(nsEnvelope.entries)) {
-          entriesOutput[kind] = this.hydrateEntriesKind(kind, innerMap, nsId);
-        }
+        const hydratedEntries = hydrateNamespaceEntities(
+          blindCast<
+            Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+            'nsEnvelope.entries has been validated by the Mongo contract schema before hydration'
+          >(nsEnvelope.entries),
+          this.entryKinds,
+          'fail',
+          nsId,
+        );
         return [
           nsId,
           {
@@ -139,8 +145,8 @@ export abstract class MongoContractSerializerBase<TContract>
             id: nsEnvelope.id,
             entries: blindCast<
               MongoNamespaceEntries,
-              'hydrateEntriesKind constructs the correct IR instances per kind'
-            >(entriesOutput),
+              'this.entryKinds (composeMongoEntityKinds plus any pack kinds) supplies the collection→MongoCollection descriptor, so this open-dict result holds the typed collection member MongoNamespaceEntries declares; the descriptor Map erases that per-kind Node type from the return.'
+            >(hydratedEntries),
           },
         ];
       }),
@@ -152,42 +158,6 @@ export abstract class MongoContractSerializerBase<TContract>
         namespaces: hydratedNamespaces,
       },
     };
-  }
-
-  /**
-   * Per-kind hydration hook — the single authority for mapping a raw
-   * entries inner map to hydrated IR instances. The family base hydrates
-   * `collection`; targets override to add pack-contributed kinds and
-   * delegate unknown kinds to `super`. Throws for any kind neither this
-   * class nor the target override handles, naming the kind and namespace
-   * id so the error is actionable.
-   */
-  protected hydrateEntriesKind(
-    kind: string,
-    innerMap: unknown,
-    nsId: string,
-  ): Record<string, unknown> {
-    if (kind === 'collection') {
-      return Object.fromEntries(
-        Object.entries(
-          blindCast<
-            Record<string, unknown>,
-            'collection inner map is a plain record validated by the mongo contract schema'
-          >(innerMap),
-        ).map(([name, raw]) => [
-          name,
-          new MongoCollection(
-            blindCast<
-              MongoCollectionInput,
-              'collection entries validated by the mongo storage schema before hydration'
-            >(raw),
-          ),
-        ]),
-      );
-    }
-    throw new Error(
-      `Unknown entries key "${kind}" in namespace "${nsId}"; no hydration factory registered for this entity kind`,
-    );
   }
 
   /**

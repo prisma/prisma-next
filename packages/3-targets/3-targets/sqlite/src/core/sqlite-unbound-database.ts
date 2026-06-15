@@ -1,13 +1,14 @@
 import {
   freezeNode,
+  hydrateNamespaceEntities,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import {
-  type SqlNamespaceEntries,
-  type SqlNamespaceTablesInput,
+import { tableEntityKind } from '@prisma-next/sql-contract/entity-kinds';
+import type {
+  SqlNamespaceEntries,
+  SqlNamespaceTablesInput,
   StorageTable,
-  type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 
@@ -33,26 +34,18 @@ export class SqliteDatabase extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
-    let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
-    for (const [kind, rawMap] of Object.entries(input.entries)) {
-      if (kind === 'table') {
-        const tableMap: Record<string, StorageTable> = {};
-        for (const [name, v] of Object.entries(
-          blindCast<
-            Record<string, StorageTableInput>,
-            'entries[table] holds StorageTableInput by construction'
-          >(rawMap),
-        )) {
-          tableMap[name] = new StorageTable(v);
-        }
-        table = Object.freeze(tableMap);
-      } else {
-        carried[kind] = Object.freeze(rawMap);
-      }
-    }
+    const dispatched = hydrateNamespaceEntities(
+      input.entries,
+      new Map([['table', tableEntityKind]]),
+      'carry',
+    );
 
-    this.entries = Object.freeze({ ...carried, table });
+    this.entries = Object.freeze(
+      blindCast<
+        SqlNamespaceEntries,
+        "SQLite's table-only descriptor map hydrates table→StorageTable and carries every other kind raw, so this open-dict result satisfies SqlNamespaceEntries; the descriptor Map erases the per-kind Node type from the return."
+      >(dispatched),
+    );
     Object.defineProperty(this, 'kind', {
       value: SQLITE_NAMESPACE_KIND,
       writable: false,
