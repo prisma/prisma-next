@@ -2,21 +2,19 @@ import type {
   AnyEntityKindDescriptor,
   EntityKindDescriptor,
 } from '@prisma-next/framework-components/ir';
-import { castAs } from '@prisma-next/utils/casts';
-import type { Type } from 'arktype';
+import { StorageTableSchema, StorageValueSetSchema } from './ir/storage-entry-schemas';
 import { StorageTable, type StorageTableInput } from './ir/storage-table';
 import { StorageValueSet, type StorageValueSetInput } from './ir/storage-value-set';
-import { StorageTableSchema, StorageValueSetSchema } from './validators';
 
 export const tableEntityKind: EntityKindDescriptor<StorageTableInput, StorageTable> = {
   kind: 'table',
-  schema: castAs<Type<StorageTableInput>>(StorageTableSchema),
+  schema: StorageTableSchema,
   construct: (input) => new StorageTable(input),
 };
 
 export const valueSetEntityKind: EntityKindDescriptor<StorageValueSetInput, StorageValueSet> = {
   kind: 'valueSet',
-  schema: castAs<Type<StorageValueSetInput>>(StorageValueSetSchema),
+  schema: StorageValueSetSchema,
   construct: (input) => new StorageValueSet(input),
 };
 

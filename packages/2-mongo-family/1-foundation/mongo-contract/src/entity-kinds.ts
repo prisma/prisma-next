@@ -2,14 +2,12 @@ import type {
   AnyEntityKindDescriptor,
   EntityKindDescriptor,
 } from '@prisma-next/framework-components/ir';
-import { castAs } from '@prisma-next/utils/casts';
-import type { Type } from 'arktype';
 import { StorageCollectionSchema } from './contract-schema';
 import { MongoCollection, type MongoCollectionInput } from './ir/mongo-collection';
 
 export const collectionEntityKind: EntityKindDescriptor<MongoCollectionInput, MongoCollection> = {
   kind: 'collection',
-  schema: castAs<Type<MongoCollectionInput>>(StorageCollectionSchema),
+  schema: StorageCollectionSchema,
   construct: (input) => new MongoCollection(input),
 };
 

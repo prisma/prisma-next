@@ -12,48 +12,40 @@ import {
   type Namespace,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import { blindCast, castAs } from '@prisma-next/utils/casts';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
+import { composeSqlEntityKinds } from './entity-kinds';
 import { buildSqlNamespaceMap } from './ir/build-sql-namespace';
+
+export {
+  CheckConstraintSchema,
+  ColumnDefaultFunctionSchema,
+  ColumnDefaultLiteralSchema,
+  ColumnDefaultSchema,
+  ForeignKeyReferenceSchema,
+  ForeignKeySchema,
+  ForeignKeySourceSchema,
+  IndexSchema,
+  ReferentialActionSchema,
+  StorageTableSchema,
+  StorageValueSetSchema,
+} from './ir/storage-entry-schemas';
+
 import { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 import {
-  type ForeignKeyInput,
-  type ForeignKeyReferenceInput,
-  type PrimaryKeyInput,
-  type ReferentialAction,
   type SqlModelStorage,
   SqlStorage,
   type SqlStorageInput,
   type StorageTable,
   type StorageTypeInstanceInput,
-  type UniqueConstraintInput,
 } from './types';
 
-type ColumnDefaultLiteral = {
-  readonly kind: 'literal';
-  readonly value: string | number | boolean | Record<string, unknown> | unknown[] | null;
-};
-type ColumnDefaultFunction = { readonly kind: 'function'; readonly expression: string };
-const literalKindSchema = type("'literal'");
-const functionKindSchema = type("'function'");
 const generatorKindSchema = type("'generator'");
 const ControlPolicySchema = type("'managed' | 'tolerated' | 'external' | 'observed'");
 const generatorIdSchema = type('string').narrow((value, ctx) => {
   return /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(value) ? true : ctx.mustBe('a flat generator id');
 });
-
-export const ColumnDefaultLiteralSchema = type.declare<ColumnDefaultLiteral>().type({
-  kind: literalKindSchema,
-  value: 'string | number | boolean | null | unknown[] | Record<string, unknown>',
-});
-
-export const ColumnDefaultFunctionSchema = type.declare<ColumnDefaultFunction>().type({
-  kind: functionKindSchema,
-  expression: 'string',
-});
-
-export const ColumnDefaultSchema = ColumnDefaultLiteralSchema.or(ColumnDefaultFunctionSchema);
 
 const ExecutionMutationDefaultValueSchema = type({
   '+': 'reject',
@@ -82,37 +74,12 @@ const ExecutionSchema = type({
   },
 });
 
-const StorageValueSetRefSchema = type({
-  plane: "'storage'",
-  namespaceId: 'string',
-  entityKind: "'valueSet'",
-  entityName: 'string',
-  'spaceId?': 'string',
-});
-
 const DomainEnumRefSchema = type({
   plane: "'domain'",
   namespaceId: 'string',
   entityKind: "'enum'",
   entityName: 'string',
   'spaceId?': 'string',
-});
-
-const StorageColumnSchema = type({
-  '+': 'reject',
-  nativeType: 'string',
-  codecId: 'string',
-  nullable: 'boolean',
-  'typeParams?': 'Record<string, unknown>',
-  'typeRef?': 'string',
-  'default?': ColumnDefaultSchema,
-  'control?': ControlPolicySchema,
-  'valueSet?': StorageValueSetRefSchema,
-}).narrow((col, ctx) => {
-  if (col.typeParams !== undefined && col.typeRef !== undefined) {
-    return ctx.mustBe('a column with either typeParams or typeRef, not both');
-  }
-  return true;
 });
 
 /**
@@ -134,18 +101,6 @@ const StorageTypeInstanceSchema = type
 const DocumentScopedStorageTypeSchema = StorageTypeInstanceSchema;
 
 /**
- * Storage value-set entry under `storage.namespaces[id].entries.valueSet[name]`.
- * Carries a `kind: 'valueSet'` discriminator (enumerable, survives JSON) and an
- * ordered `values` array of codec-encoded permitted values.
- */
-export const StorageValueSetSchema = type({
-  kind: "'valueSet'",
-  values: type('string | number | boolean | null | unknown[] | Record<string, unknown>')
-    .array()
-    .readonly(),
-});
-
-/**
  * Domain enum entry under `domain.namespaces[id].enum[name]`.
  * Carries the codec id and an ordered `members` array of `{name, value}` pairs.
  */
@@ -160,70 +115,6 @@ export const ContractEnumSchema = type({
     .readonly(),
 });
 
-const PrimaryKeySchema = type.declare<PrimaryKeyInput>().type({
-  columns: type.string.array().readonly(),
-  'name?': 'string',
-});
-
-const UniqueConstraintSchema = type.declare<UniqueConstraintInput>().type({
-  columns: type.string.array().readonly(),
-  'name?': 'string',
-});
-
-export const IndexSchema = type({
-  columns: type.string.array().readonly(),
-  'name?': 'string',
-  'type?': 'string',
-  'options?': 'Record<string, unknown>',
-});
-
-export const ForeignKeyReferenceSchema = type({
-  '+': 'reject',
-  namespaceId: 'string',
-  tableName: 'string',
-  columns: type.string.array().readonly(),
-  'spaceId?': 'string',
-}) satisfies Type<ForeignKeyReferenceInput>;
-
-export const ForeignKeySourceSchema = type({
-  '+': 'reject',
-  namespaceId: 'string',
-  tableName: 'string',
-  columns: type.string.array().readonly(),
-}) satisfies Type<ForeignKeyReferenceInput>;
-
-export const ReferentialActionSchema = type
-  .declare<ReferentialAction>()
-  .type("'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'");
-
-export const ForeignKeySchema = type.declare<ForeignKeyInput>().type({
-  source: ForeignKeySourceSchema,
-  target: ForeignKeyReferenceSchema,
-  'name?': 'string',
-  'onDelete?': ReferentialActionSchema,
-  'onUpdate?': ReferentialActionSchema,
-  constraint: 'boolean',
-  index: 'boolean',
-});
-
-export const CheckConstraintSchema = type({
-  '+': 'reject',
-  name: 'string',
-  column: 'string',
-  valueSet: StorageValueSetRefSchema,
-});
-
-export const StorageTableSchema = type({
-  '+': 'reject',
-  columns: type({ '[string]': StorageColumnSchema }),
-  'primaryKey?': PrimaryKeySchema,
-  uniques: UniqueConstraintSchema.array().readonly(),
-  indexes: IndexSchema.array().readonly(),
-  foreignKeys: ForeignKeySchema.array().readonly(),
-  'control?': ControlPolicySchema,
-  'checks?': CheckConstraintSchema.array().readonly(),
-});
-
 /**
  * Derives a schema map from a descriptor map: maps each kind's key to its
  * `schema` field. Used by validation functions to validate entries.
@@ -231,31 +122,10 @@ export const StorageTableSchema = type({
 function schemaViewOf(
   kinds: ReadonlyMap<string, AnyEntityKindDescriptor>,
 ): ReadonlyMap<string, Type<unknown>> {
-  return new Map([...kinds].map(([k, d]) => [k, castAs<Type<unknown>>(d.schema)]));
+  return new Map([...kinds].map(([k, d]) => [k, d.schema]));
 }
 
-/**
- * Default SQL entry kind descriptors used for module-level schema constants.
- * Inline to avoid circular import with entity-kinds.ts.
- */
-const DEFAULT_SQL_KINDS: ReadonlyMap<string, AnyEntityKindDescriptor> = new Map([
-  [
-    'table',
-    {
-      kind: 'table',
-      schema: castAs<Type<never>>(StorageTableSchema),
-      construct: (input: never) => input,
-    },
-  ],
-  [
-    'valueSet',
-    {
-      kind: 'valueSet',
-      schema: castAs<Type<never>>(StorageValueSetSchema),
-      construct: (input: never) => input,
-    },
-  ],
-]);
+const DEFAULT_SQL_KINDS = composeSqlEntityKinds();
 
 /**
  * Builds the per-namespace entry schema for `storage.namespaces[id]`.
@@ -290,7 +160,10 @@ export function createNamespaceEntrySchema(
           expected: `entries["${key}"] in namespace "${ns.id}" must be an object`,
         });
       }
-      const entrySchema = castAs<Type<unknown>>(schemas.get(key));
+      const entrySchema = blindCast<
+        Type<unknown>,
+        'knownKinds.has(key) guarantees schemas.get(key) is defined'
+      >(schemas.get(key));
       for (const [, value] of Object.entries(innerMap)) {
         const parsed = entrySchema(value);
         if (parsed instanceof type.errors) {
