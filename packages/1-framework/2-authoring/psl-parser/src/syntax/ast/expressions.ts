@@ -258,9 +258,8 @@ export class ObjectFieldAst implements AstNode {
 
   /**
    * The field's logical key name, unquoted. An identifier key (`length:`) yields
-   * its text; a string-literal key (`"length":`, accepted for `parsePslDocument`
-   * parity) yields the decoded string. `undefined` when the field carries no key
-   * node.
+   * its text; a string-literal key (`"length":`) yields the decoded string.
+   * `undefined` when the field carries no key node.
    */
   keyName(): string | undefined {
     for (const child of this.syntax.children()) {

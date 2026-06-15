@@ -13,7 +13,7 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 
 ## Responsibilities
 
-- Interpret `ParsePslDocumentResult` into SQL `Contract`
+- Interpret `ResolvedDocument` into SQL `Contract`
 - Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`, `@@control`)
 - Interpret SQL timestamp semantics: `DateTime @default(now())` (or the equivalent `temporal.createdAt()` field-preset call) as a storage default, and `temporal.updatedAt()` as an execution mutation default
 - Lower shared constructor expressions in both `types {}` blocks and inline field positions (for example `ShortName = sql.String(length: 35)` and `embedding pgvector.Vector(length: 1536)?`)
@@ -39,7 +39,7 @@ Determinism note:
 
 The **pure interpreter entrypoint** specifically excludes:
 - File I/O (`schema.prisma` reading)
-- PSL parsing (`parsePslDocument`)
+- PSL parsing (handled upstream by the caller; the provider calls `parse` + `resolve` from `@prisma-next/psl-parser/syntax`)
 - Artifact emission (`contract.json`, `contract.d.ts`) and hashing
 - CLI or ControlClient orchestration
 
@@ -104,8 +104,8 @@ Contract-level default (specifier options bag):
 flowchart LR
   config[prisma-next.config.ts] --> providerHelper[@prisma-next/sql-contract-psl/provider]
   providerHelper --> fsRead[read schema.prisma]
-  fsRead --> parser[@prisma-next/psl-parser]
-  parser --> parsed[ParsePslDocumentResult]
+  fsRead --> parser[@prisma-next/psl-parser/syntax]
+  parser --> parsed[ResolvedDocument]
   parsed --> interpreter[@prisma-next/sql-contract-psl]
   interpreter --> irResult[Result_Contract_Diagnostics]
   irResult --> emit[Framework emit pipeline]

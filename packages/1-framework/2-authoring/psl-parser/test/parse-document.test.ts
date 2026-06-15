@@ -705,7 +705,7 @@ describe('parse() object-literal missing-colon recovery', () => {
     `);
   });
 
-  it('accepts a string-literal key inside a block (parsePslDocument parity)', () => {
+  it('accepts a string-literal key inside a block', () => {
     const source = 'datasource db {\n  x = { a: 1, "k": 2 }\n}';
     const result = parse(source);
     expect(greenText(result.document.syntax.green)).toBe(source); // round-trip holds

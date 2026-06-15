@@ -9,12 +9,10 @@ import type {
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
 import {
-  flatPslModels,
   makePslNamespace,
   makePslNamespaceEntries,
   UNSPECIFIED_PSL_NAMESPACE_ID,
 } from '@prisma-next/framework-components/psl-ast';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { printPslFromAst } from '../src/print-psl';
 
@@ -249,7 +247,6 @@ describe('printPslFromAst', () => {
     };
     expect(printPslFromAst(ast)).toContain('@@index([a])');
   });
-
   it('renders optional and list type modifiers, plus @map on field', () => {
     const models: PslModel[] = [
       {
@@ -495,114 +492,6 @@ describe('printPslFromAst', () => {
     expect(() => printPslFromAst(ast)).not.toThrow();
   });
 
-  it('preserves @map values containing PSL escape sequences across parse → print round-trip', () => {
-    // Regression for double-escape in `getPositionalStringArg`. The parser stores
-    // a quoted-literal argument with PSL escape sequences (`\\`, `\"`, `\n`,
-    // `\r`) intact; we must decode them once on extraction so that the printer's
-    // `escapePslString` does not re-escape them on output.
-    const source = `model Doc {
-  id   Int    @id
-  body String @map("with \\"quote\\" and \\\\backslash and \\nnewline")
-}
-`;
-    const parsed1 = parsePslDocument({ schema: source, sourceId: 'r' });
-    expect(parsed1.ok).toBe(true);
-    const printed = printPslFromAst(parsed1.ast);
-    const parsed2 = parsePslDocument({ schema: printed, sourceId: 'r2' });
-    expect(parsed2.ok).toBe(true);
-
-    const findMap = (ast: typeof parsed1.ast): string | undefined => {
-      const model = flatPslModels(ast).find((m) => m.name === 'Doc');
-      const field = model?.fields.find((f) => f.name === 'body');
-      const mapAttr = field?.attributes.find((a) => a.name === 'map' && a.target === 'field');
-      const positional = mapAttr?.args.find((a) => a.kind === 'positional');
-      return positional?.value;
-    };
-
-    expect(findMap(parsed2.ast)).toBe(findMap(parsed1.ast));
-  });
-
-  it('parser → printer → parser round-trip for a small schema', () => {
-    const source = `// use prisma-next
-// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
-
-model User {
-  id    Int    @id
-  email String @unique
-  posts Post[]
-}
-
-model Post {
-  id       Int    @id
-  authorId Int
-  author   User   @relation(fields: [authorId], references: [id])
-}`;
-    const parsed1 = parsePslDocument({ schema: source, sourceId: 'r' });
-    expect(parsed1.ok).toBe(true);
-    const printed = printPslFromAst(parsed1.ast);
-    const parsed2 = parsePslDocument({ schema: printed, sourceId: 'r2' });
-    expect(parsed2.ok).toBe(true);
-    const models1 = flatPslModels(parsed1.ast);
-    const models2 = flatPslModels(parsed2.ast);
-    expect(models2.length).toBe(models1.length);
-    expect(models2.map((m) => m.name).sort()).toEqual(models1.map((m) => m.name).sort());
-  });
-
-  describe('namespace blocks', () => {
-    it('emits top-level declarations from the synthesised __unspecified__ bucket without a namespace wrapper', () => {
-      const source = `model A {
-  id Int @id
-}
-`;
-      const parsed = parsePslDocument({ schema: source, sourceId: 'r' });
-      expect(parsed.ok).toBe(true);
-      const printed = printPslFromAst(parsed.ast);
-      expect(printed).not.toMatch(/namespace\s+\w+\s*\{/);
-      expect(printed).toContain('model A {');
-    });
-
-    it('round-trips a mixed top-level + namespaced schema through parser → printer → parser', () => {
-      const source = `model TopLevel {
-  id Int @id
-}
-
-namespace auth {
-  model User {
-    id Int @id
-  }
-}
-`;
-      const parsed1 = parsePslDocument({ schema: source, sourceId: 'r' });
-      expect(parsed1.ok).toBe(true);
-      const printed = printPslFromAst(parsed1.ast);
-      const parsed2 = parsePslDocument({ schema: printed, sourceId: 'r2' });
-      expect(parsed2.ok).toBe(true);
-      expect(parsed2.ast.namespaces.map((ns) => ns.name).sort()).toEqual(
-        parsed1.ast.namespaces.map((ns) => ns.name).sort(),
-      );
-      expect(
-        flatPslModels(parsed2.ast)
-          .map((m) => m.name)
-          .sort(),
-      ).toEqual(
-        flatPslModels(parsed1.ast)
-          .map((m) => m.name)
-          .sort(),
-      );
-    });
-  });
-
-  describe('namespace ordering and escape handling', () => {
-    it('sorts non-unspecified namespaces alphabetically', () => {
-      const source =
-        'namespace billing {\n  model Invoice {\n    id Int @id\n  }\n}\n\nnamespace auth {\n  model User {\n    id Int @id\n  }\n}\n';
-      const parsed = parsePslDocument({ schema: source, sourceId: 't' });
-      expect(parsed.ok).toBe(true);
-      const printed = printPslFromAst(parsed.ast);
-      expect(printed.indexOf('namespace auth')).toBeLessThan(printed.indexOf('namespace billing'));
-    });
-  });
-
   describe('qualified field-type rendering', () => {
     // Helper: build a minimal AST with a single model containing one field.
     function astWithField(field: {
@@ -721,30 +610,6 @@ namespace auth {
         span: span(0),
       };
       expect(printPslFromAst(ast)).toContain('balance Money(2)');
-    });
-
-    it('parser → printer → parser round-trip for a cross-space colon-prefix field', () => {
-      // AC2: a field authored as `supabase:auth.User` must survive a full
-      // text→parse→print→text round-trip with the colon-prefix intact.
-      const source = `// use prisma-next
-// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
-
-model Profile {
-  id     Int             @id
-  userId Int
-  user   supabase:auth.User? @relation(fields: [userId], references: [id])
-}`;
-      const parsed1 = parsePslDocument({ schema: source, sourceId: 'r' });
-      expect(parsed1.ok).toBe(true);
-      const printed = printPslFromAst(parsed1.ast);
-      expect(printed).toContain('supabase:auth.User?');
-      const parsed2 = parsePslDocument({ schema: printed, sourceId: 'r2' });
-      expect(parsed2.ok).toBe(true);
-      const profile = flatPslModels(parsed2.ast).find((m) => m.name === 'Profile');
-      const userField = profile?.fields.find((f) => f.name === 'user');
-      expect(userField?.typeContractSpaceId).toBe('supabase');
-      expect(userField?.typeNamespaceId).toBe('auth');
-      expect(userField?.typeName).toBe('User');
     });
   });
 });

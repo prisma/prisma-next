@@ -627,7 +627,7 @@ function buildNamespace(
     }
     const name = identifierText(block.name());
     if (name === undefined) continue;
-    validateExtensionBlock(block, name, descriptor, bucket.id, resolver, extensionContext);
+    validateExtensionBlockParams(block, name, descriptor, bucket.id, resolver, extensionContext);
     if (extensionBlocks.has(name)) continue;
     extensionBlocks.set(name, { name, namespaceId: bucket.id, syntax: block.syntax });
   }
@@ -740,11 +740,11 @@ function collectBlockDescriptors(
  * Descriptor-driven validation of one generic block against the descriptor that
  * claims its keyword, computed directly over the CST {@link KeyValuePairAst}
  * entries. Reproduces the message/code corpus of the legacy
- * `validateExtensionBlock` (unknown / missing-required / option-out-of-set /
+ * Validates extension block parameters (unknown / missing-required / option-out-of-set /
  * invalid-value / unresolved-ref) plus first-occurrence-wins duplicate detection
  * over the parsed entries.
  */
-function validateExtensionBlock(
+function validateExtensionBlockParams(
   block: GenericBlockDeclarationAst,
   blockName: string,
   descriptor: AuthoringPslBlockDescriptor,

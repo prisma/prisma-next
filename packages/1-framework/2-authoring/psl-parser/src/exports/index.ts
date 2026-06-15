@@ -1,6 +1,4 @@
 export type {
-  ParsePslDocumentInput,
-  ParsePslDocumentResult,
   PslAttribute,
   PslAttributeArgument,
   PslAttributeNamedArgument,
@@ -38,4 +36,3 @@ export {
   namespacePslExtensionBlocks,
 } from '@prisma-next/framework-components/psl-ast';
 export { getPositionalArgument, parseQuotedStringLiteral } from '../attribute-helpers';
-export { parsePslDocument } from '../parser';

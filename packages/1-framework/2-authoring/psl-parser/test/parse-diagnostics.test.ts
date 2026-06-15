@@ -30,7 +30,7 @@ function diagnosticFor(source: string, code: string) {
   return { result, message: diagnostic.message, diagnostic };
 }
 
-describe('parse() syntactic diagnostics carry parsePslDocument-parity messages', () => {
+describe('parse() syntactic diagnostics', () => {
   it('reports an unterminated block, anchored on the opening brace', () => {
     const source = 'model User {\n  id Int';
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_UNTERMINATED_BLOCK');
@@ -570,10 +570,8 @@ describe('parse() diagnoses unterminated string literals', () => {
 
 describe('parse() attribute attachment is newline-insensitive', () => {
   // F06: a standalone attribute on the line after a field attaches to that
-  // field, because newlines are trivia in this grammar. This is a known,
-  // intentional divergence from `parsePslDocument`'s line semantics, to be
-  // revisited at consumer-repoint (see the spec/plan open item). This test pins
-  // the current behaviour so the follow-up has a signal; no code change.
+  // field, because newlines are trivia in this grammar. This test pins the
+  // current behaviour so any future change has a signal; no code change.
   it('attaches a standalone attribute on the next line to the preceding field', () => {
     const source = 'model M {\n  id Int\n  @id\n}';
     const result = parse(source);

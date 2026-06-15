@@ -607,7 +607,7 @@ describe('argument-position object literal', () => {
     `);
   });
 
-  it('accepts a string-literal key (parsePslDocument parity), exposing the unquoted name', () => {
+  it('accepts a string-literal key, exposing the unquoted name', () => {
     const source = '{ "k": 1 }';
     const { node, diagnostics } = parse(source, parseAttributeArg);
     expect(greenText(node)).toBe(source); // round-trip holds, object terminated

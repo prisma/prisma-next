@@ -40,7 +40,7 @@ function onlyTypeConstructorArgs(source: string): readonly ExpressionAst[] {
   );
 }
 
-describe('parse() accepts single-quoted string literals (parsePslDocument parity)', () => {
+describe('parse() accepts single-quoted string literals', () => {
   it('tokenizes a single-quoted positional argument and unquotes it via value()', () => {
     const args = onlyTypeConstructorArgs("types {\n  T = sql.Enum('Tag', ['a'])\n}\n");
     const first = args[0];
@@ -74,7 +74,7 @@ describe('parse() accepts single-quoted string literals (parsePslDocument parity
   });
 });
 
-describe('parse() accepts double-quoted object-literal keys (parsePslDocument parity)', () => {
+describe('parse() accepts double-quoted object-literal keys', () => {
   it('accepts a string-literal key with no diagnostic and exposes the unquoted name', () => {
     const args = onlyTypeConstructorArgs('types {\n  T = sql.String({ "length": 35 })\n}\n');
     const object = args[0] as ObjectLiteralExprAst;
@@ -94,7 +94,7 @@ describe('parse() accepts double-quoted object-literal keys (parsePslDocument pa
   });
 });
 
-describe('parse() accepts qualified default-function calls (parsePslDocument parity)', () => {
+describe('parse() accepts qualified default-function calls', () => {
   it('parses ns.fn() in default-value position as one qualified FunctionCall', () => {
     const source = 'model M {\n  id Int @default(temporal.updatedAt())\n}\n';
     const result = parse(source);
@@ -117,7 +117,7 @@ describe('parse() accepts qualified default-function calls (parsePslDocument par
   });
 });
 
-describe('resolve() reads qualified @@-block attributes (parsePslDocument parity)', () => {
+describe('resolve() reads qualified @@-block attributes', () => {
   it('reconstructs the namespace-qualified name for a qualified model attribute', () => {
     const source = 'model M {\n  id Int\n  @@pgvector.index(length: 3)\n}\n';
     const result = parse(source);

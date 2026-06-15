@@ -297,10 +297,9 @@ export function parseObjectField(cursor: Cursor): GreenNode {
   if (cursor.peekKind() === 'Ident') {
     parseIdentifier(cursor); // identifier key
   } else if (cursor.peekKind() === 'StringLiteral') {
-    // A string-literal key (e.g. `{ "length": 35 }`) is accepted for parity with
-    // `parsePslDocument`; its logical name is the unquoted string. Consuming it
-    // as a `StringLiteralExpr` keeps the key node structured so the field and
-    // enclosing block stay in sync.
+    // A string-literal key (e.g. `{ "length": 35 }`) is accepted; its logical
+    // name is the unquoted string. Consuming it as a `StringLiteralExpr` keeps
+    // the key node structured so the field and enclosing block stay in sync.
     parseStringLiteralExpr(cursor);
   }
   if (cursor.peekKind() === 'Colon') {

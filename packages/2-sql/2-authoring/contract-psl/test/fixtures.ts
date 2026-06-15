@@ -658,8 +658,6 @@ export interface ParseAndResolveInput {
  * are merged onto the document the interpreter reads. Returns the
  * `{ document, sourceId, sourceFile }` triple the interpreter input requires —
  * spread directly into `interpretPslDocumentToSqlContract({ ...document })`.
- * Takes the same `{ schema, sourceId, pslBlockDescriptors, codecLookup }` input
- * shape the legacy `parsePslDocument` accepted.
  */
 export function parseAndResolve(input: ParseAndResolveInput): {
   document: ResolvedDocument;

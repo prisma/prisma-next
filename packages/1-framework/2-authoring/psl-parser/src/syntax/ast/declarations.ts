@@ -10,9 +10,8 @@ import { TypeAnnotationAst } from './type-annotation';
 
 /**
  * What may appear inside a `namespace` block: models, enums, composite types,
- * and extension (block) declarations. Mirrors what `parsePslDocument` accepts
- * in a namespace body. `types {}` blocks and nested `namespace` blocks are
- * document-only, so they are not namespace members.
+ * and extension (block) declarations. `types {}` blocks and nested `namespace`
+ * blocks are document-only, so they are not namespace members.
  */
 export type NamespaceMemberAst =
   | ModelDeclarationAst
