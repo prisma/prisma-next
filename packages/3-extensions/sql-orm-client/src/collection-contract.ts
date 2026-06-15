@@ -355,7 +355,7 @@ export function resolveIncludeRelation(
   };
 }
 
-function resolveThrough(
+export function resolveThrough(
   contract: Contract<SqlStorage>,
   through: ContractRelationThrough | undefined,
 ): ResolvedThrough | undefined {

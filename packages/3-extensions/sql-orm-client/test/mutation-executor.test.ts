@@ -7,13 +7,17 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  assertJunctionParentMetadataLength,
+  assertJunctionTargetMetadataLength,
   buildPrimaryKeyFilterFromRow,
   executeNestedCreateMutation,
   executeNestedUpdateMutation,
   hasNestedMutationCallbacks,
+  type JunctionRelationDefinition,
 } from '../src/mutation-executor';
 import type { MockRuntime, TestContract } from './helpers';
 import {
+  buildExecutionDefaultJunctionContract,
   buildManyToManyContract,
   buildManyToManyContractWithTargetRelation,
   buildTestContextFromContract,
@@ -591,54 +595,67 @@ describe('mutation-executor', () => {
     expect(Object.keys(link).sort()).toEqual(['child_id', 'parent_id', 'tenant_id']);
   });
 
-  it('executeNestedCreateMutation() rejects mismatched junction parent-column metadata', async () => {
-    const contract = buildManyToManyContract({
-      junctionTable: 'parent_child',
-      parentColumns: ['parent_id', 'tenant_id'],
-      childColumns: ['child_id'],
-      targetColumns: ['id'],
-    });
-    const runtime = createMockRuntime();
-    runtime.setNextResults([[{ id: 1 }]]);
-
-    await expect(
-      executeNestedCreateMutation({
-        context: { ...getTestContext(), contract },
-        runtime,
+  // Mismatched junction column counts can't be authored — the contract-builder
+  // rejects an M:N relation whose junction FK pairing is uneven before a
+  // contract ever exists. These two cases exercise the defensive length guards
+  // directly with a typed JunctionRelationDefinition (a guard input, not a
+  // contract).
+  function junctionRelationDefinition(
+    through: Pick<JunctionRelationDefinition['through'], 'parentColumns' | 'childColumns'> & {
+      readonly targetColumns: readonly string[];
+    },
+    columns: {
+      readonly localColumns: readonly string[];
+      readonly targetColumns: readonly string[];
+    },
+  ): JunctionRelationDefinition {
+    return {
+      relationName: 'children',
+      relatedModelName: 'Child',
+      relatedNamespaceId: 'public',
+      relatedTableName: 'children',
+      cardinality: 'N:M',
+      localColumns: columns.localColumns,
+      targetColumns: columns.targetColumns,
+      through: {
+        table: 'parent_child',
         namespaceId: 'public',
-        modelName: 'Parent',
-        data: {
-          id: 1,
-          children: (children: { connect: (criterion: Record<string, unknown>) => unknown }) =>
-            children.connect({ id: 10 }),
-        } as never,
-      }),
-    ).rejects.toThrow(/parentColumns.*localColumns/);
+        parentColumns: through.parentColumns,
+        childColumns: through.childColumns,
+        targetColumns: through.targetColumns,
+        requiredPayloadColumns: [],
+      },
+    };
+  }
+
+  it('assertJunctionParentMetadataLength() rejects mismatched junction parent-column metadata', () => {
+    const relation = junctionRelationDefinition(
+      {
+        parentColumns: ['parent_id', 'tenant_id'],
+        childColumns: ['child_id'],
+        targetColumns: ['id'],
+      },
+      { localColumns: ['id'], targetColumns: ['id'] },
+    );
+
+    expect(() => assertJunctionParentMetadataLength(relation)).toThrow(
+      /parentColumns.*localColumns/,
+    );
   });
 
-  it('executeNestedCreateMutation() rejects mismatched junction target-column metadata', async () => {
-    const contract = buildManyToManyContract({
-      junctionTable: 'parent_child',
-      parentColumns: ['parent_id'],
-      childColumns: ['child_id', 'tenant_id'],
-      targetColumns: ['id'],
-    });
-    const runtime = createMockRuntime();
-    runtime.setNextResults([[{ id: 1 }], [{ id: 10 }]]);
+  it('assertJunctionTargetMetadataLength() rejects mismatched junction target-column metadata', () => {
+    const relation = junctionRelationDefinition(
+      {
+        parentColumns: ['parent_id'],
+        childColumns: ['child_id', 'tenant_id'],
+        targetColumns: ['id'],
+      },
+      { localColumns: ['id'], targetColumns: ['id'] },
+    );
 
-    await expect(
-      executeNestedCreateMutation({
-        context: { ...getTestContext(), contract },
-        runtime,
-        namespaceId: 'public',
-        modelName: 'Parent',
-        data: {
-          id: 1,
-          children: (children: { connect: (criterion: Record<string, unknown>) => unknown }) =>
-            children.connect({ id: 10 }),
-        } as never,
-      }),
-    ).rejects.toThrow(/childColumns.*targetColumns/);
+    expect(() => assertJunctionTargetMetadataLength(relation)).toThrow(
+      /childColumns.*targetColumns/,
+    );
   });
 
   it('executeNestedCreateMutation() rejects duplicate resolved connect targets before any write', async () => {
@@ -1006,24 +1023,13 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedCreateMutation() M:N connect applies the execution default to the junction row', async () => {
-    const base = getTestContract();
-    const contract = {
-      ...base,
-      execution: {
-        ...base.execution,
-        mutations: {
-          defaults: [
-            ...(base.execution?.mutations.defaults ?? []),
-            {
-              ref: { table: 'user_roles', column: 'level' },
-              onCreate: { kind: 'generator', id: 'test-level' },
-            },
-          ],
-        },
-      },
-    } as unknown as TestContract;
+    // `level` is a NOT NULL junction payload column whose only default is an
+    // execution-time onCreate generator (no storage default), authored through
+    // the DSL via `field.generated`. The connect path must populate it before
+    // the INSERT, mirroring insertJunctionLink.
+    const contract = buildExecutionDefaultJunctionContract();
     // The defaults applier closes over the contract the context was created
-    // from, so the context must be built from the patched contract — spreading
+    // from, so the context must be built from this contract — spreading
     // `{ ...getTestContext(), contract }` would never see the new default.
     const context = buildTestContextFromContract(contract, {
       mutationDefaultGenerators: [{ id: 'test-level', generate: () => 5, stability: 'field' }],

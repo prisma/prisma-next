@@ -67,7 +67,7 @@ interface RelationDefinition {
   readonly through: JunctionThrough | undefined;
 }
 
-interface JunctionRelationDefinition extends RelationDefinition {
+export interface JunctionRelationDefinition extends RelationDefinition {
   readonly through: JunctionThrough;
 }
 
@@ -929,7 +929,7 @@ function assertJunctionMetadataLength(
   );
 }
 
-function assertJunctionParentMetadataLength(relation: JunctionRelationDefinition): void {
+export function assertJunctionParentMetadataLength(relation: JunctionRelationDefinition): void {
   assertJunctionMetadataLength(
     relation,
     'parentColumns',
@@ -939,7 +939,7 @@ function assertJunctionParentMetadataLength(relation: JunctionRelationDefinition
   );
 }
 
-function assertJunctionTargetMetadataLength(relation: JunctionRelationDefinition): void {
+export function assertJunctionTargetMetadataLength(relation: JunctionRelationDefinition): void {
   assertJunctionMetadataLength(
     relation,
     'childColumns',

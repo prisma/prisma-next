@@ -1,8 +1,9 @@
-import type { Contract as ContractShape } from '@prisma-next/contract/types';
-import type { ContractWithTypeMaps } from '@prisma-next/sql-contract/types';
+import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
+import { uuidv4 } from '@prisma-next/ids';
 import { expectTypeOf, test } from 'vitest';
 import type { MutationCreateInput, MutationUpdateInput } from '../src/types';
-import type { Contract, Models, TypeMaps } from './fixtures/generated/contract';
+import { defineContract, field, model, rel } from './contract-builder';
+import type { Contract } from './fixtures/generated/contract';
 
 type RoleCreate = MutationCreateInput<Contract, 'Role'>;
 type TagCreate = MutationCreateInput<Contract, 'Tag'>;
@@ -14,129 +15,107 @@ const roleCriterion = { id: 'admin' } as { readonly id: NonNullable<RoleCreate['
 const tagCriterion = { id: 'featured' } as { readonly id: NonNullable<TagCreate['id']> };
 const roleUpdate = { name: 'Admin' } as RoleUpdate;
 
-type ShadowJunctionModel = {
-  readonly fields: {
-    readonly userId: {
-      readonly nullable: false;
-      readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-    };
-    readonly tagId: {
-      readonly nullable: false;
-      readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-    };
-    readonly shadowLevel: {
-      readonly nullable: false;
-      readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-    };
-  };
-  readonly relations: Record<string, never>;
-  readonly storage: {
-    readonly table: 'user_tags';
-    readonly namespaceId: 'shadow';
-    readonly fields: {
-      readonly userId: { readonly column: 'user_id' };
-      readonly tagId: { readonly column: 'tag_id' };
-      readonly shadowLevel: { readonly column: 'shadow_level' };
-    };
-  };
-};
+// An execution-only-defaulted junction payload column: `level` is NOT NULL with
+// no storage default, and `field.generated` is the sole source of its onCreate
+// value. Authoring it through the DSL is the only way the runtime gate sees an
+// execution onCreate default (runtime counterpart: insertJunctionLink applies
+// the default before the INSERT). Derived with `typeof` — no synthetic types.
+const ExecRole = model('Role', {
+  fields: {
+    id: field.column(textColumn).id(),
+    name: field.column(textColumn).unique(),
+  },
+}).sql({ table: 'roles' });
 
-type ShadowedContract = ContractWithTypeMaps<
-  ContractShape<Contract['storage'], Models & { readonly ShadowUserTag: ShadowJunctionModel }>,
-  TypeMaps
->;
+const ExecUserRole = model('UserRole', {
+  fields: {
+    userId: field.column(int4Column).column('user_id'),
+    roleId: field.column(textColumn).column('role_id'),
+    // NOT NULL payload column whose only default is the execution-time onCreate
+    // generator — the arm that keeps create/connect enabled.
+    token: field.generated(uuidv4()),
+  },
+})
+  .attributes(({ fields, constraints }) => ({
+    id: constraints.id([fields.userId, fields.roleId]),
+  }))
+  .sql({ table: 'user_roles' });
 
-type JunctionFkPairFields = {
-  readonly userId: {
-    readonly nullable: false;
-    readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-  };
-  readonly tagId: {
-    readonly nullable: false;
-    readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-  };
-};
+const ExecUser = model('User', {
+  fields: {
+    id: field.column(int4Column).id(),
+    name: field.column(textColumn),
+    email: field.column(textColumn).unique(),
+  },
+})
+  .relations({
+    roles: rel.manyToMany(() => ExecRole, {
+      through: () => ExecUserRole,
+      from: 'userId',
+      to: 'roleId',
+    }),
+  })
+  .sql({ table: 'users' });
 
-// The junction's only payload field is `note`, whose `user_tags.note` storage
-// column is nullable — pins IsOptionalCreateField's nullable arm in isolation.
-type NullablePayloadJunctionModel = {
-  readonly fields: JunctionFkPairFields & {
-    readonly note: {
-      readonly nullable: true;
-      readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-    };
-  };
-  readonly relations: Record<string, never>;
-  readonly storage: {
-    readonly table: 'user_tags';
-    readonly namespaceId: 'public';
-    readonly fields: {
-      readonly userId: { readonly column: 'user_id' };
-      readonly tagId: { readonly column: 'tag_id' };
-      readonly note: { readonly column: 'note' };
-    };
-  };
-};
+const executionDefaultContract = defineContract({
+  models: { User: ExecUser, Role: ExecRole, UserRole: ExecUserRole },
+});
 
-// The junction's only payload field is `createdAt`, whose non-nullable
-// `user_tags.created_at` storage column carries a default — pins the
-// storage-default arm in isolation.
-type StorageDefaultPayloadJunctionModel = {
-  readonly fields: JunctionFkPairFields & {
-    readonly createdAt: {
-      readonly nullable: false;
-      readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-    };
-  };
-  readonly relations: Record<string, never>;
-  readonly storage: {
-    readonly table: 'user_tags';
-    readonly namespaceId: 'public';
-    readonly fields: {
-      readonly userId: { readonly column: 'user_id' };
-      readonly tagId: { readonly column: 'tag_id' };
-      readonly createdAt: { readonly column: 'created_at' };
-    };
-  };
-};
+type ExecutionDefaultedContract = typeof executionDefaultContract;
+type ExecRoleCreate = MutationCreateInput<ExecutionDefaultedContract, 'Role'>;
+const execRoleCreate = { id: 'admin', name: 'Admin' } as ExecRoleCreate;
+const execRoleCriterion = { id: 'admin' } as { readonly id: NonNullable<ExecRoleCreate['id']> };
 
-// The variant contracts keep the fixture's execution block so create-input
-// optionality elsewhere (e.g. the execution-defaulted `tags.id`) is unchanged.
-type NullablePayloadContract = ContractWithTypeMaps<
-  ContractShape<
-    Contract['storage'],
-    Omit<Models, 'UserTag'> & { readonly UserTag: NullablePayloadJunctionModel }
-  >,
-  TypeMaps
-> &
-  Pick<Contract, 'execution'>;
+// A pure-junction M:N whose junction lives in a non-`public` namespace: the
+// relation lookup must resolve the junction through its declared namespace, not
+// `public`. Authored through the DSL with a declared `shadow` namespace.
+const ShadowTarget = model('Target', {
+  fields: {
+    id: field.column(int4Column).id(),
+    label: field.column(textColumn).unique(),
+  },
+}).sql({ table: 'targets' });
 
-type StorageDefaultPayloadContract = ContractWithTypeMaps<
-  ContractShape<
-    Contract['storage'],
-    Omit<Models, 'UserTag'> & { readonly UserTag: StorageDefaultPayloadJunctionModel }
-  >,
-  TypeMaps
-> &
-  Pick<Contract, 'execution'>;
+const ShadowLink = model('UserTarget', {
+  namespace: 'shadow',
+  fields: {
+    userId: field.column(int4Column).column('user_id'),
+    targetId: field.column(int4Column).column('target_id'),
+  },
+})
+  .attributes(({ fields, constraints }) => ({
+    id: constraints.id([fields.userId, fields.targetId]),
+  }))
+  .sql({ table: 'user_targets' });
 
-// `user_roles.level` is NOT NULL without a storage default; an execution
-// onCreate default is the only thing turning the gate off — pins the
-// execution-default arm (runtime counterpart: insertJunctionLink applies
-// the default before the INSERT).
-type ExecutionDefaultedContract = Omit<Contract, 'execution'> & {
-  readonly execution: {
-    readonly executionHash: Contract['execution']['executionHash'];
-    readonly mutations: {
-      readonly defaults: readonly [
-        ...Contract['execution']['mutations']['defaults'],
-        {
-          readonly ref: { readonly table: 'user_roles'; readonly column: 'level' };
-          readonly onCreate: { readonly kind: 'generator'; readonly id: 'test-level' };
-        },
-      ];
-    };
-  };
+const shadowContract = defineContract({
+  namespaces: ['shadow'],
+  models: {
+    User: model('User', {
+      fields: {
+        id: field.column(int4Column).id(),
+        name: field.column(textColumn),
+        email: field.column(textColumn).unique(),
+      },
+    })
+      .relations({
+        targets: rel.manyToMany(() => ShadowTarget, {
+          through: () => ShadowLink,
+          from: 'userId',
+          to: 'targetId',
+        }),
+      })
+      .sql({ table: 'users' }),
+    Target: ShadowTarget,
+    UserTarget: ShadowLink,
+  },
+});
+
+type ShadowedContract = typeof shadowContract;
+type ShadowTargetCreate = MutationCreateInput<ShadowedContract, 'Target'>;
+const shadowTargetCreate = { id: 1, label: 'first' } as ShadowTargetCreate;
+const shadowTargetCriterion = { id: 1 } as {
+  readonly id: NonNullable<ShadowTargetCreate['id']>;
 };
 
 test('nested create on a relation whose junction has a required payload column is a type error', () => {
@@ -232,13 +211,22 @@ test('nested create on a pure junction relation is allowed', () => {
 test('pure junction relation lookup is namespace-aware', () => {
   type Input = MutationCreateInput<ShadowedContract, 'User'>;
 
-  const input: Input = {
+  const connectInput: Input = {
+    id: 1,
     name: 'Alice',
     email: 'alice@test.com',
-    tags: (mutator) => mutator.connect(tagCriterion),
+    targets: (mutator) => mutator.connect(shadowTargetCriterion),
   };
 
-  expectTypeOf(input).toExtend<Input>();
+  const createInput: Input = {
+    id: 1,
+    name: 'Alice',
+    email: 'alice@test.com',
+    targets: (mutator) => mutator.create(shadowTargetCreate),
+  };
+
+  expectTypeOf(connectInput).toExtend<Input>();
+  expectTypeOf(createInput).toExtend<Input>();
 });
 
 test('connect and disconnect remain available on a pure junction relation', () => {
@@ -271,7 +259,10 @@ test('bare disconnect stays accepted for a plain 1:N relation', () => {
 });
 
 test('nullable junction payload column keeps create and connect enabled', () => {
-  type Input = MutationCreateInput<NullablePayloadContract, 'User'>;
+  // The emitted `User.tags` junction `user_tags` carries a nullable `note`
+  // column alongside its FK pair, so the nullable-payload arm keeps create and
+  // connect open.
+  type Input = MutationCreateInput<Contract, 'User'>;
 
   const connectInput: Input = {
     name: 'Alice',
@@ -290,7 +281,10 @@ test('nullable junction payload column keeps create and connect enabled', () => 
 });
 
 test('storage-defaulted junction payload column keeps create and connect enabled', () => {
-  type Input = MutationCreateInput<StorageDefaultPayloadContract, 'User'>;
+  // The same `user_tags` junction also carries a NOT NULL `created_at` column
+  // with a `now()` storage default, so the storage-default arm likewise keeps
+  // create and connect open.
+  type Input = MutationCreateInput<Contract, 'User'>;
 
   const connectInput: Input = {
     name: 'Alice',
@@ -312,15 +306,17 @@ test('execution-defaulted junction payload column keeps create and connect enabl
   type Input = MutationCreateInput<ExecutionDefaultedContract, 'User'>;
 
   const connectInput: Input = {
+    id: 1,
     name: 'Alice',
     email: 'alice@test.com',
-    roles: (mutator) => mutator.connect(roleCriterion),
+    roles: (mutator) => mutator.connect(execRoleCriterion),
   };
 
   const createInput: Input = {
+    id: 1,
     name: 'Alice',
     email: 'alice@test.com',
-    roles: (mutator) => mutator.create(roleCreate),
+    roles: (mutator) => mutator.create(execRoleCreate),
   };
 
   expectTypeOf(connectInput).toExtend<Input>();
