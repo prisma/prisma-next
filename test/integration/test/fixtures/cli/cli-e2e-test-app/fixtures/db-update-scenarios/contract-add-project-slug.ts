@@ -12,17 +12,19 @@ import {
   model,
 } from '@prisma-next/postgres/contract-builder';
 
+const pgText = { codecId: 'pg/text@1', nativeType: 'text' } as const;
+
 const enums = {
   AccountStatus: enumType(
-    'account_status',
-    textColumn,
+    'AccountStatus',
+    pgText,
     member('ACTIVE'),
     member('INVITED'),
     member('SUSPENDED'),
   ),
   ProjectVisibility: enumType(
-    'project_visibility',
-    textColumn,
+    'ProjectVisibility',
+    pgText,
     member('PRIVATE'),
     member('TEAM'),
     member('PUBLIC'),
