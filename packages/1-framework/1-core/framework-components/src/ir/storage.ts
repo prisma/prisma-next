@@ -52,8 +52,16 @@ export function* elementCoordinates(
   }
 }
 
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === 'object' && value !== null;
+/**
+ * Strict plain-object guard: accepts only objects with `Object.prototype`
+ * or `null` as their prototype. Rejects arrays, class instances, and other
+ * non-plain objects. Used to distinguish raw-data records from IR class
+ * instances in validation and hydration paths.
+ */
+export function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value) as unknown;
+  return proto === Object.prototype || proto === null;
 }
 
 /**
@@ -69,9 +77,9 @@ export function entityAt<T = unknown>(
   const ns = storage.namespaces[coord.namespaceId];
   if (ns === undefined) return undefined;
   const entries = ns.entries;
-  if (!isRecord(entries)) return undefined;
+  if (!isPlainRecord(entries)) return undefined;
   const kindMap = entries[coord.entityKind];
-  if (!isRecord(kindMap)) return undefined;
+  if (!isPlainRecord(kindMap)) return undefined;
   if (!Object.hasOwn(kindMap, coord.entityName)) return undefined;
   return blindCast<T | undefined, 'caller asserts the entity type at this coordinate'>(
     kindMap[coord.entityName],

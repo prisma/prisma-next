@@ -6,7 +6,11 @@ import {
   CrossReferenceSchema,
 } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
-import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  isPlainRecord,
+  type Namespace,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
@@ -260,6 +264,7 @@ export function createSqlEntrySchemaRegistry(
 export function createNamespaceEntrySchema(
   registry: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
+  const knownKinds = new Set(registry.keys());
   return type({
     '+': 'reject',
     id: 'string',
@@ -270,8 +275,7 @@ export function createNamespaceEntrySchema(
       return ctx.mustBe('an entries object');
     }
     for (const [key, innerMap] of Object.entries(ns.entries)) {
-      const entrySchema = registry.get(key);
-      if (entrySchema === undefined) {
+      if (!knownKinds.has(key)) {
         return ctx.reject({
           expected: `entries key "${key}" in namespace "${ns.id}" is not a registered entity kind`,
         });
@@ -281,6 +285,7 @@ export function createNamespaceEntrySchema(
           expected: `entries["${key}"] in namespace "${ns.id}" must be an object`,
         });
       }
+      const entrySchema = registry.get(key)!;
       for (const [, value] of Object.entries(innerMap)) {
         const parsed = entrySchema(value);
         if (parsed instanceof type.errors) {
@@ -334,12 +339,6 @@ function eachStorageTable(storage: NamespacedStorageWalk) {
       table,
     })),
   );
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  const proto = Object.getPrototypeOf(value) as unknown;
-  return proto === Object.prototype || proto === null;
 }
 
 function findDuplicateValue(values: readonly string[]): string | undefined {
