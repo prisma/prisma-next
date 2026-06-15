@@ -508,7 +508,7 @@
     "storageHash": "sha256:664e11eed7f1d28dcf79412d71801ffa7c0a6369c717c38a0aa655b033e2213e"
   },
   "execution": {
-    "executionHash": "sha256:70c6ceb0ed79d5888519ec84bf32e31a056283fa8d5c7b5c1ba65b709f8595c8",
+    "executionHash": "sha256:b5689b5ab97f808cfa98afa9bb2b762a559d895cef8c68395c9ab4611166f605",
     "mutations": {
       "defaults": [
         {
@@ -529,6 +529,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "__unbound__",
             "table": "tag"
           }
         },
@@ -539,6 +540,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "__unbound__",
             "table": "user"
           }
         }
