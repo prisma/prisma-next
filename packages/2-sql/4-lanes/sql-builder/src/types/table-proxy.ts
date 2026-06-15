@@ -1,11 +1,10 @@
-import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
 import type {
   ExtractCodecTypes,
   ExtractFieldInputTypes,
-  ExtractFieldOutputTypes,
   ExtractQueryOperationTypes,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
+import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
 import type { Expression, FieldProxy, Functions } from '../expression';
 import type {
   DefaultScope,
@@ -16,34 +15,76 @@ import type {
   Scope,
   StorageTableToScopeTable,
 } from '../scope';
-import type { TableProxyContract, UnboundTables } from './db';
+import type { NamespaceTable, TableProxyContract } from './db';
 import type { DeleteQuery, InsertQuery, InsertValues, UpdateQuery } from './mutation-query';
 import type { WithJoin, WithSelect } from './shared';
 
-/**
- * The literal columns of `table`, read straight off
- * `storage.namespaces[ns].entries.table[table].columns`. Going through
- * `UnboundTables` widens columns to the `StorageColumn` class shape and erases
- * the literal `valueSet` ref, so the ref-following path reads the columns here.
- * Unions the matching table's columns across every namespace that declares it.
- */
-type LiteralColumnsOf<C extends TableProxyContract, TableName extends string> = {
-  [NsId in keyof C['storage']['namespaces']]: C['storage']['namespaces'][NsId] extends {
-    readonly entries: { readonly table: infer Tables };
-  }
-    ? TableName extends keyof Tables
-      ? Tables[TableName] extends { readonly columns: infer Columns }
-        ? Columns
-        : never
+type FindModelForTable<
+  C extends TableProxyContract,
+  NsId extends string,
+  TableName extends string,
+> = C['domain']['namespaces'][NsId]['models'] extends infer Models extends Record<string, unknown>
+  ? {
+      [M in keyof Models & string]: Models[M] extends {
+        readonly storage: { readonly table: TableName };
+      }
+        ? M
+        : never;
+    }[keyof Models & string]
+  : never;
+
+type FindFieldForColumn<
+  C extends TableProxyContract,
+  NsId extends string,
+  ModelName extends string,
+  ColumnName extends string,
+> = C['domain']['namespaces'][NsId]['models'] extends infer Models extends Record<string, unknown>
+  ? ModelName extends keyof Models
+    ? Models[ModelName] extends {
+        readonly storage: { readonly fields: infer Fields extends Record<string, unknown> };
+      }
+      ? {
+          [F in keyof Fields & string]: Fields[F] extends { readonly column: ColumnName }
+            ? F
+            : never;
+        }[keyof Fields & string]
       : never
-    : never;
-}[keyof C['storage']['namespaces']];
+    : never
+  : never;
+
+// The select-result row's column types for a table at a namespace coordinate.
+// The query lane types an enum column from the column's OWN storage `valueSet`
+// ref (spec §5; TML-2886) — resolved here via {@link ColumnValueSetUnion} with
+// column nullability applied. Every other column delegates to
+// `ComputeColumnJsType` with the namespace coordinate, so refined per-namespace
+// output types (e.g. `Vector<N>`) are preserved and same-named tables across
+// namespaces resolve to each namespace's own columns. `ComputeColumnJsType`'s
+// constraint is the minimal `ColumnResolutionContract`, which
+// `TableProxyContract` satisfies, so `C` is indexed directly.
+type ResolvedColumnTypes<
+  C extends TableProxyContract,
+  NsId extends string,
+  TableName extends string,
+> =
+  NamespaceTable<C, NsId, TableName> extends infer Table extends StorageTable
+    ? {
+        [ColName in keyof Table['columns'] & string]: [
+          ColumnValueSetUnion<C, Table['columns'][ColName]>,
+        ] extends [never]
+          ? ComputeColumnJsType<C, NsId, TableName, ColName, ExtractCodecTypes<C>>
+          : Table['columns'][ColName]['nullable'] extends true
+            ? ColumnValueSetUnion<C, Table['columns'][ColName]> | null
+            : ColumnValueSetUnion<C, Table['columns'][ColName]>;
+      }
+    : Record<string, never>;
 
 /**
  * Resolves a storage column's own `valueSet` ref to the value union of the
  * referenced storage value-set, or `never` when the column has no ref or the
  * ref does not resolve. Intra-plane, indexed off
- * `storage.namespaces[ns].entries.valueSet`.
+ * `storage.namespaces[ns].entries.valueSet` by the ref's own namespace
+ * coordinate. The write path accepts the same enum value union the read path
+ * narrows to (TML-2886 — enum typing is ref-only on the emitted contract).
  */
 type ColumnValueSetUnion<C extends TableProxyContract, Col> = Col extends {
   readonly valueSet: {
@@ -64,146 +105,75 @@ type ColumnValueSetUnion<C extends TableProxyContract, Col> = Col extends {
     : never
   : never;
 
-type FindModelForTable<C, TableName extends string> = C extends Contract
-  ? {
-      [M in keyof ContractModelDefinitions<C> & string]: ContractModelDefinitions<C>[M] extends {
-        readonly storage: { readonly table: TableName };
-      }
-        ? M
-        : never;
-    }[keyof ContractModelDefinitions<C> & string]
-  : never;
-
-type FindFieldForColumn<C, ModelName extends string, ColumnName extends string> = C extends Contract
-  ? ModelName extends keyof ContractModelDefinitions<C>
-    ? {
-        [F in keyof ContractModelDefinitions<C>[ModelName]['storage']['fields'] &
-          string]: ContractModelDefinitions<C>[ModelName]['storage']['fields'][F] extends {
-          readonly column: ColumnName;
-        }
-          ? F
-          : never;
-      }[keyof ContractModelDefinitions<C>[ModelName]['storage']['fields'] & string]
-    : never
-  : never;
-
 /**
- * The non-enum field output/input for a column, read from the still-baked
- * `FieldOutputTypes`/`FieldInputTypes` map (keyed by model/field). The map keeps
- * value-object, parameterized-codec, union, and plain-codec narrowings; in the
- * no-emit (`typeof contract`) flow it is also the only carrier of the enum value
- * union, since the authored object's storage column has no literal `valueSet`
- * ref. `never` when no model field maps to the column or the entry is absent.
+ * Input type for a single column on the write path. Follows the column's own
+ * storage `valueSet` ref to its enum value union when present (emitted flow);
+ * else the namespace-nested baked `FieldInputTypes[NsId][Model][Field]` entry
+ * (keeps value-objects / parameterized codecs / unions, and carries the enum
+ * union in the no-emit flow where the storage column has no literal ref); else
+ * the codec input. Column nullability applied in every branch.
  */
-type BakedColumnType<
-  C,
-  TableName extends string,
-  ColumnName extends string,
-  FieldTypes extends Record<string, Record<string, unknown>>,
-> = string extends keyof FieldTypes
-  ? never
-  : FindModelForTable<C, TableName> extends infer ModelName extends string
-    ? ModelName extends keyof FieldTypes
-      ? FindFieldForColumn<C, ModelName, ColumnName> extends infer FieldName extends string
-        ? FieldName extends keyof FieldTypes[ModelName]
-          ? FieldTypes[ModelName][FieldName]
-          : never
-        : never
-      : never
-    : never;
-
-/**
- * Output type for one storage column on the query lane. Follows the column's
- * own storage `valueSet` ref when present (emitted flow); otherwise falls back
- * to the baked `FieldOutputTypes` entry (carries the enum union in the no-emit
- * flow, plus value-objects/parameterized codecs/unions); otherwise the codec
- * output. Column nullability applied in every branch.
- */
-type ResolveColumnOutput<
+type ResolvedInsertColumn<
   C extends TableProxyContract,
-  TableName extends string,
-  ColName extends string,
-  Col,
-> = [ColumnValueSetUnion<C, Col>] extends [never]
-  ? [BakedColumnType<C, TableName, ColName, ExtractFieldOutputTypes<C>>] extends [never]
-    ? Col extends { readonly codecId: infer CodecId extends string }
-      ? CodecId extends keyof ExtractCodecTypes<C>
-        ? Col extends { readonly nullable: true }
-          ? ExtractCodecTypes<C>[CodecId]['output'] | null
-          : ExtractCodecTypes<C>[CodecId]['output']
-        : unknown
-      : unknown
-    : Col extends { readonly nullable: true }
-      ? NonNullable<BakedColumnType<C, TableName, ColName, ExtractFieldOutputTypes<C>>> | null
-      : BakedColumnType<C, TableName, ColName, ExtractFieldOutputTypes<C>>
-  : Col extends { readonly nullable: true }
-    ? ColumnValueSetUnion<C, Col> | null
-    : ColumnValueSetUnion<C, Col>;
-
-/**
- * Input type for one storage column on the write path. Same precedence as
- * {@link ResolveColumnOutput} but reading `FieldInputTypes` and codec `input`.
- */
-type ResolveColumnInput<
-  C extends TableProxyContract,
-  TableName extends string,
-  ColName extends string,
-  Col,
+  NsId extends string,
+  Table extends StorageTable,
+  ColName extends keyof Table['columns'],
   CT extends Record<string, { readonly input: unknown }>,
-> = [ColumnValueSetUnion<C, Col>] extends [never]
-  ? [BakedColumnType<C, TableName, ColName, ExtractFieldInputTypes<C>>] extends [never]
-    ? Col extends { readonly codecId: infer CodecId extends string }
-      ? CodecId extends keyof CT
-        ? CT[CodecId]['input']
+  NsInputs extends Record<string, Record<string, unknown>>,
+  ModelName extends string,
+> = [ColumnValueSetUnion<C, Table['columns'][ColName]>] extends [never]
+  ? FindFieldForColumn<C, NsId, ModelName, ColName & string> extends infer FieldName extends string
+    ? FieldName extends keyof NsInputs[ModelName & keyof NsInputs]
+      ? Table['columns'][ColName]['nullable'] extends true
+        ? NonNullable<NsInputs[ModelName & keyof NsInputs][FieldName]> | null
+        : NonNullable<NsInputs[ModelName & keyof NsInputs][FieldName]>
+      : Table['columns'][ColName]['codecId'] extends keyof CT
+        ? CT[Table['columns'][ColName]['codecId']]['input']
         : unknown
+    : Table['columns'][ColName]['codecId'] extends keyof CT
+      ? CT[Table['columns'][ColName]['codecId']]['input']
       : unknown
-    : Col extends { readonly nullable: true }
-      ? NonNullable<BakedColumnType<C, TableName, ColName, ExtractFieldInputTypes<C>>> | null
-      : BakedColumnType<C, TableName, ColName, ExtractFieldInputTypes<C>>
-  : Col extends { readonly nullable: true }
-    ? ColumnValueSetUnion<C, Col> | null
-    : ColumnValueSetUnion<C, Col>;
-
-type ResolvedColumnTypes<C extends TableProxyContract, TableName extends string> =
-  LiteralColumnsOf<C, TableName> extends infer Columns
-    ? [Columns] extends [never]
-      ? Record<string, never>
-      : {
-          [ColName in keyof Columns & string]: ResolveColumnOutput<
-            C,
-            TableName,
-            ColName,
-            Columns[ColName]
-          >;
-        }
-    : Record<string, never>;
+  : Table['columns'][ColName]['nullable'] extends true
+    ? ColumnValueSetUnion<C, Table['columns'][ColName]> | null
+    : ColumnValueSetUnion<C, Table['columns'][ColName]>;
 
 type ResolvedInsertValues<
   C extends TableProxyContract,
+  NsId extends string,
   Table extends StorageTable,
   TableName extends string,
   CT extends Record<string, { readonly input: unknown }>,
-> =
-  LiteralColumnsOf<C, TableName> extends infer Columns
-    ? [Columns] extends [never]
-      ? InsertValues<Table, CT>
-      : {
-          [ColName in keyof Columns & string]?: ResolveColumnInput<
-            C,
-            TableName,
-            ColName,
-            Columns[ColName],
-            CT
-          >;
-        }
+  FieldInputs extends Record<string, Record<string, Record<string, unknown>>>,
+> = string extends keyof FieldInputs
+  ? InsertValues<Table, CT>
+  : NsId extends keyof FieldInputs
+    ? FieldInputs[NsId] extends infer NsInputs extends Record<string, Record<string, unknown>>
+      ? FindModelForTable<C, NsId, TableName> extends infer ModelName extends string
+        ? ModelName extends keyof NsInputs
+          ? {
+              [K in keyof Table['columns']]?: ResolvedInsertColumn<
+                C,
+                NsId,
+                Table,
+                K,
+                CT,
+                NsInputs,
+                ModelName
+              >;
+            }
+          : InsertValues<Table, CT>
+        : InsertValues<Table, CT>
+      : InsertValues<Table, CT>
     : InsertValues<Table, CT>;
 
 type ResolvedUpdateValues<
   C extends TableProxyContract,
+  NsId extends string,
   Table extends StorageTable,
   TableName extends string,
   CT extends Record<string, { readonly input: unknown }>,
-> = ResolvedInsertValues<C, Table, TableName, CT>;
+  FieldInputs extends Record<string, Record<string, Record<string, unknown>>>,
+> = ResolvedInsertValues<C, NsId, Table, TableName, CT, FieldInputs>;
 
 type ResolvedUpdateExpressions<Table extends StorageTable> = {
   [K in keyof Table['columns']]?: Expression<{
@@ -212,39 +182,60 @@ type ResolvedUpdateExpressions<Table extends StorageTable> = {
   }>;
 };
 
-export type ContractToQC<C extends TableProxyContract, Name extends string = string> = {
+export type ContractToQC<
+  C extends TableProxyContract,
+  NsId extends string = string,
+  Name extends string = string,
+> = {
   readonly codecTypes: ExtractCodecTypes<C>;
   readonly capabilities: C['capabilities'];
   readonly queryOperationTypes: ExtractQueryOperationTypes<C>;
-  readonly resolvedColumnOutputTypes: ResolvedColumnTypes<C, Name>;
+  readonly resolvedColumnOutputTypes: ResolvedColumnTypes<C, NsId, Name>;
 };
 
 export interface TableProxy<
   C extends TableProxyContract,
-  Name extends string & keyof UnboundTables<C>,
+  NsId extends string,
+  Name extends string,
   Alias extends string = Name,
-  AvailableScope extends Scope = DefaultScope<Name, UnboundTables<C>[Name]>,
-  QC extends QueryContext = ContractToQC<C, Name>,
-> extends JoinSource<StorageTableToScopeTable<UnboundTables<C>[Name]>, Alias>,
+  AvailableScope extends Scope = DefaultScope<Name, NamespaceTable<C, NsId, Name>>,
+  QC extends QueryContext = ContractToQC<C, NsId, Name>,
+> extends JoinSource<StorageTableToScopeTable<NamespaceTable<C, NsId, Name>>, Alias>,
     WithSelect<QC, AvailableScope, EmptyRow>,
     WithJoin<QC, AvailableScope, C['capabilities']> {
   as<NewAlias extends string>(
     newAlias: NewAlias,
-  ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>, QC>;
+  ): TableProxy<C, NsId, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>, QC>;
 
   insert(
-    rows: ReadonlyArray<ResolvedInsertValues<C, UnboundTables<C>[Name], Name, QC['codecTypes']>>,
+    rows: ReadonlyArray<
+      ResolvedInsertValues<
+        C,
+        NsId,
+        NamespaceTable<C, NsId, Name>,
+        Name,
+        QC['codecTypes'],
+        ExtractFieldInputTypes<C>
+      >
+    >,
   ): InsertQuery<QC, AvailableScope, EmptyRow>;
 
   update(
-    set: ResolvedUpdateValues<C, UnboundTables<C>[Name], Name, QC['codecTypes']>,
+    set: ResolvedUpdateValues<
+      C,
+      NsId,
+      NamespaceTable<C, NsId, Name>,
+      Name,
+      QC['codecTypes'],
+      ExtractFieldInputTypes<C>
+    >,
   ): UpdateQuery<QC, AvailableScope, EmptyRow>;
 
   update(
     callback: (
       fields: FieldProxy<AvailableScope>,
       fns: Functions<QC>,
-    ) => ResolvedUpdateExpressions<UnboundTables<C>[Name]>,
+    ) => ResolvedUpdateExpressions<NamespaceTable<C, NsId, Name>>,
   ): UpdateQuery<QC, AvailableScope, EmptyRow>;
 
   delete(): DeleteQuery<QC, AvailableScope, EmptyRow>;

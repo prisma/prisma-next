@@ -314,8 +314,7 @@ type UserIdColumn = UserColumns['id'];
       expect(contractDtsContent).toContain("from '@prisma-next/target-postgres/codec-types'");
 
       // Create a comprehensive test file that uses all exported types
-      const testFileContent = `import type { Contract, CodecTypes, Namespaces, Models } from './contract';
-import { domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
+      const testFileContent = `import type { Contract, CodecTypes, Namespaces } from './contract';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import contractJson from './contract.json' with { type: 'json' };
 
@@ -325,7 +324,8 @@ const contract = new SqlContractSerializer().deserializeContract(contractJson) a
 // Verify we can access all exported types
 const _namespaces: Namespaces = contract.storage.namespaces;
 const _tables = _namespaces['__unbound__'].entries.table;
-const _models: Models = domainModelsAtDefaultNamespace(contract.domain);
+// Models resolve per-namespace from the domain plane (no flat top-level Models export).
+const _models = contract.domain.namespaces['__unbound__'].models;
 
 // Verify we can access nested types
 type UserTable = Namespaces['__unbound__']['entries']['table']['user'];

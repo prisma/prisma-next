@@ -1,16 +1,27 @@
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
 import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
-import type { MongoAdapter, MongoLoweredDraft } from '@prisma-next/mongo-lowering';
+import type { MongoAdapter, MongoDdlPlan, MongoLoweredDraft } from '@prisma-next/mongo-lowering';
+import type { AnyMongoDdlCommand } from '@prisma-next/mongo-query-ast/control';
+import { keysToKeySpec } from '@prisma-next/mongo-query-ast/control';
 import type {
   MongoQueryPlan,
   MongoUpdatePipelineStage,
   MongoUpdateSpec,
 } from '@prisma-next/mongo-query-ast/execution';
-import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
+import type {
+  AnyMongoDdlWireCommand,
+  AnyMongoDmlWireCommand,
+  AnyMongoWireCommand,
+} from '@prisma-next/mongo-wire';
 import {
   AggregateWireCommand,
+  CollModWireCommand,
+  CreateCollectionWireCommand,
+  CreateIndexWireCommand,
   DeleteManyWireCommand,
   DeleteOneWireCommand,
+  DropCollectionWireCommand,
+  DropIndexWireCommand,
   FindOneAndDeleteWireCommand,
   FindOneAndUpdateWireCommand,
   InsertManyWireCommand,
@@ -44,6 +55,28 @@ async function resolveUpdate(
     return Promise.all(update.map((stage) => resolveDraftDoc(stage, codecs, ctx)));
   }
   return resolveDraftDoc(update, codecs, ctx);
+}
+
+function lowerDdlCommand(command: AnyMongoDdlCommand): AnyMongoDdlWireCommand {
+  switch (command.kind) {
+    case 'createCollection':
+      return new CreateCollectionWireCommand(command.collection, command);
+    case 'createIndex':
+      return new CreateIndexWireCommand(command.collection, keysToKeySpec(command.keys), command);
+    case 'dropCollection':
+      return new DropCollectionWireCommand(command.collection);
+    case 'dropIndex':
+      return new DropIndexWireCommand(command.collection, command.name);
+    case 'collMod':
+      return new CollModWireCommand(command.collection, command);
+    // v8 ignore next 4
+    default: {
+      const _exhaustive: never = command;
+      throw new Error(
+        `Unknown DDL command kind: ${blindCast<{ kind: string }, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
+      );
+    }
+  }
 }
 
 class MongoAdapterImpl implements MongoAdapter {
@@ -183,7 +216,7 @@ class MongoAdapterImpl implements MongoAdapter {
   async resolveParams(
     draft: MongoLoweredDraft,
     ctx: CodecCallContext,
-  ): Promise<AnyMongoWireCommand> {
+  ): Promise<AnyMongoDmlWireCommand> {
     switch (draft.kind) {
       case 'insertOne':
         return new InsertOneWireCommand(
@@ -281,8 +314,13 @@ class MongoAdapterImpl implements MongoAdapter {
     }
   }
 
-  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand> {
-    return this.resolveParams(this.structuralLower(plan), ctx);
+  lower(plan: MongoDdlPlan, ctx: CodecCallContext): Promise<AnyMongoDdlWireCommand>;
+  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoDmlWireCommand>;
+  lower(plan: MongoQueryPlan | MongoDdlPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand> {
+    if ('collection' in plan) {
+      return this.resolveParams(this.structuralLower(plan), ctx);
+    }
+    return Promise.resolve(lowerDdlCommand(plan.command));
   }
 }
 

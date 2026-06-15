@@ -1,6 +1,8 @@
 import type { CodecRef } from '@prisma-next/framework-components/codec';
-import { materializeCodec } from '@prisma-next/framework-components/codec';
-import { runtimeError } from '@prisma-next/framework-components/runtime';
+import {
+  materializeCodec,
+  resolveCodecDescriptorOrThrow,
+} from '@prisma-next/framework-components/codec';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -38,15 +40,11 @@ export function createAstCodecResolver(
       const cached = cache.get(key);
       if (cached) return cached;
 
-      const descriptor = descriptors.descriptorFor(ref.codecId);
-      if (!descriptor) {
-        throw runtimeError(
-          'RUNTIME.CODEC_DESCRIPTOR_MISSING',
-          `No codec descriptor registered for codecId '${ref.codecId}'.`,
-          { codecId: ref.codecId },
-        );
-      }
-
+      const descriptor = resolveCodecDescriptorOrThrow(
+        (id) => descriptors.descriptorFor(id),
+        ref,
+        'RUNTIME.CODEC_DESCRIPTOR_MISSING',
+      );
       const ctx = instanceContextFor(ref);
       const codec = materializeCodec(descriptor, ref, ctx);
 

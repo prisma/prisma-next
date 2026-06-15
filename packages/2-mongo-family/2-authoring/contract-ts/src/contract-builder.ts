@@ -3,7 +3,7 @@ import {
   type ContractEmbedRelation,
   type ContractField,
   type ContractFieldType,
-  type ContractModelDefinitions,
+  type ContractModelBase,
   type ContractReferenceRelation,
   type ContractValueObject,
   type ControlPolicy,
@@ -1265,8 +1265,8 @@ function buildValueObjects(
 
 function buildModels(
   models: Record<string, AnyModelBuilder> | undefined,
-): Record<string, ContractModelDefinitions<MongoContract>[string]> {
-  const builtModels: Record<string, ContractModelDefinitions<MongoContract>[string]> = {};
+): Record<string, ContractModelBase> {
+  const builtModels: Record<string, ContractModelBase> = {};
 
   for (const modelBuilder of Object.values(models ?? {})) {
     if (modelBuilder.__name in builtModels) {

@@ -87,6 +87,18 @@ changes:
         - "enum "
         - "enum2 "
       anyMatch: true
+  - id: generated-models-export-removed
+    summary: |
+      The generated `contract.d.ts` no longer emits the flat top-level
+      `export type Models`. Models resolve per-namespace from the domain plane:
+      replace a reference to the generated `Models` with
+      `Contract['domain']['namespaces']['<namespace>']['models']` (use `public`
+      for a standard single-schema Postgres project, `__unbound__` for SQLite or
+      Mongo). Re-emit the contract to drop the export.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "Models"
 ---
 
 <!--
@@ -303,6 +315,25 @@ Note: `prisma-next contract infer` **refuses** databases containing native enum 
 
 Run `prisma-next db verify` (or your project's test suite) after applying the converting migration: the live schema must now match the contract — `text` column, CHECK constraint present, native type gone.
 
+## `generated-models-export-removed`
+
+The generated `contract.d.ts` no longer emits the flat top-level `export type Models` (the first-name-wins map of every model across namespaces). Models now resolve per-namespace from the domain plane, matching how the runtime and DSL read them.
+
+If your code imported `Models` from the generated contract, read a namespace's models instead:
+
+```ts
+// Before
+import type { Contract, Models } from './prisma/contract';
+type UserModel = Models['User'];
+
+// After — name the namespace the model is declared in
+import type { Contract } from './prisma/contract';
+type Models = Contract['domain']['namespaces']['public']['models'];
+type UserModel = Models['User'];
+```
+
+Use `public` for a standard single-schema Postgres project, or `__unbound__` for SQLite and Mongo. In a multi-schema Postgres contract, name the schema each model is declared in. Re-emit your contract (`prisma-next contract emit`) so the generated `.d.ts` drops the `Models` export; the emitted `contract.json` is unchanged.
+
 <!--
 TML-2882: transitional PSL `enum2` block (PR #805). The demo authors `enum2 Priority`
 and a `priority` field; emitted artifacts and migrations regenerate accordingly, and
@@ -354,4 +385,32 @@ field's `FieldInputTypes` entry flips from `CodecTypes['pg/enum@1']['input']` (�
 regenerated accordingly. `contract.json` is unchanged — this is a types-only
 addition that makes create/update exhaustiveness-checked. Additive; no existing
 contract shape changes. No consumer action required. Incidental substrate diff only.
+-->
+
+<!--
+TML-2853 (PR #829): regenerate the `prisma-next-demo` example migration chain into
+the new value-set representation, recovering work that #817 (the user-facing
+`enum-becomes-domain-concept` cutover, already in main) left undone in the example.
+The committed chain previously created `user_type` as a native `CREATE TYPE … AS ENUM`
+and converted it in a later self-edge migration — a start state the post-cutover
+system can no longer produce. The chain is re-authored as a multi-step incremental
+history in which the initial migration creates `user.kind` as a `text` column with a
+`user_kind_check` CHECK constraint from the start; the native-enum arc and the
+`convert_user_type_to_value_set` self-edge are removed. The remaining incremental
+milestones (displayName, MTI variant link columns, `post.priority` value-set + default)
+are preserved so the chain still demonstrates the incremental migration CLI. Diff is
+`examples/prisma-next-demo/migrations/**` only. No NEW consumer action beyond the
+existing `enum-becomes-domain-concept` entry above. Incidental substrate diff only.
+-->
+
+<!--
+TML-2550: per-namespace typed resolution. The emitted contract.d.ts TypeMaps
+(`FieldOutputTypes` / `FieldInputTypes`) now nest by namespace
+(`{ [namespace]: { [model]: { [field] } } }`), so the query builder and ORM client
+resolve each namespace's own columns/fields — fixing same-bare-name models declared
+in more than one namespace. The example contract.d.ts fixtures regenerate to the
+nested shape; a consumer re-emit round-trips. The user-facing always-qualified query
+surface is already covered by `qualify-flat-builder-accessors` above — this slice is
+the type-resolution fix beneath it. No user action: re-emit picks up the new shape.
+Incidental substrate diff only.
 -->

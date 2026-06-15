@@ -1,6 +1,8 @@
 import type { StorageTable } from '@prisma-next/sql-contract/types';
-import type { Contract, Models } from '../prisma/contract.d';
+import type { Contract } from '../prisma/contract.d';
 
+// Models resolve per-namespace from the domain plane (no flat top-level Models export).
+type Models = Contract['domain']['namespaces']['public']['models'];
 type ContractModel = Models[keyof Models];
 
 function ModelCard({ modelName, model }: { modelName: string; model: ContractModel }) {

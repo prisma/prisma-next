@@ -84,7 +84,8 @@ export type IsToManyRelation<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   RelName extends string,
-> = RelationCardinality<TContract, ModelName, RelName> extends '1:N' | 'N:M' ? true : false;
+  NsId extends string = never,
+> = RelationCardinality<TContract, ModelName, RelName, NsId> extends '1:N' | 'N:M' ? true : false;
 
 export type IncludeRefinementResult<
   TContract extends Contract<SqlStorage>,
@@ -110,14 +111,15 @@ export type IncludeRefinementValue<
   RelName extends string,
   DefaultIncludedRow,
   RefinedResult,
+  NsId extends string = never,
 > =
   RefinedResult extends RowSelection<infer V>
     ? // IncludeScalar / IncludeCombine carry a final value that must not be
       // cardinality-wrapped; Collection carries a raw row that still needs it.
       RefinedResult extends { readonly kind: 'includeScalar' | 'includeCombine' }
       ? V
-      : IncludeRelationValue<TContract, ParentModelName, RelName, V>
-    : IncludeRelationValue<TContract, ParentModelName, RelName, DefaultIncludedRow>;
+      : IncludeRelationValue<TContract, ParentModelName, RelName, V, NsId>
+    : IncludeRelationValue<TContract, ParentModelName, RelName, DefaultIncludedRow, NsId>;
 
 export type WhereInput<TContract extends Contract<SqlStorage>, ModelName extends string> =
   | ((model: ModelAccessor<TContract, ModelName>) => AnyExpression)

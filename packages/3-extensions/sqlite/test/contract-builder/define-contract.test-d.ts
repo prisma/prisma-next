@@ -1,6 +1,9 @@
-import type { ContractModelDefinitions } from '@prisma-next/contract/types';
 import { expectTypeOf } from 'vitest';
 import { defineContract, field, model } from '../../src/exports/contract-builder';
+
+type SoleNamespaceModels<
+  T extends { domain: { namespaces: Record<string, { models: unknown }> } },
+> = T['domain']['namespaces'][keyof T['domain']['namespaces']]['models'];
 
 // @ts-expect-error — capabilities are contributed by components, not authoring input
 defineContract({ capabilities: { sql: { lateral: true } } });
@@ -20,7 +23,7 @@ const withModel = defineContract({
   },
 });
 expectTypeOf(withModel.target).toEqualTypeOf<'sqlite'>();
-expectTypeOf<ContractModelDefinitions<typeof withModel>['User']>().not.toBeNever();
+expectTypeOf<SoleNamespaceModels<typeof withModel>['User']>().not.toBeNever();
 
 const withFactory = defineContract({}, ({ model: m, field: f }) => ({
   models: {
@@ -28,4 +31,4 @@ const withFactory = defineContract({}, ({ model: m, field: f }) => ({
   },
 }));
 expectTypeOf(withFactory.target).toEqualTypeOf<'sqlite'>();
-expectTypeOf<ContractModelDefinitions<typeof withFactory>['Post']>().not.toBeNever();
+expectTypeOf<SoleNamespaceModels<typeof withFactory>['Post']>().not.toBeNever();

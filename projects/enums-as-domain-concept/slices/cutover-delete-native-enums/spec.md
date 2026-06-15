@@ -59,16 +59,28 @@ block (per the explicit-opt-in-over-diagnostics and namespace-diagnostic-wording
 rules, the wording names what was found and what to do). The
 `print-psl.enums.test.ts` native round-trip tests convert to assert the diagnostic.
 
-**4. Migration history must keep replaying.** Committed migrations (the demo's
-initial migration creates `user_type` via the native ops) must not break when the op
-*planning* is deleted. Decide at dispatch with this pinned default: **keep the
-minimal op-execution/replay surface for the four native ops** (the call shapes that
-committed `migration.ts`/`ops.json` files reference) in a clearly-marked
-legacy-replay module, while deleting all planning/diffing/emission — the planner can
-never *produce* them again. If investigation shows committed artifacts don't actually
-import the builders (pure JSON replay), delete everything and record that instead. A
-third option — rewriting the demo's migration history — is **out** (history is the
-product surface the migration system exists to preserve).
+**4. Regenerate the demo migration history into the new representation, keeping it
+multi-step (REVISED 2026-06-15, operator override).** The original pin here kept the
+native ops replayable and ruled history-rewriting OUT. The operator overruled it
+across two PR reviews. First (#817): a migration that demonstrates transitioning
+**from a state the system can no longer produce** (a native `CREATE TYPE … AS ENUM`)
+**to** the current representation is an incoherent teaching artifact, so the
+native-enum arc and the `20260611T1856_convert_user_type_to_value_set` self-edge are
+removed. Second (#829): collapsing the chain to a single from-empty baseline was also
+wrong — the demo must keep a **multi-step incremental chain** so it actually exercises
+the migration CLI (`db update` applying successive migrations, `migration status`/`list`
+across a chain). So the demo's `examples/prisma-next-demo/migrations/app/` chain is
+**re-authored from the original multi-step history in the new value-set representation**:
+the original per-step `contract.prisma` snapshots are recovered, the initial migration
+is edited to create `user.kind` as a `text` column with a `user_kind_check` CHECK
+constraint from the start (no `CREATE TYPE`), the convert self-edge folder is deleted,
+and every other incremental milestone (displayName add + backfill + NOT NULL, MTI
+variant link columns, `post.priority` value-set + default) is preserved. All derived
+artifacts (start/end-contract, ops.json, migration.json, from/to hashes) are
+regenerated via `scripts/regen-example-migrations.mjs`; the chain applies cleanly
+empty→current with no native enum anywhere. Tests that walk the chain
+(`migration-integrity` — the no-op-bookend subject — and `migration-replay`) are
+re-pointed at the regenerated chain.
 
 **5. Migrate the stragglers** (inventory: the demo's `user_type` + `User.kind`, the
 cloudflare-worker example's copy, the cli-e2e `contract-status-enum*` fixtures + the

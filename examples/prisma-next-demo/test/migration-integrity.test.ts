@@ -39,21 +39,25 @@ const PGVECTOR_EXTENSION: { readonly id: string; readonly targetId: string } = {
 };
 
 describe('demo migration integrity (offline)', () => {
-  it('shipped migrations pass aggregate integrity check', async () => {
-    const appContract = await loadAppContract();
-    const aggregate = await loadContractSpaceAggregate({
-      migrationsDir: MIGRATIONS_DIR,
-      deserializeContract,
-      appContract,
-    });
+  it(
+    'shipped migrations pass aggregate integrity check',
+    async () => {
+      const appContract = await loadAppContract();
+      const aggregate = await loadContractSpaceAggregate({
+        migrationsDir: MIGRATIONS_DIR,
+        deserializeContract,
+        appContract,
+      });
 
-    const violations = aggregate.checkIntegrity({
-      declaredExtensions: [PGVECTOR_EXTENSION],
-      checkContracts: true,
-    });
+      const violations = aggregate.checkIntegrity({
+        declaredExtensions: [PGVECTOR_EXTENSION],
+        checkContracts: true,
+      });
 
-    expect(violations).toEqual([]);
-  });
+      expect(violations).toEqual([]);
+    },
+    timeouts.databaseOperation,
+  );
 });
 
 describe('demo migration integrity — guard verification', () => {

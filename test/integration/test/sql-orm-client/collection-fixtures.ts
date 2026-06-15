@@ -1,8 +1,4 @@
-import {
-  type Contract,
-  type ContractModelDefinitions,
-  soleDomainNamespaceId,
-} from '@prisma-next/contract/types';
+import { type Contract, soleDomainNamespaceId } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { Collection } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -14,7 +10,10 @@ import {
   getTestContract,
 } from './helpers';
 
-export type TestModelName = keyof ContractModelDefinitions<TestContract> & string;
+type SoleNamespaceModels<T extends Contract> =
+  T['domain']['namespaces'][keyof T['domain']['namespaces']]['models'];
+
+export type TestModelName = keyof SoleNamespaceModels<TestContract> & string;
 
 export const baseContract = getTestContract();
 

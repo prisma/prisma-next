@@ -1,4 +1,4 @@
-import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type { ParamSpec } from '@prisma-next/operations';
 import type {
   ExtractFieldOutputTypes,
@@ -13,11 +13,45 @@ import type { SqlExecutionPlan } from './sql-execution-plan';
 export type Expr = ColumnRef | ParamRef;
 
 /**
- * Extracts the model name for a given table by iterating models to find the one
- * whose `storage.table` matches.
+ * The minimal contract shape the per-namespace column resolver needs: the
+ * application-domain models and the storage tables, both keyed by namespace
+ * coordinate, plus (via the optional TypeMaps phantom key, read structurally by
+ * {@link ExtractFieldOutputTypes}) the refined field-output map. Every emitted
+ * `Contract<SqlStorage>` satisfies it, as does `sql-builder`'s `TableProxyContract`
+ * — so the resolver indexes the coordinate directly without forcing callers to
+ * carry the full `Contract`.
  */
-type ExtractTableToModel<TContract extends Contract<SqlStorage>, TableName extends string> =
-  ContractModelDefinitions<TContract> extends infer Models extends Record<string, unknown>
+export type ColumnResolutionContract = {
+  readonly domain: {
+    readonly namespaces: Readonly<
+      Record<string, { readonly models: Readonly<Record<string, unknown>> }>
+    >;
+  };
+  readonly storage: {
+    readonly namespaces: Readonly<
+      Record<
+        string,
+        { readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>> }
+      >
+    >;
+  };
+};
+
+type NamespaceModels<
+  TContract extends ColumnResolutionContract,
+  NsId extends string,
+> = TContract['domain']['namespaces'][NsId] extends {
+  readonly models: infer Models extends Record<string, unknown>;
+}
+  ? Models
+  : never;
+
+type ExtractTableToModel<
+  TContract extends ColumnResolutionContract,
+  NsId extends string,
+  TableName extends string,
+> =
+  NamespaceModels<TContract, NsId> extends infer Models extends Record<string, unknown>
     ? {
         [M in keyof Models & string]: Models[M] extends {
           readonly storage: { readonly table: TableName };
@@ -27,17 +61,14 @@ type ExtractTableToModel<TContract extends Contract<SqlStorage>, TableName exten
       }[keyof Models & string]
     : never;
 
-/**
- * Extracts the field name for a given column by finding the field in
- * `model.storage.fields` whose `column` matches.
- */
 type ExtractColumnToField<
-  TContract extends Contract<SqlStorage>,
+  TContract extends ColumnResolutionContract,
+  NsId extends string,
   TableName extends string,
   ColumnName extends string,
 > =
-  ExtractTableToModel<TContract, TableName> extends infer ModelName extends string
-    ? ContractModelDefinitions<TContract> extends infer Models extends Record<string, unknown>
+  ExtractTableToModel<TContract, NsId, TableName> extends infer ModelName extends string
+    ? NamespaceModels<TContract, NsId> extends infer Models extends Record<string, unknown>
       ? ModelName & keyof Models extends infer MKey extends string
         ? Models[MKey] extends {
             readonly storage: { readonly fields: infer Fields extends Record<string, unknown> };
@@ -52,6 +83,28 @@ type ExtractColumnToField<
       : never
     : never;
 
+/** Resolves to `never` when the table or column is absent in the namespace. */
+type NamespaceStorageColumn<
+  TContract extends ColumnResolutionContract,
+  NsId extends string,
+  TableName extends string,
+  ColumnName extends string,
+> = TContract['storage']['namespaces'][NsId] extends {
+  readonly entries: { readonly table: infer Tables extends Record<string, unknown> };
+}
+  ? TableName extends keyof Tables
+    ? Tables[TableName] extends {
+        readonly columns: infer Columns extends Record<string, unknown>;
+      }
+      ? ColumnName extends keyof Columns
+        ? Columns[ColumnName] extends StorageColumn
+          ? Columns[ColumnName]
+          : never
+        : never
+      : never
+    : never
+  : never;
+
 type FallbackCodecLookup<
   ColumnMeta extends StorageColumn,
   CodecTypes extends Record<string, { readonly output: unknown }>,
@@ -64,6 +117,53 @@ type FallbackCodecLookup<
       : unknown
     : unknown
   : unknown;
+
+/**
+ * The refined (typeParam-applied) JS output type for a field within a namespace
+ * coordinate, read from the emitter's namespace-nested `FieldOutputTypes` map at
+ * `FieldOutputTypes[NsId][Model][Field]`. This preserves parameterized codec
+ * refinements (e.g. `Vector<N>`, `Char<N>`) that a bare codec-output lookup
+ * would drop. Resolves to `never` when the coordinate is absent from the map.
+ */
+type NamespaceFieldOutput<
+  TContract extends ColumnResolutionContract,
+  NsId extends string,
+  ModelName extends string,
+  FieldName extends string,
+> =
+  ExtractFieldOutputTypes<TContract> extends infer Outputs
+    ? NsId extends keyof Outputs
+      ? Outputs[NsId] extends infer NamespaceOutputs
+        ? ModelName extends keyof NamespaceOutputs
+          ? NamespaceOutputs[ModelName] extends infer ModelOutputs
+            ? FieldName extends keyof ModelOutputs
+              ? ModelOutputs[FieldName]
+              : never
+            : never
+          : never
+        : never
+      : never
+    : never;
+
+/**
+ * The secondary resolution path, taken for a storage column not backed by a
+ * domain model field in the namespace (e.g. a column with no corresponding
+ * field); refined model fields resolve via {@link NamespaceFieldOutput}.
+ */
+type ColumnCodecFallback<
+  TContract extends ColumnResolutionContract,
+  NsId extends string,
+  TableName extends string,
+  ColumnName extends string,
+  CodecTypes extends Record<string, { readonly output: unknown }>,
+> =
+  NamespaceStorageColumn<TContract, NsId, TableName, ColumnName> extends infer ColumnMeta
+    ? [ColumnMeta] extends [never]
+      ? never
+      : ColumnMeta extends StorageColumn
+        ? FallbackCodecLookup<ColumnMeta, CodecTypes>
+        : never
+    : never;
 
 /**
  * Type-level operation signature.
@@ -127,16 +227,18 @@ export type OperationsForTypeId<TypeId extends string, Operations extends Operat
       : Record<string, never>;
 
 /**
- * The domain field object for `model.field`, read off the model-definitions
- * union. Carries the field's `valueSet` ref (the domain-plane ref the emitter
- * renders) when the field is enum-backed.
+ * The domain field object for `model.field` within a namespace coordinate, read
+ * off `domain.namespaces[NsId].models[Model].fields[Field]`. Carries the field's
+ * `valueSet` ref (the domain-plane ref the emitter renders) when the field is
+ * enum-backed.
  */
 type DomainFieldOf<
-  TContract extends Contract<SqlStorage>,
+  TContract extends ColumnResolutionContract,
+  NsId extends string,
   ModelName extends string,
   FieldName extends string,
 > =
-  ContractModelDefinitions<TContract> extends infer Models
+  NamespaceModels<TContract, NsId> extends infer Models extends Record<string, unknown>
     ? ModelName extends keyof Models
       ? Models[ModelName] extends { readonly fields: infer Fields }
         ? FieldName extends keyof Fields
@@ -150,17 +252,18 @@ type DomainFieldOf<
  * Resolves a domain field's own `valueSet` ref to the value union of the
  * referenced domain enum, or `never` when the field carries no ref or the ref
  * does not resolve. Intra-plane: a domain field references a domain enum,
- * indexed off `domain.namespaces[ns].enum[name].members[*].value`. No storage
- * reach.
+ * indexed off `domain.namespaces[ns].enum[name].members[*].value` by the ref's
+ * own namespace coordinate. No storage reach. (`ColumnResolutionContract` types
+ * the domain namespace minimally, so the `enum` block is read defensively.)
  */
-type DomainFieldValueSetUnion<TContract extends Contract<SqlStorage>, TField> = TField extends {
+type DomainFieldValueSetUnion<TContract extends ColumnResolutionContract, TField> = TField extends {
   readonly valueSet: {
-    readonly namespaceId: infer NsId extends string;
+    readonly namespaceId: infer RefNsId extends string;
     readonly entityName: infer Name extends string;
   };
 }
-  ? NsId extends keyof TContract['domain']['namespaces']
-    ? TContract['domain']['namespaces'][NsId] extends { readonly enum: infer Enums }
+  ? RefNsId extends keyof TContract['domain']['namespaces']
+    ? TContract['domain']['namespaces'][RefNsId] extends { readonly enum: infer Enums }
       ? Name extends keyof Enums
         ? Enums[Name] extends { readonly members: infer Members extends readonly unknown[] }
           ? Members[number] extends { readonly value: infer V }
@@ -173,44 +276,47 @@ type DomainFieldValueSetUnion<TContract extends Contract<SqlStorage>, TField> = 
   : never;
 
 /**
- * The non-enum field output for `model.field`, read from the still-baked
- * `FieldOutputTypes` map. The map continues to carry the value-object,
- * parameterized-codec, union, and plain-codec narrowings (only the enum
- * narrowing moved to ref-following), so a non-enum field falls back here rather
- * than to the raw codec output. `never` when the field is absent from the map.
+ * Resolves the JavaScript output type of a column addressed by an explicit
+ * namespace coordinate.
+ *
+ * Precedence (all per-namespace): follow the domain field's own `valueSet` ref
+ * to its enum value union (TML-2886 — enum typing is ref-only); else the
+ * emitter's namespace-nested `FieldOutputTypes[NsId][Model][Field]`, which keeps
+ * parameterized codec refinements (e.g. `Vector<N>`, `Char<N>`), value objects,
+ * and unions (and, in the no-emit `typeof contract` flow, the enum union the
+ * emitted ref does not carry); else a codec-output lookup for a storage column
+ * with no model field. A bare table name shared across namespaces resolves to
+ * each namespace's own field; a column absent in the namespace resolves to
+ * `never`.
  */
-type BakedFieldOutput<
-  TContract extends Contract<SqlStorage>,
-  ModelName extends string,
-  FieldName extends string,
-> = ModelName extends keyof ExtractFieldOutputTypes<TContract>
-  ? FieldName extends keyof ExtractFieldOutputTypes<TContract>[ModelName]
-    ? ExtractFieldOutputTypes<TContract>[ModelName][FieldName]
-    : never
-  : never;
-
 export type ComputeColumnJsType<
-  TContract extends Contract<SqlStorage>,
+  TContract extends ColumnResolutionContract,
+  NsId extends string,
   TableName extends string,
   ColumnName extends string,
-  ColumnMeta extends StorageColumn,
   CodecTypes extends Record<string, { readonly output: unknown }>,
 > =
-  ExtractTableToModel<TContract, TableName> extends infer ModelName
+  ExtractTableToModel<TContract, NsId, TableName> extends infer ModelName
     ? [ModelName] extends [never]
-      ? FallbackCodecLookup<ColumnMeta, CodecTypes>
+      ? ColumnCodecFallback<TContract, NsId, TableName, ColumnName, CodecTypes>
       : ModelName extends string
-        ? ExtractColumnToField<TContract, TableName, ColumnName> extends infer FieldName
+        ? ExtractColumnToField<TContract, NsId, TableName, ColumnName> extends infer FieldName
           ? [FieldName] extends [never]
-            ? FallbackCodecLookup<ColumnMeta, CodecTypes>
+            ? ColumnCodecFallback<TContract, NsId, TableName, ColumnName, CodecTypes>
             : FieldName extends string
               ? DomainFieldValueSetUnion<
                   TContract,
-                  DomainFieldOf<TContract, ModelName, FieldName>
+                  DomainFieldOf<TContract, NsId, ModelName, FieldName>
                 > extends infer Union
                 ? [Union] extends [never]
-                  ? BakedFieldOutput<TContract, ModelName, FieldName>
-                  : ColumnMeta extends { nullable: true }
+                  ? NamespaceFieldOutput<TContract, NsId, ModelName, FieldName> extends infer Out
+                    ? [Out] extends [never]
+                      ? ColumnCodecFallback<TContract, NsId, TableName, ColumnName, CodecTypes>
+                      : Out
+                    : never
+                  : NamespaceStorageColumn<TContract, NsId, TableName, ColumnName> extends {
+                        readonly nullable: true;
+                      }
                     ? Union | null
                     : Union
                 : never

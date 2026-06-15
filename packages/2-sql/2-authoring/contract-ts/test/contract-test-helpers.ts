@@ -1,16 +1,16 @@
-import type {
-  Contract,
-  ContractModelDefinitions,
-  ContractValueObjectDefinitions,
-} from '@prisma-next/contract/types';
+import type { Contract, ContractValueObjectDefinitions } from '@prisma-next/contract/types';
 import {
   domainModelsAtDefaultNamespace,
   domainValueObjectsAtDefaultNamespace,
 } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 
-export function modelsOf<T extends Contract>(contract: T): ContractModelDefinitions<T> {
-  return domainModelsAtDefaultNamespace(contract.domain) as ContractModelDefinitions<T>;
+/** Models map for the contract's sole domain namespace, precise per-namespace. */
+type SoleNamespaceModels<T extends Contract> =
+  T['domain']['namespaces'][keyof T['domain']['namespaces']]['models'];
+
+export function modelsOf<T extends Contract>(contract: T): SoleNamespaceModels<T> {
+  return domainModelsAtDefaultNamespace(contract.domain) as SoleNamespaceModels<T>;
 }
 
 export function valueObjectsOf<T extends Contract>(

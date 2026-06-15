@@ -1,4 +1,4 @@
-import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   UnboundTables as SqlBuilderUnboundTables,
   TableProxyContract,
@@ -77,40 +77,16 @@ type ColumnValueSetUnion<TContract extends Contract<SqlStorage>, TColumn> = TCol
     : never
   : never;
 
-type FindModelForTable<TContract, TableName extends string> = TContract extends Contract
-  ? {
-      [M in keyof ContractModelDefinitions<TContract> &
-        string]: ContractModelDefinitions<TContract>[M] extends {
-        readonly storage: { readonly table: TableName };
-      }
-        ? M
-        : never;
-    }[keyof ContractModelDefinitions<TContract> & string]
-  : never;
-
-type FindFieldForColumn<
-  TContract,
-  ModelName extends string,
-  ColumnName extends string,
-> = TContract extends Contract
-  ? ModelName extends keyof ContractModelDefinitions<TContract>
-    ? {
-        [F in keyof ContractModelDefinitions<TContract>[ModelName]['storage']['fields'] &
-          string]: ContractModelDefinitions<TContract>[ModelName]['storage']['fields'][F] extends {
-          readonly column: ColumnName;
-        }
-          ? F
-          : never;
-      }[keyof ContractModelDefinitions<TContract>[ModelName]['storage']['fields'] & string]
-    : never
-  : never;
-
 /**
- * The non-enum field output for a column, read from the still-baked
- * `FieldOutputTypes` map. Carries the enum union in the no-emit (`typeof
- * contract`) flow — where the authored object's storage column has no literal
- * `valueSet` ref — plus value-objects, parameterized codecs, and unions.
- * `never` when no model field maps to the column or the entry is absent.
+ * The non-enum field output for a `table.column` on the flat query-builder
+ * surface, read from the emitter's namespace-nested `FieldOutputTypes`
+ * (`FieldOutputTypes[ns][model][field]`, since #803). Scans every domain
+ * namespace for a model whose `storage.table` matches and whose
+ * `storage.fields[*].column` matches, then indexes that namespace's nested map.
+ * Carries the enum union in the no-emit (`typeof contract`) flow — where the
+ * authored object's storage column has no literal `valueSet` ref — plus
+ * value-objects, parameterized codecs, and unions. `never` when no model field
+ * maps to the column or the entry is absent.
  */
 type BakedColumnOutput<
   TContract extends Contract<SqlStorage>,
@@ -119,15 +95,38 @@ type BakedColumnOutput<
   FOT = ExtractFieldOutputTypes<TContract>,
 > = string extends keyof FOT
   ? never
-  : FindModelForTable<TContract, TableName> extends infer ModelName extends string
-    ? ModelName extends keyof FOT
-      ? FindFieldForColumn<TContract, ModelName, ColumnName> extends infer FieldName extends string
-        ? FieldName extends keyof FOT[ModelName & keyof FOT]
-          ? FOT[ModelName & keyof FOT][FieldName & keyof FOT[ModelName & keyof FOT]]
-          : never
-        : never
-      : never
-    : never;
+  : {
+      [NsId in keyof TContract['domain']['namespaces'] & keyof FOT & string]: NamespaceModels<
+        TContract,
+        NsId
+      > extends infer Models extends Record<string, unknown>
+        ? {
+            [M in keyof Models & keyof FOT[NsId] & string]: Models[M] extends {
+              readonly storage: {
+                readonly table: TableName;
+                readonly fields: infer Fields extends Record<string, unknown>;
+              };
+            }
+              ? {
+                  [F in keyof Fields & keyof FOT[NsId][M] & string]: Fields[F] extends {
+                    readonly column: ColumnName;
+                  }
+                    ? FOT[NsId][M][F]
+                    : never;
+                }[keyof Fields & keyof FOT[NsId][M] & string]
+              : never;
+          }[keyof Models & keyof FOT[NsId] & string]
+        : never;
+    }[keyof TContract['domain']['namespaces'] & keyof FOT & string];
+
+type NamespaceModels<
+  TContract extends Contract<SqlStorage>,
+  NsId extends string,
+> = TContract['domain']['namespaces'][NsId] extends {
+  readonly models: infer Models extends Record<string, unknown>;
+}
+  ? Models
+  : never;
 
 /**
  * The output type of a referenced column. Follows the column's own storage

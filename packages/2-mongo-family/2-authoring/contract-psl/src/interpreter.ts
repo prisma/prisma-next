@@ -22,6 +22,7 @@ import {
   MongoStorage,
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
+import type { CollationOptions } from '@prisma-next/mongo-value/mongodb-types';
 import type {
   ParsePslDocumentResult,
   PslField,
@@ -484,7 +485,7 @@ function parseJsonArg(raw: string | undefined): Record<string, unknown> | undefi
 
 function parseCollation(
   attr: import('@prisma-next/psl-parser').PslAttribute,
-): Record<string, unknown> | null | undefined {
+): CollationOptions | null | undefined {
   const locale = stripQuotesHelper(getNamedArgument(attr, 'collationLocale'));
   if (!locale) {
     const hasAnyCollationArg =
@@ -499,23 +500,23 @@ function parseCollation(
     return hasAnyCollationArg ? null : undefined;
   }
 
-  const collation: Record<string, unknown> = { locale };
+  const collation: CollationOptions = { locale };
   const strength = parseNumericArg(getNamedArgument(attr, 'collationStrength'));
-  if (strength != null) collation['strength'] = strength;
+  if (strength != null) collation.strength = strength;
   const caseLevel = parseBooleanArg(getNamedArgument(attr, 'collationCaseLevel'));
-  if (caseLevel != null) collation['caseLevel'] = caseLevel;
+  if (caseLevel != null) collation.caseLevel = caseLevel;
   const caseFirst = stripQuotesHelper(getNamedArgument(attr, 'collationCaseFirst'));
-  if (caseFirst != null) collation['caseFirst'] = caseFirst;
+  if (caseFirst != null) collation.caseFirst = caseFirst;
   const numericOrdering = parseBooleanArg(getNamedArgument(attr, 'collationNumericOrdering'));
-  if (numericOrdering != null) collation['numericOrdering'] = numericOrdering;
+  if (numericOrdering != null) collation.numericOrdering = numericOrdering;
   const alternate = stripQuotesHelper(getNamedArgument(attr, 'collationAlternate'));
-  if (alternate != null) collation['alternate'] = alternate;
+  if (alternate != null) collation.alternate = alternate;
   const maxVariable = stripQuotesHelper(getNamedArgument(attr, 'collationMaxVariable'));
-  if (maxVariable != null) collation['maxVariable'] = maxVariable;
+  if (maxVariable != null) collation.maxVariable = maxVariable;
   const backwards = parseBooleanArg(getNamedArgument(attr, 'collationBackwards'));
-  if (backwards != null) collation['backwards'] = backwards;
+  if (backwards != null) collation.backwards = backwards;
   const normalization = parseBooleanArg(getNamedArgument(attr, 'collationNormalization'));
-  if (normalization != null) collation['normalization'] = normalization;
+  if (normalization != null) collation.normalization = normalization;
   return collation;
 }
 

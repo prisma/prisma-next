@@ -26,6 +26,8 @@ import {
   MongoSchemaIndex as MongoSchemaIndexCtor,
   MongoSchemaIR as MongoSchemaIRCtor,
 } from '@prisma-next/mongo-schema-ir';
+import type { CollationOptions } from '@prisma-next/mongo-value/mongodb-types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 export interface CanonicalizedSchemas {
@@ -154,7 +156,7 @@ function canonicalizeLiveIndex(
 ): MongoSchemaIndex {
   const projectedKeys = sortTextKeys(projectTextIndexKeys(liveIndex));
   const collation = liveIndex.collation
-    ? stripUnspecifiedFields(liveIndex.collation, expectedIndex?.collation)
+    ? stripCollationFields(liveIndex.collation, expectedIndex?.collation)
     : liveIndex.collation;
 
   // Text-index server defaults: when the contract did not set
@@ -288,7 +290,7 @@ function canonicalizeLiveOptions(
   expectedOptions: MongoSchemaCollectionOptions | undefined,
 ): MongoSchemaCollectionOptions | undefined {
   const collation = liveOptions.collation
-    ? stripUnspecifiedFields(liveOptions.collation, expectedOptions?.collation)
+    ? stripCollationFields(liveOptions.collation, expectedOptions?.collation)
     : undefined;
 
   // Timeseries: drop `bucketMaxSpanSeconds` (and any other server-applied
@@ -376,13 +378,20 @@ function isDisabledChangeStream(value: { enabled: boolean } | undefined): boolea
  * server-attached collation/timeseries/clusteredIndex that the contract
  * never asked for, hiding real drift.)
  */
-function stripUnspecifiedFields(
-  live: Record<string, unknown>,
-  expected: Record<string, unknown> | undefined,
-): Record<string, unknown> {
+function stripCollationFields(
+  live: CollationOptions,
+  expected: CollationOptions | undefined,
+): CollationOptions {
+  return blindCast<
+    CollationOptions,
+    'locale is required in CollationOptions so stripUnspecifiedFields preserves it when expected is defined'
+  >(stripUnspecifiedFields(live, expected));
+}
+
+function stripUnspecifiedFields<T extends object>(live: T, expected: T | undefined): Partial<T> {
   if (expected === undefined) return live;
-  const out: Record<string, unknown> = {};
-  for (const key of Object.keys(expected)) {
+  const out: Partial<T> = {};
+  for (const key of Object.keys(expected) as (keyof T)[]) {
     if (Object.hasOwn(live, key)) out[key] = live[key];
   }
   return out;

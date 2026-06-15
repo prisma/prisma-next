@@ -9,12 +9,12 @@ import { createMockRuntime } from './helpers';
 // ---------------------------------------------------------------------------
 // Minimal enum-typed contract fixture for the ORM lane.
 //
-// The enum value union is NOT baked into a FieldOutputTypes/FieldInputTypes
-// TypeMap. The domain model field carries a `valueSet` ref (plane 'domain') to
-// a domain enum entity, and the lane resolves the union by following that ref
-// into `domain.namespaces[ns].enum[Name].members[*].value`. This mirrors the
-// real emitted shape (see examples/prisma-next-demo/src/prisma/contract.d.ts:
-// Post.priority domain field ref + domain `Priority` enum block).
+// Combines #803's per-namespace shape (namespace-nested FieldOutputTypes /
+// FieldInputTypes; `domain.namespaces.__unbound__.models`) with TML-2886's
+// valueSet-ref-following: the `role`/`status`/`level` enum fields carry a
+// DOMAIN `valueSet` ref and resolve their union from the domain enum block, NOT
+// from a baked map entry. The `name` plain field has no ref and resolves through
+// the nested baked map — exercising both mechanisms in one fixture.
 // ---------------------------------------------------------------------------
 
 type EnumCodecTypes = {
@@ -30,135 +30,37 @@ type EnumCodecTypes = {
   };
 };
 
-// The baked FieldOutputTypes/FieldInputTypes maps still carry every NON-enum
-// field (plain codec outputs, value-objects, parameterized codecs, unions) — the
-// emitter keeps them; only the enum narrowing moved to ref-following. The enum
-// fields (role/status/level) are deliberately absent here so a regression that
-// re-reads the map for an enum field would surface as a stale value rather than
-// the ref-resolved union.
+// Namespace-nested (#803), carrying only the non-enum `name` field; the enum
+// fields resolve via the domain enum block ref.
 type EnumFieldMaps = {
-  User: {
-    name: string;
+  __unbound__: {
+    User: {
+      name: string;
+    };
   };
 };
 
 type EnumTypeMaps = TypeMaps<EnumCodecTypes, Record<string, never>, EnumFieldMaps, EnumFieldMaps>;
 
-type EnumContractBase = Contract<
-  {
-    storageHash: StorageHashBase<string>;
-    namespaces: {
-      public: {
-        id: 'public';
-        kind: 'sql-namespace';
-        entries: {
-          table: {
-            User: {
-              columns: {
-                role: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-                status: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: true };
-                level: { nativeType: 'int4'; codecId: 'pg/int4@1'; nullable: false };
-                name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-              };
-              primaryKey: { columns: ['role'] };
-              uniques: [];
-              indexes: [];
-              foreignKeys: [];
+type EnumStorage = {
+  storageHash: StorageHashBase<string>;
+  namespaces: {
+    __unbound__: {
+      id: '__unbound__';
+      kind: 'sql-namespace';
+      entries: {
+        table: {
+          User: {
+            columns: {
+              role: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+              status: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: true };
+              level: { nativeType: 'int4'; codecId: 'pg/int4@1'; nullable: false };
+              name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
             };
-          };
-        };
-      };
-    };
-  },
-  {
-    User: {
-      storage: {
-        table: 'User';
-        namespaceId: 'public';
-        fields: {
-          role: { column: 'role' };
-          status: { column: 'status' };
-          level: { column: 'level' };
-          name: { column: 'name' };
-        };
-      };
-      fields: {
-        role: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-          readonly valueSet: {
-            readonly plane: 'domain';
-            readonly entityKind: 'enum';
-            readonly namespaceId: 'public';
-            readonly entityName: 'Role';
-          };
-        };
-        status: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: true;
-          readonly valueSet: {
-            readonly plane: 'domain';
-            readonly entityKind: 'enum';
-            readonly namespaceId: 'public';
-            readonly entityName: 'Status';
-          };
-        };
-        level: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          readonly nullable: false;
-          readonly valueSet: {
-            readonly plane: 'domain';
-            readonly entityKind: 'enum';
-            readonly namespaceId: 'public';
-            readonly entityName: 'Level';
-          };
-        };
-        name: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-        };
-      };
-      relations: Record<string, never>;
-    };
-  }
->;
-
-// Augment the domain plane with the enum block the refs resolve against. The
-// `Contract<...>` helper only types the storage + model-definitions; the domain
-// `namespaces[ns].enum` block must be supplied alongside it the way the emitter
-// emits it in `domain.namespaces`.
-type WithDomainEnums = {
-  readonly domain: {
-    readonly namespaces: {
-      readonly public: {
-        readonly models: {
-          readonly User: EnumContractBase extends Contract<infer _S, infer M>
-            ? M extends { readonly User: infer U }
-              ? U
-              : never
-            : never;
-        };
-        readonly enum: {
-          readonly Role: {
-            readonly codecId: 'pg/text@1';
-            readonly members: readonly [
-              { readonly name: 'User'; readonly value: 'user' },
-              { readonly name: 'Admin'; readonly value: 'admin' },
-            ];
-          };
-          readonly Status: {
-            readonly codecId: 'pg/text@1';
-            readonly members: readonly [
-              { readonly name: 'Active'; readonly value: 'active' },
-              { readonly name: 'Inactive'; readonly value: 'inactive' },
-            ];
-          };
-          readonly Level: {
-            readonly codecId: 'pg/int4@1';
-            readonly members: readonly [
-              { readonly name: 'Low'; readonly value: 1 },
-              { readonly name: 'High'; readonly value: 10 },
-            ];
+            primaryKey: { columns: ['role'] };
+            uniques: [];
+            indexes: [];
+            foreignKeys: [];
           };
         };
       };
@@ -166,10 +68,96 @@ type WithDomainEnums = {
   };
 };
 
-type EnumContract = ContractWithTypeMaps<EnumContractBase, EnumTypeMaps> & WithDomainEnums;
+type EnumModels = {
+  User: {
+    storage: {
+      table: 'User';
+      namespaceId: '__unbound__';
+      fields: {
+        role: { column: 'role' };
+        status: { column: 'status' };
+        level: { column: 'level' };
+        name: { column: 'name' };
+      };
+    };
+    fields: {
+      role: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+        readonly valueSet: {
+          readonly plane: 'domain';
+          readonly entityKind: 'enum';
+          readonly namespaceId: '__unbound__';
+          readonly entityName: 'Role';
+        };
+      };
+      status: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: true;
+        readonly valueSet: {
+          readonly plane: 'domain';
+          readonly entityKind: 'enum';
+          readonly namespaceId: '__unbound__';
+          readonly entityName: 'Status';
+        };
+      };
+      level: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: false;
+        readonly valueSet: {
+          readonly plane: 'domain';
+          readonly entityKind: 'enum';
+          readonly namespaceId: '__unbound__';
+          readonly entityName: 'Level';
+        };
+      };
+      name: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+      };
+    };
+    relations: Record<string, never>;
+  };
+};
+
+// The domain enum block the field refs resolve against, nested under the same
+// namespace coordinate the emitter renders it at.
+type EnumDomainEnums = {
+  readonly Role: {
+    readonly codecId: 'pg/text@1';
+    readonly members: readonly [
+      { readonly name: 'User'; readonly value: 'user' },
+      { readonly name: 'Admin'; readonly value: 'admin' },
+    ];
+  };
+  readonly Status: {
+    readonly codecId: 'pg/text@1';
+    readonly members: readonly [
+      { readonly name: 'Active'; readonly value: 'active' },
+      { readonly name: 'Inactive'; readonly value: 'inactive' },
+    ];
+  };
+  readonly Level: {
+    readonly codecId: 'pg/int4@1';
+    readonly members: readonly [
+      { readonly name: 'Low'; readonly value: 1 },
+      { readonly name: 'High'; readonly value: 10 },
+    ];
+  };
+};
+
+type EnumContractBase = Omit<Contract<EnumStorage>, 'domain'> & {
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: { readonly models: EnumModels; readonly enum: EnumDomainEnums };
+    };
+  };
+};
+
+type EnumContract = ContractWithTypeMaps<EnumContractBase, EnumTypeMaps>;
 
 // ---------------------------------------------------------------------------
-// Read output: DefaultModelRow follows the domain field's valueSet ref
+// Read output: DefaultModelRow follows the domain field's valueSet ref.
 // ---------------------------------------------------------------------------
 
 type UserRow = DefaultModelRow<EnumContract, 'User'>;
@@ -190,12 +178,12 @@ test('ORM read output: int-codec enum field is a number-literal union', () => {
   expectTypeOf<UserRow['level']>().toEqualTypeOf<1 | 10>();
 });
 
-test('ORM read output: plain (non-enum) field falls back to codec output', () => {
+test('ORM read output: plain (non-enum) field falls back to the nested baked map', () => {
   expectTypeOf<UserRow['name']>().toEqualTypeOf<string>();
 });
 
 // ---------------------------------------------------------------------------
-// Write input: CreateInput is derived from DefaultModelRow
+// Write input: CreateInput is derived from DefaultModelRow.
 // ---------------------------------------------------------------------------
 
 type UserCreateInput = CreateInput<EnumContract, 'User'>;
@@ -204,7 +192,7 @@ test('ORM write input: non-nullable enum field rejects out-of-union literal', ()
   const runtime = createMockRuntime();
   const context = {} as unknown as ExecutionContext<EnumContract>;
   const collection = new Collection<EnumContract, 'User'>({ runtime, context }, 'User', {
-    namespaceId: 'public',
+    namespaceId: '__unbound__',
   });
 
   // @ts-expect-error 'nope' is not in the 'user' | 'admin' union

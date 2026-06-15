@@ -15,7 +15,9 @@
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
-  "dependencies": {},
+  "dependencies": {
+    "mongodb": "catalog:"
+  },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:0.13.0",
     "@prisma-next/tsdown": "workspace:0.13.0",
@@ -38,6 +40,7 @@
   "types": "./dist/index.d.mts",
   "exports": {
     ".": "./dist/index.mjs",
+    "./mongodb-types": "./dist/mongodb-types.mjs",
     "./package.json": "./package.json"
   },
   "engines": {

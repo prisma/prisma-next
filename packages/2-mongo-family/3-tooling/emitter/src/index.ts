@@ -1,4 +1,4 @@
-import type { Contract, ContractModel } from '@prisma-next/contract/types';
+import type { Contract, ContractModel, ContractModelBase } from '@prisma-next/contract/types';
 import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-type-generation';
 import type { ValidationContext } from '@prisma-next/framework-components/emission';
 import type { Namespace } from '@prisma-next/framework-components/ir';
@@ -228,7 +228,7 @@ export const mongoEmission = {
     return `{ readonly namespaces: ${namespacesType}; readonly storageHash: ${storageHashTypeName} }`;
   },
 
-  generateModelStorageType(_modelName: string, model: ContractModel): string {
+  generateModelStorageType(_modelName: string, model: ContractModelBase): string {
     const parts: string[] = [];
     const collection = model.storage['collection'] as string | undefined;
     if (collection) {

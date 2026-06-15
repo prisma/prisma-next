@@ -11,10 +11,13 @@ import type { EnumMemberNames, EnumValues } from '@prisma-next/contract/enum-acc
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { expectTypeOf, test } from 'vitest';
-import type { Contract, FieldOutputTypes, Models, TypeMaps } from '../src/prisma/contract.d';
+import type { Contract, FieldOutputTypes, TypeMaps } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { db } from '../src/prisma/db';
 import type { getPostsByPriority } from '../src/queries/get-posts-by-priority';
+
+// Models resolve per-namespace from the domain plane (no flat top-level Models export).
+type Models = Contract['domain']['namespaces']['public']['models'];
 
 test('contract.d.ts exports Contract and TypeMaps separately', () => {
   expectTypeOf<Contract>().toHaveProperty('domain');
@@ -41,8 +44,9 @@ test('emitted contract.d.ts: FieldOutputTypes carries the codec channel for Post
   // TML-2886 U3 retired the emitter's baked enum override: the enum value union
   // is no longer baked into FieldOutputTypes. The map entry is now the plain codec
   // output; the value union is supplied by the lane via ref-following (proved by
-  // the SELECT/getPostsByPriority/INSERT tests below).
-  type PriorityOutput = FieldOutputTypes['Post']['priority'];
+  // the SELECT/getPostsByPriority/INSERT tests below). The map is namespace-nested
+  // (#803), so the entry is read at FieldOutputTypes[ns][model][field].
+  type PriorityOutput = FieldOutputTypes['public']['Post']['priority'];
   expectTypeOf<PriorityOutput>().toEqualTypeOf<string>();
   expectTypeOf<PriorityOutput>().not.toEqualTypeOf<'low' | 'high' | 'urgent'>();
 });

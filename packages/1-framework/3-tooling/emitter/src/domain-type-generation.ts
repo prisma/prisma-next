@@ -1,7 +1,7 @@
 import type {
   ContractField,
   ContractManyToManyRelation,
-  ContractModel,
+  ContractModelBase,
   ContractValueObject,
   CrossReference,
 } from '@prisma-next/contract/types';
@@ -180,8 +180,8 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
 }
 
 export function generateModelsType(
-  models: Record<string, ContractModel>,
-  generateModelStorage: (modelName: string, model: ContractModel) => string,
+  models: Record<string, ContractModelBase>,
+  generateModelStorage: (modelName: string, model: ContractModelBase) => string,
 ): string {
   if (!models || Object.keys(models).length === 0) {
     return 'Record<string, never>';
@@ -293,7 +293,7 @@ function applyModifiers(base: string, field: ContractField): string {
 export type FieldTypeParamsResolver = (
   modelName: string,
   fieldName: string,
-  model: ContractModel,
+  model: ContractModelBase,
 ) => Record<string, unknown> | undefined;
 
 export function resolveFieldType(
@@ -364,7 +364,7 @@ export function generateFieldResolvedType(
 }
 
 export function generateBothFieldTypesMaps(
-  models: Record<string, ContractModel> | undefined,
+  models: Record<string, ContractModelBase> | undefined,
   codecLookup?: CodecLookup,
   resolveFieldTypeParams?: FieldTypeParamsResolver,
 ): ResolvedFieldType {
@@ -411,8 +411,40 @@ export function generateBothFieldTypesMaps(
   };
 }
 
+/**
+ * Builds the output/input field type maps nested by namespace coordinate —
+ * `{ [ns]: { [model]: { [field]: <refined-type> } } }` — mirroring how
+ * `domain.namespaces[ns]` is emitted. Each namespace's per-model map reuses
+ * {@link generateBothFieldTypesMaps} (and its `renderOutputTypeFor` typeParam
+ * refinement), so a parameterized column keeps its refined output type under
+ * its own namespace and same-named models across namespaces stay distinct.
+ */
+export function generateFieldTypesMapsByNamespace(
+  namespaceModels: ReadonlyArray<readonly [string, Record<string, ContractModelBase>]>,
+  codecLookup?: CodecLookup,
+  resolveFieldTypeParams?: FieldTypeParamsResolver,
+): ResolvedFieldType {
+  if (namespaceModels.length === 0) {
+    return { output: 'Record<string, never>', input: 'Record<string, never>' };
+  }
+
+  const outputNamespaceEntries: string[] = [];
+  const inputNamespaceEntries: string[] = [];
+  for (const [nsId, models] of namespaceModels) {
+    const inner = generateBothFieldTypesMaps(models, codecLookup, resolveFieldTypeParams);
+    const nsKey = `readonly ${serializeObjectKey(nsId)}`;
+    outputNamespaceEntries.push(`${nsKey}: ${inner.output}`);
+    inputNamespaceEntries.push(`${nsKey}: ${inner.input}`);
+  }
+
+  return {
+    output: `{ ${outputNamespaceEntries.join('; ')} }`,
+    input: `{ ${inputNamespaceEntries.join('; ')} }`,
+  };
+}
+
 export function generateFieldOutputTypesMap(
-  models: Record<string, ContractModel> | undefined,
+  models: Record<string, ContractModelBase> | undefined,
   codecLookup?: CodecLookup,
   resolveFieldTypeParams?: FieldTypeParamsResolver,
 ): string {
@@ -420,7 +452,7 @@ export function generateFieldOutputTypesMap(
 }
 
 export function generateFieldInputTypesMap(
-  models: Record<string, ContractModel> | undefined,
+  models: Record<string, ContractModelBase> | undefined,
   codecLookup?: CodecLookup,
   resolveFieldTypeParams?: FieldTypeParamsResolver,
 ): string {

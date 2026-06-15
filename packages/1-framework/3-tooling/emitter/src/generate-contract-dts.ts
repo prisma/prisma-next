@@ -1,7 +1,7 @@
 import type {
   Contract,
   ContractEnum,
-  ContractModel,
+  ContractModelBase,
   ContractValueObject,
 } from '@prisma-next/contract/types';
 import { DomainNamespaceResolutionError } from '@prisma-next/contract/types';
@@ -14,8 +14,8 @@ import type {
 import { blindCast } from '@prisma-next/utils/casts';
 import {
   deduplicateImports,
-  generateBothFieldTypesMaps,
   generateCodecTypeIntersection,
+  generateFieldTypesMapsByNamespace,
   generateHashTypeAliases,
   generateImportLines,
   generateModelsType,
@@ -82,26 +82,6 @@ export function generateContractDts(
     }
   }
 
-  // Flatten all namespace models into one record — first-name-wins on bare-name collision.
-  // This is the documented ORM flatten behaviour; the proper per-namespace .d.ts redesign
-  // is explicit-namespace-dsl's job (not this interim unblock).
-  const modelsRecord: Record<string, ContractModel> = {};
-  for (const [, ns] of namespaceEntries) {
-    for (const [modelName, model] of Object.entries(
-      blindCast<
-        Record<string, ContractModel>,
-        'ns.models is a ContractModel record in the emitted IR'
-      >(ns.models),
-    )) {
-      if (!(modelName in modelsRecord)) {
-        modelsRecord[modelName] = model;
-      }
-    }
-  }
-  const modelsType = generateModelsType(modelsRecord, (name, model) =>
-    emitter.generateModelStorageType(name, model),
-  );
-
   const rootsType = generateRootsType(contract.roots);
 
   // Flatten value objects across all namespaces — first-name-wins on collision.
@@ -126,10 +106,7 @@ export function generateContractDts(
   const perNamespaceTypes: Array<
     readonly [string, string, string | undefined, string | undefined]
   > = namespaceEntries.map(([nsId, ns]) => {
-    const nsModels = blindCast<
-      Record<string, ContractModel>,
-      'ns.models is a ContractModel record in the emitted IR'
-    >(ns.models);
+    const nsModels = ns.models;
     const nsModelsType = generateModelsType(nsModels, (name, model) =>
       emitter.generateModelStorageType(name, model),
     );
@@ -169,12 +146,16 @@ export function generateContractDts(
       : '';
 
   const resolveFieldTypeParams = emitter.resolveFieldTypeParams
-    ? (modelName: string, fieldName: string, model: ContractModel) =>
+    ? (modelName: string, fieldName: string, model: ContractModelBase) =>
         emitter.resolveFieldTypeParams?.(modelName, fieldName, model, contract)
     : undefined;
 
-  const fieldTypesMaps = generateBothFieldTypesMaps(
-    modelsRecord,
+  const namespaceModelsForFieldTypes = namespaceEntries.map(
+    ([nsId, ns]) => [nsId, ns.models] as const,
+  );
+
+  const fieldTypesMaps = generateFieldTypesMapsByNamespace(
+    namespaceModelsForFieldTypes,
     codecLookup,
     resolveFieldTypeParams,
   );
@@ -189,7 +170,6 @@ ${importLines.join('\n')}
 ${familyImportLines.join('\n')}
 import type {
   Contract as ContractType,
-  ContractModelDefinitions,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -206,10 +186,7 @@ export type FieldInputTypes = ${fieldTypesMaps.input};
 export type TypeMaps = ${typeMapsExpr};
 
 type ContractBase = Omit<
-  ContractType<
-${storageType},
-${modelsType}
-  >,
+  ContractType<${storageType}>,
   'roots' | 'domain'
 > & {
   readonly target: ${serializeValue(contract.target)};
@@ -226,8 +203,6 @@ ${domainNamespacesType};
   ${valueObjects ? `readonly valueObjects: ${valueObjectsDescriptor};` : ''}
   readonly profileHash: ProfileHash;
 };
-
-export type Models = ContractModelDefinitions<Contract>;
 
 ${contractWrapper}
 `;

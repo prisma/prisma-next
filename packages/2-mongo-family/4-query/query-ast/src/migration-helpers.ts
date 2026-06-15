@@ -1,4 +1,4 @@
-import type { MongoIndexKey } from '@prisma-next/mongo-contract';
+import type { MongoIndexKey, MongoIndexKeyDirection } from '@prisma-next/mongo-contract';
 
 export function buildIndexOpId(
   verb: 'create' | 'drop',
@@ -13,8 +13,10 @@ export function defaultMongoIndexName(keys: ReadonlyArray<MongoIndexKey>): strin
   return keys.map((k) => `${k.field}_${k.direction}`).join('_');
 }
 
-export function keysToKeySpec(keys: ReadonlyArray<MongoIndexKey>): Record<string, number | string> {
-  const spec: Record<string, number | string> = {};
+export function keysToKeySpec(
+  keys: ReadonlyArray<MongoIndexKey>,
+): Record<string, MongoIndexKeyDirection> {
+  const spec: Record<string, MongoIndexKeyDirection> = {};
   for (const k of keys) {
     spec[k.field] = k.direction;
   }
