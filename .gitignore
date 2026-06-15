@@ -11,7 +11,8 @@ coverage
 .turbo
 *.tsbuildinfo
 packages/e2e-tests/.tmp-output
-/wip
+/wip/*
+!/wip/.gitkeep
 .pnpm-store
 .cursor/*
 !.cursor/rules-footprint.config.json
