@@ -130,6 +130,12 @@ runtime, contract, or public-API change. Incidental substrate diff only.
 -->
 
 <!--
+#823: `jose` bumped from ^5 to ^6 in `packages/3-extensions/supabase`. The Supabase
+extension's transitive auth dependency only — no extension-author API, runtime, or
+contract-shape change. Incidental substrate diff only.
+-->
+
+<!--
 TML-2852: the enum read surface. Additive surface for `enumType`-authored enums.
 `@prisma-next/postgres/contract-builder` gains `enumType` / `member` exports (the
 Postgres-bound `enumType` constrains member values to the column codec) and the
