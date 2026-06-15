@@ -99,25 +99,17 @@ type EnumContract = MongoContractWithTypeMaps<
 
 declare const enumDb: MongoClient<EnumContract>;
 
-test('db.enums exposes the __unbound__ namespace', () => {
-  expectTypeOf<keyof (typeof enumDb)['enums']>().toEqualTypeOf<'__unbound__'>();
+test('db.enums.Role is a ContractEnumAccessor (unbound projection, no __unbound__ key needed)', () => {
+  expectTypeOf<(typeof enumDb)['enums']['Role']>().toMatchTypeOf<ContractEnumAccessor<RoleEnum>>();
 });
 
-test('db.enums.__unbound__.Role is a ContractEnumAccessor', () => {
-  expectTypeOf<(typeof enumDb)['enums']['__unbound__']['Role']>().toMatchTypeOf<
-    ContractEnumAccessor<RoleEnum>
-  >();
-});
-
-test('db.enums.__unbound__.Role.values carries the literal member values', () => {
-  type Values = (typeof enumDb)['enums']['__unbound__']['Role']['values'];
+test('db.enums.Role.values carries the literal member values', () => {
+  type Values = (typeof enumDb)['enums']['Role']['values'];
   expectTypeOf<Values[0]>().toEqualTypeOf<'user'>();
   expectTypeOf<Values[1]>().toEqualTypeOf<'admin'>();
   expectTypeOf<Values[number]>().toEqualTypeOf<'user' | 'admin'>();
 });
 
-test('db.enums.__unbound__.Role.members.User is the literal "user"', () => {
-  expectTypeOf<
-    (typeof enumDb)['enums']['__unbound__']['Role']['members']['User']
-  >().toEqualTypeOf<'user'>();
+test('db.enums.Role.members.User is the literal "user"', () => {
+  expectTypeOf<(typeof enumDb)['enums']['Role']['members']['User']>().toEqualTypeOf<'user'>();
 });
