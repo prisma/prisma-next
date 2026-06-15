@@ -49,6 +49,7 @@ export class SupabaseRuntimeImpl<
     }
 
     const self = this;
+    const releaseHooks: Array<() => Promise<void>> = [];
 
     const session: RoleSession = {
       execute<Row>(
@@ -79,41 +80,11 @@ export class SupabaseRuntimeImpl<
 
       async transaction(): Promise<RuntimeTransaction> {
         const tx = await conn.beginTransaction();
-        return {
-          async commit(): Promise<void> {
-            await tx.commit();
-          },
-          async rollback(): Promise<void> {
-            await tx.rollback();
-          },
-          execute<Row>(
-            plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
-            options?: RuntimeExecuteOptions,
-          ): AsyncIterableResult<Row> {
-            return self.executeAgainstQueryable<Row>(plan, tx, {
-              ...options,
-              scope: 'transaction',
-            });
-          },
-          executePrepared<Params, Row>(
-            ps: PreparedStatement<Params, Row>,
-            params: Params,
-            options?: RuntimeExecuteOptions,
-          ): AsyncIterableResult<Row> {
-            return self.executePreparedAgainstQueryable(
-              blindCast<
-                PreparedStatementImpl<Params, Row>,
-                'PreparedStatement is PreparedStatementImpl; the impl class is the only concrete form'
-              >(ps),
-              blindCast<
-                Record<string, unknown>,
-                'params are structurally Record<string, unknown> at runtime'
-              >(params),
-              tx,
-              { ...options, scope: 'transaction' },
-            );
-          },
-        };
+        return self.wrapTransaction(tx);
+      },
+
+      registerReleaseHook(hook: () => Promise<void>): void {
+        releaseHooks.push(hook);
       },
 
       /**
@@ -121,6 +92,9 @@ export class SupabaseRuntimeImpl<
        * If RESET ALL fails, destroys the connection instead — pool-poisoning guarantee.
        */
       async release(): Promise<void> {
+        for (const hook of releaseHooks) {
+          await hook();
+        }
         try {
           await conn.query('RESET ALL');
           await conn.release();

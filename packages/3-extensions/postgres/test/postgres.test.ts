@@ -1,7 +1,11 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type { ScopeField, Subquery } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { ProjectionItem, SelectAst, TableSource } from '@prisma-next/sql-relational-core/ast';
+import { planFromAst } from '@prisma-next/sql-relational-core/plan';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { createContract } from '@prisma-next/test-utils';
+import { blindCast } from '@prisma-next/utils/casts';
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 // Only mock the third-party pg boundary. Real drivers, adapters, and runtimes
@@ -376,6 +380,352 @@ describe('postgres', () => {
 
     expect(receivedTx).toBeDefined();
     expect(receivedTx!.orm).toBeDefined();
+  });
+
+  it('transaction tempTable() creates and drops a typed temp table with generated name', async () => {
+    const pool = new Pool({ connectionString: 'postgres://localhost:5432/db' });
+    const fakeClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    };
+    (pool as unknown as { connect: typeof vi.fn }).connect = vi.fn().mockResolvedValue(fakeClient);
+
+    const db = postgres({ contract, pg: pool });
+    await db.connect();
+
+    const subquery = blindCast<
+      Subquery<{ id: ScopeField }>,
+      'test fixture for temp-table typed subquery'
+    >({
+      buildAst: () =>
+        SelectAst.from(TableSource.named('source_table')).withProjection([
+          ProjectionItem.of('id', db.raw`1`.returns('pg/int4@1').buildAst()),
+        ]),
+      getRowFields: () => ({ id: { codecId: 'pg/int4@1', nullable: false } }),
+    });
+
+    await db.transaction(async (tx) => {
+      const temp = await tx.tempTable().as(subquery);
+      expect(temp.name).toMatch(/^pn_temp_[a-f0-9]+$/);
+      expect(temp.fields['id']?.codecId).toBe('pg/int4@1');
+      expect('buildAst' in temp).toBe(true);
+      expect('getJoinOuterScope' in temp).toBe(true);
+      await temp.drop();
+    });
+
+    await db.close();
+
+    const issuedSql = fakeClient.query.mock.calls.map((call) => {
+      const arg = call[0] as string | { text?: string };
+      return typeof arg === 'string' ? arg : (arg.text ?? '');
+    });
+    expect(issuedSql.some((sql) => sql.startsWith('CREATE TEMP TABLE'))).toBe(true);
+    expect(issuedSql.some((sql) => sql.startsWith('DROP TABLE IF EXISTS'))).toBe(true);
+  });
+
+  it('transaction tempTable() accepts a manual table name', async () => {
+    const pool = new Pool({ connectionString: 'postgres://localhost:5432/db' });
+    const fakeClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    };
+    (pool as unknown as { connect: typeof vi.fn }).connect = vi.fn().mockResolvedValue(fakeClient);
+
+    const db = postgres({ contract, pg: pool });
+    await db.connect();
+
+    const subquery = blindCast<
+      Subquery<{ id: ScopeField; email: ScopeField }>,
+      'test fixture for temp-table typed subquery'
+    >({
+      buildAst: () =>
+        SelectAst.from(TableSource.named('source_table')).withProjection([
+          ProjectionItem.of('id', db.raw`1`.returns('pg/int4@1').buildAst()),
+          ProjectionItem.of('email', db.raw`'a@example.com'`.returns('pg/text@1').buildAst()),
+        ]),
+      getRowFields: () => ({
+        id: { codecId: 'pg/int4@1', nullable: false },
+        email: { codecId: 'pg/text@1', nullable: false },
+      }),
+    });
+
+    await db.transaction(async (tx) => {
+      const temp = await tx.tempTable({ name: 'recent_users' }).as(subquery);
+      expect(temp.name).toBe('recent_users');
+      expect(temp.fields).toEqual({
+        id: { codecId: 'pg/int4@1', nullable: false },
+        email: { codecId: 'pg/text@1', nullable: false },
+      });
+      await temp.drop();
+    });
+
+    await db.close();
+
+    const issuedSql = fakeClient.query.mock.calls.map((call) => {
+      const arg = call[0] as string | { text?: string };
+      return typeof arg === 'string' ? arg : (arg.text ?? '');
+    });
+    expect(issuedSql.some((sql) => sql.includes('CREATE TEMP TABLE "recent_users" AS'))).toBe(true);
+    expect(issuedSql.some((sql) => sql.includes('DROP TABLE IF EXISTS "recent_users"'))).toBe(true);
+  });
+
+  it('transaction tempTable() can be reused in tx.sql join composition within the same transaction', async () => {
+    const pool = new Pool({ connectionString: 'postgres://localhost:5432/db' });
+    const fakeClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    };
+    (pool as unknown as { connect: typeof vi.fn }).connect = vi.fn().mockResolvedValue(fakeClient);
+
+    const db = postgres({ contract, pg: pool });
+    await db.connect();
+
+    const subquery = blindCast<
+      Subquery<{ id: ScopeField; email: ScopeField }>,
+      'test fixture for temp-table typed subquery'
+    >({
+      buildAst: () =>
+        SelectAst.from(TableSource.named('source_table')).withProjection([
+          ProjectionItem.of('id', db.raw`1`.returns('pg/int4@1').buildAst()),
+          ProjectionItem.of('email', db.raw`'a@example.com'`.returns('pg/text@1').buildAst()),
+        ]),
+      getRowFields: () => ({
+        id: { codecId: 'pg/int4@1', nullable: false },
+        email: { codecId: 'pg/text@1', nullable: false },
+      }),
+    });
+
+    await db.transaction(async (tx) => {
+      const recentUsers = await tx.tempTable({ name: 'recent_users' }).as(subquery);
+
+      await tx
+        .execute(
+          planFromAst(
+            SelectAst.from(recentUsers.buildAst()).withProjection([
+              ProjectionItem.of('id', db.raw`1`.returns('pg/int4@1').buildAst()),
+              ProjectionItem.of('email', db.raw`'a@example.com'`.returns('pg/text@1').buildAst()),
+            ]),
+            contract,
+            'dsl',
+          ),
+        )
+        .toArray();
+
+      await recentUsers.drop();
+    });
+
+    await db.close();
+
+    const issuedSql = fakeClient.query.mock.calls.map((call) => {
+      const arg = call[0] as string | { text?: string };
+      return typeof arg === 'string' ? arg : (arg.text ?? '');
+    });
+    expect(issuedSql.some((sql) => sql.includes('CREATE TEMP TABLE "recent_users" AS'))).toBe(true);
+    expect(issuedSql.some((sql) => sql.includes('FROM "recent_users" AS "recent_users"'))).toBe(
+      true,
+    );
+  });
+
+  it('transaction tempTable().from() issues CREATE TABLE with ON COMMIT DROP and INSERT', async () => {
+    const pool = new Pool({ connectionString: 'postgres://localhost:5432/db' });
+    const fakeClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    };
+    (pool as unknown as { connect: typeof vi.fn }).connect = vi.fn().mockResolvedValue(fakeClient);
+
+    const db = postgres({ contract, pg: pool });
+    await db.connect();
+
+    await db.transaction(async (tx) => {
+      const handle = await tx.tempTable({ name: 'csv_data' }).from([
+        { name: 'id', type: 'int4' },
+        { name: 'label', type: 'text' },
+      ]);
+      await handle.append([
+        ['1', 'Alice'],
+        ['2', 'Bob'],
+      ]);
+      expect(handle.name).toBe('csv_data');
+    });
+
+    await db.close();
+
+    const issuedSql = fakeClient.query.mock.calls.map((call) => {
+      const arg = call[0] as string | { text?: string };
+      return typeof arg === 'string' ? arg : (arg.text ?? '');
+    });
+
+    expect(
+      issuedSql.some(
+        (sql) =>
+          sql.includes('CREATE TEMP TABLE "csv_data"') &&
+          sql.includes('"id" int4') &&
+          sql.includes('"label" text') &&
+          sql.includes('ON COMMIT DROP'),
+      ),
+    ).toBe(true);
+    expect(
+      issuedSql.some(
+        (sql) =>
+          sql.includes('INSERT INTO "csv_data"') && sql.includes("'1'") && sql.includes("'Alice'"),
+      ),
+    ).toBe(true);
+  });
+
+  it('transaction tempTable().from() with empty rows skips INSERT', async () => {
+    const pool = new Pool({ connectionString: 'postgres://localhost:5432/db' });
+    const fakeClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    };
+    (pool as unknown as { connect: typeof vi.fn }).connect = vi.fn().mockResolvedValue(fakeClient);
+
+    const db = postgres({ contract, pg: pool });
+    await db.connect();
+
+    await db.transaction(async (tx) => {
+      await tx.tempTable({ name: 'empty_table' }).from([{ name: 'id', type: 'int4' }]);
+    });
+
+    await db.close();
+
+    const issuedSql = fakeClient.query.mock.calls.map((call) => {
+      const arg = call[0] as string | { text?: string };
+      return typeof arg === 'string' ? arg : (arg.text ?? '');
+    });
+
+    expect(issuedSql.some((sql) => sql.includes('CREATE TEMP TABLE "empty_table"'))).toBe(true);
+    expect(issuedSql.some((sql) => sql.includes('INSERT INTO "empty_table"'))).toBe(false);
+  });
+
+  it('transaction tempTable().from() inlines null, number and boolean as SQL literals', async () => {
+    const pool = new Pool({ connectionString: 'postgres://localhost:5432/db' });
+    const fakeClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    };
+    (pool as unknown as { connect: typeof vi.fn }).connect = vi.fn().mockResolvedValue(fakeClient);
+
+    const db = postgres({ contract, pg: pool });
+    await db.connect();
+
+    await db.transaction(async (tx) => {
+      const handle = await tx.tempTable({ name: 'typed_table' }).from([
+        { name: 'n', type: 'int4' },
+        { name: 'flag', type: 'bool' },
+        { name: 'nullable', type: 'text' },
+      ]);
+      await handle.append([[42, true, null]]);
+    });
+
+    await db.close();
+
+    const issuedSql = fakeClient.query.mock.calls.map((call) => {
+      const arg = call[0] as string | { text?: string };
+      return typeof arg === 'string' ? arg : (arg.text ?? '');
+    });
+
+    const insertSql = issuedSql.find((sql) => sql.startsWith('INSERT INTO "typed_table"')) ?? '';
+    expect(insertSql).toContain('42');
+    expect(insertSql).toContain('TRUE');
+    expect(insertSql).toContain('NULL');
+  });
+
+  it('transaction tempTable().from() handle supports append() with raw rows', async () => {
+    const pool = new Pool({ connectionString: 'postgres://localhost:5432/db' });
+    const fakeClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    };
+    (pool as unknown as { connect: typeof vi.fn }).connect = vi.fn().mockResolvedValue(fakeClient);
+
+    const db = postgres({ contract, pg: pool });
+    await db.connect();
+
+    await db.transaction(async (tx) => {
+      const handle = await tx
+        .tempTable({ name: 'append_table' })
+        .from([{ name: 'id', type: 'int4' }]);
+      await handle.append([['1']]);
+      await handle.append([['2'], ['3']]);
+    });
+
+    await db.close();
+
+    const issuedSql = fakeClient.query.mock.calls.map((call) => {
+      const arg = call[0] as string | { text?: string };
+      return typeof arg === 'string' ? arg : (arg.text ?? '');
+    });
+
+    expect(issuedSql.filter((sql) => sql.startsWith('INSERT INTO "append_table"'))).toHaveLength(2);
+    const appendSql = issuedSql.find(
+      (sql) => sql.startsWith('INSERT INTO "append_table"') && sql.includes("'2'"),
+    );
+    expect(appendSql).toMatch(/INSERT INTO "append_table" VALUES \('2'\), \('3'\)/);
+  });
+
+  it('transaction tempTable().as() handle supports append() with a subquery (INSERT INTO ... SELECT)', async () => {
+    const pool = new Pool({ connectionString: 'postgres://localhost:5432/db' });
+    const fakeClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    };
+    (pool as unknown as { connect: typeof vi.fn }).connect = vi.fn().mockResolvedValue(fakeClient);
+
+    const db = postgres({ contract, pg: pool });
+    await db.connect();
+
+    const subquery = blindCast<Subquery<{ id: ScopeField }>, 'test fixture'>({
+      buildAst: () =>
+        SelectAst.from(TableSource.named('source_table')).withProjection([
+          ProjectionItem.of('id', db.raw`1`.returns('pg/int4@1').buildAst()),
+        ]),
+      getRowFields: () => ({ id: { codecId: 'pg/int4@1', nullable: false } }),
+    });
+
+    await db.transaction(async (tx) => {
+      const handle = await tx.tempTable({ name: 'select_append' }).as(subquery);
+      await handle.append(subquery);
+    });
+
+    await db.close();
+
+    const issuedSql = fakeClient.query.mock.calls.map((call) => {
+      const arg = call[0] as string | { text?: string };
+      return typeof arg === 'string' ? arg : (arg.text ?? '');
+    });
+
+    expect(
+      issuedSql.some(
+        (sql) => sql.startsWith('INSERT INTO "select_append"') && sql.includes('SELECT'),
+      ),
+    ).toBe(true);
+  });
+
+  it('transaction tempTable().append() with empty rows is a no-op', async () => {
+    const pool = new Pool({ connectionString: 'postgres://localhost:5432/db' });
+    const fakeClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    };
+    (pool as unknown as { connect: typeof vi.fn }).connect = vi.fn().mockResolvedValue(fakeClient);
+
+    const db = postgres({ contract, pg: pool });
+    await db.connect();
+
+    await db.transaction(async (tx) => {
+      const handle = await tx.tempTable({ name: 'no_insert' }).from([{ name: 'x', type: 'int4' }]);
+      await handle.append([]);
+    });
+
+    await db.close();
+
+    const issuedSql = fakeClient.query.mock.calls.map((call) => {
+      const arg = call[0] as string | { text?: string };
+      return typeof arg === 'string' ? arg : (arg.text ?? '');
+    });
+    expect(issuedSql.some((sql) => sql.startsWith('INSERT INTO'))).toBe(false);
   });
 
   it('transaction() lazily creates runtime before connect()', async () => {
