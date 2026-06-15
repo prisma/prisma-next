@@ -4,14 +4,17 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import {
-  type PostgresEnumStorageEntry,
-  type SqlNamespaceEntries,
-  type SqlNamespaceTablesInput,
-  type SqlStorage,
+  createSqlEntryConstructionRegistry,
+  dispatchEntriesToRegistry,
+  type EntryFactory,
+} from '@prisma-next/sql-contract/entry-construction-registry';
+import type {
+  PostgresEnumStorageEntry,
+  SqlNamespaceEntries,
+  SqlNamespaceTablesInput,
+  SqlStorage,
   StorageTable,
-  type StorageTableInput,
   StorageValueSet,
-  type StorageValueSetInput,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -26,6 +29,16 @@ export interface PostgresSchemaInput {
   readonly id: string;
   readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
+
+const typeFactory: EntryFactory = (v) =>
+  new PostgresEnumType(
+    blindCast<
+      PostgresEnumTypeInput,
+      'postgres-schema: entries[type] holds PostgresEnumTypeInput by construction'
+    >(v),
+  );
+
+const POSTGRES_REGISTRY = createSqlEntryConstructionRegistry(new Map([['type', typeFactory]]));
 
 /**
  * Postgres target `Namespace` concretion — a Postgres schema (`CREATE
@@ -59,50 +72,25 @@ export class PostgresSchema extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
-    let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
-    let type: Readonly<Record<string, PostgresEnumType>> = Object.freeze({});
-    let valueSet: Readonly<Record<string, StorageValueSet>> | undefined;
-    for (const [kind, rawMap] of Object.entries(input.entries)) {
-      if (kind === 'table') {
-        const tableMap: Record<string, StorageTable> = {};
-        for (const [name, v] of Object.entries(
-          blindCast<
-            Record<string, StorageTableInput>,
-            'entries[table] holds StorageTableInput by construction'
-          >(rawMap),
-        )) {
-          tableMap[name] = new StorageTable(v);
-        }
-        table = Object.freeze(tableMap);
-      } else if (kind === 'type') {
-        const typeMap: Record<string, PostgresEnumType> = {};
-        for (const [name, v] of Object.entries(
-          blindCast<
-            Record<string, PostgresEnumTypeInput>,
-            'entries[type] holds PostgresEnumTypeInput by construction'
-          >(rawMap),
-        )) {
-          typeMap[name] = new PostgresEnumType(v);
-        }
-        type = Object.freeze(typeMap);
-      } else if (kind === 'valueSet') {
-        const vsMap: Record<string, StorageValueSet> = {};
-        for (const [name, v] of Object.entries(
-          blindCast<
-            Record<string, StorageValueSetInput>,
-            'entries[valueSet] holds StorageValueSetInput by construction'
-          >(rawMap),
-        )) {
-          vsMap[name] = new StorageValueSet(v);
-        }
-        if (Object.keys(vsMap).length > 0) {
-          valueSet = Object.freeze(vsMap);
-        }
-      } else {
-        carried[kind] = Object.freeze(rawMap);
-      }
-    }
+    const dispatched = dispatchEntriesToRegistry(input.entries, POSTGRES_REGISTRY);
+
+    const table = blindCast<
+      Readonly<Record<string, StorageTable>>,
+      'POSTGRES_REGISTRY constructs StorageTable for the table kind'
+    >(dispatched['table'] ?? Object.freeze({}));
+    const type = blindCast<
+      Readonly<Record<string, PostgresEnumType>>,
+      'POSTGRES_REGISTRY constructs PostgresEnumType for the type kind'
+    >(dispatched['type'] ?? Object.freeze({}));
+    const valueSetRaw = dispatched['valueSet'];
+    const valueSet =
+      valueSetRaw !== undefined && Object.keys(valueSetRaw).length > 0
+        ? blindCast<
+            Readonly<Record<string, StorageValueSet>>,
+            'POSTGRES_REGISTRY constructs StorageValueSet for the valueSet kind'
+          >(valueSetRaw)
+        : undefined;
+    const { table: _t, type: _ty, valueSet: _vs, ...carried } = dispatched;
 
     this.entries = Object.freeze({
       ...carried,

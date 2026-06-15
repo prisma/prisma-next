@@ -6,12 +6,17 @@ import {
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import {
+  createSqlEntryConstructionRegistry,
+  dispatchEntriesToRegistry,
+} from '../entry-construction-registry';
 import type { SqlNamespace, SqlNamespaceEntries, SqlNamespaceTablesInput } from './sql-storage';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
-import { StorageTable, type StorageTableInput } from './storage-table';
-import { StorageValueSet, type StorageValueSetInput } from './storage-value-set';
+import type { StorageTable } from './storage-table';
+import type { StorageValueSet } from './storage-value-set';
 
 const SQL_NAMESPACE_KIND = 'sql-namespace' as const;
+const CORE_REGISTRY = createSqlEntryConstructionRegistry();
 
 function isMaterializedSqlNamespace(ns: Namespace | SqlNamespaceTablesInput): ns is SqlNamespace {
   if (typeof ns !== 'object' || ns === null) {
@@ -53,36 +58,23 @@ class SqlBoundNamespace extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
-    let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
-    let valueSet: Readonly<Record<string, StorageValueSet>> | undefined;
-    for (const [kind, rawMap] of Object.entries(input.entries)) {
-      if (kind === 'table') {
-        const tableMap: Record<string, StorageTable> = {};
-        for (const [name, v] of Object.entries(
-          blindCast<
-            Record<string, StorageTableInput>,
-            'entries[table] holds StorageTableInput by construction'
-          >(rawMap),
-        )) {
-          tableMap[name] = new StorageTable(v);
-        }
-        table = Object.freeze(tableMap);
-      } else if (kind === 'valueSet') {
-        const vsMap: Record<string, StorageValueSet> = {};
-        for (const [name, v] of Object.entries(
-          blindCast<
-            Record<string, StorageValueSetInput>,
-            'entries[valueSet] holds StorageValueSetInput by construction'
-          >(rawMap),
-        )) {
-          vsMap[name] = new StorageValueSet(v);
-        }
-        valueSet = Object.freeze(vsMap);
-      } else {
-        carried[kind] = Object.freeze(rawMap);
-      }
-    }
+    const dispatched = dispatchEntriesToRegistry(
+      blindCast<
+        Record<string, Readonly<Record<string, unknown>>>,
+        'SqlNamespaceTablesInput.entries values are plain record maps'
+      >(input.entries),
+      CORE_REGISTRY,
+    );
+
+    const table = blindCast<
+      Readonly<Record<string, StorageTable>>,
+      'CORE_REGISTRY constructs StorageTable for the table kind'
+    >(dispatched['table'] ?? Object.freeze({}));
+    const valueSet = blindCast<
+      Readonly<Record<string, StorageValueSet>> | undefined,
+      'CORE_REGISTRY constructs StorageValueSet for the valueSet kind'
+    >(dispatched['valueSet']);
+    const { table: _t, valueSet: _vs, ...carried } = dispatched;
 
     this.entries = Object.freeze({ ...carried, table, ...ifDefined('valueSet', valueSet) });
     Object.defineProperty(this, 'kind', {

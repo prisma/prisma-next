@@ -4,10 +4,14 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import {
-  type SqlNamespaceEntries,
-  type SqlNamespaceTablesInput,
+  createSqlEntryConstructionRegistry,
+  dispatchEntriesToRegistry,
+  type EntryFactory,
+} from '@prisma-next/sql-contract/entry-construction-registry';
+import type {
+  SqlNamespaceEntries,
+  SqlNamespaceTablesInput,
   StorageTable,
-  type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 
@@ -15,6 +19,14 @@ export type SqliteDatabaseInput = {
   readonly id: string;
   readonly entries: SqlNamespaceEntries;
 };
+
+// SQLite constructs only `table`; valueSet stays carried raw per spec.
+// Build a table-only registry by passing no pack factories — we then
+// filter to just the table entry so valueSet is NOT registered.
+const _fullCoreRegistry = createSqlEntryConstructionRegistry();
+const SQLITE_REGISTRY: ReadonlyMap<string, EntryFactory> = new Map(
+  [..._fullCoreRegistry.entries()].filter(([k]) => k === 'table'),
+);
 
 const SQLITE_NAMESPACE_KIND = 'sqlite-namespace' as const;
 
@@ -33,24 +45,19 @@ export class SqliteDatabase extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
-    let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
-    for (const [kind, rawMap] of Object.entries(input.entries)) {
-      if (kind === 'table') {
-        const tableMap: Record<string, StorageTable> = {};
-        for (const [name, v] of Object.entries(
-          blindCast<
-            Record<string, StorageTableInput>,
-            'entries[table] holds StorageTableInput by construction'
-          >(rawMap),
-        )) {
-          tableMap[name] = new StorageTable(v);
-        }
-        table = Object.freeze(tableMap);
-      } else {
-        carried[kind] = Object.freeze(rawMap);
-      }
-    }
+    const dispatched = dispatchEntriesToRegistry(
+      blindCast<
+        Record<string, Readonly<Record<string, unknown>>>,
+        'SqliteDatabaseInput.entries values are plain record maps'
+      >(input.entries),
+      SQLITE_REGISTRY,
+    );
+
+    const table = blindCast<
+      Readonly<Record<string, StorageTable>>,
+      'SQLITE_REGISTRY constructs StorageTable for the table kind'
+    >(dispatched['table'] ?? Object.freeze({}));
+    const { table: _t, ...carried } = dispatched;
 
     this.entries = Object.freeze({ ...carried, table });
     Object.defineProperty(this, 'kind', {
