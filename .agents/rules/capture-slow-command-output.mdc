@@ -1,0 +1,32 @@
+---
+description: Save the output of long-running commands to a file once, then read the file — don't re-run to re-filter
+alwaysApply: true
+---
+
+# Capture slow command output
+
+Long-running commands (`pnpm test:packages`, `test:integration`, `build`, `lint`, `fixtures:check`, `turbo typecheck`) take ~30s–3min. Re-running one of them just to extract a different slice of the output is the largest waste of agent time in this repo.
+
+## Do
+
+Run the command once, save the full output and exit code to a file, then read or grep the file:
+
+```bash
+mkdir -p wip
+pnpm test:packages > wip/test-packages.log 2>&1; echo "exit=$?" >> wip/test-packages.log
+grep -E " FAIL |Test Files" wip/test-packages.log
+```
+
+After a failure, re-run **only the failing file** — not the whole suite:
+
+```bash
+pnpm --filter @prisma-next/cli test test/commands/migration-list-json-golden.test.ts
+```
+
+## Don't
+
+- Pipe the command directly to `tail`/`grep`/`head`. That discards the rest of the output *and* hides the exit code (`tail`/`grep` return 0).
+- Re-run the command to refine a filter. Grep the file you already wrote.
+- Pass `--force` to `turbo` reflexively. The cache is correct by default. Only force when there's a concrete cache-staleness reason this run (e.g. you just edited `tsconfig.json` or a lockfile).
+
+If a pipe is unavoidable, preserve the exit code with `${PIPESTATUS[0]}` or `set -o pipefail`.
