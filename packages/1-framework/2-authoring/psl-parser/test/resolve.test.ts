@@ -11,13 +11,13 @@ import {
 } from '../src/resolve';
 import {
   CompositeTypeDeclarationAst,
-  EnumDeclarationAst,
   ModelDeclarationAst,
   NamedTypeDeclarationAst,
 } from '../src/syntax/ast/declarations';
 
 function resolveSource(source: string): ResolvedDocument {
-  return resolve(parse(source).document);
+  const { document, sourceFile } = parse(source);
+  return resolve(document, sourceFile);
 }
 
 function namespace(doc: ResolvedDocument, id: string): ResolvedNamespace {
@@ -59,11 +59,6 @@ namespace auth {
     email Email
     posts blog.Post[]
   }
-
-  enum Role {
-    ADMIN
-    MEMBER
-  }
 }
 
 namespace blog {
@@ -90,7 +85,6 @@ types {
       const doc = resolveSource(source);
       expect([...doc.namespaces.keys()]).toEqual(['auth', 'blog']);
       expect([...namespace(doc, 'auth').models.keys()]).toEqual(['User']);
-      expect([...namespace(doc, 'auth').enums.keys()]).toEqual(['Role']);
       expect([...namespace(doc, 'blog').models.keys()]).toEqual(['Post']);
       expect([...namespace(doc, 'blog').compositeTypes.keys()]).toEqual(['Metadata']);
       expect([...doc.namedTypes.keys()]).toEqual(['Email']);
@@ -105,10 +99,6 @@ types {
         'owner',
         'vec',
         'ghost',
-      ]);
-      expect([...namespace(doc, 'auth').enums.get('Role')!.values.keys()]).toEqual([
-        'ADMIN',
-        'MEMBER',
       ]);
     });
 
@@ -192,7 +182,6 @@ types {
     it('keeps CST back-pointers on resolved entities', () => {
       const doc = resolveSource(source);
       expect(namespace(doc, 'auth').models.get('User')!.syntax).toBeInstanceOf(ModelDeclarationAst);
-      expect(namespace(doc, 'auth').enums.get('Role')!.syntax).toBeInstanceOf(EnumDeclarationAst);
       expect(namespace(doc, 'blog').compositeTypes.get('Metadata')!.syntax).toBeInstanceOf(
         CompositeTypeDeclarationAst,
       );
@@ -328,7 +317,7 @@ model User {
 `;
 
     function attr(name: string): ResolvedAttribute {
-      const doc = resolve(parse(source).document);
+      const doc = resolveSource(source);
       const field = namespace(doc, UNSPECIFIED_PSL_NAMESPACE_ID)
         .models.get('User')!
         .fields.get('name')!;
@@ -349,7 +338,7 @@ model User {
     });
 
     it('exposes dotted attribute names structurally', () => {
-      const doc = resolve(parse(source).document);
+      const doc = resolveSource(source);
       const tag = namespace(doc, UNSPECIFIED_PSL_NAMESPACE_ID)
         .models.get('User')!
         .fields.get('tag')!;
@@ -409,7 +398,7 @@ model Account {
 
   describe('namespace-qualified constructor types', () => {
     it('resolves a qualified constructor in a types-block RHS to a multi-segment path', () => {
-      const doc = resolve(parse('types {\n  Embedding = pgvector.Vector(1536)\n}').document);
+      const doc = resolveSource('types {\n  Embedding = pgvector.Vector(1536)\n}');
       const target = doc.namedTypes.get('Embedding')?.target;
       expect(target?.kind).toBe('constructor');
       if (target?.kind !== 'constructor') throw new Error('expected constructor');
@@ -420,9 +409,7 @@ model Account {
     });
 
     it('resolves a qualified constructor in field position carrying its modifiers and args', () => {
-      const doc = resolve(
-        parse('model Document {\n  embedding pgvector.Vector(length: 1536)?\n}').document,
-      );
+      const doc = resolveSource('model Document {\n  embedding pgvector.Vector(length: 1536)?\n}');
       const field = namespace(doc, UNSPECIFIED_PSL_NAMESPACE_ID)
         .models.get('Document')
         ?.fields.get('embedding');
@@ -436,7 +423,7 @@ model Account {
     });
 
     it('leaves a bare constructor as a single-segment path', () => {
-      const doc = resolve(parse('types {\n  V = Vector(1536)\n}').document);
+      const doc = resolveSource('types {\n  V = Vector(1536)\n}');
       const target = doc.namedTypes.get('V')?.target;
       expect(target?.kind).toBe('constructor');
       if (target?.kind !== 'constructor') throw new Error('expected constructor');
@@ -448,27 +435,27 @@ model Account {
   describe('over-qualified type references are not double-diagnosed', () => {
     it('emits exactly one diagnostic for a triple-segment dotted type', () => {
       const result = parse('model M {\n  x a.b.Bar\n}');
-      const resolved = resolve(result.document);
+      const resolved = resolve(result.document, result.sourceFile);
       const all = [...result.diagnostics, ...resolved.diagnostics];
       expect(all.map((d) => d.code)).toEqual(['PSL_INVALID_QUALIFIED_TYPE']);
       expect(resolved.diagnostics).toEqual([]);
     });
 
     it('still flags a well-formed but unknown two-segment reference', () => {
-      const doc = resolve(parse('model M {\n  x a.Bar\n}').document);
+      const doc = resolveSource('model M {\n  x a.Bar\n}');
       expect(doc.diagnostics.map((d) => d.code)).toEqual(['PSL_UNRESOLVED_TYPE_REFERENCE']);
     });
   });
 
   describe('non-throwing on malformed input', () => {
     it('returns a ResolvedDocument for a broken schema', () => {
-      const doc = resolve(parse('model {').document);
+      const doc = resolveSource('model {');
       expect(doc).toBeDefined();
       expect(doc.namespaces).toBeInstanceOf(Map);
     });
 
     it('resolves an empty document to an empty resolved view', () => {
-      const doc = resolve(parse('').document);
+      const doc = resolveSource('');
       expect(doc.namespaces.size).toBe(0);
       expect(doc.namedTypes.size).toBe(0);
     });

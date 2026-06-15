@@ -4,8 +4,6 @@ import {
   parse,
   parseBlockAttribute,
   parseCompositeType,
-  parseEnum,
-  parseEnumValue,
   parseField,
   parseGenericBlock,
   parseKeyValue,
@@ -14,6 +12,7 @@ import {
   parseNamespace,
   parseTypesBlock,
 } from '../src/parse';
+import { resolve } from '../src/resolve';
 import {
   AttributeArgListAst,
   FieldAttributeAst,
@@ -22,7 +21,6 @@ import {
 import {
   CompositeTypeDeclarationAst,
   DocumentAst,
-  EnumDeclarationAst,
   FieldDeclarationAst,
   GenericBlockDeclarationAst,
   KeyValuePairAst,
@@ -31,11 +29,15 @@ import {
   TypesBlockAst,
 } from '../src/syntax/ast/declarations';
 import {
+  argText,
+  type ExpressionAst,
+  FunctionCallAst,
   NumberLiteralExprAst,
   ObjectLiteralExprAst,
   StringLiteralExprAst,
 } from '../src/syntax/ast/expressions';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
+import type { SyntaxNode } from '../src/syntax/red';
 import { highlight, printTree } from './support';
 
 function greenText(element: GreenElement): string {
@@ -116,13 +118,13 @@ describe('parse() well-formed document conformance', () => {
     expect(result.diagnostics).toEqual([]);
   });
 
-  it('reproduces an enum with values', () => {
+  it('reproduces an enum as a generic block with bare members', () => {
     const source = 'enum Role {\n  ADMIN\n  USER\n}';
     const result = parse(source);
 
     expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
       "Document
-        EnumDeclaration
+        GenericBlockDeclaration
           Ident "enum"
           Whitespace " "
           Identifier
@@ -131,12 +133,12 @@ describe('parse() well-formed document conformance', () => {
           LBrace "{"
           Newline "\\n"
           Whitespace "  "
-          EnumValueDeclaration
+          KeyValuePair
             Identifier
               Ident "ADMIN"
           Newline "\\n"
           Whitespace "  "
-          EnumValueDeclaration
+          KeyValuePair
             Identifier
               Ident "USER"
           Newline "\\n"
@@ -146,31 +148,42 @@ describe('parse() well-formed document conformance', () => {
     expect(result.diagnostics).toEqual([]);
   });
 
-  it('reproduces an enum with value and block attributes', () => {
-    const source = 'enum Role {ADMIN @map@@map}';
+  it('reproduces an enum with a @@type block attribute and key=value members', () => {
+    const source = 'enum Role {\n  @@type("pg/text@1")\n  Admin = "admin"\n}';
     const result = parse(source);
 
     expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
       "Document
-        EnumDeclaration
+        GenericBlockDeclaration
           Ident "enum"
           Whitespace " "
           Identifier
             Ident "Role"
           Whitespace " "
           LBrace "{"
-          EnumValueDeclaration
-            Identifier
-              Ident "ADMIN"
-            Whitespace " "
-            FieldAttribute
-              At "@"
-              Identifier
-                Ident "map"
+          Newline "\\n"
+          Whitespace "  "
           ModelAttribute
             DoubleAt "@@"
             Identifier
-              Ident "map"
+              Ident "type"
+            AttributeArgList
+              LParen "("
+              AttributeArg
+                StringLiteralExpr
+                  StringLiteral "\\"pg/text@1\\""
+              RParen ")"
+          Newline "\\n"
+          Whitespace "  "
+          KeyValuePair
+            Identifier
+              Ident "Admin"
+            Whitespace " "
+            Equals "="
+            Whitespace " "
+            StringLiteralExpr
+              StringLiteral "\\"admin\\""
+          Newline "\\n"
           RBrace "}""
     `);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -378,7 +391,7 @@ describe('parse() well-formed document conformance', () => {
               Ident "User"
             LBrace "{"
             RBrace "}"
-          EnumDeclaration
+          GenericBlockDeclaration
             Ident "enum"
             Whitespace " "
             Identifier
@@ -413,7 +426,7 @@ describe('parse() well-formed document conformance', () => {
           LBrace "{"
           RBrace "}"
         Newline "\\n"
-        EnumDeclaration
+        GenericBlockDeclaration
           Ident "enum"
           Whitespace " "
           Identifier
@@ -460,9 +473,9 @@ describe('parse() representative multi-construct schema', () => {
     '}',
     '',
     'enum Role {',
-    '  ADMIN @map("admin")',
-    '  USER',
-    '  @@map("roles")',
+    '  @@type("pg/text@1")',
+    '  Admin = "admin"',
+    '  User = "user"',
     '}',
     '',
     'namespace auth {',
@@ -471,7 +484,8 @@ describe('parse() representative multi-construct schema', () => {
     '    tags String[] @db.Array',
     '  }',
     '  enum Visibility {',
-    '    PUBLIC',
+    '    @@type("pg/text@1")',
+    '    Public = "public"',
     '  }',
     '}',
     '',
@@ -494,7 +508,7 @@ describe('parse() representative multi-construct schema', () => {
     expect(decls[0]).toBeInstanceOf(GenericBlockDeclarationAst);
     expect(decls[1]).toBeInstanceOf(TypesBlockAst);
     expect(decls[2]).toBeInstanceOf(ModelDeclarationAst);
-    expect(decls[3]).toBeInstanceOf(EnumDeclarationAst);
+    expect(decls[3]).toBeInstanceOf(GenericBlockDeclarationAst);
     expect(decls[4]).toBeInstanceOf(NamespaceDeclarationAst);
     expect(decls[5]).toBeInstanceOf(CompositeTypeDeclarationAst);
   });
@@ -507,7 +521,7 @@ describe('parse() representative multi-construct schema', () => {
     const members = Array.from(ns!.declarations());
     expect(members).toHaveLength(2);
     expect(members[0]).toBeInstanceOf(ModelDeclarationAst);
-    expect(members[1]).toBeInstanceOf(EnumDeclarationAst);
+    expect(members[1]).toBeInstanceOf(GenericBlockDeclarationAst);
   });
 });
 
@@ -545,7 +559,7 @@ describe('parse() round-trips lossless schemas', () => {
     const decls = Array.from(result.document.declarations());
     expect(decls).toHaveLength(2);
     expect(decls[0]).toBeInstanceOf(ModelDeclarationAst);
-    expect(decls[1]).toBeInstanceOf(EnumDeclarationAst);
+    expect(decls[1]).toBeInstanceOf(GenericBlockDeclarationAst);
   });
 
   it('round-trips unicode identifiers losslessly', () => {
@@ -745,16 +759,16 @@ describe('parse() treats declaration keywords as contextual, not reserved', () =
     expect(fields.map((f) => f.name()?.token()?.text)).toEqual(['model']);
   });
 
-  it('parses `model` and `enum` as enum values', () => {
+  it('parses `model` and `enum` as bare enum-block members', () => {
     const source = 'enum Role {\n  model\n  enum\n}';
     const result = parse(source);
     expect(result.diagnostics).toEqual([]);
     expect(greenText(result.document.syntax.green)).toBe(source);
     const decl = Array.from(result.document.declarations())[0];
-    expect(decl).toBeInstanceOf(EnumDeclarationAst);
-    if (!(decl instanceof EnumDeclarationAst)) return;
-    const values = Array.from(decl.values());
-    expect(values.map((v) => v.name()?.token()?.text)).toEqual(['model', 'enum']);
+    expect(decl).toBeInstanceOf(GenericBlockDeclarationAst);
+    if (!(decl instanceof GenericBlockDeclarationAst)) return;
+    const entries = Array.from(decl.entries());
+    expect(entries.map((e) => e.key()?.token()?.text)).toEqual(['model', 'enum']);
   });
 });
 
@@ -823,17 +837,19 @@ describe('parse() declaration-level diagnostics', () => {
     }
   });
 
-  it('flags a malformed enum member and keeps parsing the valid value', () => {
+  it('flags a malformed enum-block member and keeps parsing the valid bare member', () => {
+    // `enum` routes through the generic-block grammar, so a malformed member is
+    // an extension-block-member diagnostic and the valid `OK` is a bare entry.
     const source = 'enum E {\n  123\n  OK\n}';
     const result = parse(source);
-    expect(result.diagnostics.map((d) => d.code)).toContain('PSL_INVALID_ENUM_MEMBER');
+    expect(result.diagnostics.map((d) => d.code)).toContain('PSL_INVALID_EXTENSION_BLOCK_MEMBER');
     expect(greenText(result.document.syntax.green)).toBe(source);
     const decl = Array.from(result.document.declarations())[0];
-    expect(decl).toBeInstanceOf(EnumDeclarationAst);
-    if (decl instanceof EnumDeclarationAst) {
-      const values = Array.from(decl.values());
-      expect(values).toHaveLength(1);
-      expect(values[0]!.name()?.token()?.text).toBe('OK');
+    expect(decl).toBeInstanceOf(GenericBlockDeclarationAst);
+    if (decl instanceof GenericBlockDeclarationAst) {
+      const entries = Array.from(decl.entries());
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.key()?.token()?.text).toBe('OK');
     }
   });
 
@@ -906,10 +922,6 @@ describe('ordered-alternative parsers are no-ops on non-match', () => {
     expectNoOpReject('enum Color {', parseModel);
   });
 
-  it('parseEnum rejects a non-enum keyword without consuming', () => {
-    expectNoOpReject('model User {', parseEnum);
-  });
-
   it('parseNamespace rejects a non-namespace keyword without consuming', () => {
     expectNoOpReject('model User {', parseNamespace);
   });
@@ -934,10 +946,6 @@ describe('ordered-alternative parsers are no-ops on non-match', () => {
     expectNoOpReject('@@map', parseField);
   });
 
-  it('parseEnumValue rejects a leading double-at member without consuming', () => {
-    expectNoOpReject('@@map', parseEnumValue);
-  });
-
   it('parseNamedType rejects a non-identifier member without consuming', () => {
     expectNoOpReject('@@index', parseNamedType);
   });
@@ -956,5 +964,113 @@ describe('Cursor.mark lookahead', () => {
   it('mark(1) spans the significant token after the next, trivia included in the offset', () => {
     const cursor = new Cursor('namespace Foo {');
     expect(cursor.mark(1)).toEqual({ offset: 'namespace '.length, length: 'Foo'.length });
+  });
+});
+
+function onlyTypeConstructorArgs(source: string): readonly ExpressionAst[] {
+  const result = parse(source);
+  expect(result.diagnostics).toHaveLength(0);
+  expect(greenText(result.document.syntax.green)).toBe(source);
+  const typesBlock = Array.from(result.document.declarations()).find(
+    (decl): decl is TypesBlockAst => decl instanceof TypesBlockAst,
+  );
+  const named = Array.from(typesBlock?.declarations() ?? [])[0];
+  const ctor = named?.typeAnnotation()?.constructorCall();
+  if (!ctor) throw new Error('expected a type constructor call');
+  return Array.from(ctor.args(), (arg) => arg.value()).filter(
+    (v): v is ExpressionAst => v !== undefined,
+  );
+}
+
+describe('parse() accepts single-quoted string literals', () => {
+  it('tokenizes a single-quoted positional argument and unquotes it via value()', () => {
+    const args = onlyTypeConstructorArgs("types {\n  T = sql.Enum('Tag', ['a'])\n}\n");
+    const first = args[0];
+    expect(first).toBeInstanceOf(StringLiteralExprAst);
+    expect(StringLiteralExprAst.cast((first as StringLiteralExprAst).syntax)?.value()).toBe('Tag');
+  });
+
+  it('tokenizes a single-quoted value inside an object-literal argument', () => {
+    const args = onlyTypeConstructorArgs("types {\n  T = sql.String({ label: 'short' })\n}\n");
+    const object = args[0];
+    expect(object).toBeInstanceOf(ObjectLiteralExprAst);
+    const field = Array.from((object as ObjectLiteralExprAst).fields())[0];
+    const value = field?.value();
+    expect(value).toBeInstanceOf(StringLiteralExprAst);
+    expect((value as StringLiteralExprAst).value()).toBe('short');
+    // The raw arg text round-trips the single quotes, matching the legacy reader.
+    expect(argText(object as ExpressionAst)).toBe("{ label: 'short' }");
+  });
+
+  it('unquotes both quote styles and decodes escaped single quotes', () => {
+    const args = onlyTypeConstructorArgs('types {\n  T = sql.Enum(\'a\\\'b\', "c\\"d")\n}\n');
+    expect((args[0] as StringLiteralExprAst).value()).toBe("a'b");
+    expect((args[1] as StringLiteralExprAst).value()).toBe('c"d');
+  });
+
+  it('still diagnoses an unterminated single-quoted literal', () => {
+    const source = "model M {\n  id Int @default('oops";
+    const result = parse(source);
+    expect(result.diagnostics.map((d) => d.code)).toContain('PSL_UNTERMINATED_STRING');
+    expect(greenText(result.document.syntax.green)).toBe(source);
+  });
+});
+
+describe('parse() accepts double-quoted object-literal keys', () => {
+  it('accepts a string-literal key with no diagnostic and exposes the unquoted name', () => {
+    const args = onlyTypeConstructorArgs('types {\n  T = sql.String({ "length": 35 })\n}\n');
+    const object = args[0] as ObjectLiteralExprAst;
+    const field = Array.from(object.fields())[0];
+    expect(field?.keyName()).toBe('length');
+    expect((field?.value() as NumberLiteralExprAst | undefined)?.value()).toBe(35);
+    expect(argText(object)).toBe('{ "length": 35 }');
+  });
+
+  it('accepts a mix of identifier and string-literal keys', () => {
+    const args = onlyTypeConstructorArgs(
+      'types {\n  T = sql.String({ "length": 35, label: "short" })\n}\n',
+    );
+    const object = args[0] as ObjectLiteralExprAst;
+    const keys = Array.from(object.fields(), (f) => f.keyName());
+    expect(keys).toEqual(['length', 'label']);
+  });
+});
+
+describe('parse() accepts qualified default-function calls', () => {
+  it('parses ns.fn() in default-value position as one qualified FunctionCall', () => {
+    const source = 'model M {\n  id Int @default(temporal.updatedAt())\n}\n';
+    const result = parse(source);
+    expect(result.diagnostics).toHaveLength(0);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+
+    const calls: FunctionCallAst[] = [];
+    const visit = (node: SyntaxNode): void => {
+      const call = FunctionCallAst.cast(node);
+      if (call) calls.push(call);
+      for (const child of node.childNodes()) visit(child);
+    };
+    visit(result.document.syntax);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.path()).toEqual(['temporal', 'updatedAt']);
+    // The raw text the downstream resolver reads is the full qualified call —
+    // never split into a bare `temporal` plus a trailing parse error.
+    expect(argText(calls[0] as ExpressionAst)).toBe('temporal.updatedAt()');
+  });
+});
+
+describe('resolve() reads qualified @@-block attributes', () => {
+  it('reconstructs the namespace-qualified name for a qualified model attribute', () => {
+    const source = 'model M {\n  id Int\n  @@pgvector.index(length: 3)\n}\n';
+    const result = parse(source);
+    expect(result.diagnostics).toHaveLength(0);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+
+    const resolved = resolve(result.document, result.sourceFile);
+    const models = Array.from(resolved.namespaces.values()).flatMap((ns) =>
+      Array.from(ns.models.values()),
+    );
+    const attribute = models[0]?.attributes[0];
+    expect(attribute?.name).toBe('pgvector.index');
   });
 });

@@ -14,9 +14,10 @@ export type {
   ResolvedModel,
   ResolvedNamedType,
   ResolvedNamespace,
+  ResolveOptions,
   TypeTarget,
 } from '../resolve';
-export { ResolvedAttribute, resolve } from '../resolve';
+export { DEFAULT_SCALAR_TYPES, ResolvedAttribute, resolve } from '../resolve';
 export type { Position, Range } from '../source-file';
 export { SourceFile } from '../source-file';
 export {
@@ -42,6 +43,7 @@ export type { ExpressionAst } from '../syntax/ast/expressions';
 export {
   ArrayLiteralAst,
   AttributeArgAst,
+  argText,
   BooleanLiteralExprAst,
   castExpression,
   FunctionCallAst,

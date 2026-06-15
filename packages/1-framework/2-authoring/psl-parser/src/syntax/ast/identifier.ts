@@ -14,6 +14,11 @@ export class IdentifierAst implements AstNode {
     return findChildToken(this.syntax, 'Ident');
   }
 
+  /** The identifier's source text, or `undefined` when it carries no `Ident` token. */
+  name(): string | undefined {
+    return this.token()?.text;
+  }
+
   static cast(node: SyntaxNode): IdentifierAst | undefined {
     return node.kind === 'Identifier' ? new IdentifierAst(node) : undefined;
   }

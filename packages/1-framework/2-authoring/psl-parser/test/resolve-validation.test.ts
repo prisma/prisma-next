@@ -48,7 +48,8 @@ const policySelectDescriptor: AuthoringPslBlockDescriptor = {
 const policyDescriptors = { policy_select: policySelectDescriptor };
 
 function resolveSource(source: string, options?: ResolveOptions): readonly ParseDiagnostic[] {
-  return resolve(parse(source).document, options).diagnostics;
+  const { document, sourceFile } = parse(source);
+  return resolve(document, sourceFile, options).diagnostics;
 }
 
 function diagnosticsFor(source: string): readonly ParseDiagnostic[] {
@@ -538,21 +539,6 @@ model User {
 `;
     const diagnostic = resolveSource(source).find((d) => d.code === 'PSL_INVALID_TYPES_MEMBER');
     expect(diagnostic?.message).toBe('Named type "User" conflicts with model name "User"');
-  });
-
-  it('reports a conflict with an enum name', () => {
-    const source = `
-types {
-  Role = String
-}
-
-enum Role {
-  USER
-  ADMIN
-}
-`;
-    const diagnostic = resolveSource(source).find((d) => d.code === 'PSL_INVALID_TYPES_MEMBER');
-    expect(diagnostic?.message).toBe('Named type "Role" conflicts with enum name "Role"');
   });
 
   it('reports both scalar and model conflicts together', () => {

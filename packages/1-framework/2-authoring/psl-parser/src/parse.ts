@@ -348,17 +348,33 @@ export function parseQualifiedFunctionCallExpr(cursor: Cursor): GreenNode | unde
 }
 
 /**
+ * The largest dot-qualified path the constructor/call grammar recognises. A
+ * qualified type or default call carries at most a space/namespace qualifier and
+ * the constructor name (`pgvector.Vector`, `temporal.updatedAt`), so two
+ * segments is the deepest well-formed chain; the cap keeps the lookahead bounded
+ * while admitting one extra segment of slack before bailing out.
+ */
+const MAX_QUALIFIED_CALL_SEGMENTS = 4;
+
+/**
  * Lookahead for a namespace-qualified constructor call — `ns.Ctor(`,
  * `a.b.Ctor(`, … — i.e. an identifier chain joined by `.` with at least one dot
  * segment, followed by `(`. The bare `Ctor(` form is owned by
  * {@link parseFunctionCall}; this predicate requires the qualifying dot so the
- * two branches stay disjoint.
+ * two branches stay disjoint. The peek is bounded to
+ * {@link MAX_QUALIFIED_CALL_SEGMENTS} so a pathological identifier chain can
+ * never drive an unbounded scan; a longer chain simply does not match here and
+ * falls through to the bare/identifier alternatives.
  */
 function isQualifiedConstructorCall(cursor: Cursor): boolean {
   if (cursor.peekKind() !== 'Ident') return false;
   let ahead = 1;
   let dots = 0;
-  while (cursor.peekKind(ahead) === 'Dot' && cursor.peekKind(ahead + 1) === 'Ident') {
+  while (
+    dots < MAX_QUALIFIED_CALL_SEGMENTS &&
+    cursor.peekKind(ahead) === 'Dot' &&
+    cursor.peekKind(ahead + 1) === 'Ident'
+  ) {
     dots++;
     ahead += 2;
   }
@@ -510,7 +526,6 @@ function parseDocument(cursor: Cursor): GreenNode {
 
 const RESERVED_BLOCK_KEYWORDS: ReadonlySet<string> = new Set([
   'model',
-  'enum',
   'namespace',
   'type',
   'types',
@@ -555,7 +570,6 @@ function parseDeclaration(cursor: Cursor, insideNamespace: boolean): void {
 
   const node =
     parseModel(cursor) ??
-    parseEnum(cursor) ??
     parseNamespace(cursor) ??
     parseCompositeType(cursor) ??
     parseTypesBlock(cursor) ??
@@ -603,11 +617,6 @@ function parseBlock(
 export function parseModel(cursor: Cursor): GreenNode | undefined {
   if (!keywordIs(cursor, 'model')) return undefined;
   return parseBlock(cursor, 'ModelDeclaration', true, parseModelMember);
-}
-
-export function parseEnum(cursor: Cursor): GreenNode | undefined {
-  if (!keywordIs(cursor, 'enum')) return undefined;
-  return parseBlock(cursor, 'EnumDeclaration', true, parseEnumMember);
 }
 
 /**
@@ -690,10 +699,10 @@ function parseUnsupportedTopLevel(cursor: Cursor): void {
 }
 
 /**
- * Block-attribute alternative shared by model and enum members: matches a
- * leading `@@` (yielding a `ModelAttribute`) and is a no-op on anything else. The
- * `@@`-vs-`@` distinction is preserved exactly — single-`@` attributes belong to
- * fields and enum values and are parsed inside `parseField`/`parseEnumValue`.
+ * Block-attribute alternative shared by model, composite-type, and generic-block
+ * members: matches a leading `@@` (yielding a `ModelAttribute`) and is a no-op on
+ * anything else. The `@@`-vs-`@` distinction is preserved exactly — single-`@`
+ * attributes belong to fields and are parsed inside `parseField`.
  */
 export function parseBlockAttribute(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'DoubleAt') return undefined;
@@ -707,17 +716,6 @@ function parseModelMember(cursor: Cursor): void {
       cursor,
       'PSL_INVALID_MODEL_MEMBER',
       `Invalid model member declaration "${cursor.peekToken().text}"`,
-    );
-  }
-}
-
-function parseEnumMember(cursor: Cursor): void {
-  const node = parseBlockAttribute(cursor) ?? parseEnumValue(cursor);
-  if (!node) {
-    invalidMember(
-      cursor,
-      'PSL_INVALID_ENUM_MEMBER',
-      `Invalid enum value declaration "${cursor.peekToken().text}"`,
     );
   }
 }
@@ -764,16 +762,6 @@ export function parseField(cursor: Cursor): GreenNode | undefined {
   return cursor.finishNode();
 }
 
-export function parseEnumValue(cursor: Cursor): GreenNode | undefined {
-  if (cursor.peekKind() !== 'Ident') return undefined;
-  cursor.startNode('EnumValueDeclaration');
-  parseIdentifier(cursor); // name
-  while (cursor.peekKind() === 'At') {
-    parseAttribute(cursor);
-  }
-  return cursor.finishNode();
-}
-
 export function parseNamedType(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
   cursor.startNode('NamedTypeDeclaration');
@@ -792,21 +780,27 @@ export function parseNamedType(cursor: Cursor): GreenNode | undefined {
   return cursor.finishNode();
 }
 
+/**
+ * A generic-block entry is either `key = value` or a bare `key`. The bare form
+ * (a key with no `=`) is the member shape a domain-enum block uses for a value
+ * that the codec derives from the member name itself (`enum Status { Active }`);
+ * it commits a `KeyValuePair` carrying only the key, which downstream readers
+ * treat as a bare-kind parameter. A `key =` with no following expression is a
+ * malformed value and is flagged.
+ */
 export function parseKeyValue(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
   cursor.startNode('KeyValuePair');
-  const keyMark = cursor.mark();
-  const keyText = cursor.peekToken().text;
   parseIdentifier(cursor); // key
   if (cursor.peekKind() === 'Equals') {
     cursor.bump();
-  } else {
-    cursor.diagnostic(
-      'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
-      `Expected "=" after "${keyText}"`,
-      keyMark,
-    );
+    if (!parseExpression(cursor)) {
+      cursor.diagnostic(
+        'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
+        'Expected a value after "="',
+        cursor.mark(),
+      );
+    }
   }
-  parseExpression(cursor);
   return cursor.finishNode();
 }
