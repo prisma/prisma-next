@@ -169,10 +169,27 @@ type ExtractValueObjectFields<
   VOName extends keyof TValueObjects,
 > = NormalizeContractFields<TValueObjects[VOName]['fields']>;
 
+type EnumMemberEntry = { readonly name: string; readonly value: unknown };
+
+type ResolveEnumValueUnion<
+  TDomainNamespaces,
+  NsId extends string,
+  EnumName extends string,
+> = NsId extends keyof TDomainNamespaces
+  ? TDomainNamespaces[NsId] extends { readonly enum?: infer EnumSlot }
+    ? EnumName extends keyof NonNullable<EnumSlot>
+      ? NonNullable<EnumSlot>[EnumName] extends { readonly members: ReadonlyArray<EnumMemberEntry> }
+        ? NonNullable<EnumSlot>[EnumName]['members'][number]['value']
+        : never
+      : never
+    : never
+  : never;
+
 type InferFieldBaseType<
   TFieldType,
   TValueObjects extends Record<string, ContractValueObject>,
   TCodecTypes extends Record<string, { output: unknown }>,
+  TDomainNamespaces = Record<never, never>,
 > = TFieldType extends { kind: 'scalar'; codecId: infer CId extends string & keyof TCodecTypes }
   ? TCodecTypes[CId]['output']
   : TFieldType extends { kind: 'valueObject'; name: infer VOName extends string }
@@ -181,7 +198,8 @@ type InferFieldBaseType<
           -readonly [K in keyof ExtractValueObjectFields<TValueObjects, VOName>]: InferFieldType<
             ExtractValueObjectFields<TValueObjects, VOName>[K],
             TValueObjects,
-            TCodecTypes
+            TCodecTypes,
+            TDomainNamespaces
           >;
         }
       : unknown
@@ -190,7 +208,7 @@ type InferFieldBaseType<
           members: infer TMembers extends ReadonlyArray<unknown>;
         }
       ? TMembers[number] extends infer TMember
-        ? InferFieldBaseType<TMember, TValueObjects, TCodecTypes>
+        ? InferFieldBaseType<TMember, TValueObjects, TCodecTypes, TDomainNamespaces>
         : unknown
       : unknown;
 
@@ -198,14 +216,39 @@ type InferFieldType<
   TField,
   TValueObjects extends Record<string, ContractValueObject>,
   TCodecTypes extends Record<string, { output: unknown }>,
+  TDomainNamespaces = Record<never, never>,
 > = TField extends ContractField
-  ? TField extends { many: true }
-    ? TField['nullable'] extends true
-      ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[] | null
-      : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[]
-    : TField['nullable'] extends true
-      ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes> | null
-      : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>
+  ? TField extends {
+      readonly valueSet: {
+        readonly entityKind: 'enum';
+        readonly namespaceId: infer NsId extends string;
+        readonly entityName: infer EnumName extends string;
+      };
+    }
+    ? [ResolveEnumValueUnion<TDomainNamespaces, NsId, EnumName>] extends [never]
+      ? TField extends { many: true }
+        ? TField['nullable'] extends true
+          ?
+              | InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes, TDomainNamespaces>[]
+              | null
+          : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes, TDomainNamespaces>[]
+        : TField['nullable'] extends true
+          ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes, TDomainNamespaces> | null
+          : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes, TDomainNamespaces>
+      : TField extends { many: true }
+        ? TField['nullable'] extends true
+          ? ResolveEnumValueUnion<TDomainNamespaces, NsId, EnumName>[] | null
+          : ResolveEnumValueUnion<TDomainNamespaces, NsId, EnumName>[]
+        : TField['nullable'] extends true
+          ? ResolveEnumValueUnion<TDomainNamespaces, NsId, EnumName> | null
+          : ResolveEnumValueUnion<TDomainNamespaces, NsId, EnumName>
+    : TField extends { many: true }
+      ? TField['nullable'] extends true
+        ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes, TDomainNamespaces>[] | null
+        : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes, TDomainNamespaces>[]
+      : TField['nullable'] extends true
+        ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes, TDomainNamespaces> | null
+        : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes, TDomainNamespaces>
   : never;
 
 export type InferModelRow<
@@ -218,6 +261,7 @@ export type InferModelRow<
   -readonly [FieldName in keyof TFields]: InferFieldType<
     TFields[FieldName],
     TValueObjects,
-    TCodecTypes
+    TCodecTypes,
+    TContract['domain']['namespaces']
   >;
 };

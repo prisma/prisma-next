@@ -60,7 +60,11 @@ vi.mock('@prisma-next/mongo-query-builder', () => ({
 
 import mongo from '../src/runtime/mongo';
 
-const fakeContract = { roots: {}, models: {} } as unknown as AnyMongoContract;
+const fakeContract = {
+  roots: {},
+  models: {},
+  domain: { namespaces: {} },
+} as unknown as AnyMongoContract;
 const fakeRuntime = { id: 'runtime-instance', close: vi.fn().mockResolvedValue(undefined) };
 const fakeDriverClose = vi.fn().mockResolvedValue(undefined);
 const fakeDriverFromDbClose = vi.fn().mockResolvedValue(undefined);
@@ -478,5 +482,71 @@ describe('mongo() facade', () => {
 
     const runtimeArgs = mocks.createMongoRuntime.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(runtimeArgs).not.toHaveProperty('middleware');
+  });
+
+  describe('db.enums (facade)', () => {
+    const roleEnum = {
+      codecId: 'mongo/string@1',
+      members: [
+        { name: 'User', value: 'user' },
+        { name: 'Admin', value: 'admin' },
+      ],
+    } as const;
+
+    const contractWithEnum = {
+      domain: {
+        namespaces: {
+          __unbound__: { models: {}, enum: { Role: roleEnum } },
+        },
+      },
+    } as unknown as AnyMongoContract;
+
+    beforeEach(() => {
+      mocks.deserializeContract.mockReturnValue(contractWithEnum);
+    });
+
+    function roleAccessor() {
+      const db = mongo({ contract: contractWithEnum, url: 'mongodb://localhost:27017/mydb' });
+      // Index-signature access requires bracket notation; non-null safe at runtime (test fixture)
+      return db.enums['__unbound__']!['Role']!;
+    }
+
+    it('exposes the enum accessor at db.enums[__unbound__][Role]', () => {
+      expect(roleAccessor().values).toEqual(['user', 'admin']);
+    });
+
+    it('.has returns true for a member value and false otherwise', () => {
+      const role = roleAccessor();
+      expect(role.has('user')).toBe(true);
+      expect(role.has('unknown')).toBe(false);
+    });
+
+    it('.nameOf returns the member name for a value', () => {
+      expect(roleAccessor().nameOf('admin')).toBe('Admin');
+    });
+
+    it('.ordinalOf returns the zero-based index', () => {
+      const role = roleAccessor();
+      expect(role.ordinalOf('user')).toBe(0);
+      expect(role.ordinalOf('admin')).toBe(1);
+      expect(role.ordinalOf('unknown')).toBe(-1);
+    });
+
+    it('.members exposes accessor map keyed by member name', () => {
+      expect(roleAccessor().members['User']).toBe('user');
+      expect(roleAccessor().members['Admin']).toBe('admin');
+    });
+
+    it('.names returns the ordered member name tuple', () => {
+      expect(roleAccessor().names).toEqual(['User', 'Admin']);
+    });
+
+    it('builds the enums surface eagerly, without connecting the driver', () => {
+      const db = mongo({ contract: contractWithEnum, url: 'mongodb://localhost:27017/mydb' });
+
+      expect(db.enums['__unbound__']!['Role']!.values).toEqual(['user', 'admin']);
+      expect(mocks.driverFromConnection).not.toHaveBeenCalled();
+      expect(mocks.createMongoRuntime).not.toHaveBeenCalled();
+    });
   });
 });
