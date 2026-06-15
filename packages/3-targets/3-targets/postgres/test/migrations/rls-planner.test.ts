@@ -161,7 +161,7 @@ describe('RLS planner diff-wiring', () => {
     expect(createPolicySql).toContain('auth.uid()');
   });
 
-  it('does not emit RLS ops when the policy already exists in the introspected schema', () => {
+  it('does not emit RLS ops when the policy already exists in the introspected schema', async () => {
     const contract = buildContractWithPolicy();
     const planner = createPostgresMigrationPlanner(stubLowerer);
 
@@ -209,7 +209,8 @@ describe('RLS planner diff-wiring', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
-    const opIds = result.plan.operations.map((op) => op.id);
+    const ops = await Promise.all(result.plan.operations);
+    const opIds = ops.map((op) => op.id);
     expect(opIds.some((id) => id.startsWith('rlsPolicy.'))).toBe(false);
     expect(opIds.some((id) => id.startsWith('rowLevelSecurity.'))).toBe(false);
   });
@@ -218,7 +219,7 @@ describe('RLS planner diff-wiring', () => {
 describe('RLS planner same-prefix replace', () => {
   // Contract has p_read_NEW; DB has p_read_OLD (same prefix, different hash).
   // Edit case: plan must contain a CREATE for NEW and a DROP for OLD.
-  it('emits CREATE new + DROP old when same-prefix policy is superseded', () => {
+  it('emits CREATE new + DROP old when same-prefix policy is superseded', async () => {
     const newPolicy = new PostgresRlsPolicy({
       name: 'p_read_11111111',
       prefix: 'p_read',
@@ -261,12 +262,13 @@ describe('RLS planner same-prefix replace', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
-    const opIds = result.plan.operations.map((op) => op.id);
+    const ops = await Promise.all(result.plan.operations);
+    const opIds = ops.map((op) => op.id);
     expect(opIds).toContain(`rlsPolicy.${TABLE_NAME}.p_read_11111111`);
     expect(opIds).toContain(`rlsPolicy.${TABLE_NAME}.p_read_00000000.drop`);
   });
 
-  it('does not drop a different-prefix actual policy when creating a new one', () => {
+  it('does not drop a different-prefix actual policy when creating a new one', async () => {
     const newPolicy = new PostgresRlsPolicy({
       name: 'p_read_11111111',
       prefix: 'p_read',
@@ -309,12 +311,13 @@ describe('RLS planner same-prefix replace', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
-    const opIds = result.plan.operations.map((op) => op.id);
+    const ops = await Promise.all(result.plan.operations);
+    const opIds = ops.map((op) => op.id);
     expect(opIds).toContain(`rlsPolicy.${TABLE_NAME}.p_read_11111111`);
     expect(opIds).not.toContain(`rlsPolicy.${TABLE_NAME}.other_aaaabbbb.drop`);
   });
 
-  it('does not drop a same-prefix sibling that is still in the contract', () => {
+  it('does not drop a same-prefix sibling that is still in the contract', async () => {
     // Contract has both policyA and policyB (same prefix).
     // DB only has policyA — so policyB is `missing` and triggers a CREATE.
     // During same-prefix drop scanning for policyB's CREATE, policyA matches
@@ -362,14 +365,15 @@ describe('RLS planner same-prefix replace', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
-    const opIds = result.plan.operations.map((op) => op.id);
+    const ops = await Promise.all(result.plan.operations);
+    const opIds = ops.map((op) => op.id);
     // policyB is missing — a CREATE must be emitted
     expect(opIds).toContain(`rlsPolicy.${TABLE_NAME}.p_read_bbbbbbbb`);
     // policyA shares the same prefix but is still in the contract — must not be dropped
     expect(opIds).not.toContain(`rlsPolicy.${TABLE_NAME}.p_read_aaaaaaaa.drop`);
   });
 
-  it('F06: additive-only policy passes create/enable but filters the replace-drop', () => {
+  it('F06: additive-only policy passes create/enable but filters the replace-drop', async () => {
     const newPolicy = new PostgresRlsPolicy({
       name: 'p_read_11111111',
       prefix: 'p_read',
@@ -410,7 +414,8 @@ describe('RLS planner same-prefix replace', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
-    const opIds = result.plan.operations.map((op) => op.id);
+    const ops = await Promise.all(result.plan.operations);
+    const opIds = ops.map((op) => op.id);
     // CREATE new: additive — allowed
     expect(opIds).toContain(`rlsPolicy.${TABLE_NAME}.p_read_11111111`);
     // DROP old: destructive — filtered
@@ -422,7 +427,7 @@ describe('F07: rlsEnabledByTable cross-schema collision', () => {
   // Two same-named tables in different schemas must not collide on RLS-enabled state.
   // analytics.orders has RLS enabled (key: 'analytics.orders').
   // public.orders does NOT. The planner should still emit ENABLE RLS for public.orders.
-  it('emits ENABLE RLS for a table that lacks RLS even when a same-named table in another schema has it', () => {
+  it('emits ENABLE RLS for a table that lacks RLS even when a same-named table in another schema has it', async () => {
     const policy = new PostgresRlsPolicy({
       name: 'read_orders_a1b2c3d4',
       prefix: 'read_orders',
@@ -507,12 +512,13 @@ describe('F07: rlsEnabledByTable cross-schema collision', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
-    const opIds = result.plan.operations.map((op) => op.id);
+    const ops = await Promise.all(result.plan.operations);
+    const opIds = ops.map((op) => op.id);
     // public.orders must get ENABLE RLS — its key 'public.orders' is absent from the map
     expect(opIds.some((id) => id.startsWith('rowLevelSecurity.'))).toBe(true);
   });
 
-  it('does not emit ENABLE RLS when the schema-qualified key shows RLS already enabled', () => {
+  it('does not emit ENABLE RLS when the schema-qualified key shows RLS already enabled', async () => {
     const policy = new PostgresRlsPolicy({
       name: 'read_orders_a1b2c3d4',
       prefix: 'read_orders',
@@ -595,7 +601,8 @@ describe('F07: rlsEnabledByTable cross-schema collision', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
-    const opIds = result.plan.operations.map((op) => op.id);
+    const ops = await Promise.all(result.plan.operations);
+    const opIds = ops.map((op) => op.id);
     // RLS already enabled — should NOT emit ENABLE RLS
     expect(opIds.some((id) => id.startsWith('rowLevelSecurity.'))).toBe(false);
   });

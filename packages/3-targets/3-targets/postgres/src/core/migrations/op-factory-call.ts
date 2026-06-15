@@ -61,7 +61,7 @@ import { createExtension } from './operations/dependencies';
 import { addEnumValues, createEnumType, dropEnumType, renameType } from './operations/enums';
 import { createIndex, dropIndex } from './operations/indexes';
 import { createRlsPolicy, dropRlsPolicy, enableRowLevelSecurity } from './operations/rls';
-import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
+import type { ForeignKeySpec } from './operations/shared';
 import { step, targetDetails } from './operations/shared';
 import { dropTable } from './operations/tables';
 import { columnExistsCheck, toRegclassLiteral } from './planner-sql-checks';

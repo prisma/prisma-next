@@ -130,7 +130,10 @@ export interface InterpretPslDocumentToSqlContractInput {
    * without the factory and falls back to the family
    * `SqlUnboundNamespace` singleton.
    */
-  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly createNamespace?: (
+    input: SqlNamespaceTablesInput,
+    enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
+  ) => Namespace;
   readonly codecLookup?: CodecLookup;
 }
 
@@ -2404,22 +2407,31 @@ export function interpretPslDocumentToSqlContract(
   // the generic PSL provider path works without requiring every call site to
   // re-specify the factory.
   const targetCreateNamespace = blindCast<
-    { readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace } | undefined,
+    | {
+        readonly createNamespace?: (
+          input: SqlNamespaceTablesInput,
+          enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
+        ) => Namespace;
+      }
+    | undefined,
     'target pack may carry createNamespace on its authoring object'
   >(input.target.authoring)?.createNamespace;
   const innerCreateNamespace = input.createNamespace ?? targetCreateNamespace;
   const createNamespaceWithExtensions =
     innerCreateNamespace !== undefined
-      ? (nsInput: SqlNamespaceTablesInput) => {
+      ? (
+          nsInput: SqlNamespaceTablesInput,
+          enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
+        ) => {
           const entities = namespaceExtensionEntities.get(nsInput.id);
           if (entities === undefined) {
-            return innerCreateNamespace(nsInput);
+            return innerCreateNamespace(nsInput, enumTypes);
           }
           const extended: SqlNamespaceTablesInput = {
             ...nsInput,
             entries: { ...nsInput.entries, ...entities },
           };
-          return innerCreateNamespace(extended);
+          return innerCreateNamespace(extended, enumTypes);
         }
       : undefined;
 

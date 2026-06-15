@@ -587,12 +587,12 @@ model Doc {
     });
   });
 
-  it('routes lowered extension entities to entries[kind] when no explicit createNamespace is supplied', () => {
-    // Fake PSL block: test_block <name> { value = "..." }
-    // Discriminator "test-custom-block", entry slot "testBlock".
-    // The target pack carries createNamespace in its authoring — the interpreter
-    // must pick it up as a fallback so the result namespace has entries.testBlock.
-    const capturedExtensionEntities: Record<string, Record<string, Record<string, unknown>>> = {};
+  it('routes lowered extension entities to entries[discriminator] when no explicit createNamespace is supplied', () => {
+    // Under the open entries model (ADR 224/225), extension blocks are lowered
+    // into entries[discriminator][name] — the discriminator is the entries key.
+    // The target pack carries createNamespace in its authoring; the interpreter
+    // must pick it up as a fallback so the result namespace receives the entries.
+    const capturedEntries: Record<string, Record<string, Record<string, unknown>>> = {};
 
     const targetWithCreateNamespace = {
       ...postgresTarget,
@@ -601,7 +601,6 @@ model Doc {
           test: {
             kind: 'entity' as const,
             discriminator: 'test-custom-block',
-            entrySlotName: 'testBlock',
             output: {
               factory: (raw: unknown) => raw,
             },
@@ -617,13 +616,10 @@ model Doc {
           },
         },
         createNamespace: (input: SqlNamespaceTablesInput): Namespace => {
-          const ext = input.entries.extensionEntities;
-          if (ext !== undefined) {
-            capturedExtensionEntities[input.id] = {
-              ...(capturedExtensionEntities[input.id] ?? {}),
-              ...ext,
-            };
-          }
+          capturedEntries[input.id] = {
+            ...(capturedEntries[input.id] ?? {}),
+            ...input.entries,
+          };
           return buildSqlNamespace(input);
         },
       },
@@ -655,11 +651,11 @@ namespace public {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    // The extension entity must reach capturedExtensionEntities even though
-    // no explicit createNamespace was passed to interpretPslDocumentToSqlContract.
-    expect(capturedExtensionEntities).toMatchObject({
+    // The extension entity must reach capturedEntries under its discriminator key
+    // even though no explicit createNamespace was passed to the interpreter.
+    expect(capturedEntries).toMatchObject({
       public: {
-        testBlock: {
+        'test-custom-block': {
           my_entry: expect.objectContaining({ kind: 'test-custom-block' }),
         },
       },
