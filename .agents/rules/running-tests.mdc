@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## 1. Run a test suite
 
-Each slow command has an `:agent` variant that captures full output to `wip/<name>.log` and the exit code to `wip/<name>.exit`. Each run overwrites the previous one. `wip/` is gitignored.
+Each slow command has an `:agent` variant. Every run is saved to a timestamped file (`wip/<name>.<timestamp>.<pid>.log` and `.exit`); `wip/<name>.log` and `wip/<name>.exit` are symlinks that always point to the **latest** run. Read the symlink names — historical runs are preserved next to them when you need to compare. Contents of `wip/` are gitignored.
 
 | Command | Purpose |
 |---|---|
