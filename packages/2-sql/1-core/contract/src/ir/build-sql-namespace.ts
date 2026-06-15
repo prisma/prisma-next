@@ -59,7 +59,7 @@ class SqlBoundNamespace extends NamespaceBase {
     this.entries = Object.freeze(
       blindCast<
         SqlNamespaceEntries,
-        'hydrateNamespaceEntities constructs correct IR instances per registered kind descriptors'
+        'composeSqlEntityKinds() supplies table→StorageTable and valueSet→StorageValueSet descriptors, so this open-dict result holds exactly the typed members SqlNamespaceEntries declares; the descriptor Map erases those per-kind Node types from the return.'
       >(dispatched),
     );
     Object.defineProperty(this, 'kind', {

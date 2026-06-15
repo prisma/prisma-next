@@ -43,7 +43,7 @@ export class SqliteDatabase extends NamespaceBase {
     this.entries = Object.freeze(
       blindCast<
         SqlNamespaceEntries,
-        'hydrateNamespaceEntities constructs correct IR instances per registered kind descriptors'
+        "SQLite's table-only descriptor map hydrates table→StorageTable and carries every other kind raw, so this open-dict result satisfies SqlNamespaceEntries; the descriptor Map erases the per-kind Node type from the return."
       >(dispatched),
     );
     Object.defineProperty(this, 'kind', {

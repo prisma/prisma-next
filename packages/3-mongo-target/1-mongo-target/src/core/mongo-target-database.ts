@@ -45,16 +45,10 @@ export class MongoTargetDatabase extends NamespaceBase {
       ...input.entries,
     };
     this.entries = Object.freeze(
-      blindCast<MongoNamespaceEntries, 'hydrateNamespaceEntities produces MongoNamespaceEntries'>(
-        hydrateNamespaceEntities(
-          blindCast<
-            Record<string, Readonly<Record<string, unknown>>>,
-            'MongoTargetDatabaseInput.entries values are plain record maps'
-          >(rawEntries),
-          composeMongoEntityKinds(),
-          'carry',
-        ),
-      ),
+      blindCast<
+        MongoNamespaceEntries,
+        'composeMongoEntityKinds() supplies the collection→MongoCollection descriptor, so this open-dict result holds the typed collection member MongoNamespaceEntries declares; the descriptor Map erases that per-kind Node type from the return.'
+      >(hydrateNamespaceEntities(rawEntries, composeMongoEntityKinds(), 'carry')),
     );
     Object.defineProperty(this, 'kind', {
       value: 'database',

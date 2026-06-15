@@ -140,7 +140,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
         // framework `Namespace` to the SQL-family `SqlNamespace`.
         namespaces: blindCast<
           SqlStorageInput['namespaces'],
-          'hydrated SQL namespaces are SqlNamespace instances (family hydration guarantees this)'
+          'hydrateSqlNamespaceMap builds each namespace through the SQL family concretions (SqlBoundNamespace / target schema), so every value is a SqlNamespace; the framework return type only promises the base Namespace.'
         >({ ...hydratedNamespaces, [UNBOUND_NAMESPACE_ID]: unbound }),
       }),
     };
@@ -196,7 +196,10 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       entriesOutput['table'] = {};
     }
 
-    return blindCast<SqlNamespaceTablesInput, 'hydrated namespace entries input'>({
+    return blindCast<
+      SqlNamespaceTablesInput,
+      'entriesOutput holds the hydrated SQL entity-kind maps (table always present); this wraps them as the SqlNamespaceTablesInput the family createNamespace consumes.'
+    >({
       id,
       entries: entriesOutput,
     });

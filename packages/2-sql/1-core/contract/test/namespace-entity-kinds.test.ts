@@ -41,7 +41,7 @@ function makeStorage(entries: Record<string, unknown>) {
 }
 
 // ---------------------------------------------------------------------------
-// createNamespaceEntrySchema — registry dispatch
+// createNamespaceEntrySchema — entity-kind descriptor dispatch
 // ---------------------------------------------------------------------------
 
 describe('createNamespaceEntrySchema — descriptor-driven validation', () => {
@@ -144,7 +144,7 @@ describe('createNamespaceEntrySchema — descriptor-driven validation', () => {
     expect(result).toBeInstanceOf(type.errors);
   });
 
-  it('rejects core kinds when given a truly empty registry — no hidden fallback tier', () => {
+  it('rejects core kinds when given a truly empty entity-kind descriptor map — no hidden fallback tier', () => {
     const schema = createNamespaceEntrySchema(new Map());
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
@@ -167,7 +167,7 @@ describe('createNamespaceEntrySchema — descriptor-driven validation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// createSqlStorageSchema — storage-level validation with registry
+// createSqlStorageSchema — storage-level validation with entity-kind descriptors
 // ---------------------------------------------------------------------------
 
 describe('createSqlStorageSchema — descriptor-driven storage validation', () => {

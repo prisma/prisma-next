@@ -122,7 +122,7 @@ export abstract class MongoContractSerializerBase<TContract>
 
   /**
    * Walk a structurally-validated Mongo contract and hydrate each namespace's
-   * entries via the construction registry. Unknown kinds throw (fail-closed),
+   * entries via the registered entity-kind descriptors. Unknown kinds throw (fail-closed),
    * preserving the existing Mongo serializer semantics.
    */
   protected hydrateMongoContract(contract: MongoContract): MongoContract {
@@ -145,7 +145,7 @@ export abstract class MongoContractSerializerBase<TContract>
             id: nsEnvelope.id,
             entries: blindCast<
               MongoNamespaceEntries,
-              'hydrateNamespaceEntities produces MongoNamespaceEntries per registered kind descriptors'
+              'this.entryKinds (composeMongoEntityKinds plus any pack kinds) supplies the collection→MongoCollection descriptor, so this open-dict result holds the typed collection member MongoNamespaceEntries declares; the descriptor Map erases that per-kind Node type from the return.'
             >(hydratedEntries),
           },
         ];

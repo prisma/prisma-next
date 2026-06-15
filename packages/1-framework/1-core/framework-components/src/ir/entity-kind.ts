@@ -3,6 +3,7 @@ import type { Type } from 'arktype';
 
 export interface EntityKindDescriptor<Input, Node> {
   readonly kind: string;
+  // Type<unknown>, not Type<Input>: AnyEntityKindDescriptor widens Input to never, which would force an unusable Type<never>; concrete descriptors still carry their real schema.
   readonly schema: Type<unknown>;
   readonly construct: (input: Input) => Node;
 }
@@ -34,9 +35,10 @@ export function hydrateNamespaceEntities(
       const built: Record<string, unknown> = {};
       for (const [name, value] of Object.entries(rawMap)) {
         built[name] = descriptor.construct(
-          blindCast<never, 'entries-input contract on authoring / validateStorage on hydration'>(
-            value,
-          ),
+          blindCast<
+            never,
+            "value is this kind's descriptor Input: when authoring, the typed entries-input contract produces it; when hydrating, it was validated against descriptor.schema before this loop. The never target is AnyEntityKindDescriptor's erased Input parameter."
+          >(value),
         );
       }
       result[kind] = Object.freeze(built);

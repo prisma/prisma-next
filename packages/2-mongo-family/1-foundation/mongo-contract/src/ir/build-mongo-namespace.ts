@@ -36,18 +36,15 @@ class MongoBoundNamespace extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const rawEntries = { collection: {}, ...input.entries };
+    const rawEntries: Record<string, Readonly<Record<string, unknown>>> = {
+      collection: {},
+      ...input.entries,
+    };
     this.entries = Object.freeze(
-      blindCast<MongoNamespaceEntries, 'hydrateNamespaceEntities produces MongoNamespaceEntries'>(
-        hydrateNamespaceEntities(
-          blindCast<
-            Record<string, Readonly<Record<string, unknown>>>,
-            'MongoNamespaceCollectionsInput.entries values are plain record maps'
-          >(rawEntries),
-          composeMongoEntityKinds(),
-          'carry',
-        ),
-      ),
+      blindCast<
+        MongoNamespaceEntries,
+        'composeMongoEntityKinds() supplies the collection→MongoCollection descriptor, so this open-dict result holds the typed collection member MongoNamespaceEntries declares; the descriptor Map erases that per-kind Node type from the return.'
+      >(hydrateNamespaceEntities(rawEntries, composeMongoEntityKinds(), 'carry')),
     );
     Object.defineProperty(this, 'kind', {
       value: MONGO_NAMESPACE_KIND,
