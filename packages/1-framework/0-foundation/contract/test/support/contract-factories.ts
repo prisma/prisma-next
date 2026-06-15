@@ -1,27 +1,18 @@
-import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PreserveEmptyPredicate, StorageSort } from '../../src/canonicalization';
 import type { Contract } from '../../src/contract-types';
 import type { CrossReference } from '../../src/cross-reference';
 import { UNBOUND_DOMAIN_NAMESPACE_ID } from '../../src/domain-envelope';
-import type {
-  ContractModel,
-  ContractModelBase,
-  ContractValueObject,
-  ModelStorageBase,
-} from '../../src/domain-types';
+import type { ContractModel, ContractValueObject } from '../../src/domain-types';
 import { computeExecutionHash, computeProfileHash, computeStorageHash } from '../../src/hashing';
 import type { ExecutionSection, ProfileHashBase, StorageBase } from '../../src/types';
 import { coreHash } from '../../src/types';
 
-type ContractOverrides<
-  TStorage extends StorageBase = StorageBase,
-  TModels extends Record<string, ContractModelBase> = Record<string, ContractModel>,
-> = {
+type ContractOverrides<TStorage extends StorageBase = StorageBase> = {
   target?: string;
   targetFamily?: string;
   roots?: Record<string, CrossReference>;
-  models?: TModels;
+  models?: Record<string, ContractModel>;
   storage?: Omit<TStorage, 'storageHash'>;
   valueObjects?: Record<string, ContractValueObject>;
   capabilities?: Record<string, Record<string, boolean>>;
@@ -54,10 +45,9 @@ const DEFAULT_SQL_STORAGE = {
  * cannot depend on test-utils (test-utils depends on contract), so the helper
  * is duplicated here to keep package boundaries one-way.
  */
-export function createContract<
-  TStorage extends StorageBase = StorageBase,
-  TModels extends Record<string, ContractModelBase> = Record<string, ContractModel>,
->(overrides: ContractOverrides<TStorage, TModels> = {}): Contract<TStorage, TModels> {
+export function createContract<TStorage extends StorageBase = StorageBase>(
+  overrides: ContractOverrides<TStorage> = {},
+): Contract<TStorage> {
   const target = overrides.target ?? 'postgres';
   const targetFamily = overrides.targetFamily ?? 'sql';
   const capabilities = overrides.capabilities ?? {};
@@ -87,9 +77,7 @@ export function createContract<
     domain: {
       namespaces: {
         [UNBOUND_DOMAIN_NAMESPACE_ID]: {
-          models:
-            overrides.models ??
-            blindCast<TModels, 'default empty models when createContract omits models'>({}),
+          models: overrides.models ?? {},
           ...ifDefined('valueObjects', overrides.valueObjects),
         },
       },
@@ -127,12 +115,10 @@ type SqlStorageLike = StorageBase & {
   readonly types?: Record<string, unknown>;
 };
 
-type SqlModelLike = ContractModel<ModelStorageBase & { table: string }>;
-
 export function createSqlContract(
-  overrides: ContractOverrides<SqlStorageLike, Record<string, SqlModelLike>> = {},
-): Contract<SqlStorageLike, Record<string, SqlModelLike>> {
-  return createContract<SqlStorageLike, Record<string, SqlModelLike>>({
+  overrides: ContractOverrides<SqlStorageLike> = {},
+): Contract<SqlStorageLike> {
+  return createContract<SqlStorageLike>({
     ...overrides,
     target: overrides.target ?? 'postgres',
     targetFamily: overrides.targetFamily ?? 'sql',

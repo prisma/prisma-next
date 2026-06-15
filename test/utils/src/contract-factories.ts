@@ -8,26 +8,20 @@ import type {
   Contract,
   ContractEnum,
   ContractModel,
-  ContractModelBase,
   ContractValueObject,
   CrossReference,
   ExecutionSection,
-  ModelStorageBase,
   ProfileHashBase,
   StorageBase,
 } from '@prisma-next/contract/types';
 import { coreHash, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
-import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 
-type ContractOverrides<
-  TStorage extends StorageBase = StorageBase,
-  TModels extends Record<string, ContractModelBase> = Record<string, ContractModel>,
-> = {
+type ContractOverrides<TStorage extends StorageBase = StorageBase> = {
   target?: string;
   targetFamily?: string;
   roots?: Record<string, CrossReference>;
-  models?: TModels;
+  models?: Record<string, ContractModel>;
   storage?: Omit<TStorage, 'storageHash'>;
   valueObjects?: Record<string, ContractValueObject>;
   enum?: Record<string, ContractEnum>;
@@ -55,10 +49,9 @@ const DEFAULT_SQL_STORAGE = {
   },
 } as const;
 
-export function createContract<
-  TStorage extends StorageBase = StorageBase,
-  TModels extends Record<string, ContractModelBase> = Record<string, ContractModel>,
->(overrides: ContractOverrides<TStorage, TModels> = {}): Contract<TStorage, TModels> {
+export function createContract<TStorage extends StorageBase = StorageBase>(
+  overrides: ContractOverrides<TStorage> = {},
+): Contract<TStorage> {
   const target = overrides.target ?? 'postgres';
   const targetFamily = overrides.targetFamily ?? 'sql';
   const capabilities = overrides.capabilities ?? {};
@@ -88,9 +81,7 @@ export function createContract<
     domain: {
       namespaces: {
         [UNBOUND_DOMAIN_NAMESPACE_ID]: {
-          models:
-            overrides.models ??
-            blindCast<TModels, 'default empty models when createContract omits models'>({}),
+          models: overrides.models ?? {},
           ...ifDefined('valueObjects', overrides.valueObjects),
           ...ifDefined('enum', overrides.enum),
         },
@@ -129,12 +120,10 @@ type SqlStorageLike = StorageBase & {
   readonly types?: Record<string, unknown>;
 };
 
-type SqlModelLike = ContractModel<ModelStorageBase & { table: string }>;
-
 export function createSqlContract(
-  overrides: ContractOverrides<SqlStorageLike, Record<string, SqlModelLike>> = {},
-): Contract<SqlStorageLike, Record<string, SqlModelLike>> {
-  return createContract<SqlStorageLike, Record<string, SqlModelLike>>({
+  overrides: ContractOverrides<SqlStorageLike> = {},
+): Contract<SqlStorageLike> {
+  return createContract<SqlStorageLike>({
     ...overrides,
     target: overrides.target ?? 'postgres',
     targetFamily: overrides.targetFamily ?? 'sql',

@@ -8,9 +8,9 @@ import type { ContractModelBase, ContractValueObject } from './domain-types';
  * contract does not declare exactly one namespace — bare-name access is
  * ambiguous across namespaces and must be qualified explicitly (TML-2550).
  */
-export function domainModelsAtDefaultNamespace<TModels extends Record<string, ContractModelBase>>(
-  domain: ApplicationDomain<TModels>,
-): TModels {
+export function domainModelsAtDefaultNamespace(
+  domain: ApplicationDomain,
+): Record<string, ContractModelBase> {
   const namespaceId = soleDomainNamespaceId(domain);
   const domainNamespace = domain.namespaces[namespaceId];
   if (domainNamespace === undefined) {
@@ -25,8 +25,8 @@ export function domainModelsAtDefaultNamespace<TModels extends Record<string, Co
  * Value objects for the contract's single domain namespace, when present.
  * Throws when the contract does not declare exactly one namespace.
  */
-export function domainValueObjectsAtDefaultNamespace<
-  TModels extends Record<string, ContractModelBase>,
->(domain: ApplicationDomain<TModels>): Record<string, ContractValueObject> | undefined {
+export function domainValueObjectsAtDefaultNamespace(
+  domain: ApplicationDomain,
+): Record<string, ContractValueObject> | undefined {
   return domain.namespaces[soleDomainNamespaceId(domain)]?.valueObjects;
 }

@@ -1,5 +1,4 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import type { ContractModelDefinitions } from '@prisma-next/contract/types';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { Collection } from '@prisma-next/sql-orm-client';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
@@ -11,8 +10,10 @@ import { createMockRuntime, deserializeTestContract, getTestContract } from './h
 import { unboundTables } from './unbound-tables';
 
 // Synthetic 36-char Tag ids — Tag.id is typed `Char<36>` in the test contract.
+type TestModels =
+  TestContract['domain']['namespaces'][keyof TestContract['domain']['namespaces']]['models'];
 const TAG_ID_1 =
-  '00000000-0000-4000-8000-000000000001' as ContractModelDefinitions<TestContract>['Tag']['fields']['id']['type'] extends {
+  '00000000-0000-4000-8000-000000000001' as TestModels['Tag']['fields']['id']['type'] extends {
     codecId: 'sql/char@1';
   }
     ? string

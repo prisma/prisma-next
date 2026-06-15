@@ -419,7 +419,7 @@ model Post {
 
       const contractDts = readFileSync(contractDtsPath, 'utf-8');
       expect(contractDts).toContain("readonly owner: 'Task'");
-      expect(contractDts).toContain('readonly base: { readonly namespace:');
+      expect(contractDts).toMatch(/readonly base:\s*{\s*readonly namespace:/);
       expect(contractDts).toContain("readonly discriminator: { readonly field: 'type' }");
       expect(contractDts).toContain('readonly users: {');
       expect(contractDts).toContain('readonly indexes:');

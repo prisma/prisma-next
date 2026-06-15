@@ -64,7 +64,7 @@ type Storage = {
   };
 };
 
-type ContractBase = Omit<ContractType<Storage, Models>, 'roots' | 'domain'> & {
+type ContractBase = Omit<ContractType<Storage>, 'roots' | 'domain'> & {
   readonly target: 'sqlite';
   readonly targetFamily: 'sql';
   readonly roots: Record<string, never>;

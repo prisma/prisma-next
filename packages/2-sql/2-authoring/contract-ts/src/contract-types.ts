@@ -1,7 +1,9 @@
 import type {
   ColumnDefault,
   Contract,
+  ContractEnum,
   ContractRelation,
+  ContractValueObject,
   NamespaceId,
   StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -627,6 +629,17 @@ type BuiltDomain<Definition> =
         };
       };
 
+// Per-namespace domain entry carrying the precise per-model field/storage shapes
+// for DSL inference. Modelled as an index signature (rather than enumerating
+// namespace ids) so that any namespace coordinate resolves the full model map,
+// matching how the authoring path lumps every model under the default storage
+// namespace.
+type BuiltDomainNamespace<Definition> = {
+  readonly models: BuiltModels<Definition>;
+  readonly valueObjects?: Record<string, ContractValueObject>;
+  readonly enum?: Record<string, ContractEnum>;
+};
+
 type DefaultStorageNamespaceId<Definition> =
   DefinitionTargetId<Definition> extends 'postgres' ? 'public' : '__unbound__';
 
@@ -704,22 +717,33 @@ type FieldChannelType<
       ? null
       : never);
 
+// Nested by namespace coordinate (`{ [ns]: { [model]: { [field]: type } } }`)
+// to mirror the emitter's namespace-nested `FieldOutputTypes` (and the
+// `TypeMaps` constraint). The TS authoring path lumps every model under the
+// target's default storage namespace (see `BuiltStorage`), so the per-model
+// field-type map nests under that same coordinate.
 type FieldChannelTypes<Definition, Channel extends 'output' | 'input'> = {
-  readonly [ModelName in ModelNames<Definition>]: {
-    readonly [FieldName in ModelFieldNames<Definition, ModelName>]: FieldChannelType<
-      Definition,
-      ModelName,
-      FieldName,
-      Channel
-    >;
+  readonly [Ns in DefaultStorageNamespaceId<Definition>]: {
+    readonly [ModelName in ModelNames<Definition>]: {
+      readonly [FieldName in ModelFieldNames<Definition, ModelName>]: FieldChannelType<
+        Definition,
+        ModelName,
+        FieldName,
+        Channel
+      >;
+    };
   };
 };
 
 export type SqlContractResult<Definition> = ContractWithTypeMaps<
-  Contract<BuiltStorage<Definition>, BuiltModels<Definition>> & {
+  Omit<Contract<BuiltStorage<Definition>>, 'domain'> & {
     readonly target: DefinitionTargetId<Definition>;
     readonly targetFamily: 'sql';
-  } & { readonly domain: BuiltDomain<Definition> } & {
+  } & {
+    readonly domain: {
+      readonly namespaces: Readonly<Record<string, BuiltDomainNamespace<Definition>>>;
+    } & BuiltDomain<Definition>;
+  } & {
     readonly extensionPacks: keyof DefinitionExtensionPacks<Definition> extends never
       ? Record<string, never>
       : DefinitionExtensionPacks<Definition>;

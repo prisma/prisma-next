@@ -87,6 +87,18 @@ changes:
         - "enum "
         - "enum2 "
       anyMatch: true
+  - id: generated-models-export-removed
+    summary: |
+      The generated `contract.d.ts` no longer emits the flat top-level
+      `export type Models`. Models resolve per-namespace from the domain plane:
+      replace a reference to the generated `Models` with
+      `Contract['domain']['namespaces']['<namespace>']['models']` (use `public`
+      for a standard single-schema Postgres project, `__unbound__` for SQLite or
+      Mongo). Re-emit the contract to drop the export.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "Models"
 ---
 
 <!--
@@ -303,6 +315,25 @@ Note: `prisma-next contract infer` **refuses** databases containing native enum 
 
 Run `prisma-next db verify` (or your project's test suite) after applying the converting migration: the live schema must now match the contract — `text` column, CHECK constraint present, native type gone.
 
+## `generated-models-export-removed`
+
+The generated `contract.d.ts` no longer emits the flat top-level `export type Models` (the first-name-wins map of every model across namespaces). Models now resolve per-namespace from the domain plane, matching how the runtime and DSL read them.
+
+If your code imported `Models` from the generated contract, read a namespace's models instead:
+
+```ts
+// Before
+import type { Contract, Models } from './prisma/contract';
+type UserModel = Models['User'];
+
+// After — name the namespace the model is declared in
+import type { Contract } from './prisma/contract';
+type Models = Contract['domain']['namespaces']['public']['models'];
+type UserModel = Models['User'];
+```
+
+Use `public` for a standard single-schema Postgres project, or `__unbound__` for SQLite and Mongo. In a multi-schema Postgres contract, name the schema each model is declared in. Re-emit your contract (`prisma-next contract emit`) so the generated `.d.ts` drops the `Models` export; the emitted `contract.json` is unchanged.
+
 <!--
 TML-2882: transitional PSL `enum2` block (PR #805). The demo authors `enum2 Priority`
 and a `priority` field; emitted artifacts and migrations regenerate accordingly, and
@@ -370,4 +401,16 @@ milestones (displayName, MTI variant link columns, `post.priority` value-set + d
 are preserved so the chain still demonstrates the incremental migration CLI. Diff is
 `examples/prisma-next-demo/migrations/**` only. No NEW consumer action beyond the
 existing `enum-becomes-domain-concept` entry above. Incidental substrate diff only.
+-->
+
+<!--
+TML-2550: per-namespace typed resolution. The emitted contract.d.ts TypeMaps
+(`FieldOutputTypes` / `FieldInputTypes`) now nest by namespace
+(`{ [namespace]: { [model]: { [field] } } }`), so the query builder and ORM client
+resolve each namespace's own columns/fields — fixing same-bare-name models declared
+in more than one namespace. The example contract.d.ts fixtures regenerate to the
+nested shape; a consumer re-emit round-trips. The user-facing always-qualified query
+surface is already covered by `qualify-flat-builder-accessors` above — this slice is
+the type-resolution fix beneath it. No user action: re-emit picks up the new shape.
+Incidental substrate diff only.
 -->

@@ -7,172 +7,34 @@
  * model name (`User`) lives in both, and `public.Profile` carries a
  * cross-namespace foreign key to `auth.User`.
  *
- * The fixture is authored through `buildSqlContractFromDefinition` (the TS
- * authoring builder, which now lowers same-bare-table-name-across-namespaces +
- * cross-namespace FK contracts), emitted to a `contract.json` document via the
- * Postgres serializer, then loaded through the `postgres({ contractJson })`
- * facade and driven against a real database:
+ * The fixture type-checks against a committed per-namespace `contract.d.ts` and
+ * is driven against a real database through the `postgres<Contract>` facade.
  *
- *  - `db.sql.public.users` / `db.sql.auth.users`: select / insert / update /
- *    delete on both namespaces, with the emitted SQL qualified per schema
- *    (`"public"."users"` vs `"auth"."users"`).
- *  - `db.orm.public.User` / `db.orm.auth.User`: create / find / update /
- *    delete on both namespaces, returning per-namespace-correct rows.
- *  - the cross-namespace `Profile.user` relation read returns the `auth.User`
- *    row (distinct `token` column) for a `public.Profile`.
- *
- * The distinct per-namespace columns are the discriminator: a mis-qualified
- * query would either read the wrong table's columns or fail outright. Access is
- * via the explicit coordinate accessors only (`sql.<ns>.<table>` /
- * `orm.<ns>.<Model>`); the flat default-namespace ergonomic is not relied upon.
+ * The distinct per-namespace columns are the discriminator at BOTH levels: a
+ * mis-qualified query would read the wrong table's columns or fail outright,
+ * and the per-namespace surface is type-checked directly — `db.sql.public.users`
+ * exposes `email` (not `token`) and `db.sql.auth.users` exposes `token` (not
+ * `email`). Access is via the explicit coordinate accessors only
+ * (`sql.<ns>.<table>` / `orm.<ns>.<Model>`).
  */
 
-import type { Contract } from '@prisma-next/contract/types';
-import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import {
-  buildSqlContractFromDefinition,
-  type ModelNode,
-} from '@prisma-next/postgres/contract-builder';
 import postgres from '@prisma-next/postgres/runtime';
 import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
-import { blindCast } from '@prisma-next/utils/casts';
 import { Client } from 'pg';
 import { describe, expect, it } from 'vitest';
+import { contract } from './namespaced-accessors/fixtures/contract';
+import type { Contract } from './namespaced-accessors/fixtures/generated/contract';
+import contractJson from './namespaced-accessors/fixtures/generated/contract.json' with {
+  type: 'json',
+};
 
 const serializer = new PostgresContractSerializer();
 
-const idDescriptor = { codecId: 'pg/int4@1', nativeType: 'int4' } as const;
-const textDescriptor = { codecId: 'pg/text@1', nativeType: 'text' } as const;
-
-// The TS author path merges capabilities from the target pack; a full CLI emit
-// derives them from the codec/operation pipeline. For this in-test author the
-// runtime read/write paths (RETURNING reads, jsonAgg/lateral relation reads)
-// need the capability flags present, so they ride on the target pack ref.
-const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
-  kind: 'target',
-  id: 'postgres',
-  familyId: 'sql',
-  targetId: 'postgres',
-  version: '0.0.1',
-  defaultNamespaceId: 'public',
-  capabilities: {
-    postgres: { jsonAgg: true, lateral: true, returning: true, limit: true, orderBy: true },
-    sql: { defaultInInsert: true, enums: true, lateral: true, returning: true },
-  },
-};
-
-const publicUser: ModelNode = {
-  modelName: 'User',
-  tableName: 'users',
-  namespaceId: 'public',
-  fields: [
-    { fieldName: 'id', columnName: 'id', descriptor: idDescriptor, nullable: false },
-    { fieldName: 'email', columnName: 'email', descriptor: textDescriptor, nullable: false },
-  ],
-  id: { columns: ['id'] },
-};
-
-const authUser: ModelNode = {
-  modelName: 'User',
-  tableName: 'users',
-  namespaceId: 'auth',
-  fields: [
-    { fieldName: 'id', columnName: 'id', descriptor: idDescriptor, nullable: false },
-    { fieldName: 'token', columnName: 'token', descriptor: textDescriptor, nullable: false },
-  ],
-  id: { columns: ['id'] },
-};
-
-const profile: ModelNode = {
-  modelName: 'Profile',
-  tableName: 'profile',
-  namespaceId: 'public',
-  fields: [
-    { fieldName: 'id', columnName: 'id', descriptor: idDescriptor, nullable: false },
-    { fieldName: 'userId', columnName: 'user_id', descriptor: idDescriptor, nullable: false },
-  ],
-  id: { columns: ['id'] },
-  foreignKeys: [
-    {
-      columns: ['user_id'],
-      references: { model: 'User', table: 'users', columns: ['id'], namespaceId: 'auth' },
-    },
-  ],
-  relations: [
-    {
-      fieldName: 'user',
-      toModel: 'User',
-      toTable: 'users',
-      toNamespaceId: 'auth',
-      cardinality: 'N:1',
-      on: {
-        parentTable: 'profile',
-        parentColumns: ['user_id'],
-        childTable: 'users',
-        childColumns: ['id'],
-      },
-    },
-  ],
-};
-
-function buildSameBareTableNameContract(): Contract<SqlStorage> {
-  return blindCast<
-    Contract<SqlStorage>,
-    'authored multi-namespace contract widened to framework supertype'
-  >(
-    buildSqlContractFromDefinition({
-      target: postgresTargetPack,
-      namespaces: ['public', 'auth'],
-      models: [publicUser, profile, authUser],
-    }),
-  );
-}
-
-// Runtime-only structural views of the namespaced facade surfaces. The driving
-// contract is the framework supertype (its precise per-namespace column/model
-// literals are not expressible at the deserializer boundary), so these views
-// give the test a workable handle on the per-namespace facets without softening
-// the runtime resolution being proven. Mirrors the cast style in the
-// sql-orm-client namespace tests.
-type Plan = SqlQueryPlan<Record<string, unknown>>;
-type IdField = { readonly id: unknown };
-type SqlFns = { eq(left: unknown, right: unknown): unknown };
-type WhereCb = (fields: IdField, fns: SqlFns) => unknown;
-type SqlTable = {
-  select(...columns: string[]): { build(): Plan };
-  insert(rows: ReadonlyArray<Record<string, unknown>>): { build(): Plan };
-  update(set: Record<string, unknown>): { where(cb: WhereCb): { build(): Plan } };
-  delete(): { where(cb: WhereCb): { build(): Plan } };
-};
-type SqlView = {
-  public: { users: SqlTable };
-  auth: { users: SqlTable };
-};
-
 type Row = Record<string, unknown>;
-type FilteredModel = {
-  first(): Promise<Row | null>;
-  updateCount(set: Row): Promise<number>;
-  deleteCount(): Promise<number>;
-  include(relation: string): { first(): Promise<Row | null> };
-};
-type OrmModel = {
-  create(values: Row): Promise<Row>;
-  where(filter: Row): FilteredModel;
-};
-type OrmView = {
-  public: { User: OrmModel; Profile: OrmModel };
-  auth: { User: OrmModel };
-};
-
-type LoweredAdapter = {
-  lower(ast: unknown, options: { contract: unknown; params: readonly unknown[] }): { sql: string };
-};
 
 async function rows(result: AsyncIterable<Row>): Promise<Row[]> {
   const out: Row[] = [];
@@ -184,8 +46,8 @@ async function rows(result: AsyncIterable<Row>): Promise<Row[]> {
 
 describe('explicit namespaced accessors end-to-end (PGlite)', () => {
   it('emits the multi-namespace contract.json with same bare table name + cross-namespace FK', () => {
-    const contractJson = serializer.serializeContract(buildSameBareTableNameContract());
-    const roundTripped = serializer.deserializeContract(contractJson);
+    const serialized = serializer.serializeContract(contract);
+    const roundTripped = serializer.deserializeContract(serialized);
     const storage = roundTripped.storage as SqlStorage;
 
     // Same bare table name `users` in BOTH namespaces, with DIFFERENT columns.
@@ -229,12 +91,10 @@ describe('explicit namespaced accessors end-to-end (PGlite)', () => {
   it(
     'drives sql + orm CRUD on both namespaces and the cross-namespace relation through the facade',
     async () => {
-      const contractJson = serializer.serializeContract(buildSameBareTableNameContract());
-
       await withDevDatabase(async ({ connectionString }) => {
         const client = new Client({ connectionString });
         await client.connect();
-        const db = postgres<Contract<SqlStorage>>({ contractJson });
+        const db = postgres<Contract>({ contractJson });
         try {
           await client.query('create schema if not exists auth');
           await client.query(
@@ -248,12 +108,26 @@ describe('explicit namespaced accessors end-to-end (PGlite)', () => {
           );
 
           const runtime: Runtime = await db.connect({ pg: client });
-          const sql = blindCast<SqlView, 'namespaced sql facet view'>(db.sql);
-          const orm = blindCast<OrmView, 'namespaced orm facet view'>(db.orm);
+          const sql = db.sql;
+          const orm = db.orm;
 
-          const adapter = blindCast<LoweredAdapter, 'execution stack adapter lowers ast to sql'>(
-            instantiateExecutionStack(db.stack).adapter,
-          );
+          // Per-namespace isolation is enforced at the type level: a column or
+          // field belongs to exactly one namespace's `users` / `User`, so the
+          // other namespace's name is a compile error. Dead code — type-checked,
+          // never executed.
+          const _perNamespaceIsolation = () => {
+            // @ts-expect-error `token` is an auth.users column, not public.users
+            sql.public.users.select('token');
+            // @ts-expect-error `email` is a public.users column, not auth.users
+            sql.auth.users.select('email');
+            // @ts-expect-error `token` is an auth.User field, not public.User
+            void orm.public.User.create({ id: 0, token: 'x' });
+            // @ts-expect-error `email` is a public.User field, not auth.User
+            void orm.auth.User.create({ id: 0, email: 'x' });
+          };
+          void _perNamespaceIsolation;
+
+          const adapter = instantiateExecutionStack(db.stack).adapter;
 
           const publicSelectPlan = sql.public.users.select('id', 'email').build();
           const authSelectPlan = sql.auth.users.select('id', 'token').build();
@@ -346,8 +220,8 @@ describe('explicit namespaced accessors end-to-end (PGlite)', () => {
 
           await orm.public.User.where({ id: 10 }).updateCount({ email: 'alice2@x.io' });
           await orm.auth.User.where({ id: 20 }).updateCount({ token: 'auth-tok-2' });
-          expect((await orm.public.User.where({ id: 10 }).first())?.['email']).toBe('alice2@x.io');
-          expect((await orm.auth.User.where({ id: 20 }).first())?.['token']).toBe('auth-tok-2');
+          expect((await orm.public.User.where({ id: 10 }).first())?.email).toBe('alice2@x.io');
+          expect((await orm.auth.User.where({ id: 20 }).first())?.token).toBe('auth-tok-2');
 
           await orm.public.Profile.create({ id: 100, userId: 20 });
           const withUser = await orm.public.Profile.where({ id: 100 }).include('user').first();

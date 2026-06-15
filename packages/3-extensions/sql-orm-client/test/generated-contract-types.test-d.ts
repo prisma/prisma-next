@@ -21,17 +21,19 @@ type GeneratedLikeCodecTypes = {
 };
 
 type GeneratedLikeFieldOutputTypes = {
-  User: {
-    id: string;
-    name: string;
-    email: string;
-    active: boolean;
-    metadata: unknown;
-  };
-  Post: {
-    id: string;
-    userId: string;
-    title: string;
+  __unbound__: {
+    User: {
+      id: string;
+      name: string;
+      email: string;
+      active: boolean;
+      metadata: unknown;
+    };
+    Post: {
+      id: string;
+      userId: string;
+      title: string;
+    };
   };
 };
 
@@ -41,116 +43,123 @@ type GeneratedLikeTypeMaps = TypeMaps<
   GeneratedLikeFieldOutputTypes
 >;
 
-type GeneratedLikeContractBase = Contract<
-  {
-    storageHash: StorageHashBase<string>;
-    namespaces: {
-      __unbound__: {
-        id: '__unbound__';
-        kind: 'sql-namespace';
-        entries: {
-          table: {
-            user: {
-              columns: {
-                id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-                name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-                email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-                active: { nativeType: 'bool'; codecId: 'pg/bool@1'; nullable: false };
-                metadata: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: false };
-              };
-              primaryKey: { columns: ['id'] };
-              uniques: [];
-              indexes: [];
-              foreignKeys: [];
+type GeneratedLikeStorage = {
+  storageHash: StorageHashBase<string>;
+  namespaces: {
+    __unbound__: {
+      id: '__unbound__';
+      kind: 'sql-namespace';
+      entries: {
+        table: {
+          user: {
+            columns: {
+              id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+              name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+              email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+              active: { nativeType: 'bool'; codecId: 'pg/bool@1'; nullable: false };
+              metadata: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: false };
             };
-            post: {
-              columns: {
-                id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-                userId: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-                title: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-              };
-              primaryKey: { columns: ['id'] };
-              uniques: [];
-              indexes: [];
-              foreignKeys: [];
+            primaryKey: { columns: ['id'] };
+            uniques: [];
+            indexes: [];
+            foreignKeys: [];
+          };
+          post: {
+            columns: {
+              id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+              userId: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+              title: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
             };
+            primaryKey: { columns: ['id'] };
+            uniques: [];
+            indexes: [];
+            foreignKeys: [];
           };
         };
       };
     };
-  },
-  {
-    User: {
-      storage: {
-        table: 'user';
-        fields: {
-          id: { column: 'id' };
-          name: { column: 'name' };
-          email: { column: 'email' };
-          active: { column: 'active' };
-          metadata: { column: 'metadata' };
-        };
-      };
+  };
+};
+
+type GeneratedLikeModels = {
+  User: {
+    storage: {
+      table: 'user';
       fields: {
-        id: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-        };
-        name: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-        };
-        email: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-        };
-        active: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
-          readonly nullable: false;
-        };
-        metadata: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
-          readonly nullable: false;
-        };
+        id: { column: 'id' };
+        name: { column: 'name' };
+        email: { column: 'email' };
+        active: { column: 'active' };
+        metadata: { column: 'metadata' };
       };
-      relations: {
-        posts: {
-          to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
-          cardinality: '1:N';
-          on: {
-            localFields: readonly ['id'];
-            targetFields: readonly ['userId'];
-          };
+    };
+    fields: {
+      id: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+      };
+      name: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+      };
+      email: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+      };
+      active: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
+        readonly nullable: false;
+      };
+      metadata: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+        readonly nullable: false;
+      };
+    };
+    relations: {
+      posts: {
+        to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
+        cardinality: '1:N';
+        on: {
+          localFields: readonly ['id'];
+          targetFields: readonly ['userId'];
         };
       };
     };
-    Post: {
-      storage: {
-        table: 'post';
-        fields: {
-          id: { column: 'id' };
-          userId: { column: 'userId' };
-          title: { column: 'title' };
-        };
-      };
+  };
+  Post: {
+    storage: {
+      table: 'post';
       fields: {
-        id: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-        };
-        userId: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-        };
-        title: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-        };
+        id: { column: 'id' };
+        userId: { column: 'userId' };
+        title: { column: 'title' };
       };
-      relations: Record<string, never>;
     };
-  }
->;
+    fields: {
+      id: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+      };
+      userId: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+      };
+      title: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+      };
+    };
+    relations: Record<string, never>;
+  };
+};
+
+type GeneratedLikeContractBase = Omit<Contract<GeneratedLikeStorage>, 'domain'> & {
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: { readonly models: GeneratedLikeModels };
+    };
+  };
+};
 
 type GeneratedLikeContract = ContractWithTypeMaps<GeneratedLikeContractBase, GeneratedLikeTypeMaps>;
 
@@ -388,18 +397,20 @@ type VOCodecTypes = {
 type ExpectedAddressShape = { street: string; city: string; zip: string };
 
 type VOFieldOutputTypes = {
-  User: {
-    id: number;
-    name: string;
-    homeAddress: ExpectedAddressShape | null;
-    workAddress: ExpectedAddressShape;
+  __unbound__: {
+    User: {
+      id: number;
+      name: string;
+      homeAddress: ExpectedAddressShape | null;
+      workAddress: ExpectedAddressShape;
+    };
   };
 };
 
 type VOTypeMaps = TypeMaps<VOCodecTypes, Record<string, never>, VOFieldOutputTypes>;
 
-type VOContractBase = Contract<
-  {
+type VOContractBase = Omit<
+  Contract<{
     storageHash: StorageHashBase<string>;
     namespaces: {
       __unbound__: {
@@ -423,39 +434,8 @@ type VOContractBase = Contract<
         };
       };
     };
-  },
-  {
-    User: {
-      storage: {
-        table: 'users';
-        fields: {
-          id: { column: 'id' };
-          name: { column: 'name' };
-          homeAddress: { column: 'home_address' };
-          workAddress: { column: 'work_address' };
-        };
-      };
-      fields: {
-        id: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          readonly nullable: false;
-        };
-        name: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-        };
-        homeAddress: {
-          readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
-          readonly nullable: true;
-        };
-        workAddress: {
-          readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
-          readonly nullable: false;
-        };
-      };
-      relations: Record<string, never>;
-    };
-  }
+  }>,
+  'domain'
 > & {
   readonly target: 'postgres';
   readonly roots: {

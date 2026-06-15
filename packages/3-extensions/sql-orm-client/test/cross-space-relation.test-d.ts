@@ -17,62 +17,67 @@ import { createMockRuntime } from './helpers';
 // relation ('user' as `never` — the Option B emitter output).
 // ---------------------------------------------------------------------------
 
-type CrossSpaceTestContract = Contract<
-  SqlStorage,
-  {
-    Profile: {
-      storage: {
-        table: 'profile';
-        namespaceId: 'public';
-        fields: {
-          id: { column: 'id' };
-          userId: { column: 'user_id' };
-        };
-      };
+type CrossSpaceModels = {
+  Profile: {
+    storage: {
+      table: 'profile';
+      namespaceId: 'public';
       fields: {
-        id: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          readonly nullable: false;
-        };
-        userId: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          readonly nullable: false;
-        };
-      };
-      relations: {
-        // Local relation — navigable, should appear in RelationNames
-        posts: {
-          to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
-          cardinality: '1:N';
-          on: { localFields: readonly ['id']; targetFields: readonly ['profileId'] };
-        };
-        // Cross-space relation — non-navigable (Option B emitter output: `never`)
-        user: never;
+        id: { column: 'id' };
+        userId: { column: 'user_id' };
       };
     };
-    Post: {
-      storage: {
-        table: 'post';
-        namespaceId: 'public';
-        fields: {
-          id: { column: 'id' };
-          profileId: { column: 'profile_id' };
-        };
+    fields: {
+      id: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: false;
       };
-      fields: {
-        id: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          readonly nullable: false;
-        };
-        profileId: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          readonly nullable: false;
-        };
+      userId: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: false;
       };
-      relations: Record<string, never>;
     };
-  }
->;
+    relations: {
+      // Local relation — navigable, should appear in RelationNames
+      posts: {
+        to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
+        cardinality: '1:N';
+        on: { localFields: readonly ['id']; targetFields: readonly ['profileId'] };
+      };
+      // Cross-space relation — non-navigable (Option B emitter output: `never`)
+      user: never;
+    };
+  };
+  Post: {
+    storage: {
+      table: 'post';
+      namespaceId: 'public';
+      fields: {
+        id: { column: 'id' };
+        profileId: { column: 'profile_id' };
+      };
+    };
+    fields: {
+      id: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: false;
+      };
+      profileId: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: false;
+      };
+    };
+    relations: Record<string, never>;
+  };
+};
+
+type CrossSpaceTestContract = Omit<Contract<SqlStorage>, 'domain'> & {
+  readonly domain: {
+    readonly namespaces: {
+      readonly public: { readonly models: CrossSpaceModels };
+    };
+  };
+};
 
 // ---------------------------------------------------------------------------
 // Type-level assertions

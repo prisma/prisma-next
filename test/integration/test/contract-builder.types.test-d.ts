@@ -6,7 +6,6 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import type { ContractModelDefinitions } from '@prisma-next/contract/types';
 import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import arktypeJsonRuntime from '@prisma-next/extension-arktype-json/runtime';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
@@ -30,6 +29,12 @@ import { type as arktype } from 'arktype';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
+
+// The models map for the contract's sole domain namespace, read per-namespace
+// from `domain.namespaces[ns].models` (the flat top-level models map is gone).
+type SoleNamespaceModels<
+  T extends { domain: { namespaces: Record<string, { models: unknown }> } },
+> = T['domain']['namespaces'][keyof T['domain']['namespaces']]['models'];
 
 const typecheckOnly = process.env['PN_TYPECHECK_ONLY'] === 'true';
 
@@ -160,7 +165,7 @@ test('refined object contract preserves downstream model token inference', () =>
     Record<string, unknown>
   >();
   expectTypeOf<RefinedUserColumns>().toExtend<Record<string, { readonly codecId: string }>>();
-  type ValidatedModels = ContractModelDefinitions<typeof validated>;
+  type ValidatedModels = SoleNamespaceModels<typeof validated>;
   expectTypeOf<ValidatedModels['User']['storage']['table']>().toExtend<string>();
   expectTypeOf<
     NonNullable<ValidatedModels['Post']['storage']['fields']['userId']>['column']

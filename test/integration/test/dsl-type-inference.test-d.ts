@@ -1,5 +1,4 @@
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
-import type { ContractModelDefinitions } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
@@ -18,6 +17,12 @@ import { expectTypeOf, test } from 'vitest';
 // NOT an emitted Contract type. If TypeScript cannot reduce the inferred type
 // to literal table/column/model keys, these tests fail.
 // ---------------------------------------------------------------------------
+
+// The models map for the contract's sole domain namespace, read per-namespace
+// from `domain.namespaces[ns].models` (the flat top-level models map is gone).
+type SoleNamespaceModels<
+  T extends { domain: { namespaces: Record<string, { models: unknown }> } },
+> = T['domain']['namespaces'][keyof T['domain']['namespaces']]['models'];
 
 // -- Fixtures ---------------------------------------------------------------
 
@@ -61,13 +66,11 @@ test('column name literals survive in storage.tables[name].columns', () => {
 });
 
 test('model name literals survive in models', () => {
-  expectTypeOf<
-    keyof ContractModelDefinitions<typeof singleModelContract>
-  >().toEqualTypeOf<'User'>();
+  expectTypeOf<keyof SoleNamespaceModels<typeof singleModelContract>>().toEqualTypeOf<'User'>();
 });
 
 test('model table name is a literal string', () => {
-  type SingleModels = ContractModelDefinitions<typeof singleModelContract>;
+  type SingleModels = SoleNamespaceModels<typeof singleModelContract>;
   expectTypeOf<SingleModels['User']['storage']['table']>().toEqualTypeOf<'user'>();
 });
 
@@ -86,7 +89,7 @@ test('deserializeContract preserves model name literals', () => {
   const validated = new SqlContractSerializer().deserializeContract(
     singleModelContract,
   ) as typeof singleModelContract;
-  expectTypeOf<keyof ContractModelDefinitions<typeof validated>>().toEqualTypeOf<'User'>();
+  expectTypeOf<keyof SoleNamespaceModels<typeof validated>>().toEqualTypeOf<'User'>();
 });
 
 // -- sql() dot access works with inferred contract --------------------------
@@ -130,7 +133,7 @@ test('multi-model contract preserves table name literals', () => {
 });
 
 test('multi-model contract preserves model name literals', () => {
-  expectTypeOf<keyof ContractModelDefinitions<typeof multiModelContract>>().toEqualTypeOf<
+  expectTypeOf<keyof SoleNamespaceModels<typeof multiModelContract>>().toEqualTypeOf<
     'User' | 'Post'
   >();
 });
