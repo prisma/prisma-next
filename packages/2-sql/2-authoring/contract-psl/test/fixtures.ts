@@ -8,6 +8,7 @@ import type {
   AuthoringContributions,
   AuthoringEntityContext,
   AuthoringEntityTypeNamespace,
+  AuthoringPslBlockDescriptorNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
@@ -18,10 +19,13 @@ import type {
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
+import type { ResolvedDocument, SourceFile } from '@prisma-next/psl-parser/syntax';
+import { parse, resolve } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { buildSqlNamespace } from '@prisma-next/sql-contract/types';
 import { type EnumTypeHandle, enumType } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 function testEnumFactory(
   block: PslExtensionBlock,
@@ -638,4 +642,39 @@ export function buildEnumCapturingFactory(): {
     return buildSqlNamespace(input);
   };
   return { createNamespace, capturedEnumTypes };
+}
+
+export interface ParseAndResolveInput {
+  readonly schema: string;
+  readonly sourceId?: string;
+  readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
+  readonly codecLookup?: CodecLookup;
+}
+
+/**
+ * Builds the interpreter's document input from PSL source the way the provider
+ * does: `parse` produces the CST + syntactic diagnostics, `resolve` produces
+ * the `ResolvedDocument` + semantic diagnostics, and the two diagnostic lists
+ * are merged onto the document the interpreter reads. Returns the
+ * `{ document, sourceId, sourceFile }` triple the interpreter input requires —
+ * spread directly into `interpretPslDocumentToSqlContract({ ...document })`.
+ * Takes the same `{ schema, sourceId, pslBlockDescriptors, codecLookup }` input
+ * shape the legacy `parsePslDocument` accepted.
+ */
+export function parseAndResolve(input: ParseAndResolveInput): {
+  document: ResolvedDocument;
+  sourceId: string;
+  sourceFile: SourceFile;
+} {
+  const sourceId = input.sourceId ?? 'schema.prisma';
+  const { document, diagnostics: parseDiagnostics, sourceFile } = parse(input.schema);
+  const resolved = resolve(document, {
+    ...ifDefined('pslBlockDescriptors', input.pslBlockDescriptors),
+    ...ifDefined('codecLookup', input.codecLookup),
+  });
+  return {
+    document: { ...resolved, diagnostics: [...parseDiagnostics, ...resolved.diagnostics] },
+    sourceId,
+    sourceFile,
+  };
 }

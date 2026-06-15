@@ -5,13 +5,16 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { countSemanticLines } from '@prisma-next/test-utils/semantic-lines';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
-import { createBuiltinLikeControlMutationDefaults, testEnumEntityContributions } from './fixtures';
+import {
+  createBuiltinLikeControlMutationDefaults,
+  parseAndResolve,
+  testEnumEntityContributions,
+} from './fixtures';
 
 const sqlFamilyPack = {
   kind: 'family',
@@ -360,13 +363,13 @@ describe('TS and PSL authoring parity', () => {
     readonly authoringContributions: AuthoringContributions;
   }): void {
     const tsContract = target.buildTsContract();
-    const pslDocument = parsePslDocument({
+    const pslDocument = parseAndResolve({
       schema: timestampParityPslSchema,
       sourceId: 'schema.prisma',
     });
 
     const interpreted = interpretPslDocumentToSqlContract({
-      document: pslDocument,
+      ...pslDocument,
       target: target.targetPack,
       scalarTypeDescriptors: target.scalarTypeDescriptors,
       composedExtensionContracts: new Map(),
@@ -398,7 +401,7 @@ describe('TS and PSL authoring parity', () => {
   });
 
   it('PSL and TS lower the same cross-namespace FK shape to identical contract IR', () => {
-    const pslDocument = parsePslDocument({
+    const pslDocument = parseAndResolve({
       schema: `namespace auth {
   model User {
     id Int @id
@@ -409,14 +412,14 @@ describe('TS and PSL authoring parity', () => {
 model Post {
   id Int @id
   authorId Int
-  author User @relation(fields: [authorId], references: [id])
+  author auth.User @relation(fields: [authorId], references: [id])
 }
 `,
       sourceId: 'schema.prisma',
     });
 
     const pslContract = interpretPslDocumentToSqlContract({
-      document: pslDocument,
+      ...pslDocument,
       target: portablePostgresTargetPack,
       scalarTypeDescriptors,
       composedExtensionContracts: new Map(),

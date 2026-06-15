@@ -15,10 +15,14 @@ import type {
   ResolvedNamespace,
   SourceFile,
   SyntaxNode,
-  SyntaxToken,
   TypeTarget,
 } from '@prisma-next/psl-parser/syntax';
-import { KeyValuePairAst, SyntaxNode as SyntaxNodeClass } from '@prisma-next/psl-parser/syntax';
+import {
+  GenericBlockDeclarationAst,
+  KeyValuePairAst,
+  StringLiteralExprAst,
+  SyntaxNode as SyntaxNodeClass,
+} from '@prisma-next/psl-parser/syntax';
 
 /**
  * Internal read surface over {@link ResolvedDocument} for the SQL authoring
@@ -144,75 +148,47 @@ export function spanOf(node: SyntaxNode, sourceFile: SourceFile): PslSpan {
   };
 }
 
-/**
- * The diagnostic span of a single CST token, derived from its absolute source
- * offset through the same `SourceFile` the parse produced. Token equivalent of
- * {@link spanOf} (which operates on a `SyntaxNode`).
- */
-function tokenSpan(token: SyntaxToken, sourceFile: SourceFile): PslSpan {
-  const endOffset = token.offset + token.text.length;
-  const start = sourceFile.positionAt(token.offset);
-  const end = sourceFile.positionAt(endOffset);
-  return {
-    start: { offset: token.offset, line: start.line, column: start.character },
-    end: { offset: endOffset, line: end.line, column: end.character },
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Extension-block reading
 // ---------------------------------------------------------------------------
 
 /**
- * Reads the `@@`-prefixed block attributes of a generic extension block
- * directly off its CST. The resolver does not parse block-attribute arguments
- * (it only validates `key = value` parameters against a descriptor), so the
- * `@@type("codec")` line is recovered here as a flat
- * `DoubleAt Ident LParen StringLiteral… RParen` token run — the shape the
- * generic-block parser produces inside a `GenericBlockDeclaration`. Only
- * string-literal positional arguments are captured; that is all the SQL
- * `enum2` entity factory consults.
+ * Reads the `@@`-prefixed block attributes of a generic extension block off its
+ * CST. The parser now wraps each `@@attr(args)` line inside a generic block in
+ * the same `ModelAttribute` node that model/enum/composite blocks use, so the
+ * `@@type("codec")` line is read through {@link ModelAttributeAst}: the name
+ * from `name().token().text`, and string-literal positional arguments from
+ * `argList().args()`. Only string-literal positional arguments are captured;
+ * that is all the SQL `enum2` entity factory consults. The argument `value` is
+ * the raw, quoted source text (e.g. `"pg/text@1"`) — the entity factory strips
+ * the quotes itself, mirroring the legacy reader's behaviour.
  */
 function readBlockAttributes(
   blockSyntax: SyntaxNode,
   sourceFile: SourceFile,
 ): PslExtensionBlockAttribute[] {
+  const block = GenericBlockDeclarationAst.cast(blockSyntax);
+  if (block === undefined) return [];
   const attributes: PslExtensionBlockAttribute[] = [];
-  const tokens = [...blockSyntax.children()].filter(
-    (child): child is SyntaxToken => !(child instanceof SyntaxNodeClass),
-  );
-  for (let index = 0; index < tokens.length; index += 1) {
-    const token = tokens[index];
-    if (token?.kind !== 'DoubleAt') continue;
-    const nameToken = tokens[index + 1];
-    if (nameToken?.kind !== 'Ident') continue;
+  for (const attribute of block.attributes()) {
+    const name = attribute.name()?.token()?.text;
+    if (name === undefined) continue;
     const args: PslExtensionBlockAttributeArg[] = [];
-    let end = index + 1;
-    for (let cursor = index + 2; cursor < tokens.length; cursor += 1) {
-      const argToken = tokens[cursor];
-      if (argToken === undefined) break;
-      if (argToken.kind === 'StringLiteral') {
-        args.push({
-          kind: 'positional',
-          value: argToken.text,
-          span: tokenSpan(argToken, sourceFile),
-        });
-      }
-      end = cursor;
-      if (argToken.kind === 'RParen') break;
+    for (const arg of attribute.argList()?.args() ?? []) {
+      const value = arg.value();
+      if (value === undefined) continue;
+      const literal = StringLiteralExprAst.cast(value.syntax);
+      if (literal === undefined) continue;
+      args.push({
+        kind: 'positional',
+        value: argText(value),
+        span: spanOf(value.syntax, sourceFile),
+      });
     }
-    const startOffset = token.offset;
-    const lastToken = tokens[end] ?? nameToken;
-    const endOffset = lastToken.offset + lastToken.text.length;
-    const startPos = sourceFile.positionAt(startOffset);
-    const endPos = sourceFile.positionAt(endOffset);
     attributes.push({
-      name: nameToken.text,
+      name,
       args,
-      span: {
-        start: { offset: startOffset, line: startPos.line, column: startPos.character },
-        end: { offset: endOffset, line: endPos.line, column: endPos.character },
-      },
+      span: spanOf(attribute.syntax, sourceFile),
     });
   }
   return attributes;

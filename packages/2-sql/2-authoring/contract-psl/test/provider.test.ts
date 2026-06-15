@@ -288,7 +288,7 @@ model Post {
             sourceId: './schema.prisma',
             message: expect.stringContaining('Unknown'),
             span: expect.objectContaining({
-              start: expect.objectContaining({ line: 3 }),
+              start: expect.objectContaining({ line: 2 }),
             }),
           }),
         ]),
@@ -332,7 +332,7 @@ model Post {
             sourceId: './schema.prisma',
             message: expect.stringContaining('User.posts'),
             span: expect.objectContaining({
-              start: expect.objectContaining({ line: 3 }),
+              start: expect.objectContaining({ line: 2 }),
             }),
           }),
         ]),
@@ -371,7 +371,7 @@ model Post {
             code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
             sourceId: './schema.prisma',
             span: expect.objectContaining({
-              start: expect.objectContaining({ line: 3 }),
+              start: expect.objectContaining({ line: 2 }),
             }),
           }),
         ]),
@@ -575,7 +575,7 @@ model Document {
             sourceId: './schema.prisma',
             message: expect.stringContaining('cuid(2)'),
             span: expect.objectContaining({
-              start: expect.objectContaining({ line: 3 }),
+              start: expect.objectContaining({ line: 2 }),
             }),
           }),
         ]),
