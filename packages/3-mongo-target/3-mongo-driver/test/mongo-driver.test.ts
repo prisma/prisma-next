@@ -457,6 +457,283 @@ describe('MongoDriver', () => {
     });
   });
 
+  describe('createCollection — option branches', () => {
+    it('passes validator and validationAction', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_cc_validation';
+      await db.dropCollection(col).catch(() => undefined);
+
+      const validator = { $jsonSchema: { bsonType: 'object' } };
+      await driver.run(
+        new CreateCollectionWireCommand(col, {
+          validator,
+          validationAction: 'warn',
+        }),
+      );
+
+      const colls = await db.listCollections({ name: col }, { nameOnly: false }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]).toMatchObject({
+        options: { validator, validationAction: 'warn' },
+      });
+    });
+
+    it('passes capped, size and max', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_cc_capped_max';
+      await db.dropCollection(col).catch(() => undefined);
+
+      await driver.run(
+        new CreateCollectionWireCommand(col, { capped: true, size: 1024 * 1024, max: 100 }),
+      );
+
+      const colls = await db.listCollections({ name: col }, { nameOnly: false }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]).toMatchObject({
+        options: { capped: true, size: 1024 * 1024, max: 100 },
+      });
+    });
+
+    it('passes collation', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_cc_collation';
+      await db.dropCollection(col).catch(() => undefined);
+
+      await driver.run(
+        new CreateCollectionWireCommand(col, {
+          collation: { locale: 'en', strength: 2 },
+        }),
+      );
+
+      const colls = await db.listCollections({ name: col }, { nameOnly: false }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]).toMatchObject({
+        options: { collation: { locale: 'en', strength: 2 } },
+      });
+    });
+
+    it('passes changeStreamPreAndPostImages', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_cc_cspp';
+      await db.dropCollection(col).catch(() => undefined);
+
+      await driver.run(
+        new CreateCollectionWireCommand(col, {
+          changeStreamPreAndPostImages: { enabled: true },
+        }),
+      );
+
+      const colls = await db.listCollections({ name: col }, { nameOnly: false }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]).toMatchObject({
+        options: { changeStreamPreAndPostImages: { enabled: true } },
+      });
+    });
+
+    it('passes clusteredIndex', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_cc_clustered';
+      await db.dropCollection(col).catch(() => undefined);
+
+      await driver.run(
+        new CreateCollectionWireCommand(col, {
+          clusteredIndex: { key: { _id: 1 }, unique: true },
+        }),
+      );
+
+      const colls = await db.listCollections({ name: col }, { nameOnly: false }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]).toMatchObject({ name: col });
+    });
+
+    it('passes timeseries options', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_cc_timeseries';
+      await db.dropCollection(col).catch(() => undefined);
+
+      await driver.run(
+        new CreateCollectionWireCommand(col, {
+          timeseries: { timeField: 'ts', metaField: 'meta', granularity: 'seconds' },
+        }),
+      );
+
+      const colls = await db.listCollections({ name: col }, { nameOnly: false }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]).toMatchObject({ name: col });
+    });
+
+    it('passes validationLevel without other options', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_cc_vallevel';
+      await db.dropCollection(col).catch(() => undefined);
+
+      await driver.run(new CreateCollectionWireCommand(col, { validationLevel: 'moderate' }));
+
+      const colls = await db.listCollections({ name: col }, { nameOnly: false }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]).toMatchObject({
+        options: { validationLevel: 'moderate' },
+      });
+    });
+  });
+
+  describe('createIndex — option branches', () => {
+    it('passes sparse and expireAfterSeconds', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_idx_sparse_ttl';
+      await db.dropCollection(col).catch(() => undefined);
+      await db.createCollection(col);
+
+      await driver.run(
+        new CreateIndexWireCommand(
+          col,
+          { lastSeen: 1 },
+          { sparse: true, expireAfterSeconds: 3600 },
+        ),
+      );
+
+      const indexes = await db.collection(col).indexes();
+      const idx = indexes.find((i) => Object.hasOwn(i.key, 'lastSeen'));
+      expect(idx).toMatchObject({ sparse: true, expireAfterSeconds: 3600 });
+    });
+
+    it('passes partialFilterExpression', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_idx_partial';
+      await db.dropCollection(col).catch(() => undefined);
+      await db.createCollection(col);
+
+      await driver.run(
+        new CreateIndexWireCommand(
+          col,
+          { status: 1 },
+          { partialFilterExpression: { status: { $exists: true } }, name: 'partial_status' },
+        ),
+      );
+
+      const indexes = await db.collection(col).indexes();
+      const idx = indexes.find((i) => i.name === 'partial_status');
+      expect(idx).toBeDefined();
+      expect(idx).toMatchObject({ partialFilterExpression: { status: { $exists: true } } });
+    });
+
+    it('passes collation', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_idx_collation';
+      await db.dropCollection(col).catch(() => undefined);
+      await db.createCollection(col);
+
+      await driver.run(
+        new CreateIndexWireCommand(
+          col,
+          { title: 1 },
+          { collation: { locale: 'fr', strength: 1 }, name: 'title_collated' },
+        ),
+      );
+
+      const indexes = await db.collection(col).indexes();
+      const idx = indexes.find((i) => i.name === 'title_collated');
+      expect(idx).toBeDefined();
+      expect(idx).toMatchObject({ collation: { locale: 'fr', strength: 1 } });
+    });
+
+    it('passes weights, default_language and language_override for text index', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_idx_text';
+      await db.dropCollection(col).catch(() => undefined);
+      await db.createCollection(col);
+
+      await driver.run(
+        new CreateIndexWireCommand(
+          col,
+          { content: 'text' },
+          {
+            weights: { content: 10 },
+            default_language: 'english',
+            language_override: 'lang',
+            name: 'text_idx',
+          },
+        ),
+      );
+
+      const indexes = await db.collection(col).indexes();
+      const idx = indexes.find((i) => i.name === 'text_idx');
+      expect(idx).toBeDefined();
+      expect(idx).toMatchObject({
+        weights: { content: 10 },
+        default_language: 'english',
+        language_override: 'lang',
+      });
+    });
+
+    it('passes wildcardProjection for wildcard index', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_idx_wildcard';
+      await db.dropCollection(col).catch(() => undefined);
+      await db.createCollection(col);
+
+      await driver.run(
+        new CreateIndexWireCommand(
+          col,
+          { '$**': 1 },
+          { wildcardProjection: { tags: 1 }, name: 'wildcard_idx' },
+        ),
+      );
+
+      const indexes = await db.collection(col).indexes();
+      const idx = indexes.find((i) => i.name === 'wildcard_idx');
+      expect(idx).toBeDefined();
+    });
+  });
+
+  describe('collMod — option branches', () => {
+    it('passes validationAction', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_collmod_valaction';
+      await db.dropCollection(col).catch(() => undefined);
+      await db.createCollection(col);
+
+      await driver.run(new CollModWireCommand(col, { validationAction: 'warn' }));
+
+      const colls = await db.listCollections({ name: col }, { nameOnly: false }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]).toMatchObject({
+        options: { validationAction: 'warn' },
+      });
+    });
+
+    it('passes changeStreamPreAndPostImages', async () => {
+      const db = seedClient.db(dbName);
+      const driver = MongoDriverImpl.fromDb(db);
+      const col = 'driver_collmod_cspp';
+      await db.dropCollection(col).catch(() => undefined);
+      await db.createCollection(col);
+
+      await driver.run(
+        new CollModWireCommand(col, { changeStreamPreAndPostImages: { enabled: true } }),
+      );
+
+      const colls = await db.listCollections({ name: col }, { nameOnly: false }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]).toMatchObject({
+        options: { changeStreamPreAndPostImages: { enabled: true } },
+      });
+    });
+  });
+
   describe('run() error propagation', () => {
     it('rejects when the server returns an error', async () => {
       const db = seedClient.db(dbName);
