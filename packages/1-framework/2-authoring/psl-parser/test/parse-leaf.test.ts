@@ -386,6 +386,55 @@ describe('parseTypeAnnotation well-formed', () => {
     expect(diagnostics).toHaveLength(0);
   });
 
+  it('parses a namespace-qualified constructor call into a single FunctionCall chain', () => {
+    const source = 'pgvector.Vector(1536)';
+    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "TypeAnnotation
+        FunctionCall
+          Identifier
+            Ident "pgvector"
+          Dot "."
+          Identifier
+            Ident "Vector"
+          LParen "("
+          AttributeArg
+            NumberLiteralExpr
+              NumberLiteral "1536"
+          RParen ")""
+    `);
+    expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it('parses a qualified constructor with a named argument and an optional suffix', () => {
+    const source = 'pgvector.Vector(length: 1536)?';
+    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "TypeAnnotation
+        FunctionCall
+          Identifier
+            Ident "pgvector"
+          Dot "."
+          Identifier
+            Ident "Vector"
+          LParen "("
+          AttributeArg
+            Identifier
+              Ident "length"
+            Colon ":"
+            Whitespace " "
+            NumberLiteralExpr
+              NumberLiteral "1536"
+          RParen ")"
+        Question "?""
+    `);
+    expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(0);
+  });
+
   it('parses a list suffix', () => {
     const source = 'String[]';
     const { node, diagnostics } = parse(source, parseTypeAnnotation);

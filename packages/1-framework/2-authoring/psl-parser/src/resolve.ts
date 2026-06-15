@@ -256,10 +256,9 @@ class Resolver {
 
     const constructorCall = annotation.constructorCall();
     if (constructorCall) {
-      const path = identifierText(constructorCall.name());
       return {
         kind: 'constructor',
-        path: path === undefined ? [] : [path],
+        path: constructorCall.path(),
         args: [...constructorCall.args()].flatMap((arg) => {
           const value = arg.value();
           return value === undefined ? [] : [value];
@@ -288,11 +287,16 @@ class Resolver {
       if (kind !== undefined) {
         return { kind: 'ref', coord: { kind, namespaceId: qualifier, name: typeName } };
       }
-      this.diagnostic(
-        'PSL_UNRESOLVED_TYPE_REFERENCE',
-        `Type "${qualifier}.${typeName}" does not resolve to a known declaration`,
-        annotation.syntax,
-      );
+      // An over-qualified annotation (e.g. `a.b.Bar`) was already flagged by
+      // `parse` with `PSL_INVALID_QUALIFIED_TYPE`; re-reporting it here as an
+      // unresolved reference would double-diagnose a single malformed type.
+      if (!annotation.isOverQualified()) {
+        this.diagnostic(
+          'PSL_UNRESOLVED_TYPE_REFERENCE',
+          `Type "${qualifier}.${typeName}" does not resolve to a known declaration`,
+          annotation.syntax,
+        );
+      }
       return { kind: 'unresolved', typeName };
     }
 
@@ -605,12 +609,22 @@ function buildNamespace(
 
   const extensionBlocks = new Map<string, ResolvedExtensionBlock>();
   for (const block of bucket.genericBlocks) {
-    const name = identifierText(block.name());
-    if (name === undefined) continue;
     const keyword = block.keyword()?.text;
     if (keyword === undefined) continue;
     const descriptor = extensionContext.descriptorsByKeyword.get(keyword);
-    if (descriptor === undefined) continue;
+    if (descriptor === undefined) {
+      // A generic block whose keyword no registered descriptor claims is an
+      // unsupported top-level block — the resolve-pass counterpart of the legacy
+      // parser's verbatim diagnostic, kept identical so callers see one message.
+      resolver.diagnostic(
+        'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK',
+        `Unsupported top-level block "${keyword}"`,
+        block.syntax,
+      );
+      continue;
+    }
+    const name = identifierText(block.name());
+    if (name === undefined) continue;
     validateExtensionBlock(block, name, descriptor, bucket.id, resolver, extensionContext);
     if (extensionBlocks.has(name)) continue;
     extensionBlocks.set(name, { name, namespaceId: bucket.id, syntax: block.syntax });

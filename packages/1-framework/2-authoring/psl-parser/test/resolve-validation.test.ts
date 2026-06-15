@@ -482,6 +482,36 @@ policy_select ReadPosts {
 `;
       expect(resolveSource(source).filter((d) => d.code.startsWith('PSL_EXTENSION_'))).toEqual([]);
     });
+
+    it('reports an unregistered block as an unsupported top-level block', () => {
+      const source = `
+policy_select ReadPosts {
+  target = Post
+}
+`;
+      const diagnostic = resolveSource(source).find(
+        (d) => d.code === 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK',
+      );
+      expect(diagnostic?.message).toBe('Unsupported top-level block "policy_select"');
+    });
+  });
+
+  describe('registered block keyword', () => {
+    it('does not report a registered block as unsupported', () => {
+      const source = `
+policy_select ReadPosts {
+  target = Post
+  using = "true"
+}
+
+model Post {
+  id Int @id
+}
+`;
+      expect(diagnosticsFor(source).some((d) => d.code === 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK')).toBe(
+        false,
+      );
+    });
   });
 });
 

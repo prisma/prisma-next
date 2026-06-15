@@ -330,6 +330,42 @@ export function parseFunctionCall(cursor: Cursor): GreenNode | undefined {
 }
 
 /**
+ * Lookahead for a namespace-qualified constructor call — `ns.Ctor(`,
+ * `a.b.Ctor(`, … — i.e. an identifier chain joined by `.` with at least one dot
+ * segment, followed by `(`. The bare `Ctor(` form is owned by
+ * {@link parseFunctionCall}; this predicate requires the qualifying dot so the
+ * two branches stay disjoint.
+ */
+function isQualifiedConstructorCall(cursor: Cursor): boolean {
+  if (cursor.peekKind() !== 'Ident') return false;
+  let ahead = 1;
+  let dots = 0;
+  while (cursor.peekKind(ahead) === 'Dot' && cursor.peekKind(ahead + 1) === 'Ident') {
+    dots++;
+    ahead += 2;
+  }
+  return dots > 0 && cursor.peekKind(ahead) === 'LParen';
+}
+
+/**
+ * Parses a namespace-qualified constructor call (`pgvector.Vector(1536)`) into a
+ * {@link FunctionCall} node carrying the full identifier chain — the same node
+ * kind the bare `Vector(1536)` form produces, so a single `constructorCall()`
+ * accessor reads both; the resolver recovers the multi-segment path from the
+ * chained identifiers.
+ */
+function parseQualifiedConstructorCall(cursor: Cursor): void {
+  cursor.startNode('FunctionCall');
+  parseIdentifier(cursor); // first namespace segment
+  while (cursor.peekKind() === 'Dot' && cursor.peekKind(1) === 'Ident') {
+    cursor.bump(); // Dot
+    parseIdentifier(cursor); // next segment (the last is the constructor name)
+  }
+  parseParenArgs(cursor);
+  cursor.finishNode();
+}
+
+/**
  * Parses a parenthesised, comma-separated `AttributeArg` list into the
  * currently open node (a `FunctionCall` or an `AttributeArgList`), consuming the
  * surrounding parentheses.
@@ -401,6 +437,8 @@ export function parseTypeAnnotation(cursor: Cursor): GreenNode {
   cursor.startNode('TypeAnnotation');
   if (cursor.peekKind() === 'Ident' && cursor.peekKind(1) === 'LParen') {
     parseFunctionCall(cursor); // inline constructor, e.g. Vector(1536)
+  } else if (isQualifiedConstructorCall(cursor)) {
+    parseQualifiedConstructorCall(cursor); // qualified constructor, e.g. pgvector.Vector(1536)
   } else if (cursor.peekKind() === 'Ident') {
     parseIdentifier(cursor); // base name or space/namespace segment
     parseQualifierSegments(cursor, 'Colon');

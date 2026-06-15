@@ -15,6 +15,20 @@ export class FunctionCallAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
+  /**
+   * The dotted call path, in source order. A bare `Vector(…)` yields
+   * `['Vector']`; a namespace-qualified `pgvector.Vector(…)` yields
+   * `['pgvector', 'Vector']`. Empty when the call carries no identifier.
+   */
+  path(): readonly string[] {
+    const segments: string[] = [];
+    for (const segment of filterChildren(this.syntax, IdentifierAst.cast)) {
+      const text = segment.token()?.text;
+      if (text !== undefined) segments.push(text);
+    }
+    return segments;
+  }
+
   lparen(): Token | undefined {
     return findChildToken(this.syntax, 'LParen');
   }

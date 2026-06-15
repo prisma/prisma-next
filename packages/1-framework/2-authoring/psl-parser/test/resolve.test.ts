@@ -407,6 +407,59 @@ model Account {
     });
   });
 
+  describe('namespace-qualified constructor types', () => {
+    it('resolves a qualified constructor in a types-block RHS to a multi-segment path', () => {
+      const doc = resolve(parse('types {\n  Embedding = pgvector.Vector(1536)\n}').document);
+      const target = doc.namedTypes.get('Embedding')?.target;
+      expect(target?.kind).toBe('constructor');
+      if (target?.kind !== 'constructor') throw new Error('expected constructor');
+      expect(target.path).toEqual(['pgvector', 'Vector']);
+      expect(target.args).toHaveLength(1);
+      expect(target.args[0]?.syntax.kind).toBe('NumberLiteralExpr');
+      expect(doc.diagnostics).toEqual([]);
+    });
+
+    it('resolves a qualified constructor in field position carrying its modifiers and args', () => {
+      const doc = resolve(
+        parse('model Document {\n  embedding pgvector.Vector(length: 1536)?\n}').document,
+      );
+      const field = namespace(doc, UNSPECIFIED_PSL_NAMESPACE_ID)
+        .models.get('Document')
+        ?.fields.get('embedding');
+      expect(field?.type.optional).toBe(true);
+      const target = field?.type.target;
+      expect(target?.kind).toBe('constructor');
+      if (target?.kind !== 'constructor') throw new Error('expected constructor');
+      expect(target.path).toEqual(['pgvector', 'Vector']);
+      expect(target.args).toHaveLength(1);
+      expect(doc.diagnostics).toEqual([]);
+    });
+
+    it('leaves a bare constructor as a single-segment path', () => {
+      const doc = resolve(parse('types {\n  V = Vector(1536)\n}').document);
+      const target = doc.namedTypes.get('V')?.target;
+      expect(target?.kind).toBe('constructor');
+      if (target?.kind !== 'constructor') throw new Error('expected constructor');
+      expect(target.path).toEqual(['Vector']);
+      expect(doc.diagnostics).toEqual([]);
+    });
+  });
+
+  describe('over-qualified type references are not double-diagnosed', () => {
+    it('emits exactly one diagnostic for a triple-segment dotted type', () => {
+      const result = parse('model M {\n  x a.b.Bar\n}');
+      const resolved = resolve(result.document);
+      const all = [...result.diagnostics, ...resolved.diagnostics];
+      expect(all.map((d) => d.code)).toEqual(['PSL_INVALID_QUALIFIED_TYPE']);
+      expect(resolved.diagnostics).toEqual([]);
+    });
+
+    it('still flags a well-formed but unknown two-segment reference', () => {
+      const doc = resolve(parse('model M {\n  x a.Bar\n}').document);
+      expect(doc.diagnostics.map((d) => d.code)).toEqual(['PSL_UNRESOLVED_TYPE_REFERENCE']);
+    });
+  });
+
   describe('non-throwing on malformed input', () => {
     it('returns a ResolvedDocument for a broken schema', () => {
       const doc = resolve(parse('model {').document);
