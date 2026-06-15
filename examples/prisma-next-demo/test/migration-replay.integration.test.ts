@@ -2,13 +2,10 @@
  * Replay proof: executing the shipped app migration chain from scratch lands
  * a database whose live schema matches the current contract.
  *
- * The chain's early migrations create the native `user_type` enum
- * (`CREATE TYPE … AS ENUM`) and type `"user"."kind"` with it; the converting
- * migration (`convert_user_type_to_value_set`) rewrites that to the domain
- * enum shape the contract describes: a text column whose value set is
- * enforced by the `user_kind_check` CHECK constraint, with the native type
- * dropped. This test replays every execute step in chain order against a
- * fresh dev database, then introspects and verifies against the contract.
+ * The chain creates `user.kind` as a `text` column with a `user_kind_check`
+ * CHECK constraint from the initial migration — no native Postgres enum type
+ * is ever created. This test replays every execute step in chain order against
+ * a fresh dev database, then introspects and verifies against the contract.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
