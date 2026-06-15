@@ -182,18 +182,11 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       throw new ContractValidationError(`Namespace hydration failed: ${messages}`, 'structural');
     }
     const entriesRaw = parsed.entries;
-    const rawEntriesMap =
-      entriesRaw !== null && typeof entriesRaw === 'object' && !Array.isArray(entriesRaw)
-        ? (entriesRaw as Record<string, unknown>)
-        : {};
+    const rawEntriesMap = isPlainRecord(entriesRaw) ? entriesRaw : {};
 
     const entriesInput: Record<string, Readonly<Record<string, unknown>>> = {};
     for (const [key, innerMap] of Object.entries(rawEntriesMap)) {
-      if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
-        entriesInput[key] = Object.freeze({});
-      } else {
-        entriesInput[key] = innerMap as Readonly<Record<string, unknown>>;
-      }
+      entriesInput[key] = isPlainRecord(innerMap) ? innerMap : Object.freeze({});
     }
 
     const entriesOutput = hydrateNamespaceEntities(entriesInput, this.entryKinds, 'fail', id);
