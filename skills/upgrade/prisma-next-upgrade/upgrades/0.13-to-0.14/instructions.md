@@ -416,17 +416,20 @@ Incidental substrate diff only.
 -->
 
 <!--
-TML-2886 (PR #833): enum columns are typed by following their own `valueSet` ref
-instead of a baked TypeMap entry. The emitter now renders each storage column's and
-domain field's `valueSet` ref into `contract.d.ts`, and the enum value union is no
-longer baked into the emitted `FieldOutputTypes` / `FieldInputTypes` — an enum
-field's TypeMap entry becomes its plain codec channel
-(`'low' | 'high' | 'urgent'` → `CodecTypes['pg/text@1']['output']`), with the value
-union supplied at the lane level by resolving the column's storage `valueSet` ref
-(query builder) and the field's domain enum block (ORM). Observable types are
-unchanged: `db.sql.public.post.select('id', 'priority')` and an ORM read of an enum
-field still resolve to `'low' | 'high' | 'urgent'`, now via ref-following. The demo
-`contract.d.ts` and migration `*-contract.d.ts` fixtures regenerate accordingly; a
-consumer re-emit round-trips. No user action: re-emit picks up the new shape.
-Incidental substrate diff only.
+TML-2886 (PR #833): enum columns/fields are typed by following their own `valueSet`
+ref rather than a pre-baked literal. The emitter now renders each storage column's and
+domain field's `valueSet` ref into `contract.d.ts`, and renders an enum field's
+`FieldOutputTypes` / `FieldInputTypes` entry as a ref-following type expression that
+indexes the emitted domain enum block
+(`ContractBase['domain']['namespaces'][ns]['enum'][Name]['members'][number]['value']`).
+That expression still resolves to the literal value union — so
+`FieldOutputTypes[ns][Model][enumField]` stays `'low' | 'high' | 'urgent'`, NOT codec
+output — but the source of the union moved to the ref. The lanes resolve the same
+union the same way: the query builder from the column's storage `valueSet` ref, the
+ORM from the field's domain enum block. Observable types are unchanged:
+`db.sql.public.post.select('id', 'priority')`, an ORM read of an enum field, and a
+direct `FieldOutputTypes['public']['Post']['priority']` all still resolve to
+`'low' | 'high' | 'urgent'`. The demo `contract.d.ts` and migration `*-contract.d.ts`
+fixtures regenerate accordingly; a consumer re-emit round-trips. No user action: re-emit
+picks up the new shape. Incidental substrate diff only.
 -->

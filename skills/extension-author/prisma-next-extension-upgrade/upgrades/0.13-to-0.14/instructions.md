@@ -409,20 +409,23 @@ the `namespaced-type-resolution` entry. Incidental substrate diff only.
 -->
 
 <!--
-TML-2886 (PR #833): enum columns are typed by following their own `valueSet` ref
-instead of a baked TypeMap entry. The enum value union is no longer baked into the
-emitted `FieldOutputTypes` / `FieldInputTypes`; an enum field's nested map entry
-(`ExtractFieldOutputTypes<C>[ns][Model][Field]`) becomes its plain codec channel, and
-the union is supplied at the lane level by following the column's storage `valueSet`
-ref (query builder) and the field's domain enum block (ORM, via
-`ComputeColumnJsType`). No extension-author API or SPI shape change: the observable
-model-row / select types an extension consumes through the lane (`ComputeColumnJsType`,
-`DefaultModelRow`, `TableProxy`) are unchanged — an enum column still resolves to its
-value union, now via ref-following. No extension in this repo reads the raw
-`ExtractFieldOutputTypes` enum entry directly, and the substrate diff for this slice is
-a single sql-orm-client type-test file. The native-enum SPI deletion and the
-namespace-nested TypeMaps shape are already covered by the `enum-becomes-domain-concept`
-and `namespaced-type-resolution` entries above. No extension-author action.
-Incidental substrate diff only.
+TML-2886 (PR #833): enum columns/fields are typed by following their own `valueSet`
+ref rather than a pre-baked literal. The emitter renders an enum field's nested
+`FieldOutputTypes` / `FieldInputTypes` entry
+(`ExtractFieldOutputTypes<C>[ns][Model][Field]`) as a ref-following type expression
+that indexes the emitted domain enum block
+(`ContractBase['domain']['namespaces'][ns]['enum'][Name]['members'][number]['value']`).
+That expression still resolves to the literal value union — the nested map entry stays
+the union, NOT codec output — but the source moved to the ref. The lanes resolve the
+same union the same way: the query builder from the column's storage `valueSet` ref,
+the ORM from the field's domain enum block (via `ComputeColumnJsType`). No
+extension-author API or SPI shape change: the observable model-row / select types an
+extension consumes through the lane (`ComputeColumnJsType`, `DefaultModelRow`,
+`TableProxy`) are unchanged — an enum column still resolves to its value union. No
+extension in this repo reads the raw `ExtractFieldOutputTypes` enum entry directly, and
+the substrate diff for this slice is a single sql-orm-client type-test file. The
+native-enum SPI deletion and the namespace-nested TypeMaps shape are already covered by
+the `enum-becomes-domain-concept` and `namespaced-type-resolution` entries above. No
+extension-author action. Incidental substrate diff only.
 -->
 
