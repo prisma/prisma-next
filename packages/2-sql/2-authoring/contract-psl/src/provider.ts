@@ -5,7 +5,7 @@ import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { parse, resolve } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -84,11 +84,21 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           });
         }
 
-        const document = parsePslDocument({
-          schema,
-          sourceId: schemaPath,
-          pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
+        const { document, diagnostics: parseDiagnostics, sourceFile } = parse(schema);
+        const resolved = resolve(document, {
+          ...ifDefined('pslBlockDescriptors', context.authoringContributions.pslBlockDescriptors),
+          codecLookup: context.codecLookup,
         });
+        // `parse` does not itself fail on syntax errors — it recovers and
+        // collects diagnostics on the result. The interpreter merges the
+        // resolver-owned semantic diagnostics (`resolved.diagnostics`) and
+        // raises them through its own `notOk` channel, but the syntactic
+        // diagnostics from `parse` are not part of the `ResolvedDocument`, so
+        // they are threaded in separately.
+        const resolvedDocument = {
+          ...resolved,
+          diagnostics: [...parseDiagnostics, ...resolved.diagnostics],
+        };
 
         const scalarTypeDescriptors = buildColumnDescriptorMap(
           context.scalarTypeDescriptors,
@@ -96,7 +106,9 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         );
 
         const interpreted = interpretPslDocumentToSqlContract({
-          document,
+          document: resolvedDocument,
+          sourceId: schemaPath,
+          sourceFile,
           target: options.target,
           authoringContributions: context.authoringContributions,
           scalarTypeDescriptors,

@@ -407,7 +407,7 @@ export type ResolveFieldTypeResult =
  * Constructor args from the CST are all positional; their spans are recovered
  * through `sourceFile`.
  */
-function buildConstructorCall(
+export function buildConstructorCall(
   target: TypeTarget & { kind: 'constructor' },
   span: PslSpan,
   sourceFile: SourceFile,
