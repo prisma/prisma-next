@@ -19,24 +19,26 @@ function fieldToBsonSchema(
     const bsonType = resolveBsonType(field.type.codecId, codecLookup);
     if (!bsonType) return undefined;
 
-    let schema: Record<string, unknown>;
+    const enumValues =
+      field.valueSet?.entityKind === 'enum'
+        ? (enums?.[field.valueSet.entityName]?.members.map((m) => m.value) ?? null)
+        : null;
 
     if ('many' in field && field.many) {
-      schema = { bsonType: 'array', items: { bsonType } };
-    } else if (field.nullable) {
-      schema = { bsonType: ['null', bsonType] };
-    } else {
-      schema = { bsonType };
+      const items: Record<string, unknown> = { bsonType };
+      if (enumValues) items['enum'] = enumValues;
+      return { bsonType: 'array', items };
     }
 
-    if (field.valueSet?.entityKind === 'enum') {
-      const contractEnum = enums?.[field.valueSet.entityName];
-      if (contractEnum) {
-        schema['enum'] = contractEnum.members.map((m) => m.value);
-      }
+    if (field.nullable) {
+      const s: Record<string, unknown> = { bsonType: ['null', bsonType] };
+      if (enumValues) s['enum'] = [...enumValues, null];
+      return s;
     }
 
-    return schema;
+    const s: Record<string, unknown> = { bsonType };
+    if (enumValues) s['enum'] = enumValues;
+    return s;
   }
 
   if (field.type.kind === 'valueObject') {
