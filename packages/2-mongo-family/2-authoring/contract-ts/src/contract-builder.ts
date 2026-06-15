@@ -1,6 +1,7 @@
 import { computeProfileHash, computeStorageHash } from '@prisma-next/contract/hashing';
 import {
   type ContractEmbedRelation,
+  type ContractEnum,
   type ContractField,
   type ContractFieldType,
   type ContractModelBase,
@@ -9,8 +10,10 @@ import {
   type ControlPolicy,
   type CrossReference,
   crossRef,
+  type JsonValue,
   type ProfileHashBase,
   type StorageHashBase,
+  type ValueSetRef,
 } from '@prisma-next/contract/types';
 import {
   createEntityHelpersFromNamespace,
@@ -53,6 +56,7 @@ import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { EnumTypeHandle } from './enum-type';
 
 // `canonicalStringify` rejects non-plain objects so a `Map` or class
 // instance cannot silently collapse to `{}`. The storage-shape values
@@ -144,6 +148,7 @@ export interface FieldBuilder<
   readonly __type: Type;
   readonly __nullable: Nullable;
   readonly __many: Many;
+  readonly __enumHandle?: EnumTypeHandle;
   optional(): FieldBuilder<Type, true, Many>;
   many(): FieldBuilder<Type, Nullable, true>;
 }
@@ -663,6 +668,7 @@ export type ContractDefinition<
 > = ContractScaffold<Family, Target, ExtensionPacks, Roots> & {
   readonly models?: Models;
   readonly valueObjects?: ValueObjects;
+  readonly enums?: Record<string, EnumTypeHandle>;
 };
 
 export type ContractFactory<
@@ -692,25 +698,27 @@ function createFieldBuilder<
   Type extends ContractFieldType,
   Nullable extends boolean,
   Many extends boolean,
->(spec: FieldBuilderSpec<Type, Nullable, Many>): FieldBuilder<Type, Nullable, Many> {
+>(
+  spec: FieldBuilderSpec<Type, Nullable, Many>,
+  enumHandle?: EnumTypeHandle,
+): FieldBuilder<Type, Nullable, Many> {
   return {
     __kind: 'field',
     __type: spec.type,
     __nullable: spec.nullable,
     __many: spec.many,
+    ...(enumHandle !== undefined ? { __enumHandle: enumHandle } : {}),
     optional() {
-      return createFieldBuilder<Type, true, Many>({
-        type: spec.type,
-        nullable: true,
-        many: spec.many,
-      });
+      return createFieldBuilder<Type, true, Many>(
+        { type: spec.type, nullable: true, many: spec.many },
+        enumHandle,
+      );
     },
     many() {
-      return createFieldBuilder<Type, Nullable, true>({
-        type: spec.type,
-        nullable: spec.nullable,
-        many: true,
-      });
+      return createFieldBuilder<Type, Nullable, true>(
+        { type: spec.type, nullable: spec.nullable, many: true },
+        enumHandle,
+      );
     },
   };
 }
@@ -790,6 +798,19 @@ export const field = {
       nullable: false,
       many: false,
     });
+  },
+  namedType<const Handle extends EnumTypeHandle>(handle: Handle) {
+    return createFieldBuilder(
+      {
+        type: {
+          kind: 'scalar',
+          codecId: handle.codecId,
+        } as { readonly kind: 'scalar'; readonly codecId: Handle['codecId'] },
+        nullable: false,
+        many: false,
+      },
+      handle,
+    );
   },
 } as const;
 
@@ -1193,15 +1214,26 @@ function isContractScaffold(
 }
 
 function buildContractField(builder: AnyFieldBuilder): ContractField {
+  const valueSet: ValueSetRef | undefined = builder.__enumHandle
+    ? {
+        plane: 'domain',
+        entityKind: 'enum',
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        entityName: builder.__enumHandle.enumName,
+      }
+    : undefined;
+
   return builder.__many
     ? {
         type: builder.__type,
         nullable: builder.__nullable,
         many: true,
+        ...ifDefined('valueSet', valueSet),
       }
     : {
         type: builder.__type,
         nullable: builder.__nullable,
+        ...ifDefined('valueSet', valueSet),
       };
 }
 
@@ -1582,6 +1614,26 @@ function buildContractFromDefinition<
     },
   }) as unknown as MongoStorageShape<string>;
 
+  const builtEnums: Record<string, ContractEnum> = {};
+  for (const [enumName, handle] of Object.entries(definition.enums ?? {})) {
+    if (enumName !== handle.enumName) {
+      throw new Error(
+        `enum declaration key "${enumName}" must match enumType name "${handle.enumName}". Aliases are not supported.`,
+      );
+    }
+    builtEnums[enumName] = {
+      codecId: handle.codecId,
+      members: handle.enumMembers.map((m) => ({
+        name: m.name,
+        value: blindCast<
+          JsonValue,
+          'enum member values are codec inputs (string/number/bool) and are always JsonValue-compatible'
+        >(m.value),
+      })),
+    };
+  }
+  const hasEnums = Object.keys(builtEnums).length > 0;
+
   const builtContract = {
     target: definition.target.targetId,
     targetFamily: definition.family.familyId,
@@ -1592,6 +1644,7 @@ function buildContractFromDefinition<
         [UNBOUND_NAMESPACE_ID]: {
           models: builtModels,
           ...(Object.keys(builtValueObjects).length > 0 ? { valueObjects: builtValueObjects } : {}),
+          ...(hasEnums ? { enum: builtEnums } : {}),
         },
       },
     },
@@ -1624,6 +1677,7 @@ type BoundDefinitionInput<
   readonly defaultControlPolicy?: ControlPolicy;
   readonly models?: Models;
   readonly valueObjects?: ValueObjects;
+  readonly enums?: Record<string, EnumTypeHandle>;
 };
 
 // Merges a bound input with the pre-bound family/target to produce a full ContractDefinition.

@@ -27,12 +27,32 @@ const FieldTypeSchema = ScalarFieldTypeSchema.or(ValueObjectFieldTypeSchema).or(
   UnionFieldTypeSchema,
 );
 
+const DomainEnumRefSchema = type({
+  plane: "'domain'",
+  namespaceId: 'string',
+  entityKind: "'enum'",
+  entityName: 'string',
+  'spaceId?': 'string',
+});
+
+const ContractEnumSchema = type({
+  '+': 'reject',
+  codecId: 'string',
+  members: type({
+    name: 'string',
+    value: 'string | number | boolean | null | unknown[] | Record<string, unknown>',
+  })
+    .array()
+    .readonly(),
+});
+
 const RawFieldSchema = type({
   '+': 'reject',
   type: FieldTypeSchema,
   'nullable?': 'boolean',
   'many?': 'boolean',
   'dict?': 'boolean',
+  'valueSet?': DomainEnumRefSchema,
 });
 
 const FieldSchema = RawFieldSchema.pipe((field) => ({
@@ -413,6 +433,7 @@ export function createMongoContractSchema(
           'valueObjects?': type({
             '[string]': type({ '+': 'reject', fields: type({ '[string]': FieldSchema }) }),
           }),
+          'enum?': type({ '[string]': ContractEnumSchema }),
         }),
       }),
     }),

@@ -1,0 +1,142 @@
+import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { MongoContractSchema } from '@prisma-next/mongo-contract';
+import { type } from 'arktype';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import { defineContract, field, model } from '../src/contract-builder';
+import { enumType, member } from '../src/enum-type';
+
+const mongoFamilyPack = {
+  kind: 'family',
+  id: 'mongo',
+  familyId: 'mongo',
+  version: '0.0.1',
+} as const satisfies FamilyPackRef<'mongo'>;
+
+const mongoTargetPack = {
+  kind: 'target',
+  id: 'mongo',
+  familyId: 'mongo',
+  targetId: 'mongo',
+  version: '0.0.1',
+  defaultNamespaceId: '__unbound__',
+} as const satisfies TargetPackRef<'mongo', 'mongo'>;
+
+const mongoString = { codecId: 'mongo/string@1' as const, nativeType: 'string' } as const;
+
+describe('member()', () => {
+  it('preserves name and value as literal types', () => {
+    const m = member('User', 'user');
+    expectTypeOf(m.name).toEqualTypeOf<'User'>();
+    expectTypeOf(m.value).toEqualTypeOf<'user'>();
+  });
+
+  it('defaults value to name when omitted', () => {
+    const m = member('Admin');
+    expect(m.value).toBe('Admin');
+    expectTypeOf(m.value).toEqualTypeOf<'Admin'>();
+  });
+});
+
+describe('enumType() — Mongo binding', () => {
+  const Role = enumType('Role', mongoString, member('User', 'user'), member('Admin', 'admin'));
+
+  it('preserves literal value tuple on .values', () => {
+    expectTypeOf(Role.values).toEqualTypeOf<readonly ['user', 'admin']>();
+  });
+
+  it('preserves literal name tuple on .names', () => {
+    expectTypeOf(Role.names).toEqualTypeOf<readonly ['User', 'Admin']>();
+  });
+
+  it('exposes members accessor map', () => {
+    expectTypeOf(Role.members.User).toEqualTypeOf<'user'>();
+    expectTypeOf(Role.members.Admin).toEqualTypeOf<'admin'>();
+    expect(Role.members.User).toBe('user');
+    expect(Role.members.Admin).toBe('admin');
+  });
+
+  it('runtime helpers work', () => {
+    expect(Role.has('user')).toBe(true);
+    const notAMember = 'unknown' as 'user' | 'admin';
+    expect(Role.has(notAMember)).toBe(false);
+    expect(Role.nameOf('user')).toBe('User');
+    expect(Role.ordinalOf('admin')).toBe(1);
+    expect(Role.ordinalOf(notAMember)).toBe(-1);
+  });
+
+  it('stores codecId and nativeType', () => {
+    expect(Role.codecId).toBe('mongo/string@1');
+    expect(Role.nativeType).toBe('string');
+  });
+});
+
+describe('builder accumulation + contract-schema acceptance', () => {
+  const Role = enumType('Role', mongoString, member('User', 'user'), member('Admin', 'admin'));
+
+  const Account = model('Account', {
+    collection: 'accounts',
+    fields: {
+      _id: field.objectId(),
+      role: field.namedType(Role),
+    },
+  });
+
+  const contract = defineContract({
+    family: mongoFamilyPack,
+    target: mongoTargetPack,
+    enums: { Role },
+    models: { Account },
+  });
+
+  it('accumulates the enum entity in domain.namespaces[__unbound__].enum', () => {
+    const ns = contract.domain.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(ns).toBeDefined();
+    const enumSlot = (ns as Record<string, unknown>)['enum'] as Record<string, unknown> | undefined;
+    expect(enumSlot).toBeDefined();
+    expect(enumSlot?.['Role']).toEqual({
+      codecId: 'mongo/string@1',
+      members: [
+        { name: 'User', value: 'user' },
+        { name: 'Admin', value: 'admin' },
+      ],
+    });
+  });
+
+  it('stamps the field valueSet ref on the Account.role field', () => {
+    const roleField = contract.domain.namespaces[UNBOUND_NAMESPACE_ID]?.models['Account']?.fields[
+      'role'
+    ] as Record<string, unknown> | undefined;
+    expect(roleField).toBeDefined();
+    expect(roleField?.['valueSet']).toEqual({
+      plane: 'domain',
+      entityKind: 'enum',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      entityName: 'Role',
+    });
+  });
+
+  it('passes Mongo arktype contract-schema validation', () => {
+    const envelope = JSON.parse(JSON.stringify(contract)) as unknown;
+    const result = MongoContractSchema(envelope);
+    expect(result instanceof type.errors).toBe(false);
+  });
+});
+
+describe('enumType() — error cases', () => {
+  it('throws on empty member list', () => {
+    expect(() => enumType('Status', mongoString)).toThrow('must have at least one member');
+  });
+
+  it('throws on duplicate member names', () => {
+    expect(() =>
+      enumType('Status', mongoString, member('Active', 'active'), member('Active', 'inactive')),
+    ).toThrow('duplicate member name');
+  });
+
+  it('throws on duplicate member values', () => {
+    expect(() =>
+      enumType('Status', mongoString, member('Active', 'dup'), member('Inactive', 'dup')),
+    ).toThrow('duplicate member value');
+  });
+});
