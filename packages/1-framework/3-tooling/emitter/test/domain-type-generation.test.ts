@@ -19,6 +19,7 @@ import {
   generateFieldResolvedType,
   generateHashTypeAliases,
   generateImportLines,
+  generateModelFieldEntry,
   generateModelFieldsType,
   generateModelRelationsType,
   generateModelsType,
@@ -158,6 +159,58 @@ describe('generateModelFieldsType', () => {
       'field-name': { type: { kind: 'scalar', codecId: 'sql/text@1' }, nullable: false },
     });
     expect(result).toContain("readonly 'field-name':");
+  });
+});
+
+describe('generateModelFieldEntry — valueSet ref rendering', () => {
+  const domainRef: ValueSetRef = {
+    plane: 'domain',
+    namespaceId: 'public',
+    entityKind: 'enum',
+    entityName: 'Priority',
+  };
+
+  it('renders a domain field valueSet ref as a readonly literal member', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/text@1' },
+      valueSet: domainRef,
+    };
+    const result = generateModelFieldEntry('priority', field);
+    expect(result).toContain(
+      "readonly valueSet: { readonly plane: 'domain'; readonly namespaceId: 'public'; readonly entityKind: 'enum'; readonly entityName: 'Priority' }",
+    );
+  });
+
+  it('does not render a valueSet member when the field has no ref', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/text@1' },
+    };
+    const result = generateModelFieldEntry('name', field);
+    expect(result).not.toContain('valueSet');
+  });
+
+  it('renders a __unbound__ namespaceId verbatim', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/text@1' },
+      valueSet: { ...domainRef, namespaceId: '__unbound__' },
+    };
+    const result = generateModelFieldEntry('priority', field);
+    expect(result).toContain("readonly namespaceId: '__unbound__'");
+  });
+
+  it('renders a ref identically for an int-codec enum field (ref is value-agnostic)', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/int4@1' },
+      valueSet: domainRef,
+    };
+    const result = generateModelFieldEntry('level', field);
+    expect(result).toContain(
+      "readonly valueSet: { readonly plane: 'domain'; readonly namespaceId: 'public'; readonly entityKind: 'enum'; readonly entityName: 'Priority' }",
+    );
   });
 });
 

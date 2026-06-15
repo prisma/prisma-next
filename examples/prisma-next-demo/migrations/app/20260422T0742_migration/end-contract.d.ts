@@ -327,6 +327,12 @@ type ContractBase = Omit<
                     readonly nativeType: 'text';
                     readonly codecId: 'pg/text@1';
                     readonly nullable: false;
+                    readonly valueSet: {
+                      readonly plane: 'storage';
+                      readonly entityKind: 'valueSet';
+                      readonly namespaceId: 'public';
+                      readonly entityName: 'user_type';
+                    };
                   };
                   readonly address: {
                     readonly nativeType: 'jsonb';
@@ -535,6 +541,12 @@ type ContractBase = Omit<
           readonly kind: {
             readonly nullable: false;
             readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+            readonly valueSet: {
+              readonly plane: 'domain';
+              readonly entityKind: 'enum';
+              readonly namespaceId: 'public';
+              readonly entityName: 'user_type';
+            };
           };
           readonly address: {
             readonly nullable: true;
@@ -764,6 +776,12 @@ type ContractBase = Omit<
               readonly kind: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly valueSet: {
+                  readonly plane: 'domain';
+                  readonly entityKind: 'enum';
+                  readonly namespaceId: 'public';
+                  readonly entityName: 'user_type';
+                };
               };
               readonly address: {
                 readonly nullable: true;

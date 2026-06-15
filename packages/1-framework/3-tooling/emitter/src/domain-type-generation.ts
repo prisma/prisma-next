@@ -81,17 +81,20 @@ function contractFieldModifierSuffix(field: ContractField): string {
 export function generateModelFieldEntry(fieldName: string, field: ContractField): string {
   const mods = contractFieldModifierSuffix(field);
   const { nullable, type } = field;
+  const valueSetSpec = field.valueSet
+    ? `; readonly valueSet: ${serializeValue(field.valueSet)}`
+    : '';
   if (type.kind === 'scalar') {
     const typeParamsSpec =
       type.typeParams && Object.keys(type.typeParams).length > 0
         ? `; readonly typeParams: ${serializeValue(type.typeParams)}`
         : '';
-    return `readonly ${serializeObjectKey(fieldName)}: { readonly nullable: ${nullable}; readonly type: { readonly kind: 'scalar'; readonly codecId: ${serializeValue(type.codecId)}${typeParamsSpec} }${mods} }`;
+    return `readonly ${serializeObjectKey(fieldName)}: { readonly nullable: ${nullable}; readonly type: { readonly kind: 'scalar'; readonly codecId: ${serializeValue(type.codecId)}${typeParamsSpec} }${mods}${valueSetSpec} }`;
   }
   if (type.kind === 'valueObject') {
-    return `readonly ${serializeObjectKey(fieldName)}: { readonly nullable: ${nullable}; readonly type: { readonly kind: 'valueObject'; readonly name: ${serializeValue(type.name)} }${mods} }`;
+    return `readonly ${serializeObjectKey(fieldName)}: { readonly nullable: ${nullable}; readonly type: { readonly kind: 'valueObject'; readonly name: ${serializeValue(type.name)} }${mods}${valueSetSpec} }`;
   }
-  return `readonly ${serializeObjectKey(fieldName)}: { readonly nullable: ${nullable}; readonly type: ${serializeValue(type)}${mods} }`;
+  return `readonly ${serializeObjectKey(fieldName)}: { readonly nullable: ${nullable}; readonly type: ${serializeValue(type)}${mods}${valueSetSpec} }`;
 }
 
 export function generateModelFieldsType(fields: Record<string, ContractField>): string {
