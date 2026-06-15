@@ -802,10 +802,13 @@ export const field = {
   namedType<const Handle extends EnumTypeHandle>(handle: Handle) {
     return createFieldBuilder(
       {
-        type: {
+        type: blindCast<
+          { readonly kind: 'scalar'; readonly codecId: Handle['codecId'] },
+          'literal narrowing: kind is inferred as string without the cast'
+        >({
           kind: 'scalar',
           codecId: handle.codecId,
-        } as { readonly kind: 'scalar'; readonly codecId: Handle['codecId'] },
+        }),
         nullable: false,
         many: false,
       },
