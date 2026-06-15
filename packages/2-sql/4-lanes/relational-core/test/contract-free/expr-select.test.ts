@@ -396,4 +396,20 @@ describe('exprSelect()', () => {
     const ast = exprSelect().from(s1).from(s2).build();
     expect(ast.from).toBe(s2);
   });
+
+  it('build() throws when a join is added without a FROM', () => {
+    const on = cfExpr.columnRef('n', 'oid').eqExpr(cfExpr.columnRef('c', 'connamespace'));
+    expect(() =>
+      exprSelect()
+        .join(TableSource.named('pg_namespace', 'n'), on)
+        .project('one', cfExpr.lit(1))
+        .build(),
+    ).toThrow('cannot add a JOIN without a FROM');
+  });
+
+  it('build() succeeds with no FROM and no joins (FROM-less expression select)', () => {
+    const ast = exprSelect().project('result', cfExpr.countStar().eqLit(0)).build();
+    expect(ast.from).toBeUndefined();
+    expect(ast.joins).toBeUndefined();
+  });
 });

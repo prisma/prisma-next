@@ -217,6 +217,9 @@ export class CfExprSelectQuery {
   }
 
   build(): SelectAst {
+    if (this.joinItems.length > 0 && this.src === undefined) {
+      throw new Error('CfExprSelectQuery: cannot add a JOIN without a FROM clause');
+    }
     const base =
       this.src !== undefined
         ? SelectAst.from(this.src).withProjection(this.projectionItems)
