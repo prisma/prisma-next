@@ -1,4 +1,7 @@
-import { constructEntries, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  hydrateNamespaceEntities,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { composeSqlEntityKinds, tableEntityKind, valueSetEntityKind } from '../src/entity-kinds';
 import { StorageTable } from '../src/ir/storage-table';
@@ -56,16 +59,16 @@ describe('composeSqlEntityKinds', () => {
   });
 });
 
-describe('constructEntries with SQL kinds (carry)', () => {
+describe('hydrateNamespaceEntities with SQL kinds (carry)', () => {
   it('constructs table entries', () => {
     const kinds = composeSqlEntityKinds();
-    const result = constructEntries({ table: { users: emptyTableInput } }, kinds, 'carry');
+    const result = hydrateNamespaceEntities({ table: { users: emptyTableInput } }, kinds, 'carry');
     expect(result['table']?.['users']).toBeInstanceOf(StorageTable);
   });
 
   it('constructs valueSet entries', () => {
     const kinds = composeSqlEntityKinds();
-    const result = constructEntries(
+    const result = hydrateNamespaceEntities(
       { table: {}, valueSet: { Role: valueSetInput } },
       kinds,
       'carry',
@@ -76,7 +79,7 @@ describe('constructEntries with SQL kinds (carry)', () => {
   it('carries unknown kinds frozen as-is', () => {
     const kinds = composeSqlEntityKinds();
     const bogusMap = Object.freeze({ foo: { x: 1 } });
-    const result = constructEntries(
+    const result = hydrateNamespaceEntities(
       { table: {}, bogus: bogusMap } as Record<string, Record<string, unknown>>,
       kinds,
       'carry',
@@ -87,7 +90,7 @@ describe('constructEntries with SQL kinds (carry)', () => {
 
   it('handles UNBOUND_NAMESPACE_ID as an entry key without issue', () => {
     const kinds = composeSqlEntityKinds();
-    const result = constructEntries(
+    const result = hydrateNamespaceEntities(
       { [UNBOUND_NAMESPACE_ID]: {} as Record<string, unknown>, table: {} },
       kinds,
       'carry',

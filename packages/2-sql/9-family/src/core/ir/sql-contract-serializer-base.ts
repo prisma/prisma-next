@@ -4,7 +4,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import {
   type AnyEntityKindDescriptor,
-  constructEntries,
+  hydrateNamespaceEntities,
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
@@ -196,7 +196,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       }
     }
 
-    const entriesOutput = constructEntries(entriesInput, this.entryKinds, 'fail', id);
+    const entriesOutput = hydrateNamespaceEntities(entriesInput, this.entryKinds, 'fail', id);
 
     // Always ensure a 'table' key is present (may be empty).
     if (!Object.hasOwn(entriesOutput, 'table')) {

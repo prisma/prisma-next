@@ -1,6 +1,6 @@
 import {
-  constructEntries,
   freezeNode,
+  hydrateNamespaceEntities,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
@@ -16,9 +16,6 @@ export type SqliteDatabaseInput = {
   readonly id: string;
   readonly entries: SqlNamespaceEntries;
 };
-
-// SQLite constructs only `table`; valueSet stays carried raw per spec.
-const SQLITE_KINDS = new Map([['table', tableEntityKind]]);
 
 const SQLITE_NAMESPACE_KIND = 'sqlite-namespace' as const;
 
@@ -37,22 +34,18 @@ export class SqliteDatabase extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const dispatched = constructEntries(
-      blindCast<
-        Record<string, Readonly<Record<string, unknown>>>,
-        'SqliteDatabaseInput.entries values are plain record maps'
-      >(input.entries),
-      SQLITE_KINDS,
+    const dispatched = hydrateNamespaceEntities(
+      input.entries,
+      new Map([['table', tableEntityKind]]),
       'carry',
     );
 
-    const table = blindCast<
-      Readonly<Record<string, StorageTable>>,
-      'SQLITE_KINDS constructs StorageTable for the table kind'
-    >(dispatched['table'] ?? Object.freeze({}));
-    const { table: _t, ...carried } = dispatched;
-
-    this.entries = Object.freeze({ ...carried, table });
+    this.entries = Object.freeze(
+      blindCast<
+        SqlNamespaceEntries,
+        'hydrateNamespaceEntities constructs correct IR instances per registered kind descriptors'
+      >(dispatched),
+    );
     Object.defineProperty(this, 'kind', {
       value: SQLITE_NAMESPACE_KIND,
       writable: false,

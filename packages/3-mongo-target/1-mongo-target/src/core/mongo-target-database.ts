@@ -1,6 +1,6 @@
 import {
-  constructEntries,
   freezeNode,
+  hydrateNamespaceEntities,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
@@ -16,8 +16,6 @@ export interface MongoTargetDatabaseInput {
   readonly id: string;
   readonly entries?: Readonly<Record<string, Readonly<Record<string, MongoCollectionInput>>>>;
 }
-
-const MONGO_KINDS = composeMongoEntityKinds();
 
 /**
  * Mongo target `Namespace` concretion. In Mongo the "namespace" concept
@@ -47,13 +45,13 @@ export class MongoTargetDatabase extends NamespaceBase {
       ...input.entries,
     };
     this.entries = Object.freeze(
-      blindCast<MongoNamespaceEntries, 'constructEntries produces MongoNamespaceEntries'>(
-        constructEntries(
+      blindCast<MongoNamespaceEntries, 'hydrateNamespaceEntities produces MongoNamespaceEntries'>(
+        hydrateNamespaceEntities(
           blindCast<
             Record<string, Readonly<Record<string, unknown>>>,
             'MongoTargetDatabaseInput.entries values are plain record maps'
           >(rawEntries),
-          MONGO_KINDS,
+          composeMongoEntityKinds(),
           'carry',
         ),
       ),

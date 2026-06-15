@@ -1,7 +1,7 @@
 import {
-  constructEntries,
   type EntityKindDescriptor,
   freezeNode,
+  hydrateNamespaceEntities,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
@@ -15,7 +15,6 @@ import type {
   StorageValueSet,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
-import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { PostgresEnumTypeSchema } from './postgres-enum-type-schema';
 import { escapeLiteral } from './sql-utils';
@@ -34,8 +33,6 @@ export interface PostgresSchemaInput {
   readonly id: string;
   readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
-
-const POSTGRES_KINDS = composeSqlEntityKinds([typeEntityKind]);
 
 /**
  * Postgres target `Namespace` concretion — a Postgres schema (`CREATE
@@ -69,39 +66,25 @@ export class PostgresSchema extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const dispatched = constructEntries(
-      blindCast<
-        Record<string, Readonly<Record<string, unknown>>>,
-        'PostgresSchemaInput.entries values are plain record maps'
-      >(input.entries),
-      POSTGRES_KINDS,
+    const dispatched = hydrateNamespaceEntities(
+      input.entries,
+      composeSqlEntityKinds([typeEntityKind]),
       'carry',
     );
 
-    const table = blindCast<
-      Readonly<Record<string, StorageTable>>,
-      'POSTGRES_KINDS constructs StorageTable for the table kind'
-    >(dispatched['table'] ?? Object.freeze({}));
-    const type = blindCast<
-      Readonly<Record<string, PostgresEnumType>>,
-      'POSTGRES_KINDS constructs PostgresEnumType for the type kind'
-    >(dispatched['type'] ?? Object.freeze({}));
+    // Drop an empty valueSet so presence signals non-emptiness.
     const valueSetRaw = dispatched['valueSet'];
-    const valueSet =
-      valueSetRaw !== undefined && Object.keys(valueSetRaw).length > 0
-        ? blindCast<
-            Readonly<Record<string, StorageValueSet>>,
-            'POSTGRES_KINDS constructs StorageValueSet for the valueSet kind'
-          >(valueSetRaw)
-        : undefined;
-    const { table: _t, type: _ty, valueSet: _vs, ...carried } = dispatched;
+    const withPresence =
+      valueSetRaw !== undefined && Object.keys(valueSetRaw).length === 0
+        ? { ...dispatched, valueSet: undefined }
+        : dispatched;
 
-    this.entries = Object.freeze({
-      ...carried,
-      table,
-      type,
-      ...ifDefined('valueSet', valueSet),
-    });
+    this.entries = Object.freeze(
+      blindCast<
+        PostgresNamespaceEntries,
+        'hydrateNamespaceEntities constructs correct IR instances per registered kind descriptors'
+      >(withPresence),
+    );
     Object.defineProperty(this, 'kind', {
       value: 'schema',
       writable: false,

@@ -1,12 +1,11 @@
 import {
-  constructEntries,
   freezeNode,
+  hydrateNamespaceEntities,
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
-import { ifDefined } from '@prisma-next/utils/defined';
 import { composeSqlEntityKinds } from '../entity-kinds';
 import type { SqlNamespace, SqlNamespaceEntries, SqlNamespaceTablesInput } from './sql-storage';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
@@ -55,26 +54,14 @@ class SqlBoundNamespace extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const dispatched = constructEntries(
+    const dispatched = hydrateNamespaceEntities(input.entries, composeSqlEntityKinds(), 'carry');
+
+    this.entries = Object.freeze(
       blindCast<
-        Record<string, Readonly<Record<string, unknown>>>,
-        'SqlNamespaceTablesInput.entries values are plain record maps'
-      >(input.entries),
-      composeSqlEntityKinds(),
-      'carry',
+        SqlNamespaceEntries,
+        'hydrateNamespaceEntities constructs correct IR instances per registered kind descriptors'
+      >(dispatched),
     );
-
-    const table = blindCast<
-      Readonly<Record<string, StorageTable>>,
-      'CORE_KINDS constructs StorageTable for the table kind'
-    >(dispatched['table'] ?? Object.freeze({}));
-    const valueSet = blindCast<
-      Readonly<Record<string, StorageValueSet>> | undefined,
-      'CORE_KINDS constructs StorageValueSet for the valueSet kind'
-    >(dispatched['valueSet']);
-    const { table: _t, valueSet: _vs, ...carried } = dispatched;
-
-    this.entries = Object.freeze({ ...carried, table, ...ifDefined('valueSet', valueSet) });
     Object.defineProperty(this, 'kind', {
       value: SQL_NAMESPACE_KIND,
       writable: false,

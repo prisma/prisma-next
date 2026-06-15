@@ -1,6 +1,6 @@
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
-import { type AnyEntityKindDescriptor, constructEntries } from '../src/ir/entity-kind';
+import { type AnyEntityKindDescriptor, hydrateNamespaceEntities } from '../src/ir/entity-kind';
 
 const widgetSchema = type({ name: 'string', 'value?': 'number' });
 type WidgetInput = typeof widgetSchema.infer;
@@ -41,15 +41,19 @@ const kinds = new Map<string, AnyEntityKindDescriptor>([
   ['gadget', gadgetKind],
 ]);
 
-describe('constructEntries', () => {
+describe('hydrateNamespaceEntities', () => {
   it('constructs known kinds', () => {
-    const result = constructEntries({ widget: { foo: { name: 'foo', value: 1 } } }, kinds, 'carry');
+    const result = hydrateNamespaceEntities(
+      { widget: { foo: { name: 'foo', value: 1 } } },
+      kinds,
+      'carry',
+    );
     expect(result['widget']?.['foo']).toBeInstanceOf(Widget);
   });
 
   it('carries unknown kinds frozen when onUnknown is carry', () => {
     const raw = Object.freeze({ x: { id: 'x' } });
-    const result = constructEntries(
+    const result = hydrateNamespaceEntities(
       { widget: {}, unknown: raw } as Record<string, Record<string, unknown>>,
       kinds,
       'carry',
@@ -60,7 +64,7 @@ describe('constructEntries', () => {
 
   it('throws naming the kind and nsId when onUnknown is fail', () => {
     expect(() =>
-      constructEntries(
+      hydrateNamespaceEntities(
         { bogus: { x: {} } } as Record<string, Record<string, unknown>>,
         kinds,
         'fail',
@@ -68,7 +72,7 @@ describe('constructEntries', () => {
       ),
     ).toThrow(/bogus/);
     expect(() =>
-      constructEntries(
+      hydrateNamespaceEntities(
         { bogus: { x: {} } } as Record<string, Record<string, unknown>>,
         kinds,
         'fail',
@@ -78,12 +82,12 @@ describe('constructEntries', () => {
   });
 
   it('freezes constructed kind maps', () => {
-    const result = constructEntries({ widget: { a: { name: 'a' } } }, kinds, 'carry');
+    const result = hydrateNamespaceEntities({ widget: { a: { name: 'a' } } }, kinds, 'carry');
     expect(Object.isFrozen(result['widget'])).toBe(true);
   });
 
   it('constructs multiple kinds in the same entries map', () => {
-    const result = constructEntries(
+    const result = hydrateNamespaceEntities(
       { widget: { w: { name: 'w' } }, gadget: { g: { id: 'g' } } },
       kinds,
       'carry',

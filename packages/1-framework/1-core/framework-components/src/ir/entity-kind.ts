@@ -10,20 +10,18 @@ export interface EntityKindDescriptor<Input, Node> {
 export type AnyEntityKindDescriptor = EntityKindDescriptor<never, unknown>;
 
 /**
- * Shared construction loop for both SQL and Mongo entry maps.
+ * Hydrates a namespace's entities from raw JSON maps into IR class instances.
  *
  * For each kind in `entries`: if the descriptor map has a descriptor,
  * construct each inner-map value; otherwise freeze-and-carry (`'carry'`)
  * or throw naming the kind and nsId (`'fail'`).
  *
- * The single boundary cast on line below hands `value` to
- * `descriptor.construct` as its `Input`. The value is the kind's `Input`
- * by the entries-input contract at authoring time or by prior
- * `validateStorage` validation at hydration time — these are the only two
- * call sites, and both hold the invariant. This replaces ~8 per-factory
- * casts from the old registry approach.
+ * The single boundary cast hands `value` to `descriptor.construct` as its
+ * `Input`. The value satisfies the kind's `Input` either by the
+ * entries-input contract at authoring time or by prior `validateStorage`
+ * validation at hydration time.
  */
-export function constructEntries(
+export function hydrateNamespaceEntities(
   entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
   kinds: ReadonlyMap<string, AnyEntityKindDescriptor>,
   onUnknown: 'carry' | 'fail',

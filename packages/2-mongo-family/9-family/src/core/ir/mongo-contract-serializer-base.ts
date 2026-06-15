@@ -2,7 +2,7 @@ import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import {
   type AnyEntityKindDescriptor,
-  constructEntries,
+  hydrateNamespaceEntities,
 } from '@prisma-next/framework-components/ir';
 import {
   createMongoContractSchema,
@@ -129,7 +129,7 @@ export abstract class MongoContractSerializerBase<TContract>
     const rawNamespaces = contract.storage.namespaces;
     const hydratedNamespaces = Object.fromEntries(
       Object.entries(rawNamespaces).map(([nsId, nsEnvelope]) => {
-        const hydratedEntries = constructEntries(
+        const hydratedEntries = hydrateNamespaceEntities(
           blindCast<
             Readonly<Record<string, Readonly<Record<string, unknown>>>>,
             'nsEnvelope.entries has been validated by the Mongo contract schema before hydration'
@@ -145,7 +145,7 @@ export abstract class MongoContractSerializerBase<TContract>
             id: nsEnvelope.id,
             entries: blindCast<
               MongoNamespaceEntries,
-              'constructEntries produces the correct IR instances per kind'
+              'hydrateNamespaceEntities produces MongoNamespaceEntries per registered kind descriptors'
             >(hydratedEntries),
           },
         ];

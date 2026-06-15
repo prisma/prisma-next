@@ -1,4 +1,4 @@
-import { constructEntries } from '@prisma-next/framework-components/ir';
+import { hydrateNamespaceEntities } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { collectionEntityKind, composeMongoEntityKinds } from '../src/entity-kinds';
 import { MongoCollection } from '../src/ir/mongo-collection';
@@ -38,10 +38,10 @@ describe('composeMongoEntityKinds', () => {
   });
 });
 
-describe('constructEntries with Mongo kinds (carry)', () => {
+describe('hydrateNamespaceEntities with Mongo kinds (carry)', () => {
   it('constructs collection entries', () => {
     const kinds = composeMongoEntityKinds();
-    const result = constructEntries(
+    const result = hydrateNamespaceEntities(
       { collection: { items: minimalCollectionInput } },
       kinds,
       'carry',
@@ -52,7 +52,7 @@ describe('constructEntries with Mongo kinds (carry)', () => {
   it('carries unknown kinds frozen as-is', () => {
     const kinds = composeMongoEntityKinds();
     const bogusMap = Object.freeze({ foo: { x: 1 } });
-    const result = constructEntries(
+    const result = hydrateNamespaceEntities(
       { collection: {}, bogus: bogusMap } as Record<string, Record<string, unknown>>,
       kinds,
       'carry',
@@ -64,7 +64,7 @@ describe('constructEntries with Mongo kinds (carry)', () => {
   it('throws for unknown kinds on fail mode', () => {
     const kinds = composeMongoEntityKinds();
     expect(() =>
-      constructEntries(
+      hydrateNamespaceEntities(
         { collection: {}, bogus: { x: {} } } as Record<string, Record<string, unknown>>,
         kinds,
         'fail',
