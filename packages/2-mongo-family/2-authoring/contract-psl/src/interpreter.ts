@@ -22,6 +22,7 @@ import {
   MongoStorage,
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
+import type { CollationOptions } from '@prisma-next/mongo-value/mongodb-types';
 import type {
   ParsePslDocumentResult,
   PslField,
@@ -31,7 +32,6 @@ import type {
 } from '@prisma-next/psl-parser';
 import { blindCast } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import type { CollationOptions } from 'mongodb';
 import { deriveJsonSchema, derivePolymorphicJsonSchema } from './derive-json-schema';
 import {
   getAttribute,

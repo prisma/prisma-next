@@ -23,7 +23,11 @@ import type {
   ControlMutationDefaults,
   MutationDefaultGeneratorDescriptor,
 } from '../shared/mutation-default-types';
-import { materializeCodec, resolveCodecDescriptorOrThrow } from '../shared/resolve-codec';
+import {
+  CONTRACT_CODEC_DESCRIPTOR_MISSING,
+  materializeCodec,
+  resolveCodecDescriptorOrThrow,
+} from '../shared/resolve-codec';
 import type { TypesImportSpec } from '../shared/types-import-spec';
 import type {
   ControlAdapterDescriptor,
@@ -363,7 +367,7 @@ export function extractCodecLookup(
       const d = resolveCodecDescriptorOrThrow(
         (id) => descriptorsById.get(id),
         ref,
-        'CONTRACT.CODEC_DESCRIPTOR_MISSING',
+        CONTRACT_CODEC_DESCRIPTOR_MISSING,
       );
       return materializeCodec(d, ref, { name: `<ref:${ref.codecId}>` });
     },

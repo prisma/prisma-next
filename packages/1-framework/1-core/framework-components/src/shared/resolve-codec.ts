@@ -4,6 +4,8 @@ import type { AnyCodecDescriptor } from './codec-descriptor';
 import type { CodecInstanceContext, CodecRef } from './codec-types';
 import { runtimeError } from './runtime-error';
 
+export const CONTRACT_CODEC_DESCRIPTOR_MISSING = 'CONTRACT.CODEC_DESCRIPTOR_MISSING' as const;
+
 /**
  * Look up a descriptor for `ref.codecId` using `descriptorFor`; throw
  * `code` if none is found. Each plane names its own error path: the control
