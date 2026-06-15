@@ -5,7 +5,6 @@ import {
   columnNullabilityAst,
   columnTypeAst,
   constraintExistsAst,
-  enumTypeExistsAst,
   extensionExistsAst,
   indexExistsAst,
   noNullValuesAst,
@@ -264,26 +263,6 @@ describe('D3 catalog check builders — lowering pins', () => {
       'SELECT NOT EXISTS (SELECT 1 AS "one" FROM "public"."user" WHERE "email" IS NULL) AS "result"',
     );
     expect(result.params).toEqual([]);
-  });
-
-  it('enumTypeExistsAst — pg_type joins pg_namespace', async () => {
-    const body =
-      'SELECT 1 AS "one" FROM "pg_type" AS "t" ' +
-      'INNER JOIN "pg_namespace" AS "n" ON "t"."typnamespace" = "n"."oid" WHERE ' +
-      '("n"."nspname" = $1 AND "t"."typname" = $2)';
-
-    const present = await adapter.lowerToExecuteRequest(
-      enumTypeExistsAst({ schema: 'public', typeName: 'status' }).typePresent(),
-      ctx,
-    );
-    expect(present.sql).toBe(`SELECT EXISTS (${body}) AS "result"`);
-    expect(present.params).toEqual(['public', 'status']);
-
-    const absent = await adapter.lowerToExecuteRequest(
-      enumTypeExistsAst({ schema: 'public', typeName: 'status' }).typeAbsent(),
-      ctx,
-    );
-    expect(absent.sql).toBe(`SELECT NOT EXISTS (${body}) AS "result"`);
   });
 
   it('extensionExistsAst — pg_extension extname param', async () => {

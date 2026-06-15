@@ -324,41 +324,6 @@ export function noNullValuesAst(options: {
   return exprSelect().project('result', cfExpr.notExists(inner)).build();
 }
 
-export interface EnumTypeExistsCheckBuilder {
-  typePresent(): SelectAst;
-  typeAbsent(): SelectAst;
-}
-
-/**
- * Typed enum-type existence check over `pg_type` joined to `pg_namespace`,
- * with the type name bound as a text parameter.
- */
-export function enumTypeExistsAst(options: {
-  readonly schema: string;
-  readonly typeName: string;
-}): EnumTypeExistsCheckBuilder {
-  const inner = () =>
-    exprSelect()
-      .from(cfTable('pg_type', 't'))
-      .join(
-        cfTable('pg_namespace', 'n'),
-        cfExpr.columnRef('t', 'typnamespace').eqExpr(cfExpr.columnRef('n', 'oid')),
-      )
-      .project('one', cfExpr.lit(1))
-      .where(
-        cfExpr.allOf([
-          cfExpr
-            .columnRef('n', 'nspname')
-            .eqExpr(checkNamespace(options.schema).schemaFilterExpression()),
-          cfExpr.columnRef('t', 'typname').eqParam(options.typeName, PG_TEXT_CODEC_ID),
-        ]),
-      );
-  return {
-    typePresent: () => exprSelect().project('result', cfExpr.exists(inner())).build(),
-    typeAbsent: () => exprSelect().project('result', cfExpr.notExists(inner())).build(),
-  };
-}
-
 export interface ExtensionExistsCheckBuilder {
   extensionPresent(): SelectAst;
   extensionAbsent(): SelectAst;

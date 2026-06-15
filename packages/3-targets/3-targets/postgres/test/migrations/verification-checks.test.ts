@@ -14,7 +14,6 @@ import {
   columnNullabilityAst,
   columnTypeAst,
   constraintExistsAst,
-  enumTypeExistsAst,
   extensionExistsAst,
   indexExistsAst,
   noNullValuesAst,
@@ -252,14 +251,7 @@ describe('D3 catalog check builders — construction pins', () => {
     expect(from.name).toBe('user');
   });
 
-  it('enumTypeExistsAst and extensionExistsAst bind names as pg/text@1 params', () => {
-    const enumAst = enumTypeExistsAst({ schema: 'public', typeName: 'status' }).typeAbsent();
-    expect((enumAst.projection[0]!.expr as ExistsExpr).notExists).toBe(true);
-    expect(enumAst.collectParamRefs().map((ref) => (ref as ParamRef).value)).toEqual([
-      'public',
-      'status',
-    ]);
-
+  it('extensionExistsAst binds the extension name as a pg/text@1 param', () => {
     const extAst = extensionExistsAst('vector').extensionPresent();
     const extRef = extAst.collectParamRefs()[0] as ParamRef;
     expect(extRef.value).toBe('vector');
