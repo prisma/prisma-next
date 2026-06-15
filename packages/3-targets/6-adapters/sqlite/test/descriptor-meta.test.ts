@@ -8,8 +8,9 @@
  * future codec gains renderOutputType for an unrelated reason, or if an execution
  * codec needs a named type added, the failure is loud rather than silent.
  *
- * See `descriptor-meta.ts` for the filter and its comment; see
- * `projects/.../code-review.md` F01 for the saga that motivated these tests.
+ * See `descriptor-meta.ts` for the filter and its comment. These tests exist
+ * because filtering execution codecs on an emit-renderer property previously
+ * re-broke codec lookup three times before the invariant was made explicit here.
  */
 
 import { SQL_CHAR_CODEC_ID, SQL_VARCHAR_CODEC_ID } from '@prisma-next/sql-relational-core/ast';
