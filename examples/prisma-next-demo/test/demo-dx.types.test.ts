@@ -37,10 +37,14 @@ test('SPI deserializeContract output is assignable to visualization shape', () =
   );
 });
 
-test('emitted contract.d.ts types Post.priority as the value union, not string', () => {
+test('emitted contract.d.ts: FieldOutputTypes carries the codec channel for Post.priority, not the baked union', () => {
+  // TML-2886 U3 retired the emitter's baked enum override: the enum value union
+  // is no longer baked into FieldOutputTypes. The map entry is now the plain codec
+  // output; the value union is supplied by the lane via ref-following (proved by
+  // the SELECT/getPostsByPriority/INSERT tests below).
   type PriorityOutput = FieldOutputTypes['Post']['priority'];
-  expectTypeOf<PriorityOutput>().toEqualTypeOf<'low' | 'high' | 'urgent'>();
-  expectTypeOf<PriorityOutput>().not.toEqualTypeOf<string>();
+  expectTypeOf<PriorityOutput>().toEqualTypeOf<string>();
+  expectTypeOf<PriorityOutput>().not.toEqualTypeOf<'low' | 'high' | 'urgent'>();
 });
 
 test('emitted contract: db.sql.public.post SELECT priority yields the value union', () => {

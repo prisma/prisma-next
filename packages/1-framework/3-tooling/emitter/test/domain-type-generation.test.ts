@@ -2,7 +2,6 @@ import type {
   ContractField,
   ContractModel,
   ContractValueObject,
-  JsonValue,
   ValueSetRef,
 } from '@prisma-next/contract/types';
 import { crossRef } from '@prisma-next/contract/types';
@@ -1214,12 +1213,12 @@ describe('resolveFieldType', () => {
   });
 });
 
-describe('resolveFieldType with enum value-set ref', () => {
-  // A domain field authored via `enumType` carries a `field.valueSet` ref to a domain enum.
-  // The emitter must narrow BOTH read (output) and write (input) sides to the union of the
-  // enum members' rendered values, independent of the underlying codec. This is the emitted
-  // `contract.d.ts` path a real consumer imports — the in-memory `typeof contract` path is
-  // not what ships.
+describe('resolveFieldType: enum fields are no longer narrowed by the emitter', () => {
+  // The emitter retired its baked enum override (TML-2886 U3). An enum-backed
+  // field's `FieldOutputTypes`/`FieldInputTypes` entry is now the plain codec
+  // channel; the value union is supplied at the lane level by following the
+  // `valueSet` ref (storage column ref for the query lane, domain enum block for
+  // the ORM lane), not baked into the emitted map.
 
   const priorityRef: ValueSetRef = {
     plane: 'domain',
@@ -1228,87 +1227,29 @@ describe('resolveFieldType with enum value-set ref', () => {
     entityName: 'Priority',
   };
 
-  function enumResolver(
-    values: readonly JsonValue[],
-  ): (ref: ValueSetRef) => readonly JsonValue[] | undefined {
-    return (ref) => (ref.entityName === 'Priority' ? values : undefined);
-  }
-
-  it('narrows output and input to a string-member union', () => {
+  it('emits the codec channel for an enum-backed scalar field, not the value union', () => {
     const field: ContractField = {
       nullable: false,
       type: { kind: 'scalar', codecId: 'pg/text@1' },
       valueSet: priorityRef,
     };
-    const result = resolveFieldType(field, undefined, undefined, enumResolver(['low', 'high']));
-    expect(result.output).toBe("'low' | 'high'");
-    expect(result.input).toBe("'low' | 'high'");
+    const result = resolveFieldType(field);
+    expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
+    expect(result.input).toBe("CodecTypes['pg/text@1']['input']");
   });
 
-  it('narrows to a numeric-member union for int-valued enums', () => {
-    const field: ContractField = {
-      nullable: false,
-      type: { kind: 'scalar', codecId: 'pg/int4@1' },
-      valueSet: priorityRef,
-    };
-    const result = resolveFieldType(field, undefined, undefined, enumResolver([1, 10]));
-    expect(result.output).toBe('1 | 10');
-    expect(result.input).toBe('1 | 10');
-  });
-
-  it('appends | null for a nullable enum field', () => {
+  it('applies | null to the codec channel for a nullable enum-backed field', () => {
     const field: ContractField = {
       nullable: true,
       type: { kind: 'scalar', codecId: 'pg/text@1' },
       valueSet: priorityRef,
     };
-    const result = resolveFieldType(field, undefined, undefined, enumResolver(['low', 'high']));
-    expect(result.output).toBe("'low' | 'high' | null");
-    expect(result.input).toBe("'low' | 'high' | null");
+    const result = resolveFieldType(field);
+    expect(result.output).toBe("CodecTypes['pg/text@1']['output'] | null");
+    expect(result.input).toBe("CodecTypes['pg/text@1']['input'] | null");
   });
 
-  it('falls back to the codec channel when a member value is non-scalar', () => {
-    const field: ContractField = {
-      nullable: false,
-      type: { kind: 'scalar', codecId: 'pg/text@1' },
-      valueSet: priorityRef,
-    };
-    const result = resolveFieldType(field, undefined, undefined, enumResolver([{ nested: 1 }]));
-    expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
-    expect(result.input).toBe("CodecTypes['pg/text@1']['input']");
-  });
-
-  it('falls back to the codec channel when the resolver yields nothing', () => {
-    const field: ContractField = {
-      nullable: false,
-      type: { kind: 'scalar', codecId: 'pg/text@1' },
-      valueSet: { ...priorityRef, entityName: 'Unknown' },
-    };
-    const result = resolveFieldType(field, undefined, undefined, enumResolver(['low', 'high']));
-    expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
-    expect(result.input).toBe("CodecTypes['pg/text@1']['input']");
-  });
-
-  it('leaves non-enum scalar fields on the codec channel', () => {
-    const field: ContractField = {
-      nullable: false,
-      type: { kind: 'scalar', codecId: 'pg/text@1' },
-    };
-    const result = resolveFieldType(field, undefined, undefined, enumResolver(['low', 'high']));
-    expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
-    expect(result.input).toBe("CodecTypes['pg/text@1']['input']");
-  });
-});
-
-describe('generateBothFieldTypesMaps with resolveEnumValues', () => {
-  const priorityRef: ValueSetRef = {
-    plane: 'domain',
-    entityKind: 'enum',
-    namespaceId: 'public',
-    entityName: 'Priority',
-  };
-
-  it('narrows an enum-backed field across both maps', () => {
+  it('emits an enum-backed field across both maps as the codec channel', () => {
     const models: Record<string, ContractModel> = {
       Post: {
         fields: {
@@ -1322,12 +1263,10 @@ describe('generateBothFieldTypesMaps with resolveEnumValues', () => {
         storage: {},
       },
     };
-    const resolveEnumValues = (ref: ValueSetRef): readonly JsonValue[] | undefined =>
-      ref.entityName === 'Priority' ? ['low', 'high', 'urgent'] : undefined;
-    const result = generateBothFieldTypesMaps(models, undefined, undefined, resolveEnumValues);
-    expect(result.output).toContain("readonly priority: 'low' | 'high' | 'urgent'");
-    expect(result.input).toContain("readonly priority: 'low' | 'high' | 'urgent'");
-    expect(result.output).not.toContain("CodecTypes['pg/text@1']['output']");
+    const result = generateBothFieldTypesMaps(models);
+    expect(result.output).toContain("readonly priority: CodecTypes['pg/text@1']['output']");
+    expect(result.input).toContain("readonly priority: CodecTypes['pg/text@1']['input']");
+    expect(result.output).not.toContain("readonly priority: 'low' | 'high' | 'urgent'");
   });
 });
 

@@ -4,8 +4,6 @@ import type {
   ContractModel,
   ContractValueObject,
   CrossReference,
-  JsonValue,
-  ValueSetRef,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
@@ -298,52 +296,15 @@ export type FieldTypeParamsResolver = (
   model: ContractModel,
 ) => Record<string, unknown> | undefined;
 
-/**
- * Resolves a domain field's `valueSet` ref to the member values of the referenced enum.
- * Returns `undefined` when the ref cannot be resolved to a domain enum, so the emit path
- * falls back to the codec channel.
- */
-export type EnumValuesResolver = (ref: ValueSetRef) => readonly JsonValue[] | undefined;
-
-function renderEnumMemberLiteral(value: JsonValue): string | undefined {
-  if (value === null) return 'null';
-  if (typeof value === 'string') return serializeValue(value);
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  return undefined;
-}
-
-function renderEnumValueUnion(values: readonly JsonValue[]): string | undefined {
-  if (values.length === 0) return undefined;
-  const literals: string[] = [];
-  for (const value of values) {
-    const literal = renderEnumMemberLiteral(value);
-    if (literal === undefined) return undefined;
-    literals.push(literal);
-  }
-  const union = literals.join(' | ');
-  return isSafeTypeExpression(union) ? union : undefined;
-}
-
 export function resolveFieldType(
   field: ContractField,
   codecLookup?: CodecLookup,
   resolvedTypeParams?: Record<string, unknown>,
-  resolveEnumValues?: EnumValuesResolver,
 ): ResolvedFieldType {
   const { type } = field;
 
   switch (type.kind) {
     case 'scalar': {
-      if (field.valueSet?.entityKind === 'enum' && resolveEnumValues) {
-        const values = resolveEnumValues(field.valueSet);
-        const union = values ? renderEnumValueUnion(values) : undefined;
-        if (union !== undefined) {
-          return {
-            output: applyModifiers(union, field),
-            input: applyModifiers(union, field),
-          };
-        }
-      }
       let outputResolved: string | undefined;
       let inputResolved: string | undefined;
       const inlineTypeParams =
@@ -406,7 +367,6 @@ export function generateBothFieldTypesMaps(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,
   resolveFieldTypeParams?: FieldTypeParamsResolver,
-  resolveEnumValues?: EnumValuesResolver,
 ): ResolvedFieldType {
   if (!models || Object.keys(models).length === 0) {
     return { output: 'Record<string, never>', input: 'Record<string, never>' };
@@ -427,7 +387,7 @@ export function generateBothFieldTypesMaps(
           : undefined;
       const resolvedTypeParams =
         inlineTypeParams ?? resolveFieldTypeParams?.(modelName, fieldName, model);
-      const resolved = resolveFieldType(field, codecLookup, resolvedTypeParams, resolveEnumValues);
+      const resolved = resolveFieldType(field, codecLookup, resolvedTypeParams);
       const key = `readonly ${serializeObjectKey(fieldName)}`;
       outputFieldEntries.push(`${key}: ${resolved.output}`);
       inputFieldEntries.push(`${key}: ${resolved.input}`);
@@ -455,20 +415,16 @@ export function generateFieldOutputTypesMap(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,
   resolveFieldTypeParams?: FieldTypeParamsResolver,
-  resolveEnumValues?: EnumValuesResolver,
 ): string {
-  return generateBothFieldTypesMaps(models, codecLookup, resolveFieldTypeParams, resolveEnumValues)
-    .output;
+  return generateBothFieldTypesMaps(models, codecLookup, resolveFieldTypeParams).output;
 }
 
 export function generateFieldInputTypesMap(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,
   resolveFieldTypeParams?: FieldTypeParamsResolver,
-  resolveEnumValues?: EnumValuesResolver,
 ): string {
-  return generateBothFieldTypesMaps(models, codecLookup, resolveFieldTypeParams, resolveEnumValues)
-    .input;
+  return generateBothFieldTypesMaps(models, codecLookup, resolveFieldTypeParams).input;
 }
 
 export function generateValueObjectType(

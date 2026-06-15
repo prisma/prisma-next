@@ -14,7 +14,6 @@ import type {
 import { blindCast } from '@prisma-next/utils/casts';
 import {
   deduplicateImports,
-  type EnumValuesResolver,
   generateBothFieldTypesMaps,
   generateCodecTypeIntersection,
   generateHashTypeAliases,
@@ -174,18 +173,10 @@ export function generateContractDts(
         emitter.resolveFieldTypeParams?.(modelName, fieldName, model, contract)
     : undefined;
 
-  const resolveEnumValues: EnumValuesResolver = (ref) =>
-    ref.entityKind === 'enum'
-      ? contract.domain.namespaces[ref.namespaceId]?.enum?.[ref.entityName]?.members.map(
-          (m) => m.value,
-        )
-      : undefined;
-
   const fieldTypesMaps = generateBothFieldTypesMaps(
     modelsRecord,
     codecLookup,
     resolveFieldTypeParams,
-    resolveEnumValues,
   );
 
   const contractWrapper = emitter.getContractWrapper('ContractBase', 'TypeMaps');

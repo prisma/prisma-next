@@ -91,7 +91,7 @@ export type FieldOutputTypes = {
     readonly email: CodecTypes['pg/text@1']['output'];
     readonly displayName: CodecTypes['pg/text@1']['output'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-    readonly kind: 'admin' | 'user';
+    readonly kind: CodecTypes['pg/text@1']['output'];
     readonly address: AddressOutput | null;
   };
 };
@@ -125,7 +125,7 @@ export type FieldInputTypes = {
     readonly email: CodecTypes['pg/text@1']['input'];
     readonly displayName: CodecTypes['pg/text@1']['input'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
-    readonly kind: 'admin' | 'user';
+    readonly kind: CodecTypes['pg/text@1']['input'];
     readonly address: AddressInput | null;
   };
 };

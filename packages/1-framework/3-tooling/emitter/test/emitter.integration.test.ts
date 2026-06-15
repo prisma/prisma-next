@@ -233,14 +233,16 @@ describe('emitter integration', () => {
   );
 
   it(
-    'emits the enum value union into FieldOutputTypes/FieldInputTypes for an enum-backed field',
+    'emits an enum-backed field as the codec channel and emits the ref + enum block it resolves from',
     async () => {
-      // Emit-then-consume proof. A real consumer reads the EMITTED contract.d.ts,
-      // not `typeof contract`: the in-memory authoring handle's literal tuples are
-      // erased by emission. This drives the full emit pipeline (the same path
-      // `generate-contract-dts.ts` wires the enum resolver through) and asserts the
-      // emitted typemap text carries the member-value union for a field that only
-      // declares a `valueSet` ref — its codec output is bare `string`.
+      // Emit-then-consume proof. A real consumer reads the EMITTED contract.d.ts.
+      // After TML-2886 U3 the emitter no longer bakes the enum value union into
+      // `FieldOutputTypes`/`FieldInputTypes`: an enum-backed field's typemap entry
+      // is the plain codec channel, and the value union is supplied at the lane
+      // level by following the emitted `valueSet` ref. This asserts the map carries
+      // the codec channel for the enum field, and that the two ref-following inputs
+      // are present in the emitted text — the storage column's `valueSet` ref and
+      // the domain enum block with literal member tuples.
       const ir = createTestContract({
         models: {
           Post: {
@@ -285,7 +287,17 @@ describe('emitter integration', () => {
                 table: {
                   post: {
                     columns: {
-                      priority: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                      priority: {
+                        codecId: 'pg/text@1',
+                        nativeType: 'text',
+                        nullable: false,
+                        valueSet: {
+                          plane: 'storage',
+                          entityKind: 'valueSet',
+                          namespaceId: '__unbound__',
+                          entityName: 'Priority',
+                        },
+                      },
                       title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
                     },
                     primaryKey: { columns: ['title'] },
@@ -316,13 +328,24 @@ describe('emitter integration', () => {
         result.contractDts.indexOf('export type TypeMaps'),
       );
 
-      expect(outputMap).toContain("readonly priority: 'low' | 'high' | 'urgent'");
-      expect(outputMap).not.toContain("readonly priority: CodecTypes['pg/text@1']['output']");
-      // The non-enum field stays on the codec output channel.
+      // The enum union is no longer baked into the typemap — the entry is the
+      // plain codec channel, exactly like the non-enum `title` field.
+      expect(outputMap).toContain("readonly priority: CodecTypes['pg/text@1']['output']");
+      expect(outputMap).not.toContain("readonly priority: 'low' | 'high' | 'urgent'");
       expect(outputMap).toContain("readonly title: CodecTypes['pg/text@1']['output']");
 
-      expect(inputMap).toContain("readonly priority: 'low' | 'high' | 'urgent'");
-      expect(inputMap).not.toContain("readonly priority: CodecTypes['pg/text@1']['input']");
+      expect(inputMap).toContain("readonly priority: CodecTypes['pg/text@1']['input']");
+      expect(inputMap).not.toContain("readonly priority: 'low' | 'high' | 'urgent'");
+
+      // The ref-following inputs this emitter owns are present: the domain field's
+      // `valueSet` ref (the framework emitter renders the model field literal) and
+      // the domain enum block with literal member tuples the ORM lane resolves the
+      // union from. (Storage-column ref rendering belongs to the SQL-family emitter
+      // and is covered there; the mock SPI here emits an empty storage stub.)
+      expect(result.contractDts).toContain("readonly entityKind: 'enum'");
+      expect(result.contractDts).toContain("readonly entityName: 'Priority'");
+      expect(result.contractDts).toContain("{ readonly name: 'Low'; readonly value: 'low' }");
+      expect(result.contractDts).toContain('readonly Priority:');
     },
     timeouts.typeScriptCompilation,
   );
