@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { SqlConnectionError, type SqlDriverError, SqlQueryError } from '../src/errors';
+import {
+  isUniqueConstraintViolation,
+  SqlConnectionError,
+  type SqlDriverError,
+  SqlQueryError,
+  UNIQUE_VIOLATION_SQLSTATE,
+} from '../src/errors';
 
 /**
  * Test error class for verifying is() predicate rejects other error types.
@@ -105,5 +111,40 @@ describeErrorClass(SqlConnectionError, () => {
       message: 'Connection failed',
       kind: 'sql_connection',
     });
+  });
+});
+
+describe('isUniqueConstraintViolation', () => {
+  it('is true for a normalized query error carrying the unique-violation SQLSTATE', () => {
+    const error = new SqlQueryError('duplicate key value violates unique constraint', {
+      sqlState: UNIQUE_VIOLATION_SQLSTATE,
+    });
+    expect(isUniqueConstraintViolation(error)).toBe(true);
+  });
+
+  it('is false for a query error carrying a different SQLSTATE', () => {
+    const notNull = new SqlQueryError('null value in column violates not-null constraint', {
+      sqlState: '23502',
+    });
+    expect(isUniqueConstraintViolation(notNull)).toBe(false);
+  });
+
+  it('is false for a query error with no SQLSTATE', () => {
+    expect(isUniqueConstraintViolation(new SqlQueryError('opaque failure'))).toBe(false);
+  });
+
+  it('is false for raw driver errors not normalized into SqlQueryError', () => {
+    expect(isUniqueConstraintViolation(Object.assign(new Error('boom'), { code: '23505' }))).toBe(
+      false,
+    );
+    expect(
+      isUniqueConstraintViolation(new Error('duplicate key value violates unique constraint')),
+    ).toBe(false);
+  });
+
+  it('is false for non-errors', () => {
+    expect(isUniqueConstraintViolation(null)).toBe(false);
+    expect(isUniqueConstraintViolation('23505')).toBe(false);
+    expect(isUniqueConstraintViolation(undefined)).toBe(false);
   });
 });

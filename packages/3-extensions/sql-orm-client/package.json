@@ -22,6 +22,7 @@
     "@prisma-next/framework-components": "workspace:0.14.0",
     "@prisma-next/operations": "workspace:0.14.0",
     "@prisma-next/sql-contract": "workspace:0.14.0",
+    "@prisma-next/sql-errors": "workspace:0.14.0",
     "@prisma-next/sql-operations": "workspace:0.14.0",
     "@prisma-next/sql-relational-core": "workspace:0.14.0",
     "@prisma-next/sql-runtime": "workspace:0.14.0",

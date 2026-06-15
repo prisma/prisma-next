@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { isUniqueConstraintViolation } from '@prisma-next/sql-errors';
 import {
   type AnyExpression,
   BinaryExpr,
@@ -967,34 +968,6 @@ function writeJunctionColumn(
   junctionRow[column] = value;
 }
 
-function isUniqueConstraintError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) {
-    return false;
-  }
-
-  if ('code' in error) {
-    const code = error.code;
-    if (
-      code === '23505' ||
-      code === 'SQLITE_CONSTRAINT_UNIQUE' ||
-      code === 'SQLITE_CONSTRAINT_PRIMARYKEY'
-    ) {
-      return true;
-    }
-  }
-
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  const message = error.message.toLowerCase();
-  return (
-    message.includes('duplicate key') ||
-    message.includes('unique constraint') ||
-    message.includes('unique violation')
-  );
-}
-
 async function insertJunctionLink(
   scope: RuntimeScope,
   context: ExecutionContext,
@@ -1034,7 +1007,7 @@ async function insertJunctionLink(
     // The junction PK is the common unique constraint here, but the table may
     // carry others — say a unique constraint was violated rather than
     // asserting the link itself already exists.
-    if (mutationKind === 'connect' && isUniqueConstraintError(error)) {
+    if (mutationKind === 'connect' && isUniqueConstraintViolation(error)) {
       throw new Error(
         `connect() nested mutation for relation "${relation.relationName}" violated a unique constraint on junction "${through.table}"; the junction link may already be present`,
         { cause: error },

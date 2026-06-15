@@ -3484,6 +3484,9 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:0.14.0
         version: link:../../2-sql/1-core/contract
+      '@prisma-next/sql-errors':
+        specifier: workspace:0.13.0
+        version: link:../../2-sql/1-core/errors
       '@prisma-next/sql-operations':
         specifier: workspace:0.14.0
         version: link:../../2-sql/1-core/operations

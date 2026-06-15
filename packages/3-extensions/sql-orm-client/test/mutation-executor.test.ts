@@ -1,3 +1,4 @@
+import { SqlQueryError, UNIQUE_VIOLATION_SQLSTATE } from '@prisma-next/sql-errors';
 import {
   type AnyExpression,
   BinaryExpr,
@@ -740,7 +741,12 @@ describe('mutation-executor', () => {
     vi.spyOn(runtime, 'execute').mockImplementation((plan) => {
       const ast = (plan as { ast?: { kind: string; table?: { name: string } } }).ast;
       if (ast?.kind === 'insert' && ast.table?.name === 'parent_child') {
-        throw new Error('duplicate key value violates unique constraint "parent_child_pkey"');
+        throw new SqlQueryError(
+          'duplicate key value violates unique constraint "parent_child_pkey"',
+          {
+            sqlState: UNIQUE_VIOLATION_SQLSTATE,
+          },
+        );
       }
       return execute(plan);
     });
@@ -775,8 +781,10 @@ describe('mutation-executor', () => {
     vi.spyOn(runtime, 'execute').mockImplementation((plan) => {
       const ast = (plan as { ast?: { kind: string; table?: { name: string } } }).ast;
       if (ast?.kind === 'insert' && ast.table?.name === 'parent_child') {
-        throw Object.assign(new Error('NOT NULL constraint failed: parent_child.level'), {
-          code: 'SQLITE_CONSTRAINT_NOTNULL',
+        // Drivers normalize a NOT NULL violation to sqlState 23502, not the
+        // unique-violation 23505, so the connect wrap must leave it alone.
+        throw new SqlQueryError('NOT NULL constraint failed: parent_child.level', {
+          sqlState: '23502',
         });
       }
       return execute(plan);
@@ -798,7 +806,7 @@ describe('mutation-executor', () => {
     ).rejects.toThrow(/NOT NULL constraint failed: parent_child\.level/);
   });
 
-  it('executeNestedUpdateMutation() wraps SQLITE_CONSTRAINT_PRIMARYKEY junction connect errors', async () => {
+  it('executeNestedUpdateMutation() wraps a normalized unique violation regardless of message', async () => {
     const contract = buildManyToManyContract({
       junctionTable: 'parent_child',
       parentColumns: ['parent_id'],
@@ -810,11 +818,9 @@ describe('mutation-executor', () => {
     vi.spyOn(runtime, 'execute').mockImplementation((plan) => {
       const ast = (plan as { ast?: { kind: string; table?: { name: string } } }).ast;
       if (ast?.kind === 'insert' && ast.table?.name === 'parent_child') {
-        // Message deliberately matches none of the string arms so the test
-        // pins the code-based recognition on its own.
-        throw Object.assign(new Error('constraint violation'), {
-          code: 'SQLITE_CONSTRAINT_PRIMARYKEY',
-        });
+        // Opaque message: recognition rides on the normalized sqlState alone,
+        // so a primary-key violation (which drivers map to 23505) still wraps.
+        throw new SqlQueryError('constraint violation', { sqlState: UNIQUE_VIOLATION_SQLSTATE });
       }
       return execute(plan);
     });
