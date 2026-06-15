@@ -260,7 +260,8 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
       expect(planResult.kind).toBe('success');
       if (planResult.kind !== 'success') return;
 
-      const allSql = planResult.plan.operations
+      const resolvedOps = await Promise.all(planResult.plan.operations);
+      const allSql = resolvedOps
         .flatMap((op) => [...op.precheck, ...op.execute, ...op.postcheck])
         .map((step) => step.sql);
 

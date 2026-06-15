@@ -22,10 +22,10 @@
                   "kind": "scalar"
                 }
               },
-              "owner_id": {
+              "userId": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/uuid@1",
                   "kind": "scalar"
                 }
               },
@@ -37,14 +37,31 @@
                 }
               }
             },
-            "relations": {},
+            "relations": {
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "AuthUser",
+                  "namespace": "auth",
+                  "space": "supabase"
+                }
+              }
+            },
             "storage": {
               "fields": {
                 "id": {
                   "column": "id"
                 },
-                "owner_id": {
-                  "column": "owner_id"
+                "userId": {
+                  "column": "userId"
                 },
                 "username": {
                   "column": "username"
@@ -72,7 +89,7 @@
           "rlsPolicy": {
             "profile_owner_read": {
               "kind": "rlsPolicy",
-              "name": "profile_owner_read_dc40c58a",
+              "name": "profile_owner_read_4c78e500",
               "namespaceId": "public",
               "operation": "select",
               "permissive": true,
@@ -81,7 +98,7 @@
                 "authenticated"
               ],
               "tableName": "profile",
-              "using": "owner_id::uuid = auth.uid()"
+              "using": "\\\"userId\\\"::uuid = auth.uid()"
             }
           },
           "table": {
@@ -93,10 +110,11 @@
                   "nullable": false,
                   "typeRef": "Uuid"
                 },
-                "owner_id": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                "userId": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
                 },
                 "username": {
                   "codecId": "pg/text@1",
@@ -104,14 +122,41 @@
                   "nullable": false
                 }
               },
-              "foreignKeys": [],
+              "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": true,
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "profile"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "spaceId": "supabase",
+                    "tableName": "users"
+                  }
+                }
+              ],
               "indexes": [],
               "primaryKey": {
                 "columns": [
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "userId"
+                  ]
+                }
+              ]
             }
           }
         },
@@ -119,7 +164,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:15c534873b4a3b0d23b3d0f2f2e1cf752819d72f73ff11ce87e97d3c77a5cc94",
+    "storageHash": "sha256:86b13ac0922895745b5069f70c20384b34c821f46c089035c55dae11bba9b9c6",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",

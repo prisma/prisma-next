@@ -6,13 +6,14 @@ namespace public {
   model Profile {
     id       Uuid   @id @default(uuid())
     username String
-    owner_id String
+    userId   Uuid   @unique
+    user     supabase:auth.AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
     @@map("profile")
   }
 
   policy_select profile_owner_read {
     target = Profile
     roles  = [authenticated]
-    using  = "owner_id::uuid = auth.uid()"
+    using  = "\"userId\"::uuid = auth.uid()"
   }
 }

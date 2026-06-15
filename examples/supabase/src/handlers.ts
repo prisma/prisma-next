@@ -1,15 +1,15 @@
-import type { Runtime } from '@prisma-next/sql-runtime';
-import { db } from './prisma/db';
+import type { RoleBoundDb } from '@prisma-next/extension-supabase/runtime';
+import type { Contract } from './contract';
 
 export async function insertAndReadProfile(
-  runtime: Runtime,
+  db: RoleBoundDb<Contract>,
   username: string,
-  ownerId = '00000000-0000-0000-0000-000000000000',
+  userId = '00000000-0000-0000-0000-000000000000',
 ) {
-  return runtime.execute(
-    db.sql.profile
-      .insert([{ username, owner_id: ownerId }])
-      .returning('id', 'username', 'owner_id')
+  return db.execute(
+    db.sql.public.profile
+      .insert([{ username, userId }])
+      .returning('id', 'username', 'userId')
       .build(),
   );
 }

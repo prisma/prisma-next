@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:15c534873b4a3b0d23b3d0f2f2e1cf752819d72f73ff11ce87e97d3c77a5cc94'>;
+  StorageHashBase<'sha256:86b13ac0922895745b5069f70c20384b34c821f46c089035c55dae11bba9b9c6'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:09bd7caf0ad111e77df2565dce0c4c5b0b784f9d3dfe5c97f969f1016a6b66bb'>;
 export type ProfileHash =
@@ -48,14 +48,14 @@ export type FieldOutputTypes = {
   readonly Profile: {
     readonly id: CodecTypes['pg/uuid@1']['output'];
     readonly username: CodecTypes['pg/text@1']['output'];
-    readonly owner_id: CodecTypes['pg/text@1']['output'];
+    readonly userId: CodecTypes['pg/uuid@1']['output'];
   };
 };
 export type FieldInputTypes = {
   readonly Profile: {
     readonly id: CodecTypes['pg/uuid@1']['input'];
     readonly username: CodecTypes['pg/text@1']['input'];
-    readonly owner_id: CodecTypes['pg/text@1']['input'];
+    readonly userId: CodecTypes['pg/uuid@1']['input'];
   };
 };
 export type TypeMaps = TypeMapsType<
@@ -92,16 +92,32 @@ type ContractBase = Omit<
                     readonly codecId: 'pg/text@1';
                     readonly nullable: false;
                   };
-                  readonly owner_id: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
+                  readonly userId: {
+                    readonly nativeType: 'uuid';
+                    readonly codecId: 'pg/uuid@1';
                     readonly nullable: false;
+                    readonly typeRef: 'Uuid';
                   };
                 };
                 primaryKey: { readonly columns: readonly ['id'] };
-                uniques: readonly [];
+                uniques: readonly [{ readonly columns: readonly ['userId'] }];
                 indexes: readonly [];
-                foreignKeys: readonly [];
+                foreignKeys: readonly [
+                  {
+                    readonly source: {
+                      readonly namespaceId: 'public' & NamespaceId;
+                      readonly tableName: 'profile';
+                      readonly columns: readonly ['userId'];
+                    };
+                    readonly target: {
+                      readonly namespaceId: 'auth' & NamespaceId;
+                      readonly tableName: 'users';
+                      readonly columns: readonly ['id'];
+                    };
+                    readonly constraint: true;
+                    readonly index: true;
+                  },
+                ];
               };
             };
             readonly type: Record<string, never>;
@@ -129,19 +145,19 @@ type ContractBase = Omit<
             readonly nullable: false;
             readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
           };
-          readonly owner_id: {
+          readonly userId: {
             readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
           };
         };
-        readonly relations: Record<string, never>;
+        readonly relations: { readonly user: never };
         readonly storage: {
           readonly table: 'profile';
           readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly username: { readonly column: 'username' };
-            readonly owner_id: { readonly column: 'owner_id' };
+            readonly userId: { readonly column: 'userId' };
           };
         };
       };
@@ -168,19 +184,19 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
-              readonly owner_id: {
+              readonly userId: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
             };
-            readonly relations: Record<string, never>;
+            readonly relations: { readonly user: never };
             readonly storage: {
               readonly table: 'profile';
               readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly username: { readonly column: 'username' };
-                readonly owner_id: { readonly column: 'owner_id' };
+                readonly userId: { readonly column: 'userId' };
               };
             };
           };
