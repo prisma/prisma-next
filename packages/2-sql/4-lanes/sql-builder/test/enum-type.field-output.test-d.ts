@@ -4,7 +4,12 @@ import { expectTypeOf, test } from 'vitest';
 import type { Db } from '../src/types/db';
 
 // ---------------------------------------------------------------------------
-// Minimal enum-typed contract fixture for sql-builder lane
+// Minimal enum-typed contract fixture for the sql-builder lane.
+//
+// The enum value union is NOT baked into a FieldOutputTypes/FieldInputTypes
+// TypeMap. The storage column carries a `valueSet` ref (plane 'storage') to a
+// storage value-set entity; the lane resolves the union by following that ref
+// into `storage.namespaces[ns].entries.valueSet[Name].values`.
 // ---------------------------------------------------------------------------
 
 type EnumCodecTypes = {
@@ -15,45 +20,61 @@ type EnumCodecTypes = {
   };
 };
 
-type EnumFieldOutputTypes = {
-  User: {
-    role: 'user' | 'admin';
-    status: 'active' | 'inactive' | null;
-  };
-};
-
-type EnumFieldInputTypes = {
-  User: {
-    role: 'user' | 'admin';
-    status: 'active' | 'inactive' | null;
-  };
-};
-
 type EnumTypeMaps = TypeMaps<
   EnumCodecTypes,
   Record<string, never>,
-  EnumFieldOutputTypes,
-  EnumFieldInputTypes
+  Record<string, never>,
+  Record<string, never>
 >;
 
 type EnumContractBase = Contract<
   {
     storageHash: StorageHashBase<string>;
     namespaces: {
-      readonly __unbound__: {
-        id: '__unbound__';
+      readonly public: {
+        id: 'public';
         kind: 'sql-namespace';
         entries: {
           readonly table: {
             readonly User: {
               columns: {
-                readonly role: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-                readonly status: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: true };
+                readonly role: {
+                  nativeType: 'text';
+                  codecId: 'pg/text@1';
+                  nullable: false;
+                  valueSet: {
+                    plane: 'storage';
+                    entityKind: 'valueSet';
+                    namespaceId: 'public';
+                    entityName: 'Role';
+                  };
+                };
+                readonly status: {
+                  nativeType: 'text';
+                  codecId: 'pg/text@1';
+                  nullable: true;
+                  valueSet: {
+                    plane: 'storage';
+                    entityKind: 'valueSet';
+                    namespaceId: 'public';
+                    entityName: 'Status';
+                  };
+                };
               };
               primaryKey: { columns: ['role'] };
               uniques: readonly [];
               indexes: readonly [];
               foreignKeys: readonly [];
+            };
+          };
+          readonly valueSet: {
+            readonly Role: {
+              readonly kind: 'valueSet';
+              readonly values: readonly ['user', 'admin'];
+            };
+            readonly Status: {
+              readonly kind: 'valueSet';
+              readonly values: readonly ['active', 'inactive'];
             };
           };
         };
@@ -92,10 +113,10 @@ type EnumContract = ContractWithTypeMaps<EnumContractBase, EnumTypeMaps> & {
 type EnumDb = Db<EnumContract>;
 
 // ---------------------------------------------------------------------------
-// The sql-builder's resolvedColumnOutputTypes uses FieldOutputTypes
+// The sql-builder's resolvedColumnOutputTypes follows the column's valueSet ref
 // ---------------------------------------------------------------------------
 
-test('sql-builder: column output types for enum fields come from FieldOutputTypes', () => {
+test('sql-builder: column output types for enum fields come from the storage valueSet ref', () => {
   type QC = import('../src/types/table-proxy').ContractToQC<EnumContract, 'User'>;
   type RoleOutput = QC['resolvedColumnOutputTypes']['role'];
   type StatusOutput = QC['resolvedColumnOutputTypes']['status'];
@@ -105,13 +126,13 @@ test('sql-builder: column output types for enum fields come from FieldOutputType
 });
 
 // ---------------------------------------------------------------------------
-// Write input: insert() uses FieldInputTypes
+// Write input: insert() follows the column's valueSet ref
 // ---------------------------------------------------------------------------
 
 test('sql-builder insert: non-nullable enum field rejects out-of-union literal', () => {
   const db = null as unknown as EnumDb;
 
-  db.__unbound__.User.insert([
+  db.public.User.insert([
     {
       // @ts-expect-error 'nope' is not in the 'user' | 'admin' union
       role: 'nope',
@@ -122,8 +143,8 @@ test('sql-builder insert: non-nullable enum field rejects out-of-union literal',
 test('sql-builder insert: in-union literal is accepted', () => {
   const db = null as unknown as EnumDb;
 
-  db.__unbound__.User.insert([{ role: 'user' }]);
-  db.__unbound__.User.insert([{ role: 'admin' }]);
-  db.__unbound__.User.insert([{ role: 'user', status: 'active' }]);
-  db.__unbound__.User.insert([{ role: 'user', status: null }]);
+  db.public.User.insert([{ role: 'user' }]);
+  db.public.User.insert([{ role: 'admin' }]);
+  db.public.User.insert([{ role: 'user', status: 'active' }]);
+  db.public.User.insert([{ role: 'user', status: null }]);
 });

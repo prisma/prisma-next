@@ -4,6 +4,6 @@
   "compilerOptions": {
     "rootDir": "."
   },
-  "include": ["src", "test/**/*.test.ts", "*.config.*", "package.json"],
+  "include": ["src", "test/**/*.test.ts", "test/**/*.test-d.ts", "*.config.*", "package.json"],
   "exclude": ["dist", "dist-tsc", "dist-tsc-prod", "node_modules"]
 }

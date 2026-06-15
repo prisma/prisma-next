@@ -126,6 +126,69 @@ export type OperationsForTypeId<TypeId extends string, Operations extends Operat
       ? Operations[TypeId]
       : Record<string, never>;
 
+/**
+ * The domain field object for `model.field`, read off the model-definitions
+ * union. Carries the field's `valueSet` ref (the domain-plane ref the emitter
+ * renders) when the field is enum-backed.
+ */
+type DomainFieldOf<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> =
+  ContractModelDefinitions<TContract> extends infer Models
+    ? ModelName extends keyof Models
+      ? Models[ModelName] extends { readonly fields: infer Fields }
+        ? FieldName extends keyof Fields
+          ? Fields[FieldName]
+          : never
+        : never
+      : never
+    : never;
+
+/**
+ * Resolves a domain field's own `valueSet` ref to the value union of the
+ * referenced domain enum, or `never` when the field carries no ref or the ref
+ * does not resolve. Intra-plane: a domain field references a domain enum,
+ * indexed off `domain.namespaces[ns].enum[name].members[*].value`. No storage
+ * reach.
+ */
+type DomainFieldValueSetUnion<TContract extends Contract<SqlStorage>, TField> = TField extends {
+  readonly valueSet: {
+    readonly namespaceId: infer NsId extends string;
+    readonly entityName: infer Name extends string;
+  };
+}
+  ? NsId extends keyof TContract['domain']['namespaces']
+    ? TContract['domain']['namespaces'][NsId] extends { readonly enum: infer Enums }
+      ? Name extends keyof Enums
+        ? Enums[Name] extends { readonly members: infer Members extends readonly unknown[] }
+          ? Members[number] extends { readonly value: infer V }
+            ? V
+            : never
+          : never
+        : never
+      : never
+    : never
+  : never;
+
+/**
+ * The non-enum field output for `model.field`, read from the still-baked
+ * `FieldOutputTypes` map. The map continues to carry the value-object,
+ * parameterized-codec, union, and plain-codec narrowings (only the enum
+ * narrowing moved to ref-following), so a non-enum field falls back here rather
+ * than to the raw codec output. `never` when the field is absent from the map.
+ */
+type BakedFieldOutput<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = ModelName extends keyof ExtractFieldOutputTypes<TContract>
+  ? FieldName extends keyof ExtractFieldOutputTypes<TContract>[ModelName]
+    ? ExtractFieldOutputTypes<TContract>[ModelName][FieldName]
+    : never
+  : never;
+
 export type ComputeColumnJsType<
   TContract extends Contract<SqlStorage>,
   TableName extends string,
@@ -141,10 +204,15 @@ export type ComputeColumnJsType<
           ? [FieldName] extends [never]
             ? FallbackCodecLookup<ColumnMeta, CodecTypes>
             : FieldName extends string
-              ? ModelName extends keyof ExtractFieldOutputTypes<TContract>
-                ? FieldName extends keyof ExtractFieldOutputTypes<TContract>[ModelName]
-                  ? ExtractFieldOutputTypes<TContract>[ModelName][FieldName]
-                  : never
+              ? DomainFieldValueSetUnion<
+                  TContract,
+                  DomainFieldOf<TContract, ModelName, FieldName>
+                > extends infer Union
+                ? [Union] extends [never]
+                  ? BakedFieldOutput<TContract, ModelName, FieldName>
+                  : ColumnMeta extends { nullable: true }
+                    ? Union | null
+                    : Union
                 : never
               : never
           : never
