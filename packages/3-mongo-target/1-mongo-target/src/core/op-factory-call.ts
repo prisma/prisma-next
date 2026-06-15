@@ -35,6 +35,8 @@ import type {
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
+import { blindCast } from '@prisma-next/utils/casts';
+import type { CollationOptions } from 'mongodb';
 import {
   collMod,
   createCollection,
@@ -217,7 +219,11 @@ export function schemaIndexToCreateIndexOptions(index: MongoSchemaIndex): Create
     expireAfterSeconds: index.expireAfterSeconds,
     partialFilterExpression: index.partialFilterExpression,
     wildcardProjection: index.wildcardProjection,
-    collation: index.collation,
+    collation: index.collation
+      ? blindCast<CollationOptions, 'collation from mongodb introspection has locale'>(
+          index.collation,
+        )
+      : undefined,
     weights: index.weights,
     default_language: index.default_language,
     language_override: index.language_override,
@@ -235,7 +241,11 @@ export function schemaCollectionToCreateCollectionOptions(
     size: opts?.capped?.size,
     max: opts?.capped?.max,
     timeseries: opts?.timeseries,
-    collation: opts?.collation,
+    collation: opts?.collation
+      ? blindCast<CollationOptions, 'collation from mongodb introspection has locale'>(
+          opts.collation,
+        )
+      : undefined,
     clusteredIndex: opts?.clusteredIndex
       ? {
           key: { _id: 1 } as Record<string, number>,

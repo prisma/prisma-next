@@ -2,6 +2,7 @@ import type {
   CollModOptions,
   CreateCollectionOptions,
   CreateIndexOptions,
+  MongoIndexKeyDirection,
 } from '@prisma-next/mongo-query-ast/control';
 import type { Document, RawPipeline } from '@prisma-next/mongo-value';
 import type { DefinedProps } from '@prisma-next/utils/defined';
@@ -170,12 +171,12 @@ export class CreateCollectionWireCommand extends MongoWireCommand {
 
 export class CreateIndexWireCommand extends MongoWireCommand {
   readonly kind = 'createIndex' as const;
-  readonly key: Record<string, number | string>;
+  readonly key: Record<string, MongoIndexKeyDirection>;
   readonly options: DefinedProps<CreateIndexOptions>;
 
   constructor(
     collection: string,
-    key: Record<string, number | string>,
+    key: Record<string, MongoIndexKeyDirection>,
     options: DefinedProps<CreateIndexOptions>,
   ) {
     super(collection);

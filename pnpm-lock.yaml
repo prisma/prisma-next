@@ -2160,6 +2160,9 @@ importers:
       '@prisma-next/mongo-value':
         specifier: workspace:0.13.0
         version: link:../../1-foundation/mongo-value
+      mongodb:
+        specifier: 'catalog:'
+        version: 7.2.0(socks@2.8.9)
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:0.13.0

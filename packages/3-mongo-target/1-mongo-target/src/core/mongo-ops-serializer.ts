@@ -46,7 +46,9 @@ import {
   RawUpdateManyCommand,
   RawUpdateOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { CollationOptions } from 'mongodb';
 import { type } from 'arktype';
 
 const IndexKeyDirection = type('1 | -1 | "text" | "2dsphere" | "2d" | "hashed"');
@@ -498,7 +500,14 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
           'wildcardProjection',
           data.wildcardProjection as Record<string, 0 | 1> | undefined,
         ),
-        ...ifDefined('collation', data.collation),
+        ...ifDefined(
+          'collation',
+          data.collation
+            ? blindCast<CollationOptions, 'collation from serialized ops has locale'>(
+                data.collation,
+              )
+            : undefined,
+        ),
         ...ifDefined('weights', data.weights as Record<string, number> | undefined),
         ...ifDefined('default_language', data.default_language),
         ...ifDefined('language_override', data.language_override),
@@ -518,7 +527,9 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
         size: data.size,
         max: data.max,
         timeseries: data.timeseries as CreateCollectionCommand['timeseries'],
-        collation: data.collation,
+        collation: data.collation
+          ? blindCast<CollationOptions, 'collation from serialized ops has locale'>(data.collation)
+          : undefined,
         changeStreamPreAndPostImages: data.changeStreamPreAndPostImages as
           | { enabled: boolean }
           | undefined,

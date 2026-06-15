@@ -1,4 +1,5 @@
 import type { MongoIndexKey } from '@prisma-next/mongo-contract';
+import type { CollationOptions } from 'mongodb';
 import { MongoAstNode } from './ast-node';
 import type { MongoDdlCommandVisitor } from './ddl-visitors';
 
@@ -9,7 +10,7 @@ export interface CreateIndexOptions {
   readonly partialFilterExpression?: Record<string, unknown> | undefined;
   readonly name?: string | undefined;
   readonly wildcardProjection?: Record<string, 0 | 1> | undefined;
-  readonly collation?: Record<string, unknown> | undefined;
+  readonly collation?: CollationOptions | undefined;
   readonly weights?: Record<string, number> | undefined;
   readonly default_language?: string | undefined;
   readonly language_override?: string | undefined;
@@ -25,7 +26,7 @@ export class CreateIndexCommand extends MongoAstNode {
   readonly partialFilterExpression: Record<string, unknown> | undefined;
   readonly name: string | undefined;
   readonly wildcardProjection: Record<string, 0 | 1> | undefined;
-  readonly collation: Record<string, unknown> | undefined;
+  readonly collation: CollationOptions | undefined;
   readonly weights: Record<string, number> | undefined;
   readonly default_language: string | undefined;
   readonly language_override: string | undefined;
@@ -102,7 +103,7 @@ export interface CreateCollectionOptions {
         granularity?: 'seconds' | 'minutes' | 'hours';
       }
     | undefined;
-  readonly collation?: Record<string, unknown> | undefined;
+  readonly collation?: CollationOptions | undefined;
   readonly changeStreamPreAndPostImages?: { enabled: boolean } | undefined;
   readonly clusteredIndex?:
     | {
@@ -129,7 +130,7 @@ export class CreateCollectionCommand extends MongoAstNode {
         granularity?: 'seconds' | 'minutes' | 'hours';
       }
     | undefined;
-  readonly collation: Record<string, unknown> | undefined;
+  readonly collation: CollationOptions | undefined;
   readonly changeStreamPreAndPostImages: { enabled: boolean } | undefined;
   readonly clusteredIndex:
     | {
