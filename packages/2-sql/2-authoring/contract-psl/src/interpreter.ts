@@ -2398,7 +2398,16 @@ export function interpretPslDocumentToSqlContract(
   // by the one-string rule — so they merge directly into entries without
   // translation. The enumTypes argument is not forwarded: the interpreter-level
   // override doesn't take it (enum types reach the target via namespaceTypes).
-  const innerCreateNamespace = input.createNamespace;
+  //
+  // Fall back to the target pack's authoring.createNamespace when the caller
+  // does not supply one explicitly — the Postgres target pack contributes it so
+  // the generic PSL provider path works without requiring every call site to
+  // re-specify the factory.
+  const targetCreateNamespace = blindCast<
+    { readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace } | undefined,
+    'target pack may carry createNamespace on its authoring object'
+  >(input.target.authoring)?.createNamespace;
+  const innerCreateNamespace = input.createNamespace ?? targetCreateNamespace;
   const createNamespaceWithExtensions =
     innerCreateNamespace !== undefined
       ? (nsInput: SqlNamespaceTablesInput) => {

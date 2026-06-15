@@ -88,6 +88,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           schema,
           sourceId: schemaPath,
           pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
+          codecLookup: context.codecLookup,
         });
 
         const scalarTypeDescriptors = buildColumnDescriptorMap(
