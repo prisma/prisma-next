@@ -3,7 +3,7 @@ import type { Type } from 'arktype';
 
 export interface EntityKindDescriptor<Input, Node> {
   readonly kind: string;
-  readonly schema: Type<Input>;
+  readonly schema: Type<unknown>;
   readonly construct: (input: Input) => Node;
 }
 
