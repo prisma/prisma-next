@@ -4,11 +4,12 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import { blindCast, castAs } from '@prisma-next/utils/casts';
-import type { SqlNamespace, SqlNamespaceTablesInput } from './sql-storage';
+import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
+import type { SqlNamespace, SqlNamespaceEntries, SqlNamespaceTablesInput } from './sql-storage';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
-import { StorageTable } from './storage-table';
-import { StorageValueSet } from './storage-value-set';
+import { StorageTable, type StorageTableInput } from './storage-table';
+import { StorageValueSet, type StorageValueSetInput } from './storage-value-set';
 
 const SQL_NAMESPACE_KIND = 'sql-namespace' as const;
 
@@ -27,39 +28,63 @@ class SqlBoundNamespace extends NamespaceBase {
   declare readonly kind: string;
 
   readonly id: string;
-  readonly entries: Readonly<{
-    readonly table: Readonly<Record<string, StorageTable>>;
-    readonly valueSet?: Readonly<Record<string, StorageValueSet>>;
-  }>;
+  readonly entries: SqlNamespaceEntries;
 
   static fromTablesInput(input: SqlNamespaceTablesInput): SqlNamespace {
-    const tableCount = Object.keys(input.entries.table).length;
-    const hasValueSets =
-      input.entries.valueSet !== undefined && Object.keys(input.entries.valueSet).length > 0;
-    if (input.id === UNBOUND_NAMESPACE_ID && tableCount === 0 && !hasValueSets) {
-      return castAs<SqlNamespace>(SqlUnboundNamespace.instance);
+    const tableKind = input.entries['table'];
+    const tableCount = tableKind !== undefined ? Object.keys(tableKind).length : 0;
+    const valueSetKind = input.entries['valueSet'];
+    const hasValueSets = valueSetKind !== undefined && Object.keys(valueSetKind).length > 0;
+    const hasUnknownKinds = Object.keys(input.entries).some(
+      (kind) => kind !== 'table' && kind !== 'valueSet',
+    );
+    if (
+      input.id === UNBOUND_NAMESPACE_ID &&
+      tableCount === 0 &&
+      !hasValueSets &&
+      !hasUnknownKinds
+    ) {
+      return SqlUnboundNamespace.instance;
     }
-    return castAs<SqlNamespace>(new SqlBoundNamespace(input));
+    return new SqlBoundNamespace(input);
   }
 
   private constructor(input: SqlNamespaceTablesInput) {
     super();
     this.id = input.id;
-    const table = Object.freeze(
-      Object.fromEntries(
-        Object.entries(input.entries.table).map(([k, v]) => [k, new StorageTable(v)]),
-      ),
-    );
-    if (input.entries.valueSet !== undefined) {
-      const valueSet = Object.freeze(
-        Object.fromEntries(
-          Object.entries(input.entries.valueSet).map(([k, v]) => [k, new StorageValueSet(v)]),
-        ),
-      );
-      this.entries = Object.freeze({ table, valueSet });
-    } else {
-      this.entries = Object.freeze({ table });
+
+    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
+    let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
+    let valueSet: Readonly<Record<string, StorageValueSet>> | undefined;
+    for (const [kind, rawMap] of Object.entries(input.entries)) {
+      if (kind === 'table') {
+        const tableMap: Record<string, StorageTable> = {};
+        for (const [name, v] of Object.entries(
+          blindCast<
+            Record<string, StorageTableInput>,
+            'entries[table] holds StorageTableInput by construction'
+          >(rawMap),
+        )) {
+          tableMap[name] = new StorageTable(v);
+        }
+        table = Object.freeze(tableMap);
+      } else if (kind === 'valueSet') {
+        const vsMap: Record<string, StorageValueSet> = {};
+        for (const [name, v] of Object.entries(
+          blindCast<
+            Record<string, StorageValueSetInput>,
+            'entries[valueSet] holds StorageValueSetInput by construction'
+          >(rawMap),
+        )) {
+          vsMap[name] = new StorageValueSet(v);
+        }
+        valueSet = Object.freeze(vsMap);
+      } else {
+        carried[kind] = Object.freeze(rawMap);
+      }
     }
+
+    this.entries = Object.freeze({ ...carried, table, ...ifDefined('valueSet', valueSet) });
     Object.defineProperty(this, 'kind', {
       value: SQL_NAMESPACE_KIND,
       writable: false,
@@ -67,6 +92,14 @@ class SqlBoundNamespace extends NamespaceBase {
       configurable: true,
     });
     freezeNode(this);
+  }
+
+  get table(): Readonly<Record<string, StorageTable>> {
+    return this.entries.table ?? Object.freeze({});
+  }
+
+  get valueSet(): Readonly<Record<string, StorageValueSet>> | undefined {
+    return this.entries.valueSet;
   }
 
   qualifyTable(tableName: string): string {
@@ -88,10 +121,7 @@ export function buildSqlNamespaceMap(
     Object.entries(namespaces).map(([nsKey, ns]) => [
       nsKey,
       isMaterializedSqlNamespace(ns)
-        ? blindCast<
-            SqlNamespace,
-            'a materialised SQL-family namespace entry in a namespace map is a SqlNamespace'
-          >(ns)
+        ? ns
         : SqlBoundNamespace.fromTablesInput(
             blindCast<
               SqlNamespaceTablesInput,

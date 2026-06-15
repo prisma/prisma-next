@@ -9,6 +9,11 @@ import type { AuthoringFieldNamespace } from '@prisma-next/framework-components/
  * (`character`) regardless of target, and the PSL interpreter lets the
  * generator override the scalar descriptor.
  *
+ * The `uuidString` / `id.uuidv4String` / `id.uuidv7String` presets store UUID
+ * values as `character(36)` — portable across all SQL targets. For a native
+ * Postgres `uuid` column use `uuidNative` / `id.uuidv4Native` /
+ * `id.uuidv7Native` from `@prisma-next/target-postgres`.
+ *
  * Scalar presets that map to target-specific codecs (e.g. `text`, `int`,
  * `boolean`, `dateTime`) are contributed by the target pack (see
  * `postgresAuthoringFieldPresets` in `@prisma-next/target-postgres`) so the
@@ -34,7 +39,7 @@ const nanoidOptionsArgument = {
 } as const;
 
 export const sqlFamilyAuthoringFieldPresets = {
-  uuid: {
+  uuidString: {
     kind: 'fieldPreset',
     output: {
       codecId: CHARACTER_CODEC_ID,
@@ -91,7 +96,7 @@ export const sqlFamilyAuthoringFieldPresets = {
     },
   },
   id: {
-    uuidv4: {
+    uuidv4String: {
       kind: 'fieldPreset',
       output: {
         codecId: CHARACTER_CODEC_ID,
@@ -108,7 +113,7 @@ export const sqlFamilyAuthoringFieldPresets = {
         id: true,
       },
     },
-    uuidv7: {
+    uuidv7String: {
       kind: 'fieldPreset',
       output: {
         codecId: CHARACTER_CODEC_ID,

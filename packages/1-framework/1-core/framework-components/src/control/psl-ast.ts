@@ -7,6 +7,9 @@ export type {
   PslBlockParamValue,
   PslDiagnosticCode,
   PslExtensionBlock,
+  PslExtensionBlockAttribute,
+  PslExtensionBlockAttributeArg,
+  PslExtensionBlockParamBare,
   PslExtensionBlockParamList,
   PslExtensionBlockParamOption,
   PslExtensionBlockParamRef,
@@ -391,7 +394,7 @@ export const BUILTIN_PSL_KIND_KEYS: ReadonlySet<string> = new Set([
  * Returns all extension-contributed blocks in the given namespace, in
  * insertion order (the order the parser encountered them in the source).
  *
- * Reads from `namespace.entries`, skipping the three built-in kind keys
+ * Reads from `namespace.entries`, skipping the built-in kind keys
  * (`'model'`, `'enum'`, `'compositeType'`). All remaining kind maps contain
  * only `PslExtensionBlock` nodes by construction (see `makePslNamespaceEntries`).
  */

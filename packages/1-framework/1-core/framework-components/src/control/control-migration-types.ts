@@ -75,24 +75,6 @@ export interface MigrationMetadata {
  */
 export type MigrationOperationClass = 'additive' | 'widening' | 'destructive' | 'data';
 
-// ============================================================================
-// Serialized Query Plan
-// ============================================================================
-
-/**
- * A lowered query statement as stored in ops.json.
- * Contains the SQL string and parameter values — ready for execution.
- * Lowering from query builder AST to SQL happens at verify time.
- *
- * The Postgres `dataTransform` factory uses this shape internally to
- * carry the user's lowered `check`/`run` plans before wrapping them
- * into precheck/execute/postcheck steps on the unified migration op.
- */
-export interface SerializedQueryPlan {
-  readonly sql: string;
-  readonly params: readonly unknown[];
-}
-
 /**
  * Policy defining which operation classes are allowed during a migration.
  */
@@ -185,9 +167,10 @@ export interface OpFactoryCall {
    * Lower this call to a runtime migration plan operation suitable for
    * execution / inclusion in `ops.json`. Concrete implementations narrow
    * the return type via covariant return (e.g. SQL targets return
-   * `SqlMigrationPlanOperation<TTargetDetails>`).
+   * `SqlMigrationPlanOperation<TTargetDetails>`). May return a Promise when
+   * the lowering requires async codec resolution (e.g. DDL with literal defaults).
    */
-  toOp(): MigrationPlanOperation;
+  toOp(): MigrationPlanOperation | Promise<MigrationPlanOperation>;
 }
 
 // ============================================================================
@@ -223,8 +206,8 @@ export interface MigrationPlan {
     readonly storageHash: string;
     readonly profileHash?: string;
   };
-  /** Ordered list of operations to execute. */
-  readonly operations: readonly MigrationPlanOperation[];
+  /** Ordered list of operations to execute. May contain Promises for ops that require async codec resolution. */
+  readonly operations: readonly (MigrationPlanOperation | Promise<MigrationPlanOperation>)[];
   /**
    * Sorted, deduplicated invariant ids declared by this plan's data-transform
    * ops. Authored migrations carry the canonical value from

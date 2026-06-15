@@ -6,12 +6,12 @@ import {
 import {
   asNamespaceId,
   type ColumnDefault,
-  type ColumnDefaultLiteralInputValue,
   type Contract,
   type ContractEnum,
   type ContractField,
   type ContractModel,
   type ContractRelation,
+  type ContractRelationThrough,
   type ContractValueObject,
   type CrossReference,
   coreHash,
@@ -41,7 +41,6 @@ import {
   SqlStorage,
   type SqlStorageInput,
   type StorageColumn,
-  StorageTable,
   type StorageTableInput,
   type StorageTypeInstance,
   type StorageValueSetInput,
@@ -54,6 +53,7 @@ import type {
   ContractDefinition,
   FieldNode,
   ModelNode,
+  RelationNode,
   ValueObjectFieldNode,
 } from './contract-definition';
 
@@ -61,16 +61,15 @@ type DomainFieldRef =
   | { readonly kind: 'scalar'; readonly many?: boolean }
   | { readonly kind: 'valueObject'; readonly name: string; readonly many?: boolean };
 
-function encodeDefaultLiteralValue(
-  value: ColumnDefaultLiteralInputValue,
-  codecId: string,
-  codecLookup?: CodecLookup,
-): JsonValue {
+function encodeViaCodec(value: unknown, codecId: string, codecLookup?: CodecLookup): JsonValue {
   const codec = codecLookup?.get(codecId);
   if (codec) {
     return codec.encodeJson(value);
   }
-  return value as JsonValue;
+  return blindCast<
+    JsonValue,
+    'no codec lookup at build time: literal/enum member value is already JSON-safe'
+  >(value);
 }
 
 function encodeColumnDefault(
@@ -83,7 +82,7 @@ function encodeColumnDefault(
   }
   return {
     kind: 'literal',
-    value: encodeDefaultLiteralValue(defaultInput.value, codecId, codecLookup),
+    value: encodeViaCodec(defaultInput.value, codecId, codecLookup),
   };
 }
 
@@ -122,14 +121,23 @@ function assertStorageSemantics(
 
 function assertKnownTargetModel(
   modelsByName: ReadonlyMap<string, ModelNode>,
+  modelsByCoordinate: ReadonlyMap<string, ModelNode>,
   sourceModelName: string,
   targetModelName: string,
+  targetNamespaceId: string | undefined,
   context: string,
 ): ModelNode {
-  const targetModel = modelsByName.get(targetModelName);
+  const targetModel =
+    targetNamespaceId !== undefined && targetNamespaceId.length > 0
+      ? modelsByCoordinate.get(`${targetNamespaceId}:${targetModelName}`)
+      : modelsByName.get(targetModelName);
   if (!targetModel) {
+    const qualified =
+      targetNamespaceId !== undefined && targetNamespaceId.length > 0
+        ? `${targetNamespaceId}.${targetModelName}`
+        : targetModelName;
     throw new Error(
-      `${context} on model "${sourceModelName}" references unknown model "${targetModelName}"`,
+      `${context} on model "${sourceModelName}" references unknown model "${qualified}"`,
     );
   }
   return targetModel;
@@ -166,6 +174,43 @@ function resolveModelNamespaceId(
     return model.namespaceId;
   }
   return modelNameToNamespaceId.get(model.modelName) ?? defaultNamespaceId;
+}
+
+function buildThroughDescriptor(
+  through: NonNullable<RelationNode['through']>,
+  tableNamespaceByName: ReadonlyMap<string, string>,
+  targetModel: ModelNode,
+  modelName: string,
+  fieldName: string,
+): ContractRelationThrough {
+  const namespaceId = tableNamespaceByName.get(through.table);
+  if (namespaceId === undefined) {
+    throw new Error(
+      `buildSqlContractFromDefinition: junction table "${through.table}" for relation "${modelName}.${fieldName}" is not a declared model.`,
+    );
+  }
+
+  return {
+    table: through.table,
+    namespaceId,
+    parentColumns: through.parentColumns,
+    childColumns: through.childColumns,
+    targetColumns: targetColumnsForJunction(targetModel, fieldName),
+  };
+}
+
+function targetColumnsForJunction(targetModel: ModelNode, fieldName: string): readonly string[] {
+  const primaryKeyColumns = targetModel.id?.columns;
+  if (primaryKeyColumns && primaryKeyColumns.length > 0) {
+    return primaryKeyColumns;
+  }
+  const firstUnique = targetModel.uniques?.find((u) => u.columns.length > 0);
+  if (firstUnique) {
+    return firstUnique.columns;
+  }
+  throw new Error(
+    `M:N target model "${targetModel.modelName}" (relation field "${fieldName}") has no primary id or unique key to derive junction targetColumns.`,
+  );
 }
 
 function buildStorageColumn(
@@ -330,14 +375,28 @@ export function buildSqlContractFromDefinition(
   const target = definition.target.targetId;
   const defaultNamespaceId = definition.target.defaultNamespaceId;
   const targetFamily = 'sql';
+  const resolveNamespaceId = (m: ModelNode): string =>
+    m.namespaceId !== undefined && m.namespaceId.length > 0 ? m.namespaceId : defaultNamespaceId;
   const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));
+  const tableNamespaceByName = new Map(
+    definition.models.map((m) => [
+      m.tableName,
+      m.namespaceId !== undefined && m.namespaceId.length > 0 ? m.namespaceId : defaultNamespaceId,
+    ]),
+  );
+  const modelsByCoordinate = new Map(
+    definition.models.map((m) => [`${resolveNamespaceId(m)}:${m.modelName}`, m]),
+  );
 
-  const tablesByNamespace: Record<string, Record<string, StorageTable>> = {};
-  const tableNameToNamespaceId = new Map<string, string>();
+  const tablesByNamespace: Record<string, Record<string, StorageTableInput>> = {};
   const modelNameToNamespaceId = new Map<string, string>();
   const executionDefaults: ExecutionMutationDefault[] = [];
   const modelsByNamespace: Record<string, Record<string, ContractModel>> = {};
-  const roots: Record<string, CrossReference> = {};
+  const rootEntries: Array<{
+    readonly tableName: string;
+    readonly namespaceId: string;
+    readonly ref: CrossReference;
+  }> = [];
 
   for (const semanticModel of definition.models) {
     const tableName = semanticModel.tableName;
@@ -349,7 +408,11 @@ export function buildSqlContractFromDefinition(
     // STI variants share the base table; the base model already owns this
     // table name and its root, so the variant contributes neither.
     if (!semanticModel.sharesBaseTable) {
-      roots[tableName] = crossRef(semanticModel.modelName, namespaceId);
+      rootEntries.push({
+        tableName,
+        namespaceId,
+        ref: crossRef(semanticModel.modelName, namespaceId),
+      });
     }
 
     // --- Build storage table ---
@@ -385,9 +448,9 @@ export function buildSqlContractFromDefinition(
         enumHandle !== undefined
           ? {
               plane: 'storage',
-              entityKind: 'value-set',
+              entityKind: 'valueSet',
               namespaceId: defaultNamespaceId,
-              name: enumHandle.enumName,
+              entityName: enumHandle.enumName,
             }
           : undefined;
       const domainValueSetRef: ValueSetRef | undefined =
@@ -396,7 +459,7 @@ export function buildSqlContractFromDefinition(
               plane: 'domain',
               entityKind: 'enum',
               namespaceId: defaultNamespaceId,
-              name: enumHandle.enumName,
+              entityName: enumHandle.enumName,
             }
           : undefined;
 
@@ -453,8 +516,10 @@ export function buildSqlContractFromDefinition(
 
       const targetModel = assertKnownTargetModel(
         modelsByName,
+        modelsByCoordinate,
         semanticModel.modelName,
         fk.references.model,
+        fk.references.namespaceId,
         'Foreign key',
       );
       assertTargetTableMatches(
@@ -492,14 +557,6 @@ export function buildSqlContractFromDefinition(
     // materialised onto the base `ModelNode`, so the variant builds a domain
     // model (below) but no storage table of its own.
     if (!semanticModel.sharesBaseTable) {
-      const existingNs = tableNameToNamespaceId.get(tableName);
-      if (existingNs !== undefined && existingNs !== namespaceId) {
-        throw new Error(
-          `buildSqlContractFromDefinition: table "${tableName}" is mapped in namespace "${namespaceId}" but already exists in namespace "${existingNs}".`,
-        );
-      }
-      tableNameToNamespaceId.set(tableName, namespaceId);
-
       const checksForTable: CheckConstraintInput[] = Object.entries(columns).flatMap(
         ([columnName, col]) => {
           const valueSet = col.valueSet;
@@ -544,7 +601,7 @@ export function buildSqlContractFromDefinition(
           `buildSqlContractFromDefinition: duplicate table "${tableName}" in namespace "${namespaceId}".`,
         );
       }
-      nsTables[tableName] = new StorageTable(tableInput);
+      nsTables[tableName] = tableInput;
     }
 
     // --- Build contract model ---
@@ -579,45 +636,50 @@ export function buildSqlContractFromDefinition(
 
       const targetModel = assertKnownTargetModel(
         modelsByName,
+        modelsByCoordinate,
         semanticModel.modelName,
         relation.toModel,
+        relation.toNamespaceId,
         'Relation',
       );
       assertTargetTableMatches(semanticModel.modelName, targetModel, relation.toTable, 'Relation');
-
-      if (relation.cardinality === 'N:M' && !relation.through) {
-        throw new Error(
-          `Relation "${semanticModel.modelName}.${relation.fieldName}" with cardinality "N:M" requires through metadata`,
-        );
-      }
 
       const targetColumnToField = new Map(
         targetModel.fields.map((f) => [f.columnName, f.fieldName]),
       );
 
-      modelRelations[relation.fieldName] = {
-        to: crossRef(
-          relation.toModel,
-          resolveModelNamespaceId(targetModel, modelNameToNamespaceId, defaultNamespaceId),
-        ),
-        // RelationDefinition.cardinality includes 'N:M' which isn't in
-        // ContractReferenceRelation yet — cast is needed until the contract
-        // type is extended to cover many-to-many.
-        cardinality: relation.cardinality as ContractRelation['cardinality'],
-        on: {
-          localFields: relation.on.parentColumns.map((col) => columnToField.get(col) ?? col),
-          targetFields: relation.on.childColumns.map((col) => targetColumnToField.get(col) ?? col),
-        },
-        ...(relation.through
-          ? {
-              through: {
-                table: relation.through.table,
-                parentCols: relation.through.parentColumns,
-                childCols: relation.through.childColumns,
-              },
-            }
-          : undefined),
+      const to = crossRef(
+        relation.toModel,
+        relation.toNamespaceId !== undefined && relation.toNamespaceId.length > 0
+          ? relation.toNamespaceId
+          : resolveModelNamespaceId(targetModel, modelNameToNamespaceId, defaultNamespaceId),
+      );
+      const on = {
+        localFields: relation.on.parentColumns.map((col) => columnToField.get(col) ?? col),
+        targetFields: relation.on.childColumns.map((col) => targetColumnToField.get(col) ?? col),
       };
+
+      if (relation.cardinality === 'N:M') {
+        if (!relation.through) {
+          throw new Error(
+            `Relation "${semanticModel.modelName}.${relation.fieldName}" with cardinality "N:M" requires through metadata`,
+          );
+        }
+        modelRelations[relation.fieldName] = {
+          to,
+          cardinality: 'N:M',
+          on,
+          through: buildThroughDescriptor(
+            relation.through,
+            tableNamespaceByName,
+            targetModel,
+            semanticModel.modelName,
+            relation.fieldName,
+          ),
+        };
+      } else {
+        modelRelations[relation.fieldName] = { to, cardinality: relation.cardinality, on };
+      }
     }
 
     let namespaceModels = modelsByNamespace[namespaceId];
@@ -637,6 +699,24 @@ export function buildSqlContractFromDefinition(
   }
 
   // --- Assemble contract ---
+
+  // Aggregate roots are keyed by bare storage table name. When two models in
+  // different namespaces map to the same bare table name, the bare key would
+  // collide (last write wins, silently dropping a root), so those entries fall
+  // back to a namespace-qualified key. Single-namespace contracts never
+  // collide and keep their bare keys unchanged.
+  const rootTableNameCounts = new Map<string, number>();
+  for (const entry of rootEntries) {
+    rootTableNameCounts.set(entry.tableName, (rootTableNameCounts.get(entry.tableName) ?? 0) + 1);
+  }
+  const roots: Record<string, CrossReference> = {};
+  for (const entry of rootEntries) {
+    const key =
+      (rootTableNameCounts.get(entry.tableName) ?? 0) > 1
+        ? `${entry.namespaceId}.${entry.tableName}`
+        : entry.tableName;
+    roots[key] = entry.ref;
+  }
 
   // Normalise raw codec-triple inputs to the `kind: 'codec-instance'`
   // discriminator shape before hashing so the storageHash matches the
@@ -688,7 +768,10 @@ export function buildSqlContractFromDefinition(
     }
     domainSlot[enumName] = {
       codecId: handle.codecId,
-      members: handle.enumMembers,
+      members: handle.enumMembers.map((m) => ({
+        name: m.name,
+        value: encodeViaCodec(m.value, handle.codecId, codecLookup),
+      })),
     };
 
     let storageSlot = storageValueSetsByNs[nsId];
@@ -697,8 +780,8 @@ export function buildSqlContractFromDefinition(
       storageValueSetsByNs[nsId] = storageSlot;
     }
     storageSlot[enumName] = {
-      kind: 'value-set',
-      values: handle.values,
+      kind: 'valueSet',
+      values: handle.values.map((v) => encodeViaCodec(v, handle.codecId, codecLookup)),
     };
   }
 

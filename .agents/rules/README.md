@@ -54,6 +54,7 @@ Rules below are listed by bare filename; the canonical file is `.agents/rules/<n
 - `test-intent-readability.mdc` — Tests must be readable by context (BDD-style grouping)
 - `test-database-limitations.mdc` — Test database limitations and patterns
 - `typed-contract-in-tests.mdc` — Use typed Contract from fixtures in integration tests
+- `no-contract-data-patching-in-tests.mdc` — Never patch raw contract data in tests; use emitted fixtures or a user-facing authoring surface
 - `vitest-expect-typeof.mdc` — Type test patterns
 - `test-mocking-patterns.mdc` — Test-only assertions and mocking patterns
 - `prefer-object-matcher.mdc` — Prefer object matchers over multiple individual expect().toBe() calls

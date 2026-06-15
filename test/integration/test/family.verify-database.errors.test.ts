@@ -5,7 +5,6 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   createControlStack,
   type VerifyDatabaseResult,
@@ -16,6 +15,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
 import postgres from '@prisma-next/target-postgres/control';
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { emit } from '../utils/emit';
@@ -81,7 +81,7 @@ async function emitContract(
   writeFileSync(contractDtsPath, emitResult.contractDts, 'utf-8');
 
   const contractJson = JSON.parse(emitResult.contractJson) as Record<string, unknown>;
-  return new SqlContractSerializer().deserializeContract(contractJson) as Contract<SqlStorage>;
+  return new PostgresContractSerializer().deserializeContract(contractJson) as Contract<SqlStorage>;
 }
 
 /**

@@ -4,9 +4,44 @@ import {
   type DdlTableConstraint,
 } from '@prisma-next/sql-relational-core/ast';
 
+// ---------------------------------------------------------------------------
+// AlterTableAction — nested polymorphic hierarchy
+// ---------------------------------------------------------------------------
+
+export interface AlterTableActionVisitor<R> {
+  addColumn(action: AddColumnAction): R;
+}
+
+export abstract class AlterTableAction {
+  abstract readonly kind: string;
+  abstract accept<R>(visitor: AlterTableActionVisitor<R>): R;
+}
+
+export class AddColumnAction extends AlterTableAction {
+  readonly kind = 'add-column' as const;
+  readonly column: DdlColumn;
+
+  constructor(column: DdlColumn) {
+    super();
+    this.column = column;
+    Object.freeze(this);
+  }
+
+  override accept<R>(visitor: AlterTableActionVisitor<R>): R {
+    return visitor.addColumn(this);
+  }
+}
+
+export type AnyAlterTableAction = AddColumnAction;
+
+// ---------------------------------------------------------------------------
+// Top-level DDL visitor
+// ---------------------------------------------------------------------------
+
 export interface PostgresDdlVisitor<R> {
   createTable(node: PostgresCreateTable): R;
   createSchema(node: PostgresCreateSchema): R;
+  alterTable(node: PostgresAlterTable): R;
 }
 
 export abstract class PostgresDdlNode extends DdlNode {
@@ -69,4 +104,27 @@ export class PostgresCreateSchema extends PostgresDdlNode {
   }
 }
 
-export type AnyPostgresDdlNode = PostgresCreateTable | PostgresCreateSchema;
+export class PostgresAlterTable extends PostgresDdlNode {
+  readonly kind = 'alter-table' as const;
+  readonly table: string;
+  readonly schema: string | undefined;
+  readonly actions: ReadonlyArray<AnyAlterTableAction>;
+
+  constructor(options: {
+    readonly table: string;
+    readonly schema?: string;
+    readonly actions: readonly AnyAlterTableAction[];
+  }) {
+    super();
+    this.table = options.table;
+    this.schema = options.schema;
+    this.actions = Object.freeze([...options.actions]);
+    this.freeze();
+  }
+
+  override accept<R>(visitor: PostgresDdlVisitor<R>): R {
+    return visitor.alterTable(this);
+  }
+}
+
+export type AnyPostgresDdlNode = PostgresCreateTable | PostgresCreateSchema | PostgresAlterTable;

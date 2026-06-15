@@ -22,7 +22,7 @@ describe('end-to-end prepared statements (Postgres)', () => {
         ]);
 
         const ps = await runtime.prepare({ email: 'sql/varchar@1' }, (params) =>
-          db.user
+          db.public.user
             .select('id', 'email')
             .where((f, fns) => fns.eq(f.email, params.email))
             .limit(1)
@@ -49,7 +49,7 @@ describe('end-to-end prepared statements (Postgres)', () => {
     async () => {
       await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
         const ps = await runtime.prepare({ email: 'sql/varchar@1' }, (params) =>
-          db.user
+          db.public.user
             .select('id', 'email')
             .where((f, fns) => fns.eq(f.email, params.email))
             .limit(1)
@@ -57,7 +57,7 @@ describe('end-to-end prepared statements (Postgres)', () => {
         );
 
         const insertedId = await withTransaction(runtime, async (tx) => {
-          await tx.execute(db.user.insert([{ email: 'tx-prepared@example.com' }]).build());
+          await tx.execute(db.public.user.insert([{ email: 'tx-prepared@example.com' }]).build());
           const rows = await ps.execute(tx, { email: 'tx-prepared@example.com' });
           expect(rows).toHaveLength(1);
           return rows[0]!.id;
@@ -83,7 +83,7 @@ describe('end-to-end prepared statements (Postgres)', () => {
         ]);
 
         const ps = await runtime.prepare({ take: 'pg/int4@1', skip: 'pg/int4@1' }, (params) =>
-          db.user
+          db.public.user
             .select('id', 'email')
             .orderBy('id')
             .limit(params.take)
@@ -112,7 +112,7 @@ describe('end-to-end prepared statements (Postgres)', () => {
       await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
         await expect(
           runtime.prepare({ email: 'sql/varchar@1', unused: 'pg/int4@1' }, (params) =>
-            db.user
+            db.public.user
               .select('id', 'email')
               .where((f, fns) => fns.eq(f.email, params.email))
               .limit(1)

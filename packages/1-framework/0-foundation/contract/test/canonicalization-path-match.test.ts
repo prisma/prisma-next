@@ -76,7 +76,6 @@ describe('createPreserveEmptyPredicate', () => {
     ['storage', 'namespaces', '*', 'entries', 'table', '*'],
     ['storage', 'namespaces', '*', 'entries', 'table', '*', ['uniques', 'indexes', 'foreignKeys']],
     ['storage', 'namespaces', '*', 'entries', 'table', '*', 'foreignKeys', ['constraint', 'index']],
-    ['storage', 'types', '*', 'typeParams'],
   ] as const satisfies readonly PathPattern[];
 
   const shouldPreserveEmpty = createPreserveEmptyPredicate(sqlPatterns);
@@ -137,8 +136,8 @@ describe('createPreserveEmptyPredicate', () => {
     ).toBe(true);
   });
 
-  it('preserves storage.types typeParams', () => {
-    expect(shouldPreserveEmpty(['storage', 'types', 'MyType', 'typeParams'])).toBe(true);
+  it('does not preserve storage.types typeParams (no entry in patterns)', () => {
+    expect(shouldPreserveEmpty(['storage', 'types', 'MyType', 'typeParams'])).toBe(false);
   });
 
   it('returns false for unrelated paths', () => {

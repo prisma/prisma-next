@@ -10,7 +10,7 @@ import {
 } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
 import {
   APP_SPACE_ID,
   diffNodes,
@@ -18,6 +18,7 @@ import {
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
+import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type {
   PostgresEnumStorageEntry,
   SqlControlDriverInstance,
@@ -25,10 +26,17 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
+  CodecRef,
+  ContractCodecRegistry,
+  DdlColumn,
   DdlNode,
+  DdlTableConstraint,
+  FunctionColumnDefault,
+  LiteralColumnDefault,
   LoweredStatement,
   LowererContext,
   MarkerReadResult,
+  SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
@@ -46,11 +54,17 @@ import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
 } from '@prisma-next/target-postgres/contract-free';
-import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
+import type {
+  AddColumnAction,
+  AlterTableActionVisitor,
+  PostgresAlterTable,
+  PostgresCreateSchema,
+  PostgresCreateTable,
+  PostgresDdlNode,
+} from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import {
   createResolveExistingEnumValues,
-  enumStorageCompoundKey,
   readExistingEnumValues,
   readPostgresSchemaIrAnnotations,
 } from '@prisma-next/target-postgres/enum-planning';
@@ -60,6 +74,7 @@ import {
   normalizePredicate,
   type RlsPolicyOperation,
 } from '@prisma-next/target-postgres/rls-canonicalize';
+import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
   isPostgresSchema,
   PostgresRlsPolicy,
@@ -67,8 +82,7 @@ import {
 } from '@prisma-next/target-postgres/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { createPostgresBuiltinCodecLookup } from './codec-lookup';
-import { renderLoweredDdl } from './ddl-renderer';
+import { encodeControlQueryParams } from './control-codecs';
 import {
   introspectPostgresEnumTypes,
   type PostgresEnumStorageTypeAnnotation,
@@ -106,17 +120,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   readonly familyId = 'sql' as const;
   readonly targetId = 'postgres' as const;
 
-  private readonly codecLookup: CodecLookup;
+  private readonly codecRegistry: CodecRegistry;
 
-  /**
-   * @param codecLookup - Codec lookup used by the SQL renderer to resolve
-   *   per-codec metadata at lower-time. Defaults to a Postgres-builtins-only
-   *   lookup when omitted. Stack-aware callers
-   *   (`SqlControlAdapterDescriptor.create(stack)`) supply
-   *   `stack.codecLookup` so extension codecs are visible to the renderer.
-   */
-  constructor(codecLookup?: CodecLookup) {
-    this.codecLookup = codecLookup ?? createPostgresBuiltinCodecLookup();
+  constructor(codecRegistry: CodecRegistry) {
+    this.codecRegistry = codecRegistry;
   }
 
   /**
@@ -194,9 +201,46 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    */
   lower(ast: AnyQueryAst | PostgresDdlNode, context: LowererContext<unknown>): LoweredStatement {
     if (isDdlNode(ast)) {
-      return renderLoweredDdl(ast);
+      throw new Error(
+        'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecuteRequest().',
+      );
     }
-    return renderLoweredSql(ast, context.contract as PostgresContract, this.codecLookup);
+    return renderLoweredSql(
+      ast,
+      blindCast<PostgresContract, 'caller must supply a matching PostgresContract'>(
+        context.contract,
+      ),
+      this.codecRegistry,
+    );
+  }
+
+  /**
+   * Lower an AST all the way to a driver-ready statement. For DDL nodes,
+   * literal column defaults are formatted as inline SQL with proper quoting and
+   * `::nativeType` cast suffixes. For query ASTs, params are kept as `$N`
+   * placeholders; wire values go in `params`. Does NOT call `this.lower()` —
+   * independent implementation.
+   */
+  async lowerToExecuteRequest(
+    ast: AnyQueryAst | PostgresDdlNode,
+    context?: LowererContext<unknown>,
+  ): Promise<SqlExecuteRequest> {
+    if (isDdlNode(ast)) {
+      return pgRenderDdlExecuteRequest(
+        blindCast<PostgresDdlNode, 'isDdlNode guard'>(ast),
+        this.codecRegistry,
+      );
+    }
+    const contract = blindCast<PostgresContract, 'Caller must supply matching contract'>(
+      context?.contract,
+    );
+    const lowered = renderLoweredSql(ast, contract, this.codecRegistry);
+    const codecRegistry = blindCast<
+      ContractCodecRegistry,
+      'framework CodecRegistry: its descriptors materialise SQL codecs; the framework Codec type erases to BaseCodec at this boundary'
+    >(this.codecRegistry);
+    const params = await encodeControlQueryParams(lowered, ast, codecRegistry);
+    return { sql: lowered.sql, params };
   }
 
   /**
@@ -634,20 +678,26 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     driver: SqlControlDriverInstance<'postgres'>,
     namespaceIds: readonly string[],
   ): Promise<SqlSchemaIR> {
-    const resolvedSchemas = await Promise.all(
-      namespaceIds.map(async (id) => {
-        if (id === UNBOUND_NAMESPACE_ID) {
-          const { rows } = await driver.query<{ current_schema: string }>(
-            'SELECT current_schema() AS current_schema',
-          );
-          return rows[0]?.current_schema ?? 'public';
-        }
-        return id;
-      }),
-    );
+    const resolvedSchemas: string[] = [];
+    for (const id of namespaceIds) {
+      if (id === UNBOUND_NAMESPACE_ID) {
+        const { rows } = await driver.query<{ current_schema: string }>(
+          'SELECT current_schema() AS current_schema',
+        );
+        resolvedSchemas.push(rows[0]?.current_schema ?? 'public');
+      } else {
+        resolvedSchemas.push(id);
+      }
+    }
     const uniqueSchemas = Array.from(new Set(resolvedSchemas));
 
-    const perSchema = await Promise.all(uniqueSchemas.map((s) => this.introspectSchema(driver, s)));
+    // Walk schemas sequentially: every introspectSchema call shares the one
+    // control connection, so a parallel walk only serialises behind the wire
+    // protocol and trips pg's "already executing a query" deprecation.
+    const perSchema: SqlSchemaIR[] = [];
+    for (const schema of uniqueSchemas) {
+      perSchema.push(await this.introspectSchema(driver, schema));
+    }
 
     const mergedTables: Record<string, SqlTableIR> = {};
     for (const ir of perSchema) {
@@ -656,16 +706,18 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       }
     }
 
-    const mergedStorageTypes: Record<string, PostgresEnumStorageTypeAnnotation> = {};
-    for (let i = 0; i < perSchema.length; i++) {
-      const ir = perSchema[i];
-      const pg = blindCast<
-        { storageTypes?: Record<string, PostgresEnumStorageTypeAnnotation> } | undefined,
+    const mergedEnumTypes: Record<string, Record<string, PostgresEnumStorageTypeAnnotation>> = {};
+    for (const ir of perSchema) {
+      const enumTypes = blindCast<
+        | { enumTypes?: Record<string, Record<string, PostgresEnumStorageTypeAnnotation>> }
+        | undefined,
         'pg annotation envelope index slot'
-      >(ir?.annotations?.['pg'])?.storageTypes;
-      if (!pg) continue;
-      for (const [key, value] of Object.entries(pg)) {
-        mergedStorageTypes[key] = value;
+      >(ir?.annotations?.['pg'])?.enumTypes;
+      if (!enumTypes) continue;
+      for (const [schemaName, byType] of Object.entries(enumTypes)) {
+        const merged = mergedEnumTypes[schemaName] ?? {};
+        Object.assign(merged, byType);
+        mergedEnumTypes[schemaName] = merged;
       }
     }
 
@@ -681,8 +733,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         pg: {
           ...firstPg,
           ...ifDefined(
-            'storageTypes',
-            Object.keys(mergedStorageTypes).length > 0 ? mergedStorageTypes : undefined,
+            'enumTypes',
+            Object.keys(mergedEnumTypes).length > 0 ? mergedEnumTypes : undefined,
           ),
         },
       }),
@@ -698,39 +750,33 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     driver: SqlControlDriverInstance<'postgres'>,
     schema: string,
   ): Promise<SqlSchemaIR> {
-    // Execute all queries in parallel for efficiency (7 queries instead of 6T+1)
-    const [
-      tablesResult,
-      columnsResult,
-      pkResult,
-      fkResult,
-      uniqueResult,
-      indexResult,
-      checkResult,
-    ] = await Promise.all([
-      // Query all tables
-      driver.query<{ table_name: string }>(
-        `SELECT table_name
+    // Issue the schema-wide queries one at a time. A single control connection
+    // serialises queries anyway, so Promise.all buys no parallelism here and
+    // makes pg emit a "client is already executing a query" deprecation. One
+    // schema-wide query per relation kind keeps this to 7 round-trips, not 6T+1.
+    // Query all tables
+    const tablesResult = await driver.query<{ table_name: string }>(
+      `SELECT table_name
          FROM information_schema.tables
          WHERE table_schema = $1
            AND table_type = 'BASE TABLE'
          ORDER BY table_name`,
-        [schema],
-      ),
-      // Query all columns for all tables in schema
-      driver.query<{
-        table_name: string;
-        column_name: string;
-        data_type: string;
-        udt_name: string;
-        is_nullable: string;
-        character_maximum_length: number | null;
-        numeric_precision: number | null;
-        numeric_scale: number | null;
-        column_default: string | null;
-        formatted_type: string | null;
-      }>(
-        `SELECT
+      [schema],
+    );
+    // Query all columns for all tables in schema
+    const columnsResult = await driver.query<{
+      table_name: string;
+      column_name: string;
+      data_type: string;
+      udt_name: string;
+      is_nullable: string;
+      character_maximum_length: number | null;
+      numeric_precision: number | null;
+      numeric_scale: number | null;
+      column_default: string | null;
+      formatted_type: string | null;
+    }>(
+      `SELECT
            c.table_name,
            column_name,
            data_type,
@@ -754,16 +800,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            AND NOT a.attisdropped
          WHERE c.table_schema = $1
          ORDER BY c.table_name, c.ordinal_position`,
-        [schema],
-      ),
-      // Query all primary keys for all tables in schema
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-      }>(
-        `SELECT
+      [schema],
+    );
+    // Query all primary keys for all tables in schema
+    const pkResult = await driver.query<{
+      table_name: string;
+      constraint_name: string;
+      column_name: string;
+      ordinal_position: number;
+    }>(
+      `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -776,24 +822,24 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'PRIMARY KEY'
          ORDER BY tc.table_name, kcu.ordinal_position`,
-        [schema],
-      ),
-      // Query all foreign keys for all tables in schema, including referential actions.
-      // Uses pg_catalog for correct positional pairing of composite FK columns
-      // (information_schema.constraint_column_usage lacks ordinal_position,
-      // which causes Cartesian products for multi-column FKs).
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-        referenced_table_schema: string;
-        referenced_table_name: string;
-        referenced_column_name: string;
-        delete_rule: string;
-        update_rule: string;
-      }>(
-        `SELECT
+      [schema],
+    );
+    // Query all foreign keys for all tables in schema, including referential actions.
+    // Uses pg_catalog for correct positional pairing of composite FK columns
+    // (information_schema.constraint_column_usage lacks ordinal_position,
+    // which causes Cartesian products for multi-column FKs).
+    const fkResult = await driver.query<{
+      table_name: string;
+      constraint_name: string;
+      column_name: string;
+      ordinal_position: number;
+      referenced_table_schema: string;
+      referenced_table_name: string;
+      referenced_column_name: string;
+      delete_rule: string;
+      update_rule: string;
+    }>(
+      `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -826,16 +872,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'FOREIGN KEY'
          ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
-        [schema],
-      ),
-      // Query all unique constraints for all tables in schema (excluding PKs)
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-      }>(
-        `SELECT
+      [schema],
+    );
+    // Query all unique constraints for all tables in schema (excluding PKs)
+    const uniqueResult = await driver.query<{
+      table_name: string;
+      constraint_name: string;
+      column_name: string;
+      ordinal_position: number;
+    }>(
+      `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -848,31 +894,31 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'UNIQUE'
          ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
-        [schema],
-      ),
-      // Query all indexes for all tables in schema (excluding constraints).
-      // `index_position` is the column's position within the index (1-based),
-      // derived from `pg_index.indkey` so composite indexes round-trip with
-      // their declared column order intact.
-      driver.query<{
-        tablename: string;
-        indexname: string;
-        indisunique: boolean;
-        attname: string | null;
-        index_position: number;
-        amname: string | null;
-        reloptions: string[] | null;
-      }>(
-        // `ix.indkey` is an int2vector of column numbers in the order the
-        // columns appear in the index definition. Unnest it WITH ORDINALITY
-        // so each (index, column) row carries its position in the index,
-        // then ORDER BY that position. Without this the rows come back in
-        // table-column order (`a.attnum`), which silently shuffles the
-        // columns of any composite index whose index order differs from
-        // the table order — verification compares against the contract
-        // with order-sensitive equality and reports a spurious
-        // `index_mismatch`.
-        `SELECT
+      [schema],
+    );
+    // Query all indexes for all tables in schema (excluding constraints).
+    // `index_position` is the column's position within the index (1-based),
+    // derived from `pg_index.indkey` so composite indexes round-trip with
+    // their declared column order intact.
+    const indexResult = await driver.query<{
+      tablename: string;
+      indexname: string;
+      indisunique: boolean;
+      attname: string | null;
+      index_position: number;
+      amname: string | null;
+      reloptions: string[] | null;
+    }>(
+      // `ix.indkey` is an int2vector of column numbers in the order the
+      // columns appear in the index definition. Unnest it WITH ORDINALITY
+      // so each (index, column) row carries its position in the index,
+      // then ORDER BY that position. Without this the rows come back in
+      // table-column order (`a.attnum`), which silently shuffles the
+      // columns of any composite index whose index order differs from
+      // the table order — verification compares against the contract
+      // with order-sensitive equality and reports a spurious
+      // `index_mismatch`.
+      `SELECT
            i.tablename,
            i.indexname,
            ix.indisunique,
@@ -898,22 +944,22 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
                AND tc.constraint_name = i.indexname
            )
          ORDER BY i.tablename, i.indexname, k.ord`,
-        [schema],
-      ),
-      // Query all check constraints for enum-restricted columns.
-      // `pg_get_constraintdef(oid)` returns the predicate including the
-      // `CHECK (...)` wrapper. We parse the inner predicate to extract
-      // the column name and permitted values.
-      //
-      // Scope: only parses the `= ANY (ARRAY[...])` and `IN (...)` shapes
-      // that this slice emits. Arbitrary SQL predicates are left as-is
-      // and will not produce check IR entries (they are silently skipped).
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        constraintdef: string;
-      }>(
-        `SELECT
+      [schema],
+    );
+    // Query all check constraints for enum-restricted columns.
+    // `pg_get_constraintdef(oid)` returns the predicate including the
+    // `CHECK (...)` wrapper. We parse the inner predicate to extract
+    // the column name and permitted values.
+    //
+    // Scope: only parses the `= ANY (ARRAY[...])` and `IN (...)` shapes
+    // that this slice emits. Arbitrary SQL predicates are left as-is
+    // and will not produce check IR entries (they are silently skipped).
+    const checkResult = await driver.query<{
+      table_name: string;
+      constraint_name: string;
+      constraintdef: string;
+    }>(
+      `SELECT
            cl.relname AS table_name,
            c.conname AS constraint_name,
            pg_get_constraintdef(c.oid) AS constraintdef
@@ -923,9 +969,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE ns.nspname = $1
            AND c.contype = 'c'
          ORDER BY cl.relname, c.conname`,
-        [schema],
-      ),
-    ]);
+      [schema],
+    );
 
     // Group results by table name for efficient lookup
     const columnsByTable = groupBy(columnsResult.rows, 'table_name');
@@ -1131,7 +1176,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const [rawStorageTypes, policiesResult, rolesResult, rlsEnabledResult] = await Promise.all([
+    const [rawEnumTypes, policiesResult, rolesResult, rlsEnabledResult] = await Promise.all([
       introspectPostgresEnumTypes({ driver, schemaName: schema }),
       driver.query<{
         schemaname: string;
@@ -1167,10 +1212,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       ),
     ]);
 
-    const storageTypes: Record<string, PostgresEnumStorageTypeAnnotation> = {};
-    for (const [typeName, annotation] of Object.entries(rawStorageTypes)) {
-      storageTypes[enumStorageCompoundKey(schema, typeName)] = annotation;
-    }
+    const enumTypes: Record<
+      string,
+      Record<string, PostgresEnumStorageTypeAnnotation>
+    > = Object.keys(rawEnumTypes).length > 0 ? { [schema]: rawEnumTypes } : {};
 
     const rlsPolicies: PostgresRlsPolicy[] = policiesResult.rows.map((row) => {
       const operation = mapPgCmd(row.cmd);
@@ -1213,10 +1258,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       pg: {
         schema,
         version: await this.getPostgresVersion(driver),
-        ...ifDefined(
-          'storageTypes',
-          Object.keys(storageTypes).length > 0 ? storageTypes : undefined,
-        ),
+        ...ifDefined('enumTypes', Object.keys(enumTypes).length > 0 ? enumTypes : undefined),
         ...ifDefined('rlsPolicies', rlsPolicies.length > 0 ? rlsPolicies : undefined),
         ...ifDefined('roles', roles.length > 0 ? roles : undefined),
         ...ifDefined(
@@ -1529,4 +1571,190 @@ function extractQuotedLiterals(listBody: string): readonly string[] | undefined 
   const pattern = /'((?:[^'\\]|\\.|'')*)'/g;
   const values = [...listBody.matchAll(pattern)].map((m) => (m[1] ?? '').replace(/''/g, "'"));
   return values.length > 0 ? values : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// pgRenderDdlExecuteRequest — independent DDL walker for lowerToExecuteRequest
+// ---------------------------------------------------------------------------
+
+function pgIsTextLikeNativeType(nativeType: string): boolean {
+  return (
+    nativeType === 'text' ||
+    nativeType === 'varchar' ||
+    nativeType.startsWith('varchar(') ||
+    nativeType === 'character varying' ||
+    nativeType.startsWith('character varying(') ||
+    nativeType === 'char' ||
+    nativeType.startsWith('char(') ||
+    nativeType === 'character' ||
+    nativeType.startsWith('character(')
+  );
+}
+
+function pgInlineLiteral(wire: unknown, nativeType: string): string {
+  if (wire === null) return 'NULL';
+  if (typeof wire === 'boolean') return wire ? 'true' : 'false';
+  if (typeof wire === 'number') {
+    if (!Number.isFinite(wire)) {
+      throw new Error(
+        `pgRenderDdlExecuteRequest: non-finite number wire value ${String(wire)} cannot be emitted as a DEFAULT literal for native type "${nativeType}"`,
+      );
+    }
+    return String(wire);
+  }
+  if (typeof wire === 'bigint') return String(wire);
+  if (wire instanceof Date) {
+    if (Number.isNaN(wire.getTime())) {
+      throw new Error(
+        `pgRenderDdlExecuteRequest: invalid Date value cannot be emitted as a DEFAULT literal for native type "${nativeType}"`,
+      );
+    }
+    const quoted = `'${escapeLiteral(wire.toISOString())}'`;
+    return pgIsTextLikeNativeType(nativeType) ? quoted : `${quoted}::${nativeType}`;
+  }
+  if (typeof wire === 'string') {
+    const quoted = `'${escapeLiteral(wire)}'`;
+    return pgIsTextLikeNativeType(nativeType) ? quoted : `${quoted}::${nativeType}`;
+  }
+  if (wire instanceof Uint8Array) {
+    const hex = Array.from(wire)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    return `'\\x${hex}'::${nativeType}`;
+  }
+  if (typeof wire === 'object') {
+    const quoted = `'${escapeLiteral(JSON.stringify(wire))}'`;
+    return `${quoted}::${nativeType}`;
+  }
+  throw new Error(
+    `pgRenderDdlExecuteRequest: unexpected wire type "${typeof wire}" for native type "${nativeType}"`,
+  );
+}
+
+async function pgRenderDdlColumnDefault(
+  def: LiteralColumnDefault | FunctionColumnDefault,
+  nativeType: string,
+  codecLookup: CodecLookup,
+  codecRef: CodecRef | undefined,
+): Promise<string> {
+  if (def.kind === 'function') {
+    if (def.expression === 'autoincrement()') return '';
+    return `DEFAULT (${def.expression})`;
+  }
+  if (codecRef !== undefined) {
+    const codec = codecLookup.get(codecRef.codecId);
+    if (codec !== undefined) {
+      const wire = await codec.encode(def.value, {});
+      return `DEFAULT ${pgInlineLiteral(wire, nativeType)}`;
+    }
+  }
+  // Fallback: codec-less literal defaults follow RawSqlLiteral wire-scalar semantics.
+  return `DEFAULT ${pgInlineLiteral(def.value, nativeType)}`;
+}
+
+async function pgRenderDdlColumn(column: DdlColumn, codecLookup: CodecLookup): Promise<string> {
+  const parts = [quoteIdentifier(column.name), column.type];
+  if (column.default) {
+    const clause = await pgRenderDdlColumnDefault(
+      column.default,
+      column.type,
+      codecLookup,
+      column.codecRef,
+    );
+    if (clause.length > 0) parts.push(clause);
+  }
+  if (column.notNull) parts.push('NOT NULL');
+  if (column.primaryKey) parts.push('PRIMARY KEY');
+  return parts.join(' ');
+}
+
+function pgRenderDdlConstraint(constraint: DdlTableConstraint): string {
+  if (constraint.kind === 'primary-key') {
+    const cols = constraint.columns.map(quoteIdentifier).join(', ');
+    if (constraint.name !== undefined) {
+      return `CONSTRAINT ${quoteIdentifier(constraint.name)} PRIMARY KEY (${cols})`;
+    }
+    return `PRIMARY KEY (${cols})`;
+  }
+  if (constraint.kind === 'foreign-key') {
+    const cols = constraint.columns.map(quoteIdentifier).join(', ');
+    const refTable = constraint.refTable.split('.').map(quoteIdentifier).join('.');
+    const refCols = constraint.refColumns.map(quoteIdentifier).join(', ');
+    let sql = `FOREIGN KEY (${cols}) REFERENCES ${refTable} (${refCols})`;
+    if (constraint.onDelete !== undefined) {
+      sql += ` ON DELETE ${REFERENTIAL_ACTION_SQL[constraint.onDelete]}`;
+    }
+    if (constraint.onUpdate !== undefined) {
+      sql += ` ON UPDATE ${REFERENTIAL_ACTION_SQL[constraint.onUpdate]}`;
+    }
+    if (constraint.name !== undefined) {
+      sql = `CONSTRAINT ${quoteIdentifier(constraint.name)} ${sql}`;
+    }
+    return sql;
+  }
+  const cols = constraint.columns.map(quoteIdentifier).join(', ');
+  if (constraint.name !== undefined) {
+    return `CONSTRAINT ${quoteIdentifier(constraint.name)} UNIQUE (${cols})`;
+  }
+  return `UNIQUE (${cols})`;
+}
+
+async function pgRenderCreateTable(
+  node: PostgresCreateTable,
+  codecLookup: CodecLookup,
+): Promise<SqlExecuteRequest> {
+  const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
+  const tableRef = node.schema
+    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`
+    : quoteIdentifier(node.table);
+  const columnDefs = await Promise.all(
+    node.columns.map((col) => pgRenderDdlColumn(col, codecLookup)),
+  );
+  const constraintDefs =
+    node.constraints !== undefined ? node.constraints.map(pgRenderDdlConstraint) : [];
+  const allDefs = [...columnDefs, ...constraintDefs].join(',\n  ');
+  return {
+    sql: `CREATE TABLE ${ifNotExists}${tableRef} (\n  ${allDefs}\n)`,
+    params: [],
+  };
+}
+
+function pgRenderCreateSchema(node: PostgresCreateSchema): SqlExecuteRequest {
+  const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
+  return {
+    sql: `CREATE SCHEMA ${ifNotExists}${quoteIdentifier(node.schema)}`,
+    params: [],
+  };
+}
+
+async function pgRenderAlterTable(
+  node: PostgresAlterTable,
+  codecLookup: CodecLookup,
+): Promise<SqlExecuteRequest> {
+  const tableRef = node.schema
+    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`
+    : quoteIdentifier(node.table);
+  const actionVisitor: AlterTableActionVisitor<Promise<string>> = {
+    async addColumn(action: AddColumnAction): Promise<string> {
+      const colFragment = await pgRenderDdlColumn(action.column, codecLookup);
+      return `ADD COLUMN ${colFragment}`;
+    },
+  };
+  const actionSqls = await Promise.all(node.actions.map((a) => a.accept(actionVisitor)));
+  return {
+    sql: `ALTER TABLE ${tableRef} ${actionSqls.join(', ')}`,
+    params: [],
+  };
+}
+
+async function pgRenderDdlExecuteRequest(
+  ast: PostgresDdlNode,
+  codecLookup: CodecLookup,
+): Promise<SqlExecuteRequest> {
+  const visitor = {
+    createTable: (node: PostgresCreateTable) => pgRenderCreateTable(node, codecLookup),
+    createSchema: (node: PostgresCreateSchema) => Promise.resolve(pgRenderCreateSchema(node)),
+    alterTable: (node: PostgresAlterTable) => pgRenderAlterTable(node, codecLookup),
+  };
+  return ast.accept(visitor);
 }

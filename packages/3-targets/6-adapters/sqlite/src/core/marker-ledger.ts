@@ -4,13 +4,7 @@ import {
   type LoweredStatement,
   RawExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import {
-  createAstCodecRegistry,
-  deriveParamMetadata,
-  encodeParamsWithMetadata,
-} from '@prisma-next/sql-runtime';
 import { SQLITE_DATETIME_CODEC_ID } from '@prisma-next/target-sqlite/codec-ids';
-import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
 import {
   datetime,
   integer,
@@ -18,8 +12,7 @@ import {
   sqliteTable,
   text,
 } from '@prisma-next/target-sqlite/contract-free';
-
-const CONTROL_CODECS = createAstCodecRegistry(sqliteCodecRegistry);
+import { encodeControlQueryParams } from './control-codecs';
 
 export const marker = sqliteTable('_prisma_marker', {
   space: text(),
@@ -91,16 +84,7 @@ export async function execute(
   query: AnyQueryAst,
 ): Promise<readonly Record<string, unknown>[]> {
   const lowered = lower(query);
-  const values = lowered.params.map((slot) => {
-    if (slot.kind === 'literal') return slot.value;
-    throw new Error('SQLite control DML lowered to a bind parameter, which is unsupported');
-  });
-  const encoded = await encodeParamsWithMetadata(
-    values,
-    deriveParamMetadata(query),
-    {},
-    CONTROL_CODECS,
-  );
+  const encoded = await encodeControlQueryParams(lowered, query);
   const result = await driver.query(lowered.sql, encoded);
   return result.rows;
 }

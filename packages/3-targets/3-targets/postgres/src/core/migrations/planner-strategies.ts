@@ -35,8 +35,12 @@ import {
   StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import type { CodecRef, DdlColumn } from '@prisma-next/sql-relational-core/ast';
+import { col } from '@prisma-next/sql-relational-core/contract-free';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
+import type { JsonValue } from '@prisma-next/utils/json';
 import { PostgresEnumType } from '../postgres-enum-type';
 import { isPostgresSchema } from '../postgres-schema';
 import {
@@ -54,15 +58,12 @@ import {
   DropCheckConstraintCall,
   DropEnumTypeCall,
   type PostgresOpFactoryCall,
+  postgresDefaultToDdlColumnDefault,
   RawSqlCall,
   RenameTypeCall,
   SetNotNullCall,
 } from './op-factory-call';
-import {
-  buildAddColumnSql,
-  buildColumnDefaultSql,
-  buildColumnTypeSql,
-} from './planner-ddl-builders';
+import { buildAddColumnSql, buildColumnTypeSql } from './planner-ddl-builders';
 import { resolveIdentityValue } from './planner-identity-values';
 import {
   buildAddColumnOperationIdentity,
@@ -77,6 +78,7 @@ import {
   tableIsEmptyCheck,
 } from './planner-sql-checks';
 import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
+import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
 const REBUILD_SUFFIX = '__prisma_next_new';
 
@@ -95,9 +97,9 @@ export function tableAt(
   namespaceId: string,
   tableName: string,
 ): StorageTable | undefined {
-  // Namespace.tables is typed as Record<string, IRNode> at the interface level;
-  // SQL family namespaces always hold StorageTable instances.
-  return storage.namespaces[namespaceId]?.entries.table[tableName] as StorageTable | undefined;
+  const ns = storage.namespaces[namespaceId];
+  if (ns === undefined) return undefined;
+  return ns.entries.table?.[tableName];
 }
 
 /**
@@ -139,7 +141,7 @@ const DEFAULT_ENUM_NAMESPACE_ID = 'public';
 function namespaceHasEnum(storage: SqlStorage, namespaceId: string, typeName: string): boolean {
   const ns = storage.namespaces[namespaceId];
   if (!isPostgresSchema(ns)) return false;
-  return ns.entries.type[typeName] !== undefined;
+  return ns.type[typeName] !== undefined;
 }
 
 /**
@@ -244,21 +246,37 @@ function buildColumnSpec(
   column: string,
   ctx: StrategyContext,
   overrides?: { nullable?: boolean },
-) {
-  const col = tableAt(ctx.toContract.storage, namespaceId, table)?.columns[column];
-  if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
+): DdlColumn {
+  const storageCol = tableAt(ctx.toContract.storage, namespaceId, table)?.columns[column];
+  if (!storageCol)
+    throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
   const mutableTypes = ctx.storageTypes as Record<
     string,
     StorageTypeInstance | PostgresEnumStorageEntry
   >;
-  return {
-    name: column,
-    typeSql: buildColumnTypeSql(col, mutableHooks, mutableTypes),
-    defaultSql: buildColumnDefaultSql(col.default, col),
-    columnDefault: col.default,
-    nullable: overrides?.nullable ?? col.nullable,
-  };
+  const typeSql = buildColumnTypeSql(storageCol, mutableHooks, mutableTypes);
+  const ddlDefault = postgresDefaultToDdlColumnDefault(storageCol.default);
+  const resolved = resolveColumnTypeMetadata(storageCol, mutableTypes);
+  const typeParams =
+    resolved.typeParams === undefined
+      ? undefined
+      : blindCast<
+          JsonValue,
+          'resolved.typeParams is JsonValue-shaped storage metadata; the narrowed value lands in CodecRef.typeParams which is JsonValue'
+        >(resolved.typeParams);
+  const codecRef: CodecRef | undefined = resolved.codecId
+    ? {
+        codecId: resolved.codecId,
+        ...ifDefined('typeParams', typeParams),
+      }
+    : undefined;
+  const nullable = overrides?.nullable ?? storageCol.nullable;
+  return col(column, typeSql, {
+    ...(!nullable ? { notNull: true } : {}),
+    ...ifDefined('default', ddlDefault),
+    ...ifDefined('codecRef', codecRef),
+  });
 }
 
 function buildAlterTypeOptions(
@@ -445,8 +463,7 @@ function enumRebuildCallRecipe(
   // same-named enums in distinct namespaces keep their columns disjoint.
   const columnRefs: { namespaceId: string; table: string; column: string }[] = [];
   for (const [nsId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
-    for (const [tableName, tableNode] of Object.entries(ns.entries.table)) {
-      const table = tableNode as StorageTable;
+    for (const [tableName, table] of Object.entries(ns.entries.table ?? {})) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (
           column.typeRef === typeName &&
@@ -649,9 +666,7 @@ function collectPostgresEnumTypes(storage: SqlStorage): ReadonlyMap<string, Post
   const result = new Map<string, PostgresEnumType>();
   for (const [nsId, ns] of Object.entries(storage.namespaces)) {
     if (!isPostgresSchema(ns)) continue;
-    for (const [name, instance] of Object.entries(ns.entries.type).sort(([a], [b]) =>
-      a.localeCompare(b),
-    )) {
+    for (const [name, instance] of Object.entries(ns.type).sort(([a], [b]) => a.localeCompare(b))) {
       if (instance instanceof PostgresEnumType) {
         result.set(enumCompoundKey(nsId, name), instance);
       }
@@ -670,7 +685,7 @@ function collectContractChecks(
   tableName: string,
 ): ReadonlyArray<{ name: string; column: string; permittedValues: readonly string[] }> {
   const ns = storage.namespaces[namespaceId];
-  const tableRaw = ns?.entries.table[tableName];
+  const tableRaw = ns !== undefined ? ns.entries.table?.[tableName] : undefined;
   if (!(tableRaw instanceof StorageTable)) return [];
   const checks = tableRaw.checks;
   if (!checks || checks.length === 0) return [];
@@ -716,7 +731,7 @@ export const checkConstraintPlanCallStrategy: CallMigrationStrategy = (issues, c
   const handledIssueKeys = new Set<string>();
 
   for (const [namespaceId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
-    for (const tableName of Object.keys(ns.entries.table)) {
+    for (const tableName of Object.keys(ns.entries.table ?? {})) {
       const contractChecks = collectContractChecks(ctx.toContract.storage, namespaceId, tableName);
       if (contractChecks.length === 0) continue;
 

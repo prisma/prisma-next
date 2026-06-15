@@ -15,10 +15,11 @@ import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/pla
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../../src/core/adapter';
+import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
+import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 const emptySchema: SqlSchemaIR = { tables: {} };
-const testAdapter = createPostgresAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 const PG_TEXT_CODEC = 'pg/text@1';
 const HOOKED_CODEC = 'cs/string@1';
@@ -86,7 +87,7 @@ function makeFrameworkComponents(
 }
 
 describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
-  it('inlines ops emitted by onFieldEvent after structural DDL', () => {
+  it('inlines ops emitted by onFieldEvent after structural DDL', async () => {
     const planner = createPostgresMigrationPlanner(testAdapter);
 
     const hooks: CodecControlHooks = {
@@ -124,12 +125,13 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
     });
 
     expectNarrowedType(result.kind === 'success');
-    const ids = result.plan.operations.map((op) => op.id);
+    const ops = await Promise.all(result.plan.operations);
+    const ids = ops.map((op) => op.id);
     expect(ids[ids.length - 1]).toBe('codec.added.User.email');
     expect(ids).toContain('table.User');
   });
 
-  it('does not fire when no codec has an onFieldEvent hook', () => {
+  it('does not fire when no codec has an onFieldEvent hook', async () => {
     const planner = createPostgresMigrationPlanner(testAdapter);
 
     const frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>> = [];
@@ -149,10 +151,11 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
     });
 
     expectNarrowedType(result.kind === 'success');
-    expect(result.plan.operations.every((op) => !op.id.startsWith('codec.'))).toBe(true);
+    const ops = await Promise.all(result.plan.operations);
+    expect(ops.every((op) => !op.id.startsWith('codec.'))).toBe(true);
   });
 
-  it('produces byte-identical operations across re-emits (deterministic)', () => {
+  it('produces byte-identical operations across re-emits (deterministic)', async () => {
     const planner = createPostgresMigrationPlanner(testAdapter);
 
     const hooks: CodecControlHooks = {
@@ -201,6 +204,8 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
 
     expectNarrowedType(a.kind === 'success');
     expectNarrowedType(b.kind === 'success');
-    expect(JSON.stringify(a.plan.operations)).toBe(JSON.stringify(b.plan.operations));
+    const aOps = await Promise.all(a.plan.operations);
+    const bOps = await Promise.all(b.plan.operations);
+    expect(JSON.stringify(aOps)).toBe(JSON.stringify(bOps));
   });
 });

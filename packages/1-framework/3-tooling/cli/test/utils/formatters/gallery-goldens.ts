@@ -55,6 +55,22 @@
 import { parseGrid, type Row, type ScenarioInput } from './gallery-cells';
 
 // ---------------------------------------------------------------------------
+// Scenario: continued-merge   mc_root forks to a long arm (mc_root→mc_mid→mc_merge)
+//                              and a short arm (mc_root→mc_merge), then the trunk
+//                              continues (mc_merge→mc_tip)
+// ---------------------------------------------------------------------------
+
+const continuedMergeInput: ScenarioInput = {
+  contracts: ['mc_root', 'mc_mid', 'mc_merge', 'mc_tip'],
+  migrations: [
+    { name: '1_long', from: 'mc_root', to: 'mc_mid' },
+    { name: '2_merge', from: 'mc_mid', to: 'mc_merge' },
+    { name: '3_short', from: 'mc_root', to: 'mc_merge' },
+    { name: '4_continue', from: 'mc_merge', to: 'mc_tip' },
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // Scenario: linear   ∅ → lin_a → lin_b → lin_c
 // ---------------------------------------------------------------------------
 
@@ -379,6 +395,92 @@ export const GOLDENS: readonly ScenarioGolden[] = [
       ['○', 'dm_root', 'g'],
       ['│↑', '000_init', 'gg'],
       ['○', '∅', 'g'],
+    ]),
+  },
+  // ── two-component ────────────────────────────────────────────────────────
+  // two-component:flat
+  {
+    scenario: 'two-component',
+    strategy: 'flat',
+    variant: undefined,
+    description: 'two fully-disconnected chains — each its own lane-0 block, blank-separated',
+    input: {
+      contracts: ['∅', 'tc_a', 'tc_b', 'tc_x', 'tc_y', 'tc_z'],
+      migrations: [
+        { name: '000_a_init', from: '∅', to: 'tc_a' },
+        { name: '001_a_step', from: 'tc_a', to: 'tc_b' },
+        { name: '100_x_step1', from: 'tc_x', to: 'tc_y' },
+        { name: '101_x_step2', from: 'tc_y', to: 'tc_z' },
+      ],
+    },
+    onPath: [],
+    rows: parseGrid([
+      ['○', 'tc_b', '1'],
+      ['│↑', '001_a_step', '11'],
+      ['○', 'tc_a', '1'],
+      ['│↑', '000_a_init', '11'],
+      ['○', '∅', '1'],
+      ['', ''],
+      ['○', 'tc_z', '1'],
+      ['│↑', '101_x_step2', '11'],
+      ['○', 'tc_y', '1'],
+      ['│↑', '100_x_step1', '11'],
+      ['○', 'tc_x', '1'],
+    ]),
+  },
+  // ── asymmetric-diamond ───────────────────────────────────────────────────
+  // asymmetric-diamond:flat
+  {
+    scenario: 'asymmetric-diamond',
+    strategy: 'flat',
+    variant: undefined,
+    description: 'fork with unequal-length arms; merge node stays on the lane-0 trunk',
+    input: {
+      contracts: ['∅', '3bfce91', '419c099', 'f5aa17d', '83a1ded'],
+      migrations: [
+        { name: '20260601T0719_init', from: '∅', to: '3bfce91' },
+        { name: '20260601T0725_add_name', from: '3bfce91', to: '419c099' },
+        { name: '20260601T0725_alice_phone', from: '419c099', to: 'f5aa17d' },
+        { name: '20260601T0726_merge_alice', from: 'f5aa17d', to: '83a1ded' },
+        { name: '20260601T0726_fast_forward', from: '3bfce91', to: '83a1ded' },
+      ],
+    },
+    onPath: [],
+    rows: parseGrid([
+      ['○', '83a1ded', '1'],
+      ['│─╮ ', '122.'],
+      ['│↑│', '20260601T0726_merge_alice', '112'],
+      ['│ │↑', '20260601T0726_fast_forward', '1.22'],
+      ['○ │', 'f5aa17d', '1.2'],
+      ['│↑│', '20260601T0725_alice_phone', '112'],
+      ['○ │', '419c099', '1.2'],
+      ['│↑│', '20260601T0725_add_name', '112'],
+      ['│─╯ ', '122.'],
+      ['○', '3bfce91', '1'],
+      ['│↑', '20260601T0719_init', '11'],
+      ['○', '∅', '1'],
+    ]),
+  },
+  // ── continued-merge ─────────────────────────────────────────────────────
+  // continued-merge:flat
+  {
+    scenario: 'continued-merge',
+    strategy: 'flat',
+    variant: undefined,
+    description: 'trunk continues past an asymmetric-diamond merge — stays on lane 0',
+    input: continuedMergeInput,
+    onPath: [],
+    rows: parseGrid([
+      ['○', 'mc_tip', '1'],
+      ['│↑', '4_continue', '11'],
+      ['○', 'mc_merge', '1'],
+      ['│─╮ ', '122.'],
+      ['│↑│', '2_merge', '112'],
+      ['│ │↑', '3_short', '1.22'],
+      ['○ │', 'mc_mid', '1.2'],
+      ['│↑│', '1_long', '112'],
+      ['│─╯ ', '122.'],
+      ['○', 'mc_root', '1'],
     ]),
   },
 ];

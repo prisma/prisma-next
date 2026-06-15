@@ -1,11 +1,11 @@
 name: Detect inert diff
 description: >
-  Classify the current PR diff as "inert" — touching only files that cannot
+  Classify the current diff as "inert" — touching only files that cannot
   affect build/test/fixture results (docs, markdown, rules, skills, transient
   project artefacts). Fail-safe: a diff is inert only if *every* changed file
   matches the allow-list below; any unrecognized path yields inert=false. The
-  caller must check out the repository with fetch-depth: 0 first. On any event
-  other than pull_request, inert is always false.
+  caller must check out the repository with fetch-depth: 0 first. Handles
+  pull_request and merge_group; on any other event inert is always false.
 
 outputs:
   inert:
@@ -19,15 +19,23 @@ runs:
       shell: bash
       env:
         EVENT_NAME: ${{ github.event_name }}
-        BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        MG_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+        MG_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
       run: |
         set -euo pipefail
-        if [ "$EVENT_NAME" != "pull_request" ]; then
-          echo "Not a pull_request event; treating diff as non-inert."
-          echo "inert=false" >> "$GITHUB_OUTPUT"
-          exit 0
-        fi
+        case "$EVENT_NAME" in
+          pull_request) BASE_SHA="$PR_BASE_SHA"; HEAD_SHA="$PR_HEAD_SHA" ;;
+          merge_group)  BASE_SHA="$MG_BASE_SHA"; HEAD_SHA="$MG_HEAD_SHA" ;;
+          *)
+            echo "Event $EVENT_NAME has no diff range; treating diff as non-inert."
+            echo "inert=false" >> "$GITHUB_OUTPUT"
+            exit 0
+            ;;
+        esac
+        git cat-file -e "$BASE_SHA" 2>/dev/null || git fetch --no-tags --depth=1 origin "$BASE_SHA"
+        git cat-file -e "$HEAD_SHA" 2>/dev/null || git fetch --no-tags --depth=1 origin "$HEAD_SHA"
         files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
         echo "Changed files:"
         echo "$files"

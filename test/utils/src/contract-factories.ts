@@ -6,6 +6,7 @@ import {
 } from '@prisma-next/contract/hashing';
 import type {
   Contract,
+  ContractEnum,
   ContractModel,
   ContractModelBase,
   ContractValueObject,
@@ -29,6 +30,7 @@ type ContractOverrides<
   models?: TModels;
   storage?: Omit<TStorage, 'storageHash'>;
   valueObjects?: Record<string, ContractValueObject>;
+  enum?: Record<string, ContractEnum>;
   capabilities?: Record<string, Record<string, boolean>>;
   extensionPacks?: Record<string, unknown>;
   execution?: Omit<ExecutionSection, 'executionHash'>;
@@ -90,6 +92,7 @@ export function createContract<
             overrides.models ??
             blindCast<TModels, 'default empty models when createContract omits models'>({}),
           ...ifDefined('valueObjects', overrides.valueObjects),
+          ...ifDefined('enum', overrides.enum),
         },
       },
     },

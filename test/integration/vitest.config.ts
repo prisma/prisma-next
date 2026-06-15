@@ -1,11 +1,12 @@
-import { pgliteWorkerExecArgv, timeouts } from '@prisma-next/test-utils';
+import { timeouts } from '@prisma-next/test-utils';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // Disable the V8 PKU JIT hardening that crashes PGlite WASM teardown on
-    // Linux CI; see pgliteWorkerExecArgv in @prisma-next/test-utils.
-    execArgv: pgliteWorkerExecArgv,
+    // Disable V8 PKU JIT write-protection in the test worker forks: PGlite
+    // (WASM) teardown still intermittently aborts on Linux with
+    // jit_page_->allocations_.erase even on @prisma/dev 0.24.12. No-op on macOS.
+    execArgv: ['--no-memory-protection-keys'],
     globals: true,
     environment: 'node',
     include: ['test/**/*.test.ts'],

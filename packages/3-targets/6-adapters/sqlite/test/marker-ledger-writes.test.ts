@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { describe, expect, it } from 'vitest';
+import { createSqliteBuiltinCodecLookup } from '../src/core/codec-lookup';
 import { SqliteControlAdapter } from '../src/core/control-adapter';
 
 interface CapturedCall {
@@ -40,7 +41,7 @@ function createMemoryDriver() {
 }
 
 describe('SqliteControlAdapter marker/ledger write lowering', () => {
-  const adapter = new SqliteControlAdapter();
+  const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
 
   it('insertMarker lowers to a plain insert with DB-side updated_at', async () => {
     const driver = createCapturingDriver();
@@ -163,12 +164,14 @@ describe('SqliteControlAdapter marker/ledger write lowering', () => {
 });
 
 describe('SqliteControlAdapter marker/ledger writes (end-to-end)', () => {
-  const adapter: SqlControlAdapter<'sqlite'> = new SqliteControlAdapter();
+  const adapter: SqlControlAdapter<'sqlite'> = new SqliteControlAdapter(
+    createSqliteBuiltinCodecLookup(),
+  );
 
   async function withDb(fn: (driver: ReturnType<typeof createMemoryDriver>) => Promise<void>) {
     const driver = createMemoryDriver();
     for (const ddl of adapter.bootstrapControlTableQueries()) {
-      const lowered = adapter.lower(ddl, { contract: undefined });
+      const lowered = await adapter.lowerToExecuteRequest(ddl, { contract: undefined });
       await driver.query(lowered.sql);
     }
     try {

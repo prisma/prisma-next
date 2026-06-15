@@ -8,7 +8,7 @@ Writing the example against the design â€” before committing to a project spec â
 
 The sketch also doubles as:
 
-- **Spec anchor.** When the project moves out of design-notes phase, AC1 for the Supabase project will be "this sketch typechecks against the live framework after milestones X / Y / Z ship," and the subsequent ACs hang off its observable behaviour.
+- **Spec anchor.** When the project moves out of design-notes phase, AC1 for the Supabase project will be "this sketch typechecks against the live framework after slices X / Y / Z ship," and the subsequent ACs hang off its observable behaviour.
 - **Onboarding artifact.** When the project ships, this directory migrates to `examples/supabase/` and becomes the canonical onboarding sample. Users land here first.
 
 ## Layout

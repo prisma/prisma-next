@@ -1,4 +1,8 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import {
+  createPostgresBuiltinCodecLookup,
+  PostgresControlAdapter,
+} from '@prisma-next/adapter-postgres/control';
+
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -9,7 +13,6 @@ import {
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { enumStorageCompoundKey } from '@prisma-next/target-postgres/enum-planning';
 import { planIssues } from '@prisma-next/target-postgres/issue-planner';
 import type { CreateTableCall } from '@prisma-next/target-postgres/op-factory-call';
 import { renderCallsToTypeScript } from '@prisma-next/target-postgres/render-typescript';
@@ -22,7 +25,7 @@ import {
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
-const testAdapter = createPostgresAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 function makeContract(
   overrides: {
@@ -67,22 +70,24 @@ function makeSchemaWithEnum(
   values: readonly string[],
   schemaName = UNBOUND_NAMESPACE_ID,
 ): SqlSchemaIR {
-  // Introspection always keys `storageTypes` by the *live* schema name the
-  // adapter walked — the unbound coordinate resolves to `current_schema()`
-  // (`public` here), never the `__unbound__` DDL-emit sentinel.
+  // Introspection nests `enumTypes` by the *live* schema name the adapter
+  // walked — the unbound coordinate resolves to `current_schema()` (`public`
+  // here), never the `__unbound__` DDL-emit sentinel.
   const liveSchema = schemaName === UNBOUND_NAMESPACE_ID ? 'public' : schemaName;
   return {
     tables: {},
     annotations: {
       pg: {
         schema: liveSchema,
-        storageTypes: {
-          [enumStorageCompoundKey(liveSchema, nativeType)]: {
-            kind: 'postgres-enum',
-            codecId: 'pg/enum@1',
-            nativeType,
-            values,
-            typeParams: { values },
+        enumTypes: {
+          [liveSchema]: {
+            [nativeType]: {
+              kind: 'postgres-enum',
+              codecId: 'pg/enum@1',
+              nativeType,
+              values,
+              typeParams: { values },
+            },
           },
         },
       },
@@ -900,7 +905,7 @@ describe('planIssues', () => {
       expect(createSchemaIdx).toBeLessThan(createTableIdx);
     });
 
-    it('emits a CreateSchemaCall whose toOp emits CREATE SCHEMA IF NOT EXISTS', () => {
+    it('emits a CreateSchemaCall whose toOp emits CREATE SCHEMA IF NOT EXISTS', async () => {
       const toContract = makeNamespacedContract({ auth: { entries: { table: {} } } });
       const issues: SchemaIssue[] = [
         {
@@ -922,7 +927,7 @@ describe('planIssues', () => {
       if (!result.ok) throw new Error('expected ok');
       const call = result.value.calls[0]!;
       expect(call.factoryName).toBe('createSchema');
-      const op = call.toOp(testAdapter);
+      const op = await call.toOp(testAdapter);
       expect(op.execute?.[0]?.sql).toContain('CREATE SCHEMA IF NOT EXISTS "auth"');
     });
   });

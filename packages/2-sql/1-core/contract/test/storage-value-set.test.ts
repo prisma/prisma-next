@@ -18,28 +18,33 @@ const baseTable = new StorageTable({
 
 describe('StorageValueSet', () => {
   it('constructs with ordered values', () => {
-    const vs = new StorageValueSet({ kind: 'value-set', values: ['user', 'admin'] });
-    expect(vs.kind).toBe('value-set');
+    const vs = new StorageValueSet({ kind: 'valueSet', values: ['user', 'admin'] });
+    expect(vs.kind).toBe('valueSet');
     expect(vs.values).toEqual(['user', 'admin']);
   });
 
   it('preserves declaration order', () => {
     const vs = new StorageValueSet({
-      kind: 'value-set',
+      kind: 'valueSet',
       values: ['alpha', 'beta', 'gamma'],
     });
     expect([...vs.values]).toEqual(['alpha', 'beta', 'gamma']);
   });
 
   it('is frozen', () => {
-    const vs = new StorageValueSet({ kind: 'value-set', values: ['x', 'y'] });
+    const vs = new StorageValueSet({ kind: 'valueSet', values: ['x', 'y'] });
     expect(Object.isFrozen(vs)).toBe(true);
+  });
+
+  it('kind equals the entries slot key it lives under', () => {
+    const vs = new StorageValueSet({ kind: 'valueSet', values: ['a'] });
+    expect(vs.kind).toBe('valueSet');
   });
 });
 
 describe('SqlNamespace with valueSet entries', () => {
   it('accepts a namespace with a valueSet slot alongside the table slot', () => {
-    const roleVs = new StorageValueSet({ kind: 'value-set', values: ['user', 'admin'] });
+    const roleVs = new StorageValueSet({ kind: 'valueSet', values: ['user', 'admin'] });
 
     const ns = buildSqlNamespace({
       id: UNBOUND_NAMESPACE_ID,
@@ -49,9 +54,9 @@ describe('SqlNamespace with valueSet entries', () => {
       },
     });
 
-    expect(ns.entries.table['users']).toBeDefined();
+    expect(ns.entries.table?.['users']).toBeDefined();
     expect(ns.entries.valueSet?.['Role']).toBeDefined();
-    expect(ns.entries.valueSet?.['Role']?.kind).toBe('value-set');
+    expect(ns.entries.valueSet?.['Role']?.kind).toBe('valueSet');
     expect(ns.entries.valueSet?.['Role']?.values).toEqual(['user', 'admin']);
   });
 
@@ -60,31 +65,33 @@ describe('SqlNamespace with valueSet entries', () => {
       id: UNBOUND_NAMESPACE_ID,
       entries: { table: { users: baseTable } },
     });
-    expect(ns.entries.valueSet).toBeUndefined();
+    expect(ns.entries['valueSet']).toBeUndefined();
   });
 });
 
 describe('StorageColumn with valueSet restriction', () => {
   it('carries a valueSet ref when provided', () => {
     const ref: ValueSetRef = {
-      kind: 'value-set',
+      plane: 'storage',
+      entityKind: 'valueSet',
       namespaceId: UNBOUND_NAMESPACE_ID,
-      name: 'Role',
+      entityName: 'Role',
     };
     const col = new StorageColumn({ ...baseColumn, valueSet: ref });
 
     expect(col.valueSet).toEqual(ref);
-    expect(col.valueSet?.kind).toBe('value-set');
+    expect(col.valueSet?.entityKind).toBe('valueSet');
     expect(col.valueSet?.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
-    expect(col.valueSet?.name).toBe('Role');
+    expect(col.valueSet?.entityName).toBe('Role');
     expect(col.valueSet?.spaceId).toBeUndefined();
   });
 
   it('carries a cross-space valueSet ref when spaceId is provided', () => {
     const ref: ValueSetRef = {
-      kind: 'value-set',
+      plane: 'storage',
+      entityKind: 'valueSet',
       namespaceId: UNBOUND_NAMESPACE_ID,
-      name: 'Role',
+      entityName: 'Role',
       spaceId: 'other-space',
     };
     const col = new StorageColumn({ ...baseColumn, valueSet: ref });
@@ -99,8 +106,32 @@ describe('StorageColumn with valueSet restriction', () => {
   it('is frozen', () => {
     const col = new StorageColumn({
       ...baseColumn,
-      valueSet: { kind: 'value-set', namespaceId: UNBOUND_NAMESPACE_ID, name: 'Role' },
+      valueSet: {
+        plane: 'storage',
+        entityKind: 'valueSet',
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        entityName: 'Role',
+      },
     });
     expect(Object.isFrozen(col)).toBe(true);
+  });
+
+  it('ref entityKind equals the entries slot key it resolves in', () => {
+    const ref: ValueSetRef = {
+      plane: 'storage',
+      entityKind: 'valueSet',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      entityName: 'Role',
+    };
+    const ns = buildSqlNamespace({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: {
+        table: {},
+        valueSet: { Role: new StorageValueSet({ kind: 'valueSet', values: ['user'] }) },
+      },
+    });
+    const resolved = ns.entries.valueSet?.[ref.entityName];
+    expect(resolved).toBeDefined();
+    expect(ref.entityKind).toBe('valueSet');
   });
 });

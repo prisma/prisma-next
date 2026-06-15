@@ -3,23 +3,19 @@ import type { TableProxy } from './table-proxy';
 
 export type CapabilitiesBase = Record<string, Record<string, boolean>>;
 
-// The sql-builder DSL is flat by table name across every declared
-// namespace. Two namespaces declaring tables with the same name produce
-// a union at the DSL surface (which collapses to a type error at the
-// first call site); landing the namespace-aware DSL surface (db.<ns>.<table>)
-// is tracked separately. Within scope here: the DSL accepts the
-// namespaced storage shape directly and walks every namespace.
+type NamespaceEntries = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+
 export type TableProxyContract = {
   readonly storage: {
-    readonly namespaces: Readonly<
-      Record<
-        string,
-        { readonly entries: { readonly table: Readonly<Record<string, StorageTable>> } }
-      >
-    >;
+    readonly namespaces: Readonly<Record<string, { readonly entries: NamespaceEntries }>>;
   };
   readonly capabilities: CapabilitiesBase;
 };
+
+type TablesInNamespace<NS extends { readonly entries: NamespaceEntries }> =
+  NS['entries']['table'] extends Readonly<Record<string, StorageTable>>
+    ? NS['entries']['table']
+    : Readonly<Record<string, StorageTable>>;
 
 // Union of every table name declared in any namespace of `C`. Replaces
 // the prior `UnboundTables<C>` indexing (which only saw `__unbound__`).
@@ -28,16 +24,33 @@ export type UnboundTables<C extends TableProxyContract> = {
 };
 
 export type TableNamesAcrossNamespaces<C extends TableProxyContract> = {
-  [NSId in keyof C['storage']['namespaces']]: keyof C['storage']['namespaces'][NSId]['entries']['table'] &
+  [NSId in keyof C['storage']['namespaces']]: keyof TablesInNamespace<
+    C['storage']['namespaces'][NSId]
+  > &
     string;
 }[keyof C['storage']['namespaces']];
 
 export type TableInAnyNamespace<C extends TableProxyContract, Name extends string> = {
-  [NSId in keyof C['storage']['namespaces']]: Name extends keyof C['storage']['namespaces'][NSId]['entries']['table']
-    ? C['storage']['namespaces'][NSId]['entries']['table'][Name]
+  [NSId in keyof C['storage']['namespaces']]: Name extends keyof TablesInNamespace<
+    C['storage']['namespaces'][NSId]
+  >
+    ? TablesInNamespace<C['storage']['namespaces'][NSId]>[Name]
     : never;
 }[keyof C['storage']['namespaces']];
 
+// The tables of a single storage namespace, keyed by bare table name. Lets
+// callers reach a table by its namespace coordinate (`db.<ns>.<table>`) when
+// the same bare name is declared in more than one namespace.
+export type Namespace<
+  C extends TableProxyContract,
+  NsId extends keyof C['storage']['namespaces'],
+> = {
+  readonly [Name in keyof TablesInNamespace<C['storage']['namespaces'][NsId]> & string]: TableProxy<
+    C,
+    Name
+  >;
+};
+
 export type Db<C extends TableProxyContract> = {
-  [Name in TableNamesAcrossNamespaces<C>]: TableProxy<C, Name>;
+  readonly [Ns in keyof C['storage']['namespaces']]: Namespace<C, Ns>;
 };

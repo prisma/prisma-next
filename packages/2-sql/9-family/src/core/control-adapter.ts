@@ -18,6 +18,7 @@ import type {
   DdlNode,
   LoweredStatement,
   LowererContext,
+  SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/verify-sql-schema';
@@ -34,13 +35,27 @@ export interface Lowerer {
 }
 
 /**
+ * Extends {@link Lowerer} with async codec-routed DDL lowering. Control
+ * adapters implement this; the planner's `CreateTableCall.toOp` and
+ * `CreateSchemaCall.toOp` accept it to produce executable DDL statements
+ * with literal defaults encoded through their codec.
+ */
+export interface ExecuteRequestLowerer extends Lowerer {
+  lowerToExecuteRequest(
+    ast: AnyQueryAst | DdlNode,
+    context?: LowererContext<unknown>,
+  ): Promise<SqlExecuteRequest>;
+}
+
+/**
  * SQL control adapter interface for control-plane operations.
  * Implemented by target-specific adapters (e.g., Postgres, MySQL).
  *
  * @template TTarget - The target ID (e.g., 'postgres', 'mysql')
  */
 export interface SqlControlAdapter<TTarget extends string = string>
-  extends ControlAdapterInstance<'sql', TTarget> {
+  extends ControlAdapterInstance<'sql', TTarget>,
+    ExecuteRequestLowerer {
   /**
    * Reads the contract marker for `space` from the database, returning
    * `null` if no marker row exists for that space (or if the marker
@@ -231,17 +246,6 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * `sign` — excludes the ledger table.
    */
   bootstrapSignMarkerQueries(): readonly DdlNode[];
-
-  /**
-   * Lower a SQL query AST into a target-flavored `{ sql, params }` payload.
-   *
-   * Migration tooling (e.g. the `dataTransform` operation) needs to materialize
-   * SQL at emit/plan time without instantiating the runtime adapter. The control
-   * adapter's `lower` is byte-equivalent to the runtime adapter's `lower` for the
-   * same AST and contract, ensuring planned SQL matches what the runtime would
-   * emit.
-   */
-  lower(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement;
 }
 
 /**

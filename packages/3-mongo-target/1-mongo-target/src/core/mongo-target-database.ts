@@ -3,21 +3,24 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import { MongoCollection, type MongoCollectionInput } from '@prisma-next/mongo-contract';
+import {
+  MongoCollection,
+  type MongoCollectionInput,
+  type MongoNamespaceEntries,
+} from '@prisma-next/mongo-contract';
+import { blindCast } from '@prisma-next/utils/casts';
 
 export interface MongoTargetDatabaseInput {
   readonly id: string;
-  readonly entries?: {
-    readonly collection?: Record<string, MongoCollection | MongoCollectionInput>;
-  };
+  readonly entries?: Readonly<Record<string, Readonly<Record<string, MongoCollectionInput>>>>;
 }
 
 /**
  * Mongo target `Namespace` concretion. In Mongo the "namespace" concept
  * binds to the connection's `db` field — a `MongoTargetDatabase` instance
- * names the database the collections live under. `entries.collection`
+ * names the database the collections live under. `entries['collection']`
  * holds collection IR. The unbound singleton (below) is the late-bound
- * slot whose binding the connection's `db` resolves at runtime rather
+ * namespace whose binding the connection's `db` resolves at runtime rather
  * than at authoring time.
  *
  * Qualifier emission is the rendering seam: query / DDL emission asks the
@@ -27,26 +30,45 @@ export interface MongoTargetDatabaseInput {
  * never branch on `id === UNBOUND_NAMESPACE_ID`.
  */
 export class MongoTargetDatabase extends NamespaceBase {
-  readonly kind = 'database' as const;
+  declare readonly kind: string;
   readonly id: string;
-  readonly entries: Readonly<{
-    readonly collection: Readonly<Record<string, MongoCollection>>;
-  }>;
+  readonly entries: MongoNamespaceEntries;
 
   constructor(input: MongoTargetDatabaseInput) {
     super();
     this.id = input.id;
-    this.entries = Object.freeze({
-      collection: Object.freeze(
-        Object.fromEntries(
-          Object.entries(input.entries?.collection ?? {}).map(([name, c]) => [
-            name,
-            c instanceof MongoCollection ? c : new MongoCollection(c),
-          ]),
-        ),
-      ),
+
+    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
+    let collection: Readonly<Record<string, MongoCollection>> = Object.freeze({});
+    for (const [kind, rawMap] of Object.entries(input.entries ?? {})) {
+      if (kind === 'collection') {
+        const collectionMap: Record<string, MongoCollection> = {};
+        for (const [name, c] of Object.entries(
+          blindCast<
+            Record<string, MongoCollectionInput>,
+            'entries[collection] holds MongoCollectionInput by construction'
+          >(rawMap),
+        )) {
+          collectionMap[name] = new MongoCollection(c);
+        }
+        collection = Object.freeze(collectionMap);
+      } else {
+        carried[kind] = Object.freeze(rawMap);
+      }
+    }
+
+    this.entries = Object.freeze({ ...carried, collection });
+    Object.defineProperty(this, 'kind', {
+      value: 'database',
+      writable: false,
+      enumerable: false,
+      configurable: true,
     });
     freezeNode(this);
+  }
+
+  get collection(): Readonly<Record<string, MongoCollection>> {
+    return this.entries.collection ?? Object.freeze({});
   }
 
   /**
@@ -70,7 +92,7 @@ export class MongoTargetDatabase extends NamespaceBase {
 
 /**
  * Singleton subclass for the reserved sentinel namespace id
- * (`UNBOUND_NAMESPACE_ID`) — the late-bound slot whose binding the
+ * (`UNBOUND_NAMESPACE_ID`) — the late-bound namespace whose binding the
  * connection's `db` resolves at runtime. Overrides qualifier emission
  * to elide the database prefix; call sites that consume `qualifier()`
  * / `qualifyCollection()` get unqualified output without branching on

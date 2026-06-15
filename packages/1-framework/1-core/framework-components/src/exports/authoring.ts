@@ -3,6 +3,7 @@ export type {
   AuthoringArgumentDescriptor,
   AuthoringColumnDefaultTemplate,
   AuthoringContributions,
+  AuthoringDiagnosticSink,
   AuthoringEntityContext,
   AuthoringEntityTypeDescriptor,
   AuthoringEntityTypeFactoryOutput,

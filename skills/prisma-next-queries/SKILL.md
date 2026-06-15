@@ -1,18 +1,19 @@
 ---
 name: prisma-next-queries
 description: >-
-  Write Prisma Next queries for Postgres or Mongo — pick a lane (Postgres
-  `db.orm.<Model>` + `db.sql.<table>`; Mongo `db.orm.<root>` +
-  `db.query.from(...)` pipeline builder), filter / project / sort / paginate,
-  eager-load with `.include(...)`, Postgres `db.transaction(...)`, Postgres ORM
-  `.aggregate(...)`, Mongo aggregations via query builder. Triggers: query,
-  where, match, select, project, orderBy, take, skip, include, lookup, first,
-  all, count, aggregate, group, create, update, delete, upsert, returning,
-  transaction, db.close, script teardown, variant, polymorphism, drizzle-style,
-  kysely-style. Notes: `.all()` is a Thenable (just `await` it), iterators are
-  single-use (`RUNTIME.ITERATOR_CONSUMED`), Postgres `count` is `number` while
-  sum/avg/min/max are `number | null`, ranges use chained `.where()` or
-  `and(...)` (no `.between(...)`).
+  Write Prisma Next queries for Postgres, SQLite, or Mongo — pick a lane
+  (Postgres/SQLite `db.orm.<Model>` + `db.sql.<table>`; Mongo `db.orm.<root>`
+  + `db.query.from(...)` pipeline builder), filter / project / sort / paginate,
+  eager-load with `.include(...)`, Postgres/SQLite `db.transaction(...)`,
+  Postgres/SQLite ORM `.aggregate(...)`, Mongo aggregations via query builder,
+  namespace-aware accessors (`db.orm.<ns>.<Model>`, `db.sql.<ns>.<table>`).
+  Triggers: query, where, match, select, project, orderBy, take, skip, include,
+  lookup, first, all, count, aggregate, group, create, update, delete, upsert,
+  returning, transaction, db.close, script teardown, variant, polymorphism,
+  drizzle-style, kysely-style. Notes: `.all()` is a Thenable (just `await` it),
+  iterators are single-use (`RUNTIME.ITERATOR_CONSUMED`), Postgres `count` is
+  `number` while sum/avg/min/max are `number | null`, ranges use chained
+  `.where()` or `and(...)` (no `.between(...)`).
 ---
 
 # Prisma Next — Queries
@@ -26,7 +27,7 @@ Once the contract is emitted and the DB is up to date, this skill covers everyth
 - User wants to read, write, update, or delete data.
 - User wants to include / eager-load relations.
 - User wants to paginate, sort, filter, project.
-- User wants to wrap operations in a transaction (`db.transaction(...)` — Postgres only today).
+- User wants to wrap operations in a transaction (`db.transaction(...)` — Postgres and SQLite).
 - User wants to aggregate (`count`, `sum`, `avg`, …).
 - User asks about query lanes (ORM vs SQL builder / query builder).
 - User mentions: *query, select, where, orderBy, take, skip, include, eager load, first, all, count, aggregate, create, update, delete, upsert, returning, drizzle-style, kysely-style, prisma client*.
@@ -49,6 +50,17 @@ Prisma Next ships **two query lanes per target** on the same `db` value from `sr
 Both targets share the contract and connection on one `db` value. Reach for the ORM first; drop to the lower-level lane when the ORM can't express the shape. Lane choice is local — one query function picks one lane, not the whole app.
 
 **Do not mix target examples.** Postgres uses PascalCase model roots (`db.orm.User`) and `db.sql.user`; Mongo uses lowercased plural roots (`db.orm.users`) and `db.query.from('users')`. There is no `db.sql` on Mongo and no `db.query` SQL-builder equivalent on Postgres.
+
+## Namespace-aware accessors
+
+When a contract declares more than one namespace (e.g. `public` and `auth`), models and tables are addressed by namespace coordinate:
+
+- **ORM**: `db.orm.<namespace>.<Model>` — e.g. `db.orm.public.User`, `db.orm.auth.User`
+- **SQL builder**: `db.sql.<namespace>.<table>` — e.g. `db.sql.public.users`, `db.sql.auth.users`
+
+The flat `db.orm.User` / `db.sql.users` form still works for single-namespace contracts (or when all table names are unique across namespaces). When the same bare name appears in more than one namespace, you must use the namespace coordinate.
+
+See [`postgres.md` § Namespace-aware accessors](./postgres.md#namespace-aware-accessors) for a worked example.
 
 ## Consuming the result: `await`, `.toArray()`, or `for await`
 
@@ -133,6 +145,8 @@ Target-specific pitfalls live in the per-target guides.
 
 ## What Prisma Next doesn't do yet
 
+- **N:M `.include()` across a junction table.** The contract IR supports many-to-many relations with a `through` junction table, and `N:M` relations appear as valid relation names on the ORM collection. However, `.include()` on an N:M relation does not emit the two-step junction join — the query plan builder only handles the direct join columns (`localColumn` / `targetColumn`) and ignores the `through` metadata. Attempting it either produces wrong results or an error. Workaround: express the N:M traversal through `db.sql.<table>` with an explicit join on the junction table.
+- **N:M nested mutations.** `mutation-executor.ts` explicitly throws `'N:M nested mutations are not supported yet'` for nested creates/links through an N:M relation.
 - **`and` / `or` / `not` combinators in the postgres façade.** The combinators currently import from `@prisma-next/sql-orm-client` (an internal package). Workaround today: import them from `@prisma-next/sql-orm-client` directly, the way the example apps do. If you want them on `@prisma-next/postgres/runtime`, file a feature request via `prisma-next-feedback`.
 - **`.orderBy(...)` / `.take(...)` on grouped aggregates (Postgres).** `db.orm.<Model>.groupBy(...).aggregate(...)` materializes a `Promise<Array<Group & Aggregates>>` and exposes neither ordering nor row limits at the DB layer. Result: a "top-N groups by SUM" query falls back to JS-side sort + slice over the full grouped result, which is fine at small cardinalities and bad at scale. Workarounds: (a) drop to `db.sql.<table>` and write the `GROUP BY` + `ORDER BY` + `LIMIT` against the aggregated table directly; (b) live with the JS-side sort/slice if the grouped cardinality is bounded. File a feature request via `prisma-next-feedback` if this is hitting you in production.
 - **A raw-SQL lane.** Prisma Next does not currently expose a user-facing raw-SQL surface (no `db.sql.raw(...)`). Workaround: model the query through the SQL builder or — for shapes the builder can't yet express — file a feature request via `prisma-next-feedback` describing the shape so the team can decide whether to grow the builder or ship a raw lane.
@@ -155,6 +169,7 @@ This skill is split for selective loading. Target-specific reference paths live 
 ## Checklist
 
 - [ ] Confirmed the active target from `db.ts` and loaded the matching guide ([`postgres.md`](./postgres.md) or [`mongo.md`](./mongo.md)).
+- [ ] For multi-namespace contracts, used `db.orm.<ns>.<Model>` / `db.sql.<ns>.<table>` coordinates when the same bare name exists in more than one namespace.
 - [ ] Chose the right lane (ORM by default; lower-level builder for shapes the ORM doesn't express).
 - [ ] Used `.first()` / `.first({ pk })` (Postgres) or `.where({ ... }).first()` (Mongo) for single-row reads — not `.all()`.
 - [ ] Consumed `.all()` with plain `await` (not a `collect()` / `toArray()` helper). Used `for await` only when streaming is actually wanted, and never iterated the same result twice.

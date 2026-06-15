@@ -20,6 +20,25 @@
   "domain": {
     "namespaces": {
       "public": {
+        "enum": {
+          "Priority": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "Low",
+                "value": "low"
+              },
+              {
+                "name": "High",
+                "value": "high"
+              },
+              {
+                "name": "Urgent",
+                "value": "urgent"
+              }
+            ]
+          }
+        },
         "models": {
           "Bug": {
             "base": {
@@ -117,6 +136,19 @@
                   }
                 }
               },
+              "priority": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "Priority",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
               "title": {
                 "nullable": false,
                 "type": {
@@ -159,6 +191,9 @@
                 },
                 "id": {
                   "column": "id"
+                },
+                "priority": {
+                  "column": "priority"
                 },
                 "title": {
                   "column": "title"
@@ -538,6 +573,18 @@
               "uniques": []
             },
             "post": {
+              "checks": [
+                {
+                  "column": "priority",
+                  "name": "post_priority_check",
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Priority",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                }
+              ],
               "columns": {
                 "createdAt": {
                   "codecId": "pg/timestamptz@1",
@@ -560,6 +607,21 @@
                   "nullable": false,
                   "typeParams": {
                     "length": 36
+                  }
+                },
+                "priority": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "low"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Priority",
+                    "namespaceId": "public",
+                    "plane": "storage"
                   }
                 },
                 "title": {
@@ -740,13 +802,23 @@
                 "user"
               ]
             }
+          },
+          "valueSet": {
+            "Priority": {
+              "kind": "valueSet",
+              "values": [
+                "low",
+                "high",
+                "urgent"
+              ]
+            }
           }
         },
         "id": "public",
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:ab50cca9eadd5727aa91cf94a1fd3910efbd8d1c5b8da6526c32ced6bc377a97",
+    "storageHash": "sha256:372f890816e6e404f2365d11fca59175fa4e79ba84125ab08ca71c4561cf4581",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

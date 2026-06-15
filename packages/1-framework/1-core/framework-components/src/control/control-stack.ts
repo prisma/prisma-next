@@ -1,6 +1,7 @@
 import { blindCast } from '@prisma-next/utils/casts';
 import type { Codec } from '../shared/codec';
-import type { CodecLookup, CodecMeta } from '../shared/codec-types';
+import type { AnyCodecDescriptor } from '../shared/codec-descriptor';
+import type { CodecLookup, CodecMeta, CodecRef, CodecRegistry } from '../shared/codec-types';
 import type {
   AuthoringContributions,
   AuthoringEntityTypeNamespace,
@@ -22,6 +23,8 @@ import type {
   ControlMutationDefaults,
   MutationDefaultGeneratorDescriptor,
 } from '../shared/mutation-default-types';
+import { materializeCodec } from '../shared/resolve-codec';
+import { runtimeError } from '../shared/runtime-error';
 import type { TypesImportSpec } from '../shared/types-import-spec';
 import type {
   ControlAdapterDescriptor,
@@ -51,7 +54,7 @@ export interface ControlStack<
   readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly queryOperationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds: ReadonlyArray<string>;
-  readonly codecLookup: CodecLookup;
+  readonly codecLookup: CodecRegistry;
   readonly authoringContributions: AssembledAuthoringContributions;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly controlMutationDefaults: ControlMutationDefaults;
@@ -294,8 +297,9 @@ export function assembleControlMutationDefaults(
 
 export function extractCodecLookup(
   descriptors: ReadonlyArray<Pick<ComponentMetadata & { id: string }, 'types' | 'id'>>,
-): CodecLookup {
+): CodecRegistry {
   const byId = new Map<string, Codec>();
+  const descriptorsById = new Map<string, AnyCodecDescriptor>();
   const targetTypesById = new Map<string, readonly string[]>();
   const metaById = new Map<string, CodecMeta>();
   const renderersById = new Map<string, (params: Record<string, unknown>) => string | undefined>();
@@ -313,6 +317,7 @@ export function extractCodecLookup(
         entityOwnershipLabel: 'codec descriptor provider',
       });
       owners.set(codecDescriptor.codecId, descriptorId);
+      descriptorsById.set(codecDescriptor.codecId, codecDescriptor);
       if (Array.isArray(codecDescriptor.targetTypes)) {
         targetTypesById.set(codecDescriptor.codecId, codecDescriptor.targetTypes);
       }
@@ -348,6 +353,18 @@ export function extractCodecLookup(
   }
   return {
     get: (id) => byId.get(id),
+    forCodecRef(ref: CodecRef) {
+      const d = descriptorsById.get(ref.codecId);
+      if (d === undefined) {
+        throw runtimeError(
+          'RUNTIME.CODEC_DESCRIPTOR_MISSING',
+          `No codec descriptor registered for codecId '${ref.codecId}'.`,
+          { codecId: ref.codecId },
+        );
+      }
+      return materializeCodec(d, ref, { name: `<ref:${ref.codecId}>` });
+    },
+    forColumn: () => undefined,
     targetTypesFor: (id) => targetTypesById.get(id),
     metaFor: (id) => metaById.get(id),
     renderOutputTypeFor: (id, params) => renderersById.get(id)?.(params),

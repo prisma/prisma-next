@@ -7,7 +7,7 @@ describe('integration: JOIN', { timeout: timeouts.databaseOperation }, () => {
   it('INNER JOIN returns matched rows', async () => {
     const rows = await runtime().execute(
       db()
-        .users.innerJoin(db().posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+        .public.users.innerJoin(db().public.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
         .select('name', 'title')
         .build(),
     );
@@ -21,7 +21,9 @@ describe('integration: JOIN', { timeout: timeouts.databaseOperation }, () => {
   it('LEFT JOIN returns all left rows with nulls for unmatched', async () => {
     const rows = await runtime().execute(
       db()
-        .users.outerLeftJoin(db().profiles, (f, fns) => fns.eq(f.users.id, f.profiles.user_id))
+        .public.users.outerLeftJoin(db().public.profiles, (f, fns) =>
+          fns.eq(f.users.id, f.profiles.user_id),
+        )
         .select('name', 'bio')
         .orderBy('name')
         .build(),
@@ -36,9 +38,11 @@ describe('integration: JOIN', { timeout: timeouts.databaseOperation }, () => {
   it('self-join via .as()', async () => {
     const d = db();
     const rows = await runtime().execute(
-      d.users
+      d.public.users
         .as('invitee')
-        .innerJoin(d.users.as('inviter'), (f, fns) => fns.eq(f.invitee.invited_by_id, f.inviter.id))
+        .innerJoin(d.public.users.as('inviter'), (f, fns) =>
+          fns.eq(f.invitee.invited_by_id, f.inviter.id),
+        )
         .select((f) => ({ invitee: f.invitee.name, inviter: f.inviter.name }))
         .build(),
     );
@@ -49,9 +53,9 @@ describe('integration: JOIN', { timeout: timeouts.databaseOperation }, () => {
 
   it('subquery as join source', async () => {
     const d = db();
-    const sub = d.posts.select('user_id', 'title').as('sub');
+    const sub = d.public.posts.select('user_id', 'title').as('sub');
     const rows = await runtime().execute(
-      d.users
+      d.public.users
         .innerJoin(sub, (f, fns) => fns.eq(f.users.id, f.sub.user_id))
         .select('name', 'title')
         .build(),

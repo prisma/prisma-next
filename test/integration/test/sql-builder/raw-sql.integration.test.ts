@@ -2,19 +2,18 @@ import { postgresRawCodecInferer } from '@prisma-next/adapter-postgres/adapter';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   type ExecutionStackInstance,
   instantiateExecutionStack,
   type RuntimeDriverInstance,
 } from '@prisma-next/framework-components/execution';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { param } from '@prisma-next/sql-relational-core/expression';
 import type { SqlParamRefMutator } from '@prisma-next/sql-relational-core/middleware';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
   createExecutionContext,
-  createRuntime,
   createSqlExecutionStack,
   type Runtime,
   type SqlMiddleware,
@@ -22,7 +21,7 @@ import {
   type SqlRuntimeDriverInstance,
   type SqlRuntimeExtensionInstance,
 } from '@prisma-next/sql-runtime';
-import postgresTarget from '@prisma-next/target-postgres/runtime';
+import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -30,7 +29,7 @@ import { setupTestDatabase } from '../utils';
 import { contract } from './fixtures/contract';
 import type { Contract } from './fixtures/generated/contract';
 
-const sqlContract = new SqlContractSerializer().deserializeContract(contract) as Contract;
+const sqlContract = new PostgresContractSerializer().deserializeContract(contract) as Contract;
 
 type TestStackInstance = ExecutionStackInstance<
   'sql',
@@ -146,9 +145,9 @@ describe('integration: rawSql expression in typed builder', {
   });
 
   function buildRuntime(middleware?: readonly SqlMiddleware[]): Runtime {
-    return createRuntime({
-      stackInstance,
+    return new PostgresRuntimeImpl({
       context,
+      adapter: stackInstance.adapter,
       driver,
       verifyMarker: false,
       ...(middleware ? { middleware } : {}),
@@ -165,7 +164,7 @@ describe('integration: rawSql expression in typed builder', {
       // fns.raw is RawSqlTag (always present) because BuiltinFunctions declares it
       // concretely; the callback receives AggregateFunctions<QC>.
       const rows = await runtime.execute(
-        db.posts
+        db.public.posts
           .select('id')
           .select('doubled', (f, fns) => fns.raw`${f.views} * 2`.returns('pg/int4@1'))
           .orderBy('id')
@@ -182,7 +181,7 @@ describe('integration: rawSql expression in typed builder', {
       const runtime = buildRuntime();
 
       const rows = await runtime.execute(
-        db.posts
+        db.public.posts
           .select('id')
           .select('magic', (_f, fns) => fns.raw`42`.returns('pg/int4@1'))
           .orderBy('id')
@@ -218,7 +217,7 @@ describe('integration: rawSql expression in typed builder', {
       // The middleware's beforeExecute should see it via params.entries().
       // fns.raw is RawSqlTag (non-optional) — callable directly as a template tag.
       await runtime.execute(
-        db.posts
+        db.public.posts
           .select('id')
           .where((_f, fns) =>
             fns.gt(
@@ -258,7 +257,7 @@ describe('integration: rawSql expression in typed builder', {
       // Two param() calls: param(10) and param(200).
       // The where clause: both params embedded in rawSql expressions, surfaced via gt/lt.
       await runtime.execute(
-        db.posts
+        db.public.posts
           .select('id')
           .where((_f, fns) =>
             fns.and(

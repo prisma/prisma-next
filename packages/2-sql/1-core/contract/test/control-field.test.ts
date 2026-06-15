@@ -5,7 +5,7 @@ import { StorageColumn } from '../src/ir/storage-column';
 import { StorageTable } from '../src/ir/storage-table';
 import {
   createSqlContractSchema,
-  PostgresEnumTypeSchema,
+  createSqlEntrySchemaRegistry,
   validateStorage,
 } from '../src/validators';
 
@@ -135,22 +135,8 @@ describe('SQL storage validators accept control', () => {
   });
 });
 
-describe('PostgresEnumTypeSchema control field', () => {
-  const schema = PostgresEnumTypeSchema;
-
-  it('accepts an enum entry carrying control', () => {
-    const result = schema({ kind: 'postgres-enum', values: ['a', 'b'], control: 'external' });
-    expect(result instanceof type.errors).toBe(false);
-  });
-
-  it('rejects an enum entry carrying a non-ControlPolicy string', () => {
-    const result = schema({ kind: 'postgres-enum', values: ['a', 'b'], control: 'bogus' });
-    expect(result instanceof type.errors).toBe(true);
-  });
-});
-
 describe('SQL contract schema defaultControlPolicy', () => {
-  const schema = createSqlContractSchema();
+  const schema = createSqlContractSchema(createSqlEntrySchemaRegistry());
 
   it('accepts a contract carrying defaultControlPolicy', () => {
     expect(schema(minimalContract('observed')) instanceof type.errors).toBe(false);

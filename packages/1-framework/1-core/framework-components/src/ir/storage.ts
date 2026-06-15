@@ -1,4 +1,5 @@
 import type { StorageBase } from '@prisma-next/contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { IRNode } from './ir-node';
 import type { Namespace } from './namespace';
 
@@ -30,11 +31,11 @@ export interface EntityCoordinate {
  * value, yielded as {@link EntityCoordinate} tuples with
  * `plane: 'storage'` (the parameter type binds the plane).
  *
- * Iterates each namespace's `entries` slot maps structurally. Skips
+ * Iterates each namespace's `entries` kind maps structurally. Skips
  * non-object `entries`; `id` and `kind` are not walked (`kind` is
  * non-enumerable on concretions). For every entity-kind key under
  * `entries` whose value is a non-null object, yields one coordinate per
- * entity name in that map. No family-specific slot vocabulary is required.
+ * entity name in that map. No family-specific kind vocabulary is required.
  */
 export function* elementCoordinates(
   storage: Pick<StorageBase, 'namespaces'>,
@@ -42,13 +43,39 @@ export function* elementCoordinates(
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
     const entries = ns.entries;
     if (entries === null || typeof entries !== 'object') continue;
-    for (const [entityKind, slot] of Object.entries(entries)) {
-      if (slot === null || typeof slot !== 'object') continue;
-      for (const entityName of Object.keys(slot)) {
+    for (const [entityKind, kindMap] of Object.entries(entries)) {
+      if (kindMap === null || typeof kindMap !== 'object') continue;
+      for (const entityName of Object.keys(kindMap)) {
         yield { plane: 'storage', namespaceId, entityKind, entityName };
       }
     }
   }
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * Looks up a single entity in a `Storage`-shaped value by its full coordinate.
+ * Returns `undefined` if the namespace, entity kind, or entity name is absent.
+ * The type parameter is a caller assertion — the walk itself is structural
+ * and cannot verify the entity's shape.
+ */
+export function entityAt<T = unknown>(
+  storage: Pick<StorageBase, 'namespaces'>,
+  coord: Pick<EntityCoordinate, 'namespaceId' | 'entityKind' | 'entityName'>,
+): T | undefined {
+  const ns = storage.namespaces[coord.namespaceId];
+  if (ns === undefined) return undefined;
+  const entries = ns.entries;
+  if (!isRecord(entries)) return undefined;
+  const kindMap = entries[coord.entityKind];
+  if (!isRecord(kindMap)) return undefined;
+  if (!Object.hasOwn(kindMap, coord.entityName)) return undefined;
+  return blindCast<T | undefined, 'caller asserts the entity type at this coordinate'>(
+    kindMap[coord.entityName],
+  );
 }
 
 /**
@@ -66,7 +93,7 @@ export function* elementCoordinates(
  * is honest at every layer.
  *
  * Extends `IRNode` so the framework's IR-walking surfaces (verifiers,
- * serializers) can dispatch on `Storage`-typed slots through the same
+ * serializers) can dispatch on `Storage`-typed fields through the same
  * IR-node alphabet as every other node — the structural dual already
  * holds in code (every concrete storage class extends an IR-node base);
  * the interface promotion makes the typing honest.

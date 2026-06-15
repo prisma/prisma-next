@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../src/core/control-adapter';
 
 interface CapturedCall {
@@ -21,7 +22,7 @@ function createCapturingDriver(rows: Record<string, unknown>[] = []) {
 }
 
 describe('PostgresControlAdapter marker/ledger write lowering', () => {
-  const adapter = new PostgresControlAdapter();
+  const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
   it('insertMarker lowers to a plain insert with DB-side updated_at', async () => {
     const driver = createCapturingDriver();

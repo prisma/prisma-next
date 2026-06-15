@@ -4,13 +4,7 @@ import {
   type LoweredStatement,
   RawExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import {
-  createAstCodecRegistry,
-  deriveParamMetadata,
-  encodeParamsWithMetadata,
-} from '@prisma-next/sql-runtime';
 import { PG_TIMESTAMPTZ_CODEC_ID } from '@prisma-next/target-postgres/codec-ids';
-import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
 import {
   int4,
   int8,
@@ -20,8 +14,7 @@ import {
   textArray,
   timestamptz,
 } from '@prisma-next/target-postgres/contract-free';
-
-const CONTROL_CODECS = createAstCodecRegistry(postgresCodecRegistry);
+import { encodeControlQueryParams } from './control-codecs';
 
 export const marker = pgTable(
   { name: 'marker', schema: 'prisma_contract' },
@@ -105,16 +98,7 @@ export async function execute(
   query: AnyQueryAst,
 ): Promise<readonly Record<string, unknown>[]> {
   const lowered = lower(query);
-  const values = lowered.params.map((slot) => {
-    if (slot.kind === 'literal') return slot.value;
-    throw new Error('Postgres control DML lowered to a bind parameter, which is unsupported');
-  });
-  const encoded = await encodeParamsWithMetadata(
-    values,
-    deriveParamMetadata(query),
-    {},
-    CONTROL_CODECS,
-  );
+  const encoded = await encodeControlQueryParams(lowered, query);
   const result = await driver.query(lowered.sql, encoded);
   return result.rows;
 }

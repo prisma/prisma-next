@@ -1,12 +1,16 @@
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createContract } from '@prisma-next/test-utils';
+import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { col, fk, index, model, pk, table, unique } from '../src/factories';
 import { CheckConstraint } from '../src/ir/check-constraint';
 import { StorageTable } from '../src/ir/storage-table';
 import type { ReferentialAction, SqlStorage } from '../src/types';
 import {
+  createSqlEntrySchemaRegistry,
+  createSqlStorageSchema,
+  StorageValueSetSchema,
   validateModel,
   validateSqlContractFully,
   validateSqlStorageConsistency,
@@ -187,6 +191,53 @@ describe('SQL contract validators', () => {
         },
       };
       expect(() => validateModel(modelWithoutRelations)).not.toThrow();
+    });
+
+    const modelWithRelation = (relation: unknown) => ({
+      storage: {
+        table: 'parent',
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        fields: { id: { column: 'id' } },
+      },
+      fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
+      relations: { rel: relation },
+    });
+
+    const through = {
+      table: 'parent_child',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+    };
+
+    it('validates an N:M relation carrying through', () => {
+      const valid = modelWithRelation({
+        to: { model: 'Child', namespace: UNBOUND_NAMESPACE_ID },
+        cardinality: 'N:M',
+        on: { localFields: ['id'], targetFields: ['id'] },
+        through,
+      });
+      expect(() => validateModel(valid)).not.toThrow();
+    });
+
+    it('rejects an N:M relation without through', () => {
+      const invalid = modelWithRelation({
+        to: { model: 'Child', namespace: UNBOUND_NAMESPACE_ID },
+        cardinality: 'N:M',
+        on: { localFields: ['id'], targetFields: ['id'] },
+      });
+      expect(() => validateModel(invalid)).toThrow();
+    });
+
+    it('rejects a non-N:M relation carrying through', () => {
+      const invalid = modelWithRelation({
+        to: { model: 'Child', namespace: UNBOUND_NAMESPACE_ID },
+        cardinality: 'N:1',
+        on: { localFields: ['parentId'], targetFields: ['id'] },
+        through,
+      });
+      expect(() => validateModel(invalid)).toThrow();
     });
   });
 
@@ -1069,9 +1120,9 @@ describe('SQL contract validators', () => {
                 column: 'role',
                 valueSet: {
                   plane: 'storage',
-                  entityKind: 'value-set',
+                  entityKind: 'valueSet',
                   namespaceId: UNBOUND_NAMESPACE_ID,
-                  name: 'Role',
+                  entityName: 'Role',
                 },
               }),
             ],
@@ -1099,9 +1150,9 @@ describe('SQL contract validators', () => {
                 column: 'role',
                 valueSet: {
                   plane: 'storage',
-                  entityKind: 'value-set',
+                  entityKind: 'valueSet',
                   namespaceId: UNBOUND_NAMESPACE_ID,
-                  name: 'Role',
+                  entityName: 'Role',
                 },
               }),
             ],
@@ -1118,9 +1169,9 @@ describe('SQL contract validators', () => {
     it('rejects duplicate check constraint definitions (same column + valueSet)', () => {
       const valueSetRef = {
         plane: 'storage' as const,
-        entityKind: 'value-set' as const,
+        entityKind: 'valueSet' as const,
         namespaceId: UNBOUND_NAMESPACE_ID,
-        name: 'Role',
+        entityName: 'Role',
       };
       const s = createContract<SqlStorage>({
         storage: unboundTables({
@@ -1166,9 +1217,9 @@ describe('SQL contract validators', () => {
                 column: 'status',
                 valueSet: {
                   plane: 'storage',
-                  entityKind: 'value-set',
+                  entityKind: 'valueSet',
                   namespaceId: UNBOUND_NAMESPACE_ID,
-                  name: 'Status',
+                  entityName: 'Status',
                 },
               }),
             ],
@@ -1194,9 +1245,9 @@ describe('SQL contract validators', () => {
                 column: 'status',
                 valueSet: {
                   plane: 'storage',
-                  entityKind: 'value-set',
+                  entityKind: 'valueSet',
                   namespaceId: UNBOUND_NAMESPACE_ID,
-                  name: 'Status',
+                  entityName: 'Status',
                 },
               }),
             ],
@@ -1223,6 +1274,146 @@ describe('SQL contract validators', () => {
         models: { User: model('users', { id: { column: 'id' } }) },
       });
       expect(() => validateSqlContractFully(c)).not.toThrow();
+    });
+  });
+
+  describe('ValueSetRef call-site-narrowed schemas', () => {
+    const storageSchema = createSqlStorageSchema(createSqlEntrySchemaRegistry());
+
+    function makeStorageWithCheckRef(ref: Record<string, unknown>) {
+      return {
+        storageHash: 'sha256:test',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {
+                users: {
+                  columns: { role: { nativeType: 'text', codecId: 'pg/text@1', nullable: false } },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                  checks: [{ name: 'users_role_check', column: 'role', valueSet: ref }],
+                },
+              },
+            },
+          },
+        },
+      };
+    }
+
+    it('accepts a storage check ref with plane:storage + entityKind:valueSet', () => {
+      const result = storageSchema(
+        makeStorageWithCheckRef({
+          plane: 'storage',
+          entityKind: 'valueSet',
+          namespaceId: 'public',
+          entityName: 'Role',
+        }),
+      );
+      expect(result).not.toBeInstanceOf(type.errors);
+    });
+
+    it('rejects a storage check ref with plane:domain + entityKind:enum', () => {
+      const result = storageSchema(
+        makeStorageWithCheckRef({
+          plane: 'domain',
+          entityKind: 'enum',
+          namespaceId: 'public',
+          entityName: 'Role',
+        }),
+      );
+      expect(result).toBeInstanceOf(type.errors);
+    });
+
+    it('rejects a storage check ref with plane:domain + entityKind:valueSet', () => {
+      const result = storageSchema(
+        makeStorageWithCheckRef({
+          plane: 'domain',
+          entityKind: 'valueSet',
+          namespaceId: 'public',
+          entityName: 'Role',
+        }),
+      );
+      expect(result).toBeInstanceOf(type.errors);
+    });
+
+    it('accepts a domain field ref with plane:domain + entityKind:enum', () => {
+      const result = validateModel({
+        fields: {
+          role: {
+            nullable: false,
+            type: { kind: 'scalar', codecId: 'pg/text@1' },
+            valueSet: {
+              plane: 'domain',
+              entityKind: 'enum',
+              namespaceId: 'public',
+              entityName: 'Role',
+            },
+          },
+        },
+        relations: {},
+        storage: { table: 'user', namespaceId: 'public', fields: { role: { column: 'role' } } },
+      });
+      expect(result).toBeDefined();
+    });
+
+    it('rejects a domain field ref with plane:storage + entityKind:valueSet', () => {
+      expect(() =>
+        validateModel({
+          fields: {
+            role: {
+              nullable: false,
+              type: { kind: 'scalar', codecId: 'pg/text@1' },
+              valueSet: {
+                plane: 'storage',
+                entityKind: 'valueSet',
+                namespaceId: 'public',
+                entityName: 'Role',
+              },
+            },
+          },
+          relations: {},
+          storage: { table: 'user', namespaceId: 'public', fields: { role: { column: 'role' } } },
+        }),
+      ).toThrow();
+    });
+
+    it('StorageValueSetSchema accepts kind valueSet', () => {
+      const result = StorageValueSetSchema({ kind: 'valueSet', values: ['a', 'b'] });
+      expect(result).not.toBeInstanceOf(type.errors);
+    });
+
+    it('StorageValueSetSchema rejects kind value-set', () => {
+      const result = StorageValueSetSchema({ kind: 'value-set', values: ['a', 'b'] });
+      expect(result).toBeInstanceOf(type.errors);
+    });
+  });
+
+  describe('createSqlEntrySchemaRegistry', () => {
+    it('throws when a pack schema collides with a core kind (table)', () => {
+      const packSchemas = new Map([[' table', type('unknown')]]);
+      expect(() => createSqlEntrySchemaRegistry(packSchemas)).not.toThrow();
+
+      const collidingPackSchemas = new Map([['table', type('unknown')]]);
+      expect(() => createSqlEntrySchemaRegistry(collidingPackSchemas)).toThrow(
+        /collides with a core kind/,
+      );
+    });
+
+    it('throws when a pack schema collides with a core kind (valueSet)', () => {
+      const collidingPackSchemas = new Map([['valueSet', type('unknown')]]);
+      expect(() => createSqlEntrySchemaRegistry(collidingPackSchemas)).toThrow(
+        /collides with a core kind/,
+      );
+    });
+
+    it('registers non-colliding pack schemas', () => {
+      const packSchemas = new Map([['type', type('unknown')]]);
+      const registry = createSqlEntrySchemaRegistry(packSchemas);
+      expect(registry.has('type')).toBe(true);
+      expect(registry.has('table')).toBe(true);
+      expect(registry.has('valueSet')).toBe(true);
     });
   });
 });

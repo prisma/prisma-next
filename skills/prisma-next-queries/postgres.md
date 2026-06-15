@@ -103,15 +103,25 @@ await db.orm.Post
   .orderBy([(p) => p.createdAt.desc(), (p) => p.id.desc()])
   .take(20)
   .all();
+```
 
-// Cursor pagination — order by an indexed unique column and filter past the cursor.
-const cursor = lastPostFromPreviousPage.createdAt;
-await db.orm.Post
-  .where((p) => p.createdAt.lt(cursor))
+**Cursor pagination.** Call `.cursor({ field: lastValue })` after `.orderBy(...)` to resume from a known position. The cursor requires a prior `orderBy` — the type system enforces this. Direction (forward or backward) follows the sort: ascending order means "greater than the cursor value", descending means "less than".
+
+```typescript
+const page1 = await db.orm.Post
   .orderBy((p) => p.createdAt.desc())
   .take(20)
   .all();
+
+const last = page1[page1.length - 1]!;
+const page2 = await db.orm.Post
+  .orderBy((p) => p.createdAt.desc())
+  .cursor({ createdAt: last.createdAt })
+  .take(20)
+  .all();
 ```
+
+Cursor keys must match fields in the active `orderBy`. For a composite `orderBy`, pass a value for each ordering column — a partial cursor seeks only on the columns you supply, which gives an incomplete keyset. An empty cursor object is a no-op: you get the unfiltered first page back.
 
 **`.first()` vs `.first({ pk })` vs `.all()`.** Use `.first()` for a single row (issues a `LIMIT 1`); use `.first({ pk })` for primary-key lookups; reserve `.all()` for the genuine many case (no implicit `LIMIT`).
 
@@ -305,6 +315,25 @@ await db.transaction(async (tx) => {
 
 The callback's return value passes through `db.transaction(...)`. Capture inserted ids out of the callback and use them downstream after commit.
 
+## Namespace-aware accessors
+
+When the contract declares multiple namespaces, both `db.sql` and `db.orm` expose a namespace coordinate alongside the flat bare-name surface:
+
+```typescript
+// db.sql.<namespace>.<table>
+const plan = db.sql.public.users.select('id', 'email').build();
+const authPlan = db.sql.auth.users.select('id', 'token').build();
+await db.runtime().execute(plan);
+
+// db.orm.<namespace>.<Model>
+const user = await db.orm.public.User.create({ id: 1, email: 'a@x.io' });
+const authUser = await db.orm.auth.User.create({ id: 2, token: 'tok' });
+```
+
+The flat `db.sql.users` / `db.orm.User` form still works when bare names are unique across all namespaces. When the same bare name appears in more than one namespace, use the coordinate form — both the type system and the runtime require it to resolve to the right table.
+
+Cross-namespace relations (e.g. `public.Profile` → `auth.User`) follow the same `.include()` syntax; the ORM resolves the correct schema-qualified join automatically.
+
 ## Common Pitfalls (Postgres)
 
 1. **Reaching for the lower-level lane when the ORM would have done.** The ORM covers most CRUD shapes; drop to `db.sql` only for shapes the ORM can't express. Default to the ORM.
@@ -331,6 +360,7 @@ The callback's return value passes through `db.transaction(...)`. Capture insert
 - [ ] Used `.first()` / `.first({ pk })` for single-row reads — not `.all()`.
 - [ ] Coalesced `sum` / `avg` / `min` / `max` results with `?? 0` at the consumption site when zero-fill is desired — did NOT coalesce `count()`, which is `number`.
 - [ ] Expressed ranges as chained `.where(...)` clauses or a single `and(...)` clause — did NOT reach for a non-existent `.between(...)` operator.
+- [ ] For cursor pagination, used `.orderBy(...).cursor({ field: lastValue }).take(n).all()` — did NOT hand-write a `.where(p => p.field.lt(cursor))` workaround when the `.cursor()` API serves the same purpose.
 - [ ] For ORM combinators, imported `and` / `or` / `not` from the (currently internal) `@prisma-next/sql-orm-client` and noted the façade gap to the user.
 - [ ] Executed SQL-builder plans via `db.runtime().execute(plan)` (or `tx.execute(plan)` inside a transaction).
 - [ ] Wrapped multi-statement work in `db.transaction(async (tx) => { ... })` where atomicity matters.

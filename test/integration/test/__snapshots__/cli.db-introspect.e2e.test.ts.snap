@@ -1,7 +1,8 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`live schema CLI commands (e2e) > contract infer > writes a full PSL snapshot to output/contract.prisma 1`] = `
-"// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+"// use prisma-next
+// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
 model User {
   id    Int     @id(map: "user_pkey") @default(autoincrement())

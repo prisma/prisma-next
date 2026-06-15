@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { MigrationMetadata } from '../src/metadata';
 import { buildMigrationArtifacts, Migration } from '../src/migration-base';
 
-describe('Migration', () => {
-  describe('operations + describe() contract', () => {
-    it('subclasses expose operations via the getter and describe() metadata', () => {
+describe('Migration', async () => {
+  describe('operations + describe() contract', async () => {
+    it('subclasses expose operations via the getter and describe() metadata', async () => {
       class TestMigration extends Migration<{
         id: string;
         label: string;
@@ -31,7 +31,7 @@ describe('Migration', () => {
       expect(m.describe()).toEqual({ from: 'abc', to: 'def' });
     });
 
-    it('derives origin/destination from describe()', () => {
+    it('derives origin/destination from describe()', async () => {
       class TestMigration extends Migration {
         readonly targetId = 'test';
         override get operations() {
@@ -47,7 +47,7 @@ describe('Migration', () => {
       expect(m.destination).toEqual({ storageHash: 'hashTo' });
     });
 
-    it('returns a null origin when from is null (baseline plan)', () => {
+    it('returns a null origin when from is null (baseline plan)', async () => {
       class InitialMigration extends Migration {
         readonly targetId = 'test';
         override get operations() {
@@ -61,7 +61,7 @@ describe('Migration', () => {
       expect(new InitialMigration().origin).toBeNull();
     });
 
-    it('wraps from as a storage-hash origin when describe() returns a string', () => {
+    it('wraps from as a storage-hash origin when describe() returns a string', async () => {
       class NonBaselineMigration extends Migration {
         readonly targetId = 'test';
         override get operations() {
@@ -76,7 +76,7 @@ describe('Migration', () => {
     });
   });
 
-  describe('constructor accepts and stores a ControlStack', () => {
+  describe('constructor accepts and stores a ControlStack', async () => {
     /**
      * The constructor injection contract is that a subclass (e.g.
      * `PostgresMigration`) can read `this.stack` to materialize whatever it
@@ -85,7 +85,7 @@ describe('Migration', () => {
      * subclass that exposes the protected field, independent of any concrete
      * target's stack-consumption logic.
      */
-    it('stores the injected stack on the protected `stack` field', () => {
+    it('stores the injected stack on the protected `stack` field', async () => {
       const stub = { sentinel: true } as unknown as ControlStack<'sql', 'test'>;
 
       class StackProbe extends Migration {
@@ -104,7 +104,7 @@ describe('Migration', () => {
       expect(new StackProbe(stub).readStack()).toBe(stub);
     });
 
-    it('leaves `stack` undefined when constructed without an argument', () => {
+    it('leaves `stack` undefined when constructed without an argument', async () => {
       class StackProbe extends Migration {
         readonly targetId = 'test';
         override get operations() {
@@ -130,7 +130,7 @@ describe('Migration', () => {
  * dry-run stdout output) lives in `@prisma-next/cli` and is exercised
  * there.
  */
-describe('buildMigrationArtifacts', () => {
+describe('buildMigrationArtifacts', async () => {
   function makeMigration(
     operations: unknown,
     meta: {
@@ -153,8 +153,8 @@ describe('buildMigrationArtifacts', () => {
     return new M();
   }
 
-  it('produces ops.json + migration.json strings with synthesized metadata fields', () => {
-    const { opsJson, metadata, metadataJson } = buildMigrationArtifacts(
+  it('produces ops.json + migration.json strings with synthesized metadata fields', async () => {
+    const { opsJson, metadata, metadataJson } = await buildMigrationArtifacts(
       makeMigration([{ id: 'op1', label: 'Test op', operationClass: 'additive' }]),
       null,
     );
@@ -171,14 +171,14 @@ describe('buildMigrationArtifacts', () => {
     expect(JSON.parse(metadataJson)).toEqual(metadata);
   });
 
-  it('preserves createdAt from existing metadata', () => {
+  it('preserves createdAt from existing metadata', async () => {
     const existingMetadata: Partial<MigrationMetadata> = {
       from: 'sha256:from',
       to: 'sha256:to',
       createdAt: '2026-01-15T10:00:00.000Z',
     };
 
-    const { metadata } = buildMigrationArtifacts(
+    const { metadata } = await buildMigrationArtifacts(
       makeMigration([{ id: 'op1', label: 'Edited op', operationClass: 'additive' }], {
         from: 'sha256:from',
         to: 'sha256:to',
@@ -190,15 +190,15 @@ describe('buildMigrationArtifacts', () => {
     expect(metadata.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
-  it('throws when operations is not an array', () => {
-    expect(() => buildMigrationArtifacts(makeMigration('not an array'), null)).toThrow(
+  it('throws when operations is not an array', async () => {
+    await expect(buildMigrationArtifacts(makeMigration('not an array'), null)).rejects.toThrow(
       /operations/,
     );
   });
 
-  it('throws MIGRATION.INVALID_OPERATION_ENTRY when an entry is missing id', () => {
+  it('throws MIGRATION.INVALID_OPERATION_ENTRY when an entry is missing id', async () => {
     const ops = [{ label: 'No id', operationClass: 'additive' }];
-    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+    await expect(buildMigrationArtifacts(makeMigration(ops), null)).rejects.toThrowError(
       expect.objectContaining({
         code: 'MIGRATION.INVALID_OPERATION_ENTRY',
         details: expect.objectContaining({ index: 0 }),
@@ -206,9 +206,9 @@ describe('buildMigrationArtifacts', () => {
     );
   });
 
-  it('throws MIGRATION.INVALID_OPERATION_ENTRY when an entry is missing label', () => {
+  it('throws MIGRATION.INVALID_OPERATION_ENTRY when an entry is missing label', async () => {
     const ops = [{ id: 'op1', operationClass: 'additive' }];
-    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+    await expect(buildMigrationArtifacts(makeMigration(ops), null)).rejects.toThrowError(
       expect.objectContaining({
         code: 'MIGRATION.INVALID_OPERATION_ENTRY',
         details: expect.objectContaining({ index: 0 }),
@@ -216,9 +216,9 @@ describe('buildMigrationArtifacts', () => {
     );
   });
 
-  it('throws MIGRATION.INVALID_OPERATION_ENTRY when an entry is missing operationClass', () => {
+  it('throws MIGRATION.INVALID_OPERATION_ENTRY when an entry is missing operationClass', async () => {
     const ops = [{ id: 'op1', label: 'No class' }];
-    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+    await expect(buildMigrationArtifacts(makeMigration(ops), null)).rejects.toThrowError(
       expect.objectContaining({
         code: 'MIGRATION.INVALID_OPERATION_ENTRY',
         details: expect.objectContaining({ index: 0 }),
@@ -226,9 +226,9 @@ describe('buildMigrationArtifacts', () => {
     );
   });
 
-  it('throws MIGRATION.INVALID_OPERATION_ENTRY when operationClass is outside the allowed union', () => {
+  it('throws MIGRATION.INVALID_OPERATION_ENTRY when operationClass is outside the allowed union', async () => {
     const ops = [{ id: 'op1', label: 'Bad class', operationClass: 'unknown' }];
-    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+    await expect(buildMigrationArtifacts(makeMigration(ops), null)).rejects.toThrowError(
       expect.objectContaining({
         code: 'MIGRATION.INVALID_OPERATION_ENTRY',
         details: expect.objectContaining({ index: 0 }),
@@ -236,13 +236,13 @@ describe('buildMigrationArtifacts', () => {
     );
   });
 
-  it('reports the offending entry index when later entries in the array are malformed', () => {
+  it('reports the offending entry index when later entries in the array are malformed', async () => {
     const ops = [
       { id: 'op1', label: 'Good', operationClass: 'additive' },
       { id: 'op2', label: 'Good', operationClass: 'widening' },
       { id: 'op3', label: 'Bad', operationClass: 'totally-wrong' },
     ];
-    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+    await expect(buildMigrationArtifacts(makeMigration(ops), null)).rejects.toThrowError(
       expect.objectContaining({
         code: 'MIGRATION.INVALID_OPERATION_ENTRY',
         details: expect.objectContaining({ index: 2 }),
@@ -250,23 +250,23 @@ describe('buildMigrationArtifacts', () => {
     );
   });
 
-  it('throws a clear error when describe() returns invalid metadata', () => {
-    expect(() =>
+  it('throws a clear error when describe() returns invalid metadata', async () => {
+    await expect(
       buildMigrationArtifacts(
         makeMigration([{ id: 'op1', label: 'Op 1', operationClass: 'additive' }], {
           bad: true,
         } as never),
         null,
       ),
-    ).toThrow(/describe\(\).*invalid/);
+    ).rejects.toThrow(/describe\(\).*invalid/);
   });
 
   // The on-disk loader (`MigrationMetadataSchema` in `io.ts`) rejects
   // `from: ''` so the `describe()` validator must reject the same value.
   // Otherwise an authored migration could self-emit a package whose own
   // loader would refuse to read it back.
-  it("rejects describe() returning from: '' (empty-string sentinel is not allowed)", () => {
-    expect(() =>
+  it("rejects describe() returning from: '' (empty-string sentinel is not allowed)", async () => {
+    await expect(
       buildMigrationArtifacts(
         makeMigration([{ id: 'op1', label: 'Op 1', operationClass: 'additive' }], {
           from: '',
@@ -274,10 +274,10 @@ describe('buildMigrationArtifacts', () => {
         }),
         null,
       ),
-    ).toThrow(/describe\(\).*invalid/);
+    ).rejects.toThrow(/describe\(\).*invalid/);
   });
 
-  it('derives providedInvariants from data ops with invariantId (sorted, deduped)', () => {
+  it('derives providedInvariants from data ops with invariantId (sorted, deduped)', async () => {
     const ops = [
       { id: 'add', label: 'Add', operationClass: 'additive' },
       {
@@ -302,11 +302,11 @@ describe('buildMigrationArtifacts', () => {
       },
     ];
 
-    const { metadata } = buildMigrationArtifacts(makeMigration(ops), null);
+    const { metadata } = await buildMigrationArtifacts(makeMigration(ops), null);
     expect(metadata.providedInvariants).toEqual(['apple-invariant', 'zebra-invariant']);
   });
 
-  it('produces empty providedInvariants when no data ops declare invariantId', () => {
+  it('produces empty providedInvariants when no data ops declare invariantId', async () => {
     const ops = [
       { id: 'add', label: 'Add', operationClass: 'additive' },
       {
@@ -319,11 +319,11 @@ describe('buildMigrationArtifacts', () => {
         run: null,
       },
     ];
-    const { metadata } = buildMigrationArtifacts(makeMigration(ops), null);
+    const { metadata } = await buildMigrationArtifacts(makeMigration(ops), null);
     expect(metadata.providedInvariants).toEqual([]);
   });
 
-  it('rejects a malformed invariantId at emit time', () => {
+  it('rejects a malformed invariantId at emit time', async () => {
     const ops = [
       {
         id: 'data.bad',
@@ -336,12 +336,12 @@ describe('buildMigrationArtifacts', () => {
         run: null,
       },
     ];
-    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+    await expect(buildMigrationArtifacts(makeMigration(ops), null)).rejects.toThrowError(
       expect.objectContaining({ code: 'MIGRATION.INVALID_INVARIANT_ID' }) as unknown as Error,
     );
   });
 
-  it('rejects duplicate invariantId across data ops at emit time', () => {
+  it('rejects duplicate invariantId across data ops at emit time', async () => {
     const ops = [
       {
         id: 'data.first',
@@ -364,7 +364,7 @@ describe('buildMigrationArtifacts', () => {
         run: null,
       },
     ];
-    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+    await expect(buildMigrationArtifacts(makeMigration(ops), null)).rejects.toThrowError(
       expect.objectContaining({
         code: 'MIGRATION.DUPLICATE_INVARIANT_IN_EDGE',
       }) as unknown as Error,

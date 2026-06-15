@@ -12,7 +12,7 @@ import {
   planFieldEventOperations,
   plannerFailure,
 } from '@prisma-next/family-sql/control';
-import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -67,14 +67,19 @@ type VerifySqlSchemaOptionsWithComponents = Parameters<typeof verifySqlSchema>[0
 };
 
 /**
- * Reads every `entries.rlsPolicy` entry across the contract's namespaces and
+ * Reads every `entries['rlsPolicy']` entry across the contract's namespaces and
  * returns them as a flat array. Each policy retains its original `namespaceId`.
  */
 function readExpectedRlsPolicies(contract: Contract<SqlStorage>): readonly PostgresRlsPolicy[] {
   const policies: PostgresRlsPolicy[] = [];
   for (const ns of Object.values(contract.storage.namespaces)) {
     if (isPostgresSchema(ns)) {
-      for (const policy of Object.values(ns.entries.rlsPolicy)) {
+      for (const policy of Object.values(
+        blindCast<
+          Record<string, PostgresRlsPolicy>,
+          'entries[rlsPolicy] holds PostgresRlsPolicy by construction'
+        >(ns.entries['rlsPolicy'] ?? {}),
+      )) {
         policies.push(policy);
       }
     }
@@ -158,7 +163,9 @@ function buildRlsDiffCalls(
   return calls;
 }
 
-export function createPostgresMigrationPlanner(lowerer?: Lowerer): PostgresMigrationPlanner {
+export function createPostgresMigrationPlanner(
+  lowerer: ExecuteRequestLowerer,
+): PostgresMigrationPlanner {
   return new PostgresMigrationPlanner(lowerer);
 }
 
@@ -194,9 +201,9 @@ export type PostgresPlanResult =
  * authoring surface.
  */
 export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgres'> {
-  readonly #lowerer: Lowerer | undefined;
+  readonly #lowerer: ExecuteRequestLowerer | undefined;
 
-  constructor(lowerer?: Lowerer) {
+  constructor(lowerer?: ExecuteRequestLowerer) {
     this.#lowerer = lowerer;
   }
 

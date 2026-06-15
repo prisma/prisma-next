@@ -146,7 +146,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
   }, timeouts.spinUpMongoMemoryServer);
 
   describe('plan + apply create index', () => {
-    it('plans a createIndex operation from empty to indexed contract', () => {
+    it('plans a createIndex operation from empty to indexed contract', async () => {
       const planner = new MongoMigrationPlanner();
       const schema = contractToMongoSchemaIR(null);
       const result = planner.plan({
@@ -161,7 +161,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
       if (result.kind !== 'success') return;
 
       expect(result.plan.operations).toHaveLength(1);
-      const op = result.plan.operations[0]!;
+      const op = await result.plan.operations[0]!;
       expect(op.operationClass).toBe('additive');
       expect(op.label).toContain('Create index');
       expect(op.label).toContain('users');
@@ -367,8 +367,9 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         if (dropResult.kind !== 'success') throw new Error('Drop plan failed');
 
         expect(dropResult.plan.operations).toHaveLength(1);
-        expect(dropResult.plan.operations[0]!.operationClass).toBe('destructive');
-        expect(dropResult.plan.operations[0]!.label).toContain('Drop index');
+        const dropOp = await dropResult.plan.operations[0]!;
+        expect(dropOp.operationClass).toBe('destructive');
+        expect(dropOp.label).toContain('Drop index');
 
         // Step 3: Apply drop
         const dropOps = dropResult.plan.operations as readonly MongoMigrationPlanOperation[];

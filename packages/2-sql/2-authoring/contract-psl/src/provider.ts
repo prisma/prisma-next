@@ -88,7 +88,6 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           schema,
           sourceId: schemaPath,
           pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
-          codecLookup: context.codecLookup,
         });
 
         const scalarTypeDescriptors = buildColumnDescriptorMap(
@@ -116,6 +115,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           ),
           controlMutationDefaults: context.controlMutationDefaults,
           ...ifDefined('createNamespace', options.createNamespace),
+          codecLookup: context.codecLookup,
         });
         if (!interpreted.ok) {
           return interpreted;

@@ -35,8 +35,8 @@ import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-cont
 import type {
   AnyQueryAst,
   DdlNode,
-  LoweredStatement,
   LowererContext,
+  SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
@@ -68,10 +68,10 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
   ) {
     const namespaces = contract.storage.namespaces as Record<
       string,
-      { readonly entries: { readonly table: Readonly<Record<string, unknown>> } }
+      { readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>> }
     >;
     for (const ns of Object.values(namespaces)) {
-      const tbls = ns.entries.table;
+      const tbls = ns.entries['table'];
       if (typeof tbls !== 'object' || tbls === null) continue;
       for (const table of Object.values(tbls)) {
         if (
@@ -240,7 +240,10 @@ export interface SqlControlFamilyInstance
 
   inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst;
 
-  lowerAst(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement;
+  lowerAst(
+    ast: AnyQueryAst | DdlNode,
+    context: LowererContext<unknown>,
+  ): Promise<SqlExecuteRequest>;
 
   /**
    * Inserts the initial marker row for `space` (upsert on `space`).
@@ -718,7 +721,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const controlAdapter = getControlAdapter();
       const lowererContext = { contract };
       for (const query of controlAdapter.bootstrapSignMarkerQueries()) {
-        const lowered = controlAdapter.lower(query, lowererContext);
+        const lowered = await controlAdapter.lowerToExecuteRequest(query, lowererContext);
         await driver.query(lowered.sql, lowered.params);
       }
 
@@ -868,8 +871,11 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       return sqlSchemaIrToPslAst(schemaIR);
     },
 
-    lowerAst(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement {
-      return getControlAdapter().lower(ast, context);
+    lowerAst(
+      ast: AnyQueryAst | DdlNode,
+      context: LowererContext<unknown>,
+    ): Promise<SqlExecuteRequest> {
+      return getControlAdapter().lowerToExecuteRequest(ast, context);
     },
 
     bootstrapControlTableQueries(): readonly DdlNode[] {

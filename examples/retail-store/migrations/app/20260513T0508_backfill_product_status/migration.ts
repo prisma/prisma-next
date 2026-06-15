@@ -11,9 +11,10 @@ import {
   RawUpdateManyCommand,
 } from '@prisma-next/mongo-query-ast/execution';
 import { dataTransform, setValidation } from '@prisma-next/target-mongo/migration';
+import type { Contract } from './end-contract';
 import endContractJson from './end-contract.json' with { type: 'json' };
 
-const endContract = new MongoContractSerializer().deserializeContract(endContractJson);
+const endContract = new MongoContractSerializer().deserializeContract<Contract>(endContractJson);
 
 const STORAGE_HASH = endContract.storage.storageHash;
 
@@ -34,16 +35,8 @@ const STORAGE_HASH = endContract.storage.storageHash;
 //
 // The validator is sourced from `end-contract.json` so the op stays in sync
 // with the contract if the chain is ever re-emitted.
-function requireProductsValidator() {
-  const validator =
-    endContract.storage.namespaces['__unbound__']?.entries.collection['products']?.validator;
-  if (validator === undefined) {
-    throw new Error('end-contract.json is missing a validator for the products collection');
-  }
-  return validator;
-}
-
-const PRODUCTS_VALIDATOR = requireProductsValidator();
+const PRODUCTS_VALIDATOR =
+  endContract.storage.namespaces.__unbound__.entries.collection.products.validator;
 
 function existingProductsWithoutStatus(): MongoQueryPlan {
   return {

@@ -107,11 +107,12 @@ export interface BuilderContext {
  */
 export function codecRefFor(
   ctx: BuilderContext,
+  namespaceId: string,
   tableName: string,
   columnName: string,
 ): CodecRef | undefined {
   if (!ctx.storage) return undefined;
-  return codecRefForStorageColumn(ctx.storage, tableName, columnName);
+  return codecRefForStorageColumn(ctx.storage, namespaceId, tableName, columnName);
 }
 
 export function emptyState(from: TableSource, scope: Scope): BuilderState {
@@ -199,14 +200,21 @@ export function buildPlan<Row = unknown>(
 export function tableToScope(
   alias: string,
   table: StorageTable,
-  options?: { readonly storage?: SqlStorage | undefined; readonly tableName?: string | undefined },
+  options?: {
+    readonly storage?: SqlStorage | undefined;
+    readonly namespaceId?: string | undefined;
+    readonly tableName?: string | undefined;
+  },
 ): Scope {
   const storage = options?.storage;
   const lookupName = options?.tableName;
+  const namespaceId = options?.namespaceId;
   const fields: ScopeTable = {};
   for (const [colName, col] of Object.entries(table.columns)) {
     const codec =
-      storage && lookupName ? codecRefForStorageColumn(storage, lookupName, colName) : undefined;
+      storage && lookupName && namespaceId !== undefined
+        ? codecRefForStorageColumn(storage, namespaceId, lookupName, colName)
+        : undefined;
     fields[colName] = {
       codecId: col.codecId,
       nullable: col.nullable,

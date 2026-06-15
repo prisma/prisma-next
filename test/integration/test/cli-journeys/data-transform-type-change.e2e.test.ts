@@ -112,11 +112,11 @@ withTempDir(({ createTempDir }) => {
         const filled = injectMigrationSqlDbSetup(scaffold)
           .replace(
             "() => placeholder('typechange-user-score:check')",
-            "() => db.user.select('id').where((f, fns) => fns.eq(f.id, -1)).limit(1)",
+            "() => db.public.user.select('id').where((f, fns) => fns.eq(f.id, -1)).limit(1)",
           )
           .replace(
             "() => placeholder('typechange-user-score:run')",
-            '() => db.user.update({ score: 0 }).where((f, fns) => fns.eq(f.id, -1))',
+            '() => db.public.user.update({ score: 0 }).where((f, fns) => fns.eq(f.id, -1))',
           );
         expect(filled).not.toContain('placeholder(');
         expect(filled).toContain('const db = sql(');

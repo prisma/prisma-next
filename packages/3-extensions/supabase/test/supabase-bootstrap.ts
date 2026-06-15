@@ -7,17 +7,10 @@
  * `db init`/`db update` will fail at the verify step because the framework
  * confirms declared `external` tables exist.
  *
- * **M1 scope:** `CREATE SCHEMA auth, storage` + the four tables
- * (`auth.users`, `auth.identities`, `storage.buckets`, `storage.objects`) with
- * columns matching the Supabase extension contract's pinned model table.
- *
- * **postgres-rls constituent (M2):** adds the three Supabase platform roles
- * (`anon`, `authenticated`, `service_role`) and the `auth.uid()` function that
- * RLS policies reference. In real Supabase these are platform-provided; the
- * shim emulates them for local test databases.
- *
- * **Future increments:**
- * - `cross-contract-refs` constituent seeds `auth.users` rows for FK tests.
+ * Also creates the three Postgres roles (`anon`, `authenticated`, `service_role`)
+ * with grants that mirror a real Supabase database. `ALTER DEFAULT PRIVILEGES`
+ * ensures tables created after the shim runs (e.g. `public.profile` via `dbInit`)
+ * are automatically accessible to the roles.
  *
  * The caller owns the client lifecycle — pass any already-connected `pg.Client`
  * (e.g. one the test is sharing across setup steps, or one bound to a
@@ -52,6 +45,7 @@ import type { Client } from 'pg';
  * Also creates the three Supabase platform roles (`anon`, `authenticated`,
  * `service_role`) and the `auth.uid()` function that reads the current user's
  * id from the `request.jwt.claims` GUC, matching Supabase's implementation.
+ * `ALTER DEFAULT PRIVILEGES` covers tables created after the shim runs (e.g. via `dbInit`).
  */
 export async function bootstrapSupabaseShim(client: Client): Promise<void> {
   await client.query('CREATE SCHEMA IF NOT EXISTS auth');
@@ -69,7 +63,7 @@ export async function bootstrapSupabaseShim(client: Client): Promise<void> {
         CREATE ROLE authenticated NOLOGIN;
       END IF;
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
-        CREATE ROLE service_role NOLOGIN;
+        CREATE ROLE service_role NOLOGIN BYPASSRLS;
       END IF;
     END
     $$
@@ -127,4 +121,21 @@ export async function bootstrapSupabaseShim(client: Client): Promise<void> {
       PRIMARY KEY (id)
     )
   `);
+
+  // Grants mirror a real Supabase database.
+  await client.query('GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role');
+  await client.query('GRANT USAGE ON SCHEMA auth, storage TO anon, authenticated, service_role');
+  await client.query('GRANT ALL ON ALL TABLES IN SCHEMA auth TO service_role');
+  await client.query('GRANT ALL ON ALL TABLES IN SCHEMA storage TO service_role');
+  await client.query('GRANT SELECT ON ALL TABLES IN SCHEMA auth TO anon, authenticated');
+  await client.query('GRANT SELECT ON ALL TABLES IN SCHEMA storage TO anon, authenticated');
+
+  // Default privileges cover tables created after this shim runs (e.g. public.profile via dbInit).
+  await client.query(
+    'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO service_role',
+  );
+  await client.query(
+    'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, UPDATE ON TABLES TO authenticated',
+  );
+  await client.query('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO anon');
 }

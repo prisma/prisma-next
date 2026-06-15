@@ -86,6 +86,7 @@ function scan(source: string, pos: number): Token {
     scanWhitespace(source, pos) ??
     scanComment(source, pos) ??
     scanAt(source, pos) ??
+    scanKeywordNumber(source, pos) ??
     scanIdent(source, pos) ??
     scanNumber(source, pos) ??
     scanString(source, pos) ??
@@ -151,6 +152,22 @@ function scanIdent(source: string, pos: number): Token | undefined {
   return { kind: 'Ident', text: source.slice(pos, end) };
 }
 
+const KEYWORD_NUMBERS = ['-Infinity', 'Infinity', 'NaN'] as const;
+
+// `NaN`, `Infinity`, and `-Infinity` are numeric literals, not identifiers.
+// They must match before `scanIdent` (which would otherwise claim the
+// identifier-led words) and are word-bounded: a following identifier-part char
+// (so `Infinityx` / `NaNxyz`) keeps the run an `Ident` rather than a number.
+function scanKeywordNumber(source: string, pos: number): Token | undefined {
+  for (const word of KEYWORD_NUMBERS) {
+    if (!source.startsWith(word, pos)) continue;
+    const after = readChar(source, pos + word.length);
+    if (after !== '' && isIdentPart(after)) return undefined;
+    return { kind: 'NumberLiteral', text: word };
+  }
+  return undefined;
+}
+
 function scanNumber(source: string, pos: number): Token | undefined {
   let end = pos;
   if (source.charAt(end) === '-') {
@@ -193,6 +210,37 @@ function scanString(source: string, pos: number): Token | undefined {
   }
   // Unterminated at EOF
   return { kind: 'StringLiteral', text: source.slice(pos, end) };
+}
+
+/**
+ * Whether a `StringLiteral` token's text is properly closed. `scanString` emits
+ * the same `StringLiteral` kind for both well-formed and unterminated strings —
+ * it stops at a newline or EOF when no closing quote is found — so callers that
+ * need to distinguish the two ask here.
+ *
+ * Because `scanString` stops at the *first* unescaped `"`, the only quote whose
+ * escaping can be in question is the **last character**: the text is terminated
+ * iff it opens with `"`, ends with `"`, and that closing `"` is not escaped.
+ * Under the `\\`-escapes-the-next-character rule, a `"` is unescaped iff an
+ * **even** number of backslashes immediately precede it — each `\\` pair cancels,
+ * and an odd run leaves the final `\` escaping the quote. So it suffices to
+ * count the trailing backslash run; no full re-scan is needed:
+ *
+ * - `"ok"`  → 0 backslashes (even) → closing quote stands → terminated
+ * - `"a\"`  → 1 backslash  (odd)   → the `"` is escaped     → unterminated
+ * - `"a\\"` → 2 backslashes (even) → escaped `\`, real `"`  → terminated
+ *
+ * A lone `"` (length 1) or a text with no closing `"` is unterminated.
+ */
+export function isTerminatedStringLiteral(text: string): boolean {
+  if (text.length < 2 || text.charAt(0) !== '"' || text.charAt(text.length - 1) !== '"') {
+    return false;
+  }
+  let backslashes = 0;
+  for (let i = text.length - 2; i >= 1 && text.charAt(i) === '\\'; i--) {
+    backslashes++;
+  }
+  return backslashes % 2 === 0;
 }
 
 function scanPunctuation(source: string, pos: number): Token | undefined {

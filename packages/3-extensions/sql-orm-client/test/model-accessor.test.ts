@@ -5,6 +5,7 @@ import {
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
+  JoinAst,
   ListExpression,
   NotExpr,
   NullCheckExpr,
@@ -16,7 +17,7 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { createModelAccessor } from '../src/model-accessor';
+import { buildPairedColumnExprs, createModelAccessor } from '../src/model-accessor';
 import {
   buildMixedPolyContract,
   getTestContext,
@@ -85,8 +86,8 @@ describe('createModelAccessor', () => {
   }
 
   it('creates scalar comparison operators and maps fields to columns', () => {
-    const user = createModelAccessor(context, 'User');
-    const post = createModelAccessor(context, 'Post');
+    const user = createModelAccessor(context, 'public', 'User');
+    const post = createModelAccessor(context, 'public', 'Post');
 
     expectBinaryParam(user['name']!.eq('Alice'), 'users', 'name', 'eq', 'Alice');
     expectBinaryParam(
@@ -105,7 +106,7 @@ describe('createModelAccessor', () => {
   });
 
   it('creates ilike as trait-matched extension operation returning predicate', () => {
-    const user = createModelAccessor(context, 'User');
+    const user = createModelAccessor(context, 'public', 'User');
     const ilike = user['name']!.ilike;
     const result = ilike('%ali%');
     expect(result).toBeInstanceOf(OperationExpr);
@@ -115,13 +116,13 @@ describe('createModelAccessor', () => {
   });
 
   it('does not expose ilike on non-textual fields', () => {
-    const post = createModelAccessor(context, 'Post');
+    const post = createModelAccessor(context, 'public', 'Post');
     const field = post['views'] as unknown as Record<string, unknown>;
     expect(field['ilike']).toBeUndefined();
   });
 
   it('creates list literal, null check, and order directive helpers', () => {
-    const accessor = createModelAccessor(context, 'Post');
+    const accessor = createModelAccessor(context, 'public', 'Post');
 
     expect(accessor['id']!.in([1, 2, 3])).toEqual(
       BinaryExpr.in(
@@ -142,7 +143,7 @@ describe('createModelAccessor', () => {
     expect(accessor['id']!.asc()).toEqual(OrderByItem.asc(ColumnRef.of('posts', 'id')));
     expect(accessor['id']!.desc()).toEqual(OrderByItem.desc(ColumnRef.of('posts', 'id')));
 
-    const user = createModelAccessor(context, 'User');
+    const user = createModelAccessor(context, 'public', 'User');
     expect(user['email']!.isNull()).toEqual(NullCheckExpr.isNull(ColumnRef.of('users', 'email')));
     expect(user['email']!.isNotNull()).toEqual(
       NullCheckExpr.isNotNull(ColumnRef.of('users', 'email')),
@@ -150,7 +151,7 @@ describe('createModelAccessor', () => {
   });
 
   it('creates some() relation filters as EXISTS subqueries', () => {
-    const accessor = createModelAccessor(context, 'User');
+    const accessor = createModelAccessor(context, 'public', 'User');
 
     expect(accessor['posts']!.some()).toEqual(
       ExistsExpr.exists(
@@ -162,7 +163,7 @@ describe('createModelAccessor', () => {
   });
 
   it('creates none() and every() relation filters with NOT EXISTS semantics', () => {
-    const accessor = createModelAccessor(context, 'User');
+    const accessor = createModelAccessor(context, 'public', 'User');
 
     const noneExpr = accessor['posts']!.none({ views: 10 }) as ExistsExpr;
     expect(noneExpr.notExists).toBe(true);
@@ -184,7 +185,7 @@ describe('createModelAccessor', () => {
   });
 
   it('treats every({}) as vacuously true and none() as a plain anti-exists join', () => {
-    const accessor = createModelAccessor(context, 'User');
+    const accessor = createModelAccessor(context, 'public', 'User');
 
     expect(accessor['posts']!.every({})).toEqual(AndExpr.true());
 
@@ -196,7 +197,7 @@ describe('createModelAccessor', () => {
   });
 
   it('supports nested relation filters', () => {
-    const accessor = createModelAccessor(context, 'User');
+    const accessor = createModelAccessor(context, 'public', 'User');
     const expr = accessor['posts']!.some((post) =>
       post['comments']!.some((comment) => comment['body']!.like('%urgent%')),
     ) as ExistsExpr;
@@ -207,7 +208,7 @@ describe('createModelAccessor', () => {
   });
 
   it('keeps proxy symbol access undefined and relation shorthand maps null and undefined', () => {
-    const user = createModelAccessor(context, 'User');
+    const user = createModelAccessor(context, 'public', 'User');
     expect((user as Record<PropertyKey, unknown>)[Symbol.iterator]).toBeUndefined();
 
     // Unknown fields in a shorthand predicate are surfaced loudly — silent skip would drop user intent (a typo'd filter would match every row).
@@ -221,7 +222,7 @@ describe('createModelAccessor', () => {
       BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
     );
 
-    const post = createModelAccessor(context, 'Post');
+    const post = createModelAccessor(context, 'public', 'Post');
     const nullExpr = post['comments']!.some({ body: null }) as ExistsExpr;
     expect(nullExpr.subquery.where).toEqual(
       AndExpr.of([
@@ -239,7 +240,7 @@ describe('createModelAccessor', () => {
         ...(models['User'] as Record<string, unknown>),
         relations: {
           posts: {
-            to: { model: 'Post', namespace: '__unbound__' },
+            to: { model: 'Post', namespace: 'public' },
             cardinality: '1:N',
             on: {
               localFields: [],
@@ -254,6 +255,7 @@ describe('createModelAccessor', () => {
       (
         createModelAccessor(
           { ...context, contract: brokenJoinContract } as never,
+          'public',
           'User',
         ) as unknown as Record<string, { some: () => unknown }>
       )['posts']!.some(),
@@ -278,7 +280,7 @@ describe('createModelAccessor', () => {
           relations: {
             ...user.relations,
             posts: {
-              to: { model: 'Post', namespace: '__unbound__' },
+              to: { model: 'Post', namespace: 'public' },
               cardinality: '1:N',
               on: {
                 localFields: ['id', 'email'],
@@ -293,6 +295,7 @@ describe('createModelAccessor', () => {
     const compositeExpr = (
       createModelAccessor(
         { ...context, contract: compositeContract } as never,
+        'public',
         'User',
       ) as unknown as Record<string, { some: () => unknown }>
     )['posts']!.some() as ExistsExpr;
@@ -322,7 +325,7 @@ describe('createModelAccessor', () => {
           relations: {
             ...user.relations,
             posts: {
-              to: { model: 'Post', namespace: '__unbound__' },
+              to: { model: 'Post', namespace: 'public' },
               cardinality: '1:N',
               on: {
                 localFields: ['id', 'name'],
@@ -337,6 +340,7 @@ describe('createModelAccessor', () => {
     const fallbackExpr = (
       createModelAccessor(
         { ...context, contract: noTargetFieldsContract } as never,
+        'public',
         'User',
       ) as unknown as Record<string, { some: () => unknown }>
     )['posts']!.some() as ExistsExpr;
@@ -364,6 +368,7 @@ describe('createModelAccessor', () => {
     // Contract claims the User model lives in `users_storage`, but storage.tables has no entry for it. The Proxy returns undefined for fields whose column cannot be resolved, matching plain JS object semantics. Downstream consumers (or TypeScript at compile time) are responsible for noticing the missing column.
     const accessor = createModelAccessor(
       { ...context, contract: storageFallbackContract } as never,
+      'public',
       'User',
     );
     expect(accessor['name']).toBeUndefined();
@@ -381,14 +386,16 @@ describe('createModelAccessor', () => {
     }));
 
     expect(
-      createModelAccessor({ ...context, contract: modelNameFallbackContract } as never, 'User')[
-        'name'
-      ]!.isNull(),
+      createModelAccessor(
+        { ...context, contract: modelNameFallbackContract } as never,
+        'public',
+        'User',
+      )['name']!.isNull(),
     ).toEqual(NullCheckExpr.isNull(ColumnRef.of('users', 'name')));
   });
 
   it('combines relation shorthand fields with and() and rejects missing join arrays', () => {
-    const accessor = createModelAccessor(context, 'User');
+    const accessor = createModelAccessor(context, 'public', 'User');
     const predicate = accessor['posts']!.some({ title: 'A', views: 1 }) as ExistsExpr;
 
     expect(predicate.subquery.where).toEqual(
@@ -408,7 +415,7 @@ describe('createModelAccessor', () => {
         ...(models['User'] as Record<string, unknown>),
         relations: {
           posts: {
-            to: { model: 'Post', namespace: '__unbound__' },
+            to: { model: 'Post', namespace: 'public' },
             cardinality: '1:N',
             on: { localFields: [], targetFields: [] },
           },
@@ -420,6 +427,7 @@ describe('createModelAccessor', () => {
       (
         createModelAccessor(
           { ...context, contract: contractWithoutJoinArrays } as never,
+          'public',
           'User',
         ) as unknown as Record<string, { some: () => unknown }>
       )['posts']!.some(),
@@ -429,7 +437,7 @@ describe('createModelAccessor', () => {
   describe('runtime trait-gating', () => {
     it('only creates equality methods when codec has equality trait', () => {
       const codecDescriptors = makeDescriptors({ 'pg/int4@1': ['equality'] });
-      const accessor = createModelAccessor({ ...context, codecDescriptors }, 'Post');
+      const accessor = createModelAccessor({ ...context, codecDescriptors }, 'public', 'Post');
       const field = accessor['id'] as unknown as Record<string, unknown>;
 
       expect(typeof field['eq']).toBe('function');
@@ -452,7 +460,7 @@ describe('createModelAccessor', () => {
       const codecDescriptors = makeDescriptors({
         'pg/text@1': ['equality', 'order', 'textual'],
       });
-      const accessor = createModelAccessor({ ...context, codecDescriptors }, 'User');
+      const accessor = createModelAccessor({ ...context, codecDescriptors }, 'public', 'User');
       const field = accessor['name'] as unknown as Record<string, unknown>;
 
       for (const method of [
@@ -476,7 +484,7 @@ describe('createModelAccessor', () => {
 
     it('throws when relation shorthand filter targets a field without equality trait', () => {
       const codecDescriptors = makeDescriptors({ 'pg/int4@1': ['order'] });
-      const accessor = createModelAccessor({ ...context, codecDescriptors }, 'Post');
+      const accessor = createModelAccessor({ ...context, codecDescriptors }, 'public', 'Post');
 
       expect(() => accessor['comments']!.some({ postId: 42 })).toThrow(
         /does not support equality comparisons/,
@@ -509,7 +517,12 @@ describe('createModelAccessor', () => {
     type FieldBag = Record<string, FieldOps | undefined>;
 
     it('resolves an MTI variant column against the joined variant table', () => {
-      const feature = createModelAccessor(polyContext, 'Task', 'Feature') as unknown as FieldBag;
+      const feature = createModelAccessor(
+        polyContext,
+        'public',
+        'Task',
+        'Feature',
+      ) as unknown as FieldBag;
       // `priority` lives on the joined `features` table, not the base `tasks`.
       expect(feature['priority']!.gte(3)).toEqual(
         new BinaryExpr(
@@ -521,7 +534,12 @@ describe('createModelAccessor', () => {
     });
 
     it('keeps base columns qualified against the base table when a variant is selected', () => {
-      const feature = createModelAccessor(polyContext, 'Task', 'Feature') as unknown as FieldBag;
+      const feature = createModelAccessor(
+        polyContext,
+        'public',
+        'Task',
+        'Feature',
+      ) as unknown as FieldBag;
       expect(feature['title']!.eq('Dark mode')).toEqual(
         new BinaryExpr(
           'eq',
@@ -532,9 +550,14 @@ describe('createModelAccessor', () => {
     });
 
     it('does not expose another variant column for the selected variant', () => {
-      const feature = createModelAccessor(polyContext, 'Task', 'Feature') as unknown as FieldBag;
+      const feature = createModelAccessor(
+        polyContext,
+        'public',
+        'Task',
+        'Feature',
+      ) as unknown as FieldBag;
       expect(feature['priority']).toBeDefined();
-      const bug = createModelAccessor(polyContext, 'Task', 'Bug') as unknown as FieldBag;
+      const bug = createModelAccessor(polyContext, 'public', 'Task', 'Bug') as unknown as FieldBag;
       // Bug is STI — its `severity` rides the base table, never the features join.
       expect(bug['severity']!.eq('critical')).toEqual(
         new BinaryExpr(
@@ -548,12 +571,179 @@ describe('createModelAccessor', () => {
     });
 
     it('leaves base resolution untouched when no variant is selected', () => {
-      const task = createModelAccessor(polyContext, 'Task') as unknown as FieldBag;
+      const task = createModelAccessor(polyContext, 'public', 'Task') as unknown as FieldBag;
       expect(task['title']!.eq('x')).toEqual(
         new BinaryExpr('eq', ColumnRef.of('tasks', 'title'), polyParam('tasks', 'title', 'x')),
       );
       // Without a selected variant the MTI variant column is not resolvable.
       expect(task['priority']).toBeUndefined();
+    });
+  });
+
+  describe('M:N relation filters via junction', () => {
+    it('some() emits EXISTS through junction (single-key)', () => {
+      const accessor = createModelAccessor(context, 'public', 'User') as unknown as Record<
+        string,
+        { some: (pred?: unknown) => unknown }
+      >;
+
+      const expr = accessor['tags']!.some() as ExistsExpr;
+
+      expect(expr.notExists).toBe(false);
+      expect(expr.subquery.from).toEqual(TableSource.named('tags', undefined, 'public'));
+      expect(expr.subquery.joins).toEqual([
+        JoinAst.inner(
+          TableSource.named('user_tags', undefined, 'public'),
+          BinaryExpr.eq(ColumnRef.of('user_tags', 'tag_id'), ColumnRef.of('tags', 'id')),
+        ),
+      ]);
+      expect(expr.subquery.where).toEqual(
+        BinaryExpr.eq(ColumnRef.of('user_tags', 'user_id'), ColumnRef.of('users', 'id')),
+      );
+    });
+
+    it('some(pred) AND-s junction correlation with predicate', () => {
+      const accessor = createModelAccessor(context, 'public', 'User') as unknown as Record<
+        string,
+        { some: (pred: (c: unknown) => unknown) => unknown }
+      >;
+
+      const expr = accessor['tags']!.some((c: unknown) =>
+        (c as Record<string, { eq: (v: unknown) => unknown }>)['name']!.eq('Rust'),
+      ) as ExistsExpr;
+
+      expect(expr.notExists).toBe(false);
+      expect(expr.subquery.where).toEqual(
+        AndExpr.of([
+          BinaryExpr.eq(ColumnRef.of('user_tags', 'user_id'), ColumnRef.of('users', 'id')),
+          BinaryExpr.eq(ColumnRef.of('tags', 'name'), paramRef('tags', 'name', 'Rust')),
+        ]),
+      );
+    });
+
+    it('none() emits NOT EXISTS through junction', () => {
+      const accessor = createModelAccessor(context, 'public', 'User') as unknown as Record<
+        string,
+        { none: (pred?: unknown) => unknown }
+      >;
+
+      const expr = accessor['tags']!.none() as ExistsExpr;
+      expect(expr.notExists).toBe(true);
+      expect(expr.subquery.where).toEqual(
+        BinaryExpr.eq(ColumnRef.of('user_tags', 'user_id'), ColumnRef.of('users', 'id')),
+      );
+    });
+
+    it('every(pred) emits NOT EXISTS(… AND NOT(pred)) through junction', () => {
+      const accessor = createModelAccessor(context, 'public', 'User') as unknown as Record<
+        string,
+        { every: (pred: (c: unknown) => unknown) => unknown }
+      >;
+
+      const expr = accessor['tags']!.every((c: unknown) =>
+        (c as Record<string, { eq: (v: unknown) => unknown }>)['name']!.eq('Rust'),
+      ) as ExistsExpr;
+
+      expect(expr.notExists).toBe(true);
+      expect(expr.subquery.where).toEqual(
+        AndExpr.of([
+          BinaryExpr.eq(ColumnRef.of('user_tags', 'user_id'), ColumnRef.of('users', 'id')),
+          new NotExpr(
+            BinaryExpr.eq(ColumnRef.of('tags', 'name'), paramRef('tags', 'name', 'Rust')),
+          ),
+        ]),
+      );
+    });
+
+    it('every({}) is vacuously true for M:N relations', () => {
+      const accessor = createModelAccessor(context, 'public', 'User') as unknown as Record<
+        string,
+        { every: (pred: unknown) => unknown }
+      >;
+
+      expect(accessor['tags']!.every({})).toEqual(AndExpr.true());
+    });
+
+    it('some() emits EXISTS with composite-key AND-ed junction join', () => {
+      const accessor = createModelAccessor(context, 'public', 'Project') as unknown as Record<
+        string,
+        { some: () => unknown }
+      >;
+
+      const expr = accessor['related']!.some() as ExistsExpr;
+
+      expect(expr.subquery.joins).toEqual([
+        JoinAst.inner(
+          TableSource.named('project_links', undefined, 'public'),
+          AndExpr.of([
+            BinaryExpr.eq(
+              ColumnRef.of('project_links', 'dst_tenant_id'),
+              ColumnRef.of('related__child', 'tenant_id'),
+            ),
+            BinaryExpr.eq(
+              ColumnRef.of('project_links', 'dst_id'),
+              ColumnRef.of('related__child', 'id'),
+            ),
+          ]),
+        ),
+      ]);
+      expect(expr.subquery.where).toEqual(
+        AndExpr.of([
+          BinaryExpr.eq(
+            ColumnRef.of('project_links', 'src_tenant_id'),
+            ColumnRef.of('projects', 'tenant_id'),
+          ),
+          BinaryExpr.eq(ColumnRef.of('project_links', 'src_id'), ColumnRef.of('projects', 'id')),
+        ]),
+      );
+    });
+
+    it('aliases the related table for self-referential M:N predicates', () => {
+      const accessor = createModelAccessor(context, 'public', 'Project') as unknown as Record<
+        string,
+        { some: (pred: (c: unknown) => unknown) => unknown }
+      >;
+
+      const expr = accessor['related']!.some((c: unknown) =>
+        (c as Record<string, { eq: (v: unknown) => unknown }>)['name']!.eq('Apollo'),
+      ) as ExistsExpr;
+
+      expect(expr.subquery.from).toEqual(TableSource.named('projects', 'related__child', 'public'));
+      expect(expr.subquery.projection).toEqual([
+        ProjectionItem.of('_exists', ColumnRef.of('related__child', 'tenant_id')),
+      ]);
+      expect(expr.subquery.where).toEqual(
+        AndExpr.of([
+          AndExpr.of([
+            BinaryExpr.eq(
+              ColumnRef.of('project_links', 'src_tenant_id'),
+              ColumnRef.of('projects', 'tenant_id'),
+            ),
+            BinaryExpr.eq(ColumnRef.of('project_links', 'src_id'), ColumnRef.of('projects', 'id')),
+          ]),
+          BinaryExpr.eq(
+            ColumnRef.of('related__child', 'name'),
+            paramRef('projects', 'name', 'Apollo'),
+          ),
+        ]),
+      );
+    });
+
+    it('throws when M:N join metadata column counts differ', () => {
+      expect(() =>
+        buildPairedColumnExprs('project_links', ['dst_tenant_id', 'dst_id'], 'projects', [
+          'tenant_id',
+        ]),
+      ).toThrow(/Relation metadata has mismatched join column counts/);
+    });
+
+    it('throws when M:N join metadata omits a paired column', () => {
+      expect(() =>
+        buildPairedColumnExprs('project_links', ['dst_tenant_id', ''], 'projects', [
+          'tenant_id',
+          'id',
+        ]),
+      ).toThrow(/Relation metadata is missing a join column pair/);
     });
   });
 
@@ -573,8 +763,8 @@ describe('createModelAccessor', () => {
       const codecDescriptors = makeDescriptors(traitsByCodec);
 
       const ctx = { ...context, queryOperations, codecDescriptors };
-      const user = createModelAccessor(ctx, 'User');
-      const post = createModelAccessor(ctx, 'Post');
+      const user = createModelAccessor(ctx, 'public', 'User');
+      const post = createModelAccessor(ctx, 'public', 'Post');
 
       const name = user['name'] as unknown as Record<string, unknown>;
       expect(typeof name['synthetic']).toBe('function');

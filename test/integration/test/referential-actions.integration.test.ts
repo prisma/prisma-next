@@ -3,12 +3,12 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
 import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -250,7 +250,7 @@ describe('referential actions integration', () => {
               }),
             );
 
-            const validatedContract = new SqlContractSerializer().deserializeContract(
+            const validatedContract = new PostgresContractSerializer().deserializeContract(
               contract,
             ) as Contract<SqlStorage>;
             const schema = await familyInstance.introspect({
@@ -346,7 +346,7 @@ describe('referential actions integration', () => {
               }),
             );
 
-            const validatedContract = new SqlContractSerializer().deserializeContract(
+            const validatedContract = new PostgresContractSerializer().deserializeContract(
               contract,
             ) as Contract<SqlStorage>;
             const schema = await familyInstance.introspect({
@@ -420,7 +420,7 @@ describe('referential actions integration', () => {
               }),
             );
 
-            const validatedContract = new SqlContractSerializer().deserializeContract(
+            const validatedContract = new PostgresContractSerializer().deserializeContract(
               contract,
             ) as Contract<SqlStorage>;
             const schema = await familyInstance.introspect({
@@ -516,7 +516,7 @@ describe('referential actions integration', () => {
               }),
             );
 
-            const validatedContract = new SqlContractSerializer().deserializeContract(
+            const validatedContract = new PostgresContractSerializer().deserializeContract(
               contract,
             ) as Contract<SqlStorage>;
             const schema = await familyInstance.introspect({
@@ -585,7 +585,7 @@ describe('referential actions integration', () => {
           models: { User, Post },
         });
 
-        const validatedContract = new SqlContractSerializer().deserializeContract(
+        const validatedContract = new PostgresContractSerializer().deserializeContract(
           contract,
         ) as Contract<SqlStorage>;
         const controlStack = createControlStack({
@@ -616,7 +616,11 @@ describe('referential actions integration', () => {
           expect(planResult.kind).toBe('success');
           if (planResult.kind !== 'success') throw new Error('Expected planning success');
 
-          const fkOps = planResult.plan.operations.filter((op) => op.id.startsWith('foreignKey.'));
+          const planOps = (await Promise.all(planResult.plan.operations)) as ReadonlyArray<{
+            readonly id: string;
+            readonly execute: ReadonlyArray<{ readonly sql: string }>;
+          }>;
+          const fkOps = planOps.filter((op) => op.id.startsWith('foreignKey.'));
           expect(fkOps.length).toBeGreaterThan(0);
 
           const fkSql = fkOps.flatMap((op) => op.execute.map((step) => step.sql)).join('\n');

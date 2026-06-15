@@ -23,9 +23,8 @@ describe('test-contract-space fixture descriptor', () => {
   it('exposes a contractSpace whose contract declares the test_box table', () => {
     const space = testContractSpaceExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
-    expect(
-      Object.keys(space!.contractJson.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table),
-    ).toEqual([TEST_BOX_TABLE]);
+    const ns = space!.contractJson.storage.namespaces[UNBOUND_NAMESPACE_ID]!;
+    expect(Object.keys(ns.entries.table ?? {})).toEqual([TEST_BOX_TABLE]);
   });
 
   it('publishes one baseline migration that establishes the head invariant', () => {

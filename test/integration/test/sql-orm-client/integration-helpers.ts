@@ -14,17 +14,17 @@ import {
 export { timeouts };
 
 export function createUsersCollection(runtime: PgIntegrationRuntime) {
-  return new Collection({ runtime, context: getTestContext() }, 'User');
+  return new Collection({ runtime, context: getTestContext() }, 'User', { namespaceId: 'public' });
 }
 
 export function createUsersCollectionWithoutReturning(runtime: PgIntegrationRuntime) {
   const contract = { ...getTestContract(), capabilities: {} } as TestContract;
   const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
-  return new Collection({ runtime, context }, 'User');
+  return new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
 }
 
 export function createPostsCollection(runtime: PgIntegrationRuntime) {
-  return new Collection({ runtime, context: getTestContext() }, 'Post');
+  return new Collection({ runtime, context: getTestContext() }, 'Post', { namespaceId: 'public' });
 }
 
 // Shallow spread is intentional — withReturningCapability only adds capabilities
@@ -32,19 +32,19 @@ export function createPostsCollection(runtime: PgIntegrationRuntime) {
 export function createReturningUsersCollection(runtime: PgIntegrationRuntime) {
   const contract = withReturningCapability(getTestContract());
   const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
-  return new Collection({ runtime, context }, 'User');
+  return new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
 }
 
 export function createReturningPostsCollection(runtime: PgIntegrationRuntime) {
   const contract = withReturningCapability(getTestContract());
   const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
-  return new Collection({ runtime, context }, 'Post');
+  return new Collection({ runtime, context }, 'Post', { namespaceId: 'public' });
 }
 
 export function createReturningTagsCollection(runtime: PgIntegrationRuntime) {
   const contract = withReturningCapability(getTestContract());
   const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
-  return new Collection({ runtime, context }, 'Tag');
+  return new Collection({ runtime, context }, 'Tag', { namespaceId: 'public' });
 }
 
 export async function withCollectionRuntime(

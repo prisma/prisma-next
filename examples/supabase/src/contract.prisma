@@ -1,7 +1,10 @@
-// use prisma-next
+types {
+  Uuid = String @db.Uuid
+}
+
 namespace public {
   model Profile {
-    id       String @id @default(uuid())
+    id       Uuid   @id @default(uuid())
     username String
     owner_id String
     @@map("profile")

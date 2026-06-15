@@ -1,4 +1,5 @@
 import type { CodecRef } from '@prisma-next/framework-components/codec';
+import { materializeCodec } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
@@ -46,54 +47,11 @@ export function createAstCodecResolver(
         );
       }
 
-      // Parameterized codecs whose paramsSchema accepts `{}` (every field
-      // optional, e.g. `pg/timestamptz@1` precision) tolerate refs that omit
-      // `typeParams` entirely. Normalize `undefined` to `{}` at the validation
-      // boundary; the integrity check upstream already rejected refs whose
-      // schemas reject the empty object.
-      const validated = validateTypeParams(
-        descriptor.paramsSchema,
-        descriptor.isParameterized && ref.typeParams === undefined
-          ? { ...ref, typeParams: {} }
-          : ref,
-      );
       const ctx = instanceContextFor(ref);
-      // The descriptor's `factory` is typed against its own `P`; the registry erases `P` to `unknown`, so callers narrow per codec id at the dispatch boundary. The descriptor's `paramsSchema` validates the input above before we forward it, so this narrow is safe by construction.
-      const codec = (
-        descriptor.factory as (params: unknown) => (ctx: SqlCodecInstanceContext) => Codec
-      )(validated)(ctx);
+      const codec = materializeCodec(descriptor, ref, ctx);
 
       cache.set(key, codec);
       return codec;
     },
   };
-}
-
-function validateTypeParams(
-  paramsSchema: { '~standard': { validate: (input: unknown) => unknown } },
-  ref: CodecRef,
-): unknown {
-  const result = paramsSchema['~standard'].validate(ref.typeParams) as
-    | { value: unknown }
-    | { issues: ReadonlyArray<{ message: string }> }
-    | Promise<unknown>;
-
-  if (result instanceof Promise) {
-    throw runtimeError(
-      'RUNTIME.TYPE_PARAMS_INVALID',
-      `paramsSchema for codec '${ref.codecId}' returned a Promise; runtime validation requires a synchronous Standard Schema validator.`,
-      { codecId: ref.codecId, typeParams: ref.typeParams },
-    );
-  }
-
-  if ('issues' in result && result.issues) {
-    const messages = result.issues.map((issue) => issue.message).join('; ');
-    throw runtimeError(
-      'RUNTIME.TYPE_PARAMS_INVALID',
-      `Invalid typeParams for codec '${ref.codecId}': ${messages}`,
-      { codecId: ref.codecId, typeParams: ref.typeParams },
-    );
-  }
-
-  return (result as { value: unknown }).value;
 }

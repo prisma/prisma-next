@@ -73,6 +73,21 @@ describe('MongoContractSerializerBase', () => {
       expect(() => serializer.deserializeContract(json)).toThrow();
     });
 
+    it('rejects an unknown entries kind at hydration naming the kind and the namespace id', () => {
+      const serializer = new RecordingSerializer();
+      const json = makeValidContractJson();
+      const storage = json.storage as {
+        namespaces: Record<string, { id: string; entries: Record<string, unknown> }>;
+      };
+      const unbound = Object.values(storage.namespaces)[0]!;
+      unbound.entries['bogus'] = { item: {} };
+
+      expect(() => serializer.deserializeContract(json)).toThrow(/bogus/);
+      expect(() => serializer.deserializeContract(json)).toThrow(
+        new RegExp(unbound.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      );
+    });
+
     it('only invokes constructTargetContract after structural + domain validation passes', () => {
       const serializer = new RecordingSerializer();
       const json = { ...makeValidContractJson(), targetFamily: 'sql' };

@@ -30,7 +30,7 @@ export const QUERY_META: Record<QueryId, QueryMeta> = {
     blurb:
       'Order all cafes by spherical distance to the query point and return the closest few. Distance comes back in metres so you can show "how far".',
     postgis: 'ST_DistanceSphere · ORDER BY · LIMIT',
-    snippet: `db.sql.cafe
+    snippet: `db.sql.public.cafe
   .select('id', 'name')
   .select('meters', (f, fns) => fns.distanceSphere(f.location, point))
   .orderBy((f, fns) => fns.distanceSphere(f.location, point), { direction: 'asc' })
@@ -46,7 +46,7 @@ export const QUERY_META: Record<QueryId, QueryMeta> = {
     blurb:
       'Filter cafes whose spherical distance to the query point is at most N metres. The yellow ring on the map shows the search circle.',
     postgis: 'ST_DistanceSphere(location, $point) ≤ $metres',
-    snippet: `db.sql.cafe
+    snippet: `db.sql.public.cafe
   .select('id', 'name')
   .where((f, fns) => fns.lte(fns.distanceSphere(f.location, point), metres))
   .limit(limit)`,
@@ -61,7 +61,7 @@ export const QUERY_META: Record<QueryId, QueryMeta> = {
     blurb:
       'Find the neighborhood polygon that contains the query point. Returns at most one match for our SF dataset.',
     postgis: 'ST_Contains(boundary, $point)',
-    snippet: `db.sql.neighborhood
+    snippet: `db.sql.public.neighborhood
   .select('id', 'name')
   .where((f, fns) => fns.contains(f.boundary, point))`,
     kind: 'neighborhood',
@@ -75,7 +75,7 @@ export const QUERY_META: Record<QueryId, QueryMeta> = {
     blurb:
       'Spatial join from cafes to a fixed neighborhood polygon (SoMa). The violet outline on the map shows the polygon being matched against.',
     postgis: 'ST_Within(location, $boundary)',
-    snippet: `db.sql.cafe
+    snippet: `db.sql.public.cafe
   .select('id', 'name')
   .where((f, fns) => fns.within(f.location, boundary))`,
     kind: 'cafe',
@@ -89,7 +89,7 @@ export const QUERY_META: Record<QueryId, QueryMeta> = {
     blurb:
       'Detect line/polygon intersection between bus routes and a closure polygon. Useful for impact analysis when streets shut down.',
     postgis: 'ST_Intersects(path, $closure)',
-    snippet: `db.sql.route
+    snippet: `db.sql.public.route
   .select('id', 'name')
   .where((f, fns) => fns.intersects(f.path, other))`,
     kind: 'route',
@@ -103,7 +103,7 @@ export const QUERY_META: Record<QueryId, QueryMeta> = {
     blurb:
       'Use the index-friendly && operator to filter by a rectangle. This is what you would call as the user pans/zooms a real map.',
     postgis: '&& (intersectsBbox)',
-    snippet: `db.sql.cafe
+    snippet: `db.sql.public.cafe
   .select('id', 'name')
   .where((f, fns) => fns.intersectsBbox(f.location, envelope))`,
     kind: 'cafe',

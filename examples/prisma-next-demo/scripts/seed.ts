@@ -26,7 +26,7 @@ async function main() {
   try {
     // Insert users with embedded address value objects
     await runtime.execute(
-      db.sql.user
+      db.sql.public.user
         .insert([
           {
             email: 'alice@example.com',
@@ -40,7 +40,7 @@ async function main() {
     );
 
     await runtime.execute(
-      db.sql.user
+      db.sql.public.user
         .insert([
           {
             email: 'bob@example.com',
@@ -54,7 +54,7 @@ async function main() {
     );
 
     const aliceRows = await runtime.execute(
-      db.sql.user
+      db.sql.public.user
         .select('id', 'email')
         .where((f, fns) => fns.eq(f.email, 'alice@example.com'))
         .limit(1)
@@ -63,7 +63,7 @@ async function main() {
     const alice = aliceRows[0] ?? null;
 
     const bobRows = await runtime.execute(
-      db.sql.user
+      db.sql.public.user
         .select('id', 'email')
         .where((f, fns) => fns.eq(f.email, 'bob@example.com'))
         .limit(1)
@@ -89,11 +89,12 @@ async function main() {
 
     // Insert posts with embeddings
     await runtime.execute(
-      db.sql.post
+      db.sql.public.post
         .insert([
           {
             title: 'First Post',
             userId: alice.id,
+            priority: db.enums.public.Priority.members.Low,
             embedding: generateEmbedding(1),
             createdAt: new Date(),
           },
@@ -102,11 +103,12 @@ async function main() {
     );
 
     await runtime.execute(
-      db.sql.post
+      db.sql.public.post
         .insert([
           {
             title: 'Second Post',
             userId: alice.id,
+            priority: db.enums.public.Priority.members.High,
             embedding: generateEmbedding(2),
             createdAt: new Date(),
           },
@@ -115,11 +117,12 @@ async function main() {
     );
 
     await runtime.execute(
-      db.sql.post
+      db.sql.public.post
         .insert([
           {
             title: 'Third Post',
             userId: bob.id,
+            priority: db.enums.public.Priority.members.Urgent,
             embedding: generateEmbedding(3),
             createdAt: new Date(),
           },

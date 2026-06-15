@@ -1,14 +1,21 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  ColumnDefaultLiteralInputValue,
+  ExecutionMutationDefaultPhases,
+} from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { PslAttribute, PslField, PslModel } from '@prisma-next/psl-parser';
+import type { EnumTypeHandle } from '@prisma-next/sql-contract-ts/contract-builder';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   getAttribute,
+  getPositionalArgumentEntry,
   lowerFirst,
   parseConstraintMapArgument,
   parseMapName,
@@ -20,6 +27,61 @@ import {
   reportUncomposedNamespace,
   resolveFieldTypeDescriptor,
 } from './psl-column-resolution';
+
+type LoweredFieldDefault = {
+  readonly defaultValue?: ColumnDefault;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases;
+};
+
+function lowerEnum2DefaultForField(input: {
+  readonly modelName: string;
+  readonly fieldName: string;
+  readonly defaultAttribute: PslAttribute;
+  readonly enumHandle: EnumTypeHandle;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): LoweredFieldDefault {
+  const expressionEntry = getPositionalArgumentEntry(input.defaultAttribute);
+  if (!expressionEntry) {
+    return {};
+  }
+
+  const raw = expressionEntry.value.trim();
+  const isQuotedString = /^(['"]).*\1$/.test(raw);
+  const isFunctionCall = raw.includes('(') && raw.endsWith(')');
+
+  if (isQuotedString || isFunctionCall) {
+    input.diagnostics.push({
+      code: 'PSL_ENUM2_DEFAULT_MUST_BE_MEMBER_NAME',
+      message: `Field "${input.modelName}.${input.fieldName}" @default on an enum2 field must name a member (e.g. @default(Low)), not a raw value or function.`,
+      sourceId: input.sourceId,
+      span: input.defaultAttribute.span,
+    });
+    return {};
+  }
+
+  const match = input.enumHandle.enumMembers.find((m) => m.name === raw);
+  if (!match) {
+    const validNames = input.enumHandle.enumMembers.map((m) => m.name).join(', ');
+    input.diagnostics.push({
+      code: 'PSL_ENUM2_UNKNOWN_DEFAULT_MEMBER',
+      message: `Field "${input.modelName}.${input.fieldName}" @default(${raw}) does not name a member of ${input.enumHandle.enumName}. Valid members: ${validNames}.`,
+      sourceId: input.sourceId,
+      span: input.defaultAttribute.span,
+    });
+    return {};
+  }
+
+  return {
+    defaultValue: {
+      kind: 'literal',
+      value: blindCast<
+        ColumnDefaultLiteralInputValue,
+        'enum member values are codec-validated JsonValue-compatible scalars'
+      >(match.value),
+    },
+  };
+}
 
 export type ResolvedField = {
   readonly field: PslField;
@@ -42,6 +104,24 @@ export type ModelNameMapping = {
   readonly fieldColumns: Map<string, string>;
 };
 
+/**
+ * A PSL model paired with its resolved namespace coordinate (undefined when
+ * the target leaves the model late-bound). Two models may share a bare name
+ * across namespaces, so structures that must distinguish them are keyed by
+ * the `(namespaceId, modelName)` coordinate produced by
+ * {@link modelCoordinateKey} rather than the bare model name.
+ */
+export type ModelNamespaceEntry = {
+  readonly model: PslModel;
+  readonly namespaceId: string | undefined;
+};
+
+const MODEL_COORDINATE_SEPARATOR = '\u0000';
+
+export function modelCoordinateKey(namespaceId: string, modelName: string): string {
+  return `${namespaceId}${MODEL_COORDINATE_SEPARATOR}${modelName}`;
+}
+
 export interface CollectResolvedFieldsInput {
   readonly model: PslModel;
   readonly mapping: ModelNameMapping;
@@ -58,6 +138,7 @@ export interface CollectResolvedFieldsInput {
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly enum2Handles?: ReadonlyMap<string, EnumTypeHandle>;
 }
 
 const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
@@ -77,7 +158,7 @@ const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
  * migrated (so they don't get told to do what they just did).
  *
  * Pairing the suppression predicate with the hint makes each entry
- * self-contained: a future entry for, say, `@id` ↔ `id.uuidv7()` cannot
+ * self-contained: a future entry for, say, `@id` ↔ `id.uuidv7String()` cannot
  * silently inherit the wrong predicate when added.
  */
 interface RemovedAttributeRule {
@@ -207,6 +288,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     diagnostics,
     sourceId,
     scalarTypeDescriptors,
+    enum2Handles,
   } = input;
   const resolvedFields: ResolvedField[] = [];
 
@@ -332,17 +414,27 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       });
       continue;
     }
-    const loweredDefault = defaultAttribute
-      ? lowerDefaultForField({
-          modelName: model.name,
-          fieldName: field.name,
-          defaultAttribute,
-          columnDescriptor: descriptor,
-          generatorDescriptorById,
-          sourceId,
-          defaultFunctionRegistry,
-          diagnostics,
-        })
+    const enum2Handle = enum2Handles?.get(field.typeName);
+    const loweredDefault: LoweredFieldDefault = defaultAttribute
+      ? enum2Handle
+        ? lowerEnum2DefaultForField({
+            modelName: model.name,
+            fieldName: field.name,
+            defaultAttribute,
+            enumHandle: enum2Handle,
+            sourceId,
+            diagnostics,
+          })
+        : lowerDefaultForField({
+            modelName: model.name,
+            fieldName: field.name,
+            defaultAttribute,
+            columnDescriptor: descriptor,
+            generatorDescriptorById,
+            sourceId,
+            defaultFunctionRegistry,
+            diagnostics,
+          })
       : {};
     const loweredOnCreate = loweredDefault.executionDefaults?.onCreate;
     if (field.optional && loweredOnCreate) {
@@ -356,7 +448,9 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       });
       continue;
     }
-    if (loweredOnCreate) {
+    const fieldUsesNamedType =
+      field.typeRef !== undefined || namedTypeDescriptors.has(field.typeName);
+    if (loweredOnCreate && !fieldUsesNamedType) {
       const generatorDescriptor = generatorDescriptorById.get(loweredOnCreate.id);
       const generatedDescriptor = generatorDescriptor?.resolveGeneratedColumnDescriptor?.({
         generated: loweredOnCreate,
@@ -424,12 +518,13 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
 }
 
 export function buildModelMappings(
-  models: readonly PslModel[],
+  modelEntries: readonly ModelNamespaceEntry[],
+  defaultNamespaceId: string,
   diagnostics: ContractSourceDiagnostic[],
   sourceId: string,
 ): Map<string, ModelNameMapping> {
   const result = new Map<string, ModelNameMapping>();
-  for (const model of models) {
+  for (const { model, namespaceId } of modelEntries) {
     const mapAttribute = getAttribute(model.attributes, 'map');
     const tableName = parseMapName({
       attribute: mapAttribute,
@@ -452,7 +547,7 @@ export function buildModelMappings(
       });
       fieldColumns.set(field.name, columnName);
     }
-    result.set(model.name, {
+    result.set(modelCoordinateKey(namespaceId ?? defaultNamespaceId, model.name), {
       model,
       tableName,
       fieldColumns,

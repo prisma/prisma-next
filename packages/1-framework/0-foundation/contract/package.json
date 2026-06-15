@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/contract",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -16,13 +16,13 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/utils": "workspace:0.12.0",
+    "@prisma-next/utils": "workspace:0.13.0",
     "@standard-schema/spec": "^1.1.0",
     "arktype": "catalog:"
   },
   "devDependencies": {
-    "@prisma-next/tsconfig": "workspace:0.12.0",
-    "@prisma-next/tsdown": "workspace:0.12.0",
+    "@prisma-next/tsconfig": "workspace:0.13.0",
+    "@prisma-next/tsdown": "workspace:0.13.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
@@ -44,6 +44,7 @@
     "./apply-specifier-default-control-policy": "./dist/apply-specifier-default-control-policy.mjs",
     "./contract-validation-error": "./dist/contract-validation-error.mjs",
     "./default-namespace": "./dist/default-namespace.mjs",
+    "./enum-accessor": "./dist/enum-accessor.mjs",
     "./hashing": "./dist/hashing.mjs",
     "./hashing-utils": "./dist/hashing-utils.mjs",
     "./resolve-domain-model": "./dist/resolve-domain-model.mjs",

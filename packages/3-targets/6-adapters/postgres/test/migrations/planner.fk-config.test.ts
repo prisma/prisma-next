@@ -7,7 +7,8 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../../src/core/adapter';
+import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
+import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 function createFkTestContract(fkConfig: {
   constraint: boolean;
@@ -83,10 +84,11 @@ const MIGRATION_PLAN_POLICY = {
 } as const;
 
 describe('PostgresMigrationPlanner - per-FK config combinations', () => {
-  const testAdapter = createPostgresAdapter();
-  const planner = createPostgresMigrationPlanner(testAdapter);
+  const planner = createPostgresMigrationPlanner(
+    new PostgresControlAdapter(createPostgresBuiltinCodecLookup()),
+  );
 
-  it('emits both FK constraints and FK indexes when constraint=true, index=true', () => {
+  it('emits both FK constraints and FK indexes when constraint=true, index=true', async () => {
     const contract = createFkTestContract({ constraint: true, index: true });
     const result = planner.plan({
       contract,
@@ -100,12 +102,12 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') throw new Error('Expected success');
 
-    const operationIds = result.plan.operations.map((op) => op.id);
+    const operationIds = (await Promise.all(result.plan.operations)).map((op) => op.id);
     expect(operationIds).toContain('foreignKey.post.post_userId_fkey');
     expect(operationIds).toContain('index.post.post_userId_idx');
   });
 
-  it('emits FK constraint and user-declared index when constraint=true, index=false (user-declared index survives)', () => {
+  it('emits FK constraint and user-declared index when constraint=true, index=false (user-declared index survives)', async () => {
     const contract = createFkTestContract({ constraint: true, index: false });
     const result = planner.plan({
       contract,
@@ -119,13 +121,13 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') throw new Error('Expected success');
 
-    const operationIds = result.plan.operations.map((op) => op.id);
+    const operationIds = (await Promise.all(result.plan.operations)).map((op) => op.id);
     expect(operationIds).toContain('foreignKey.post.post_userId_fkey');
     // User-declared index is always emitted regardless of FK index flag
     expect(operationIds).toContain('index.post.post_userId_idx');
   });
 
-  it('omits FK constraints but emits FK indexes when constraint=false, index=true', () => {
+  it('omits FK constraints but emits FK indexes when constraint=false, index=true', async () => {
     const contract = createFkTestContract({ constraint: false, index: true });
     const result = planner.plan({
       contract,
@@ -139,12 +141,12 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') throw new Error('Expected success');
 
-    const operationIds = result.plan.operations.map((op) => op.id);
+    const operationIds = (await Promise.all(result.plan.operations)).map((op) => op.id);
     expect(operationIds).not.toContain('foreignKey.post.post_userId_fkey');
     expect(operationIds).toContain('index.post.post_userId_idx');
   });
 
-  it('omits FK constraints but user-declared index survives when constraint=false, index=false', () => {
+  it('omits FK constraints but user-declared index survives when constraint=false, index=false', async () => {
     const contract = createFkTestContract({ constraint: false, index: false });
     const result = planner.plan({
       contract,
@@ -158,13 +160,13 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') throw new Error('Expected success');
 
-    const operationIds = result.plan.operations.map((op) => op.id);
+    const operationIds = (await Promise.all(result.plan.operations)).map((op) => op.id);
     expect(operationIds).not.toContain('foreignKey.post.post_userId_fkey');
     // User-declared index is always emitted regardless of FK index flag
     expect(operationIds).toContain('index.post.post_userId_idx');
   });
 
-  it('auto-creates FK-backing index when index=true and no user-declared index exists', () => {
+  it('auto-creates FK-backing index when index=true and no user-declared index exists', async () => {
     const contract = createFkTestContract({
       constraint: true,
       index: true,
@@ -183,13 +185,13 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') throw new Error('Expected success');
 
-    const operationIds = result.plan.operations.map((op) => op.id);
+    const operationIds = (await Promise.all(result.plan.operations)).map((op) => op.id);
     expect(operationIds).toContain('foreignKey.post.post_userId_fkey');
     // FK-backing index auto-created since no user-declared index covers it
     expect(operationIds).toContain('index.post.post_userId_idx');
   });
 
-  it('does not auto-create FK-backing index when index=false and no user-declared index exists', () => {
+  it('does not auto-create FK-backing index when index=false and no user-declared index exists', async () => {
     const contract = createFkTestContract({
       constraint: true,
       index: false,
@@ -208,13 +210,13 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') throw new Error('Expected success');
 
-    const operationIds = result.plan.operations.map((op) => op.id);
+    const operationIds = (await Promise.all(result.plan.operations)).map((op) => op.id);
     expect(operationIds).toContain('foreignKey.post.post_userId_fkey');
     // No index: no user-declared and FK index=false
     expect(operationIds).not.toContain('index.post.post_userId_idx');
   });
 
-  it('does not plan a destructive drop for a constraintless FK in offline from-contract schema', () => {
+  it('does not plan a destructive drop for a constraintless FK in offline from-contract schema', async () => {
     const fromContract = createWorkflowStateContract({
       storageHash: coreHash('sha256:from'),
       includeStateColumn: false,
@@ -237,10 +239,11 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') throw new Error('Expected success');
 
-    const operationIds = result.plan.operations.map((op) => op.id);
+    const ops = await Promise.all(result.plan.operations);
+    const operationIds = ops.map((op) => op.id);
     expect(operationIds).toContain('column.workflow_states.state');
     expect(operationIds).not.toContain('dropConstraint.workflow_states.fk(workflow_id)');
-    expect(result.plan.operations).not.toContainEqual(
+    expect(ops).not.toContainEqual(
       expect.objectContaining({
         operationClass: 'destructive',
         label: expect.stringContaining('fk(workflow_id)'),

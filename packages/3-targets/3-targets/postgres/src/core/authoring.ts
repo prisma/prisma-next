@@ -11,8 +11,8 @@ import type {
   PslExtensionBlockParamScalarValue,
 } from '@prisma-next/framework-components/authoring';
 import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
-import { PostgresEnumTypeSchema } from '@prisma-next/sql-contract/validators';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
+import { PostgresEnumTypeSchema } from './postgres-enum-type-schema';
 import { PostgresRlsPolicy } from './postgres-rls-policy';
 import { PostgresRole, type PostgresRoleInput } from './postgres-role';
 import { PostgresRlsPolicySchema, PostgresRoleSchema } from './postgres-validators';
@@ -133,18 +133,16 @@ export const postgresAuthoringEntityTypes = {
   },
   role: {
     kind: 'entity',
-    discriminator: 'postgres-role',
+    discriminator: 'role',
     validatorSchema: PostgresRoleSchema,
-    entrySlotName: 'role',
     output: {
       factory: (input: PostgresRoleInput): PostgresRole => new PostgresRole(input),
     },
   },
   rlsPolicy: {
     kind: 'entity',
-    discriminator: 'postgres-rls-policy',
+    discriminator: 'rlsPolicy',
     validatorSchema: PostgresRlsPolicySchema,
-    entrySlotName: 'rlsPolicy',
     output: {
       factory: lowerRlsPolicyFromBlock,
     },
@@ -158,6 +156,11 @@ export const postgresAuthoringEntityTypes = {
  * (see `createPostgresPslScalarTypeDescriptors`), so that authoring a field
  * via the TS callback surface (e.g. `field.int()`) and via the PSL scalar
  * surface (e.g. `Int`) lowers to byte-identical contracts.
+ *
+ * The `uuidNative` / `id.uuidv4Native` / `id.uuidv7Native` presets use the
+ * native Postgres `uuid` type (codecId `pg/uuid@1`). For cross-target
+ * portability use `uuidString` / `id.uuidv4String` / `id.uuidv7String` from
+ * the family pack instead.
  */
 /**
  * PSL block descriptor for `policy_select`.
@@ -179,7 +182,7 @@ export const postgresAuthoringPslBlockDescriptors = {
   policy_select: {
     kind: 'pslBlock',
     keyword: 'policy_select',
-    discriminator: 'postgres-rls-policy',
+    discriminator: 'rlsPolicy',
     name: { required: true },
     parameters: {
       target: { kind: 'ref', refKind: 'model', scope: 'same-namespace', required: true },
@@ -260,4 +263,41 @@ export const postgresAuthoringFieldPresets = {
     codecId: 'pg/timestamptz@1',
     nativeType: 'timestamptz',
   }),
+  uuidNative: {
+    kind: 'fieldPreset',
+    output: {
+      codecId: 'pg/uuid@1',
+      nativeType: 'uuid',
+    },
+  },
+  id: {
+    uuidv4Native: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'pg/uuid@1',
+        nativeType: 'uuid',
+        executionDefaults: {
+          onCreate: {
+            kind: 'generator',
+            id: 'uuidv4',
+          },
+        },
+        id: true,
+      },
+    },
+    uuidv7Native: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'pg/uuid@1',
+        nativeType: 'uuid',
+        executionDefaults: {
+          onCreate: {
+            kind: 'generator',
+            id: 'uuidv7',
+          },
+        },
+        id: true,
+      },
+    },
+  },
 } as const satisfies AuthoringFieldNamespace;

@@ -10,13 +10,10 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
-import {
-  createExecutionContext,
-  createRuntime,
-  createSqlExecutionStack,
-} from '@prisma-next/sql-runtime';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { PostgresSchema } from '@prisma-next/target-postgres/types';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
@@ -186,9 +183,9 @@ describe('multi-namespace runtime', () => {
           const driver = postgresDriver.create();
           await driver.connect({ kind: 'pgPool', pool });
 
-          const runtime = createRuntime({
-            stackInstance,
+          const runtime = new PostgresRuntimeImpl({
             context,
+            adapter: stackInstance.adapter,
             driver,
           });
 
@@ -204,14 +201,14 @@ describe('multi-namespace runtime', () => {
             [10, 'hello', 1],
           );
 
-          const userSelect = db['user']!.select('id', 'name').build();
+          const userSelect = db['auth']!['user']!.select('id', 'name').build();
           const userSql = adapter.lower(userSelect.ast, {
             contract,
             params: userSelect.params,
           }).sql;
           expect(userSql).toContain('FROM "auth"."user"');
 
-          const noteSelect = db['note']!.select('id', 'body').build();
+          const noteSelect = db['public']!['note']!.select('id', 'body').build();
           const noteSql = adapter.lower(noteSelect.ast, {
             contract,
             params: noteSelect.params,

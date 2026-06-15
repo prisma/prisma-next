@@ -5,24 +5,30 @@ import {
 } from '@prisma-next/framework-components/ir';
 import {
   type PostgresEnumStorageEntry,
+  type SqlNamespaceEntries,
   type SqlNamespaceTablesInput,
   type SqlStorage,
   StorageTable,
   type StorageTableInput,
+  StorageValueSet,
+  type StorageValueSetInput,
 } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { PostgresRlsPolicy, type PostgresRlsPolicyInput } from './postgres-rls-policy';
 import { PostgresRole, type PostgresRoleInput } from './postgres-role';
 import { escapeLiteral } from './sql-utils';
 
+export type PostgresNamespaceEntries = SqlNamespaceEntries & {
+  readonly type?: Readonly<Record<string, PostgresEnumType>>;
+  readonly role?: Readonly<Record<string, PostgresRole>>;
+  readonly rlsPolicy?: Readonly<Record<string, PostgresRlsPolicy>>;
+};
+
 export interface PostgresSchemaInput {
   readonly id: string;
-  readonly entries: {
-    readonly table: Record<string, StorageTable | StorageTableInput>;
-    readonly type: Record<string, PostgresEnumType | PostgresEnumTypeInput>;
-    readonly role?: Record<string, PostgresRole | PostgresRoleInput>;
-    readonly rlsPolicy?: Record<string, PostgresRlsPolicy | PostgresRlsPolicyInput>;
-  };
+  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
 /**
@@ -31,7 +37,7 @@ export interface PostgresSchemaInput {
  * `namespaces: Record<NamespaceId, PostgresSchema>` map populated by
  * the Postgres PSL interpreter from `namespace { … }` AST buckets.
  *
- * `entries` holds entity-kind slot maps (`table`, `type`). Qualifier
+ * `entries` holds entity-kind maps (`table`, `type`). Qualifier
  * emission is the rendering seam: DDL / SQL emission asks the namespace
  * for its qualifier (`"<schema>"`) or for a qualified table name
  * (`"<schema>"."<table>"`) and consumes the result polymorphically.
@@ -51,49 +57,92 @@ export class PostgresSchema extends NamespaceBase {
 
   declare readonly kind: 'schema';
   readonly id: string;
-  readonly entries: Readonly<{
-    readonly table: Readonly<Record<string, StorageTable>>;
-    readonly type: Readonly<Record<string, PostgresEnumType>>;
-    readonly role: Readonly<Record<string, PostgresRole>>;
-    readonly rlsPolicy: Readonly<Record<string, PostgresRlsPolicy>>;
-  }>;
+  readonly entries: PostgresNamespaceEntries;
 
   constructor(input: PostgresSchemaInput) {
     super();
     this.id = input.id;
+
+    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
+    let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
+    let type: Readonly<Record<string, PostgresEnumType>> = Object.freeze({});
+    let valueSet: Readonly<Record<string, StorageValueSet>> | undefined;
+    let role: Readonly<Record<string, PostgresRole>> | undefined;
+    let rlsPolicy: Readonly<Record<string, PostgresRlsPolicy>> | undefined;
+    for (const [kind, rawMap] of Object.entries(input.entries)) {
+      if (kind === 'table') {
+        const tableMap: Record<string, StorageTable> = {};
+        for (const [name, v] of Object.entries(
+          blindCast<
+            Record<string, StorageTableInput>,
+            'entries[table] holds StorageTableInput by construction'
+          >(rawMap),
+        )) {
+          tableMap[name] = new StorageTable(v);
+        }
+        table = Object.freeze(tableMap);
+      } else if (kind === 'type') {
+        const typeMap: Record<string, PostgresEnumType> = {};
+        for (const [name, v] of Object.entries(
+          blindCast<
+            Record<string, PostgresEnumTypeInput>,
+            'entries[type] holds PostgresEnumTypeInput by construction'
+          >(rawMap),
+        )) {
+          typeMap[name] = new PostgresEnumType(v);
+        }
+        type = Object.freeze(typeMap);
+      } else if (kind === 'valueSet') {
+        const vsMap: Record<string, StorageValueSet> = {};
+        for (const [name, v] of Object.entries(
+          blindCast<
+            Record<string, StorageValueSetInput>,
+            'entries[valueSet] holds StorageValueSetInput by construction'
+          >(rawMap),
+        )) {
+          vsMap[name] = new StorageValueSet(v);
+        }
+        if (Object.keys(vsMap).length > 0) {
+          valueSet = Object.freeze(vsMap);
+        }
+      } else if (kind === 'role') {
+        const roleMap: Record<string, PostgresRole> = {};
+        for (const [name, v] of Object.entries(
+          blindCast<
+            Record<string, PostgresRoleInput>,
+            'entries[role] holds PostgresRoleInput by construction'
+          >(rawMap),
+        )) {
+          roleMap[name] = new PostgresRole(v);
+        }
+        if (Object.keys(roleMap).length > 0) {
+          role = Object.freeze(roleMap);
+        }
+      } else if (kind === 'rlsPolicy') {
+        const policyMap: Record<string, PostgresRlsPolicy> = {};
+        for (const [name, v] of Object.entries(
+          blindCast<
+            Record<string, PostgresRlsPolicyInput>,
+            'entries[rlsPolicy] holds PostgresRlsPolicyInput by construction'
+          >(rawMap),
+        )) {
+          policyMap[name] = new PostgresRlsPolicy(v);
+        }
+        if (Object.keys(policyMap).length > 0) {
+          rlsPolicy = Object.freeze(policyMap);
+        }
+      } else {
+        carried[kind] = Object.freeze(rawMap);
+      }
+    }
+
     this.entries = Object.freeze({
-      table: Object.freeze(
-        Object.fromEntries(
-          Object.entries(input.entries.table).map(([k, v]) => [
-            k,
-            v instanceof StorageTable ? v : new StorageTable(v as StorageTableInput),
-          ]),
-        ),
-      ),
-      type: Object.freeze(
-        Object.fromEntries(
-          Object.entries(input.entries.type).map(([k, v]) => [
-            k,
-            v instanceof PostgresEnumType ? v : new PostgresEnumType(v as PostgresEnumTypeInput),
-          ]),
-        ),
-      ),
-      role: Object.freeze(
-        Object.fromEntries(
-          Object.entries(input.entries.role ?? {}).map(([k, v]) => [
-            k,
-            v instanceof PostgresRole ? v : new PostgresRole(v as PostgresRoleInput),
-          ]),
-        ),
-      ),
-      rlsPolicy: Object.freeze(
-        Object.fromEntries(
-          Object.entries(input.entries.rlsPolicy ?? {}).map(([k, v]) => [
-            k,
-            v instanceof PostgresRlsPolicy ? v : new PostgresRlsPolicy(v as PostgresRlsPolicyInput),
-          ]),
-        ),
-      ),
+      ...carried,
+      table,
+      type,
+      ...ifDefined('valueSet', valueSet),
+      ...ifDefined('role', role),
+      ...ifDefined('rlsPolicy', rlsPolicy),
     });
     Object.defineProperty(this, 'kind', {
       value: 'schema',
@@ -102,6 +151,18 @@ export class PostgresSchema extends NamespaceBase {
       configurable: true,
     });
     freezeNode(this);
+  }
+
+  get table(): Readonly<Record<string, StorageTable>> {
+    return this.entries.table ?? Object.freeze({});
+  }
+
+  get type(): Readonly<Record<string, PostgresEnumType>> {
+    return this.entries.type ?? Object.freeze({});
+  }
+
+  get valueSet(): Readonly<Record<string, StorageValueSet>> | undefined {
+    return this.entries.valueSet;
   }
 
   /**
@@ -184,7 +245,12 @@ export class PostgresUnboundSchema extends PostgresSchema {
   static readonly instance: PostgresUnboundSchema = new PostgresUnboundSchema();
 
   constructor(input?: PostgresSchemaInput) {
-    super(input ?? { id: UNBOUND_NAMESPACE_ID, entries: { table: {}, type: {} } });
+    super(
+      input ?? {
+        id: UNBOUND_NAMESPACE_ID,
+        entries: { table: {}, type: {}, role: {}, rlsPolicy: {} },
+      },
+    );
   }
 
   override qualifier(): string {
@@ -233,13 +299,12 @@ export function postgresCreateNamespace(
   const schemaInput: PostgresSchemaInput = {
     id: input.id,
     entries: {
-      table: input.entries.table,
-      type: (enumTypes ?? {}) as Record<string, PostgresEnumTypeInput>,
-      role: (input.entries.extensionEntities?.['role'] ?? {}) as Record<string, PostgresRoleInput>,
-      rlsPolicy: (input.entries.extensionEntities?.['rlsPolicy'] ?? {}) as Record<
-        string,
-        PostgresRlsPolicyInput
-      >,
+      ...input.entries,
+      table: input.entries['table'] ?? {},
+      type: blindCast<
+        Record<string, PostgresEnumTypeInput>,
+        'enumTypes values are PostgresEnumTypeInput by construction'
+      >(enumTypes ?? {}),
     },
   };
   if (input.id === UNBOUND_NAMESPACE_ID) {

@@ -24,6 +24,6 @@ describe('buildSqlNamespaceMap', () => {
     });
     expect(map[UNBOUND_NAMESPACE_ID]).toBe(SqlUnboundNamespace.instance);
     expect(map.app.id).toBe('app');
-    expect(map.app.entries.table.users).toBeDefined();
+    expect(map.app!.entries.table?.['users']).toBeDefined();
   });
 });

@@ -7,6 +7,7 @@ import {
   NamespaceBase,
 } from '@prisma-next/framework-components/ir';
 import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { enumType, member } from '../src/enum-type';
@@ -118,7 +119,8 @@ describe('enumType() — runtime behaviour', () => {
   });
 
   it('.has() returns false for unknown values', () => {
-    expect(Role.has('guest')).toBe(false);
+    const notAMember = 'guest' as 'user' | 'admin';
+    expect(Role.has(notAMember)).toBe(false);
   });
 
   it('.nameOf() returns the name for a valid value', () => {
@@ -127,7 +129,8 @@ describe('enumType() — runtime behaviour', () => {
   });
 
   it('.nameOf() returns undefined for an unknown value', () => {
-    expect(Role.nameOf('guest')).toBeUndefined();
+    const notAMember = 'guest' as 'user' | 'admin';
+    expect(Role.nameOf(notAMember)).toBeUndefined();
   });
 
   it('.ordinalOf() returns the zero-based index', () => {
@@ -136,7 +139,8 @@ describe('enumType() — runtime behaviour', () => {
   });
 
   it('.ordinalOf() returns -1 for an unknown value', () => {
-    expect(Role.ordinalOf('guest')).toBe(-1);
+    const notAMember = 'guest' as 'user' | 'admin';
+    expect(Role.ordinalOf(notAMember)).toBe(-1);
   });
 });
 
@@ -158,6 +162,12 @@ describe('enumType() — well-formedness guards', () => {
   it('throws on duplicate values', () => {
     expect(() => enumType('Dupe', pgText, member('User', 'same'), member('Admin', 'same'))).toThrow(
       /duplicate.*value/i,
+    );
+  });
+
+  it('throws when two members collapse to the same lowered value', () => {
+    expect(() => enumType('Dupe', pgText, member('One', 1), member('TextOne', '1'))).toThrow(
+      /duplicate member value "1"/i,
     );
   });
 });
@@ -202,7 +212,7 @@ describe('enumType() authoring → contract structure', () => {
     }) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const valueSet = storageNs?.entries.valueSet?.['Role'];
+    const valueSet = storageNs !== undefined ? storageNs.entries.valueSet?.['Role'] : undefined;
     expect(valueSet).toBeDefined();
     expect(valueSet?.values).toEqual(['user', 'admin']);
   });
@@ -228,7 +238,7 @@ describe('enumType() authoring → contract structure', () => {
       plane: 'domain',
       entityKind: 'enum',
       namespaceId: 'public',
-      name: 'Role',
+      entityName: 'Role',
     });
   });
 
@@ -247,13 +257,13 @@ describe('enumType() authoring → contract structure', () => {
     }) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs?.entries.table?.['User'];
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
     const roleColumn = userTable?.columns?.['role'];
     expect(roleColumn?.valueSet).toEqual({
       plane: 'storage',
-      entityKind: 'value-set',
+      entityKind: 'valueSet',
       namespaceId: 'public',
-      name: 'Role',
+      entityName: 'Role',
     });
   });
 
@@ -272,7 +282,7 @@ describe('enumType() authoring → contract structure', () => {
     }) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs?.entries.table?.['User'];
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
     const roleColumn = userTable?.columns?.['role'];
     expect(roleColumn?.typeRef).toBeUndefined();
   });
@@ -290,7 +300,7 @@ describe('enumType() authoring → contract structure', () => {
 class StubNamespace extends NamespaceBase {
   readonly kind = 'schema' as const;
   readonly id: string;
-  readonly entries: Readonly<{ readonly table: Readonly<Record<string, IRNode>> }>;
+  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
   constructor(id: string, tables: Readonly<Record<string, IRNode>> = {}) {
     super();
@@ -311,7 +321,9 @@ class StubNamespace extends NamespaceBase {
 function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
   return new StubNamespace(
     input.id,
-    input.entries.table as Readonly<Record<string, IRNode>> | undefined,
+    blindCast<Readonly<Record<string, IRNode>>, 'entries[table] holds only IRNode-shaped tables'>(
+      input.entries['table'],
+    ),
   );
 }
 
@@ -347,18 +359,19 @@ describe('enumType() — valueSet ref namespace (non-default model namespace)', 
       plane: 'domain',
       entityKind: 'enum',
       namespaceId: 'public',
-      name: 'Role',
+      entityName: 'Role',
     });
 
     // Same check on the storage side.
     const storageAuthNs = contract.storage.namespaces['auth'];
-    const userTable = storageAuthNs?.entries.table?.['User'];
+    const userTable =
+      storageAuthNs !== undefined ? storageAuthNs.entries.table?.['User'] : undefined;
     const roleColumn = userTable?.columns?.['role'];
     expect(roleColumn?.valueSet).toEqual({
       plane: 'storage',
-      entityKind: 'value-set',
+      entityKind: 'valueSet',
       namespaceId: 'public',
-      name: 'Role',
+      entityName: 'Role',
     });
   });
 });
@@ -426,7 +439,9 @@ describe('enumType() — full integration via defineContract factory', () => {
 
     // storage value-set
     const storageNs = contract.storage.namespaces['public'];
-    expect(storageNs?.entries.valueSet?.['Status']?.values).toEqual(['active', 'inactive']);
+    expect(
+      storageNs !== undefined ? storageNs.entries.valueSet?.['Status']?.values : undefined,
+    ).toEqual(['active', 'inactive']);
 
     // domain field valueSet
     const postModel = domainNs?.models?.['Post'];
@@ -434,16 +449,16 @@ describe('enumType() — full integration via defineContract factory', () => {
       plane: 'domain',
       entityKind: 'enum',
       namespaceId: 'public',
-      name: 'Status',
+      entityName: 'Status',
     });
 
     // storage column valueSet
-    const postTable = storageNs?.entries.table?.['Post'];
+    const postTable = storageNs !== undefined ? storageNs.entries.table?.['Post'] : undefined;
     expect(postTable?.columns?.['status']?.valueSet).toEqual({
       plane: 'storage',
-      entityKind: 'value-set',
+      entityKind: 'valueSet',
       namespaceId: 'public',
-      name: 'Status',
+      entityName: 'Status',
     });
   });
 });

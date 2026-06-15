@@ -1,12 +1,12 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   type ExecutionStackInstance,
   instantiateExecutionStack,
   type RuntimeDriverInstance,
 } from '@prisma-next/framework-components/execution';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import {
   AndExpr,
@@ -18,7 +18,6 @@ import {
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
   createExecutionContext,
-  createRuntime,
   createSqlExecutionStack,
   type Log,
   type Runtime,
@@ -27,7 +26,7 @@ import {
   type SqlRuntimeDriverInstance,
   type SqlRuntimeExtensionInstance,
 } from '@prisma-next/sql-runtime';
-import postgresTarget from '@prisma-next/target-postgres/runtime';
+import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -35,7 +34,7 @@ import { contract } from './sql-builder/fixtures/contract';
 import type { Contract } from './sql-builder/fixtures/generated/contract';
 import { setupTestDatabase } from './utils';
 
-const sqlContract = new SqlContractSerializer().deserializeContract(contract) as Contract;
+const sqlContract = new PostgresContractSerializer().deserializeContract(contract) as Contract;
 
 function rewriteUserSelects(name: string, rewrite: (ast: SelectAst) => SelectAst): SqlMiddleware {
   return {
@@ -159,9 +158,9 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
   });
 
   function buildRuntime(middleware: SqlMiddleware[], log?: Log): Runtime {
-    return createRuntime({
-      stackInstance,
+    return new PostgresRuntimeImpl({
       context,
+      adapter: stackInstance.adapter,
       driver,
       middleware,
       ...(log ? { log } : {}),
@@ -183,7 +182,7 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
     });
 
     const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
-    const rows = await runtime.execute(db.users.select('id').build()).toArray();
+    const rows = await runtime.execute(db.public.users.select('id').build()).toArray();
 
     expect(rows.map((r) => r.id)).toEqual([1]);
     expect(debug).toHaveBeenCalledWith({
@@ -216,7 +215,7 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
     });
 
     const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
-    const rows = await runtime.execute(db.users.select('id', 'name').build()).toArray();
+    const rows = await runtime.execute(db.public.users.select('id', 'name').build()).toArray();
 
     expect(rows.map((r) => r.id).sort()).toEqual([2, 3]);
     expect(debug).toHaveBeenCalledTimes(2);

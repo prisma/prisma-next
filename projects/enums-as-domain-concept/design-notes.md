@@ -87,19 +87,53 @@ extension-contributed blocks cannot reuse — so the codec rides the existing
 
 ### References
 
-`valueSet` (and the `enumMember` default) carry a discriminated, space-aware coordinate:
-`kind` (the source entity-kind) + `namespaceId` (admitting the `__unbound__` sentinel) +
-`name`, plus an optional `spaceId` whose presence is the cross-space discriminator — the
-TML-2500 / PR #745 carrier convention. Domain → domain and storage → storage references
-are intra-plane; the `enumMember` default is storage → domain, permitted by ADR 221's
-directional invariant.
+`valueSet` carries the entity coordinate — the ADR 221 four-tuple, carried, never
+derived: `plane` + `entityKind` (equal to the entries slot key: `'enum'` / `'valueSet'`
+— one vocabulary, no translation) + `namespaceId` (admitting the `__unbound__`
+sentinel) + `entityName`, plus an optional `spaceId` whose presence is the cross-space
+discriminator (the TML-2500 / PR #745 convention). Every `valueSet` reference is
+intra-plane (domain field → domain enum; storage column/check → storage value-set).
+The directional invariant (corrected 2026-06-10; ADR 221 §115's parenthetical is
+transposed, erratum pending): **domain may reference storage; storage may never
+reference domain** — storage must be consumable in isolation by the migration
+planner/runner. The original `enumMember` default carrier violated this and is
+removed: the storage column carries the resolved literal default; member intent, where
+recorded, lives domain-side.
 
 ### Typing and surface
 
 Read/write types are the codec's `Output`/`Input` narrowed to the value-set's values
-(`string` → `'user' | 'admin'`). `db.enums.<Name>` exposes the ordered, literal-typed
+(`string` → `'user' | 'admin'`). `db.enums.<ns>.<Name>` exposes the ordered, literal-typed
 value tuple and member accessors. `ORDER BY` follows declaration order, rendered per
 target from the ordered values.
+
+### Client-side entity accessors live on the `db` facade
+
+Enums are **contract metadata, lane-agnostic** — the same values whether you reach them
+through the sql lane or the orm lane — so the enum accessor map lives on the **`db`
+facade** alongside `transaction` / `prepare` / `raw` / `context`, not under one lane.
+`db.enums` is a **namespace-keyed map projected per target exactly like `db.sql` /
+`db.orm`**: `db.enums.public.Priority.values` on postgres, and `db.enums.Role.values` on
+unbound-namespace targets (sqlite, mongo) via the existing per-facade unbound projection.
+Each namespace exposes only its own enums (`domain.namespaces[ns].enum`).
+
+Why the facade, and why namespace-keyed:
+
+- **Lane-agnostic placement.** Putting enums under `db.orm` (or `db.sql`) buries
+  lane-independent metadata under one lane. The facade is the shared home for things that
+  belong to the contract, not to a query style.
+- **Cross-namespace collision.** A flat map merges every namespace's enums into one
+  record, so the same enum name in two namespaces silently last-write-wins.
+  Namespace-keyed resolution matches the IR (`domain.namespaces[ns].enum`) and keeps
+  same-named enums independent.
+
+**No reserved-name guard needed.** Because enums sit on the facade, not adjacent to models
+in a namespace facet, a domain model named `enums` no longer collides with the accessor —
+the earlier reserved-name rule is gone.
+
+This is the template for future client-side entity-accessor maps over IR-modelled
+entities: build a namespace-keyed map from `domain.namespaces[ns].<entity>`, hang it on
+the facade, and project it per target like `db.sql` / `db.orm`.
 
 ## Alternatives considered
 
@@ -123,10 +157,12 @@ target from the ordered values.
   self-contained for DDL. **Rejected because:** it duplicates the list per site. The
   named value-set, referenced intra-plane, keeps values once and storage still resolves
   without leaving its plane.
-- **A literal default instead of an `enumMember` variant.** Attractive: no new
-  `ColumnDefault` shape. **Rejected because:** a column now openly carries an enum
-  restriction, so a member-referenced default is the natural corollary and records
-  intent; the fixture cost is small.
+- **An `enumMember` `ColumnDefault` variant in storage (the original choice, reversed
+  2026-06-10).** Attractive: records member intent in the contract. **Rejected
+  because:** it is a storage → domain reference, violating the directional invariant —
+  the migration planner must resolve defaults from storage alone. The storage column
+  carries the resolved literal; member intent, where recorded, lives on the domain
+  field.
 - **An explicit persistence-strategy marker.** **Rejected because:** the structure
   declares the strategy (as in polymorphism/ownership); a marker would be a second source
   of truth.
@@ -150,8 +186,10 @@ target from the ordered values.
   (MySQL/SQLite inherit) or Postgres-only now? **Working position:** family-layer; the
   structured check is dialect-agnostic.
 - **`db.enums` scope** — local to this project or the first instance of a broader
-  domain-client surface for IR-modelled entities? **Working position:** ship it here,
-  shaped so a later generalization is non-breaking.
+  domain-client surface for IR-modelled entities? **Resolved (2026-06-10):** ship it
+  here as the first namespace-keyed entity-accessor map, shaped so a later generalization
+  is non-breaking; enums live on the `db` facade as a per-target-projected map (see
+  "Client-side entity accessors live on the `db` facade").
 - **Reference-carrier coupling** — the `valueSet`/default refs track TML-2500 / PR #745;
   if that convention shifts before this lands, these refs shift with it. **Working
   position:** conform to the merged M1 carrier; local refs need no `spaceId`.

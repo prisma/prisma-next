@@ -46,7 +46,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model Account {
         id     Int     @id
@@ -113,7 +114,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model Account {
         userId2 Int     @id @map("user_id")
@@ -166,7 +168,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model Account {
         id      Int     @id
@@ -200,7 +203,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model Record {
         id       Int    @id
@@ -237,7 +241,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model Record {
         id       Int    @id
@@ -274,7 +279,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model Record {
         id       Int    @id(map: "record_pkey")
@@ -307,7 +313,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model _Type {
         id     Int    @id
@@ -367,11 +374,13 @@ describe('printPsl', () => {
       },
       annotations: {
         pg: {
-          storageTypes: {
-            user_role: {
-              codecId: 'pg/enum@1',
-              nativeType: 'user_role',
-              typeParams: { values: ['USER', 'ADMIN'] },
+          enumTypes: {
+            public: {
+              user_role: {
+                codecId: 'pg/enum@1',
+                nativeType: 'user_role',
+                typeParams: { values: ['USER', 'ADMIN'] },
+              },
             },
           },
         },
@@ -389,16 +398,18 @@ describe('printPsl', () => {
       tables: {},
       annotations: {
         pg: {
-          storageTypes: {
-            user_role: {
-              codecId: 'pg/enum@1',
-              nativeType: 'user_role',
-              typeParams: { values: ['USER'] },
-            },
-            UserRole: {
-              codecId: 'pg/enum@1',
-              nativeType: 'UserRole',
-              typeParams: { values: ['ADMIN'] },
+          enumTypes: {
+            public: {
+              user_role: {
+                codecId: 'pg/enum@1',
+                nativeType: 'user_role',
+                typeParams: { values: ['USER'] },
+              },
+              UserRole: {
+                codecId: 'pg/enum@1',
+                nativeType: 'UserRole',
+                typeParams: { values: ['ADMIN'] },
+              },
             },
           },
         },

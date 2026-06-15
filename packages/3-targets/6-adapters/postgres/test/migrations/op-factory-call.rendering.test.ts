@@ -163,17 +163,14 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     expect(schema.importRequirements()).toEqual([]);
   });
 
-  it('AddColumnCall emits the column literal and imports addColumn', () => {
-    const call = new AddColumnCall('public', 'user', {
-      name: 'email',
-      typeSql: 'text',
-      defaultSql: '',
-      nullable: true,
-    });
+  it('AddColumnCall emits this.addColumn({...}) and imports col', () => {
+    const call = new AddColumnCall('public', 'user', col('email', 'text'));
     expect(call.renderTypeScript()).toBe(
-      'addColumn("public", "user", { name: "email", typeSql: "text", defaultSql: "", nullable: true })',
+      'this.addColumn({ schema: "public", table: "user", column: col("email", "text") })',
     );
-    expectFactoryImport(call, 'addColumn');
+    expect(call.importRequirements()).toEqual([
+      { moduleSpecifier: migrationModule, symbol: 'col' },
+    ]);
   });
 
   it('DropColumnCall emits three positional args and imports dropColumn', () => {
@@ -358,12 +355,7 @@ describe('renderCallsToTypeScript', () => {
     const calls = [
       new CreateTableCall('public', 'user', [col('id', 'text', { notNull: true })]),
       new DropTableCall('public', 'old_user'),
-      new AddColumnCall('public', 'user', {
-        name: 'email',
-        typeSql: 'text',
-        defaultSql: '',
-        nullable: true,
-      }),
+      new AddColumnCall('public', 'user', col('email', 'text')),
       new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
     ];
 
@@ -380,12 +372,12 @@ describe('renderCallsToTypeScript', () => {
       .split('\n')
       .filter((line) => line.includes("from '@prisma-next/postgres/migration';"));
     expect(targetPostgresImports).toEqual([
-      "import { Migration, MigrationCLI, addColumn, col, createIndex, dropTable } from '@prisma-next/postgres/migration';",
+      "import { Migration, MigrationCLI, col, createIndex, dropTable } from '@prisma-next/postgres/migration';",
     ]);
-    // CreateTableCall emits as this.createTable(...) (method call), not free function.
+    // CreateTableCall and AddColumnCall both emit as this.* method calls, not free functions.
     expect(source).toContain('this.createTable(');
+    expect(source).toContain('this.addColumn(');
     expect(source).toContain('dropTable(');
-    expect(source).toContain('addColumn(');
     expect(source).toContain('createIndex(');
   });
 

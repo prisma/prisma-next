@@ -102,18 +102,24 @@ namespace public {
 
     // Same per-namespace table keys
     for (const nsId of Object.keys(pslStorage.namespaces)) {
-      const pslTables = pslStorage.namespaces[nsId]?.entries.table ?? {};
-      const tsTables = tsStorage.namespaces[nsId]?.entries.table ?? {};
+      const pslTables =
+        pslStorage.namespaces[nsId] !== undefined
+          ? (pslStorage.namespaces[nsId]!.entries.table ?? {})
+          : {};
+      const tsTables =
+        tsStorage.namespaces[nsId] !== undefined
+          ? (tsStorage.namespaces[nsId]!.entries.table ?? {})
+          : {};
       expect(Object.keys(pslTables).sort()).toEqual(Object.keys(tsTables).sort());
     }
 
     // Same per-table column shapes
-    const pslAuthUser = pslStorage.namespaces['auth']?.entries.table['user'];
-    const tsAuthUser = tsStorage.namespaces['auth']?.entries.table['user'];
+    const pslAuthUser = pslStorage.namespaces['auth']!.entries.table?.['user'];
+    const tsAuthUser = tsStorage.namespaces['auth']!.entries.table?.['user'];
     expect(pslAuthUser?.columns).toEqual(tsAuthUser?.columns);
 
-    const pslPublicPost = pslStorage.namespaces['public']?.entries.table['post'];
-    const tsPublicPost = tsStorage.namespaces['public']?.entries.table['post'];
+    const pslPublicPost = pslStorage.namespaces['public']!.entries.table?.['post'];
+    const tsPublicPost = tsStorage.namespaces['public']!.entries.table?.['post'];
     expect(pslPublicPost?.columns).toEqual(tsPublicPost?.columns);
 
     // Same FK source/target
@@ -210,10 +216,10 @@ namespace public {
     const pslStorage = pslResult.value.storage as SqlStorage;
     const tsStorage = tsContract.storage as unknown as SqlStorage;
 
-    const pslProfileTable = pslStorage.namespaces['public']?.entries.table?.['profile'];
+    const pslProfileTable = pslStorage.namespaces['public']!.entries.table?.['profile'];
     const pslFks: readonly ForeignKey[] = pslProfileTable?.foreignKeys ?? [];
 
-    const tsProfileTable = tsStorage.namespaces['public']?.entries.table?.['profile'];
+    const tsProfileTable = tsStorage.namespaces['public']!.entries.table?.['profile'];
     const tsFks: readonly ForeignKey[] = tsProfileTable?.foreignKeys ?? [];
 
     expect(pslFks.length).toBe(1);

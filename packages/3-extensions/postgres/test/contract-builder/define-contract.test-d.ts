@@ -1,6 +1,6 @@
 import type { ContractModelDefinitions } from '@prisma-next/contract/types';
-import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import { expectTypeOf } from 'vitest';
+import { defineContract, enumType, field, member, model } from '../../src/exports/contract-builder';
 
 // @ts-expect-error — capabilities are contributed by components, not authoring input
 defineContract({ capabilities: { postgres: { lateral: true } } });
@@ -24,8 +24,24 @@ expectTypeOf<ContractModelDefinitions<typeof withModel>['User']>().not.toBeNever
 
 const withFactory = defineContract({}, ({ model: m, field: f }) => ({
   models: {
-    Post: m('Post', { fields: { id: f.id.uuidv4() } }),
+    Post: m('Post', { fields: { id: f.id.uuidv4String() } }),
   },
 }));
 expectTypeOf(withFactory.target).toEqualTypeOf<'postgres'>();
 expectTypeOf<ContractModelDefinitions<typeof withFactory>['Post']>().not.toBeNever();
+
+// Mixed scaffold + factory enums: the postgres wrapper must advertise both,
+// mirroring the core defineContract merge (not collapse them into one generic).
+const pgText = { codecId: 'pg/text@1' as const, nativeType: 'text' } as const;
+const Role = enumType('Role', pgText, member('User', 'user'), member('Admin', 'admin'));
+const Priority = enumType('Priority', pgText, member('Low', 'low'), member('High', 'high'));
+
+const mixedEnums = defineContract({ enums: { Role } }, ({ model: m, field: f }) => ({
+  enums: { Priority },
+  models: {
+    Item: m('Item', { fields: { id: f.id.uuidv4String() } }),
+  },
+}));
+type MixedAccessors = typeof mixedEnums extends { enumAccessors: infer A } ? A : never;
+expectTypeOf<MixedAccessors>().toHaveProperty('Role');
+expectTypeOf<MixedAccessors>().toHaveProperty('Priority');

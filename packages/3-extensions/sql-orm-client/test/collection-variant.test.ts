@@ -54,7 +54,7 @@ function createPolyCollection() {
   const baseContext = getTestContext();
   const context = { ...baseContext, contract };
   const runtime = createMockRuntime();
-  const collection = new Collection({ runtime, context }, 'User');
+  const collection = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
   return { collection, runtime, contract };
 }
 
@@ -92,7 +92,9 @@ describe('Collection.variant()', () => {
   it('returns unchanged collection when model has no discriminator', () => {
     const baseContext = getTestContext();
     const runtime = createMockRuntime();
-    const collection = new Collection({ runtime, context: baseContext }, 'User');
+    const collection = new Collection({ runtime, context: baseContext }, 'User', {
+      namespaceId: 'public',
+    });
     const result = collection.variant('Admin' as never);
     expect(result.state.filters).toHaveLength(0);
   });
@@ -184,7 +186,7 @@ function createMixedPolyCollection() {
   const baseContext = getTestContext();
   const context = { ...baseContext, contract };
   const runtime = createMockRuntime();
-  const collection = new Collection({ runtime, context }, 'Task');
+  const collection = new Collection({ runtime, context }, 'Task', { namespaceId: 'public' });
   return { collection, runtime };
 }
 
@@ -261,11 +263,73 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     expect(featurePriorityRefs).toHaveLength(1);
   });
 
+  it('orderBy after variant(Feature) resolves the MTI variant field against the variant table', async () => {
+    const { collection, runtime } = createMixedPolyCollection();
+    runtime.setNextResults([
+      [{ id: 2, title: 'Dark mode', type: 'feature', features__priority: 7 }],
+    ]);
+
+    // orderBy's selector is variant-aware like where()'s/first()'s: under
+    // variant(Feature) the runtime accessor exposes the MTI variant field
+    // `priority`, resolved against the `features` variant table. The patched
+    // Task model is absent from the static type, so the field is reached via
+    // `never`.
+    const narrowed = collection.variant('Feature' as never) as typeof collection;
+    await narrowed
+      .orderBy(((task: Record<string, { desc(): unknown }>) => task['priority']!.desc()) as never)
+      .all();
+
+    const ast = runtime.executions[0]!.plan.ast;
+    expect(isSelectAst(ast)).toBe(true);
+    const orderRefs = isSelectAst(ast)
+      ? (ast.orderBy ?? []).flatMap((item) => collectColumnRefs(item.expr))
+      : [];
+    expect(orderRefs).toEqual([ColumnRef.of('features', 'priority')]);
+    expect(isSelectAst(ast) ? ast.orderBy?.[0]?.dir : undefined).toBe('desc');
+  });
+
+  it('orderBy after variant(Feature) keeps base fields qualified against the base table', async () => {
+    const { collection, runtime } = createMixedPolyCollection();
+    runtime.setNextResults([
+      [{ id: 2, title: 'Dark mode', type: 'feature', features__priority: 7 }],
+    ]);
+
+    const narrowed = collection.variant('Feature' as never) as typeof collection;
+    await narrowed
+      .orderBy(((task: Record<string, { asc(): unknown }>) => task['title']!.asc()) as never)
+      .all();
+
+    const ast = runtime.executions[0]!.plan.ast;
+    const orderRefs = isSelectAst(ast)
+      ? (ast.orderBy ?? []).flatMap((item) => collectColumnRefs(item.expr))
+      : [];
+    expect(orderRefs).toEqual([ColumnRef.of('tasks', 'title')]);
+  });
+
+  it('orderBy without a variant resolves fields against the base table', async () => {
+    const { collection, runtime } = createMixedPolyCollection();
+    runtime.setNextResults([
+      [{ id: 2, title: 'Dark mode', type: 'feature', features__priority: 7 }],
+    ]);
+
+    await collection
+      .orderBy(((task: Record<string, { asc(): unknown }>) => task['title']!.asc()) as never)
+      .all();
+
+    const ast = runtime.executions[0]!.plan.ast;
+    const orderRefs = isSelectAst(ast)
+      ? (ast.orderBy ?? []).flatMap((item) => collectColumnRefs(item.expr))
+      : [];
+    expect(orderRefs).toEqual([ColumnRef.of('tasks', 'title')]);
+  });
+
   it('variant() on a polymorphic-target include refinement sets nested variantName', () => {
     const contract = buildMixedPolyContract();
     const context = { ...getTestContext(), contract };
     const runtime = createMockRuntime();
-    const projects = new Collection({ runtime, context }, 'Project') as unknown as PolyParent;
+    const projects = new Collection({ runtime, context }, 'Project', {
+      namespaceId: 'public',
+    }) as unknown as PolyParent;
 
     const refined = projects.include('tasks', (tasks) => tasks.variant('Bug'));
 
@@ -276,7 +340,9 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     const contract = buildMixedPolyContract();
     const context = { ...getTestContext(), contract };
     const runtime = createMockRuntime();
-    const projects = new Collection({ runtime, context }, 'Project') as unknown as PolyParent;
+    const projects = new Collection({ runtime, context }, 'Project', {
+      namespaceId: 'public',
+    }) as unknown as PolyParent;
 
     const included = projects.include('tasks');
 
@@ -289,7 +355,7 @@ function createReturningMixedPolyCollection() {
   const baseContext = getTestContext();
   const context = { ...baseContext, contract };
   const runtime = createMockRuntime();
-  const collection = new Collection({ runtime, context }, 'Task');
+  const collection = new Collection({ runtime, context }, 'Task', { namespaceId: 'public' });
   return { collection, runtime, contract };
 }
 
@@ -442,7 +508,9 @@ describe('MTI variant create (two-INSERT orchestration)', () => {
       }),
     };
 
-    const collection = new Collection({ runtime: txRuntime, context }, 'Task');
+    const collection = new Collection({ runtime: txRuntime, context }, 'Task', {
+      namespaceId: 'public',
+    });
     const narrowed = collection.variant('Feature' as never) as typeof collection;
     await narrowed.createAll([{ title: 'Dark mode', priority: 1 } as never]).toArray();
 

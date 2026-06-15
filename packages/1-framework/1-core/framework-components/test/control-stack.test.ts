@@ -476,6 +476,192 @@ describe('assembleAuthoringContributions', () => {
       ]),
     ).not.toThrow();
   });
+
+  it('does not mutate source pack sub-namespace objects when merging', () => {
+    // Pack A owns the `id` sub-namespace with one leaf.
+    // Pack B adds a second leaf under the same sub-namespace.
+    // After merging, pack A's original object must not contain pack B's key.
+    const packAAuthoring = {
+      field: {
+        id: {
+          alpha: { kind: 'fieldPreset' as const, output: { codecId: 'a@1', nativeType: 'text' } },
+        },
+      },
+    };
+    const packBAuthoring = {
+      field: {
+        id: {
+          beta: { kind: 'fieldPreset' as const, output: { codecId: 'b@1', nativeType: 'int4' } },
+        },
+      },
+    };
+
+    const result = assembleAuthoringContributions([
+      createDescriptor({ authoring: packAAuthoring }),
+      createDescriptor({ id: 'pack-b', authoring: packBAuthoring }),
+    ]);
+
+    expect(Object.keys(result.field['id'] as object)).toEqual(['alpha', 'beta']);
+    // Pack A's original sub-namespace object must be untouched.
+    expect(packAAuthoring.field.id).not.toHaveProperty('beta');
+  });
+
+  it('composing the same pack objects twice does not throw', () => {
+    // Simulates two calls to assembleAuthoringContributions (or createControlStack) within the
+    // same process using the same singleton pack descriptors. Without the shallow-copy fix,
+    // the first call mutates the family pack's id sub-namespace, so the second call finds both
+    // leaves already present in the source object and throws "Duplicate authoring field helper".
+    const packADescriptor = createDescriptor({
+      authoring: {
+        field: {
+          id: {
+            alpha: {
+              kind: 'fieldPreset' as const,
+              output: { codecId: 'a@1', nativeType: 'text' },
+            },
+          },
+        },
+      },
+    });
+    const packBDescriptor = createDescriptor({
+      id: 'pack-b',
+      authoring: {
+        field: {
+          id: {
+            beta: {
+              kind: 'fieldPreset' as const,
+              output: { codecId: 'b@1', nativeType: 'int4' },
+            },
+          },
+        },
+      },
+    });
+
+    const first = assembleAuthoringContributions([packADescriptor, packBDescriptor]);
+    expect(Object.keys(first.field['id'] as object)).toEqual(['alpha', 'beta']);
+
+    // Second composition with the same singletons must not throw.
+    expect(() => assembleAuthoringContributions([packADescriptor, packBDescriptor])).not.toThrow();
+  });
+
+  it('still throws when the same leaf path is contributed by two different packs', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            field: {
+              id: {
+                shared: {
+                  kind: 'fieldPreset' as const,
+                  output: { codecId: 'a@1', nativeType: 'text' },
+                },
+              },
+            },
+          },
+        }),
+        createDescriptor({
+          id: 'pack-b',
+          authoring: {
+            field: {
+              id: {
+                shared: {
+                  kind: 'fieldPreset' as const,
+                  output: { codecId: 'b@1', nativeType: 'int4' },
+                },
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/Duplicate authoring field helper "id\.shared"/);
+  });
+
+  it('preserves prototype-carrying objects in sub-namespaces through composition', () => {
+    // A sub-namespace whose value is a class instance with a prototype getter.
+    // Before the fix, mergeAuthoringNamespaces used isPlainNamespaceObject which
+    // matched any non-null non-array object, so it would shallow-copy the class
+    // instance ({ ...instance }), stripping the prototype and making the getter
+    // return undefined. With the fix, only plain objects ({} prototype or null)
+    // are shallow-copied; class instances are passed by reference.
+    class SubNs {
+      get leafDescriptor() {
+        return {
+          kind: 'entity' as const,
+          discriminator: 'proto-entity',
+          output: { factory: () => ({}) },
+        };
+      }
+    }
+    const subNsInstance = new SubNs();
+
+    // Wrap the instance behind a plain outer namespace so mergeAuthoringNamespaces
+    // receives subNsInstance as the sourceValue for key 'sub'.
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        authoring: {
+          entityTypes: {
+            sub: subNsInstance as unknown as Record<
+              string,
+              { kind: 'entity'; discriminator: string; output: { factory: () => object } }
+            >,
+          },
+        },
+      }),
+    ]);
+
+    // The sub-namespace value must be the original instance (prototype intact),
+    // not a shallow-copied plain object with an undefined getter.
+    expect(result.entityTypes['sub']).toBe(subNsInstance);
+    expect((result.entityTypes['sub'] as unknown as SubNs).leafDescriptor).toBeDefined();
+  });
+
+  it('deep-copies nested plain-object sub-namespaces so composing the same pack twice does not throw or mutate', () => {
+    // depth-3: pack A owns field.a.b.alpha; pack B adds field.a.b.beta.
+    // Before the deep-copy fix, shallow-copying `a` on first assignment left
+    // `a.b` shared with pack A's original. On the second composition, pack B
+    // recursing into `a.b` would find `beta` already present (mutated in by the
+    // first run) and throw "Duplicate authoring field helper".
+    const packADescriptor = createDescriptor({
+      authoring: {
+        field: {
+          a: {
+            b: {
+              alpha: {
+                kind: 'fieldPreset' as const,
+                output: { codecId: 'a@1', nativeType: 'text' },
+              },
+            },
+          },
+        },
+      },
+    });
+    const packBDescriptor = createDescriptor({
+      id: 'pack-b',
+      authoring: {
+        field: {
+          a: {
+            b: {
+              beta: {
+                kind: 'fieldPreset' as const,
+                output: { codecId: 'b@1', nativeType: 'int4' },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const first = assembleAuthoringContributions([packADescriptor, packBDescriptor]);
+    expect(Object.keys((first.field['a'] as Record<string, unknown>)['b'] as object)).toEqual([
+      'alpha',
+      'beta',
+    ]);
+
+    // Second composition with the same singletons must not throw.
+    expect(() => assembleAuthoringContributions([packADescriptor, packBDescriptor])).not.toThrow();
+    // Pack A's original nested object must be untouched.
+    expect(packADescriptor.authoring?.field?.['a']).not.toHaveProperty(['b', 'beta']);
+  });
 });
 
 describe('extractCodecLookup', () => {

@@ -59,6 +59,15 @@ const rollbackArcInput: ScenarioInput = {
 
 // ---------------------------------------------------------------------------
 // Scenario: rollback-merge   two rollback arcs both landing on rm_a
+//
+// Converged: one shared back-lane (lane2+lane3 are per-arc arc colours).
+// Arc colour assignment follows migration list order:
+//   004_rollback_c → lane2 (cyan, primary)
+//   005_rollback_d → lane3 (yellow, secondary)
+// Display order is rank-descending: rm_d (top) → rm_c → rm_b → rm_a.
+// rm_d's arc (lane3) opens the shared back-lane from the top.
+// rm_c's arc (lane2, higher priority) overwrites rm_d's running rail with
+// its own corner ╮ at rm_c's row; from rm_c down to rm_a the rail is cyan.
 // ---------------------------------------------------------------------------
 
 const rollbackMergeInput: ScenarioInput = {
@@ -70,6 +79,34 @@ const rollbackMergeInput: ScenarioInput = {
     { name: '003_fwd_cd', from: 'rm_c', to: 'rm_d' },
     { name: '004_rollback_c', from: 'rm_c', to: 'rm_a' },
     { name: '005_rollback_d', from: 'rm_d', to: 'rm_a' },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Scenario: rollback-merge-3   three rollback arcs all landing on rm3_a
+//
+// Chain: ∅ → rm3_a → rm3_b → rm3_c → rm3_d → rm3_e
+// Arcs: rm3_c→rm3_a (006), rm3_d→rm3_a (007), rm3_e→rm3_a (008)
+//
+// Arc colour assignment (migration list order):
+//   006_rollback_c → lane2 (cyan, primary)
+//   007_rollback_d → lane3 (yellow)
+//   008_rollback_e → lane4 (blueBright)
+// Each arc shows its own ╮ corner at its source row (higher-priority arc's
+// corner overwrites the running lower-priority rail at that row).
+// ---------------------------------------------------------------------------
+
+const rollbackMerge3Input: ScenarioInput = {
+  contracts: ['∅', 'rm3_a', 'rm3_b', 'rm3_c', 'rm3_d', 'rm3_e'],
+  migrations: [
+    { name: '000_init', from: '∅', to: 'rm3_a' },
+    { name: '001_fwd_ab', from: 'rm3_a', to: 'rm3_b' },
+    { name: '002_fwd_bc', from: 'rm3_b', to: 'rm3_c' },
+    { name: '003_fwd_cd', from: 'rm3_c', to: 'rm3_d' },
+    { name: '004_fwd_de', from: 'rm3_d', to: 'rm3_e' },
+    { name: '006_rollback_c', from: 'rm3_c', to: 'rm3_a' },
+    { name: '007_rollback_d', from: 'rm3_d', to: 'rm3_a' },
+    { name: '008_rollback_e', from: 'rm3_e', to: 'rm3_a' },
   ],
 };
 
@@ -260,75 +297,126 @@ export const BACKLINK_GOLDENS: readonly ScenarioGolden[] = [
   },
   // ── rollback-merge ───────────────────────────────────────────────────────
   // rollback-merge:flat
+  //
+  // ONE shared back-lane (converged). Arc colours:
+  //   005_rollback_d → lane3 (yellow): opens the back-lane at rm_d with ─╮
+  //   004_rollback_c → lane2 (cyan, primary): its corner ─╮ at rm_c overwrites
+  //     arc_d's running │; below rm_c the rail is cyan to the landing.
   {
     scenario: 'rollback-merge',
     strategy: 'flat',
     variant: undefined,
-    description: 'two rollback arcs landing on same target (two separate back-lanes)',
+    description: 'two rollback arcs landing on same target, converged into one back-lane',
     input: rollbackMergeInput,
     onPath: [],
     rows: parseGrid([
-      ['○───╮', 'rm_d', '13333'],
-      ['│   │↓', '005_rollback_d', '1...33'],
-      ['│↑  │', '003_fwd_cd', '11..3'],
-      ['○─╮ │', 'rm_c', '122.3'],
-      ['│ │↓│', '004_rollback_c', '11223'],
-      ['│↑│ │', '002_fwd_bc', '112.3'],
-      ['○ │ │', 'rm_b', '1.2.3'],
-      ['│↑│ │', '001_fwd_ab', '112.3'],
-      ['○◂╯─╯', 'rm_a', '12233'],
+      ['○─╮', 'rm_d', '133'],
+      ['│ │↓', '005_rollback_d', '1133'],
+      ['│↑│', '003_fwd_cd', '113'],
+      ['○─╮', 'rm_c', '122'],
+      ['│ │↓', '004_rollback_c', '1122'],
+      ['│↑│', '002_fwd_bc', '112'],
+      ['○ │', 'rm_b', '112'],
+      ['│↑│', '001_fwd_ab', '112'],
+      ['○◂╯', 'rm_a', '122'],
       ['│↑', '000_init', '11'],
       ['○', '∅', '1'],
     ]),
   },
-  // rollback-merge:focus:via-A  (arc_D = 005_rollback_d is on-path)
+  // rollback-merge:focus:via-A  (005_rollback_d is on-path)
+  //
+  // arc_d (on-path) is green throughout its route.
+  // The shared back-lane rail │ at col2 is owned by arc_d from rm_d all the
+  // way to rm_a; it renders green. arc_c's hook ─ at rm_c is dim; arc_c's
+  // ↓ connector is dim. The rail at col2 in arc_c's connector row is still
+  // green (arc_d's running rail). Landing rm_a green.
   {
     scenario: 'rollback-merge',
     strategy: 'focus',
     variant: 'via-A',
-    description: 'highlight arc_D (longer arc) — green; arc_C dim',
+    description: 'highlight arc_d (005_rollback_d) — green; arc_c dim',
     input: rollbackMergeInput,
     onPath: ['005_rollback_d'],
     from: 'rm_d',
     to: 'rm_a',
     rows: parseGrid([
-      ['○───╮', 'rm_d', 'ggggg'],
-      ['│   │↓', '005_rollback_d', 'd...gg'],
-      ['│↑  │', '003_fwd_cd', 'dd..g'],
-      ['○─╮ │', 'rm_c', 'ddd.g'],
-      ['│ │↓│', '004_rollback_c', 'd.ddg'],
-      ['│↑│ │', '002_fwd_bc', 'ddd.g'],
-      ['○ │ │', 'rm_b', 'd.d.g'],
-      ['│↑│ │', '001_fwd_ab', 'ddd.g'],
-      ['○◂──╯', 'rm_a', 'ggggg'],
+      ['○─╮', 'rm_d', 'ggg'],
+      ['│ │↓', '005_rollback_d', 'd.gg'],
+      ['│↑│', '003_fwd_cd', 'ddg'],
+      ['○─│', 'rm_c', 'ddg'],
+      ['│ │↓', '004_rollback_c', 'd.gd'],
+      ['│↑│', '002_fwd_bc', 'ddg'],
+      ['○ │', 'rm_b', 'd.g'],
+      ['│↑│', '001_fwd_ab', 'ddg'],
+      ['○◂╯', 'rm_a', 'ggg'],
       ['│↑', '000_init', 'dd'],
       ['○', '∅', 'd'],
     ]),
   },
-  // rollback-merge:focus:via-B  (arc_C = 004_rollback_c is on-path)
-  // rm_c is the source of the on-path rollback, so its node is on-path (green) —
-  // mirroring how via-A renders rm_d (the source of its on-path rollback) green.
+  // rollback-merge:focus:via-B  (004_rollback_c is on-path)
+  //
+  // arc_c (on-path, lane2/primary) is green. arc_d (off-path) is fully dim.
+  // arc_d's entire section (rm_d's ─╮ corner and its rail above rm_c) is dim.
+  // At rm_c: arc_c is primary so its corner ─╮ shows green (col2=╮ green).
+  // Below rm_c the green rail runs to rm_a. Landing rm_a green.
   {
     scenario: 'rollback-merge',
     strategy: 'focus',
     variant: 'via-B',
-    description: 'highlight arc_C (shorter arc) — green; arc_D dim',
+    description: 'highlight arc_c (004_rollback_c) — green; arc_d dim',
     input: rollbackMergeInput,
     onPath: ['004_rollback_c'],
     from: 'rm_c',
     to: 'rm_a',
     rows: parseGrid([
-      ['○───╮', 'rm_d', 'ddddd'],
-      ['│   │↓', '005_rollback_d', 'd...dd'],
-      ['│↑  │', '003_fwd_cd', 'dd..d'],
-      ['○─╮ │', 'rm_c', 'ggg.d'],
-      ['│ │↓│', '004_rollback_c', 'd.ggd'],
-      ['│↑│ │', '002_fwd_bc', 'ddg.d'],
-      ['○ │ │', 'rm_b', 'd.g.d'],
-      ['│↑│ │', '001_fwd_ab', 'ddg.d'],
-      ['○◂╯─╯', 'rm_a', 'gggdd'],
+      ['○─╮', 'rm_d', 'ddd'],
+      ['│ │↓', '005_rollback_d', 'd.dd'],
+      ['│↑│', '003_fwd_cd', 'ddd'],
+      ['○─╮', 'rm_c', 'ggg'],
+      ['│ │↓', '004_rollback_c', 'd.gg'],
+      ['│↑│', '002_fwd_bc', 'ddg'],
+      ['○ │', 'rm_b', 'd.g'],
+      ['│↑│', '001_fwd_ab', 'ddg'],
+      ['○◂╯', 'rm_a', 'ggg'],
       ['│↑', '000_init', 'dd'],
       ['○', '∅', 'd'],
+    ]),
+  },
+  // ── rollback-merge-3 ─────────────────────────────────────────────────────
+  // rollback-merge-3:flat
+  //
+  // Three rollback arcs on ONE shared back-lane (converged).
+  // Arc colours (migration list order):
+  //   006_rollback_c → lane2 (cyan, primary)
+  //   007_rollback_d → lane3 (yellow)
+  //   008_rollback_e → lane4 (blueBright)
+  //
+  // Display: rm3_e (top) → rm3_d → rm3_c → rm3_b → rm3_a.
+  // Each arc's corner ─╮ appears at its source row in its own colour because
+  // higher-priority arcs (smaller lane number) overwrite the running rail when
+  // they join. Segment colours: rm3_e→rm3_d=l4, rm3_d→rm3_c=l3, rm3_c↓=l2.
+  {
+    scenario: 'rollback-merge-3',
+    strategy: 'flat',
+    variant: undefined,
+    description: 'three rollback arcs to same target, all converged into one back-lane',
+    input: rollbackMerge3Input,
+    onPath: [],
+    rows: parseGrid([
+      ['○─╮', 'rm3_e', '144'],
+      ['│ │↓', '008_rollback_e', '1144'],
+      ['│↑│', '004_fwd_de', '114'],
+      ['○─╮', 'rm3_d', '133'],
+      ['│ │↓', '007_rollback_d', '1133'],
+      ['│↑│', '003_fwd_cd', '113'],
+      ['○─╮', 'rm3_c', '122'],
+      ['│ │↓', '006_rollback_c', '1122'],
+      ['│↑│', '002_fwd_bc', '112'],
+      ['○ │', 'rm3_b', '112'],
+      ['│↑│', '001_fwd_ab', '112'],
+      ['○◂╯', 'rm3_a', '122'],
+      ['│↑', '000_init', '11'],
+      ['○', '∅', '1'],
     ]),
   },
   // ── rollback-cross ───────────────────────────────────────────────────────

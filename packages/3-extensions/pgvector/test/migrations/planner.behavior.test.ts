@@ -1,4 +1,7 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import {
+  createPostgresBuiltinCodecLookup,
+  PostgresControlAdapter,
+} from '@prisma-next/adapter-postgres/control';
 import {
   asNamespaceId,
   type ColumnDefaultLiteralInputValue,
@@ -6,6 +9,7 @@ import {
   coreHash,
   profileHash,
 } from '@prisma-next/contract/types';
+import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import { type CodecControlHooks, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
@@ -20,11 +24,12 @@ import {
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { buildBuiltinIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
+import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
 
-const testAdapter = createPostgresAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
   const planner = createPostgresMigrationPlanner(testAdapter);
@@ -63,7 +68,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
     });
   });
 
-  it('plans additive operations for subset schema (missing column/index/fk)', () => {
+  it('plans additive operations for subset schema (missing column/index/fk)', async () => {
     const schema: SqlSchemaIR = {
       tables: {
         user: {
@@ -92,7 +97,8 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
     if (result.kind !== 'success') {
       throw new Error('expected planner success for additive subset');
     }
-    expect(result.plan.operations.map((op) => op.id)).toEqual([
+    const ops = await Promise.all(result.plan.operations);
+    expect(ops.map((op) => op.id)).toEqual([
       'table.post',
       'column.user.email',
       'unique.user.user_email_key',
@@ -146,8 +152,8 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
 describe('NOT NULL column without default uses temporary default', () => {
   const qualifiedUserTable = '"user"';
 
-  it('emits 2-step execute (add with temp default, drop default) for NOT NULL text column', () => {
-    const addCol = planAddColumn('name', {
+  it('emits 2-step execute (add with temp default, drop default) for NOT NULL text column', async () => {
+    const addCol = await planAddColumn('name', {
       nativeType: 'text',
       codecId: 'pg/text@1',
       nullable: false,
@@ -169,8 +175,8 @@ describe('NOT NULL column without default uses temporary default', () => {
     );
   });
 
-  it('emits 2-step execute for NOT NULL int4 column', () => {
-    const addCol = planAddColumn('age', {
+  it('emits 2-step execute for NOT NULL int4 column', async () => {
+    const addCol = await planAddColumn('age', {
       nativeType: 'int4',
       codecId: 'pg/int4@1',
       nullable: false,
@@ -182,8 +188,8 @@ describe('NOT NULL column without default uses temporary default', () => {
     ]);
   });
 
-  it('uses length-aware temporary defaults for fixed-length bit columns', () => {
-    const addCol = planAddColumn(
+  it('uses length-aware temporary defaults for fixed-length bit columns', async () => {
+    const addCol = await planAddColumn(
       'flags',
       {
         nativeType: 'bit',
@@ -207,8 +213,8 @@ describe('NOT NULL column without default uses temporary default', () => {
     ]);
   });
 
-  it('uses empty-array temporary defaults for NOT NULL array columns', () => {
-    const addCol = planAddColumn('tags', {
+  it('uses empty-array temporary defaults for NOT NULL array columns', async () => {
+    const addCol = await planAddColumn('tags', {
       nativeType: 'text[]',
       codecId: 'pg/text-array@1',
       nullable: false,
@@ -220,8 +226,8 @@ describe('NOT NULL column without default uses temporary default', () => {
     ]);
   });
 
-  it('uses built-in temporary defaults for NOT NULL tsvector columns', () => {
-    const addCol = planAddColumn('searchDocument', {
+  it('uses built-in temporary defaults for NOT NULL tsvector columns', async () => {
+    const addCol = await planAddColumn('searchDocument', {
       nativeType: 'tsvector',
       codecId: 'pg/tsvector@1',
       nullable: false,
@@ -233,8 +239,8 @@ describe('NOT NULL column without default uses temporary default', () => {
     ]);
   });
 
-  it('uses a json-typed identity literal for NOT NULL json columns', () => {
-    const addCol = planAddColumn('metadata', {
+  it('uses a json-typed identity literal for NOT NULL json columns', async () => {
+    const addCol = await planAddColumn('metadata', {
       nativeType: 'json',
       codecId: 'pg/json@1',
       nullable: false,
@@ -246,8 +252,8 @@ describe('NOT NULL column without default uses temporary default', () => {
     ]);
   });
 
-  it('uses explicit UTC-offset temporary defaults for NOT NULL timetz columns', () => {
-    const addCol = planAddColumn('opensAt', {
+  it('uses explicit UTC-offset temporary defaults for NOT NULL timetz columns', async () => {
+    const addCol = await planAddColumn('opensAt', {
       nativeType: 'timetz',
       codecId: 'pg/timetz@1',
       nullable: false,
@@ -259,8 +265,8 @@ describe('NOT NULL column without default uses temporary default', () => {
     ]);
   });
 
-  it('uses codec hook temporary defaults for parameterized pgvector columns', () => {
-    const addCol = planAddColumn(
+  it('uses codec hook temporary defaults for parameterized pgvector columns', async () => {
+    const addCol = await planAddColumn(
       'embedding',
       {
         nativeType: 'vector',
@@ -280,8 +286,8 @@ describe('NOT NULL column without default uses temporary default', () => {
     ]);
   });
 
-  it('uses codec hook temporary defaults for parameterized pgvector storage type refs', () => {
-    const addCol = planAddColumn(
+  it('uses codec hook temporary defaults for parameterized pgvector storage type refs', async () => {
+    const addCol = await planAddColumn(
       'embedding',
       {
         nativeType: 'vector',
@@ -311,8 +317,8 @@ describe('NOT NULL column without default uses temporary default', () => {
     ]);
   });
 
-  it('uses the empty-table fallback when a codec hook declines a temporary default', () => {
-    const addCol = planAddColumn(
+  it('uses the empty-table fallback when a codec hook declines a temporary default', async () => {
+    const addCol = await planAddColumn(
       'name',
       {
         nativeType: 'text',
@@ -336,8 +342,8 @@ describe('NOT NULL column without default uses temporary default', () => {
     ]);
   });
 
-  it('uses the empty-table fallback when the new column becomes a primary key later in the same plan', () => {
-    const operations = planUserTableOperations(
+  it('uses the empty-table fallback when the new column becomes a primary key later in the same plan', async () => {
+    const operationsPromise = planUserTableOperations(
       {
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -357,18 +363,19 @@ describe('NOT NULL column without default uses temporary default', () => {
       },
     );
 
-    const addCol = getRequiredOperation(operations, 'column.user.slug');
+    const addCol = await getRequiredOperation(operationsPromise, 'column.user.slug');
     expect(addCol.precheck.map((p) => p.sql)).toContain(
       `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
     );
     expect(addCol.execute.map((step) => step.sql)).toEqual([
       `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "slug" text NOT NULL`,
     ]);
+    const operations = await operationsPromise;
     expect(operations.map((op) => op.id)).toContain('primaryKey.user.user_pkey');
   });
 
-  it('uses the empty-table fallback when the new column becomes unique later in the same plan', () => {
-    const operations = planUserTableOperations(
+  it('uses the empty-table fallback when the new column becomes unique later in the same plan', async () => {
+    const operationsPromise = planUserTableOperations(
       {
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -382,18 +389,19 @@ describe('NOT NULL column without default uses temporary default', () => {
       buildUserTableSchemaWithoutEmail(),
     );
 
-    const addCol = getRequiredOperation(operations, 'column.user.slug');
+    const addCol = await getRequiredOperation(operationsPromise, 'column.user.slug');
     expect(addCol.precheck.map((p) => p.sql)).toContain(
       `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
     );
     expect(addCol.execute.map((step) => step.sql)).toEqual([
       `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "slug" text NOT NULL`,
     ]);
+    const operations = await operationsPromise;
     expect(operations.map((op) => op.id)).toContain('unique.user.user_slug_key');
   });
 
-  it('uses the empty-table fallback when the new column becomes a foreign key later in the same plan', () => {
-    const operations = planUserTableOperations(
+  it('uses the empty-table fallback when the new column becomes a foreign key later in the same plan', async () => {
+    const operationsPromise = planUserTableOperations(
       {
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -447,18 +455,19 @@ describe('NOT NULL column without default uses temporary default', () => {
       },
     );
 
-    const addCol = getRequiredOperation(operations, 'column.user.orgId');
+    const addCol = await getRequiredOperation(operationsPromise, 'column.user.orgId');
     expect(addCol.precheck.map((p) => p.sql)).toContain(
       `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
     );
     expect(addCol.execute.map((step) => step.sql)).toEqual([
       `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "orgId" uuid NOT NULL`,
     ]);
+    const operations = await operationsPromise;
     expect(operations.map((op) => op.id)).toContain('foreignKey.user.user_orgId_fkey');
   });
 
-  it('skips temporary default for nullable columns', () => {
-    const addCol = planAddColumn('bio', {
+  it('skips temporary default for nullable columns', async () => {
+    const addCol = await planAddColumn('bio', {
       nativeType: 'text',
       codecId: 'pg/text@1',
       nullable: true,
@@ -469,8 +478,8 @@ describe('NOT NULL column without default uses temporary default', () => {
     ]);
   });
 
-  it('skips temporary default for NOT NULL columns with explicit default', () => {
-    const addCol = planAddColumn('active', {
+  it('skips temporary default for NOT NULL columns with explicit default', async () => {
+    const addCol = await planAddColumn('active', {
       nativeType: 'bool',
       codecId: 'pg/bool@1',
       nullable: false,
@@ -645,7 +654,7 @@ function planAddColumn(
     extraStorageTypes?: Contract<SqlStorage>['storage']['types'];
   },
 ) {
-  const operations = planUserTableOperations(
+  const operationsPromise = planUserTableOperations(
     {
       columns: {
         id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -659,7 +668,7 @@ function planAddColumn(
     buildUserTableSchemaWithoutEmail(),
     options,
   );
-  return getRequiredOperation(operations, `column.user.${columnName}`);
+  return getRequiredOperation(operationsPromise, `column.user.${columnName}`);
 }
 
 function createPlannerControlHookComponent(
@@ -684,7 +693,7 @@ function createPlannerControlHookComponent(
   } as TargetBoundComponentDescriptor<'sql', 'postgres'>;
 }
 
-function planUserTableOperations(
+async function planUserTableOperations(
   userTable: StorageTable,
   schemaUserTable: SqlSchemaIR['tables'][string],
   options?: {
@@ -726,10 +735,16 @@ function planUserTableOperations(
     spaceId: APP_SPACE_ID,
   });
   if (result.kind !== 'success') throw new Error('expected planner success');
-  return result.plan.operations;
+  return Promise.all(result.plan.operations) as Promise<
+    SqlMigrationPlanOperation<PostgresPlanTargetDetails>[]
+  >;
 }
 
-function getRequiredOperation(operations: ReturnType<typeof planUserTableOperations>, id: string) {
+async function getRequiredOperation(
+  operationsPromise: ReturnType<typeof planUserTableOperations>,
+  id: string,
+) {
+  const operations = await operationsPromise;
   const operation = operations.find((candidate) => candidate.id === id);
   if (!operation) {
     throw new Error(`operation ${id} not found`);

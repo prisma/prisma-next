@@ -1,7 +1,9 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
-import sqlFamilyDescriptor, { createMigrationPlan } from '@prisma-next/family-sql/control';
+import sqlFamilyDescriptor, {
+  createMigrationPlan,
+  type SqlMigrationPlanOperation,
+} from '@prisma-next/family-sql/control';
 import {
   APP_SPACE_ID,
   createControlStack,
@@ -14,13 +16,15 @@ import {
   buildSynthMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { buildControlTableBootstrapQueries } from '@prisma-next/target-postgres/contract-free';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { applicationDomainOf, createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import { createPostgresBuiltinCodecLookup } from '../../../src/core/codec-lookup';
+import { PostgresControlAdapter } from '../../../src/core/control-adapter';
 import type { PostgresContract } from '../../../src/core/types';
 import postgresAdapterDescriptor from '../../../src/exports/control';
 
@@ -145,7 +149,7 @@ export const LEDGER_TEST_SPACE_ID = 'ledger-test';
 
 export function createLedgerTestPlan<TDetails extends PostgresPlanTargetDetails>(options: {
   readonly destinationHash: string;
-  readonly operations: ReturnType<typeof createMigrationPlan<TDetails>>['operations'];
+  readonly operations: readonly SqlMigrationPlanOperation<TDetails>[];
   readonly migrationEdges: readonly AggregateMigrationEdgeRef[];
 }) {
   return createMigrationPlan<TDetails>({
@@ -158,7 +162,7 @@ export function createLedgerTestPlan<TDetails extends PostgresPlanTargetDetails>
   });
 }
 
-const postgresControlAdapter = createPostgresAdapter();
+const postgresControlAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 const postgresControlLowererContext = { contract: {} as PostgresContract };
 
 export async function bootstrapPostgresControlSchema(driver: PostgresControlDriver): Promise<void> {
@@ -169,7 +173,10 @@ export async function bootstrapPostgresControlSchema(driver: PostgresControlDriv
   const postgresSchemaQuery = schemaQuery as unknown as PostgresDdlNode;
   await executeStatement(
     driver,
-    postgresControlAdapter.lower(postgresSchemaQuery, postgresControlLowererContext),
+    await postgresControlAdapter.lowerToExecuteRequest(
+      postgresSchemaQuery,
+      postgresControlLowererContext,
+    ),
   );
 }
 
@@ -178,16 +185,19 @@ export async function bootstrapPostgresControlTables(driver: PostgresControlDriv
     const postgresQuery = query as unknown as PostgresDdlNode;
     await executeStatement(
       driver,
-      postgresControlAdapter.lower(postgresQuery, postgresControlLowererContext),
+      await postgresControlAdapter.lowerToExecuteRequest(
+        postgresQuery,
+        postgresControlLowererContext,
+      ),
     );
   }
 }
 
 export async function executeStatement(
   driver: PostgresControlDriver,
-  statement: LoweredStatement,
+  statement: SqlExecuteRequest,
 ): Promise<void> {
-  if (statement.params.length > 0) {
+  if (statement.params && statement.params.length > 0) {
     await driver.query(statement.sql, statement.params);
     return;
   }

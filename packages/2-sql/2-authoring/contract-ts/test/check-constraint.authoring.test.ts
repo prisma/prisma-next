@@ -1,7 +1,11 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import type { SqlStorage, StorageTableInput } from '@prisma-next/sql-contract/types';
-import { CheckConstraint, StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  CheckConstraint,
+  type SqlStorage,
+  StorageTable,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { defineContract } from '../src/contract-builder';
 import { enumType, member } from '../src/enum-type';
@@ -60,7 +64,7 @@ describe('check-constraint lowering', () => {
     ) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs?.entries.table?.['User'];
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
 
     expect(userTable?.checks).toHaveLength(1);
     expect(userTable?.checks?.[0]).toMatchObject({
@@ -68,9 +72,9 @@ describe('check-constraint lowering', () => {
       column: 'role',
       valueSet: {
         plane: 'storage',
-        entityKind: 'value-set',
+        entityKind: 'valueSet',
         namespaceId: 'public',
-        name: 'Role',
+        entityName: 'Role',
       },
     });
   });
@@ -105,7 +109,7 @@ describe('check-constraint lowering', () => {
     ) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs?.entries.table?.['User'];
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
 
     expect(userTable?.checks).toHaveLength(2);
     const checkNames = userTable?.checks?.map((c) => c.name).sort();
@@ -132,7 +136,7 @@ describe('check-constraint lowering', () => {
     ) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs?.entries.table?.['User'];
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
 
     expect(userTable?.checks).toBeUndefined();
   });
@@ -160,7 +164,7 @@ describe('check-constraint lowering', () => {
     ) as Contract<SqlStorage>;
 
     const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs?.entries.table?.['User'];
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
 
     expect(userTable?.checks?.[0]).toBeInstanceOf(CheckConstraint);
   });
@@ -210,9 +214,9 @@ describe('check-constraint serialize→hydrate round-trip', () => {
     expect(hydratedTable.checks![0]!.column).toBe('role');
     expect(hydratedTable.checks![0]!.valueSet).toEqual({
       plane: 'storage',
-      entityKind: 'value-set',
+      entityKind: 'valueSet',
       namespaceId: 'public',
-      name: 'Role',
+      entityName: 'Role',
     });
   });
 });

@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:59aa59ab2038a667008a6940a27b727e6ba755085d104b25e32b075e3c484e36'>;
+  StorageHashBase<'sha256:066a33747544c0e070987dc62d3bacfef92227a92c45364b800ab3d99f13993c'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:09bd7caf0ad111e77df2565dce0c4c5b0b784f9d3dfe5c97f969f1016a6b66bb'>;
 export type ProfileHash =
@@ -46,16 +46,16 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type FieldOutputTypes = {
   readonly Profile: {
-    readonly id: Char<36>;
+    readonly id: CodecTypes['pg/uuid@1']['output'];
     readonly username: CodecTypes['pg/text@1']['output'];
-    readonly owner_id: CodecTypes['pg/text@1']['output'];
+    readonly userId: CodecTypes['pg/uuid@1']['output'];
   };
 };
 export type FieldInputTypes = {
   readonly Profile: {
-    readonly id: CodecTypes['sql/char@1']['input'];
+    readonly id: CodecTypes['pg/uuid@1']['input'];
     readonly username: CodecTypes['pg/text@1']['input'];
-    readonly owner_id: CodecTypes['pg/text@1']['input'];
+    readonly userId: CodecTypes['pg/uuid@1']['input'];
   };
 };
 export type TypeMaps = TypeMapsType<
@@ -71,41 +71,64 @@ type ContractBase = Omit<
       readonly namespaces: {
         readonly __unbound__: {
           readonly id: '__unbound__';
-          readonly kind: 'postgres-unbound-schema';
-          readonly entries: { readonly table: {}; readonly type: Record<string, never> };
+          readonly kind: 'sql-namespace';
+          readonly entries: { readonly table: {} };
         };
         readonly public: {
           readonly id: 'public';
-          readonly kind: 'postgres-schema';
+          readonly kind: 'sql-namespace';
           readonly entries: {
             readonly table: {
               readonly profile: {
                 columns: {
                   readonly id: {
-                    readonly nativeType: 'character';
-                    readonly codecId: 'sql/char@1';
+                    readonly nativeType: 'uuid';
+                    readonly codecId: 'pg/uuid@1';
                     readonly nullable: false;
-                    readonly typeParams: { readonly length: 36 };
+                    readonly typeRef: 'Uuid';
                   };
                   readonly username: {
                     readonly nativeType: 'text';
                     readonly codecId: 'pg/text@1';
                     readonly nullable: false;
                   };
-                  readonly owner_id: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
+                  readonly userId: {
+                    readonly nativeType: 'uuid';
+                    readonly codecId: 'pg/uuid@1';
                     readonly nullable: false;
+                    readonly typeRef: 'Uuid';
                   };
                 };
                 primaryKey: { readonly columns: readonly ['id'] };
-                uniques: readonly [];
+                uniques: readonly [{ readonly columns: readonly ['userId'] }];
                 indexes: readonly [];
-                foreignKeys: readonly [];
+                foreignKeys: readonly [
+                  {
+                    readonly source: {
+                      readonly namespaceId: 'public' & NamespaceId;
+                      readonly tableName: 'profile';
+                      readonly columns: readonly ['userId'];
+                    };
+                    readonly target: {
+                      readonly namespaceId: 'auth' & NamespaceId;
+                      readonly tableName: 'users';
+                      readonly columns: readonly ['id'];
+                    };
+                    readonly constraint: true;
+                    readonly index: true;
+                  },
+                ];
               };
             };
-            readonly type: Record<string, never>;
           };
+        };
+      };
+      readonly types: {
+        readonly Uuid: {
+          readonly kind: 'codec-instance';
+          readonly codecId: 'pg/uuid@1';
+          readonly nativeType: 'uuid';
+          readonly typeParams: Record<string, never>;
         };
       };
       readonly storageHash: StorageHash;
@@ -115,29 +138,25 @@ type ContractBase = Omit<
         readonly fields: {
           readonly id: {
             readonly nullable: false;
-            readonly type: {
-              readonly kind: 'scalar';
-              readonly codecId: 'sql/char@1';
-              readonly typeParams: { readonly length: 36 };
-            };
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
           };
           readonly username: {
             readonly nullable: false;
             readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
           };
-          readonly owner_id: {
+          readonly userId: {
             readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
           };
         };
-        readonly relations: Record<string, never>;
+        readonly relations: { readonly user: never };
         readonly storage: {
           readonly table: 'profile';
           readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly username: { readonly column: 'username' };
-            readonly owner_id: { readonly column: 'owner_id' };
+            readonly userId: { readonly column: 'userId' };
           };
         };
       };
@@ -158,29 +177,25 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 36 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
               readonly username: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
-              readonly owner_id: {
+              readonly userId: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
             };
-            readonly relations: Record<string, never>;
+            readonly relations: { readonly user: never };
             readonly storage: {
               readonly table: 'profile';
               readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly username: { readonly column: 'username' };
-                readonly owner_id: { readonly column: 'owner_id' };
+                readonly userId: { readonly column: 'userId' };
               };
             };
           };
@@ -210,7 +225,7 @@ type ContractBase = Omit<
       readonly id: 'supabase';
       readonly kind: 'extension';
       readonly targetId: 'postgres';
-      readonly version: '0.12.0';
+      readonly version: '0.13.0';
     };
   };
   readonly execution: {

@@ -14,6 +14,7 @@ import { renderCells } from './gallery-cells';
 import type { ScenarioGolden } from './gallery-goldens';
 import { GOLDENS, goldenId } from './gallery-goldens';
 import { BACKLINK_GOLDENS } from './gallery-goldens-backlink';
+import { KNOWN_BROKEN_GOLDENS } from './gallery-goldens-known-broken';
 
 // ---------------------------------------------------------------------------
 // ANSI constants (biome rejects regex literals with control chars, so use strings)
@@ -389,7 +390,7 @@ function assertGreenOnlyOnPath(golden: ScenarioGolden, rendered: string): void {
 
 const ALL_GOLDENS: readonly ScenarioGolden[] = [...GOLDENS, ...BACKLINK_GOLDENS];
 
-describe('golden-pipeline: render(input) === golden (RED baseline — expected to fail on current renderer)', () => {
+describe('golden-pipeline: render(input) === golden (structure + colour, labels stripped)', () => {
   for (const golden of ALL_GOLDENS) {
     const id = goldenId(golden);
     describe(id, () => {
@@ -413,6 +414,25 @@ describe('golden-pipeline: render(input) === golden (RED baseline — expected t
     });
   }
 });
+
+// Layout bugs the showcase fixture exposed. Each golden encodes the TARGET shape
+// and `it.fails` until the renderer is fixed (then move it to GOLDENS). See
+// gallery-goldens-known-broken.ts for the per-bug root-cause notes.
+if (KNOWN_BROKEN_GOLDENS.length > 0) {
+  describe('golden-pipeline: known-broken layout (target shape; renderer not yet fixed)', () => {
+    for (const golden of KNOWN_BROKEN_GOLDENS) {
+      const id = goldenId(golden);
+      it.fails(`${id} — structure + colour match`, () => {
+        const real = renderReal(golden);
+        const expected = goldenExpected(golden);
+        const actual = structureOf(real);
+        expect(actual, `[${id}] structure+colour mismatch (each line: colour:text tokens)`).toEqual(
+          expected,
+        );
+      });
+    }
+  });
+}
 
 // (showcase real-world golden shelved to branch `showcase-golden-shelf` — it
 // needs back-arc convergence from the render-redesign-geometry slice.)

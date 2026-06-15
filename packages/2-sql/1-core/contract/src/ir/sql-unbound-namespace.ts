@@ -3,6 +3,8 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
+import { blindCast } from '@prisma-next/utils/casts';
+import type { SqlNamespaceEntries } from './sql-storage';
 import type { StorageTable } from './storage-table';
 
 /**
@@ -40,9 +42,12 @@ export class SqlUnboundNamespace extends NamespaceBase {
   static readonly instance: SqlUnboundNamespace = new SqlUnboundNamespace();
 
   readonly id = UNBOUND_NAMESPACE_ID;
-  readonly entries: Readonly<{
-    readonly table: Readonly<Record<string, StorageTable>>;
-  }> = Object.freeze({ table: Object.freeze({}) });
+  readonly entries: SqlNamespaceEntries = Object.freeze({
+    table: blindCast<
+      Readonly<Record<string, StorageTable>>,
+      'empty frozen map is a valid Readonly<Record<string, StorageTable>>'
+    >(Object.freeze({})),
+  });
   declare readonly kind: string;
 
   private constructor() {
@@ -54,6 +59,13 @@ export class SqlUnboundNamespace extends NamespaceBase {
       configurable: true,
     });
     freezeNode(this);
+  }
+
+  get table(): Readonly<Record<string, StorageTable>> {
+    return blindCast<
+      Readonly<Record<string, StorageTable>>,
+      'entries[table] holds only StorageTable by construction'
+    >(this.entries['table']);
   }
 
   qualifyTable(tableName: string): string {

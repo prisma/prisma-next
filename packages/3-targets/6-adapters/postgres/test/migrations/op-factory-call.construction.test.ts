@@ -8,17 +8,19 @@
 
 import { col, fn, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import {
+  AddColumnCall,
   CreateSchemaCall,
   CreateTableCall,
   DataTransformCall,
 } from '@prisma-next/target-postgres/op-factory-call';
 import { describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../../src/core/adapter';
+import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
+import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
-const testAdapter = createPostgresAdapter();
+const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 describe('Postgres call classes - construction + toOp parity', () => {
-  it('CreateTableCall freezes, labels from the table name, and lowers to a createTable op', () => {
+  it('CreateTableCall freezes, labels from the table name, and lowers to a createTable op', async () => {
     const call = new CreateTableCall('public', 'user', [col('id', 'text', { notNull: true })]);
 
     expect(Object.isFrozen(call)).toBe(true);
@@ -26,7 +28,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
     expect(call.operationClass).toBe('additive');
     expect(call.label).toBe('Create table "user"');
 
-    expect(call.toOp(testAdapter)).toMatchObject({
+    expect(await call.toOp(testAdapter)).toMatchObject({
       id: 'table.user',
       operationClass: 'additive',
       target: {
@@ -46,7 +48,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
     expect(() => call.toOp()).toThrow(/Unfilled migration placeholder/);
   });
 
-  it('CreateTableCall.toOp produces byte-identical SQL for a composite-PK table', () => {
+  it('CreateTableCall.toOp produces byte-identical SQL for a composite-PK table', async () => {
     const call = new CreateTableCall(
       'public',
       'item',
@@ -58,7 +60,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
       [primaryKey(['tenant_id', 'id'])],
     );
 
-    const op = call.toOp(testAdapter);
+    const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe(
       'CREATE TABLE "public"."item" (\n' +
         '  "tenant_id" uuid NOT NULL,\n' +
@@ -69,27 +71,27 @@ describe('Postgres call classes - construction + toOp parity', () => {
     );
   });
 
-  it('CreateSchemaCall.toOp produces byte-identical SQL', () => {
+  it('CreateSchemaCall.toOp produces byte-identical SQL', async () => {
     const call = new CreateSchemaCall('app');
 
-    const op = call.toOp(testAdapter);
+    const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe('CREATE SCHEMA IF NOT EXISTS "app"');
   });
 
-  it('CreateTableCall.toOp with a sequence default produces nextval SQL (byte-parity)', () => {
+  it('CreateTableCall.toOp with a sequence default produces nextval SQL (byte-parity)', async () => {
     const call = new CreateTableCall('public', 'user', [
       col('id', 'bigint', { notNull: true, default: fn(`nextval('"user_id_seq"'::regclass)`) }),
     ]);
 
-    const op = call.toOp(testAdapter);
+    const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe(
       'CREATE TABLE "public"."user" (\n' +
-        `  "id" bigint NOT NULL DEFAULT (nextval('"user_id_seq"'::regclass))\n` +
+        `  "id" bigint DEFAULT (nextval('"user_id_seq"'::regclass)) NOT NULL\n` +
         ')',
     );
   });
 
-  it('CreateTableCall.toOp with __unbound__ schema produces an unqualified table name', () => {
+  it('CreateTableCall.toOp with __unbound__ schema produces an unqualified table name', async () => {
     const call = new CreateTableCall(
       '__unbound__',
       'item',
@@ -97,9 +99,37 @@ describe('Postgres call classes - construction + toOp parity', () => {
       [primaryKey(['id'])],
     );
 
-    const op = call.toOp(testAdapter);
+    const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe(
       'CREATE TABLE "item" (\n' + '  "id" text NOT NULL,\n' + '  PRIMARY KEY ("id")\n' + ')',
     );
+  });
+
+  it('AddColumnCall freezes, labels from column+table, requires a lowerer', async () => {
+    const call = new AddColumnCall('public', 'user', col('email', 'text'));
+
+    expect(Object.isFrozen(call)).toBe(true);
+    expect(call.factoryName).toBe('addColumn');
+    expect(call.operationClass).toBe('additive');
+    expect(call.label).toBe('Add column "email" to "user"');
+    await expect(call.toOp()).rejects.toThrow(/lowerer is required/);
+  });
+
+  it('AddColumnCall.toOp produces ALTER TABLE … ADD COLUMN SQL (byte-parity)', async () => {
+    const call = new AddColumnCall('public', 'user', col('email', 'text', { notNull: true }));
+    const op = await call.toOp(testAdapter);
+    expect(op.execute[0]?.sql).toBe('ALTER TABLE "public"."user" ADD COLUMN "email" text NOT NULL');
+    expect(op.id).toBe('column.user.email');
+    expect(op.operationClass).toBe('additive');
+    expect(op.target).toMatchObject({
+      id: 'postgres',
+      details: { schema: 'public', objectType: 'column', name: 'email', table: 'user' },
+    });
+  });
+
+  it('AddColumnCall.toOp with __unbound__ schema produces an unqualified table name', async () => {
+    const call = new AddColumnCall('__unbound__', 'item', col('score', 'int'));
+    const op = await call.toOp(testAdapter);
+    expect(op.execute[0]?.sql).toBe('ALTER TABLE "item" ADD COLUMN "score" int');
   });
 });

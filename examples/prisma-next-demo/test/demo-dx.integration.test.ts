@@ -16,7 +16,7 @@ import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 
 describe('demo contract visualization DX', () => {
   it('validated contract has runtime shape needed for visualization', () => {
-    const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
+    const contract = new PostgresContractSerializer().deserializeContract<Contract>(contractJson);
 
     expect(contract.target).toBeDefined();
     expect(typeof contract.target).toBe('string');
@@ -32,7 +32,7 @@ describe('demo contract visualization DX', () => {
   });
 
   it('validated contract exposes model storage field mappings', () => {
-    const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
+    const contract = new PostgresContractSerializer().deserializeContract<Contract>(contractJson);
 
     const models = domainModelsAtDefaultNamespace(contract.domain) as Models;
     expect(models.User.storage.table).toBe('user');
@@ -45,16 +45,16 @@ describe('demo contract visualization DX', () => {
       ...contractJson,
       _generated: { emittedAt: '2026-02-15T12:00:00Z' },
     };
-    const contract = new PostgresContractSerializer().deserializeContract(
+    const contract = new PostgresContractSerializer().deserializeContract<Contract>(
       contractWithGenerated,
-    ) as Contract;
+    );
 
     expect(contract).not.toHaveProperty('_generated');
     expect(Object.hasOwn(contract as object, '_generated')).toBe(false);
   });
 
   it('validated contract is traversable for render use-case', () => {
-    const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
+    const contract = new PostgresContractSerializer().deserializeContract<Contract>(contractJson);
 
     for (const [, model] of Object.entries(domainModelsAtDefaultNamespace(contract.domain))) {
       const m = blindCast<

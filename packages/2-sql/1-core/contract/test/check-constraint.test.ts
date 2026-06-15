@@ -4,13 +4,13 @@ import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { CheckConstraint } from '../src/ir/check-constraint';
 import { StorageTable } from '../src/ir/storage-table';
-import { createSqlStorageSchema } from '../src/validators';
+import { createSqlEntrySchemaRegistry, createSqlStorageSchema } from '../src/validators';
 
 const baseValueSetRef: ValueSetRef = {
   plane: 'storage',
   namespaceId: 'public',
-  entityKind: 'value-set',
-  name: 'Role',
+  entityKind: 'valueSet',
+  entityName: 'Role',
 };
 
 describe('CheckConstraint', () => {
@@ -109,7 +109,7 @@ describe('StorageTable with optional checks', () => {
 });
 
 describe('StorageTableSchema validates checks', () => {
-  const storageSchema = createSqlStorageSchema();
+  const storageSchema = createSqlStorageSchema(createSqlEntrySchemaRegistry());
 
   function makeRawStorage(tableExtra: Record<string, unknown>) {
     return {
@@ -150,8 +150,8 @@ describe('StorageTableSchema validates checks', () => {
             valueSet: {
               plane: 'storage',
               namespaceId: 'public',
-              entityKind: 'value-set',
-              name: 'Role',
+              entityKind: 'valueSet',
+              entityName: 'Role',
             },
           },
         ],
@@ -169,8 +169,8 @@ describe('StorageTableSchema validates checks', () => {
             valueSet: {
               plane: 'storage',
               namespaceId: 'public',
-              entityKind: 'value-set',
-              name: 'Role',
+              entityKind: 'valueSet',
+              entityName: 'Role',
             },
           },
         ],

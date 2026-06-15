@@ -16,17 +16,25 @@ import { isPostgresSchema } from '../postgres-schema';
 
 /**
  * Codec-typed enum entry shape stored under
- * `schema.annotations.pg.storageTypes[(schemaName, nativeType)]`.
+ * `schema.annotations.pg.enumTypes[schemaName][nativeType]`.
  */
 interface PgStorageTypeEntry {
   readonly codecId?: string;
   readonly typeParams?: { readonly values?: unknown };
 }
 
+/**
+ * Live enum types keyed by `(schemaName, nativeType)` as a nested map, so two
+ * schemas sharing a native enum name stay distinct without packing the pair
+ * into a string. This is the same `(namespace, entityName)` coordinate the
+ * contract side addresses entities by.
+ */
+type PgEnumTypesMap = Readonly<Record<string, Readonly<Record<string, PgStorageTypeEntry>>>>;
+
 /** Postgres-specific subtree on family `SqlSchemaIR.annotations`. */
 export interface PostgresSchemaIrAnnotations {
   readonly schema?: string;
-  readonly storageTypes?: Readonly<Record<string, PgStorageTypeEntry>>;
+  readonly enumTypes?: PgEnumTypesMap;
   /** RLS policies introspected from `pg_policies`, keyed by full wire name. */
   readonly rlsPolicies?: readonly PostgresRlsPolicy[];
   /** Database roles introspected from `pg_roles`, excluding system roles. */
@@ -58,20 +66,27 @@ function readPgStorageTypeEntry(value: unknown): PgStorageTypeEntry | undefined 
   };
 }
 
-function readPgStorageTypesMap(
-  value: unknown,
-): Readonly<Record<string, PgStorageTypeEntry>> | undefined {
+function readPgEnumTypesMap(value: unknown): PgEnumTypesMap | undefined {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return undefined;
   }
-  const entries: Record<string, PgStorageTypeEntry> = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    const entry = readPgStorageTypeEntry(entryValue);
-    if (entry !== undefined) {
-      entries[key] = entry;
+  const bySchema: Record<string, Record<string, PgStorageTypeEntry>> = {};
+  for (const [schemaName, byTypeRaw] of Object.entries(value)) {
+    if (byTypeRaw === null || typeof byTypeRaw !== 'object' || Array.isArray(byTypeRaw)) {
+      continue;
+    }
+    const byType: Record<string, PgStorageTypeEntry> = {};
+    for (const [nativeType, entryValue] of Object.entries(byTypeRaw)) {
+      const entry = readPgStorageTypeEntry(entryValue);
+      if (entry !== undefined) {
+        byType[nativeType] = entry;
+      }
+    }
+    if (Object.keys(byType).length > 0) {
+      bySchema[schemaName] = byType;
     }
   }
-  return Object.keys(entries).length > 0 ? entries : undefined;
+  return Object.keys(bySchema).length > 0 ? bySchema : undefined;
 }
 
 /**
@@ -86,7 +101,7 @@ export function readPostgresSchemaIrAnnotations(schema: SqlSchemaIR): PostgresSc
     return {};
   }
   const schemaField = readOptionalString(Reflect.get(raw, 'schema'));
-  const storageTypes = readPgStorageTypesMap(Reflect.get(raw, 'storageTypes'));
+  const enumTypes = readPgEnumTypesMap(Reflect.get(raw, 'enumTypes'));
 
   const rlsPoliciesRaw = Reflect.get(raw, 'rlsPolicies');
   const rlsPolicies = Array.isArray(rlsPoliciesRaw)
@@ -106,23 +121,11 @@ export function readPostgresSchemaIrAnnotations(schema: SqlSchemaIR): PostgresSc
 
   return {
     ...(schemaField !== undefined ? { schema: schemaField } : {}),
-    ...(storageTypes !== undefined ? { storageTypes } : {}),
+    ...(enumTypes !== undefined ? { enumTypes } : {}),
     ...(rlsPolicies !== undefined ? { rlsPolicies } : {}),
     ...(roles !== undefined ? { roles } : {}),
     ...(rlsEnabledByTable !== undefined ? { rlsEnabledByTable } : {}),
   };
-}
-
-/**
- * Separator for `(schemaName, nativeType)` keys in introspected
- * `schema.annotations.pg.storageTypes`. NUL cannot appear in Postgres
- * identifiers, so the pair is unambiguous.
- */
-export const ENUM_STORAGE_KEY_SEP = '\u0000';
-
-/** Builds the schema-qualified storageTypes map key for a live Postgres enum. */
-export function enumStorageCompoundKey(schemaName: string, nativeType: string): string {
-  return `${schemaName}${ENUM_STORAGE_KEY_SEP}${nativeType}`;
 }
 
 /**
@@ -177,9 +180,10 @@ export type EnumDiff =
 
 /**
  * Reads existing enum values for `(schemaName, nativeType)` from the
- * Postgres-introspected `schema.annotations.pg.storageTypes` map.
+ * Postgres-introspected `schema.annotations.pg.enumTypes` map, addressed by
+ * the `(schema, nativeType)` coordinate.
  *
- * Schema IR's `storageTypes` slots are always codec-typed
+ * Schema IR's enum entries are always codec-typed
  * (`{codecId: PG_ENUM_CODEC_ID, typeParams.values}`): the introspector
  * writes that shape, and the Contract→Schema IR projector resolves
  * `PostgresEnumType` instances down to the same codec-typed triple before
@@ -193,8 +197,8 @@ export function readExistingEnumValues(
   schemaName: string,
   nativeType: string,
 ): readonly string[] | null {
-  const storageTypes = readPostgresSchemaIrAnnotations(schema).storageTypes;
-  const existing = storageTypes?.[enumStorageCompoundKey(schemaName, nativeType)];
+  const enumTypes = readPostgresSchemaIrAnnotations(schema).enumTypes;
+  const existing = enumTypes?.[schemaName]?.[nativeType];
   if (!existing || existing.codecId !== PG_ENUM_CODEC_ID) {
     return null;
   }

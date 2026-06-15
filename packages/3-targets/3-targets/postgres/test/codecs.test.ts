@@ -34,9 +34,11 @@ import {
   pgTimestampDescriptor,
   pgTimestamptzDescriptor,
   pgTimetzDescriptor,
+  pgUuidDescriptor,
   pgVarbitDescriptor,
   pgVarcharDescriptor,
 } from '../src/core/codecs';
+import { postgresCodecRegistry } from '../src/core/registry';
 
 const SYNTH_CTX: CodecInstanceContext = { name: 'test' };
 
@@ -70,6 +72,7 @@ const descriptorByScalar = {
   enum: pgEnumDescriptor,
   json: pgJsonDescriptor,
   jsonb: pgJsonbDescriptor,
+  uuid: pgUuidDescriptor,
 } as const satisfies Record<string, AnyCodecDescriptor>;
 
 type ScalarName = keyof typeof descriptorByScalar;
@@ -111,6 +114,7 @@ describe('adapter-postgres codecs', () => {
       'timestamp',
       'timestamptz',
       'timetz',
+      'uuid',
       'varchar',
     ]);
   });
@@ -205,6 +209,7 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'sql-text', value: 'portable text' },
       { scalar: 'text', value: 'hello world' },
       { scalar: 'enum', value: 'ADMIN' },
+      { scalar: 'uuid', value: '550e8400-e29b-41d4-a716-446655440000' },
     ] as const)('keeps $scalar values unchanged', async ({ scalar, value }) => {
       const codec = codecForScalar(scalar) as {
         encode: (input: string, ctx: SqlCodecCallContext) => Promise<string>;
@@ -444,6 +449,7 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'int4', nativeType: 'integer' },
       { scalar: 'float8', nativeType: 'double precision' },
       { scalar: 'bit varying', nativeType: 'bit varying' },
+      { scalar: 'uuid', nativeType: 'uuid' },
     ];
 
     it.each(postgresNativeTypeCases)('sets postgres nativeType metadata for $scalar', ({
@@ -475,6 +481,7 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'enum' },
       { scalar: 'bool' },
       { scalar: 'int4' },
+      { scalar: 'uuid' },
     ];
 
     it.each(paramsSchemaPresenceCases)('descriptor for $scalar carries a paramsSchema', ({
@@ -569,6 +576,13 @@ describe('adapter-postgres codecs', () => {
         expect(codec.encodeJson(9001)).toBe(9001);
         expect(codec.decodeJson(9001)).toBe(9001);
       });
+    });
+  });
+
+  describe('pg/uuid@1 registry resolution', () => {
+    it('resolves pgUuidDescriptor by codec id from the registry', () => {
+      const resolved = postgresCodecRegistry.descriptorFor('pg/uuid@1');
+      expect(resolved).toBe(pgUuidDescriptor);
     });
   });
 

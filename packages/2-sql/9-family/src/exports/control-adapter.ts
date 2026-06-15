@@ -1,4 +1,5 @@
 export type {
+  ExecuteRequestLowerer,
   Lowerer,
   SqlControlAdapter,
   SqlControlAdapterDescriptor,

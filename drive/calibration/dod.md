@@ -116,4 +116,12 @@ Beyond the canonical project DoD items:
 
 Walk `design-decisions.md` for any decision that hasn't migrated to an ADR. If unmigrated decisions exist that are architecturally durable (cross-cutting, hard to reverse, affect future work), block close-out until they have ADRs — closing with un-ADR'd architectural decisions is a known close-out failure mode.
 
+## Test-dispatch brief overlay
+
+When a dispatch's primary deliverable is a test, the brief must state what the test **proves** and on which surface — not merely "the test passes."
+
+Two failure modes from a single PR review (PR #765): a walking-skeleton test was modified to keep passing after a schema change (seeding a row, threading an id), but those additions proved nothing about the FK — the test would have passed identically with the FK removed. In the same PR, a cascade test used raw SQL for a model that the ORM fully owns; raw SQL is correct only for the non-navigable cross-space table that has no ORM surface. A "claims preserved" acceptance criterion would have caught both: the first because the claim about the FK was gone; the second because the surface was wrong.
+
+Acceptance criterion to add to test-dispatch briefs: **"The test fails if and only if the behaviour it claims to verify is removed or broken, and it exercises that behaviour through the right surface (ORM for ORM-owned models; SQL for non-navigable cross-space tables)."**
+
 _(Living; add overlays as the team discovers them.)_

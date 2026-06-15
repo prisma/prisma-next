@@ -36,6 +36,15 @@ export type PslDiagnosticCode =
   | 'PSL_INVALID_TYPES_MEMBER'
   | 'PSL_INVALID_QUALIFIED_TYPE'
   /**
+   * A reserved declaration keyword (`model`/`enum`/`namespace`/`type`) that
+   * committed the declaration kind on the keyword alone but is missing its name
+   * and/or opening brace. The recursive-descent parser produces a best-effort
+   * typed node for the malformed header and reports this code rather than
+   * `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK`, which is reserved for a genuinely unknown
+   * top-level keyword.
+   */
+  | 'PSL_INVALID_DECLARATION'
+  /**
    * A malformed line inside an extension-contributed top-level block body, or
    * a structurally invalid element inside a `list` parameter value.
    *
@@ -46,6 +55,21 @@ export type PslDiagnosticCode =
    * extension-block parse errors their own code.
    */
   | 'PSL_INVALID_EXTENSION_BLOCK_MEMBER'
+  /**
+   * A malformed JS-like object literal `{ key: value, … }` in value/argument
+   * position — a field missing its `:`, a field missing its value, or an
+   * unterminated `{`. The recursive-descent parser still produces a best-effort
+   * `ObjectLiteralExpr` node (preserving the lossless round-trip) and reports
+   * this code anchored on the offending token.
+   */
+  | 'PSL_INVALID_OBJECT_LITERAL'
+  /**
+   * A string literal with no closing quote — the tokenizer stops the literal at
+   * a newline or at EOF when no terminating `"` is found, and the
+   * recursive-descent parser still consumes the token (preserving the lossless
+   * round-trip) but reports this code anchored on the string token's span.
+   */
+  | 'PSL_UNTERMINATED_STRING'
   /**
    * An unknown parameter key in an extension-contributed block — a key present
    * in the source block but absent from the descriptor's `parameters` map.
@@ -70,7 +94,16 @@ export type PslDiagnosticCode =
    * A `ref`-kind parameter identifier does not resolve to a declared entity of
    * the required `refKind` within the declared scope.
    */
-  | 'PSL_EXTENSION_UNRESOLVED_REF';
+  | 'PSL_EXTENSION_UNRESOLVED_REF'
+  /**
+   * A parameter key appears more than once in an extension block body.
+   * The first occurrence is kept; subsequent occurrences emit this diagnostic.
+   */
+  | 'PSL_EXTENSION_DUPLICATE_PARAMETER'
+  /**
+   * A `@@`-prefixed block-attribute line inside an extension block has invalid syntax.
+   */
+  | 'PSL_INVALID_EXTENSION_BLOCK_ATTRIBUTE';
 
 /**
  * Descriptor vocabulary for a single parameter on a declared block.
@@ -118,14 +151,17 @@ export interface PslBlockParamList {
 /**
  * The parsed representation of a single parameter value on a uniform
  * extension-block AST node. Mirrors the `PslBlockParam` descriptor
- * vocabulary:
+ * vocabulary, plus `bare` for keyonly entries:
  *
  * - `ref`    → `PslExtensionBlockParamRef` — a raw identifier string
  *   (resolution runs in the validator, not the parser).
- * - `value`  → `PslExtensionBlockParamValue` — a raw PSL literal string
+ * - `value`  → `PslExtensionBlockParamScalarValue` — a raw PSL literal string
  *   (codec validation runs in the validator).
  * - `option` → `PslExtensionBlockParamOption` — the chosen token.
  * - `list`   → `PslExtensionBlockParamList` — ordered list of the above.
+ * - `bare`   → `PslExtensionBlockParamBare` — a bare identifier line with no
+ *   `= value` (e.g. `Low` in an enum2 block). The name is the key in
+ *   `parameters`; the interpreting consumer decides the default value.
  *
  * These shapes are intentionally minimal. The validator and lowering refine
  * and consume them; the generic framework parser produces them.
@@ -134,7 +170,8 @@ export type PslExtensionBlockParamValue =
   | PslExtensionBlockParamRef
   | PslExtensionBlockParamScalarValue
   | PslExtensionBlockParamOption
-  | PslExtensionBlockParamList;
+  | PslExtensionBlockParamList
+  | PslExtensionBlockParamBare;
 
 export interface PslExtensionBlockParamRef {
   readonly kind: 'ref';
@@ -161,6 +198,38 @@ export interface PslExtensionBlockParamList {
 }
 
 /**
+ * A bare identifier line inside an extension block — a key with no `= value`.
+ * Emitted when a line matches `/^[A-Za-z_]\w*$/` with no assignment. The
+ * consumer decides what default value (if any) to apply.
+ */
+export interface PslExtensionBlockParamBare {
+  readonly kind: 'bare';
+  readonly span: PslSpan;
+}
+
+/**
+ * A positional argument on a block attribute, e.g. the `"pg/text@1"` in
+ * `@@type("pg/text@1")`.
+ */
+export interface PslExtensionBlockAttributeArg {
+  readonly kind: 'positional';
+  readonly value: string;
+  readonly span: PslSpan;
+}
+
+/**
+ * A `@@`-prefixed block-level attribute parsed inside an extension block,
+ * e.g. `@@type("pg/text@1")`. Block attributes are captured generically
+ * — the parser does not validate attribute names or argument shapes; that
+ * is a concern of the block's interpreter.
+ */
+export interface PslExtensionBlockAttribute {
+  readonly name: string;
+  readonly args: readonly PslExtensionBlockAttributeArg[];
+  readonly span: PslSpan;
+}
+
+/**
  * Base shape for a uniform extension-contributed top-level PSL block
  * node, as produced by the generic framework parser and consumed by the
  * validator and lowering factory.
@@ -173,12 +242,18 @@ export interface PslExtensionBlockParamList {
  *   parameter names from the descriptor; values are the parsed parameter
  *   representations. Only parameters present in the source are included
  *   — absence of a required parameter is a validator concern, not a
- *   parser concern.
+ *   parser concern. Insertion order is preserved; the first occurrence of a
+ *   duplicate key is retained and subsequent occurrences emit
+ *   `PSL_EXTENSION_DUPLICATE_PARAMETER`.
+ * - `blockAttributes` are `@@`-prefixed attribute lines inside the block, in
+ *   declaration order. Captured generically — names and args are not validated
+ *   by the parser.
  * - `span` covers the full block from keyword to closing brace.
  */
 export interface PslExtensionBlock {
   readonly kind: string;
   readonly name: string;
   readonly parameters: Record<string, PslExtensionBlockParamValue>;
+  readonly blockAttributes: readonly PslExtensionBlockAttribute[];
   readonly span: PslSpan;
 }

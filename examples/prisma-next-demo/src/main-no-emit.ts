@@ -17,6 +17,9 @@
  * - user <id>                  Get user by ID
  * - posts <userId>             Get posts for a user
  * - users-with-posts [limit]   Users with posts via ORM client (include)
+ * - enum-default-demo          Insert a Post without `priority` (typed-optional thanks to
+ *                              `.default(Priority.members.Low)` in the inline TS contract),
+ *                              read it back, and confirm the database supplied 'low'
  *
  * See also:
  * - main.ts: Full CLI using emitted contract.json + contract.d.ts
@@ -24,6 +27,7 @@
 import 'dotenv/config';
 import { loadAppConfig } from './app-config';
 import { getRuntime } from './prisma-no-emit/runtime';
+import { enumDefaultDemoNoEmit } from './queries/enum-default-demo-no-emit';
 import { getUserById } from './queries/get-user-by-id-no-emit';
 import { getUserPosts } from './queries/get-user-posts-no-emit';
 import { getUsers } from './queries/get-users-no-emit';
@@ -62,9 +66,15 @@ async function main() {
       const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 10;
       const usersWithPosts = await getUsersWithPosts(runtime, limit);
       console.log(JSON.stringify(usersWithPosts, null, 2));
+    } else if (cmd === 'enum-default-demo') {
+      console.log(
+        'Demonstrating enum member default: inserting a Post without priority, then reading it back...',
+      );
+      await enumDefaultDemoNoEmit(runtime);
     } else {
       console.log(
-        'Usage: pnpm start:no-emit -- [users [limit] | user <userId> | posts <userId> | users-with-posts [limit]]',
+        'Usage: pnpm start:no-emit -- [users [limit] | user <userId> | posts <userId> | ' +
+          'users-with-posts [limit] | enum-default-demo]',
       );
       process.exit(1);
     }

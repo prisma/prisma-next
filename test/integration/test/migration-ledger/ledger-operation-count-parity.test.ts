@@ -1,6 +1,12 @@
 import { createMongoRunnerDeps, MongoControlAdapterImpl } from '@prisma-next/adapter-mongo/control';
-import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
-import { SqliteControlAdapter } from '@prisma-next/adapter-sqlite/control';
+import {
+  createPostgresBuiltinCodecLookup,
+  PostgresControlAdapter,
+} from '@prisma-next/adapter-postgres/control';
+import {
+  createSqliteBuiltinCodecLookup,
+  SqliteControlAdapter,
+} from '@prisma-next/adapter-sqlite/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
@@ -230,7 +236,9 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       ],
     });
     if (!pgResult.ok) throw new Error(formatRunnerFailure(pgResult.failure));
-    const pgLedger = await new PostgresControlAdapter().readLedger(pgDriver!, LEDGER_TEST_SPACE_ID);
+    const pgLedger = await new PostgresControlAdapter(
+      createPostgresBuiltinCodecLookup(),
+    ).readLedger(pgDriver!, LEDGER_TEST_SPACE_ID);
 
     const sqlite = multiEdgePlanSqlite();
     const sqliteRunner = sqliteTargetDescriptor.createRunner(sqliteFamily);
@@ -251,10 +259,9 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       ],
     });
     if (!sqliteResult.ok) throw new Error(formatRunnerFailure(sqliteResult.failure));
-    const sqliteLedger = await new SqliteControlAdapter().readLedger(
-      sqliteDriver,
-      LEDGER_TEST_SPACE_ID,
-    );
+    const sqliteLedger = await new SqliteControlAdapter(
+      createSqliteBuiltinCodecLookup(),
+    ).readLedger(sqliteDriver, LEDGER_TEST_SPACE_ID);
 
     const mongoDest = 'sha256:parity-mongo-multi';
     const mongoEdges = buildMultiEdgeRefs(mongoDest);
@@ -360,7 +367,9 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       ],
     });
     if (!pgResult.ok) throw new Error(formatRunnerFailure(pgResult.failure));
-    const pgLedger = await new PostgresControlAdapter().readLedger(pgDriver!, LEDGER_TEST_SPACE_ID);
+    const pgLedger = await new PostgresControlAdapter(
+      createPostgresBuiltinCodecLookup(),
+    ).readLedger(pgDriver!, LEDGER_TEST_SPACE_ID);
 
     const sqliteDriver = sqliteTestDb!.driver;
     await sqliteDriver.query(
@@ -414,10 +423,9 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       ],
     });
     if (!sqliteResult.ok) throw new Error(formatRunnerFailure(sqliteResult.failure));
-    const sqliteLedger = await new SqliteControlAdapter().readLedger(
-      sqliteDriver,
-      LEDGER_TEST_SPACE_ID,
-    );
+    const sqliteLedger = await new SqliteControlAdapter(
+      createSqliteBuiltinCodecLookup(),
+    ).readLedger(sqliteDriver, LEDGER_TEST_SPACE_ID);
 
     const mongoDest = 'sha256:parity-mongo-skip';
     const collection = 'parity_skip_user';
@@ -517,7 +525,9 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       ],
     });
     if (!pgResult.ok) throw new Error(formatRunnerFailure(pgResult.failure));
-    const pgLedger = await new PostgresControlAdapter().readLedger(pgDriver!, LEDGER_TEST_SPACE_ID);
+    const pgLedger = await new PostgresControlAdapter(
+      createPostgresBuiltinCodecLookup(),
+    ).readLedger(pgDriver!, LEDGER_TEST_SPACE_ID);
 
     const sqliteDest = sqliteContract.storage.storageHash;
     const sqliteSynthEdges = [
@@ -563,10 +573,9 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       ],
     });
     if (!sqliteResult.ok) throw new Error(formatRunnerFailure(sqliteResult.failure));
-    const sqliteLedger = await new SqliteControlAdapter().readLedger(
-      sqliteDriver,
-      LEDGER_TEST_SPACE_ID,
-    );
+    const sqliteLedger = await new SqliteControlAdapter(
+      createSqliteBuiltinCodecLookup(),
+    ).readLedger(sqliteDriver, LEDGER_TEST_SPACE_ID);
 
     const mongoDest = 'sha256:parity-mongo-synth';
     const mongoPlan = {

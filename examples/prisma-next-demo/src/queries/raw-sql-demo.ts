@@ -21,7 +21,7 @@ import { db } from '../prisma/db';
  *    their AST + codec through the raw renderer unchanged.
  */
 export async function rawSqlDemo(limit = 10) {
-  const plan = db.sql.user
+  const plan = db.sql.public.user
     .select('id', 'email')
     .select('upperEmail', (f, fns) => fns.raw`UPPER(${f.email})`.returns('pg/text@1'))
     .select('kindLabel', (f, fns) =>

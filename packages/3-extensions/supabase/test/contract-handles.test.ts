@@ -131,15 +131,12 @@ describe('lowering smoke test — FK + relation to AuthUser via real supabasePac
 
   it('lowers the FK with spaceId "supabase", namespace "auth", table "users", column "id"', () => {
     const contract = buildProfileContract();
-    const profileTable = contract.storage.namespaces['public']?.entries.table['profile'];
+    const profileTable = contract.storage.namespaces['public']!.entries.table?.['profile'];
     expect(profileTable).toBeDefined();
     const fks = profileTable?.foreignKeys;
     expect(fks).toHaveLength(1);
     const fk = fks![0]!;
-    // Access via record to avoid the BuiltStorageTables narrow type which omits spaceId.
-    // At runtime the FK target is a ForeignKeyReference instance that carries spaceId.
-    const target = fk.target as Record<string, unknown>;
-    expect(target['spaceId']).toBe('supabase');
+    expect(fk.target.spaceId).toBe('supabase');
     expect(fk.target.namespaceId).toBe('auth');
     expect(fk.target.tableName).toBe('users');
     expect(fk.target.columns).toEqual(['id']);
@@ -147,7 +144,7 @@ describe('lowering smoke test — FK + relation to AuthUser via real supabasePac
 
   it('cascade action passes through the FK without error', () => {
     const contract = buildProfileContract();
-    const profileTable = contract.storage.namespaces['public']?.entries.table['profile'];
+    const profileTable = contract.storage.namespaces['public']!.entries.table?.['profile'];
     const fk = profileTable?.foreignKeys?.[0];
     expect(fk?.onDelete).toBe('cascade');
   });

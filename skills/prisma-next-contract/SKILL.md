@@ -1,6 +1,6 @@
 ---
 name: prisma-next-contract
-description: Edit the Prisma Next data contract — add models, fields, relations, indexes, enums, type aliases, polymorphic types (`@@discriminator` / `@@base`), use extension namespaces (`pgvector.Vector(...)`, `cipherstash.EncryptedString(...)`), wire `prisma-next.config.ts` with `defineConfig` from the `@prisma-next/<target>/config` façade, and run `prisma-next contract emit`. Use for schema, models, fields, attributes, soft delete, paranoid, scopes, validations, callbacks, prisma schema, PSL, contract.prisma, contract.ts, contract.json, contract.d.ts, façade imports, `@prisma-next/postgres/config`, `@prisma-next/postgres/contract-builder`, `@prisma-next/postgres/control`, `@prisma-next/mongo/config`, `@prisma-next/mongo/contract-builder`, `extensions:`, `extensionPacks`, pgvector, cipherstash, postgis, paradedb, PN-CLI-4002, PN-CLI-4003, PN-CLI-4011.
+description: Edit the Prisma Next data contract — add models, fields, relations, indexes, enums, value objects (composite types), type aliases, namespaces (Postgres schemas), cross-contract foreign keys (cross-space FK), polymorphic types (`@@discriminator` / `@@base`), use extension namespaces (`pgvector.Vector(...)`, `cipherstash.EncryptedString(...)`), wire `prisma-next.config.ts` with `defineConfig` from the `@prisma-next/<target>/config` façade, and run `prisma-next contract emit`. Use for schema, models, fields, attributes, soft delete, paranoid, scopes, validations, callbacks, prisma schema, PSL, contract.prisma, contract.ts, contract.json, contract.d.ts, façade imports, `@prisma-next/postgres/config`, `@prisma-next/postgres/contract-builder`, `@prisma-next/postgres/control`, `@prisma-next/mongo/config`, `@prisma-next/mongo/contract-builder`, `extensions:`, `extensionPacks`, pgvector, cipherstash, postgis, paradedb, supabase, `@prisma-next/extension-supabase`, `@@control`, control policy, managed, tolerated, external, observed, PN-CLI-4002, PN-CLI-4003, PN-CLI-4011.
 ---
 
 # Prisma Next — Contract Authoring
@@ -23,12 +23,14 @@ Both files are **emitted artefacts**. Edit the source; never the JSON or `.d.ts`
 ## When to Use
 
 - User wants to add, change, or remove a model / field / relation.
-- User wants to add an index, unique constraint, or enum.
+- User wants to add an index, unique constraint, enum, or value object (composite type).
+- User wants to add a namespace block (Postgres schema) or a cross-contract foreign key.
+- User wants to set `@@control` on a model or configure `defaultControlPolicy`.
 - User wants to use a custom type from an extension (`pgvector.Vector(length: 1536)`, `cipherstash.EncryptedString({...})`).
-- User wants to install or configure an extension via `extensions: [...]` in `prisma-next.config.ts`.
+- User wants to install or configure an extension via `extensions: [...]` or `extensionPacks: [...]` in `prisma-next.config.ts`, including `@prisma-next/extension-supabase`.
 - User is migrating between authoring sources (PSL ↔ TypeScript builder).
 - User received `PN-CLI-4002`, `PN-CLI-4003`, or `PN-CLI-4011` from `contract emit`.
-- User mentions: *schema, fields, models, attributes, prisma schema, PSL, contract.prisma, contract.ts, contract.json, contract.d.ts, contract emit, façade imports, `@prisma-next/postgres/config`, `@prisma-next/postgres/contract-builder`, extensions, extensionPacks, pgvector, cipherstash, postgis, paradedb, validations, callbacks, soft delete, paranoid, scopes*. (The last cluster routes to *What Prisma Next doesn't do yet* below.)
+- User mentions: *schema, fields, models, attributes, prisma schema, PSL, contract.prisma, contract.ts, contract.json, contract.d.ts, contract emit, façade imports, `@prisma-next/postgres/config`, `@prisma-next/postgres/contract-builder`, extensions, extensionPacks, pgvector, cipherstash, postgis, paradedb, supabase, namespaces, cross-space FK, `@@control`, enums, value objects, validations, callbacks, soft delete, paranoid, scopes*. (The last cluster routes to *What Prisma Next doesn't do yet* below.)
 
 ## When Not to Use
 
@@ -113,11 +115,11 @@ model User {
 }
 ```
 
-Note: scalar lists (e.g. `String[]`) and implicit Prisma-ORM many-to-many (list nav on both sides without a join model) are rejected by the SQL interpreter — use a join model. Composite/embeddable types (`type Address { ... }` with `address Address` on a model) are not supported by the SQL contract today.
+Note: scalar lists (e.g. `String[]`) and implicit Prisma-ORM many-to-many (list nav on both sides without a join model) are rejected by the SQL interpreter — use a join model. Composite/embeddable types (`type Address { ... }` with `address Address` on a model) are supported: the interpreter lowers them to `valueObjects` in the domain and stores them as `jsonb` columns. See *Workflow — Value objects* below.
 
 ## Workflow — Edit a model / field / relation (TS builder)
 
-The concept: same model, different authoring surface. The façade re-exports `defineContract`, `field`, `model`, `rel`, plus the `family`/`target` packs as default exports of `@prisma-next/postgres/family` and `@prisma-next/postgres/target`. Use the callback overload (`defineContract({...}, ({ field, model, rel, type }) => ({...}))`) to get the higher-level helpers (`field.text()`, `field.id.uuidv7()`, `field.temporal.createdAt()`, `type.sql.String(35)`).
+The concept: same model, different authoring surface. The façade re-exports `defineContract`, `field`, `model`, `rel`, plus the `family`/`target` packs as default exports of `@prisma-next/postgres/family` and `@prisma-next/postgres/target`. Use the callback overload (`defineContract({...}, ({ field, model, rel, type }) => ({...}))`) to get the higher-level helpers (`field.text()`, `field.id.uuidv7String()`, `field.temporal.createdAt()`, `type.sql.String(35)`).
 
 ```typescript
 import sqlFamily from '@prisma-next/postgres/family';
@@ -133,7 +135,7 @@ export const contract = defineContract(
     models: {
       User: model('User', {
         fields: {
-          id: field.id.uuidv7(),
+          id: field.id.uuidv7String(),
           email: field.text().unique(),
           createdAt: field.temporal.createdAt(),
         },
@@ -215,6 +217,134 @@ Mongo has no schema layer, so polymorphism on Mongo is modelled by an explicit `
 
 Querying the variants is a runtime concern — see `prisma-next-queries`.
 
+## Workflow — Value objects (composite types)
+
+The concept: `type Foo { ... }` blocks declare value-object shapes. The interpreter lowers them to `valueObjects` in the contract domain and stores them as `jsonb` columns. Nested value-object references are supported.
+
+```prisma
+type Address {
+  street  String
+  city    String
+  zip     String?
+  country String
+}
+
+model User {
+  id      String   @id @default(uuid())
+  email   String
+  address Address?
+}
+```
+
+Emitted `contract.json` carries `domain.namespaces.<ns>.valueObjects.Address` with its field descriptors, and the `address` column lands as `codecId: "pg/jsonb@1"` / `nativeType: "jsonb"` in `storage`.
+
+Canonical worked example: `examples/prisma-next-demo/src/prisma/contract.prisma`.
+
+## Workflow — Enums
+
+The concept: PSL `enum` blocks declare named value-sets. On Postgres the interpreter lowers them to a Postgres native `CREATE TYPE … AS ENUM` type (`pg/enum@1` codec), which the planner emits DDL for. Use the enum name as a field type on any model in the same contract.
+
+```prisma
+enum user_type {
+  admin
+  user
+}
+
+model User {
+  id   String    @id @default(uuid())
+  kind user_type
+}
+```
+
+Canonical worked example: `examples/prisma-next-demo/src/prisma/contract.prisma`.
+
+## Workflow — Namespaces (Postgres schemas)
+
+The concept: wrap models in a `namespace <name> { ... }` block to place them in a non-default Postgres schema. Models outside any block go into the implicit default namespace.
+
+```prisma
+namespace public {
+  model Profile {
+    id       String @id @default(uuid())
+    username String
+    userId   String @unique
+    @@map("profile")
+  }
+}
+```
+
+Canonical worked example: `examples/supabase/src/contract.prisma`.
+
+## Workflow — Cross-contract foreign keys
+
+The concept: a relation field can reference a model in another contract space using the `<space>:<namespace>.<Model>` form. The contract also supports top-level named-type aliases in a `types { }` block (with native-type attributes like `@db.Uuid`).
+
+```prisma
+types {
+  Uuid = String @db.Uuid
+}
+
+namespace public {
+  model Profile {
+    id       String @id @default(uuid())
+    username String
+    userId   Uuid   @unique
+    user     supabase:auth.AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+    @@map("profile")
+  }
+}
+```
+
+`supabase:auth.AuthUser` means: model `AuthUser` in namespace `auth` of contract space `supabase`. The target space is provided by a registered extension pack (here `@prisma-next/extension-supabase/pack`).
+
+Canonical worked example: `examples/supabase/src/contract.prisma`.
+
+## Workflow — `@@control` (control policy)
+
+The concept: `@@control(<policy>)` on a model sets whether Prisma manages that table's DDL in migrations. The argument is a positional lowercase literal — one of `managed`, `tolerated`, `external`, or `observed`.
+
+```prisma
+model AuditLog {
+  id        Int    @id
+  message   String
+
+  @@control(observed)
+}
+```
+
+A contract-level default can be set via `defaultControlPolicy` on `prismaContract(path, { defaultControlPolicy })`. See `prisma-next-migrations` for how control policies affect DDL planning.
+
+## Workflow — `@prisma-next/extension-supabase`
+
+The concept: the Supabase extension provides the `supabase` contract space (containing `auth.AuthUser` and related auth models) and a runtime extension. It does not expose a `/control` subpath so it cannot be registered via the user-facing `defineConfig({ extensions: [...] })` façade. Instead it is wired via `extensionPacks` in the low-level config and `extensions` in the runtime factory. See `examples/supabase` for the full working pattern.
+
+`prisma-next.config.ts` (mirrors the example):
+
+```typescript
+import supabasePack from '@prisma-next/extension-supabase/pack';
+import { defineConfig } from '@prisma-next/cli/config-types';
+// ... other low-level imports
+
+export default defineConfig({
+  // ...
+  extensionPacks: [supabasePack],
+});
+```
+
+`src/prisma/db.ts`:
+
+```typescript
+import supabaseExtension from '@prisma-next/extension-supabase/runtime';
+import postgres from '@prisma-next/postgres/runtime';
+
+export const db = postgres<Contract>({
+  contractJson,
+  extensions: [supabaseExtension],
+});
+```
+
+Export subpaths: `@prisma-next/extension-supabase/pack`, `@prisma-next/extension-supabase/runtime`, `@prisma-next/extension-supabase/contract`. Canonical worked example: `examples/supabase`.
+
 ## Workflow — Brownfield introspection
 
 The concept: pull a contract source out of an existing database and continue from there. `prisma-next contract infer --db <url>` reads the live schema and writes a `contract.prisma` file. It stops there — follow it with `contract emit` and (when the schema matches a pinned hash) `db sign` as separate steps.
@@ -240,7 +370,6 @@ pnpm prisma-next contract emit
 - **Lifecycle callbacks** (`beforeSave`, `afterCreate`, etc.). Not supported. Use middleware (`prisma-next-runtime`) or app code. To request lifecycle callbacks, file via `prisma-next-feedback`.
 - **Soft delete / `paranoid: true`.** No built-in soft-delete column. Add a nullable `deletedAt DateTime?` and filter explicitly in queries (or in middleware). To request built-in soft delete, file via `prisma-next-feedback`.
 - **Scopes / default filters.** No ActiveRecord-style scopes. Compose query helpers yourself. To request scopes, file via `prisma-next-feedback`.
-- **Composite / embeddable types on SQL.** PSL parses `type Foo { ... }` syntax but the SQL interpreter does not lower it to composite types or JSON columns. Use a separate model + relation, or a `Json` column with application-side schemas. To request first-class composite types, file via `prisma-next-feedback`.
 - **Implicit Prisma-ORM many-to-many.** List navigation on both sides without an explicit join model is rejected. Author the join model explicitly. To request implicit M2M, file via `prisma-next-feedback`.
 
 ## Reference
@@ -262,4 +391,4 @@ pnpm prisma-next contract emit
 - [ ] Ran `pnpm prisma-next contract emit` after the edit (or let the Vite plugin re-emit on save).
 - [ ] Confirmed `contract.json` and `contract.d.ts` updated next to the source.
 - [ ] Did **not** hand-edit `contract.json` / `contract.d.ts`.
-- [ ] Did **not** confabulate a missing feature (validations, callbacks, soft delete, scopes, in-contract rename hint, composite types) — referred the user to *What Prisma Next doesn't do yet* + `prisma-next-feedback`.
+- [ ] Did **not** confabulate a missing feature (validations, callbacks, soft delete, scopes, in-contract rename hint) — referred the user to *What Prisma Next doesn't do yet* + `prisma-next-feedback`.

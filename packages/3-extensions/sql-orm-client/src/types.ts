@@ -50,13 +50,29 @@ export interface IncludeCombine<ResultShape extends Record<string, unknown>>
   readonly branches: Readonly<Record<string, IncludeCombineBranch>>;
 }
 
+export interface IncludeThroughDescriptor {
+  readonly table: string;
+  /** Namespace the junction table lives in, as declared in the contract. */
+  readonly namespaceId: string;
+  /** FK columns in the junction table that point to the parent. */
+  readonly parentColumns: readonly string[];
+  /** FK columns in the junction table that point to the target (child). */
+  readonly childColumns: readonly string[];
+  /** PK columns in the target table that the junction's childColumns reference. */
+  readonly targetColumns: readonly string[];
+  /** Resolved column names in the parent table that junction.parentColumns reference. */
+  readonly parentLocalColumns: readonly string[];
+}
+
 export interface IncludeExpr {
   readonly relationName: string;
   readonly relatedModelName: string;
+  readonly relatedNamespaceId: string;
   readonly relatedTableName: string;
   readonly targetColumn: string;
   readonly localColumn: string;
   readonly cardinality: RelationCardinalityTag | undefined;
+  readonly through?: IncludeThroughDescriptor;
   readonly nested: CollectionState;
   readonly scalar: IncludeScalar<unknown> | undefined;
   readonly combine: Readonly<Record<string, IncludeCombineBranch>> | undefined;
@@ -106,7 +122,7 @@ export interface CollectionTypeState {
   readonly variantName: string | undefined;
 }
 
-export type RelationCardinalityTag = '1:1' | 'N:1' | '1:N' | 'M:N';
+export type RelationCardinalityTag = '1:1' | 'N:1' | '1:N' | 'N:M';
 
 export type DefaultCollectionTypeState = {
   readonly hasOrderBy: false;

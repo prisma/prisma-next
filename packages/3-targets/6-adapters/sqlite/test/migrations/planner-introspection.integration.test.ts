@@ -9,6 +9,7 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -20,6 +21,7 @@ import {
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createSqliteBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { SqliteControlAdapter } from '../../src/core/control-adapter';
 
 function createMemoryDriver() {
@@ -98,8 +100,8 @@ describe('SQLite planner + introspection round-trip', () => {
   it('executes planned DDL and verifies via introspection', async () => {
     const driver = createMemoryDriver();
     try {
-      const adapter = new SqliteControlAdapter();
-      const planner = createSqliteMigrationPlanner();
+      const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
+      const planner = createSqliteMigrationPlanner(adapter);
 
       const contract = makeContract({
         users: makeTable({
@@ -133,7 +135,10 @@ describe('SQLite planner + introspection round-trip', () => {
       expect(result.kind).toBe('success');
       if (result.kind !== 'success') return;
 
-      await runPlannedSteps(driver, result.plan.operations);
+      await runPlannedSteps(
+        driver,
+        (await Promise.all(result.plan.operations)) as SqlMigrationPlanOperation<unknown>[],
+      );
 
       const schema = await adapter.introspect(driver);
       expect(schema.tables['users']).toBeDefined();
@@ -164,7 +169,9 @@ describe('SQLite planner + introspection round-trip', () => {
   it('handles AUTOINCREMENT with INTEGER PRIMARY KEY', async () => {
     const driver = createMemoryDriver();
     try {
-      const planner = createSqliteMigrationPlanner();
+      const planner = createSqliteMigrationPlanner(
+        new SqliteControlAdapter(createSqliteBuiltinCodecLookup()),
+      );
 
       const contract = makeContract({
         items: makeTable({
@@ -192,7 +199,10 @@ describe('SQLite planner + introspection round-trip', () => {
       expect(result.kind).toBe('success');
       if (result.kind !== 'success') return;
 
-      await runPlannedSteps(driver, result.plan.operations);
+      await runPlannedSteps(
+        driver,
+        (await Promise.all(result.plan.operations)) as SqlMigrationPlanOperation<unknown>[],
+      );
 
       await driver.query('INSERT INTO items (value) VALUES (?)', ['first']);
       await driver.query('INSERT INTO items (value) VALUES (?)', ['second']);
@@ -210,7 +220,9 @@ describe('SQLite planner + introspection round-trip', () => {
   it('handles foreign key constraints in CREATE TABLE', async () => {
     const driver = createMemoryDriver();
     try {
-      const planner = createSqliteMigrationPlanner();
+      const planner = createSqliteMigrationPlanner(
+        new SqliteControlAdapter(createSqliteBuiltinCodecLookup()),
+      );
 
       const contract = makeContract({
         authors: makeTable({
@@ -257,7 +269,10 @@ describe('SQLite planner + introspection round-trip', () => {
       expect(result.kind).toBe('success');
       if (result.kind !== 'success') return;
 
-      await runPlannedSteps(driver, result.plan.operations);
+      await runPlannedSteps(
+        driver,
+        (await Promise.all(result.plan.operations)) as SqlMigrationPlanOperation<unknown>[],
+      );
 
       await driver.query('INSERT INTO authors (id) VALUES (?)', [1]);
       await driver.query('INSERT INTO posts (id, author_id) VALUES (?, ?)', [1, 1]);

@@ -194,6 +194,82 @@ describe('createExecutionContext — column codec integrity', () => {
     ).toThrow(/CODEC_PARAMETERIZATION_MISMATCH|test\/scalar@1/);
   });
 
+  it('accepts a non-parameterized codec column whose typeParams is an empty object (equivalent to missing)', () => {
+    // M3b.2 substrate fix: `{}` and missing typeParams must be equivalent at
+    // the validator boundary. PSL emits `typeParams: {}` for `@db.X` named
+    // types whose body has no parameters; that empty form must round-trip
+    // through the runtime path against a non-parameterized codec descriptor
+    // without tripping CODEC_PARAMETERIZATION_MISMATCH.
+    const contract = contractWithColumn({
+      codecId: 'test/scalar@1',
+      nativeType: 'scalar',
+      typeParams: {},
+    });
+    expect(() =>
+      createTestContext(contract, createStubAdapter(), {
+        extensionPacks: [nonParameterizedExtension()],
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts a typeRef column whose typed instance carries empty-object typeParams against a non-parameterized codec', () => {
+    // M3b.2 substrate fix: PSL `types { Uuid = String @db.Uuid }` stores the
+    // alias as `{ codecId: 'pg/text@1', typeParams: {} }`. The codec-ref
+    // derived for a column whose `typeRef` points at that alias must compare
+    // equal to "no typeParams" against the non-parameterized `pg/text@1`
+    // descriptor.
+    const storage: SqlStorage = new SqlStorage({
+      storageHash: coreHash('sha256:test'),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: {
+            table: {
+              Doc: {
+                columns: {
+                  uuidCol: {
+                    nativeType: 'uuid',
+                    codecId: 'test/scalar@1',
+                    nullable: false,
+                    typeRef: 'Uuid',
+                  },
+                },
+                primaryKey: { columns: ['uuidCol'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        }),
+      },
+      types: {
+        Uuid: {
+          kind: 'codec-instance',
+          codecId: 'test/scalar@1',
+          nativeType: 'uuid',
+          typeParams: {},
+        },
+      },
+    });
+    const contract: Contract<SqlStorage> = {
+      targetFamily: 'sql',
+      target: 'postgres',
+      profileHash: profileHash('sha256:test'),
+      domain: applicationDomainOf({ models: {} }),
+      roots: {},
+      storage,
+      extensionPacks: {},
+      capabilities: {},
+      meta: {},
+    };
+    expect(() =>
+      createTestContext(contract, createStubAdapter(), {
+        extensionPacks: [nonParameterizedExtension()],
+      }),
+    ).not.toThrow();
+  });
+
   it('error message names the (table, column) site for missing codec', () => {
     const contract = contractWithColumn({
       codecId: 'nope/missing@1',

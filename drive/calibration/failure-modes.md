@@ -460,6 +460,40 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-06-04, control-policy close-out ADR (ADR 224, TML-2831). First draft (drawn from `spec.md`) used `effectiveControl` (shipped `effectiveControlPolicy`), `defaultControl` (shipped `defaultControlPolicy`, renamed under TML-2800), and a predicted diagnostic `control_managed_in_external_space` (shipped `controlPolicySuppressedCall`); it also shipped a structurally-wrong `defineContract` TS example and a relative link off by one `../`. All caught in the orchestrator's source-verification review before merge. The implementer's brief *had* asked it to verify against source — which surfaced the divergences in its return — but the brief's own predicted names were themselves from the stale spec, so the verification was doing double duty.
 
+### F24. Stale `dist` makes a red gate look like a broken base
+
+**Symptom.** A dispatch (or babysitter) runs `pnpm typecheck` / `pnpm test` in a freshly-created or freshly-updated worktree and gets a wall of red — cross-package type errors (`X is not assignable`, `property Y does not exist`) or runtime failures that name a *consumed* package's API. The implementer concludes "the base is broken" or "pre-existing failure, not mine" and either gives up or ships around it. The errors are actually **stale `dist/*.d.mts` artefacts**: a dependency package's emitted types are out of date relative to its source after a base update / rebase, so consumers typecheck against the old surface.
+
+**Detection signal.**
+
+- Worktree was just created, rebased, or had its base updated (`git pull`, `WorktreeCreate`, a rebase-onto-main).
+- The red errors are *cross-package* and reference a dependency's types/exports, not the file the dispatch is editing.
+- An implementer's report contains "pre-existing on the base" / "broken base" for a cross-package type or API mismatch.
+
+**Mitigation.**
+
+- **Run `pnpm build` before trusting any red typecheck/test in a fresh or freshly-updated worktree.** Turbo is cached, so it's cheap; it refreshes every `dist/*.d.mts`. Re-run the gate after. CLAUDE.md's golden rule ("after changing exported types in a consumed package, run that package's build before validating downstream") generalises to "after any base movement, build first."
+- Brief implementers and babysitters to build-then-gate, and to never report "broken base" for a cross-package mismatch until a post-build re-run still fails. A genuine base breakage survives `pnpm build`; stale dist does not.
+
+**Reference incident.** 2026-06-10, runtime-target-layer (TML-2502, PR #792). Nearly tripped this three times: slice 1 reported 153 typecheck errors + 18 test failures (`SqlNamespace.entries` vs `.tables`) as "pre-existing/broken base"; a `pnpm build` cleared all of it (274 tests green). It recurred after the rebase onto main (an `enum-accessor` mismatch) and again when a review-fix subagent saw red — both stale dist, both green after build.
+
+### F25. "Pre-existing failure" claim accepted without running the suspect file on pristine main
+
+**Symptom.** After merging main into a feature branch (or any base movement), a gate run shows failures in files the branch didn't touch. The implementer (or merge-resolution agent) classifies them as "pre-existing / in-progress upstream work, not a regression" because the failing tests belong to someone else's feature — and the loop moves on with a real regression aboard. The classification rested on whose tests failed, not on whether they fail without the branch's changes.
+
+**Detection signal.**
+
+- The failing tests landed on main recently (they passed CI there — main's CI being green is itself evidence against "pre-existing").
+- The branch carries changes to shared infrastructure the failing feature flows through (mergers, registries, shared walkers), even if no file overlaps.
+- The report says "not a regression from the merge" without naming the command that proved it.
+
+**Mitigation.**
+
+- **Run the suspect file on pristine main before accepting any "already red" claim**: `git worktree add wip/main-check origin/main`, install + `pnpm turbo run build --filter=<pkg>...`, run the one file, `git worktree remove`. Minutes of cost; rules the question out completely.
+- Heuristic: a test that passed CI on main and fails on the branch is a branch regression until proven otherwise — the burden of proof is on the "pre-existing" claim, never on the regression hypothesis.
+
+**Reference incident.** 2026-06-11, uuid slice (PR #810). After merging main (TML-2882 enum2), 11/14 `interpreter.enum2.test.ts` tests failed; the merge agent called them "in-progress TML-2882 work, not a regression". Running the file on a pristine-main worktree showed 14/14 green — the branch's `mergeAuthoringNamespaces` shallow-copy fix was dropping prototype getters (`blockAttributes`) off enum2's class-instance descriptors. Fixed by narrowing the copy to plain-prototype objects.
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.

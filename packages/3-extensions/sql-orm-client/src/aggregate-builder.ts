@@ -6,8 +6,12 @@ import type { AggregateBuilder, AggregateSelector, NumericFieldNames } from './t
 export function createAggregateBuilder<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
->(contract: TContract, modelName: ModelName): AggregateBuilder<TContract, ModelName> {
-  const fieldToColumn = getFieldToColumnMap(contract, modelName);
+>(
+  contract: TContract,
+  namespaceId: string,
+  modelName: ModelName,
+): AggregateBuilder<TContract, ModelName> {
+  const fieldToColumn = getFieldToColumnMap(contract, namespaceId, modelName);
 
   return {
     count() {

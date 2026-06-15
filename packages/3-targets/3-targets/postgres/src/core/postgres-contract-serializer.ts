@@ -15,14 +15,15 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
-import { blindCast } from '@prisma-next/utils/casts';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
-import { type as arktypeType, type Type } from 'arktype';
+import type { Type } from 'arktype';
 import { postgresAuthoringEntityTypes } from './authoring';
 import type { PostgresEnumType } from './postgres-enum-type';
+import { PostgresEnumTypeSchema } from './postgres-enum-type-schema';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
-import type { PostgresRole } from './postgres-role';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
+import { PostgresRlsPolicySchema, PostgresRoleSchema } from './postgres-validators';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
   family: 'sql',
@@ -40,36 +41,21 @@ function isAuthoringEntityTypeFactoryOutput(
 }
 
 /**
- * Walks a pack's entity-type namespace tree and emits the maps the
- * family base consumes — hydrators, validator-schema fragments (keyed
- * by discriminator), and validator entry slots (keyed by slot name)
- * for entity kinds that declare an `entrySlotName`.
+ * Walks a pack's entity-type namespace tree and emits hydration factories
+ * keyed by the descriptor's `discriminator`. Used for `storage.types`
+ * (codec-triple hydration). Namespace entries hydration dispatches by
+ * entries key, not discriminator — handled by `hydrateEntriesKind`.
  */
-function collectEntityRegistryContributions(namespace: AuthoringEntityTypeNamespace): {
-  readonly entityTypeRegistry: ReadonlyMap<string, SqlEntityHydrationFactory>;
-  readonly validatorFragments: ReadonlyMap<string, Type<unknown>>;
-  readonly validatorEntrySlots: ReadonlyMap<string, Type<unknown>>;
-} {
-  const entityTypeRegistry = new Map<string, SqlEntityHydrationFactory>();
-  const validatorFragments = new Map<string, Type<unknown>>();
-  const entrySlotFragments = new Map<string, Type<unknown>>();
+function collectStorageTypesHydrators(
+  namespace: AuthoringEntityTypeNamespace,
+): ReadonlyMap<string, SqlEntityHydrationFactory> {
+  const registry = new Map<string, SqlEntityHydrationFactory>();
   const walk = (node: AuthoringEntityTypeNamespace): void => {
     for (const value of Object.values(node)) {
       if (isAuthoringEntityTypeDescriptor(value)) {
         if (isAuthoringEntityTypeFactoryOutput(value.output)) {
           const { factory } = value.output;
-          entityTypeRegistry.set(value.discriminator, (raw) =>
-            factory(raw, POSTGRES_AUTHORING_CTX),
-          );
-        }
-        if (value.validatorSchema !== undefined) {
-          validatorFragments.set(value.discriminator, value.validatorSchema);
-          if (value.entrySlotName !== undefined) {
-            const existing = entrySlotFragments.get(value.entrySlotName);
-            const schema =
-              existing !== undefined ? existing.or(value.validatorSchema) : value.validatorSchema;
-            entrySlotFragments.set(value.entrySlotName, schema);
-          }
+          registry.set(value.discriminator, (raw) => factory(raw, POSTGRES_AUTHORING_CTX));
         }
         continue;
       }
@@ -79,18 +65,64 @@ function collectEntityRegistryContributions(namespace: AuthoringEntityTypeNamesp
     }
   };
   walk(namespace);
-  const validatorEntrySlots = new Map<string, Type<unknown>>();
-  for (const [slotName, schema] of entrySlotFragments) {
-    validatorEntrySlots.set(slotName, arktypeType({ '[string]': schema }));
-  }
-  return { entityTypeRegistry, validatorFragments, validatorEntrySlots };
+  return registry;
 }
 
+const POSTGRES_VALIDATOR_REGISTRY: ReadonlyMap<string, Type<unknown>> = new Map<
+  string,
+  Type<unknown>
+>([
+  ['type', castAs<Type<unknown>>(PostgresEnumTypeSchema)],
+  ['role', castAs<Type<unknown>>(PostgresRoleSchema)],
+  ['rlsPolicy', castAs<Type<unknown>>(PostgresRlsPolicySchema)],
+]);
+
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
+  private readonly enumFactory: SqlEntityHydrationFactory | undefined;
+  private readonly rlsPolicyFactory: SqlEntityHydrationFactory | undefined;
+
   constructor() {
-    const { entityTypeRegistry, validatorFragments, validatorEntrySlots } =
-      collectEntityRegistryContributions(postgresAuthoringEntityTypes);
-    super(entityTypeRegistry, validatorFragments, validatorEntrySlots);
+    const storageTypesHydrators = collectStorageTypesHydrators(postgresAuthoringEntityTypes);
+    super(storageTypesHydrators, POSTGRES_VALIDATOR_REGISTRY);
+    this.enumFactory = storageTypesHydrators.get('type');
+    this.rlsPolicyFactory = storageTypesHydrators.get('rlsPolicy');
+  }
+
+  protected override hydrateEntriesKind(
+    key: string,
+    innerMap: unknown,
+  ): Record<string, unknown> | undefined {
+    if (key === 'type') {
+      if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
+        return {};
+      }
+      return Object.fromEntries(
+        Object.entries(
+          blindCast<Record<string, unknown>, 'checked object, non-null, non-array above'>(innerMap),
+        ).map(([name, entry]) => [
+          name,
+          blindCast<PostgresEnumType, 'postgres-enum factory returns PostgresEnumType'>(
+            this.enumFactory !== undefined ? this.enumFactory(entry) : entry,
+          ),
+        ]),
+      );
+    }
+    if (key === 'rlsPolicy') {
+      if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
+        return {};
+      }
+      return Object.fromEntries(
+        Object.entries(
+          blindCast<Record<string, unknown>, 'checked object, non-null, non-array above'>(innerMap),
+        ).map(([name, entry]) => [
+          name,
+          blindCast<PostgresRlsPolicy, 'PostgresSchema constructor accepts PostgresRlsPolicyInput'>(
+            this.rlsPolicyFactory !== undefined ? this.rlsPolicyFactory(entry) : entry,
+          ),
+        ]),
+      );
+    }
+    return super.hydrateEntriesKind(key, innerMap);
   }
 
   protected override hydrateSqlNamespaceEntry(
@@ -102,82 +134,66 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     }
     const hydrated = blindCast<
       SqlNamespaceTablesInput,
-      'super.hydrateSqlNamespaceEntry returns the tables form when raw is not a NamespaceBase'
+      'super.hydrateSqlNamespaceEntry returns SqlNamespaceTablesInput when raw is not a NamespaceBase'
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
 
-    // Extract postgres-specific slots directly from raw input.
-    // The family base handles `table`; the postgres target owns `type`, `role`, `rlsPolicy`.
-    const rawRecord = raw as Record<string, unknown>;
-    const rawEntries = rawRecord['entries'];
-    let typeSlot: Record<string, PostgresEnumType> | undefined;
-    let roleSlot: Record<string, PostgresRole> | undefined;
-    let rlsPolicySlot: Record<string, PostgresRlsPolicy> | undefined;
-
-    if (rawEntries !== null && typeof rawEntries === 'object' && !Array.isArray(rawEntries)) {
-      const entriesRecord = rawEntries as Record<string, unknown>;
-
-      const rawTypeSlot = entriesRecord['type'];
-      if (rawTypeSlot !== null && typeof rawTypeSlot === 'object' && !Array.isArray(rawTypeSlot)) {
-        const enumFactory = this.entityTypeRegistry.get('postgres-enum');
-        typeSlot = Object.fromEntries(
-          Object.entries(rawTypeSlot as Record<string, unknown>).map(([name, entry]) => [
-            name,
-            blindCast<PostgresEnumType, 'postgres-enum factory returns PostgresEnumType'>(
-              enumFactory !== undefined ? enumFactory(entry) : entry,
-            ),
-          ]),
-        );
-      }
-
-      const rawRoleSlot = entriesRecord['role'];
-      if (rawRoleSlot !== null && typeof rawRoleSlot === 'object' && !Array.isArray(rawRoleSlot)) {
-        const roleFactory = this.entityTypeRegistry.get('postgres-role');
-        roleSlot = Object.fromEntries(
-          Object.entries(rawRoleSlot as Record<string, unknown>).map(([name, entry]) => [
-            name,
-            blindCast<PostgresRole, 'postgres-role factory returns PostgresRole'>(
-              roleFactory !== undefined ? roleFactory(entry) : entry,
-            ),
-          ]),
-        );
-      }
-
-      const rawRlsPolicySlot = entriesRecord['rlsPolicy'];
-      if (
-        rawRlsPolicySlot !== null &&
-        typeof rawRlsPolicySlot === 'object' &&
-        !Array.isArray(rawRlsPolicySlot)
-      ) {
-        // Pass raw entries directly — the PostgresSchema constructor already
-        // handles PostgresRlsPolicyInput objects. The rlsPolicy authoring
-        // factory lowers PslExtensionBlock nodes (PSL path), not JSON (this path).
-        rlsPolicySlot = Object.fromEntries(
-          Object.entries(rawRlsPolicySlot as Record<string, unknown>).map(([name, entry]) => [
-            name,
-            blindCast<
-              PostgresRlsPolicy,
-              'PostgresSchema constructor accepts PostgresRlsPolicyInput'
-            >(entry),
-          ]),
-        );
-      }
-    }
-
-    const emptyTables = Object.keys(entries.table).length === 0;
-    const emptyTypes = !typeSlot || Object.keys(typeSlot).length === 0;
-    const emptyRoles = !roleSlot || Object.keys(roleSlot).length === 0;
-    const emptyPolicies = !rlsPolicySlot || Object.keys(rlsPolicySlot).length === 0;
-    if (id === UNBOUND_NAMESPACE_ID && emptyTables && emptyTypes && emptyRoles && emptyPolicies) {
+    const typeEntries = blindCast<
+      Record<string, PostgresEnumType> | undefined,
+      'hydrateEntriesKind populates entries[type] with PostgresEnumType instances'
+    >(entries['type']);
+    const valueSetEntries = entries['valueSet'];
+    const rlsPolicyEntries = entries['rlsPolicy'];
+    const roleEntries = entries['role'];
+    const hasValueSets = valueSetEntries !== undefined && Object.keys(valueSetEntries).length > 0;
+    const hasRlsPolicies =
+      rlsPolicyEntries !== undefined && Object.keys(rlsPolicyEntries).length > 0;
+    const hasRoles = roleEntries !== undefined && Object.keys(roleEntries).length > 0;
+    const tableEntries = entries['table'] ?? {};
+    const emptyTables = Object.keys(tableEntries).length === 0;
+    const emptyTypes = !typeEntries || Object.keys(typeEntries).length === 0;
+    if (
+      id === UNBOUND_NAMESPACE_ID &&
+      emptyTables &&
+      emptyTypes &&
+      !hasValueSets &&
+      !hasRlsPolicies &&
+      !hasRoles
+    ) {
       return PostgresSchema.unbound;
     }
     return new PostgresSchema({
       id,
       entries: {
-        table: entries.table,
-        type: typeSlot ?? {},
-        role: roleSlot ?? {},
-        rlsPolicy: rlsPolicySlot ?? {},
+        table: blindCast<
+          Record<string, unknown>,
+          'table entries are StorageTable instances after base hydration'
+        >(tableEntries),
+        type: typeEntries ?? {},
+        ...(hasValueSets
+          ? {
+              valueSet: blindCast<
+                Record<string, unknown>,
+                'valueSet entries are StorageValueSet instances after base hydration'
+              >(valueSetEntries),
+            }
+          : {}),
+        ...(hasRoles
+          ? {
+              role: blindCast<
+                Record<string, unknown>,
+                'role entries are PostgresRole instances after base hydration'
+              >(roleEntries),
+            }
+          : {}),
+        ...(hasRlsPolicies
+          ? {
+              rlsPolicy: blindCast<
+                Record<string, unknown>,
+                'rlsPolicy entries are PostgresRlsPolicy instances after hydrateEntriesKind'
+              >(rlsPolicyEntries),
+            }
+          : {}),
       },
     });
   }
@@ -195,7 +211,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
           kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
           entries: {
             table: Object.fromEntries(
-              Object.entries(ns.entries.table).map(([tableName, table]) => [
+              Object.entries(ns.entries.table ?? {}).map(([tableName, table]) => [
                 tableName,
                 this.serializeJsonValue(table) as JsonObject,
               ]),
@@ -223,20 +239,36 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
 
   private serializePostgresNamespace(ns: PostgresSchema, isUnboundSlot: boolean): JsonObject {
     const tablesOut: Record<string, JsonObject> = {};
-    for (const [tableName, table] of Object.entries(ns.entries.table)) {
+    for (const [tableName, table] of Object.entries(ns.table)) {
       tablesOut[tableName] = this.serializeJsonValue(table) as JsonObject;
     }
     const typeOut: Record<string, JsonObject> = {};
-    for (const [typeName, ty] of Object.entries(ns.entries.type)) {
+    for (const [typeName, ty] of Object.entries(ns.type)) {
       typeOut[typeName] = this.serializeJsonValue(ty) as JsonObject;
     }
-    const roleOut: Record<string, JsonObject> = {};
-    for (const [roleName, role] of Object.entries(ns.entries.role)) {
-      roleOut[roleName] = this.serializeJsonValue(role) as JsonObject;
+    const valueSetEntries = ns.valueSet;
+    const valueSetOut: Record<string, JsonObject> = {};
+    if (valueSetEntries !== undefined) {
+      for (const [valueSetName, valueSet] of Object.entries(valueSetEntries)) {
+        valueSetOut[valueSetName] = blindCast<
+          JsonObject,
+          'serializeJsonValue round-trips the value-set node through JSON, yielding a JsonObject'
+        >(this.serializeJsonValue(valueSet));
+      }
     }
+    const roleEntries = ns.entries['role'];
+    const roleOut: Record<string, JsonObject> = {};
+    if (roleEntries !== undefined) {
+      for (const [roleName, role] of Object.entries(roleEntries)) {
+        roleOut[roleName] = this.serializeJsonValue(role) as JsonObject;
+      }
+    }
+    const rlsPolicyEntries = ns.entries['rlsPolicy'];
     const rlsPolicyOut: Record<string, JsonObject> = {};
-    for (const [policyName, policy] of Object.entries(ns.entries.rlsPolicy)) {
-      rlsPolicyOut[policyName] = this.serializeJsonValue(policy) as JsonObject;
+    if (rlsPolicyEntries !== undefined) {
+      for (const [policyName, policy] of Object.entries(rlsPolicyEntries)) {
+        rlsPolicyOut[policyName] = this.serializeJsonValue(policy) as JsonObject;
+      }
     }
     return {
       id: ns.id,
@@ -244,8 +276,9 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       entries: {
         table: tablesOut,
         type: typeOut,
-        role: roleOut,
-        rlsPolicy: rlsPolicyOut,
+        ...(Object.keys(valueSetOut).length > 0 ? { valueSet: valueSetOut } : {}),
+        ...(Object.keys(roleOut).length > 0 ? { role: roleOut } : {}),
+        ...(Object.keys(rlsPolicyOut).length > 0 ? { rlsPolicy: rlsPolicyOut } : {}),
       },
     };
   }

@@ -61,7 +61,7 @@ These belong to sibling Supabase-integration projects:
 
 - **Role-binding runtime** (`asUser(jwt)` / `asAnon()` / `asServiceRole()`) — `extension-supabase` M2 (real `SupabaseRuntime` extends `PostgresRuntime`; issues `SET LOCAL role` below user middleware).
 - **RLS authoring + policies** — [`postgres-rls`](../../../projects/postgres-rls/spec.md) (`.rls(...)` builder, PSL `policy { … }` blocks, content-addressed wire names, `pg_policies` verifier).
-- **Cross-contract FK to `auth.users`** — [`cross-contract-refs`](../../../projects/cross-contract-refs/spec.md) (`supabase:auth.User` PSL grammar; cross-space references in the TS builder).
+- **Cross-contract FK to `auth.users`** — [cross-contract FK references](../../../docs/architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20%26%20Packs.md) (`supabase:auth.AuthUser` PSL grammar; cross-space references in the TS builder). See also [ADR 226](../../../docs/architecture%20docs/adrs/ADR%20226%20-%20Cross-contract%20foreign-key%20references.md).
 - **Explicit namespace-qualified queries** (`db.sql.auth.users`) — [`explicit-namespace-dsl`](../../../projects/explicit-namespace-dsl/spec.md).
 - **Roles as first-class IR** (`anon` / `authenticated` / `service_role` / `authenticator`) — `postgres-rls` (`PostgresRole`).
 - **`auth.uid()` / `auth.jwt()` / `auth.role()` session-GUC functions** — `postgres-rls` extends `bootstrapSupabaseShim` to seed them when its RLS tests need them.

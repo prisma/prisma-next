@@ -18,18 +18,20 @@ describe('collection-runtime', () => {
 
   it('mapStorageRowToModelFields() maps known columns and falls back otherwise', () => {
     expect(
-      mapStorageRowToModelFields(contract, 'Post', { id: 1, user_id: 2, custom: true }),
+      mapStorageRowToModelFields(contract, 'public', 'Post', { id: 1, user_id: 2, custom: true }),
     ).toEqual({
       id: 1,
       userId: 2,
       custom: true,
     });
-    expect(mapStorageRowToModelFields(contract, 'UnknownModel', { id: 1 })).toEqual({ id: 1 });
+    expect(mapStorageRowToModelFields(contract, 'public', 'UnknownModel', { id: 1 })).toEqual({
+      id: 1,
+    });
   });
 
   it('mapModelDataToStorageRow() maps fields and skips undefined values', () => {
     expect(
-      mapModelDataToStorageRow(contract, 'Post', {
+      mapModelDataToStorageRow(contract, 'public', 'Post', {
         id: 1,
         userId: 2,
         views: undefined,
@@ -44,7 +46,7 @@ describe('collection-runtime', () => {
 
   it('mapModelDataToStorageRow() falls back to input keys when model mappings are missing', () => {
     expect(
-      mapModelDataToStorageRow(contract, 'UnknownModel', {
+      mapModelDataToStorageRow(contract, 'public', 'UnknownModel', {
         customField: 1,
         optionalField: undefined,
       }),
@@ -55,25 +57,25 @@ describe('collection-runtime', () => {
 
   it('stripHiddenMappedFields() removes mapped fields for hidden columns', () => {
     const mapped = { id: 1, userId: 2, title: 'A' };
-    stripHiddenMappedFields(contract, 'Post', mapped, ['user_id']);
+    stripHiddenMappedFields(contract, 'public', 'Post', mapped, ['user_id']);
 
     expect(mapped).toEqual({ id: 1, title: 'A' });
-    stripHiddenMappedFields(contract, 'Post', mapped, []);
+    stripHiddenMappedFields(contract, 'public', 'Post', mapped, []);
     expect(mapped).toEqual({ id: 1, title: 'A' });
   });
 
   it('stripHiddenMappedFields() falls back to raw column names when mappings are missing', () => {
     const unknownTableMapped = { custom_col: 1 };
-    stripHiddenMappedFields(contract, 'UnknownModel', unknownTableMapped, ['custom_col']);
+    stripHiddenMappedFields(contract, 'public', 'UnknownModel', unknownTableMapped, ['custom_col']);
     expect(unknownTableMapped).toEqual({});
 
     const unknownColumnMapped = { id: 1, custom_col: 2 };
-    stripHiddenMappedFields(contract, 'User', unknownColumnMapped, ['custom_col']);
+    stripHiddenMappedFields(contract, 'public', 'User', unknownColumnMapped, ['custom_col']);
     expect(unknownColumnMapped).toEqual({ id: 1 });
   });
 
   it('createRowEnvelope() retains raw and mapped values', () => {
-    expect(createRowEnvelope(contract, 'Post', { id: 1, user_id: 2 })).toEqual({
+    expect(createRowEnvelope(contract, 'public', 'Post', { id: 1, user_id: 2 })).toEqual({
       raw: { id: 1, user_id: 2 },
       mapped: { id: 1, userId: 2 },
     });
@@ -144,20 +146,20 @@ describe('collection-runtime', () => {
 describe('mapPolymorphicRow()', () => {
   it('maps STI Bug row: includes base + Bug fields, excludes Feature fields', () => {
     const contract = buildMixedPolyContract();
-    const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
+    const polyInfo = resolvePolymorphismInfo(contract, 'public', 'Task')!;
 
     const row = { id: 1, title: 'Crash', type: 'bug', severity: 'critical' };
-    const result = mapPolymorphicRow(contract, 'Task', polyInfo, row);
+    const result = mapPolymorphicRow(contract, 'public', 'Task', polyInfo, row);
 
     expect(result).toEqual({ id: 1, title: 'Crash', type: 'bug', severity: 'critical' });
   });
 
   it('maps STI row and strips non-matching variant columns (NULL for other STI variants)', () => {
     const contract = buildMixedPolyContract();
-    const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
+    const polyInfo = resolvePolymorphismInfo(contract, 'public', 'Task')!;
 
     const row = { id: 1, title: 'Crash', type: 'bug', severity: 'critical', priority: null };
-    const result = mapPolymorphicRow(contract, 'Task', polyInfo, row);
+    const result = mapPolymorphicRow(contract, 'public', 'Task', polyInfo, row);
 
     expect(result).toEqual({ id: 1, title: 'Crash', type: 'bug', severity: 'critical' });
     expect(result).not.toHaveProperty('priority');
@@ -165,7 +167,7 @@ describe('mapPolymorphicRow()', () => {
 
   it('maps MTI Feature row: includes base + Feature fields via table-qualified aliases', () => {
     const contract = buildMixedPolyContract();
-    const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
+    const polyInfo = resolvePolymorphismInfo(contract, 'public', 'Task')!;
 
     const row = {
       id: 2,
@@ -174,7 +176,7 @@ describe('mapPolymorphicRow()', () => {
       severity: null,
       features__priority: 1,
     };
-    const result = mapPolymorphicRow(contract, 'Task', polyInfo, row);
+    const result = mapPolymorphicRow(contract, 'public', 'Task', polyInfo, row);
 
     expect(result).toEqual({ id: 2, title: 'Dark mode', type: 'feature', priority: 1 });
     expect(result).not.toHaveProperty('severity');
@@ -182,17 +184,17 @@ describe('mapPolymorphicRow()', () => {
 
   it('maps row with known variant using variantName override', () => {
     const contract = buildMixedPolyContract();
-    const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
+    const polyInfo = resolvePolymorphismInfo(contract, 'public', 'Task')!;
 
     const row = { id: 1, title: 'Crash', type: 'bug', severity: 'high' };
-    const result = mapPolymorphicRow(contract, 'Task', polyInfo, row, 'Bug');
+    const result = mapPolymorphicRow(contract, 'public', 'Task', polyInfo, row, 'Bug');
 
     expect(result).toEqual({ id: 1, title: 'Crash', type: 'bug', severity: 'high' });
   });
 
   it('falls back to base-only mapping for unknown discriminator values', () => {
     const contract = buildMixedPolyContract();
-    const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
+    const polyInfo = resolvePolymorphismInfo(contract, 'public', 'Task')!;
 
     const row = {
       id: 3,
@@ -201,7 +203,7 @@ describe('mapPolymorphicRow()', () => {
       severity: null,
       features__priority: null,
     };
-    const result = mapPolymorphicRow(contract, 'Task', polyInfo, row);
+    const result = mapPolymorphicRow(contract, 'public', 'Task', polyInfo, row);
 
     expect(result).toEqual({ id: 3, title: 'Unknown', type: 'epic' });
   });
@@ -226,10 +228,10 @@ describe('mapPolymorphicRow()', () => {
       fields: { priority: {} },
     };
 
-    const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
+    const polyInfo = resolvePolymorphismInfo(contract, 'public', 'Task')!;
 
     const stiRow = { id: 1, title: 'Crash', type: 'bug', severity: 'high' };
-    expect(mapPolymorphicRow(contract, 'Task', polyInfo, stiRow)).toEqual({
+    expect(mapPolymorphicRow(contract, 'public', 'Task', polyInfo, stiRow)).toEqual({
       id: 1,
       title: 'Crash',
       type: 'bug',
@@ -237,7 +239,7 @@ describe('mapPolymorphicRow()', () => {
     });
 
     const mtiRow = { id: 2, title: 'Feature', type: 'feature', features__priority: 5 };
-    expect(mapPolymorphicRow(contract, 'Task', polyInfo, mtiRow)).toEqual({
+    expect(mapPolymorphicRow(contract, 'public', 'Task', polyInfo, mtiRow)).toEqual({
       id: 2,
       title: 'Feature',
       type: 'feature',
@@ -245,7 +247,7 @@ describe('mapPolymorphicRow()', () => {
     });
 
     const unknownRow = { id: 3, title: 'Unknown', type: 'epic' };
-    expect(mapPolymorphicRow(contract, 'Task', polyInfo, unknownRow)).toEqual({
+    expect(mapPolymorphicRow(contract, 'public', 'Task', polyInfo, unknownRow)).toEqual({
       id: 3,
       title: 'Unknown',
       type: 'epic',

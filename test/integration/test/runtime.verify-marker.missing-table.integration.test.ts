@@ -1,23 +1,19 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { Log } from '@prisma-next/sql-runtime';
-import {
-  createExecutionContext,
-  createRuntime,
-  createSqlExecutionStack,
-} from '@prisma-next/sql-runtime';
-import postgresTarget from '@prisma-next/target-postgres/runtime';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
+import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { contract } from './sql-builder/fixtures/contract';
 import type { Contract } from './sql-builder/fixtures/generated/contract';
 
-const sqlContract = new SqlContractSerializer().deserializeContract(contract) as Contract;
+const sqlContract = new PostgresContractSerializer().deserializeContract(contract) as Contract;
 
 describe('runtime verify-marker: missing marker table', {
   timeout: timeouts.databaseOperation,
@@ -77,16 +73,16 @@ describe('runtime verify-marker: missing marker table', {
     const client = new Client({ connectionString });
     await driver.connect({ kind: 'pgClient', client });
 
-    const runtime = createRuntime({
-      stackInstance,
+    const runtime = new PostgresRuntimeImpl({
       context,
+      adapter: stackInstance.adapter,
       driver,
       log,
     });
     const builder = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
     try {
-      const rows = await runtime.execute(builder.users.select('id').build()).toArray();
+      const rows = await runtime.execute(builder.public.users.select('id').build()).toArray();
 
       expect(rows.map((r) => r.id)).toEqual([1]);
       expect(log.warn).toHaveBeenCalledOnce();
