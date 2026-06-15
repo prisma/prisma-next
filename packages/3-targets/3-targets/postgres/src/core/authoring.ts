@@ -86,7 +86,7 @@ function readListRefParams(block: PslExtensionBlock, key: string): string[] {
 
 function unwrapQuotedString(raw: string): string {
   if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
-    return raw.slice(1, -1);
+    return raw.slice(1, -1).replace(/\\"/g, '"');
   }
   return raw;
 }

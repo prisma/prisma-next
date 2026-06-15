@@ -712,13 +712,25 @@
               },
               "uniques": []
             }
+          },
+          "type": {
+            "user_type": {
+              "codecId": "pg/enum@1",
+              "kind": "postgres-enum",
+              "name": "user_type",
+              "nativeType": "user_type",
+              "values": [
+                "admin",
+                "user"
+              ]
+            }
           }
         },
         "id": "public",
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:47323fe36cef39b1e9f5228b4926f49df211db789362b4711a7ae573a78a18b2"
+    "storageHash": "sha256:0ac0dfcf30b29e590c31e45e08f57b1f67a93f5ce5e42a21c7469fc83c1a91d4"
   },
   "execution": {
     "executionHash": "sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e",

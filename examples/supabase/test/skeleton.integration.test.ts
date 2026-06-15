@@ -55,7 +55,7 @@ import contractJson from '../src/contract.json' with { type: 'json' };
 import { createDb } from '../src/prisma/db';
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
 
-const POLICY_WIRE_NAME = 'profile_owner_read_dc40c58a';
+const POLICY_WIRE_NAME = 'profile_owner_read_3486711c';
 
 // Active in CI (test:examples). This asserts the M1 walking-skeleton behaviour only —
 // external-contract migrate/verify + the public.profile round-trip — which is green and
@@ -421,9 +421,15 @@ describe.sequential('supabase RLS behavioral e2e — filtering + drift-fails-ver
       const ownerB = '22222222-2222-2222-2222-222222222222';
 
       // Insert two rows as superuser (bypasses RLS).
+      // auth.users rows must exist first because profile.userId is a FK.
       await withClient(connectionString, async (pgClient) => {
+        const now = new Date().toISOString();
         await pgClient.query(
-          'INSERT INTO public.profile (id, username, owner_id) VALUES ($1, $2, $3), ($4, $5, $6)',
+          'INSERT INTO auth.users (id, email, created_at, updated_at) VALUES ($1, $2, $3, $3), ($4, $5, $3, $3)',
+          [ownerA, 'alice@example.com', now, ownerB, 'bob@example.com'],
+        );
+        await pgClient.query(
+          'INSERT INTO public.profile (id, username, "userId") VALUES ($1, $2, $3), ($4, $5, $6)',
           [
             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
             'alice',
@@ -450,8 +456,8 @@ describe.sequential('supabase RLS behavioral e2e — filtering + drift-fails-ver
         const result = await pgClient.query<{
           id: string;
           username: string;
-          owner_id: string;
-        }>('SELECT id, username, owner_id FROM public.profile');
+          userId: string;
+        }>('SELECT id, username, "userId" FROM public.profile');
 
         await pgClient.query('RESET ROLE');
 
@@ -459,7 +465,7 @@ describe.sequential('supabase RLS behavioral e2e — filtering + drift-fails-ver
         expect(result.rows[0]).toEqual({
           id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           username: 'alice',
-          owner_id: ownerA,
+          userId: ownerA,
         });
       });
     },

@@ -36,7 +36,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:b5f85f53472456ac651778689bbd5cac6dcdd0e067e6f1964f2650513e4f19ae'>;
+  StorageHashBase<'sha256:372f890816e6e404f2365d11fca59175fa4e79ba84125ab08ca71c4561cf4581'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e'>;
 export type ProfileHash =
@@ -92,7 +92,7 @@ export type FieldOutputTypes = {
     readonly email: CodecTypes['pg/text@1']['output'];
     readonly displayName: CodecTypes['pg/text@1']['output'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-    readonly kind: CodecTypes['pg/enum@1']['output'];
+    readonly kind: 'admin' | 'user';
     readonly address: AddressOutput | null;
   };
 };
@@ -396,7 +396,15 @@ type ContractBase = Omit<
                 foreignKeys: readonly [];
               };
             };
-            readonly type: Record<string, never>;
+            readonly type: {
+              readonly user_type: {
+                readonly kind: 'postgres-enum';
+                readonly name: 'user_type';
+                readonly nativeType: 'user_type';
+                readonly codecId: 'pg/enum@1';
+                readonly values: readonly ['admin', 'user'];
+              };
+            };
           };
         };
       };

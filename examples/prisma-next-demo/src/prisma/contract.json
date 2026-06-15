@@ -791,6 +791,18 @@
               "uniques": []
             }
           },
+          "type": {
+            "user_type": {
+              "codecId": "pg/enum@1",
+              "kind": "postgres-enum",
+              "name": "user_type",
+              "nativeType": "user_type",
+              "values": [
+                "admin",
+                "user"
+              ]
+            }
+          },
           "valueSet": {
             "Priority": {
               "kind": "valueSet",
@@ -806,7 +818,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:b5f85f53472456ac651778689bbd5cac6dcdd0e067e6f1964f2650513e4f19ae",
+    "storageHash": "sha256:372f890816e6e404f2365d11fca59175fa4e79ba84125ab08ca71c4561cf4581",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

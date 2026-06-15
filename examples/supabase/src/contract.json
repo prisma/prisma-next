@@ -89,7 +89,7 @@
           "rlsPolicy": {
             "profile_owner_read": {
               "kind": "rlsPolicy",
-              "name": "profile_owner_read_4c78e500",
+              "name": "profile_owner_read_3486711c",
               "namespaceId": "public",
               "operation": "select",
               "permissive": true,
@@ -98,7 +98,7 @@
                 "authenticated"
               ],
               "tableName": "profile",
-              "using": "\\\"userId\\\"::uuid = auth.uid()"
+              "using": "\"userId\"::uuid = auth.uid()"
             }
           },
           "table": {
@@ -164,7 +164,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:86b13ac0922895745b5069f70c20384b34c821f46c089035c55dae11bba9b9c6",
+    "storageHash": "sha256:e6ead07713652c501d3c424f1f1d593fac96c3034c439fb29647050077505022",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",
