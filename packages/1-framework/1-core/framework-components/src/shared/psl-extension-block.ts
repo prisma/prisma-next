@@ -160,7 +160,7 @@ export interface PslBlockParamList {
  * - `option` → `PslExtensionBlockParamOption` — the chosen token.
  * - `list`   → `PslExtensionBlockParamList` — ordered list of the above.
  * - `bare`   → `PslExtensionBlockParamBare` — a bare identifier line with no
- *   `= value` (e.g. `Low` in an enum2 block). The name is the key in
+ *   `= value` (e.g. `Low` in an enum block). The name is the key in
  *   `parameters`; the interpreting consumer decides the default value.
  *
  * These shapes are intentionally minimal. The validator and lowering refine

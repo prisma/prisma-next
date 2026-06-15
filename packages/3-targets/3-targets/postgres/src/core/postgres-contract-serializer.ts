@@ -18,8 +18,7 @@ import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contr
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
-import type { PostgresEnumType } from './postgres-enum-type';
-import { isPostgresSchema, PostgresSchema, typeEntityKind } from './postgres-schema';
+import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
   family: 'sql',
@@ -40,7 +39,7 @@ function isAuthoringEntityTypeFactoryOutput(
  * Walks a pack's entity-type namespace tree and emits hydration factories
  * keyed by the descriptor's `discriminator`. Used for `storage.types`
  * (codec-triple hydration). Namespace entries hydration dispatches by
- * entries key, not discriminator — this is handled by `typeEntityKind.construct`.
+ * entries key, not discriminator — handled by `hydrateEntriesKind`.
  */
 function collectStorageTypesHydrators(
   namespace: AuthoringEntityTypeNamespace,
@@ -67,7 +66,7 @@ function collectStorageTypesHydrators(
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor() {
     const storageTypesHydrators = collectStorageTypesHydrators(postgresAuthoringEntityTypes);
-    super(storageTypesHydrators, [typeEntityKind]);
+    super(storageTypesHydrators);
   }
 
   protected override hydrateSqlNamespaceEntry(
@@ -83,34 +82,18 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
 
-    const typeEntries = blindCast<
-      Record<string, PostgresEnumType> | undefined,
-      'hydrateEntriesKind populates entries[type] with PostgresEnumType instances'
-    >(entries['type']);
-    const valueSetEntries = entries['valueSet'];
-    const hasValueSets = valueSetEntries !== undefined && Object.keys(valueSetEntries).length > 0;
-    const tableEntries = entries['table'] ?? {};
-    const emptyTables = Object.keys(tableEntries).length === 0;
-    const emptyTypes = !typeEntries || Object.keys(typeEntries).length === 0;
-    if (id === UNBOUND_NAMESPACE_ID && emptyTables && emptyTypes && !hasValueSets) {
+    const valueSetSlot = entries['valueSet'];
+    const hasValueSets = valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0;
+    const emptyTables = Object.keys(entries['table'] ?? {}).length === 0;
+    if (id === UNBOUND_NAMESPACE_ID && emptyTables && !hasValueSets) {
       return PostgresSchema.unbound;
     }
     return new PostgresSchema({
       id,
       entries: {
-        table: blindCast<
-          Record<string, unknown>,
-          'table entries are StorageTable instances after base hydration'
-        >(tableEntries),
-        type: typeEntries ?? {},
-        ...(hasValueSets
-          ? {
-              valueSet: blindCast<
-                Record<string, unknown>,
-                'valueSet entries are StorageValueSet instances after base hydration'
-              >(valueSetEntries),
-            }
-          : {}),
+        ...entries,
+        table: entries['table'] ?? {},
+        ...(hasValueSets ? { valueSet: valueSetSlot } : {}),
       },
     });
   }
@@ -159,10 +142,6 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     for (const [tableName, table] of Object.entries(ns.table)) {
       tablesOut[tableName] = this.serializeJsonValue(table) as JsonObject;
     }
-    const typeOut: Record<string, JsonObject> = {};
-    for (const [typeName, ty] of Object.entries(ns.type)) {
-      typeOut[typeName] = this.serializeJsonValue(ty) as JsonObject;
-    }
     const valueSetEntries = ns.valueSet;
     const valueSetOut: Record<string, JsonObject> = {};
     if (valueSetEntries !== undefined) {
@@ -178,7 +157,6 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
       entries: {
         table: tablesOut,
-        type: typeOut,
         ...(Object.keys(valueSetOut).length > 0 ? { valueSet: valueSetOut } : {}),
       },
     };

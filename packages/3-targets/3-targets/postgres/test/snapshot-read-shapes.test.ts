@@ -4,7 +4,6 @@ import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { join, relative, resolve } from 'pathe';
 import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
-import { PostgresEnumType } from '../src/core/postgres-enum-type';
 
 /**
  * TML-2536 snapshot-read coverage.
@@ -13,15 +12,13 @@ import { PostgresEnumType } from '../src/core/postgres-enum-type';
  *
  * 1. Per-polymorphic-`storage.types`-kind fixtures hydrate cleanly
  *    through the family serializer. One fixture per `kind` shipped
- *    in tree (`codec-instance`, `postgres-enum`) — adding a third
- *    fixture is the canonical way to extend test coverage when a
- *    new entity type lands in the family registry.
+ *    in tree (`codec-instance`) — adding another fixture is the
+ *    canonical way to extend test coverage when a new entity type
+ *    lands in the family registry.
  * 2. Every checked-in on-disk contract snapshot (`*-contract.json`)
  *    deserializes without throwing. The snapshot scan covers
  *    `examples/**` (demo + integration fixtures) plus the per-kind
- *    fixtures themselves. A regression on the new strict
- *    `normaliseTypeEntry` would fail here before the demo CI job
- *    fires.
+ *    fixtures themselves.
  *
  * The "snapshot read seam" exercised here is the same code path
  * `readPredecessorEndContract` (and every other CLI on-disk read)
@@ -59,8 +56,7 @@ function walk(dir: string, into: string[]): void {
       stats.isFile() &&
       (entry === 'contract.json' ||
         entry.endsWith('-contract.json') ||
-        entry === 'codec-instance.json' ||
-        entry === 'postgres-enum.json')
+        entry === 'codec-instance.json')
     ) {
       into.push(full);
     }
@@ -81,21 +77,6 @@ describe('snapshot-read shape fixtures — per-kind round-trip (TML-2536)', () =
       codecId: 'pg/vector@1',
       nativeType: 'vector',
       typeParams: { length: 1536 },
-    });
-  });
-
-  it('hydrates the postgres-enum fixture into a PostgresEnumType IR-class instance', () => {
-    const raw = JSON.parse(readFileSync(join(FIXTURES_DIR, 'postgres-enum.json'), 'utf-8'));
-    const contract = serializer.deserializeContract(raw);
-    expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const entry = contract.storage.namespaces['public']?.entries['type']?.['user_role'];
-    expect(entry).toBeInstanceOf(PostgresEnumType);
-    expect(entry).toMatchObject({
-      kind: 'postgres-enum',
-      name: 'user_role',
-      nativeType: 'user_role',
-      values: ['admin', 'user'],
-      codecId: 'pg/enum@1',
     });
   });
 });

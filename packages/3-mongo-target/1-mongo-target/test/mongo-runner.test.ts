@@ -10,17 +10,15 @@ import {
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MongoContract } from '@prisma-next/mongo-contract';
-import type { MongoAdapter, MongoDriver, MongoLoweredDraft } from '@prisma-next/mongo-lowering';
 import type {
-  AnyMongoDdlCommand,
+  MongoAdapter,
+  MongoDdlPlan,
+  MongoDriver,
+  MongoLoweredDraft,
+} from '@prisma-next/mongo-lowering';
+import type {
   AnyMongoInspectionCommand,
   AnyMongoMigrationOperation,
-  CollModCommand,
-  CreateCollectionCommand,
-  CreateIndexCommand,
-  DropCollectionCommand,
-  DropIndexCommand,
-  MongoDdlCommandVisitor,
   MongoInspectionCommandVisitor,
 } from '@prisma-next/mongo-query-ast/control';
 import {
@@ -32,6 +30,11 @@ import {
   RawUpdateManyCommand,
 } from '@prisma-next/mongo-query-ast/execution';
 import { MongoSchemaCollection, MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
+import type {
+  AnyMongoDdlWireCommand,
+  AnyMongoDmlWireCommand,
+  AnyMongoWireCommand,
+} from '@prisma-next/mongo-wire';
 import { describe, expect, it } from 'vitest';
 import { createCollection, dataTransform } from '../src/core/migration-factories';
 import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
@@ -42,11 +45,7 @@ import {
 } from '../src/core/mongo-runner';
 
 type Row = Record<string, unknown>;
-// The wire-command union is exposed on `MongoAdapter['lower']`'s return type
-// (Promise<AnyMongoWireCommand>) and on `MongoDriver.execute`'s parameter
-// type. Re-deriving it here avoids a dependency on `@prisma-next/mongo-wire`,
-// which `target-mongo` does not list as a direct devDependency.
-type WireCommand = Awaited<ReturnType<MongoAdapter['lower']>>;
+type WireCommand = AnyMongoWireCommand;
 
 const ALL_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'],
@@ -85,8 +84,12 @@ class StubMongoDriver implements MongoDriver {
     })();
   }
 
+  async run(_wireCommand: WireCommand): Promise<void> {}
+
   async close(): Promise<void> {}
 }
+
+type DmlWireCommand = AnyMongoDmlWireCommand;
 
 class StubMongoAdapter implements MongoAdapter {
   readonly loweredPlans: MongoQueryPlan[] = [];
@@ -106,41 +109,23 @@ class StubMongoAdapter implements MongoAdapter {
     };
   }
 
-  async resolveParams(draft: MongoLoweredDraft, _ctx: CodecCallContext): Promise<WireCommand> {
+  async resolveParams(draft: MongoLoweredDraft, _ctx: CodecCallContext): Promise<DmlWireCommand> {
     const wireKind =
       draft.kind === 'aggregate' || draft.kind === 'rawAggregate' ? 'aggregate' : 'updateMany';
-    return { kind: wireKind, collection: draft.collection } as unknown as WireCommand;
+    return { kind: wireKind, collection: draft.collection } as unknown as DmlWireCommand;
   }
 
-  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<WireCommand> {
-    return this.resolveParams(this.structuralLower(plan), ctx);
-  }
-}
-
-class StubCommandExecutor implements MongoDdlCommandVisitor<Promise<void>> {
-  readonly calls: AnyMongoDdlCommand[] = [];
-
-  constructor(private readonly log?: EventLog) {}
-
-  private async record(command: AnyMongoDdlCommand): Promise<void> {
-    this.calls.push(command);
-    this.log?.record(`ddl:${command.kind}:${command.collection}`);
-  }
-
-  createIndex(command: CreateIndexCommand): Promise<void> {
-    return this.record(command);
-  }
-  dropIndex(command: DropIndexCommand): Promise<void> {
-    return this.record(command);
-  }
-  createCollection(command: CreateCollectionCommand): Promise<void> {
-    return this.record(command);
-  }
-  dropCollection(command: DropCollectionCommand): Promise<void> {
-    return this.record(command);
-  }
-  collMod(command: CollModCommand): Promise<void> {
-    return this.record(command);
+  lower(plan: MongoDdlPlan, ctx: CodecCallContext): Promise<AnyMongoDdlWireCommand>;
+  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoDmlWireCommand>;
+  lower(plan: MongoQueryPlan | MongoDdlPlan, ctx: CodecCallContext): Promise<WireCommand> {
+    if ('collection' in plan) {
+      return this.resolveParams(this.structuralLower(plan), ctx);
+    }
+    const { command } = plan;
+    return Promise.resolve({
+      kind: command.kind,
+      collection: command.collection,
+    } as unknown as WireCommand);
   }
 }
 
@@ -227,22 +212,25 @@ interface Harness {
   readonly runner: MongoMigrationRunner;
   readonly driver: StubMongoDriver;
   readonly adapter: StubMongoAdapter;
-  readonly commandExecutor: StubCommandExecutor;
   readonly inspectionExecutor: StubInspectionExecutor;
   readonly log: EventLog;
+  readonly ddlCalls: string[];
 }
 
 function makeHarness(): Harness {
   const log = new EventLog();
   const driver = new StubMongoDriver(log);
   const adapter = new StubMongoAdapter();
-  const commandExecutor = new StubCommandExecutor(log);
   const inspectionExecutor = new StubInspectionExecutor();
+  const ddlCalls: string[] = [];
   const deps: MongoRunnerDependencies = {
-    commandExecutor,
     inspectionExecutor,
     adapter,
     driver,
+    executeDdl: async (command) => {
+      ddlCalls.push(`ddl:${command.kind}:${command.collection}`);
+      log.record(`ddl:${command.kind}:${command.collection}`);
+    },
     markerOps: NOOP_MARKER_OPS,
     introspectSchema: async () => new MongoSchemaIR([]),
   };
@@ -250,9 +238,9 @@ function makeHarness(): Harness {
     runner: new MongoMigrationRunner(deps),
     driver,
     adapter,
-    commandExecutor,
     inspectionExecutor,
     log,
+    ddlCalls,
   };
 }
 
@@ -399,7 +387,7 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
     expect(harness.driver.executeCalls).toEqual([]);
   });
 
-  it('dispatches DDL ops through the command executor and data ops through the driver, in plan order', async () => {
+  it('dispatches DDL ops through executeDdl seam and data ops through adapter.lower + driver.execute, in plan order', async () => {
     const harness = makeHarness();
     const ddlOp = createCollection('orders');
     const dataOp = dataTransform('seed-orders', { run: () => makeRunPlan() });
@@ -411,14 +399,12 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
     });
 
     expect(result.assertOk()).toEqual({ operationsPlanned: 2, operationsExecuted: 2 });
-    expect(harness.commandExecutor.calls).toHaveLength(1);
-    expect(harness.commandExecutor.calls[0]).toMatchObject({
-      kind: 'createCollection',
-      collection: 'orders',
+    expect(harness.ddlCalls).toEqual(['ddl:createCollection:orders']);
+    expect(harness.driver.executeCalls).toHaveLength(1);
+    expect(harness.driver.executeCalls[0]).toMatchObject({
+      kind: 'updateMany',
+      collection: RUN_COLLECTION,
     });
-    expect(harness.driver.executeCalls).toEqual([
-      { kind: 'updateMany', collection: RUN_COLLECTION },
-    ]);
     expect(harness.log.entries).toEqual([
       'ddl:createCollection:orders',
       `dml:updateMany:${RUN_COLLECTION}`,
@@ -458,14 +444,13 @@ describe('MongoMigrationRunner schema verification', () => {
     const { ops, calls } = makeTrackingMarkerOps();
     const driver = new StubMongoDriver();
     const adapter = new StubMongoAdapter();
-    const commandExecutor = new StubCommandExecutor();
     const inspectionExecutor = new StubInspectionExecutor();
     const driftIR = new MongoSchemaIR([new MongoSchemaCollection({ name: 'rogue' })]);
     const deps: MongoRunnerDependencies = {
-      commandExecutor,
       inspectionExecutor,
       adapter,
       driver,
+      executeDdl: async () => {},
       markerOps: ops,
       introspectSchema: async () => driftIR,
     };
@@ -513,14 +498,13 @@ describe('MongoMigrationRunner schema verification', () => {
     let introspectCalls = 0;
     const driver = new StubMongoDriver();
     const adapter = new StubMongoAdapter();
-    const commandExecutor = new StubCommandExecutor();
     const inspectionExecutor = new StubInspectionExecutor();
     const driftIR = new MongoSchemaIR([new MongoSchemaCollection({ name: 'rogue' })]);
     const deps: MongoRunnerDependencies = {
-      commandExecutor,
       inspectionExecutor,
       adapter,
       driver,
+      executeDdl: async () => {},
       markerOps: trackingReadMarker,
       introspectSchema: async () => {
         introspectCalls++;
@@ -587,10 +571,10 @@ function makeLedgerHarness(): {
     },
   };
   const deps: MongoRunnerDependencies = {
-    commandExecutor: new StubCommandExecutor(),
     inspectionExecutor: new StubInspectionExecutor(),
     adapter: new StubMongoAdapter(),
     driver: new StubMongoDriver(),
+    executeDdl: async () => {},
     markerOps,
     introspectSchema: async () => new MongoSchemaIR([]),
   };

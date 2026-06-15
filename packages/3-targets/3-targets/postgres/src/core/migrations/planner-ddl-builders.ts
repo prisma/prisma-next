@@ -1,6 +1,5 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type {
-  PostgresEnumStorageEntry,
   StorageColumn,
   StorageTable,
   StorageTypeInstance,
@@ -14,7 +13,7 @@ export function buildCreateTableSql(
   qualifiedTableName: string,
   table: StorageTable,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
-  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {},
+  storageTypes: Record<string, StorageTypeInstance> = {},
 ): string {
   const columnDefinitions = Object.entries(table.columns).map(
     ([columnName, column]: [string, StorageColumn]) => {
@@ -79,7 +78,7 @@ function assertSafeDefaultExpression(expression: string): void {
 export function buildColumnTypeSql(
   column: StorageColumn,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
-  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {},
+  storageTypes: Record<string, StorageTypeInstance> = {},
   allowPseudoTypes = true,
 ): string {
   const resolved = resolveColumnTypeMetadata(column, storageTypes);
@@ -200,7 +199,7 @@ export function buildAddColumnSql(
   column: StorageColumn,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
   temporaryDefault?: string | null,
-  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {},
+  storageTypes: Record<string, StorageTypeInstance> = {},
 ): string {
   const typeSql = buildColumnTypeSql(column, codecHooks, storageTypes);
   const defaultSql =

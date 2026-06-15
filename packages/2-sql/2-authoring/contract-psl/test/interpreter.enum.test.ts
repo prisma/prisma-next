@@ -22,7 +22,7 @@ import {
 } from './fixtures';
 
 // ---------------------------------------------------------------------------
-// Minimal test codecs for enum2 validation
+// Minimal test codecs for enum validation
 // ---------------------------------------------------------------------------
 
 const textCodec: Codec = {
@@ -62,10 +62,10 @@ const testCodecLookup: CodecLookup = {
   renderOutputTypeFor: () => undefined,
 };
 
-const enum2PslBlockDescriptor = {
+const enumPslBlockDescriptor = {
   kind: 'pslBlock' as const,
-  keyword: 'enum2',
-  discriminator: 'enum2',
+  keyword: 'enum',
+  discriminator: 'enum',
   name: { required: true },
   parameters: {},
   variadicParameters: true,
@@ -75,7 +75,7 @@ const authoringContributions = {
   entityTypes: testEnumEntityContributions,
   field: {},
   type: {},
-  pslBlockDescriptors: { enum2: enum2PslBlockDescriptor },
+  pslBlockDescriptors: { enum: enumPslBlockDescriptor },
 };
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
@@ -101,13 +101,13 @@ function interpret(schema: string, overrides?: Partial<InterpretPslDocumentToSql
 }
 
 // ---------------------------------------------------------------------------
-// PSL ↔ TS parity: enum2 emits contract equal to TS enumType authoring
+// PSL ↔ TS parity: enum emits contract equal to TS enumType authoring
 // ---------------------------------------------------------------------------
 
-describe('enum2 PSL ↔ TS parity', () => {
+describe('enum PSL ↔ TS parity', () => {
   it('emits domain enum, storage valueSet, field/column valueSet refs, and table check equal to TS enumType authoring', () => {
     const pslResult = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low    = "low"
   High   = "high"
@@ -188,7 +188,7 @@ model Post {
 
   it('parity holds with a defaulted field: @default(Low) produces the same column as .default(members.Low)', () => {
     const pslResult = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low    = "low"
   High   = "high"
@@ -260,28 +260,32 @@ model Post {
 // Diagnostic tests
 // ---------------------------------------------------------------------------
 
-describe('enum2 diagnostics', () => {
+describe('enum diagnostics', () => {
   it('missing @@type emits diagnostic', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   Low = "low"
 }
-model Post { id Int @id }
+model Post {
+  id Int @id
+}
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'PSL_ENUM2_MISSING_TYPE' })]),
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_ENUM_MISSING_TYPE' })]),
     );
   });
 
   it('unknown codec id emits diagnostic', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("unknown/codec@1")
   Low = "low"
 }
-model Post { id Int @id }
+model Post {
+  id Int @id
+}
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -292,11 +296,13 @@ model Post { id Int @id }
 
   it('non-JSON member rawValue emits diagnostic', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low = notjson
 }
-model Post { id Int @id }
+model Post {
+  id Int @id
+}
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -307,11 +313,13 @@ model Post { id Int @id }
 
   it('codec-rejected member value emits diagnostic', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low = 42
 }
-model Post { id Int @id }
+model Post {
+  id Int @id
+}
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -322,29 +330,33 @@ model Post { id Int @id }
 
   it('bare member under non-string codec emits diagnostic', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/int4@1")
   Low
 }
-model Post { id Int @id }
+model Post {
+  id Int @id
+}
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: 'PSL_ENUM2_BARE_MEMBER_NON_STRING_CODEC' }),
+        expect.objectContaining({ code: 'PSL_ENUM_BARE_MEMBER_NON_STRING_CODEC' }),
       ]),
     );
   });
 
   it('duplicate member names emits PSL_EXTENSION_DUPLICATE_PARAMETER from the parser', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low  = "low"
   Low  = "low2"
 }
-model Post { id Int @id }
+model Post {
+  id Int @id
+}
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -357,93 +369,104 @@ model Post { id Int @id }
 
   it('duplicate member values emits diagnostic', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low  = "same"
   High = "same"
 }
-model Post { id Int @id }
+model Post {
+  id Int @id
+}
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: 'PSL_ENUM2_DUPLICATE_MEMBER_VALUE' }),
+        expect.objectContaining({ code: 'PSL_ENUM_DUPLICATE_MEMBER_VALUE' }),
       ]),
     );
   });
 
-  it('enum2 name colliding with native enum name emits diagnostic', () => {
+  it('duplicate enum block names: second block silently wins (last-writer wins in entries map)', () => {
     const result = interpret(`
 enum Priority {
-  Low
-}
-enum2 Priority {
   @@type("pg/text@1")
   Low = "low"
 }
-model Post { id Int @id }
+enum Priority {
+  @@type("pg/text@1")
+  High = "high"
+}
+model Post {
+  id Int @id
+}
 `);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'PSL_ENUM2_DUPLICATE_TYPE_NAME' })]),
-    );
+    // The extension-block grammar stores blocks by kind+name in entries; a
+    // second block with the same name overwrites the first without a
+    // diagnostic. The second Priority block (High = "high") wins.
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
   });
 
-  it('namespaced enum2 emits not-supported diagnostic', () => {
+  it('namespaced enum emits not-supported diagnostic', () => {
     const result = interpret(`
 namespace public {
-  enum2 Priority {
+  enum Priority {
     @@type("pg/text@1")
     Low = "low"
   }
-  model Post { id Int @id }
+  model Post {
+  id Int @id
+}
 }
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: 'PSL_ENUM2_NAMESPACE_NOT_SUPPORTED' }),
+        expect.objectContaining({ code: 'PSL_ENUM_NAMESPACE_NOT_SUPPORTED' }),
       ]),
     );
   });
 
-  it('missing enum2 entityType factory emits diagnostic for each enum2 block', () => {
-    const entityTypesWithoutEnum2 = { enum: testEnumEntityContributions.enum };
+  it('missing enum entityType factory emits diagnostic for each enum block', () => {
+    const entityTypesWithoutEnum = {};
     const result = interpret(
       `
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low = "low"
 }
-model Post { id Int @id }
+model Post {
+  id Int @id
+}
 `,
       {
         authoringContributions: {
-          entityTypes: entityTypesWithoutEnum2,
+          entityTypes: entityTypesWithoutEnum,
           field: {},
           type: {},
-          pslBlockDescriptors: { enum2: enum2PslBlockDescriptor },
+          pslBlockDescriptors: { enum: enumPslBlockDescriptor },
         },
       },
     );
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'PSL_ENUM2_MISSING_FACTORY' })]),
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_ENUM_MISSING_FACTORY' })]),
     );
   });
 
-  it('missing pslBlockDescriptors means enum2 is treated as unknown top-level block', () => {
+  it('missing pslBlockDescriptors means enum is treated as unknown top-level block', () => {
     const result = interpret(
       `
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low = "low"
 }
-model Post { id Int @id }
+model Post {
+  id Int @id
+}
 `,
       {
         authoringContributions: {
@@ -464,30 +487,19 @@ model Post { id Int @id }
 });
 
 // ---------------------------------------------------------------------------
-// Mixed document: native enum + enum2 side by side
+// Multiple enums in one document
 // ---------------------------------------------------------------------------
 
-describe('enum2 mixed document', () => {
-  it('native enum and enum2 lower correctly side by side', () => {
-    const nativeOnlyResult = interpret(`
+describe('enum multiple document', () => {
+  it('two domain enums lower correctly side by side', () => {
+    const result = interpret(`
 enum Role {
-  USER
-  ADMIN
+  @@type("pg/text@1")
+  User  = "user"
+  Admin = "admin"
 }
 
-model User {
-  id   Int  @id
-  role Role
-}
-`);
-
-    const mixedResult = interpret(`
-enum Role {
-  USER
-  ADMIN
-}
-
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low    = "low"
   High   = "high"
@@ -500,26 +512,22 @@ model User {
 }
 `);
 
-    expect(nativeOnlyResult.ok).toBe(true);
-    expect(mixedResult.ok).toBe(true);
-    if (!nativeOnlyResult.ok || !mixedResult.ok) return;
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
 
-    const nativeNs = (nativeOnlyResult.value.storage as unknown as SqlStorage).namespaces['public'];
-    const mixedNs = (mixedResult.value.storage as unknown as SqlStorage).namespaces['public'];
+    const ns = (result.value.storage as unknown as SqlStorage).namespaces['public'];
 
-    expect(
-      mixedNs !== undefined ? mixedNs.entries.table?.['user']?.columns?.['role'] : undefined,
-    ).toMatchObject(
-      nativeNs !== undefined ? (nativeNs.entries.table?.['user']?.columns?.['role'] as object) : {},
-    );
-    expect(
-      mixedNs !== undefined ? mixedNs.entries.valueSet?.['Priority'] : undefined,
-    ).toMatchObject({
+    expect(ns?.entries.valueSet?.['Role']).toMatchObject({
+      kind: 'valueSet',
+      values: ['user', 'admin'],
+    });
+    expect(ns?.entries.valueSet?.['Priority']).toMatchObject({
       kind: 'valueSet',
       values: ['low', 'high'],
     });
-    const mixedDomainNs = mixedResult.value.domain.namespaces['public'];
-    expect(mixedDomainNs?.enum?.['Priority']).toBeDefined();
+    const domainNs = result.value.domain.namespaces['public'];
+    expect(domainNs?.enum?.['Role']).toBeDefined();
+    expect(domainNs?.enum?.['Priority']).toBeDefined();
   });
 });
 
@@ -527,10 +535,10 @@ model User {
 // Non-string codec happy path
 // ---------------------------------------------------------------------------
 
-describe('enum2 non-string codec', () => {
-  it('integer-backed enum2 lowers correctly', () => {
+describe('enum non-string codec', () => {
+  it('integer-backed enum lowers correctly', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/int4@1")
   Low  = 1
   High = 10
@@ -560,13 +568,13 @@ model Post {
 });
 
 // ---------------------------------------------------------------------------
-// enum2 field defaults: member-name resolution
+// enum field defaults: member-name resolution
 // ---------------------------------------------------------------------------
 
-describe('enum2 field defaults: @default(MemberName) lowering', () => {
-  it('@default(Low) on an enum2 field emits "default": "low" on the storage column', () => {
+describe('enum field defaults: @default(MemberName) lowering', () => {
+  it('@default(Low) on an enum field emits "default": "low" on the storage column', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low    = "low"
   High   = "high"
@@ -588,7 +596,7 @@ model Post {
 
   it('@default(High) resolves to "high"', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low    = "low"
   High   = "high"
@@ -607,9 +615,9 @@ model Post {
     });
   });
 
-  it('@default(Low) on an int-backed enum2 field emits numeric literal default', () => {
+  it('@default(Low) on an int-backed enum field emits numeric literal default', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/int4@1")
   Low  = 1
   High = 10
@@ -630,7 +638,7 @@ model Post {
 
   it('non-member identifier emits diagnostic naming the enum and the identifier', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low  = "low"
   High = "high"
@@ -645,16 +653,16 @@ model Post {
     if (result.ok) return;
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: 'PSL_ENUM2_UNKNOWN_DEFAULT_MEMBER' }),
+        expect.objectContaining({ code: 'PSL_ENUM_UNKNOWN_DEFAULT_MEMBER' }),
       ]),
     );
     expect(result.failure.diagnostics[0]?.message).toMatch(/Critical/);
     expect(result.failure.diagnostics[0]?.message).toMatch(/Priority/);
   });
 
-  it('quoted raw value @default("low") on an enum2 field emits diagnostic', () => {
+  it('quoted raw value @default("low") on an enum field emits diagnostic', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low  = "low"
   High = "high"
@@ -669,14 +677,14 @@ model Post {
     if (result.ok) return;
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: 'PSL_ENUM2_DEFAULT_MUST_BE_MEMBER_NAME' }),
+        expect.objectContaining({ code: 'PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME' }),
       ]),
     );
   });
 
-  it('function default @default(uuid()) on an enum2 field emits diagnostic', () => {
+  it('function default @default(uuid()) on an enum field emits diagnostic', () => {
     const result = interpret(`
-enum2 Priority {
+enum Priority {
   @@type("pg/text@1")
   Low  = "low"
   High = "high"
@@ -691,7 +699,7 @@ model Post {
     if (result.ok) return;
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: 'PSL_ENUM2_DEFAULT_MUST_BE_MEMBER_NAME' }),
+        expect.objectContaining({ code: 'PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME' }),
       ]),
     );
   });

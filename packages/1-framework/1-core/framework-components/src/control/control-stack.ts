@@ -23,8 +23,11 @@ import type {
   ControlMutationDefaults,
   MutationDefaultGeneratorDescriptor,
 } from '../shared/mutation-default-types';
-import { materializeCodec } from '../shared/resolve-codec';
-import { runtimeError } from '../shared/runtime-error';
+import {
+  CONTRACT_CODEC_DESCRIPTOR_MISSING,
+  materializeCodec,
+  resolveCodecDescriptorOrThrow,
+} from '../shared/resolve-codec';
 import type { TypesImportSpec } from '../shared/types-import-spec';
 import type {
   ControlAdapterDescriptor,
@@ -303,6 +306,10 @@ export function extractCodecLookup(
   const targetTypesById = new Map<string, readonly string[]>();
   const metaById = new Map<string, CodecMeta>();
   const renderersById = new Map<string, (params: Record<string, unknown>) => string | undefined>();
+  const inputRenderersById = new Map<
+    string,
+    (params: Record<string, unknown>) => string | undefined
+  >();
   const owners = new Map<string, string>();
   for (const descriptor of descriptors) {
     const codecTypes = descriptor.types?.codecTypes;
@@ -326,6 +333,9 @@ export function extractCodecLookup(
       }
       if (typeof codecDescriptor.renderOutputType === 'function') {
         renderersById.set(codecDescriptor.codecId, codecDescriptor.renderOutputType);
+      }
+      if (typeof codecDescriptor.renderInputType === 'function') {
+        inputRenderersById.set(codecDescriptor.codecId, codecDescriptor.renderInputType);
       }
       // Materialize a representative `Codec` instance for `byId.get()` so consumers reading the lookup's instance side (e.g. SQL renderer's cast-policy lookup, or the contract emitter's literal-default `encodeJson` resolver) keep finding the codec.
       //
@@ -354,20 +364,18 @@ export function extractCodecLookup(
   return {
     get: (id) => byId.get(id),
     forCodecRef(ref: CodecRef) {
-      const d = descriptorsById.get(ref.codecId);
-      if (d === undefined) {
-        throw runtimeError(
-          'RUNTIME.CODEC_DESCRIPTOR_MISSING',
-          `No codec descriptor registered for codecId '${ref.codecId}'.`,
-          { codecId: ref.codecId },
-        );
-      }
+      const d = resolveCodecDescriptorOrThrow(
+        (id) => descriptorsById.get(id),
+        ref,
+        CONTRACT_CODEC_DESCRIPTOR_MISSING,
+      );
       return materializeCodec(d, ref, { name: `<ref:${ref.codecId}>` });
     },
     forColumn: () => undefined,
     targetTypesFor: (id) => targetTypesById.get(id),
     metaFor: (id) => metaById.get(id),
     renderOutputTypeFor: (id, params) => renderersById.get(id)?.(params),
+    renderInputTypeFor: (id, params) => inputRenderersById.get(id)?.(params),
   };
 }
 

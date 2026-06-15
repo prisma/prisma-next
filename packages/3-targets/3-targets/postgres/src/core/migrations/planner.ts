@@ -31,7 +31,6 @@ import {
   resolvePostgresIssueControlPolicySubject,
   resolvePostgresIssueCreationFactoryName,
 } from './control-policy';
-import { createResolveExistingEnumValues } from './enum-planning';
 import { planIssues } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
@@ -268,7 +267,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       frameworkComponents: options.frameworkComponents,
       normalizeDefault: parsePostgresDefault,
       normalizeNativeType: normalizeSchemaNativeType,
-      resolveExistingEnumValues: createResolveExistingEnumValues(options.contract.storage),
     };
     const verifyResult = verifySqlSchema(verifyOptions);
     // Schema presence is a Postgres-specific concern (no equivalent in

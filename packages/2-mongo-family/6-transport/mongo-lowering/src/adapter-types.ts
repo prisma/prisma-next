@@ -1,6 +1,11 @@
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
+import type { AnyMongoDdlCommand } from '@prisma-next/mongo-query-ast/control';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
-import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
+import type {
+  AnyMongoDdlWireCommand,
+  AnyMongoDmlWireCommand,
+  AnyMongoWireCommand,
+} from '@prisma-next/mongo-wire';
 
 /**
  * Intermediate state produced by structural lowering. `MongoParamRef` leaves
@@ -121,17 +126,18 @@ export type MongoLoweredDraft =
       readonly pipeline: ReadonlyArray<Record<string, unknown>>;
     };
 
+/** Wraps a DDL command for passage to `MongoAdapter.lower`. */
+export interface MongoDdlPlan {
+  readonly command: AnyMongoDdlCommand;
+}
+
 export interface MongoAdapter {
-  /**
-   * Lower a `MongoQueryPlan` to a driver-ready wire command.
-   *
-   * Equivalent to `resolveParams(structuralLower(plan), ctx)`. Preserved for
-   * callers that do not need the two-phase split.
-   */
-  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand>;
+  lower(plan: MongoDdlPlan, ctx: CodecCallContext): Promise<AnyMongoDdlWireCommand>;
+  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoDmlWireCommand>;
+  lower(plan: MongoQueryPlan | MongoDdlPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand>;
 
   /**
-   * Phase 1 of the two-phase lowering pipeline.
+   * Phase 1 of the two-phase lowering pipeline (DML only).
    *
    * Transforms the plan's command AST into the lowered wire shape **without**
    * calling `resolveValue` on any `MongoParamRef` leaf. All filter predicates,
@@ -150,5 +156,5 @@ export interface MongoAdapter {
    * frozen `AnyMongoWireCommand` ready for the driver. The same abort-signal
    * forwarding and `RUNTIME.ABORTED` surface contract as `lower` applies.
    */
-  resolveParams(draft: MongoLoweredDraft, ctx: CodecCallContext): Promise<AnyMongoWireCommand>;
+  resolveParams(draft: MongoLoweredDraft, ctx: CodecCallContext): Promise<AnyMongoDmlWireCommand>;
 }

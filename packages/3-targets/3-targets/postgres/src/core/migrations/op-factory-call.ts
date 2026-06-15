@@ -57,7 +57,6 @@ import {
   dropConstraint,
 } from './operations/constraints';
 import { createExtension } from './operations/dependencies';
-import { addEnumValues, createEnumType, dropEnumType, renameType } from './operations/enums';
 import { createIndex, dropIndex } from './operations/indexes';
 import type { ForeignKeySpec } from './operations/shared';
 import { step, targetDetails } from './operations/shared';
@@ -809,8 +808,8 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
   readonly tableName: string;
   readonly indexName: string;
   readonly columns: readonly string[];
-  // Named indexType (not typeName) to avoid collision with CreateEnumTypeCall.typeName,
-  // which identifies a CREATE TYPE target and is read by `locationForCall` in issue-planner.ts.
+  // Named indexType (not typeName): `locationForCall` in issue-planner.ts reads
+  // a call's `typeName` as a CREATE TYPE target location, which an index is not.
   readonly indexType: string | undefined;
   readonly options: Record<string, unknown> | undefined;
   readonly label: string;
@@ -880,123 +879,6 @@ export class DropIndexCall extends PostgresOpFactoryCallNode {
 
   renderTypeScript(): string {
     return `dropIndex(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.indexName)})`;
-  }
-}
-
-// ============================================================================
-// Enum types
-// ============================================================================
-
-export class CreateEnumTypeCall extends PostgresOpFactoryCallNode {
-  readonly factoryName = 'createEnumType' as const;
-  readonly operationClass = 'additive' as const;
-  readonly schemaName: string;
-  readonly typeName: string;
-  readonly nativeType: string;
-  readonly values: readonly string[];
-  readonly label: string;
-
-  constructor(
-    schemaName: string,
-    typeName: string,
-    values: readonly string[],
-    nativeType: string = typeName,
-  ) {
-    super();
-    this.schemaName = schemaName;
-    this.typeName = typeName;
-    this.nativeType = nativeType;
-    this.values = values;
-    this.label = `Create enum type "${typeName}"`;
-    this.freeze();
-  }
-
-  toOp(): Op {
-    return createEnumType(this.schemaName, this.typeName, this.values, this.nativeType);
-  }
-
-  renderTypeScript(): string {
-    const nativeArg =
-      this.nativeType === this.typeName ? '' : `, ${jsonToTsSource(this.nativeType)}`;
-    return `createEnumType(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.typeName)}, ${jsonToTsSource(this.values)}${nativeArg})`;
-  }
-}
-
-export class AddEnumValuesCall extends PostgresOpFactoryCallNode {
-  readonly factoryName = 'addEnumValues' as const;
-  readonly operationClass = 'additive' as const;
-  readonly schemaName: string;
-  readonly typeName: string;
-  readonly nativeType: string;
-  readonly values: readonly string[];
-  readonly label: string;
-
-  constructor(schemaName: string, typeName: string, nativeType: string, values: readonly string[]) {
-    super();
-    this.schemaName = schemaName;
-    this.typeName = typeName;
-    this.nativeType = nativeType;
-    this.values = values;
-    this.label = `Add values to enum type "${typeName}": ${values.join(', ')}`;
-    this.freeze();
-  }
-
-  toOp(): Op {
-    return addEnumValues(this.schemaName, this.typeName, this.nativeType, this.values);
-  }
-
-  renderTypeScript(): string {
-    return `addEnumValues(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.typeName)}, ${jsonToTsSource(this.nativeType)}, ${jsonToTsSource(this.values)})`;
-  }
-}
-
-export class DropEnumTypeCall extends PostgresOpFactoryCallNode {
-  readonly factoryName = 'dropEnumType' as const;
-  readonly operationClass = 'destructive' as const;
-  readonly schemaName: string;
-  readonly typeName: string;
-  readonly label: string;
-
-  constructor(schemaName: string, typeName: string) {
-    super();
-    this.schemaName = schemaName;
-    this.typeName = typeName;
-    this.label = `Drop enum type "${typeName}"`;
-    this.freeze();
-  }
-
-  toOp(): Op {
-    return dropEnumType(this.schemaName, this.typeName);
-  }
-
-  renderTypeScript(): string {
-    return `dropEnumType(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.typeName)})`;
-  }
-}
-
-export class RenameTypeCall extends PostgresOpFactoryCallNode {
-  readonly factoryName = 'renameType' as const;
-  readonly operationClass = 'destructive' as const;
-  readonly schemaName: string;
-  readonly fromName: string;
-  readonly toName: string;
-  readonly label: string;
-
-  constructor(schemaName: string, fromName: string, toName: string) {
-    super();
-    this.schemaName = schemaName;
-    this.fromName = fromName;
-    this.toName = toName;
-    this.label = `Rename type "${fromName}" to "${toName}"`;
-    this.freeze();
-  }
-
-  toOp(): Op {
-    return renameType(this.schemaName, this.fromName, this.toName);
-  }
-
-  renderTypeScript(): string {
-    return `renameType(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.fromName)}, ${jsonToTsSource(this.toName)})`;
   }
 }
 
@@ -1190,10 +1072,6 @@ export type PostgresOpFactoryCall =
   | CreateIndexCall
   | DropIndexCall
   | DropConstraintCall
-  | CreateEnumTypeCall
-  | AddEnumValuesCall
-  | DropEnumTypeCall
-  | RenameTypeCall
   | RawSqlCall
   | CreateExtensionCall
   | CreateSchemaCall

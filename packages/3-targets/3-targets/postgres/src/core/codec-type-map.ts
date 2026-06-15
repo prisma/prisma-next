@@ -21,7 +21,6 @@ import {
   pgBoolDescriptor,
   pgByteaDescriptor,
   pgCharDescriptor,
-  pgEnumDescriptor,
   pgFloat4Descriptor,
   pgFloat8Descriptor,
   pgFloatDescriptor,
@@ -71,7 +70,6 @@ export const codecDescriptorMap = {
   bytea: pgByteaDescriptor,
   uuid: pgUuidDescriptor,
   interval: pgIntervalDescriptor,
-  enum: pgEnumDescriptor,
   json: pgJsonDescriptor,
   jsonb: pgJsonbDescriptor,
 } as const;

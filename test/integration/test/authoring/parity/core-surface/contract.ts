@@ -1,13 +1,21 @@
 import {
   boolColumn,
-  enumType,
   float8Column,
   int4Column,
   jsonbColumn,
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
+import {
+  defineContract,
+  enumType,
+  field,
+  member,
+  model,
+  rel,
+} from '@prisma-next/postgres/contract-builder';
+
+const pgText = { codecId: 'pg/text@1', nativeType: 'text' } as const;
 
 const types = {
   Email: {
@@ -16,14 +24,17 @@ const types = {
     nativeType: 'text',
     typeParams: {},
   },
-  Role: enumType('Role', ['USER', 'ADMIN']),
+} as const;
+
+const enums = {
+  Role: enumType('Role', pgText, member('USER', 'USER'), member('ADMIN', 'ADMIN')),
 } as const;
 
 const User = model('User', {
   fields: {
     id: field.column(int4Column).defaultSql('autoincrement()').id(),
     email: field.namedType(types.Email).unique(),
-    role: field.namedType(types.Role),
+    role: field.namedType(enums.Role),
     createdAt: field.column(timestamptzColumn).defaultSql('now()'),
     isActive: field.column(boolColumn).default(true),
     profile: field.column(jsonbColumn).optional(),
@@ -53,6 +64,7 @@ const Post = model('Post', {
 
 export const contract = defineContract({
   types,
+  enums,
   models: {
     User,
     Post,

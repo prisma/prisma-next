@@ -35,6 +35,7 @@ import type {
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   collMod,
   createCollection,
@@ -212,15 +213,15 @@ export type OpFactoryCall =
 
 export function schemaIndexToCreateIndexOptions(index: MongoSchemaIndex): CreateIndexOptions {
   return {
-    unique: index.unique || undefined,
-    sparse: index.sparse,
-    expireAfterSeconds: index.expireAfterSeconds,
-    partialFilterExpression: index.partialFilterExpression,
-    wildcardProjection: index.wildcardProjection,
-    collation: index.collation,
-    weights: index.weights,
-    default_language: index.default_language,
-    language_override: index.language_override,
+    ...(index.unique ? { unique: true } : {}),
+    ...ifDefined('sparse', index.sparse),
+    ...ifDefined('expireAfterSeconds', index.expireAfterSeconds),
+    ...ifDefined('partialFilterExpression', index.partialFilterExpression),
+    ...ifDefined('wildcardProjection', index.wildcardProjection),
+    ...ifDefined('collation', index.collation),
+    ...ifDefined('weights', index.weights),
+    ...ifDefined('default_language', index.default_language),
+    ...ifDefined('language_override', index.language_override),
   };
 }
 
@@ -231,21 +232,23 @@ export function schemaCollectionToCreateCollectionOptions(
   const validator: MongoSchemaValidator | undefined = coll.validator;
   if (!opts && !validator) return undefined;
   return {
-    capped: opts?.capped ? true : undefined,
-    size: opts?.capped?.size,
-    max: opts?.capped?.max,
-    timeseries: opts?.timeseries,
-    collation: opts?.collation,
-    clusteredIndex: opts?.clusteredIndex
+    ...(opts?.capped ? { capped: true } : {}),
+    ...ifDefined('size', opts?.capped?.size),
+    ...ifDefined('max', opts?.capped?.max),
+    ...ifDefined('timeseries', opts?.timeseries),
+    ...ifDefined('collation', opts?.collation),
+    ...(opts?.clusteredIndex
       ? {
-          key: { _id: 1 } as Record<string, number>,
-          unique: true as boolean,
-          ...(opts.clusteredIndex.name != null ? { name: opts.clusteredIndex.name } : {}),
+          clusteredIndex: {
+            key: { _id: 1 } satisfies Record<string, number>,
+            unique: true,
+            ...(opts.clusteredIndex.name != null ? { name: opts.clusteredIndex.name } : {}),
+          },
         }
-      : undefined,
-    validator: validator ? { $jsonSchema: validator.jsonSchema } : undefined,
-    validationLevel: validator?.validationLevel,
-    validationAction: validator?.validationAction,
-    changeStreamPreAndPostImages: opts?.changeStreamPreAndPostImages,
+      : {}),
+    ...(validator ? { validator: { $jsonSchema: validator.jsonSchema } } : {}),
+    ...ifDefined('validationLevel', validator?.validationLevel),
+    ...ifDefined('validationAction', validator?.validationAction),
+    ...ifDefined('changeStreamPreAndPostImages', opts?.changeStreamPreAndPostImages),
   };
 }

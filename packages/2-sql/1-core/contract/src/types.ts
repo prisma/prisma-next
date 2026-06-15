@@ -21,11 +21,6 @@ export {
   ForeignKeyReference,
   type ForeignKeyReferenceInput,
 } from './ir/foreign-key-reference';
-export {
-  isPostgresEnumStorageEntry,
-  POSTGRES_ENUM_KIND,
-  type PostgresEnumStorageEntry,
-} from './ir/postgres-enum-storage-entry';
 export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';

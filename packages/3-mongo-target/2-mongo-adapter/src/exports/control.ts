@@ -1,7 +1,7 @@
 import type { MongoControlAdapterDescriptor } from '@prisma-next/family-mongo/control-adapter';
 import type { MongoControlDriverInstance } from '@prisma-next/mongo-lowering';
 
-export { MongoCommandExecutor, MongoInspectionExecutor } from '../core/command-executor';
+export { MongoInspectionExecutor } from '../core/inspection-executor';
 export { introspectSchema } from '../core/introspect-schema';
 export { MongoControlAdapterImpl } from '../core/mongo-control-adapter';
 export { isMongoControlDriver } from '../core/mongo-control-driver';

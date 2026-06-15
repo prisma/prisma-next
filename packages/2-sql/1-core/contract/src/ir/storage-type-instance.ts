@@ -14,8 +14,8 @@ export const CODEC_INSTANCE_KIND = 'codec-instance' as const;
  * in `SqlStorage.types`. These are plain object literals — there is no
  * runtime IR class, the JSON envelope round-trips through the slot
  * unchanged. The `kind: 'codec-instance'` discriminator is the dispatch
- * key that distinguishes codec-typed entries from class-instance entries
- * (e.g. `PostgresEnumType`) sharing the polymorphic slot.
+ * key that distinguishes codec-typed entries from any class-instance
+ * kinds a target pack contributes to the polymorphic slot.
  */
 export interface StorageTypeInstance extends StorageType {
   readonly kind: typeof CODEC_INSTANCE_KIND;
@@ -54,7 +54,7 @@ export function toStorageTypeInstance(input: StorageTypeInstanceInput): StorageT
 /**
  * Type-guard for codec-typed entries on the polymorphic
  * `SqlStorage.types` slot. Distinguishes `StorageTypeInstance` from
- * class-instance kinds (e.g. `PostgresEnumType`).
+ * any class-instance kinds a target pack contributes.
  */
 export function isStorageTypeInstance(value: unknown): value is StorageTypeInstance {
   if (typeof value !== 'object' || value === null) return false;

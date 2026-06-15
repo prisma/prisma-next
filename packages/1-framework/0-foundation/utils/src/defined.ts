@@ -1,3 +1,5 @@
+import { blindCast } from './casts';
+
 /**
  * Returns an object with the key/value if value is defined, otherwise an empty object.
  *
@@ -24,5 +26,7 @@ export function ifDefined<K extends string, V>(
   key: K,
   value: V | undefined,
 ): Record<never, never> | { [P in K]: V } {
-  return value !== undefined ? ({ [key]: value } as { [P in K]: V }) : {};
+  return value !== undefined
+    ? blindCast<{ [P in K]: V }, 'computed key K; value is defined'>({ [key]: value })
+    : {};
 }

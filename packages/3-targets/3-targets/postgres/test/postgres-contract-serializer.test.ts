@@ -132,7 +132,6 @@ describe('PostgresContractSerializer', () => {
                   columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
                 },
               },
-              type: {},
             },
           },
         },
@@ -229,15 +228,6 @@ describe('control-policy round-trip fidelity', () => {
             ...base.storage.namespaces[UNBOUND_NAMESPACE_ID]!,
             entries: {
               ...base.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries,
-              type: {
-                Role: {
-                  kind: 'postgres-enum',
-                  name: 'Role',
-                  nativeType: 'role',
-                  values: ['admin', 'user'],
-                  control: 'managed',
-                },
-              },
             },
           },
         },
@@ -258,13 +248,11 @@ describe('control-policy round-trip fidelity', () => {
     const table = ns.entries.table.user;
     const idColumn = table.columns.id;
     const emailColumn = table.columns.email;
-    const enumEntry = ns.entries.type.Role;
 
     const def = reparsed.defaultControlPolicy;
     expect(effectiveControlPolicy(table.control, def)).toBe('external');
     expect(effectiveControlPolicy(idColumn.control, def)).toBe('observed');
     expect(effectiveControlPolicy(emailColumn.control, def)).toBe('tolerated');
-    expect(effectiveControlPolicy(enumEntry.control, def)).toBe('managed');
 
     // Omit-when-default holds: the unset column never grows a control property.
     expect(emailColumn).not.toHaveProperty('control');

@@ -8,7 +8,6 @@ import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/cod
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
-  PostgresEnumStorageEntry,
   ReferentialAction,
   SqlNamespaceTablesInput,
   StorageTypeInstance,
@@ -162,33 +161,14 @@ export interface ContractDefinition {
   readonly extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>;
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
-  readonly storageTypes?: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
-  /**
-   * Enum types declared inside a named `namespace { enum … }` block,
-   * keyed first by namespace id then by type name. These are routed to
-   * `storage.namespaces[nsId].entries.type` rather than the implicit fallback
-   * namespace used for top-level `storageTypes` enums.
-   */
-  readonly namespaceTypes?: Readonly<
-    Record<string, Readonly<Record<string, PostgresEnumStorageEntry>>>
-  >;
+  readonly storageTypes?: Record<string, StorageTypeInstance>;
   /**
    * Declared namespace coordinates for this contract — populates
    * `SqlStorage.namespaces` together with `createNamespace`.
    */
   readonly namespaces?: readonly string[];
-  /**
-   * Target-supplied factory that materialises a `Namespace` concretion
-   * for a declared namespace coordinate. Mirrors
-   * `ContractInput.createNamespace`.
-   *
-   * The optional second argument carries target-specific enum types for the
-   * namespace (e.g. postgres enum registrations keyed by type name).
-   */
-  readonly createNamespace?: (
-    input: SqlNamespaceTablesInput,
-    enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
-  ) => Namespace;
+  /** Target-supplied factory that materialises a `Namespace` concretion for a declared namespace coordinate. */
+  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly models: readonly ModelNode[];
   readonly valueObjects?: readonly ValueObjectNode[];
   /**

@@ -1,6 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/framework-components/runtime';
 import type { MongoResultShape } from '@prisma-next/mongo-query-ast/execution';
-import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
+import type { AnyMongoDmlWireCommand } from '@prisma-next/mongo-wire';
 
 /**
  * Mongo-domain execution plan: a query lowered to the wire-command shape
@@ -31,6 +31,6 @@ export interface MongoExecutionPlan<Row = unknown> extends ExecutionPlan<Row> {
    * command (`InsertOneWireCommand`, `AggregateWireCommand`, …). Do not read
    * `command` structurally in `beforeExecute` — use the `params` mutator.
    */
-  readonly command: AnyMongoWireCommand;
+  readonly command: AnyMongoDmlWireCommand;
   readonly resultShape?: MongoResultShape;
 }

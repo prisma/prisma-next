@@ -1,33 +1,19 @@
 import {
-  type EntityKindDescriptor,
   freezeNode,
-  hydrateNamespaceEntities,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import { composeSqlEntityKinds } from '@prisma-next/sql-contract/entity-kinds';
-import type {
-  PostgresEnumStorageEntry,
-  SqlNamespaceEntries,
-  SqlNamespaceTablesInput,
-  SqlStorage,
+import {
+  type SqlNamespaceTablesInput,
+  type SqlStorage,
   StorageTable,
+  type StorageTableInput,
   StorageValueSet,
+  type StorageValueSetInput,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
-import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
-import { PostgresEnumTypeSchema } from './postgres-enum-type-schema';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { escapeLiteral } from './sql-utils';
-
-export const typeEntityKind: EntityKindDescriptor<PostgresEnumTypeInput, PostgresEnumType> = {
-  kind: 'type',
-  schema: PostgresEnumTypeSchema,
-  construct: (input) => new PostgresEnumType(input),
-};
-
-export type PostgresNamespaceEntries = SqlNamespaceEntries & {
-  readonly type?: Readonly<Record<string, PostgresEnumType>>;
-};
 
 export interface PostgresSchemaInput {
   readonly id: string;
@@ -40,7 +26,7 @@ export interface PostgresSchemaInput {
  * `namespaces: Record<NamespaceId, PostgresSchema>` map populated by
  * the Postgres PSL interpreter from `namespace { … }` AST buckets.
  *
- * `entries` holds entity-kind maps (`table`, `type`). Qualifier
+ * `entries` holds entity-kind maps (`table`, `valueSet`). Qualifier
  * emission is the rendering seam: DDL / SQL emission asks the namespace
  * for its qualifier (`"<schema>"`) or for a qualified table name
  * (`"<schema>"."<table>"`) and consumes the result polymorphically.
@@ -60,31 +46,50 @@ export class PostgresSchema extends NamespaceBase {
 
   declare readonly kind: 'schema';
   readonly id: string;
-  readonly entries: PostgresNamespaceEntries;
+  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
   constructor(input: PostgresSchemaInput) {
     super();
     this.id = input.id;
 
-    const dispatched = hydrateNamespaceEntities(
-      input.entries,
-      composeSqlEntityKinds([typeEntityKind]),
-      'carry',
-    );
+    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
+    let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
+    let valueSet: Readonly<Record<string, StorageValueSet>> | undefined;
+    for (const [kind, rawMap] of Object.entries(input.entries)) {
+      if (kind === 'table') {
+        const tableMap: Record<string, StorageTable> = {};
+        for (const [name, v] of Object.entries(
+          blindCast<
+            Record<string, StorageTableInput>,
+            'entries[table] holds StorageTableInput by construction'
+          >(rawMap),
+        )) {
+          tableMap[name] = new StorageTable(v);
+        }
+        table = Object.freeze(tableMap);
+      } else if (kind === 'valueSet') {
+        const vsMap: Record<string, StorageValueSet> = {};
+        for (const [name, v] of Object.entries(
+          blindCast<
+            Record<string, StorageValueSetInput>,
+            'entries[valueSet] holds StorageValueSetInput by construction'
+          >(rawMap),
+        )) {
+          vsMap[name] = new StorageValueSet(v);
+        }
+        if (Object.keys(vsMap).length > 0) {
+          valueSet = Object.freeze(vsMap);
+        }
+      } else {
+        carried[kind] = Object.freeze(rawMap);
+      }
+    }
 
-    // Drop an empty valueSet so presence signals non-emptiness.
-    const valueSetRaw = dispatched['valueSet'];
-    const withPresence =
-      valueSetRaw !== undefined && Object.keys(valueSetRaw).length === 0
-        ? { ...dispatched, valueSet: undefined }
-        : dispatched;
-
-    this.entries = Object.freeze(
-      blindCast<
-        PostgresNamespaceEntries,
-        'hydrateNamespaceEntities constructs correct IR instances per registered kind descriptors'
-      >(withPresence),
-    );
+    this.entries = Object.freeze({
+      ...carried,
+      table,
+      ...ifDefined('valueSet', valueSet),
+    });
     Object.defineProperty(this, 'kind', {
       value: 'schema',
       writable: false,
@@ -95,15 +100,11 @@ export class PostgresSchema extends NamespaceBase {
   }
 
   get table(): Readonly<Record<string, StorageTable>> {
-    return this.entries.table ?? Object.freeze({});
-  }
-
-  get type(): Readonly<Record<string, PostgresEnumType>> {
-    return this.entries.type ?? Object.freeze({});
+    return this.entries['table'] ?? Object.freeze({});
   }
 
   get valueSet(): Readonly<Record<string, StorageValueSet>> | undefined {
-    return this.entries.valueSet;
+    return this.entries['valueSet'] as Readonly<Record<string, StorageValueSet>> | undefined;
   }
 
   /**
@@ -186,7 +187,7 @@ export class PostgresUnboundSchema extends PostgresSchema {
   static readonly instance: PostgresUnboundSchema = new PostgresUnboundSchema();
 
   constructor(input?: PostgresSchemaInput) {
-    super(input ?? { id: UNBOUND_NAMESPACE_ID, entries: { table: {}, type: {} } });
+    super(input ?? { id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
   }
 
   override qualifier(): string {
@@ -228,19 +229,12 @@ export function isPostgresSchema(ns: unknown): ns is PostgresSchema {
  * by reference and trust the resulting `SqlStorage.namespaces` map to
  * be value-stable for a given input set.
  */
-export function postgresCreateNamespace(
-  input: SqlNamespaceTablesInput,
-  enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
-): PostgresSchema {
+export function postgresCreateNamespace(input: SqlNamespaceTablesInput): PostgresSchema {
   const schemaInput: PostgresSchemaInput = {
     id: input.id,
     entries: {
       ...input.entries,
       table: input.entries['table'] ?? {},
-      type: blindCast<
-        Record<string, PostgresEnumTypeInput>,
-        'enumTypes values are PostgresEnumTypeInput by construction'
-      >(enumTypes ?? {}),
     },
   };
   if (input.id === UNBOUND_NAMESPACE_ID) {

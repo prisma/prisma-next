@@ -46,7 +46,7 @@ const publicContract = {
     namespaces: {
       public: new PostgresSchema({
         id: 'public',
-        entries: { table: { user: new StorageTable(userTableInput) }, type: {} },
+        entries: { table: { user: new StorageTable(userTableInput) } },
       }),
     },
   }),

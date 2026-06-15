@@ -1,15 +1,34 @@
 import {
-  enumType,
   jsonbColumn,
   textColumn,
   timestamptzColumn,
   varcharColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
+import {
+  defineContract,
+  enumType,
+  field,
+  member,
+  model,
+} from '@prisma-next/postgres/contract-builder';
 
-const types = {
-  AccountStatus: enumType('account_status', ['ACTIVE', 'INVITED', 'SUSPENDED']),
-  ProjectVisibility: enumType('project_visibility', ['PRIVATE', 'TEAM', 'PUBLIC']),
+const pgText = { codecId: 'pg/text@1', nativeType: 'text' } as const;
+
+const enums = {
+  AccountStatus: enumType(
+    'AccountStatus',
+    pgText,
+    member('ACTIVE'),
+    member('INVITED'),
+    member('SUSPENDED'),
+  ),
+  ProjectVisibility: enumType(
+    'ProjectVisibility',
+    pgText,
+    member('PRIVATE'),
+    member('TEAM'),
+    member('PUBLIC'),
+  ),
 } as const;
 
 const Account = model('Account', {
@@ -21,7 +40,7 @@ const Account = model('Account', {
       })
       .id(),
     email: field.column(varcharColumn(320)).unique(),
-    status: field.namedType(types.AccountStatus),
+    status: field.namedType(enums.AccountStatus),
     profile: field.column(jsonbColumn).optional(),
     createdAt: field.column(timestamptzColumn).defaultSql('now()'),
   },
@@ -37,7 +56,7 @@ const Project = model('Project', {
       .id(),
     accountId: field.column(textColumn),
     name: field.column(textColumn),
-    visibility: field.namedType(types.ProjectVisibility),
+    visibility: field.namedType(enums.ProjectVisibility),
     metadata: field.column(jsonbColumn).optional(),
     createdAt: field.column(timestamptzColumn).defaultSql('now()'),
   },
@@ -48,7 +67,7 @@ const Project = model('Project', {
 }));
 
 export const contract = defineContract({
-  types,
+  enums,
   models: {
     Account,
     Project,

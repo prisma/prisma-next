@@ -133,7 +133,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
       name: 'user_type',
       nativeType: 'user_type',
       values: ['admin', 'user'],
-      codecId: 'pg/enum@1',
+      codecId: 'app/test-enum@1',
     } as unknown as SqlStorageTypeEntry;
     expect(
       () =>

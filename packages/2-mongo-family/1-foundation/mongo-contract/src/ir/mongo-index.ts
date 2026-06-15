@@ -1,4 +1,5 @@
 import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
+import type { CollationOptions } from '@prisma-next/mongo-value/mongodb-types';
 import type { MongoIndexKey } from '../contract-types';
 
 /**
@@ -14,7 +15,7 @@ export interface MongoIndexInput {
   readonly expireAfterSeconds?: number;
   readonly partialFilterExpression?: Record<string, unknown>;
   readonly wildcardProjection?: Record<string, 0 | 1>;
-  readonly collation?: Record<string, unknown>;
+  readonly collation?: CollationOptions;
   readonly weights?: Record<string, number>;
   readonly default_language?: string;
   readonly language_override?: string;
@@ -41,7 +42,7 @@ export class MongoIndex extends IRNodeBase {
   declare readonly expireAfterSeconds?: number;
   declare readonly partialFilterExpression?: Record<string, unknown>;
   declare readonly wildcardProjection?: Record<string, 0 | 1>;
-  declare readonly collation?: Record<string, unknown>;
+  declare readonly collation?: CollationOptions;
   declare readonly weights?: Record<string, number>;
   declare readonly default_language?: string;
   declare readonly language_override?: string;

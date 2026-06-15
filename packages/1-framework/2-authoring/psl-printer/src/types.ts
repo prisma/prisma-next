@@ -25,24 +25,6 @@ export type PrinterModel = {
   readonly comment?: string | undefined;
 };
 
-/**
- * A printer-internal enum value. `name` is the original storage label as it
- * appeared in the AST or in the producer's input; `serializeEnum` normalises
- * it for emission and emits a per-member `@map(...)` when normalisation
- * changed the printed form (or when the AST already carried an explicit
- * `mapName`), preserving the round-trip through the parser.
- */
-export type PrinterEnumValue = {
-  readonly name: string;
-  readonly mapName?: string | undefined;
-};
-
-export type PrinterEnum = {
-  readonly name: string;
-  readonly mapName?: string | undefined;
-  readonly values: readonly PrinterEnumValue[];
-};
-
 export type PrinterNamedType = {
   readonly name: string;
   readonly baseType: string;

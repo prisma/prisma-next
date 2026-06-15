@@ -13,15 +13,13 @@ import {
   type Namespace,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import {
-  isPostgresEnumStorageEntry,
-  type PostgresEnumStorageEntry,
-  type SqlModelStorage,
-  type SqlStorage,
-  type StorageTable,
-  type StorageTypeInstance,
+import type {
+  SqlModelStorage,
+  SqlStorage,
+  StorageTable,
+  StorageTypeInstance,
+  StorageValueSet,
 } from '@prisma-next/sql-contract/types';
-import { blindCast } from '@prisma-next/utils/casts';
 
 function serializeTypeParamsLiteral(params: Record<string, unknown> | undefined): string {
   if (!params || Object.keys(params).length === 0) {
@@ -299,20 +297,8 @@ export const sqlEmission = {
     if (!column) return undefined;
 
     if (column.typeRef) {
-      const ns = storage.namespaces[storageNamespaceId];
-      const nsEnums =
-        ns !== undefined
-          ? blindCast<
-              { readonly type?: Readonly<Record<string, PostgresEnumStorageEntry>> },
-              'postgres target namespace entries carry a type slot beyond the family-shared SqlNamespace.entries type'
-            >(ns.entries).type
-          : undefined;
-      const fromNamespace = nsEnums?.[column.typeRef];
-      const typeInstance = fromNamespace ?? storage.types?.[column.typeRef];
+      const typeInstance = storage.types?.[column.typeRef];
       if (typeInstance === undefined) return undefined;
-      if (isPostgresEnumStorageEntry(typeInstance)) {
-        return { values: typeInstance.values };
-      }
       const codecShape = typeInstance as Partial<StorageTypeInstance>;
       return codecShape.typeParams;
     }
@@ -368,11 +354,6 @@ function generateDocumentScopedStorageTypesType(types: SqlStorage['types']): str
 
   const typeEntries: string[] = [];
   for (const [typeName, typeInstance] of Object.entries(types)) {
-    if (isPostgresEnumStorageEntry(typeInstance)) {
-      throw new Error(
-        `Document-scoped storage.types entry "${typeName}" is a postgres-enum; enums belong under storage.namespaces[namespaceId].entries.type`,
-      );
-    }
     const codecInstanceShape = typeInstance as Partial<StorageTypeInstance>;
     if (
       typeof codecInstanceShape.codecId !== 'string' ||
@@ -393,30 +374,20 @@ function generateDocumentScopedStorageTypesType(types: SqlStorage['types']): str
   return `{ ${typeEntries.join('; ')} }`;
 }
 
-function generatePostgresNamespaceTypesType(
-  types: Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>,
+function generateNamespaceValueSetType(
+  valueSet: Readonly<Record<string, StorageValueSet>>,
 ): string {
-  if (Object.keys(types).length === 0) {
+  if (Object.keys(valueSet).length === 0) {
     return 'Record<string, never>';
   }
-
-  const typeEntries: string[] = [];
-  for (const [typeName, typeInstance] of Object.entries(types)) {
-    if (isPostgresEnumStorageEntry(typeInstance)) {
-      const codecId = serializeValue(typeInstance.codecId);
-      const nativeType = serializeValue(typeInstance.nativeType);
-      const name = serializeValue(typeInstance.name);
-      const valuesLiteral = typeInstance.values.map((v) => serializeValue(v)).join(', ');
-      typeEntries.push(
-        `readonly ${serializeObjectKey(typeName)}: { readonly kind: 'postgres-enum'; readonly name: ${name}; readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly values: readonly [${valuesLiteral}] }`,
-      );
-      continue;
-    }
-    throw new Error(
-      `Unknown namespace storage type kind for "${typeName}"; expected postgres-enum in namespace.entries.type.`,
+  const entries: string[] = [];
+  for (const [name, vs] of Object.entries(valueSet)) {
+    const valuesLiteral = vs.values.map((v) => serializeValue(v)).join(', ');
+    entries.push(
+      `readonly ${serializeObjectKey(name)}: { readonly kind: 'valueSet'; readonly values: readonly [${valuesLiteral}] }`,
     );
   }
-  return `{ ${typeEntries.join('; ')} }`;
+  return `{ ${entries.join('; ')} }`;
 }
 
 const SQL_NAMESPACE_KIND_FALLBACK = 'sql-namespace' as const;
@@ -534,22 +505,13 @@ function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): st
   const parts: string[] = [];
   for (const [name, ns] of entries) {
     const kindSuffix = `; ${namespaceSerializedKind(ns)}`;
-    const tablesType = generateTablesMapType(ns.entries.table ?? {});
-    const typeSlot =
-      ns.kind === 'schema'
-        ? blindCast<
-            Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>> | undefined,
-            'postgres schema namespace entries carry a type slot beyond the family-shared SqlNamespace.entries type'
-          >(
-            blindCast<
-              { readonly type?: Readonly<Record<string, unknown>> },
-              'access opaque type slot on postgres target namespace entries'
-            >(ns.entries).type,
-          )
-        : undefined;
+    const tablesType = generateTablesMapType(
+      (ns.entries.table ?? {}) as Readonly<Record<string, StorageTable>>,
+    );
+    const valueSetSlot = ns.entries.valueSet;
     const entriesParts = [`readonly table: ${tablesType}`];
-    if (typeSlot !== undefined) {
-      entriesParts.push(`readonly type: ${generatePostgresNamespaceTypesType(typeSlot)}`);
+    if (valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0) {
+      entriesParts.push(`readonly valueSet: ${generateNamespaceValueSetType(valueSetSlot)}`);
     }
     const entriesType = `{ ${entriesParts.join('; ')} }`;
     parts.push(
