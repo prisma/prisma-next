@@ -262,16 +262,17 @@ function resolveEnumOrderValues(
   if (source === undefined || source.namespaceId === undefined) {
     return undefined;
   }
+  const sourceNs = contract.storage.namespaces[source.namespaceId];
   const column =
-    contract.storage.namespaces[source.namespaceId]?.entries.table[source.name]?.columns[
-      ref.column
-    ];
+    sourceNs !== undefined ? sourceNs.entries.table?.[source.name]?.columns[ref.column] : undefined;
   const valueSet = column?.valueSet;
   if (valueSet === undefined) {
     return undefined;
   }
-  return contract.storage.namespaces[valueSet.namespaceId]?.entries.valueSet?.[valueSet.entityName]
-    ?.values;
+  const valueSetNs = contract.storage.namespaces[valueSet.namespaceId];
+  return valueSetNs !== undefined
+    ? valueSetNs.entries.valueSet?.[valueSet.entityName]?.values
+    : undefined;
 }
 
 /**
@@ -288,8 +289,9 @@ function resolveEnumOrderValuesForIdentifier(
     if (source.namespaceId === undefined) {
       continue;
     }
+    const identNs = contract.storage.namespaces[source.namespaceId];
     const column =
-      contract.storage.namespaces[source.namespaceId]?.entries.table[source.name]?.columns[name];
+      identNs !== undefined ? identNs.entries.table?.[source.name]?.columns[name] : undefined;
     if (column === undefined) {
       continue;
     }
@@ -301,9 +303,11 @@ function resolveEnumOrderValuesForIdentifier(
     if (valueSet === undefined) {
       return undefined;
     }
+    const valueSetNs = contract.storage.namespaces[valueSet.namespaceId];
     resolved =
-      contract.storage.namespaces[valueSet.namespaceId]?.entries.valueSet?.[valueSet.entityName]
-        ?.values;
+      valueSetNs !== undefined
+        ? valueSetNs.entries.valueSet?.[valueSet.entityName]?.values
+        : undefined;
   }
   return resolved;
 }
@@ -843,11 +847,11 @@ function getInsertColumnOrder(
   let table: { columns: Readonly<Record<string, unknown>> } | undefined;
   if (tableRef.namespaceId !== undefined) {
     const ns = contract.storage.namespaces[tableRef.namespaceId];
-    table = ns?.entries.table[tableName];
+    table = ns !== undefined ? ns.entries.table?.[tableName] : undefined;
   }
   if (table === undefined) {
     for (const ns of Object.values(contract.storage.namespaces)) {
-      const found = ns.entries.table[tableName];
+      const found = ns.entries.table?.[tableName];
       if (found !== undefined) {
         table = found;
         break;

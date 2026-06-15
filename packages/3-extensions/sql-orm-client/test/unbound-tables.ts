@@ -1,20 +1,18 @@
-import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlNamespace, StorageTable } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 
 type StorageLike = {
-  readonly namespaces: Readonly<
-    Record<string, { readonly entries: { readonly table: Readonly<Record<string, unknown>> } }>
-  >;
+  readonly namespaces: Readonly<Record<string, unknown>>;
 };
 
-export function unboundTables(
-  storage: StorageLike | SqlStorage,
-): Readonly<Record<string, StorageTable>> {
+export function unboundTables(storage: StorageLike): Readonly<Record<string, StorageTable>> {
   const merged: Record<string, StorageTable> = {};
   for (const ns of Object.values(storage.namespaces)) {
-    const table = ns.entries.table;
-    if (table) {
-      Object.assign(merged, table);
-    }
+    Object.assign(
+      merged,
+      blindCast<SqlNamespace, 'runtime namespaces hold SqlNamespace concretions'>(ns).entries
+        .table ?? {},
+    );
   }
   return merged;
 }

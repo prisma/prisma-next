@@ -77,6 +77,19 @@ changes:
         - "from '@prisma-next/target-postgres/migration'"
       anyMatch: true
     script: migration-op-factories-to-methods.ts
+  - id: postgres-contract-serializer
+    summary: |
+      `SqlContractSerializer` (from `@prisma-next/family-sql/ir`) can no longer
+      deserialize Postgres contracts. The family serializer has an empty entries
+      registry and now rejects the `type` key that every Postgres namespace carries.
+      Any migration file or app code that calls
+      `new SqlContractSerializer().deserializeContract(postgresContractJson)` must
+      switch to `new PostgresContractSerializer()` imported from
+      `@prisma-next/target-postgres/runtime`.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "SqlContractSerializer"
 ---
 
 <!--
@@ -100,9 +113,11 @@ substrate diff only.
 
 TML-2838: the PGlite-backed example apps (`prisma-next-demo`, `react-router-demo`,
 `supabase`, `bundle-size`, `multi-extension-monorepo`) switched their vitest
-`pool` from `threads` to `forks`. Running PGlite (WebAssembly) across vitest
-worker threads in one process intermittently aborts on Linux (a V8 JIT-page
-race); a process-per-fork avoids it. Test-harness only — no runtime, contract,
+`pool` from `threads` to `forks` and pass `--no-memory-protection-keys`. Running
+PGlite (WebAssembly) across vitest worker threads intermittently aborts on Linux
+with a residual V8 JIT-page race (`jit_page_->allocations_.erase`) that
+`@prisma/dev` 0.24.12 reduced but did not fully eliminate; process-per-fork with
+PKU JIT-hardening disabled removes it. Test-harness only — no runtime, contract,
 or public-API change. Incidental substrate diff only.
 -->
 
@@ -284,6 +299,24 @@ The colocated script applies this transformation automatically. Run it from your
 ```bash
 pnpm exec tsx node_modules/.skills/prisma-next-upgrade/upgrades/0.13-to-0.14/migration-op-factories-to-methods.ts
 ```
+
+## `postgres-contract-serializer`
+
+`SqlContractSerializer` (from `@prisma-next/family-sql/ir`) now rejects Postgres contracts. The family serializer validates entries against a registry of known entity kinds; it only knows the SQL-family built-ins (`table`, `valueSet`) and has no knowledge of the Postgres-specific `type` key (Postgres enum types). Every Postgres namespace carries `"type": {}` in its `entries`, so the family serializer throws a `ContractValidationError` naming `type` as an unregistered kind.
+
+Replace `SqlContractSerializer` with `PostgresContractSerializer` in any migration file or app code that deserializes a Postgres-emitted contract:
+
+```ts
+// Before
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+
+// After
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
+```
+
+SQLite and family-only (non-Postgres) contracts are unaffected — their namespaces carry only `table` entries, which the family serializer knows about.
 
 <!--
 TML-2882: transitional PSL `enum2` block (PR #805). The demo authors `enum2 Priority`

@@ -30,11 +30,12 @@ export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
 export {
+  type SqlNamespace,
+  type SqlNamespaceEntries,
   type SqlNamespaceTablesInput,
   SqlStorage,
   type SqlStorageInput,
   type SqlStorageTypeEntry,
-  storageTableAt,
 } from './ir/sql-storage';
 export { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';

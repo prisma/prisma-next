@@ -62,8 +62,9 @@ describe('mongo contract builder — polymorphic index scoping', () => {
       models: { Task, Bug, Feature },
     });
 
-    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries
-      .collection as unknown as Record<
+    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries[
+      'collection'
+    ] as unknown as Record<
       string,
       {
         indexes?: Array<{
@@ -126,8 +127,9 @@ describe('mongo contract builder — polymorphic index scoping', () => {
       models: { taskModel: Task, bugModel: Bug, featureModel: Feature },
     });
 
-    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries
-      .collection as unknown as Record<
+    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries[
+      'collection'
+    ] as unknown as Record<
       string,
       {
         indexes?: Array<{
@@ -184,8 +186,9 @@ describe('mongo contract builder — polymorphic index scoping', () => {
       models: { Task, Bug, Feature },
     });
 
-    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries
-      .collection as unknown as Record<
+    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries[
+      'collection'
+    ] as unknown as Record<
       string,
       {
         indexes?: Array<{
@@ -233,8 +236,9 @@ describe('mongo contract builder — polymorphic index scoping', () => {
       models: { Task, Bug },
     });
 
-    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries
-      .collection as unknown as Record<
+    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries[
+      'collection'
+    ] as unknown as Record<
       string,
       {
         indexes?: Array<{
@@ -276,8 +280,9 @@ describe('mongo contract builder — polymorphic index scoping', () => {
       models: { Task, Bug },
     });
 
-    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries
-      .collection as unknown as Record<
+    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries[
+      'collection'
+    ] as unknown as Record<
       string,
       {
         indexes?: Array<{

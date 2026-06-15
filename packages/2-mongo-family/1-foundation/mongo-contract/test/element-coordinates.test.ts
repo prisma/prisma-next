@@ -1,11 +1,11 @@
 import { coreHash } from '@prisma-next/contract/types';
-import { elementCoordinates } from '@prisma-next/framework-components/ir';
+import { elementCoordinates, entityAt } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { buildMongoNamespace } from '../src/ir/build-mongo-namespace';
 import { MongoStorage } from '../src/ir/mongo-storage';
 
 describe('elementCoordinates with MongoStorage', () => {
-  it('walks Mongo namespace collections slot', () => {
+  it('walks Mongo namespace collection entries', () => {
     const storage = new MongoStorage({
       storageHash: coreHash('sha256:element-coordinates-mongo'),
       namespaces: {
@@ -20,5 +20,31 @@ describe('elementCoordinates with MongoStorage', () => {
       entityKind: 'collection',
       entityName: 'posts',
     });
+  });
+});
+
+describe('coordinate-resolution acceptance — every elementCoordinates tuple resolves', () => {
+  it('every coordinate from a mongo storage resolves through entityAt', () => {
+    const storage = new MongoStorage({
+      storageHash: coreHash('sha256:coord-resolution-mongo'),
+      namespaces: {
+        app: buildMongoNamespace({
+          id: 'app',
+          entries: { collection: { users: {}, posts: {}, comments: {} } },
+        }),
+        analytics: buildMongoNamespace({
+          id: 'analytics',
+          entries: { collection: { events: {} } },
+        }),
+      },
+    });
+
+    const coordinates = [...elementCoordinates(storage)];
+    expect(coordinates.length).toBeGreaterThan(0);
+
+    for (const coordinate of coordinates) {
+      const entity = entityAt(storage, coordinate);
+      expect(entity, `entityAt did not resolve ${JSON.stringify(coordinate)}`).toBeDefined();
+    }
   });
 });

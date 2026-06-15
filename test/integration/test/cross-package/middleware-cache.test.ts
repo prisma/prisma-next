@@ -1,7 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   type ExecutionStackInstance,
   instantiateExecutionStack,
@@ -32,7 +31,7 @@ import {
   type SqlRuntimeDriverInstance,
   type SqlRuntimeExtensionInstance,
 } from '@prisma-next/sql-runtime';
-import postgresTarget from '@prisma-next/target-postgres/runtime';
+import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -55,7 +54,7 @@ import { setupTestDatabase } from '../utils';
  *   through the per-exec WeakMap buffer.
  */
 
-const sqlContract = new SqlContractSerializer().deserializeContract(contract) as Contract;
+const sqlContract = new PostgresContractSerializer().deserializeContract(contract) as Contract;
 
 type TestStackInstance = ExecutionStackInstance<
   'sql',

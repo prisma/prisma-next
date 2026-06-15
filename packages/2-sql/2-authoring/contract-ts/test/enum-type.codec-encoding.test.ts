@@ -48,7 +48,7 @@ function definitionWith(enumHandle: ReturnType<typeof enumType>): ContractDefini
 
 function valueSetValues(contract: Contract<SqlStorage>, name: string): readonly JsonValue[] {
   const ns = contract.storage.namespaces['public'];
-  return ns?.entries.valueSet?.[name]?.values ?? [];
+  return (ns !== undefined ? ns.entries.valueSet?.[name]?.values : undefined) ?? [];
 }
 
 function memberValues(contract: Contract<SqlStorage>, name: string): readonly JsonValue[] {

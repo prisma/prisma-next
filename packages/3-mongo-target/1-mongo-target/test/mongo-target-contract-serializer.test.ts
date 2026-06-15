@@ -88,7 +88,9 @@ describe('MongoTargetContractSerializer', () => {
     const serializer = new MongoTargetContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
 
-    const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.entries.collection['items'];
+    const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(ns).toBeDefined();
+    const items = ns!.entries.collection?.['items'];
     expect(items).toBeInstanceOf(MongoCollection);
     expect(items?.kind).toBe('mongo-collection');
   });
@@ -97,6 +99,16 @@ describe('MongoTargetContractSerializer', () => {
     const serializer = new MongoTargetContractSerializer();
     const bad = { ...makeValidContractJson(), targetFamily: 'sql' };
     expect(() => serializer.deserializeContract(bad)).toThrow();
+  });
+
+  it('fails closed at hydration: an unregistered entries kind throws naming the kind', () => {
+    const serializer = new MongoTargetContractSerializer();
+    const json = makeValidContractJson();
+    const ns = json.storage.namespaces[UNBOUND_NAMESPACE_ID] as {
+      entries: Record<string, unknown>;
+    };
+    ns.entries['bogus'] = { Foo: {} };
+    expect(() => serializer.deserializeContract(json)).toThrow(/bogus/);
   });
 
   it('serializeContract emits canonical nested namespaces on disk', () => {
@@ -173,7 +185,9 @@ describe('MongoTargetContractSerializer', () => {
       const serializer = new MongoTargetContractSerializer();
       const contract = serializer.deserializeContract(makeFullyPopulatedJson());
 
-      const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.entries.collection['items'];
+      const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+      expect(ns).toBeDefined();
+      const items = ns!.entries.collection?.['items'];
       expect(items).toBeInstanceOf(MongoCollection);
       expect(items?.indexes?.[0]).toBeInstanceOf(MongoIndex);
       expect(items?.validator).toBeInstanceOf(MongoValidator);
@@ -257,9 +271,9 @@ describe('MongoTargetContractSerializer', () => {
       expect(items.options.collation.kind).toBe('mongo-collation-options');
 
       const roundtripped = serializer.deserializeContract(reparsed);
-      expect(
-        roundtripped.storage.namespaces[UNBOUND_NAMESPACE_ID]?.entries.collection['items'],
-      ).toBeInstanceOf(MongoCollection);
+      const roundtrippedNs = roundtripped.storage.namespaces[UNBOUND_NAMESPACE_ID];
+      expect(roundtrippedNs).toBeDefined();
+      expect(roundtrippedNs!.entries.collection?.['items']).toBeInstanceOf(MongoCollection);
     });
   });
 });

@@ -1,7 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { StorageValueSet } from '@prisma-next/sql-contract/types';
+import { type SqlStorage, StorageValueSet } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { defineContract, enumType, member } from '@prisma-next/sql-contract-ts/contract-builder';
 import { describe, expect, it } from 'vitest';
@@ -64,7 +63,8 @@ describe('value-set serializer hydration + round-trip', () => {
   ) as Contract<SqlStorage>;
 
   it('StorageValueSet is a StorageValueSet instance before serialization', () => {
-    const valueSet = authored.storage.namespaces['public']?.entries.valueSet?.['Role'];
+    const ns = authored.storage.namespaces['public'];
+    const valueSet = ns !== undefined ? ns.entries.valueSet?.['Role'] : undefined;
     expect(valueSet).toBeInstanceOf(StorageValueSet);
   });
 
@@ -73,7 +73,8 @@ describe('value-set serializer hydration + round-trip', () => {
     const json = JSON.parse(JSON.stringify(authored));
     const hydrated = serializer.deserializeContract(json) as Contract<SqlStorage>;
 
-    const valueSet = hydrated.storage.namespaces['public']?.entries.valueSet?.['Role'];
+    const ns = hydrated.storage.namespaces['public'];
+    const valueSet = ns !== undefined ? ns.entries.valueSet?.['Role'] : undefined;
     expect(valueSet).toBeInstanceOf(StorageValueSet);
     expect(valueSet?.kind).toBe('valueSet');
     expect(valueSet?.values).toEqual(['user', 'admin']);
@@ -84,7 +85,8 @@ describe('value-set serializer hydration + round-trip', () => {
     const json = JSON.parse(JSON.stringify(authored));
     const hydrated = serializer.deserializeContract(json) as Contract<SqlStorage>;
 
-    const valueSet = hydrated.storage.namespaces['public']?.entries.valueSet?.['Role'];
+    const ns = hydrated.storage.namespaces['public'];
+    const valueSet = ns !== undefined ? ns.entries.valueSet?.['Role'] : undefined;
     expect(valueSet?.kind).toBe('valueSet');
   });
 
@@ -109,7 +111,8 @@ describe('value-set serializer hydration + round-trip', () => {
     const hydrated = serializer.deserializeContract(json) as Contract<SqlStorage>;
 
     const storageNs = hydrated.storage.namespaces['public'];
-    const roleColumn = storageNs?.entries.table?.['Post']?.columns?.['role'];
+    const roleColumn =
+      storageNs !== undefined ? storageNs.entries.table?.['Post']?.columns?.['role'] : undefined;
     expect(roleColumn?.valueSet).toEqual({
       plane: 'storage',
       entityKind: 'valueSet',
@@ -140,7 +143,8 @@ describe('value-set serializer hydration + round-trip', () => {
     const json2 = JSON.parse(JSON.stringify(hydrated1));
     const hydrated2 = serializer.deserializeContract(json2) as Contract<SqlStorage>;
 
-    const valueSet = hydrated2.storage.namespaces['public']?.entries.valueSet?.['Role'];
+    const ns2 = hydrated2.storage.namespaces['public'];
+    const valueSet = ns2 !== undefined ? ns2.entries.valueSet?.['Role'] : undefined;
     expect(valueSet).toBeInstanceOf(StorageValueSet);
     expect(valueSet?.values).toEqual(['user', 'admin']);
   });

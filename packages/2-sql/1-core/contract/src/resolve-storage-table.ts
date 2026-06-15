@@ -1,23 +1,10 @@
-import type { SqlNamespace, SqlStorage } from './ir/sql-storage';
+import { entityAt } from '@prisma-next/framework-components/ir';
+import type { SqlStorage } from './ir/sql-storage';
 import type { StorageTable } from './ir/storage-table';
 
 export interface ResolvedStorageTable {
   readonly namespaceId: string;
   readonly table: StorageTable;
-}
-
-function tableInNamespace(
-  namespace: SqlNamespace | undefined,
-  tableName: string,
-): StorageTable | undefined {
-  if (namespace === undefined) {
-    return undefined;
-  }
-  const tables = namespace.entries.table;
-  if (!Object.hasOwn(tables, tableName)) {
-    return undefined;
-  }
-  return tables[tableName];
 }
 
 /**
@@ -35,13 +22,21 @@ export function resolveStorageTable(
   namespaceId?: string,
 ): ResolvedStorageTable | undefined {
   if (namespaceId !== undefined) {
-    const table = tableInNamespace(storage.namespaces[namespaceId], tableName);
+    const table = entityAt<StorageTable>(storage, {
+      namespaceId,
+      entityKind: 'table',
+      entityName: tableName,
+    });
     return table === undefined ? undefined : { namespaceId, table };
   }
 
   const matches: ResolvedStorageTable[] = [];
   for (const candidateNamespaceId of Object.keys(storage.namespaces)) {
-    const table = tableInNamespace(storage.namespaces[candidateNamespaceId], tableName);
+    const table = entityAt<StorageTable>(storage, {
+      namespaceId: candidateNamespaceId,
+      entityKind: 'table',
+      entityName: tableName,
+    });
     if (table !== undefined) {
       matches.push({ namespaceId: candidateNamespaceId, table });
     }

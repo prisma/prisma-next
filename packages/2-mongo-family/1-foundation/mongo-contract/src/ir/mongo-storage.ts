@@ -7,22 +7,17 @@ import {
 } from '@prisma-next/framework-components/ir';
 import type { MongoCollection, MongoCollectionInput } from './mongo-collection';
 
+export type MongoNamespaceEntries = Readonly<Record<string, Readonly<Record<string, unknown>>>> & {
+  readonly collection?: Readonly<Record<string, MongoCollection>>;
+};
+
 export interface MongoNamespaceCollectionsInput {
   readonly id: string;
-  readonly entries: {
-    readonly collection: Record<string, MongoCollection | MongoCollectionInput>;
-  };
+  readonly entries: Readonly<Record<string, Readonly<Record<string, MongoCollectionInput>>>>;
 }
 
-// Mongo concretions store `MongoCollection` instances under
-// `entries.collection` (Mongo idiom — distinct from the SQL family's
-// `entries.table`). Narrowing the namespace map here lets target/family-
-// level consumers iterate collection slots and recover the concrete type
-// without the framework's wider `Namespace` tripping them up.
 export type MongoNamespace = Namespace & {
-  readonly entries: Readonly<{
-    readonly collection: Readonly<Record<string, MongoCollection>>;
-  }>;
+  readonly entries: MongoNamespaceEntries;
 };
 
 export interface MongoStorageInput<THash extends string = string> {

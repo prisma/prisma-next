@@ -62,6 +62,38 @@ changes:
         - "from '@prisma-next/target-postgres/migration'"
       anyMatch: true
     script: migration-op-factories-to-methods.ts
+  - id: namespace-entries-open-dict
+    summary: |
+      `SqlNamespace.entries` is now an open dictionary typed
+      `Readonly<Record<string, Readonly<Record<string, unknown>>>>`. The previously
+      closed shape (`{ table?: ..., type?: ..., valueSet?: ... }`) is gone — dot-access
+      like `.entries.table` or `.entries.collection` no longer compiles. Read tables via
+      the `namespaceTables(ns)` helper from `@prisma-next/sql-contract/types`, or via
+      bracket notation `entries['table']`. For typed getter access on the concrete
+      class instances use the non-enumerable getters (`ns.table`, `schema.type`,
+      `db.collection`). Annotations and type constraints that hard-code the closed shape
+      must be widened to the open dict.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - ".entries.table"
+        - ".entries.collection"
+        - ".entries.type"
+        - ".entries.valueSet"
+      anyMatch: true
+  - id: postgres-contract-serializer
+    summary: |
+      `SqlContractSerializer` (from `@prisma-next/family-sql/ir`) can no longer
+      deserialize Postgres contracts. The family serializer now rejects the `type` entries
+      key that every Postgres namespace carries. Extension code that deserializes a
+      Postgres-emitted contract via `new SqlContractSerializer().deserializeContract(...)`
+      must switch to `new PostgresContractSerializer()` from
+      `@prisma-next/target-postgres/runtime`. SQLite and non-Postgres contracts are
+      unaffected.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "SqlContractSerializer"
 ---
 
 <!--
@@ -98,6 +130,11 @@ reads — `.include()` of an N:M relation resolves child rows through the
 junction table via a correlated subquery. Internal runtime only; no
 extension API or contract-shape change. No extension-author action
 required.
+
+TML-2786: the sql-orm-client runtime gained M:N relation filters — a
+`where` predicate on an N:M relation lowers to an EXISTS subquery joined
+through the junction table. Internal runtime only; no extension API or
+contract-shape change. No extension-author action required.
 
 TML-2838: the temporary `--no-memory-protection-keys` test-harness workaround
 has been removed from every PGlite-backed vitest config (including
@@ -248,3 +285,79 @@ const runtime = new SqliteRuntimeImpl({ adapter: stackInstance.adapter, context,
 ```
 
 The options are identical except `stackInstance` is no longer passed: supply `adapter` from `stackInstance.adapter` directly. Depend on the bare-name interfaces (`PostgresRuntime`, `SqliteRuntime`) for type annotations, not the `Impl` classes.
+
+## `namespace-entries-open-dict`
+
+The `entries` property on every namespace class is now an open dictionary:
+
+```ts
+// The type is now:
+entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>
+
+// Previously it was a closed shape:
+entries: {
+  table?: Readonly<Record<string, StorageTable>>;
+  type?: Readonly<Record<string, PostgresEnumType>>;
+  valueSet?: Readonly<Record<string, StorageValueSet>>;
+}
+```
+
+Dot-access like `.entries.table`, `.entries.collection`, or `.entries.type` no longer compiles. Migrate to one of the two canonical read styles:
+
+**Generic/walker code** — bracket notation:
+
+```ts
+// Before
+const tables = ns.entries.table;
+
+// After — bracket notation
+const tables = ns.entries['table'] as Record<string, StorageTable> | undefined;
+```
+
+**Typed family/target code** — use the exported family helpers or the class getters:
+
+```ts
+// Using the namespaceTables() helper (for SqlNamespace values)
+import { namespaceTables, namespaceValueSets } from '@prisma-next/sql-contract/types';
+const tables = namespaceTables(ns);    // Record<string, StorageTable>
+const vsets  = namespaceValueSets(ns); // Record<string, StorageValueSet> | undefined
+
+// Using the non-enumerable class getter (for PostgresSchema instances)
+const enumTypes = schema.type; // Record<string, PostgresEnumType>
+
+// Using the namespaceCollections() helper (for MongoNamespace values)
+import { namespaceCollections } from '@prisma-next/mongo-contract';
+const collections = namespaceCollections(ns); // Record<string, MongoCollection>
+```
+
+**Type annotations** — widen any closed-shape annotation to the open dict:
+
+```ts
+// Before
+const ns = namespaces[id] as { entries: { table: Record<string, StorageTable> } };
+
+// After — open dict annotation
+const ns = namespaces[id] as { entries: Record<string, Record<string, unknown>> };
+// then narrow via the helper:
+const tables = namespaceTables(ns);
+```
+
+This is a compile-time-only change when using the helpers — no runtime behavior differs. Run `pnpm typecheck` to find all remaining dot-access sites.
+
+## `postgres-contract-serializer`
+
+`SqlContractSerializer` (from `@prisma-next/family-sql/ir`) can no longer deserialize Postgres contracts. Every Postgres namespace carries a `type` key in its `entries`; the family serializer validates entries against a built-in registry (`table`, `valueSet` only) and throws a `ContractValidationError` when it encounters `type`.
+
+Replace with `PostgresContractSerializer` from `@prisma-next/target-postgres/runtime`:
+
+```ts
+// Before
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+
+// After
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
+```
+
+Extension code that only uses the target descriptor's serializer (`descriptor.contractSerializer`) is unaffected — the postgres descriptor already exposes a `PostgresContractSerializer` instance. Only code that directly instantiates `SqlContractSerializer` for a Postgres contract needs to change. SQLite and non-Postgres contracts are unaffected.

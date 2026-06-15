@@ -3,12 +3,12 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -92,7 +92,7 @@ describe('family instance schemaVerify', () => {
             }),
           );
 
-          const validatedContract = new SqlContractSerializer().deserializeContract(
+          const validatedContract = new PostgresContractSerializer().deserializeContract(
             contract,
           ) as Contract<SqlStorage>;
           const frameworkComponents: ReadonlyArray<
@@ -174,7 +174,7 @@ describe('family instance schemaVerify', () => {
             }),
           );
 
-          const validatedContract = new SqlContractSerializer().deserializeContract(
+          const validatedContract = new PostgresContractSerializer().deserializeContract(
             contract,
           ) as Contract<SqlStorage>;
           const frameworkComponents: ReadonlyArray<
@@ -250,7 +250,7 @@ describe('family instance schemaVerify', () => {
             }),
           );
 
-          const validatedContract = new SqlContractSerializer().deserializeContract(
+          const validatedContract = new PostgresContractSerializer().deserializeContract(
             contract,
           ) as Contract<SqlStorage>;
           const frameworkComponents: ReadonlyArray<

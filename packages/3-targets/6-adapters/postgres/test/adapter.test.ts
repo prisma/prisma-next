@@ -556,7 +556,7 @@ describe('Postgres adapter', () => {
           public: new PostgresSchema({
             id: 'public',
             entries: {
-              table: contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table,
+              table: contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table ?? {},
               type: {},
             },
           }),

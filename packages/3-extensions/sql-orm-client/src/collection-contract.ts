@@ -362,7 +362,8 @@ function resolveThrough(
   if (!through) return undefined;
   const { table, namespaceId, parentColumns, childColumns, targetColumns } = through;
 
-  const junctionTable = contract.storage.namespaces[namespaceId]?.entries.table[table];
+  const ns = contract.storage.namespaces[namespaceId];
+  const junctionTable = ns?.entries.table?.[table];
   if (!junctionTable) return undefined;
 
   const fkColumnSet = new Set<string>([...parentColumns, ...childColumns]);

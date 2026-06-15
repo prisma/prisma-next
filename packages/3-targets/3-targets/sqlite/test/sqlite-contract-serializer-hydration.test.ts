@@ -41,7 +41,7 @@ describe('SqliteContractSerializer namespace hydration', () => {
       return;
     }
     expect(namespace.qualifyTable('user')).toBe('"user"');
-    const userTable = namespace.entries.table['user'];
+    const userTable = namespace.table['user'];
     expect(userTable).toBeInstanceOf(StorageTable);
     expect(userTable?.columns['id']).toBeInstanceOf(StorageColumn);
   });

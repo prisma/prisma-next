@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { loadContractFromTs } from '@prisma-next/cli';
 import type { Contract, ContractRelation, StorageHashBase } from '@prisma-next/contract/types';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { setupIntegrationTestDirectoryFromFixtures } from './utils/cli-test-helpers';
@@ -146,7 +146,7 @@ describe('contract emit command (CLI process e2e)', () => {
       expect(contractDtsContent).toContain('export type Contract');
       expect(contractDtsContent).toContain('CodecTypes');
 
-      const validatedContract = new SqlContractSerializer().deserializeContract(
+      const validatedContract = new PostgresContractSerializer().deserializeContract(
         contractJson,
       ) as EmittedContract;
       expect(validatedContract.targetFamily).toBe('sql');
@@ -187,33 +187,34 @@ describe('contract emit command (CLI process e2e)', () => {
       const contractJsonContent = readFileSync(contractJsonPath, 'utf-8');
       const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
 
-      const validatedContract = new SqlContractSerializer().deserializeContract(
+      const validatedContract = new PostgresContractSerializer().deserializeContract(
         contractJson,
       ) as EmittedContract;
 
       expect(validatedContract.targetFamily).toBe(originalContract.targetFamily);
       expect(validatedContract.target).toBe(originalContract.target);
-      const tables = (validatedContract.storage as SqlStorage).namespaces['public']?.entries
-        .table as Record<string, unknown> | undefined;
+      const tables = (validatedContract.storage as SqlStorage).namespaces['public']?.entries[
+        'table'
+      ] as Record<string, unknown> | undefined;
       const originalTables = (originalContract.storage as SqlStorage | undefined)?.namespaces[
         'public'
-      ]?.entries.table as Record<string, unknown> | undefined;
+      ]?.entries['table'] as Record<string, unknown> | undefined;
       const userTable = tables?.['user'] as Record<string, unknown> | undefined;
       const originalUserTable = originalTables?.['user'] as Record<string, unknown> | undefined;
-      if (userTable && originalUserTable) {
-        const columns = userTable['columns'] as
-          | Record<string, { nativeType?: string; codecId?: string }>
-          | undefined;
-        const originalColumns = originalUserTable['columns'] as
-          | Record<string, { nativeType?: string; codecId?: string }>
-          | undefined;
-        if (columns && originalColumns) {
-          expect(columns['id']?.codecId).toBe(originalColumns['id']?.codecId);
-          expect(columns['email']?.codecId).toBe(originalColumns['email']?.codecId);
-          expect(columns['id']?.nativeType).toBe(originalColumns['id']?.nativeType);
-          expect(columns['email']?.nativeType).toBe(originalColumns['email']?.nativeType);
-        }
-      }
+      expect(userTable).toBeDefined();
+      expect(originalUserTable).toBeDefined();
+      const columns = userTable?.['columns'] as
+        | Record<string, { nativeType?: string; codecId?: string }>
+        | undefined;
+      const originalColumns = originalUserTable?.['columns'] as
+        | Record<string, { nativeType?: string; codecId?: string }>
+        | undefined;
+      expect(columns).toBeDefined();
+      expect(originalColumns).toBeDefined();
+      expect(columns?.['id']?.codecId).toBe(originalColumns?.['id']?.codecId);
+      expect(columns?.['email']?.codecId).toBe(originalColumns?.['email']?.codecId);
+      expect(columns?.['id']?.nativeType).toBe(originalColumns?.['id']?.nativeType);
+      expect(columns?.['email']?.nativeType).toBe(originalColumns?.['email']?.nativeType);
     },
     timeouts.spinUpPpgDev,
   );

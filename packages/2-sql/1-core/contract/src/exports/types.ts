@@ -25,6 +25,8 @@ export type {
   SqlControlDriverInstance,
   SqlModelFieldStorage,
   SqlModelStorage,
+  SqlNamespace,
+  SqlNamespaceEntries,
   SqlNamespaceTablesInput,
   SqlQueryOperationTypes,
   SqlStorageInput,
@@ -59,7 +61,6 @@ export {
   StorageColumn,
   StorageTable,
   StorageValueSet,
-  storageTableAt,
   toStorageTypeInstance,
   UniqueConstraint,
 } from '../types';

@@ -7,7 +7,7 @@ import {
 } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { blindCast } from '@prisma-next/utils/casts';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
 import { buildSqlNamespaceMap } from './ir/build-sql-namespace';
@@ -125,19 +125,6 @@ const StorageTypeInstanceSchema = type
     'typeParams?': 'Record<string, unknown>',
   });
 
-/**
- * Postgres native enum entry under `storage.namespaces[namespaceId].entries.type[name]`.
- * Document-scoped `storage.types` carries codec aliases only
- * (`DocumentScopedStorageTypeSchema`).
- */
-const PostgresEnumTypeSchema = type({
-  kind: "'postgres-enum'",
-  'name?': 'string',
-  'nativeType?': 'string',
-  values: type.string.array().readonly(),
-  'control?': ControlPolicySchema,
-});
-
 /** Document-scoped `storage.types`: codec triples only. */
 const DocumentScopedStorageTypeSchema = StorageTypeInstanceSchema;
 
@@ -233,103 +220,88 @@ const StorageTableSchema = type({
 });
 
 /**
- * Re-exported so target packs can register their `validatorSchema`
- * fragment without re-declaring the schema for the kinds the family
- * core already validates. Full extraction of enum-specific schemas
- * into the Postgres pack is a follow-up; today the symbol lives here.
+ * Composes the single entry-validator registry consulted during
+ * structural validation. SQL core registers its own kinds (`'table'`,
+ * `'valueSet'`) into the same registry targets extend — there is no
+ * separate built-in fallback tier. Target packs pass their contributed
+ * kinds (e.g. postgres passes `'type'` → the postgres enum schema).
  */
-export { PostgresEnumTypeSchema };
-
-/**
- * Composes a hardcoded family `fallback` schema with optional
- * pack-contributed `fragments` keyed by the entry's `kind`
- * discriminator. The composition is **additive**, not substitutive:
- *
- * - No fragments registered → entries are validated by `fallback`
- *   alone (the unchanged baseline).
- * - An entry's `kind` matches `fallbackKind` AND a fragment for that
- *   kind is registered → the entry must pass **both** `fallback` and
- *   the fragment. This preserves family-owned invariants (e.g. the
- *   built-in `PostgresEnumType` shape) even when a pack contributes
- *   its own schema for the same kind.
- * - An entry's `kind` matches a registered fragment for some
- *   non-fallback kind → the fragment alone validates the entry.
- *   `fallback` is family-specific (validates a single hardcoded kind)
- *   and would reject any other kind, so it does not apply here.
- * - An entry's `kind` matches no fragment → fall through to
- *   `fallback`.
- */
-function namespaceSlotEntrySchema(
-  fallback: Type<unknown>,
-  fallbackKind: string,
-  fragments?: ReadonlyMap<string, Type<unknown>>,
-): Type<unknown> {
-  if (fragments === undefined || fragments.size === 0) {
-    return fallback;
-  }
-  return type('unknown').narrow((entry, ctx) => {
-    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
-      return ctx.mustBe('an object');
-    }
-    const kind = (entry as { kind?: unknown }).kind;
-    if (typeof kind === 'string') {
-      const fragment = fragments.get(kind);
-      if (fragment !== undefined) {
-        if (kind === fallbackKind) {
-          const baseParsed = fallback(entry);
-          if (baseParsed instanceof type.errors) {
-            return ctx.reject({ expected: baseParsed.summary });
-          }
-        }
-        const parsed = fragment(entry);
-        if (parsed instanceof type.errors) {
-          return ctx.reject({ expected: parsed.summary });
-        }
-        return true;
+export function createSqlEntrySchemaRegistry(
+  packSchemas?: ReadonlyMap<string, Type<unknown>>,
+): ReadonlyMap<string, Type<unknown>> {
+  const registry = new Map<string, Type<unknown>>([
+    ['table', castAs<Type<unknown>>(StorageTableSchema)],
+    ['valueSet', castAs<Type<unknown>>(StorageValueSetSchema)],
+  ]);
+  if (packSchemas !== undefined) {
+    for (const [kind, schema] of packSchemas) {
+      if (registry.has(kind)) {
+        throw new Error(
+          `createSqlEntrySchemaRegistry: pack schema "${kind}" collides with a core kind — pack schemas cannot override "table" or "valueSet"`,
+        );
       }
+      registry.set(kind, schema);
     }
-    const parsed = fallback(entry);
-    if (parsed instanceof type.errors) {
-      return ctx.reject({ expected: parsed.summary });
-    }
-    return true;
-  });
+  }
+  return registry;
 }
 
 /**
  * Builds the per-namespace entry schema for `storage.namespaces[id]`.
- * Pack-contributed `validatorSchema` fragments — keyed by the
- * descriptor's `discriminator` — validate each entry by matching the
- * entry's `kind` field on the `'entries.type'` slot.
+ *
+ * Validation is registry-driven: the `registry` parameter maps each
+ * entries key to an arktype schema that validates a single inner-map
+ * value for that kind. Compose the registry with
+ * {@link createSqlEntrySchemaRegistry} — SQL core's kinds and pack
+ * contributions live in the same map. An unregistered key fails
+ * validation naming the kind and the namespace id, so validation fails
+ * closed.
  */
 export function createNamespaceEntrySchema(
-  fragments?: ReadonlyMap<string, Type<unknown>>,
+  registry: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
   return type({
     '+': 'reject',
     id: 'string',
     'kind?': 'string',
-    entries: type({
-      '+': 'reject',
-      'table?': type({ '[string]': StorageTableSchema }),
-      'type?': type({
-        '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),
-      }),
-      'valueSet?': type({ '[string]': StorageValueSetSchema }),
-    }),
+    entries: 'object',
+  }).narrow((ns, ctx) => {
+    if (!isPlainRecord(ns.entries)) {
+      return ctx.mustBe('an entries object');
+    }
+    for (const [key, innerMap] of Object.entries(ns.entries)) {
+      const entrySchema = registry.get(key);
+      if (entrySchema === undefined) {
+        return ctx.reject({
+          expected: `entries key "${key}" in namespace "${ns.id}" is not a registered entity kind`,
+        });
+      }
+      if (!isPlainRecord(innerMap)) {
+        return ctx.reject({
+          expected: `entries["${key}"] in namespace "${ns.id}" must be an object`,
+        });
+      }
+      for (const [, value] of Object.entries(innerMap)) {
+        const parsed = entrySchema(value);
+        if (parsed instanceof type.errors) {
+          return ctx.reject({ expected: parsed.summary });
+        }
+      }
+    }
+    return true;
   }) as Type<unknown>;
 }
 
 /**
  * Builds the storage schema. Pack contributions reach the per-namespace
  * entry shape through {@link createNamespaceEntrySchema}; the
- * document-scoped `storage.types` slot (codec triples only) and the
+ * document-scoped `storage.types` field (codec triples only) and the
  * storage hash stay family-shared.
  */
 export function createSqlStorageSchema(
-  fragments?: ReadonlyMap<string, Type<unknown>>,
+  registry: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
-  const namespaceEntry = createNamespaceEntrySchema(fragments);
+  const namespaceEntry = createNamespaceEntrySchema(registry);
   return type({
     '+': 'reject',
     storageHash: 'string',
@@ -343,24 +315,20 @@ export function createSqlStorageSchema(
   }) as Type<unknown>;
 }
 
-const StorageSchema = createSqlStorageSchema();
+const StorageSchema = createSqlStorageSchema(createSqlEntrySchemaRegistry());
 
-// SQL-specific namespace walk shape (`entries.table` is the SQL family's
-// idiom). The wider `object` table value keeps this helper structurally
-// compatible with `SqlNamespace` and JSON envelope variants that lose class
-// identity.
 type NamespacedStorageWalk = {
   readonly namespaces: Readonly<
     Record<
       string,
-      Namespace & { readonly entries: { readonly table: Readonly<Record<string, object>> } }
+      Namespace & { readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>> }
     >
   >;
 };
 
 function eachStorageTable(storage: NamespacedStorageWalk) {
   return Object.entries(storage.namespaces).flatMap(([namespaceId, ns]) =>
-    Object.entries(ns.entries.table).map(([tableName, table]) => ({
+    Object.entries(ns.entries['table'] ?? {}).map(([tableName, table]) => ({
       namespaceId,
       tableName,
       table,
@@ -369,7 +337,9 @@ function eachStorageTable(storage: NamespacedStorageWalk) {
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value) as unknown;
+  return proto === Object.prototype || proto === null;
 }
 
 function findDuplicateValue(values: readonly string[]): string | undefined {
@@ -490,9 +460,9 @@ const ContractMetaSchema = type({
  * of the contract envelope is family-shared.
  */
 export function createSqlContractSchema(
-  fragments?: ReadonlyMap<string, Type<unknown>>,
+  registry: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
-  const storage = createSqlStorageSchema(fragments);
+  const storage = createSqlStorageSchema(registry);
   return type({
     '+': 'reject',
     target: 'string',
@@ -518,7 +488,7 @@ export function createSqlContractSchema(
   }) as Type<unknown>;
 }
 
-const SqlContractSchema = createSqlContractSchema();
+const SqlContractSchema = createSqlContractSchema(createSqlEntrySchemaRegistry());
 
 // NOTE: StorageColumnSchema, StorageTableSchema, and StorageSchema use bare type()
 // instead of type.declare<T>().type() because the ColumnDefault union's value field
@@ -802,7 +772,8 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
       }
 
       const storageTable = model.storage.table;
-      const rawTable = contract.storage.namespaces[storageNamespaceId]?.entries.table[storageTable];
+      const storageNs = contract.storage.namespaces[storageNamespaceId];
+      const rawTable = storageNs?.entries.table?.[storageTable];
       if (rawTable === undefined) {
         throw new ContractValidationError(
           `Model "${qualifiedName}" references non-existent table "${storageNamespaceId}.${storageTable}"`,
@@ -922,7 +893,7 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
 
       if (fk.target.spaceId === undefined) {
         const targetNamespace = contract.storage.namespaces[fk.target.namespaceId];
-        const referencedRaw = targetNamespace?.entries.table[fk.target.tableName];
+        const referencedRaw = targetNamespace?.entries.table?.[fk.target.tableName];
         if (referencedRaw === undefined) {
           throw new ContractValidationError(
             `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent table "${fk.target.namespaceId}.${fk.target.tableName}"`,

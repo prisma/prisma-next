@@ -158,7 +158,7 @@ model UuidNative {
     });
 
     const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-    const uuidNativeTable = storage.namespaces['public']?.entries.table['uuidNative'];
+    const uuidNativeTable = storage.namespaces['public']?.entries.table?.['uuidNative'];
     expect(uuidNativeTable?.columns['idV4']).toMatchObject({
       codecId: 'pg/uuid@1',
       nativeType: 'uuid',
@@ -202,7 +202,7 @@ model Profile {
     });
 
     const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-    const profileTable = storage.namespaces['public']?.entries.table['profile'];
+    const profileTable = storage.namespaces['public']?.entries.table?.['profile'];
     expect(profileTable?.columns['id']).toMatchObject({
       codecId: 'pg/uuid@1',
       nativeType: 'uuid',

@@ -58,7 +58,7 @@ export abstract class MongoSchemaVerifierBase<
     collectionName: string,
   ): ControlPolicy {
     const namespace = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
-    const collection = namespace?.entries.collection[collectionName];
+    const collection = namespace?.entries.collection?.[collectionName];
     return this.effectiveCollectionControlPolicy(contract, collection);
   }
 

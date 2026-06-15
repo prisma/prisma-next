@@ -1,5 +1,5 @@
 import { coreHash } from '@prisma-next/contract/types';
-import { elementCoordinates } from '@prisma-next/framework-components/ir';
+import { elementCoordinates, entityAt } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { buildSqlNamespace } from '../src/ir/build-sql-namespace';
 import { SqlStorage } from '../src/ir/sql-storage';
@@ -12,7 +12,7 @@ const emptyTableInput = {
 } as const;
 
 describe('elementCoordinates with SqlStorage', () => {
-  it('walks SQL namespace tables slot', () => {
+  it('walks SQL namespace table entries', () => {
     const storage = new SqlStorage({
       storageHash: coreHash('sha256:element-coordinates-sql'),
       namespaces: {
@@ -27,5 +27,30 @@ describe('elementCoordinates with SqlStorage', () => {
       entityKind: 'table',
       entityName: 'users',
     });
+  });
+});
+
+describe('coordinate-resolution acceptance — every elementCoordinates tuple resolves', () => {
+  it('every coordinate from a sql storage resolves through entityAt', () => {
+    const storage = new SqlStorage({
+      storageHash: coreHash('sha256:coord-resolution-sql'),
+      namespaces: {
+        app: buildSqlNamespace({
+          id: 'app',
+          entries: {
+            table: { users: emptyTableInput, posts: emptyTableInput },
+            valueSet: { status: { kind: 'value-set', values: ['active', 'inactive'] } },
+          },
+        }),
+      },
+    });
+
+    const coordinates = [...elementCoordinates(storage)];
+    expect(coordinates.length).toBeGreaterThan(0);
+
+    for (const coordinate of coordinates) {
+      const entity = entityAt(storage, coordinate);
+      expect(entity, `entityAt did not resolve ${JSON.stringify(coordinate)}`).toBeDefined();
+    }
   });
 });

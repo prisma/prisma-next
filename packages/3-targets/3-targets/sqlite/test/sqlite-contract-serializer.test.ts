@@ -53,7 +53,7 @@ describe('SqliteContractSerializer', () => {
     const serializer = new SqliteContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
     expect(contract.targetFamily).toBe('sql');
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table).toEqual({});
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table ?? {}).toEqual({});
   });
 
   it('hydrates JSON storage into the SQL Contract IR class hierarchy', () => {
@@ -61,7 +61,7 @@ describe('SqliteContractSerializer', () => {
     const contract = serializer.deserializeContract(makeContractWithTablesJson());
 
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const userTable = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table['user'] as
+    const userTable = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table?.['user'] as
       | StorageTable
       | undefined;
     expect(userTable).toBeInstanceOf(StorageTable);

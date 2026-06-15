@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { blindCast } from '@prisma-next/utils/casts';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../prisma/contract.d';
@@ -21,7 +22,10 @@ function buildContract(overrides?: Partial<Contract>): Contract {
     },
     relations: {},
   };
-  const base = {
+  const base = blindCast<
+    Contract,
+    'deliberately partial mock contract covering only what ContractView renders'
+  >({
     target: 'postgres',
     targetFamily: 'sql',
     domain: {
@@ -62,7 +66,7 @@ function buildContract(overrides?: Partial<Contract>): Contract {
     extensionPacks: {
       pgvector: {},
     },
-  } as unknown as Contract;
+  });
 
   return { ...base, ...overrides };
 }

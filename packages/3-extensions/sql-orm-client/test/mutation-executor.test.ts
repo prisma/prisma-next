@@ -164,9 +164,9 @@ describe('mutation-executor', () => {
             entries: {
               ...publicNs.entries,
               table: {
-                ...publicNs.entries.table,
+                ...(publicNs.entries.table ?? {}),
                 users: {
-                  ...publicNs.entries.table.users,
+                  ...publicNs.entries.table?.['users'],
                   primaryKey: { columns: ['pk_id'] },
                 },
               },

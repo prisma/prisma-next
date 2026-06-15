@@ -324,7 +324,7 @@ export function detectDestructiveChanges(
     if (!fromTables) continue;
 
     for (const tableName of Object.keys(fromTables)) {
-      const toTableRaw = toNs?.entries.table[tableName];
+      const toTableRaw = toNs?.entries.table?.[tableName];
       if (!(toTableRaw instanceof StorageTable)) {
         conflicts.push({
           kind: 'tableRemoved',
@@ -410,7 +410,7 @@ export function contractToSchemaIR(
   const storageTypes = allTypes as ResolvedStorageTypes;
   const tables: Record<string, SqlTableIR> = {};
   for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, tableDefRaw] of Object.entries(ns.entries.table)) {
+    for (const [tableName, tableDefRaw] of Object.entries(ns.entries.table ?? {})) {
       if (!(tableDefRaw instanceof StorageTable)) {
         throw new Error(
           `contractToSchemaIR: expected StorageTable at namespaces.${ns.id}.entries.table.${tableName}`,

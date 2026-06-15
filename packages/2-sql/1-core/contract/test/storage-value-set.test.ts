@@ -54,7 +54,7 @@ describe('SqlNamespace with valueSet entries', () => {
       },
     });
 
-    expect(ns.entries.table['users']).toBeDefined();
+    expect(ns.entries.table?.['users']).toBeDefined();
     expect(ns.entries.valueSet?.['Role']).toBeDefined();
     expect(ns.entries.valueSet?.['Role']?.kind).toBe('valueSet');
     expect(ns.entries.valueSet?.['Role']?.values).toEqual(['user', 'admin']);
@@ -65,7 +65,7 @@ describe('SqlNamespace with valueSet entries', () => {
       id: UNBOUND_NAMESPACE_ID,
       entries: { table: { users: baseTable } },
     });
-    expect(ns.entries.valueSet).toBeUndefined();
+    expect(ns.entries['valueSet']).toBeUndefined();
   });
 });
 

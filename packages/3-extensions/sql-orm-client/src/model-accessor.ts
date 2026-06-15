@@ -8,8 +8,10 @@ import {
   type CodecRef,
   ColumnRef,
   ExistsExpr,
+  JoinAst,
   ProjectionItem,
   SelectAst,
+  TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { Expression, ScopeField } from '@prisma-next/sql-relational-core/expression';
@@ -34,10 +36,22 @@ import {
 } from './types';
 
 type ResolvedModelRelation = ReturnType<typeof resolveModelRelations>[string];
+type ResolvedModelRelationWithThrough = ResolvedModelRelation & {
+  through: NonNullable<ResolvedModelRelation['through']>;
+};
+
+function hasThrough(relation: ResolvedModelRelation): relation is ResolvedModelRelationWithThrough {
+  return relation.through !== undefined;
+}
 
 type RelationPredicateInput<TContract extends Contract<SqlStorage>, ModelName extends string> =
   | ((model: ModelAccessor<TContract, ModelName>) => AnyExpression)
   | Record<string, unknown>;
+
+type RelationFilterMode = 'some' | 'every' | 'none';
+type RelationFilterPlan =
+  | { readonly kind: 'constantTrue' }
+  | { readonly kind: 'exists'; readonly notExists: boolean; readonly where: AnyExpression };
 
 type NamedOp = readonly [name: string, entry: SqlOperationEntry];
 
@@ -104,7 +118,14 @@ export function createModelAccessor<
 
         const relation = modelRelations[prop];
         if (relation) {
-          return createRelationFilterAccessor(context, namespaceId, modelName, tableName, relation);
+          return createRelationFilterAccessor(
+            context,
+            namespaceId,
+            modelName,
+            tableName,
+            prop,
+            relation,
+          );
         }
 
         const variantField = variantFieldColumns[prop];
@@ -180,18 +201,24 @@ function createScalarFieldAccessor(
     comparisonEntries.push([name, meta.create(column, codec)]);
   }
 
-  const accessor = {
+  const accessor = blindCast<
+    Expression<ScopeField> & Record<string, unknown>,
+    'scalar field accessor combines the expression protocol with generated comparison methods'
+  >({
     returnType: { codecId, nullable, codec },
     codec,
     buildAst: () => column,
     ...Object.fromEntries(comparisonEntries),
-  } as Expression<ScopeField> & Record<string, unknown>;
+  });
 
   for (const [name, entry] of operations) {
     accessor[name] = createExtensionMethodFactory(accessor, entry, context);
   }
 
-  return accessor as Partial<ComparisonMethodFns<unknown>>;
+  return blindCast<
+    Partial<ComparisonMethodFns<unknown>>,
+    'scalar field accessor exposes comparison methods dynamically by codec traits'
+  >(accessor);
 }
 
 function createExtensionMethodFactory(
@@ -205,7 +232,10 @@ function createExtensionMethodFactory(
     // declared return omits `buildAst` (sql-contract intentionally doesn't
     // depend on relational-core). Cast here to the practical shape: authors
     // always return Expression<ScopeField> via `buildOperation`.
-    const impl = entry.impl as (self: unknown, ...args: unknown[]) => Expression<ScopeField>;
+    const impl = blindCast<
+      (self: unknown, ...args: unknown[]) => Expression<ScopeField>,
+      'registered SQL operation implementations return relational-core expressions at runtime'
+    >(entry.impl);
     const result = impl(selfExpr, ...args);
     const returnCodecId = result.returnType.codecId;
     const returnTraits = context.codecDescriptors.descriptorFor(returnCodecId)?.traits ?? [];
@@ -234,6 +264,7 @@ function createRelationFilterAccessor<
   parentNamespaceId: string,
   parentModelName: ParentModelName,
   parentTableName: string,
+  relationName: string,
   relation: ResolvedModelRelation,
 ): RelationFilterAccessor<TContract, string> {
   const relatedTableName = resolveModelTableName(
@@ -250,6 +281,7 @@ function createRelationFilterAccessor<
         parentModelName,
         parentTableName,
         relatedTableName,
+        relationName,
         relation,
         { mode: 'some', predicate },
       ),
@@ -260,6 +292,7 @@ function createRelationFilterAccessor<
         parentModelName,
         parentTableName,
         relatedTableName,
+        relationName,
         relation,
         { mode: 'every', predicate },
       ),
@@ -270,6 +303,7 @@ function createRelationFilterAccessor<
         parentModelName,
         parentTableName,
         relatedTableName,
+        relationName,
         relation,
         { mode: 'none', predicate },
       ),
@@ -284,12 +318,26 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
   parentModelName: string,
   parentTableName: string,
   relatedTableName: string,
+  relationName: string,
   relation: ResolvedModelRelation,
   options: {
-    readonly mode: 'some' | 'every' | 'none';
+    readonly mode: RelationFilterMode;
     readonly predicate: RelationPredicateInput<TContract, string> | undefined;
   },
 ): AnyExpression {
+  if (hasThrough(relation)) {
+    return buildManyToManyExistsExpr(
+      context,
+      parentNamespaceId,
+      parentModelName,
+      parentTableName,
+      relatedTableName,
+      relationName,
+      relation,
+      options,
+    );
+  }
+
   const joinWhere = buildJoinWhere(
     context.contract,
     parentNamespaceId,
@@ -305,22 +353,9 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
     options.predicate,
   );
 
-  let subqueryWhere = joinWhere;
-  let existsNot = false;
-
-  if (options.mode === 'every') {
-    if (!childWhere) {
-      return AndExpr.true();
-    }
-    existsNot = true;
-    subqueryWhere = and(joinWhere, not(childWhere));
-  } else if (options.mode === 'none') {
-    existsNot = true;
-    if (childWhere) {
-      subqueryWhere = and(joinWhere, childWhere);
-    }
-  } else if (childWhere) {
-    subqueryWhere = and(joinWhere, childWhere);
+  const filterPlan = planRelationFilterMode(joinWhere, childWhere, options.mode);
+  if (filterPlan.kind === 'constantTrue') {
+    return AndExpr.true();
   }
 
   const selectProjectionColumn = firstTargetColumn(context.contract, relation) ?? 'id';
@@ -330,9 +365,157 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
     .withProjection([
       ProjectionItem.of('_exists', ColumnRef.of(relatedTableName, selectProjectionColumn)),
     ])
-    .withWhere(subqueryWhere);
+    .withWhere(filterPlan.where);
 
-  return existsNot ? ExistsExpr.notExists(subquery) : ExistsExpr.exists(subquery);
+  return filterPlan.notExists ? ExistsExpr.notExists(subquery) : ExistsExpr.exists(subquery);
+}
+
+function buildManyToManyExistsExpr<TContract extends Contract<SqlStorage>>(
+  context: ExecutionContext<TContract>,
+  parentNamespaceId: string,
+  parentModelName: string,
+  parentTableName: string,
+  relatedTableName: string,
+  relationName: string,
+  relation: ResolvedModelRelationWithThrough,
+  options: {
+    readonly mode: RelationFilterMode;
+    readonly predicate: RelationPredicateInput<TContract, string> | undefined;
+  },
+): AnyExpression {
+  const { through } = relation;
+  const junctionTable = through.table;
+  const relatedTableAlias =
+    parentNamespaceId === relation.toNamespace && parentTableName === relatedTableName
+      ? `${relationName}__child`
+      : undefined;
+  const relatedTableRef = relatedTableAlias ?? relatedTableName;
+
+  const junctionJoinOn = buildPairedColumnExprs(
+    junctionTable,
+    through.childColumns,
+    relatedTableRef,
+    through.targetColumns,
+  );
+
+  const parentLocalColumns = relation.on.localFields.map((field) =>
+    resolveFieldToColumn(context.contract, parentNamespaceId, parentModelName, field),
+  );
+  const junctionCorrelation = buildPairedColumnExprs(
+    junctionTable,
+    through.parentColumns,
+    parentTableName,
+    parentLocalColumns,
+  );
+
+  const childWhere = remapColumnRefs(
+    relatedTableName,
+    relatedTableRef,
+    toRelationWhereExpr(context, relation.toNamespace, relation.to, options.predicate),
+  );
+
+  const filterPlan = planRelationFilterMode(junctionCorrelation, childWhere, options.mode);
+  if (filterPlan.kind === 'constantTrue') {
+    return AndExpr.true();
+  }
+
+  const firstTargetCol = firstJoinColumn(through.targetColumns, 'targetColumns');
+  const subquery = SelectAst.from(
+    tableSourceForContract(
+      context.contract,
+      relation.toNamespace,
+      relatedTableName,
+      relatedTableAlias,
+    ),
+  )
+    .withJoins([
+      JoinAst.inner(
+        TableSource.named(junctionTable, undefined, through.namespaceId),
+        junctionJoinOn,
+      ),
+    ])
+    .withProjection([ProjectionItem.of('_exists', ColumnRef.of(relatedTableRef, firstTargetCol))])
+    .withWhere(filterPlan.where);
+
+  return filterPlan.notExists ? ExistsExpr.notExists(subquery) : ExistsExpr.exists(subquery);
+}
+
+function planRelationFilterMode(
+  joinWhere: AnyExpression,
+  childWhere: AnyExpression | undefined,
+  mode: RelationFilterMode,
+): RelationFilterPlan {
+  if (mode === 'every') {
+    if (!childWhere) {
+      return { kind: 'constantTrue' };
+    }
+    return { kind: 'exists', notExists: true, where: and(joinWhere, not(childWhere)) };
+  }
+
+  if (mode === 'none') {
+    return {
+      kind: 'exists',
+      notExists: true,
+      where: childWhere ? and(joinWhere, childWhere) : joinWhere,
+    };
+  }
+
+  return {
+    kind: 'exists',
+    notExists: false,
+    where: childWhere ? and(joinWhere, childWhere) : joinWhere,
+  };
+}
+
+function remapColumnRefs(
+  tableName: string,
+  tableRef: string,
+  expr: AnyExpression | undefined,
+): AnyExpression | undefined {
+  if (!expr || tableName === tableRef) {
+    return expr;
+  }
+  return expr.rewrite({
+    columnRef: (column) =>
+      column.table === tableName ? ColumnRef.of(tableRef, column.column) : column,
+  });
+}
+
+function firstJoinColumn(columns: readonly string[], label: string): string {
+  const first = columns[0];
+  if (!first) {
+    throw new Error(`Relation metadata is missing ${label}`);
+  }
+  return first;
+}
+
+export function buildPairedColumnExprs(
+  leftTable: string,
+  leftColumns: readonly string[],
+  rightTable: string,
+  rightColumns: readonly string[],
+): AnyExpression {
+  if (leftColumns.length !== rightColumns.length) {
+    throw new Error(
+      `Relation metadata has mismatched join column counts: ${leftColumns.length} left column(s), ${rightColumns.length} right column(s)`,
+    );
+  }
+  if (leftColumns.length === 0) {
+    throw new Error('Relation metadata is missing join columns');
+  }
+  const exprs: AnyExpression[] = [];
+  for (let i = 0; i < leftColumns.length; i++) {
+    const left = leftColumns[i];
+    const right = rightColumns[i];
+    if (!left || !right) {
+      throw new Error(`Relation metadata is missing a join column pair at index ${i}`);
+    }
+    exprs.push(BinaryExpr.eq(ColumnRef.of(leftTable, left), ColumnRef.of(rightTable, right)));
+  }
+  if (exprs.length === 1 && exprs[0]) {
+    return exprs[0];
+  }
+  return and(...exprs);
 }
 
 function toRelationWhereExpr<TContract extends Contract<SqlStorage>>(
@@ -359,9 +542,11 @@ function toRelationWhereExpr<TContract extends Contract<SqlStorage>>(
       continue;
     }
 
-    const fieldAccessor = (accessor as Record<string, Partial<ComparisonMethodFns<unknown>>>)[
-      fieldName
-    ];
+    const fieldAccessors = blindCast<
+      Record<string, Partial<ComparisonMethodFns<unknown>>>,
+      'relation shorthand fields are read from the dynamic model accessor proxy'
+    >(accessor);
+    const fieldAccessor = fieldAccessors[fieldName];
     // Unknown field in the shorthand predicate — the Proxy returns undefined
     // for fields the contract doesn't declare. Surface it explicitly: silent
     // skip would drop user intent (e.g. a typo'd `nmae: 'Alice'` filter would
