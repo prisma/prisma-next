@@ -1,40 +1,72 @@
 ---
-description: How to run tests (and other slow verification commands) — save output to a file once, read the file, don't re-run to grep different lines
+description: How to run tests, check for failures, and rerun specific failing tests — use the :agent variants of slow commands
 alwaysApply: true
 ---
 
-# Running tests
+# How to run tests, check for failures, and get specific failures
 
-When you run tests, save the output to a file and read the file. **Don't re-run the tests to grep different parts of the same output** — that is the single largest waste of agent time in this repo.
+## 1. Run a test suite
 
-Applies to tests and the other slow verification commands (each takes 30s–3min): `pnpm test:packages`, `test:integration`, `test:e2e`, `build`, `lint`, `lint:deps`, `fixtures:check`, `turbo typecheck`. Short commands (`git status`, a single-file `pnpm --filter X test <path>`, etc.) run normally.
+Each slow command has an `:agent` variant that captures full output to `wip/<name>.log` and the exit code to `wip/<name>.exit`. Each run overwrites the previous one. `wip/` is gitignored.
 
-## Recipe
+| Command | Purpose |
+|---|---|
+| `pnpm test:packages:agent` | Unit tests for every package |
+| `pnpm test:integration:agent` | Integration suite (PGlite + mongodb-memory-server) |
+| `pnpm test:e2e:agent` | End-to-end suite |
+| `pnpm build:agent` | Build every package (turbo) |
+| `pnpm typecheck:agent` | Typecheck every package (turbo, cached) |
+| `pnpm lint:agent` | Biome lint |
+| `pnpm lint:deps:agent` | Dependency-layering check |
+| `pnpm fixtures:check:agent` | Regenerate fixtures and diff them |
 
-Run from the worktree/repo root. `wip/` is gitignored at the repo root, so the log won't appear in diffs.
+## 2. Run one package's tests
 
 ```bash
-mkdir -p wip
-pnpm test:packages > wip/test-packages.log 2>&1; echo "exit=$?" >> wip/test-packages.log
-tail -1 wip/test-packages.log                              # 1. confirm exit=0 (or read the failure)
-grep -E " FAIL |Test Files" wip/test-packages.log          # 2. then inspect details
+pnpm --filter @prisma-next/cli test
 ```
 
-If exit≠0 and the log has no `FAIL` lines, the suite crashed before any test ran — read the tail of the log, not just `FAIL` matches.
+Runs only that package's own `test` script — seconds, not minutes. Output goes to your terminal; no capture needed.
 
-**Re-running after a fix**: overwrite the same file with `>` (the snippet above already does this). Don't append, don't write to a new path — stale failures from the prior run will confuse the grep.
+## 3. Rerun a specific failing test
 
-After a failure, re-run **only the failing test file** — `pnpm --filter <package> test <path>`. That's seconds, not minutes, and doesn't need to be captured.
+By file:
+
+```bash
+pnpm --filter @prisma-next/cli test test/commands/migration-list-json-golden.test.ts
+```
+
+By test name within a file (vitest's `-t` filter):
+
+```bash
+pnpm --filter @prisma-next/cli test test/commands/migration-list-json-golden.test.ts -t "pins head ref decoration"
+```
+
+## 4. Find specific failures in the captured output
+
+Check the exit code first:
+
+```bash
+cat wip/test-packages.exit
+```
+
+If non-zero, list failing files and assertions:
+
+```bash
+grep -nE " FAIL |Test Files" wip/test-packages.log
+grep -B2 -A20 "FAIL " wip/test-packages.log
+```
+
+If `.exit` is non-zero but the log has no `FAIL` lines, the suite crashed before any test ran — read the tail:
+
+```bash
+tail -50 wip/test-packages.log
+```
 
 ## Don't
 
-1. **Don't re-run the suite to grep different output.** Grep the file you already wrote. This is the exact pattern this rule exists to prevent.
-2. **Don't pipe the command directly to `tail`/`grep`/`head`.** That discards the rest of the output *and* hides the exit code (`tail`/`grep` return 0).
-3. **Don't pass `--force` to `turbo`.** Run `pnpm turbo typecheck` plain — the cache is correct by default. Only force when this same run edited `tsconfig.json` or a lockfile.
-
-If you must pipe through another tool (e.g. into `jq`), preserve the exit code with `tee` and `PIPESTATUS`:
-
-```bash
-pnpm test:packages 2>&1 | tee wip/test-packages.log | jq …
-echo "exit=${PIPESTATUS[0]}" >> wip/test-packages.log
-```
+- **Don't run the full suite when you already know which file is failing.** Use the targeted commands in §3 — they run in seconds.
+- **Don't run the bare canonical commands (`pnpm test:packages`, etc.) for a full-suite run.** They dump the entire output into your context window. Use the `:agent` variant.
+- **Don't pipe a `:agent` command to `tail`/`grep`/`head`.** The point is that the output is already on disk — read `wip/<name>.log`.
+- **Don't re-run a suite to refine a grep.** Grep the file you already have.
+- **Don't pass `--force` to `turbo`.** The cache is correct by default. Only force when this same run edited `tsconfig.json` or a lockfile.
