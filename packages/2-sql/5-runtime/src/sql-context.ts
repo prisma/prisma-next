@@ -337,8 +337,8 @@ function initializeTypeHelpers(
   const typeRefSites = collectTypeRefSites(storage);
 
   for (const [typeName, typeInstance] of Object.entries(documentTypes)) {
-    const codecId = (typeInstance as StorageTypeInstance).codecId;
-    const typeParams = (typeInstance as StorageTypeInstance).typeParams;
+    const codecId = typeInstance.codecId;
+    const typeParams = typeInstance.typeParams;
     const descriptor = codecDescriptors.get(codecId);
 
     if (!descriptor) {
@@ -502,15 +502,15 @@ function buildContractCodecRegistry(
 
   const typeRefSites = collectTypeRefSites(contract.storage);
   for (const [typeName, typeInstance] of Object.entries(documentScopedCodecTypes(contract) ?? {})) {
-    const instanceTypeParams = (typeInstance as StorageTypeInstance).typeParams;
+    const instanceTypeParams = typeInstance.typeParams;
     const hasParamKeys =
       instanceTypeParams !== undefined && Object.keys(instanceTypeParams).length > 0;
     const ref: CodecRef = hasParamKeys
       ? {
-          codecId: (typeInstance as StorageTypeInstance).codecId,
+          codecId: typeInstance.codecId,
           typeParams: instanceTypeParams as JsonValue,
         }
-      : { codecId: (typeInstance as StorageTypeInstance).codecId };
+      : { codecId: typeInstance.codecId };
     const key = refKeyOf(ref);
     const sites = typeRefSites.get(typeName) ?? [];
     const existing = usedAtByKey.get(key);

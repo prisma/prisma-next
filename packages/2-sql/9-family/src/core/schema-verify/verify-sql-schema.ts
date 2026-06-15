@@ -118,8 +118,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
   const { contractStorageHash, contractProfileHash, contractTarget } =
     extractContractMetadata(contract);
-  const storageTypes: Readonly<Record<string, StorageTypeInstance>> = (contract.storage.types ??
-    {}) as Readonly<Record<string, StorageTypeInstance>>;
+  const storageTypes: Readonly<Record<string, StorageTypeInstance>> = contract.storage.types ?? {};
   const { issues, rootChildren } = verifySchemaTables({
     contract,
     schema,

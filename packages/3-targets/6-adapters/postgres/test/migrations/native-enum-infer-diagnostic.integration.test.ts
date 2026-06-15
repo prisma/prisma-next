@@ -17,7 +17,7 @@ import {
  * This test creates a real native enum type in the database (via PGlite), calls the full
  * introspect→infer path, and asserts the diagnostic fires with the type name.
  */
-describe.sequential('native enum inference diagnostic — end-to-end PGlite', () => {
+describe('native enum inference diagnostic — end-to-end PGlite', { concurrent: false }, () => {
   let database: Awaited<ReturnType<typeof createTestDatabase>>;
   let driver: PostgresControlDriver | undefined;
 
