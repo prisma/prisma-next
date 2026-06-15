@@ -82,9 +82,9 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
 
-    const valueSetSlot = entries.valueSet;
+    const valueSetSlot = entries['valueSet'];
     const hasValueSets = valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0;
-    const emptyTables = Object.keys(entries.table ?? {}).length === 0;
+    const emptyTables = Object.keys(entries['table'] ?? {}).length === 0;
     if (id === UNBOUND_NAMESPACE_ID && emptyTables && !hasValueSets) {
       return PostgresSchema.unbound;
     }
@@ -92,7 +92,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       id,
       entries: {
         ...entries,
-        table: entries.table ?? {},
+        table: entries['table'] ?? {},
         ...(hasValueSets ? { valueSet: valueSetSlot } : {}),
       },
     });

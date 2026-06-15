@@ -100,11 +100,11 @@ export class PostgresSchema extends NamespaceBase {
   }
 
   get table(): Readonly<Record<string, StorageTable>> {
-    return this.entries.table ?? Object.freeze({});
+    return this.entries['table'] ?? Object.freeze({});
   }
 
   get valueSet(): Readonly<Record<string, StorageValueSet>> | undefined {
-    return this.entries.valueSet;
+    return this.entries['valueSet'] as Readonly<Record<string, StorageValueSet>> | undefined;
   }
 
   /**

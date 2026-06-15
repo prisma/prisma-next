@@ -1,8 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { ControlPolicySubject } from '@prisma-next/family-sql/control';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { type SqlStorage, storageTableAt } from '@prisma-next/sql-contract/types';
+import { entityAt, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { isPostgresSchema } from '../postgres-schema';
 import type { PostgresOpFactoryCall } from './op-factory-call';
@@ -38,7 +38,11 @@ function resolveNamespaceIdForTable(
   ddlSchemaName: string | undefined,
 ): string {
   for (const namespaceId of Object.keys(contract.storage.namespaces)) {
-    const table = storageTableAt(contract.storage, namespaceId, tableName);
+    const table = entityAt<StorageTable>(contract.storage, {
+      namespaceId,
+      entityKind: 'table',
+      entityName: tableName,
+    });
     if (!table) continue;
     if (
       ddlSchemaName === undefined ||
@@ -112,11 +116,11 @@ export function resolvePostgresCallControlPolicySubject(
       callFields.tableName,
       callFields.schemaName,
     );
-    const tableControlPolicy = storageTableAt(
-      contract.storage,
+    const tableControlPolicy = entityAt<StorageTable>(contract.storage, {
       namespaceId,
-      callFields.tableName,
-    )?.control;
+      entityKind: 'table',
+      entityName: callFields.tableName,
+    })?.control;
     return {
       namespaceId,
       ...ifDefined('explicitNodeControlPolicy', tableControlPolicy),
@@ -182,7 +186,11 @@ export function resolvePostgresIssueControlPolicySubject(
       'namespaceId' in issue && issue.namespaceId
         ? issue.namespaceId
         : resolveNamespaceIdForTable(contract, issue.table, undefined);
-    const table = storageTableAt(contract.storage, namespaceId, issue.table);
+    const table = entityAt<StorageTable>(contract.storage, {
+      namespaceId,
+      entityKind: 'table',
+      entityName: issue.table,
+    });
     return {
       namespaceId,
       ...ifDefined('explicitNodeControlPolicy', table?.control),

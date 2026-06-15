@@ -49,8 +49,8 @@ describe('PostgresUnboundSchema', () => {
   });
 
   it('carries empty frozen tables on the unbound singleton', () => {
-    expect(PostgresSchema.unbound.entries.table).toEqual({});
-    expect(Object.isFrozen(PostgresSchema.unbound.entries.table)).toBe(true);
+    expect(PostgresSchema.unbound.entries['table']).toEqual({});
+    expect(Object.isFrozen(PostgresSchema.unbound.entries['table'])).toBe(true);
   });
 
   it('elides the schema qualifier so emission paths render unqualified output', () => {
