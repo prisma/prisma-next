@@ -1,13 +1,11 @@
 import {
+  constructEntries,
   freezeNode,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
-import {
-  createMongoEntryConstructionRegistry,
-  dispatchMongoEntriesToRegistryCarrying,
-} from '../entry-construction-registry';
+import { composeMongoEntityKinds } from '../entity-kinds';
 import type { MongoCollection } from './mongo-collection';
 import type {
   MongoNamespace,
@@ -17,8 +15,7 @@ import type {
 import { MongoUnboundNamespace } from './mongo-unbound-namespace';
 
 const MONGO_NAMESPACE_KIND = 'mongo-namespace' as const;
-
-const coreRegistry = createMongoEntryConstructionRegistry();
+const MONGO_KINDS = composeMongoEntityKinds();
 
 class MongoBoundNamespace extends NamespaceBase {
   declare readonly kind: string;
@@ -42,8 +39,15 @@ class MongoBoundNamespace extends NamespaceBase {
 
     const rawEntries = { collection: {}, ...input.entries };
     this.entries = Object.freeze(
-      blindCast<MongoNamespaceEntries, 'registry dispatch produces MongoNamespaceEntries'>(
-        dispatchMongoEntriesToRegistryCarrying(rawEntries, coreRegistry),
+      blindCast<MongoNamespaceEntries, 'constructEntries produces MongoNamespaceEntries'>(
+        constructEntries(
+          blindCast<
+            Record<string, Readonly<Record<string, unknown>>>,
+            'MongoNamespaceCollectionsInput.entries values are plain record maps'
+          >(rawEntries),
+          MONGO_KINDS,
+          'carry',
+        ),
       ),
     );
     Object.defineProperty(this, 'kind', {

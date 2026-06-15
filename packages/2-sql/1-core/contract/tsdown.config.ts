@@ -3,7 +3,6 @@ import { defineConfig } from '@prisma-next/tsdown';
 export default defineConfig({
   entry: [
     'src/exports/entity-kinds.ts',
-    'src/exports/entry-construction-registry.ts',
     'src/exports/referential-action-sql.ts',
     'src/exports/resolve-storage-table.ts',
     'src/exports/types.ts',

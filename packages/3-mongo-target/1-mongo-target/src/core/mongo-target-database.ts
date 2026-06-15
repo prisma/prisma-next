@@ -1,4 +1,5 @@
 import {
+  constructEntries,
   freezeNode,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
@@ -8,10 +9,7 @@ import type {
   MongoCollectionInput,
   MongoNamespaceEntries,
 } from '@prisma-next/mongo-contract';
-import {
-  createMongoEntryConstructionRegistry,
-  dispatchMongoEntriesToRegistryCarrying,
-} from '@prisma-next/mongo-contract/entry-construction-registry';
+import { composeMongoEntityKinds } from '@prisma-next/mongo-contract/entity-kinds';
 import { blindCast } from '@prisma-next/utils/casts';
 
 export interface MongoTargetDatabaseInput {
@@ -19,7 +17,7 @@ export interface MongoTargetDatabaseInput {
   readonly entries?: Readonly<Record<string, Readonly<Record<string, MongoCollectionInput>>>>;
 }
 
-const coreRegistry = createMongoEntryConstructionRegistry();
+const MONGO_KINDS = composeMongoEntityKinds();
 
 /**
  * Mongo target `Namespace` concretion. In Mongo the "namespace" concept
@@ -49,8 +47,15 @@ export class MongoTargetDatabase extends NamespaceBase {
       ...input.entries,
     };
     this.entries = Object.freeze(
-      blindCast<MongoNamespaceEntries, 'registry dispatch produces MongoNamespaceEntries'>(
-        dispatchMongoEntriesToRegistryCarrying(rawEntries, coreRegistry),
+      blindCast<MongoNamespaceEntries, 'constructEntries produces MongoNamespaceEntries'>(
+        constructEntries(
+          blindCast<
+            Record<string, Readonly<Record<string, unknown>>>,
+            'MongoTargetDatabaseInput.entries values are plain record maps'
+          >(rawEntries),
+          MONGO_KINDS,
+          'carry',
+        ),
       ),
     );
     Object.defineProperty(this, 'kind', {

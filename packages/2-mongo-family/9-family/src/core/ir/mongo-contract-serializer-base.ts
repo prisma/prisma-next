@@ -1,6 +1,10 @@
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import {
+  type AnyEntityKindDescriptor,
+  constructEntries,
+} from '@prisma-next/framework-components/ir';
+import {
   createMongoContractSchema,
   type MongoContract,
   MongoContractSchema,
@@ -8,11 +12,7 @@ import {
   validateMongoStorage,
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
-import {
-  createMongoEntryConstructionRegistry,
-  dispatchMongoEntriesToRegistry,
-  type MongoEntryFactory,
-} from '@prisma-next/mongo-contract/entry-construction-registry';
+import { composeMongoEntityKinds } from '@prisma-next/mongo-contract/entity-kinds';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { type as arktypeType, type Type } from 'arktype';
@@ -42,21 +42,17 @@ export abstract class MongoContractSerializerBase<TContract>
   implements ContractSerializer<TContract>
 {
   private readonly contractSchema: Type<unknown> | undefined;
-  private readonly entriesRegistry: ReadonlyMap<string, MongoEntryFactory>;
+  private readonly entryKinds: ReadonlyMap<string, AnyEntityKindDescriptor>;
 
   constructor(
     validatorFragments?: ReadonlyMap<string, Type<unknown>>,
-    packEntryFactories?: ReadonlyMap<string, MongoEntryFactory>,
+    packEntityKinds: readonly AnyEntityKindDescriptor[] = [],
   ) {
+    this.entryKinds = composeMongoEntityKinds(packEntityKinds);
     this.contractSchema =
       validatorFragments !== undefined && validatorFragments.size > 0
         ? createMongoContractSchema(validatorFragments)
         : undefined;
-    this.entriesRegistry = createMongoEntryConstructionRegistry(
-      packEntryFactories !== undefined && packEntryFactories.size > 0
-        ? packEntryFactories
-        : undefined,
-    );
   }
 
   deserializeContract<T extends TContract = TContract>(json: unknown): T {
@@ -133,12 +129,13 @@ export abstract class MongoContractSerializerBase<TContract>
     const rawNamespaces = contract.storage.namespaces;
     const hydratedNamespaces = Object.fromEntries(
       Object.entries(rawNamespaces).map(([nsId, nsEnvelope]) => {
-        const hydratedEntries = dispatchMongoEntriesToRegistry(
+        const hydratedEntries = constructEntries(
           blindCast<
             Readonly<Record<string, Readonly<Record<string, unknown>>>>,
             'nsEnvelope.entries has been validated by the Mongo contract schema before hydration'
           >(nsEnvelope.entries),
-          this.entriesRegistry,
+          this.entryKinds,
+          'fail',
           nsId,
         );
         return [
@@ -148,7 +145,7 @@ export abstract class MongoContractSerializerBase<TContract>
             id: nsEnvelope.id,
             entries: blindCast<
               MongoNamespaceEntries,
-              'registry dispatch constructs the correct IR instances per kind'
+              'constructEntries produces the correct IR instances per kind'
             >(hydratedEntries),
           },
         ];
