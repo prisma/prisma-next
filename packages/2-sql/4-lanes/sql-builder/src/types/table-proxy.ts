@@ -19,7 +19,6 @@ import type { NamespaceTable, TableProxyContract } from './db';
 import type { DeleteQuery, InsertQuery, InsertValues, UpdateQuery } from './mutation-query';
 import type { WithJoin, WithSelect } from './shared';
 
-// Reads the per-namespace domain block rather than the flat model map.
 type FindModelForTable<
   C extends TableProxyContract,
   NsId extends string,

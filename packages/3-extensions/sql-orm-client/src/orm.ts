@@ -39,7 +39,7 @@ type CustomCollectionForKey<
 // The `NsId` coordinate is threaded into the collection (and its `InferRootRow`)
 // so the read row AND the create/update/where input types resolve the model's
 // fields within its namespace (per-namespace domain block + nested
-// `FieldOutputTypes[NsId]`), rather than the flat first-name-wins map.
+// `FieldOutputTypes[NsId]`).
 type ModelCollection<
   TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,

@@ -634,11 +634,9 @@ type NamespaceModelsOf<
     : Record<string, never>
   : Record<string, never>;
 
-// The model definition for `ModelName` found by scanning every domain namespace
-// block — never the flat cross-namespace model map. For a single-namespace
-// contract this is exactly the sole namespace's model (byte-for-byte identical
-// to the old flat read); under a same-bare-name collision it unions the
-// same-named models.
+// The model definition for `ModelName`, scanning every domain namespace block.
+// For a single-namespace contract this is the sole namespace's model; under a
+// same-bare-name collision it unions the same-named models.
 type ScannedModelDef<TContract extends Contract<SqlStorage>, ModelName extends string> = {
   [Ns in keyof TContract['domain']['namespaces']]: ModelName extends keyof TContract['domain']['namespaces'][Ns]['models']
     ? TContract['domain']['namespaces'][Ns]['models'][ModelName]
@@ -655,7 +653,7 @@ type ModelDef<
     ? NamespaceModelsOf<TContract, NsId>[ModelName]
     : never;
 
-// Fallback for a (flat) model definition that does not carry its own
+// Fallback for a model definition that does not carry its own
 // `storage.namespaceId`: the storage namespace whose block declares the table.
 type NamespaceContainingTable<TContract extends Contract<SqlStorage>, TableName extends string> = {
   [K in keyof TContract['storage']['namespaces'] &
@@ -1498,11 +1496,9 @@ export type IncludeRelationValue<
       : IncludedRow
     : IncludedRow[];
 
-// The union of model names across every domain namespace. Reading the flat
-// `ModelsOf` map instead collapses to the *intersection* of names when
-// namespaces declare different models (a union of object types keys to its
-// shared keys), which would drop a model unique to one namespace under a
-// same-bare-name collision.
+// The union of model names across every domain namespace, scanned per-namespace
+// so a model unique to one namespace under a same-bare-name collision is not
+// dropped (a single keyed map would collapse to the shared-key intersection).
 export type CollectionModelName<TContract extends Contract<SqlStorage>> = {
   [Ns in keyof TContract['domain']['namespaces']]: keyof TContract['domain']['namespaces'][Ns]['models'] &
     string;

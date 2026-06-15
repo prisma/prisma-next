@@ -19,7 +19,7 @@ export type Expr = ColumnRef | ParamRef;
  * {@link ExtractFieldOutputTypes}) the refined field-output map. Every emitted
  * `Contract<SqlStorage>` satisfies it, as does `sql-builder`'s `TableProxyContract`
  * — so the resolver indexes the coordinate directly without forcing callers to
- * carry the full `Contract`. Resolution stays per-namespace; no flat map is read.
+ * carry the full `Contract`.
  */
 export type ColumnResolutionContract = {
   readonly domain: {
@@ -37,11 +37,6 @@ export type ColumnResolutionContract = {
   };
 };
 
-/**
- * Resolving models per-namespace keeps table/column resolution anchored to the
- * namespace the caller asked for, rather than a flat cross-namespace view that
- * collapses same-named tables across namespaces.
- */
 type NamespaceModels<
   TContract extends ColumnResolutionContract,
   NsId extends string,
@@ -88,11 +83,7 @@ type ExtractColumnToField<
       : never
     : never;
 
-/**
- * Resolves to `never` when the table or column is absent in the namespace — so a
- * column unique to another namespace does not leak in through a flat
- * cross-namespace view.
- */
+/** Resolves to `never` when the table or column is absent in the namespace. */
 type NamespaceStorageColumn<
   TContract extends ColumnResolutionContract,
   NsId extends string,
