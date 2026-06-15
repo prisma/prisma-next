@@ -8,9 +8,7 @@ import {
   buildIndexOpId,
   CollModCommand,
   type CollModOptions,
-  CreateCollectionCommand,
   type CreateCollectionOptions,
-  CreateIndexCommand,
   type CreateIndexOptions,
   DropCollectionCommand,
   DropIndexCommand,
@@ -24,10 +22,26 @@ import {
   type MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import { createFieldAccessor } from '@prisma-next/mongo-query-builder';
+import { collection } from '@prisma-next/mongo-query-builder/contract-free';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { CollModMeta } from './op-factory-call';
+
+type StringField = { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+type BoolField = { readonly codecId: 'mongo/bool@1'; readonly nullable: false };
+type DocField = { readonly codecId: 'mongo/document@1'; readonly nullable: false };
+
+type IndexInfoDocShape = {
+  readonly key: DocField;
+  readonly unique: BoolField;
+  readonly name: StringField;
+};
+
+type CollectionInfoDocShape = {
+  readonly name: StringField;
+};
 
 interface Buildable {
   build(): MongoQueryPlan;
@@ -106,48 +120,52 @@ function isTextIndex(keys: ReadonlyArray<MongoIndexKey>): boolean {
 }
 
 function keyFilter(keys: ReadonlyArray<MongoIndexKey>) {
+  const f = createFieldAccessor<IndexInfoDocShape>();
   return isTextIndex(keys)
-    ? MongoFieldFilter.eq('key._fts', 'text')
-    : MongoFieldFilter.eq('key', keysToKeySpec(keys));
+    ? f.rawPath('key._fts').eq('text')
+    : f.key.eq(
+        blindCast<
+          MongoValue,
+          'keysToKeySpec returns a plain BSON object used as a MongoValue equality target'
+        >(keysToKeySpec(keys)),
+      );
 }
 
 export function createIndex(
-  collection: string,
+  collectionName: string,
   keys: ReadonlyArray<MongoIndexKey>,
   options?: CreateIndexOptions,
 ): MongoMigrationPlanOperation {
   const name = defaultMongoIndexName(keys);
+  const f = createFieldAccessor<IndexInfoDocShape>();
   const filter = keyFilter(keys);
-  const fullFilter = options?.unique
-    ? MongoAndExpr.of([filter, MongoFieldFilter.eq('unique', true)])
-    : filter;
+  const fullFilter = options?.unique ? filter.and(f.unique.eq(true)) : filter;
 
   return {
-    id: buildIndexOpId('create', collection, keys),
-    label: `Create index on ${collection} (${formatKeys(keys)})`,
+    id: buildIndexOpId('create', collectionName, keys),
+    label: `Create index on ${collectionName} (${formatKeys(keys)})`,
     operationClass: 'additive',
     precheck: [
       {
-        description: `index does not already exist on ${collection}`,
-        source: new ListIndexesCommand(collection),
+        description: `index does not already exist on ${collectionName}`,
+        source: new ListIndexesCommand(collectionName),
         filter,
         expect: 'notExists',
       },
     ],
     execute: [
       {
-        description: `create index on ${collection}`,
-        command: new CreateIndexCommand(collection, keys, {
+        description: `create index on ${collectionName}`,
+        command: collection(collectionName).createIndex(keys, {
           ...options,
-          unique: options?.unique ?? undefined,
           name,
         }),
       },
     ],
     postcheck: [
       {
-        description: `index exists on ${collection}`,
-        source: new ListIndexesCommand(collection),
+        description: `index exists on ${collectionName}`,
+        source: new ListIndexesCommand(collectionName),
         filter: fullFilter,
         expect: 'exists',
       },
@@ -156,34 +174,34 @@ export function createIndex(
 }
 
 export function dropIndex(
-  collection: string,
+  collectionName: string,
   keys: ReadonlyArray<MongoIndexKey>,
 ): MongoMigrationPlanOperation {
   const indexName = defaultMongoIndexName(keys);
   const filter = keyFilter(keys);
 
   return {
-    id: buildIndexOpId('drop', collection, keys),
-    label: `Drop index on ${collection} (${formatKeys(keys)})`,
+    id: buildIndexOpId('drop', collectionName, keys),
+    label: `Drop index on ${collectionName} (${formatKeys(keys)})`,
     operationClass: 'destructive',
     precheck: [
       {
-        description: `index exists on ${collection}`,
-        source: new ListIndexesCommand(collection),
+        description: `index exists on ${collectionName}`,
+        source: new ListIndexesCommand(collectionName),
         filter,
         expect: 'exists',
       },
     ],
     execute: [
       {
-        description: `drop index on ${collection}`,
-        command: new DropIndexCommand(collection, indexName),
+        description: `drop index on ${collectionName}`,
+        command: new DropIndexCommand(collectionName, indexName),
       },
     ],
     postcheck: [
       {
-        description: `index no longer exists on ${collection}`,
-        source: new ListIndexesCommand(collection),
+        description: `index no longer exists on ${collectionName}`,
+        source: new ListIndexesCommand(collectionName),
         filter,
         expect: 'notExists',
       },
@@ -192,41 +210,43 @@ export function dropIndex(
 }
 
 export function createCollection(
-  collection: string,
+  collectionName: string,
   options?: CreateCollectionOptions,
 ): MongoMigrationPlanOperation {
+  const f = createFieldAccessor<CollectionInfoDocShape>();
+
   return {
-    id: `collection.${collection}.create`,
-    label: `Create collection ${collection}`,
+    id: `collection.${collectionName}.create`,
+    label: `Create collection ${collectionName}`,
     operationClass: 'additive',
     precheck: [
       {
-        description: `collection ${collection} does not exist`,
+        description: `collection ${collectionName} does not exist`,
         source: new ListCollectionsCommand(),
-        filter: MongoFieldFilter.eq('name', collection),
+        filter: f.name.eq(collectionName),
         expect: 'notExists',
       },
     ],
     execute: [
       {
-        description: `create collection ${collection}`,
-        command: new CreateCollectionCommand(collection, options),
+        description: `create collection ${collectionName}`,
+        command: collection(collectionName).createCollection(options),
       },
     ],
     postcheck: [],
   };
 }
 
-export function dropCollection(collection: string): MongoMigrationPlanOperation {
+export function dropCollection(collectionName: string): MongoMigrationPlanOperation {
   return {
-    id: `collection.${collection}.drop`,
-    label: `Drop collection ${collection}`,
+    id: `collection.${collectionName}.drop`,
+    label: `Drop collection ${collectionName}`,
     operationClass: 'destructive',
     precheck: [],
     execute: [
       {
-        description: `drop collection ${collection}`,
-        command: new DropCollectionCommand(collection),
+        description: `drop collection ${collectionName}`,
+        command: new DropCollectionCommand(collectionName),
       },
     ],
     postcheck: [],
@@ -234,22 +254,22 @@ export function dropCollection(collection: string): MongoMigrationPlanOperation 
 }
 
 export function setValidation(
-  collection: string,
+  collectionName: string,
   schema: Record<string, unknown>,
   options?: { validationLevel?: 'strict' | 'moderate'; validationAction?: 'error' | 'warn' },
 ): MongoMigrationPlanOperation {
   return {
-    id: `collection.${collection}.setValidation`,
-    label: `Set validation on ${collection}`,
+    id: `collection.${collectionName}.setValidation`,
+    label: `Set validation on ${collectionName}`,
     operationClass: 'destructive',
     precheck: [],
     execute: [
       {
-        description: `set validation on ${collection}`,
-        command: new CollModCommand(collection, {
+        description: `set validation on ${collectionName}`,
+        command: new CollModCommand(collectionName, {
           validator: { $jsonSchema: schema },
-          validationLevel: options?.validationLevel,
-          validationAction: options?.validationAction,
+          ...ifDefined('validationLevel', options?.validationLevel),
+          ...ifDefined('validationAction', options?.validationAction),
         }),
       },
     ],
@@ -258,40 +278,40 @@ export function setValidation(
 }
 
 export function collMod(
-  collection: string,
+  collectionName: string,
   options: CollModOptions,
   meta?: CollModMeta,
 ): MongoMigrationPlanOperation {
   const hasValidator = options.validator != null && Object.keys(options.validator).length > 0;
 
   return {
-    id: meta?.id ?? `collection.${collection}.collMod`,
-    label: meta?.label ?? `Modify collection ${collection}`,
+    id: meta?.id ?? `collection.${collectionName}.collMod`,
+    label: meta?.label ?? `Modify collection ${collectionName}`,
     operationClass: meta?.operationClass ?? 'destructive',
     precheck:
       options.validator != null
         ? [
             {
-              description: `collection ${collection} exists`,
+              description: `collection ${collectionName} exists`,
               source: new ListCollectionsCommand(),
-              filter: MongoFieldFilter.eq('name', collection),
+              filter: MongoFieldFilter.eq('name', collectionName),
               expect: 'exists' as const,
             },
           ]
         : [],
     execute: [
       {
-        description: `modify ${collection}`,
-        command: new CollModCommand(collection, options),
+        description: `modify ${collectionName}`,
+        command: new CollModCommand(collectionName, options),
       },
     ],
     postcheck: hasValidator
       ? [
           {
-            description: `validator applied on ${collection}`,
+            description: `validator applied on ${collectionName}`,
             source: new ListCollectionsCommand(),
             filter: MongoAndExpr.of([
-              MongoFieldFilter.eq('name', collection),
+              MongoFieldFilter.eq('name', collectionName),
               ...(options.validationLevel
                 ? [MongoFieldFilter.eq('options.validationLevel', options.validationLevel)]
                 : []),
@@ -339,6 +359,8 @@ export function validatedCollection(
       validationLevel: 'strict',
       validationAction: 'error',
     }),
-    ...indexes.map((idx) => createIndex(name, idx.keys, { unique: idx.unique })),
+    ...indexes.map((idx) =>
+      createIndex(name, idx.keys, idx.unique !== undefined ? { unique: idx.unique } : undefined),
+    ),
   ];
 }

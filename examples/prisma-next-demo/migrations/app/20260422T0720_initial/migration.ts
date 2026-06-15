@@ -44,34 +44,6 @@ export default class M extends Migration {
           },
         ],
       }),
-      rawSql({
-        id: 'type.user_type',
-        label: 'Create type user_type',
-        summary: 'Creates enum type user_type',
-        operationClass: 'additive',
-        target: {
-          id: 'postgres',
-          details: { schema: 'public', objectType: 'type', name: 'user_type' },
-        },
-        precheck: [
-          {
-            description: 'ensure type "user_type" does not exist',
-            sql: "SELECT NOT EXISTS (\n  SELECT 1\n  FROM pg_type t\n  JOIN pg_namespace n ON t.typnamespace = n.oid\n  WHERE n.nspname = 'public'\n    AND t.typname = 'user_type'\n)",
-          },
-        ],
-        execute: [
-          {
-            description: 'create type "user_type"',
-            sql: 'CREATE TYPE "public"."user_type" AS ENUM (\'admin\', \'user\')',
-          },
-        ],
-        postcheck: [
-          {
-            description: 'verify type "user_type" exists',
-            sql: "SELECT EXISTS (\n  SELECT 1\n  FROM pg_type t\n  JOIN pg_namespace n ON t.typnamespace = n.oid\n  WHERE n.nspname = 'public'\n    AND t.typname = 'user_type'\n)",
-          },
-        ],
-      }),
       this.createTable({
         schema: 'public',
         table: 'bug',
@@ -116,9 +88,16 @@ export default class M extends Migration {
           col('createdAt', 'timestamptz', { notNull: true, default: fn('now()') }),
           col('email', 'text', { notNull: true }),
           col('id', 'character(36)', { notNull: true }),
-          col('kind', '"user_type"', { notNull: true }),
+          col('kind', 'text', { notNull: true }),
         ],
         constraints: [primaryKey(['id'])],
+      }),
+      this.addCheckConstraint({
+        schema: 'public',
+        table: 'user',
+        constraint: 'user_kind_check',
+        column: 'kind',
+        values: ['admin', 'user'],
       }),
       this.addForeignKey({
         schema: 'public',

@@ -462,3 +462,19 @@ regenerated accordingly. `contract.json` is unchanged — this is a types-only
 addition that makes create/update exhaustiveness-checked. Additive; no existing
 contract shape changes. No consumer action required. Incidental substrate diff only.
 -->
+
+<!--
+TML-2853 (PR #829): regenerate the `prisma-next-demo` example migration chain into
+the new value-set representation, recovering work that #817 (the user-facing
+`enum-becomes-domain-concept` cutover, already in main) left undone in the example.
+The committed chain previously created `user_type` as a native `CREATE TYPE … AS ENUM`
+and converted it in a later self-edge migration — a start state the post-cutover
+system can no longer produce. The chain is re-authored as a multi-step incremental
+history in which the initial migration creates `user.kind` as a `text` column with a
+`user_kind_check` CHECK constraint from the start; the native-enum arc and the
+`convert_user_type_to_value_set` self-edge are removed. The remaining incremental
+milestones (displayName, MTI variant link columns, `post.priority` value-set + default)
+are preserved so the chain still demonstrates the incremental migration CLI. Diff is
+`examples/prisma-next-demo/migrations/**` only. No NEW consumer action beyond the
+existing `enum-becomes-domain-concept` entry above. Incidental substrate diff only.
+-->

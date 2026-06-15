@@ -27,38 +27,6 @@
     ]
   },
   {
-    "id": "type.user_type",
-    "label": "Create type user_type",
-    "summary": "Creates enum type user_type",
-    "operationClass": "additive",
-    "target": {
-      "id": "postgres",
-      "details": {
-        "schema": "public",
-        "objectType": "type",
-        "name": "user_type"
-      }
-    },
-    "precheck": [
-      {
-        "description": "ensure type \"user_type\" does not exist",
-        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM pg_type t\n  JOIN pg_namespace n ON t.typnamespace = n.oid\n  WHERE n.nspname = 'public'\n    AND t.typname = 'user_type'\n)"
-      }
-    ],
-    "execute": [
-      {
-        "description": "create type \"user_type\"",
-        "sql": "CREATE TYPE \"public\".\"user_type\" AS ENUM ('admin', 'user')"
-      }
-    ],
-    "postcheck": [
-      {
-        "description": "verify type \"user_type\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM pg_type t\n  JOIN pg_namespace n ON t.typnamespace = n.oid\n  WHERE n.nspname = 'public'\n    AND t.typname = 'user_type'\n)"
-      }
-    ]
-  },
-  {
     "id": "table.bug",
     "label": "Create table \"bug\"",
     "summary": "Creates table \"bug\"",
@@ -221,7 +189,7 @@
     "execute": [
       {
         "description": "create table \"user\"",
-        "sql": "CREATE TABLE \"public\".\"user\" (\n  \"address\" jsonb,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"email\" text NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"kind\" \"user_type\" NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "sql": "CREATE TABLE \"public\".\"user\" (\n  \"address\" jsonb,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"email\" text NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"kind\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
         "params": []
       }
     ],
@@ -230,6 +198,40 @@
         "description": "verify table \"user\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
         "params": ["\"public\".\"user\""]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.user.user_kind_check",
+    "label": "Add check constraint \"user_kind_check\" on \"user\".\"kind\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "user_kind_check",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"user_kind_check\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["user_kind_check", "public", "\"public\".\"user\""]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"user_kind_check\"",
+        "sql": "ALTER TABLE \"public\".\"user\" ADD CONSTRAINT \"user_kind_check\" CHECK (\"kind\" IN ('admin', 'user'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"user_kind_check\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["user_kind_check", "public", "\"public\".\"user\""]
       }
     ]
   },

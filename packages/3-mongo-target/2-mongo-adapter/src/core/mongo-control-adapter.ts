@@ -3,7 +3,8 @@ import { withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { MongoControlAdapter } from '@prisma-next/family-mongo/control-adapter';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
-import type { MongoAdapter } from '@prisma-next/mongo-lowering';
+import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
+import type { AnyMongoDdlCommand } from '@prisma-next/mongo-query-ast/control';
 import {
   type AnyMongoCommand,
   MongoAggFieldRef,
@@ -64,6 +65,11 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
       rows.push(row);
     }
     return rows;
+  }
+
+  async executeDdl(driver: MongoDriver, command: AnyMongoDdlCommand): Promise<void> {
+    const wire = await this.#adapter.lower({ command }, {});
+    await driver.run(wire);
   }
 
   /**

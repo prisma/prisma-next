@@ -18,8 +18,10 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:0.13.0",
     "@prisma-next/framework-components": "workspace:0.13.0",
+    "@prisma-next/mongo-value": "workspace:0.13.0",
     "@prisma-next/utils": "workspace:0.13.0",
-    "arktype": "catalog:"
+    "arktype": "catalog:",
+    "mongodb": "catalog:"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:0.13.0",

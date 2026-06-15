@@ -23,8 +23,11 @@ import type {
   ControlMutationDefaults,
   MutationDefaultGeneratorDescriptor,
 } from '../shared/mutation-default-types';
-import { materializeCodec } from '../shared/resolve-codec';
-import { runtimeError } from '../shared/runtime-error';
+import {
+  CONTRACT_CODEC_DESCRIPTOR_MISSING,
+  materializeCodec,
+  resolveCodecDescriptorOrThrow,
+} from '../shared/resolve-codec';
 import type { TypesImportSpec } from '../shared/types-import-spec';
 import type {
   ControlAdapterDescriptor,
@@ -361,14 +364,11 @@ export function extractCodecLookup(
   return {
     get: (id) => byId.get(id),
     forCodecRef(ref: CodecRef) {
-      const d = descriptorsById.get(ref.codecId);
-      if (d === undefined) {
-        throw runtimeError(
-          'RUNTIME.CODEC_DESCRIPTOR_MISSING',
-          `No codec descriptor registered for codecId '${ref.codecId}'.`,
-          { codecId: ref.codecId },
-        );
-      }
+      const d = resolveCodecDescriptorOrThrow(
+        (id) => descriptorsById.get(id),
+        ref,
+        CONTRACT_CODEC_DESCRIPTOR_MISSING,
+      );
       return materializeCodec(d, ref, { name: `<ref:${ref.codecId}>` });
     },
     forColumn: () => undefined,

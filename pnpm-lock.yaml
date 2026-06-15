@@ -1957,12 +1957,18 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:0.13.0
         version: link:../../../1-framework/1-core/framework-components
+      '@prisma-next/mongo-value':
+        specifier: workspace:0.13.0
+        version: link:../mongo-value
       '@prisma-next/utils':
         specifier: workspace:0.13.0
         version: link:../../../1-framework/0-foundation/utils
       arktype:
         specifier: 'catalog:'
         version: 2.2.0
+      mongodb:
+        specifier: 'catalog:'
+        version: 7.2.0(socks@2.8.9)
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:0.13.0
@@ -1984,6 +1990,10 @@ importers:
         version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/1-foundation/mongo-value:
+    dependencies:
+      mongodb:
+        specifier: 'catalog:'
+        version: 7.2.0(socks@2.8.9)
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:0.13.0
@@ -2015,12 +2025,18 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:0.13.0
         version: link:../../1-foundation/mongo-contract
+      '@prisma-next/mongo-value':
+        specifier: workspace:0.13.0
+        version: link:../../1-foundation/mongo-value
       '@prisma-next/psl-parser':
         specifier: workspace:0.13.0
         version: link:../../../1-framework/2-authoring/psl-parser
       '@prisma-next/utils':
         specifier: workspace:0.13.0
         version: link:../../../1-framework/0-foundation/utils
+      mongodb:
+        specifier: 'catalog:'
+        version: 7.2.0(socks@2.8.9)
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
@@ -2126,6 +2142,12 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:0.13.0
         version: link:../../1-foundation/mongo-contract
+      '@prisma-next/mongo-value':
+        specifier: workspace:0.13.0
+        version: link:../../1-foundation/mongo-value
+      mongodb:
+        specifier: 'catalog:'
+        version: 7.2.0(socks@2.8.9)
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:0.13.0
@@ -2160,6 +2182,9 @@ importers:
       '@prisma-next/mongo-value':
         specifier: workspace:0.13.0
         version: link:../../1-foundation/mongo-value
+      mongodb:
+        specifier: 'catalog:'
+        version: 7.2.0(socks@2.8.9)
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:0.13.0
@@ -2314,6 +2339,9 @@ importers:
       '@prisma-next/mongo-value':
         specifier: workspace:0.13.0
         version: link:../../1-foundation/mongo-value
+      '@prisma-next/utils':
+        specifier: workspace:0.13.0
+        version: link:../../../1-framework/0-foundation/utils
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:0.13.0
@@ -2430,12 +2458,18 @@ importers:
       '@prisma-next/mongo-schema-ir':
         specifier: workspace:0.13.0
         version: link:../3-tooling/mongo-schema-ir
+      '@prisma-next/mongo-value':
+        specifier: workspace:0.13.0
+        version: link:../1-foundation/mongo-value
       '@prisma-next/utils':
         specifier: workspace:0.13.0
         version: link:../../1-framework/0-foundation/utils
       arktype:
         specifier: 'catalog:'
         version: 2.2.0
+      mongodb:
+        specifier: 'catalog:'
+        version: 7.2.0(socks@2.8.9)
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
@@ -3717,6 +3751,9 @@ importers:
       '@prisma-next/mongo-query-ast':
         specifier: workspace:0.13.0
         version: link:../../2-mongo-family/4-query/query-ast
+      '@prisma-next/mongo-query-builder':
+        specifier: workspace:0.13.0
+        version: link:../../2-mongo-family/5-query-builders/query-builder
       '@prisma-next/mongo-schema-ir':
         specifier: workspace:0.13.0
         version: link:../../2-mongo-family/3-tooling/mongo-schema-ir
@@ -3736,6 +3773,9 @@ importers:
       '@prisma-next/mongo-contract-psl':
         specifier: workspace:0.13.0
         version: link:../../2-mongo-family/2-authoring/contract-psl
+      '@prisma-next/mongo-wire':
+        specifier: workspace:0.13.0
+        version: link:../../2-mongo-family/6-transport/mongo-wire
       '@prisma-next/psl-parser':
         specifier: workspace:0.13.0
         version: link:../../1-framework/2-authoring/psl-parser
