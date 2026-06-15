@@ -1,4 +1,4 @@
-import { flatPslEnums, flatPslModels } from '@prisma-next/framework-components/psl-ast';
+import { flatPslModels } from '@prisma-next/framework-components/psl-ast';
 import { printPsl } from '@prisma-next/psl-printer';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
@@ -79,7 +79,7 @@ describe('sqlSchemaIrToPslAst', () => {
     expect(userField?.attributes.some((a) => a.name === 'relation')).toBe(true);
   });
 
-  it('emits enum declarations and field references for pg/enum codec annotations', () => {
+  it('throws an actionable diagnostic when the schema contains native Postgres enum types', () => {
     const schemaIR = ir({
       tables: {
         user: {
@@ -96,27 +96,17 @@ describe('sqlSchemaIrToPslAst', () => {
       },
       annotations: {
         pg: {
-          enumTypes: {
-            public: {
-              role_t: {
-                codecId: 'pg/enum@1',
-                nativeType: 'role_t',
-                typeParams: { values: ['admin', 'user'] },
-              },
-            },
-          },
+          nativeEnumTypeNames: ['role_t'],
         },
       },
     });
 
-    const ast = sqlSchemaIrToPslAst(schemaIR);
-    expect(flatPslEnums(ast).map((e) => e.name)).toEqual(['RoleT']);
-    const enumModel = flatPslModels(ast)[0];
-    const roleField = enumModel?.fields.find((f) => f.name === 'role');
-    expect(roleField?.typeName).toBe('RoleT');
+    expect(() => sqlSchemaIrToPslAst(schemaIR)).toThrow(
+      /contract infer:.*native Postgres enum type.*role_t.*not adoptable/i,
+    );
   });
 
-  it('links columns to enums and emits a clean @@map for schema-nested storage', () => {
+  it('throws naming all native enum types when multiple are present', () => {
     const schemaIR = ir({
       tables: {
         applications: {
@@ -133,29 +123,12 @@ describe('sqlSchemaIrToPslAst', () => {
       },
       annotations: {
         pg: {
-          enumTypes: {
-            public: {
-              application_kind: {
-                codecId: 'pg/enum@1',
-                nativeType: 'application_kind',
-                typeParams: { values: ['complete', 'formless'] },
-              },
-            },
-          },
+          nativeEnumTypeNames: ['application_kind'],
         },
       },
     });
 
-    const ast = sqlSchemaIrToPslAst(schemaIR);
-
-    const enumDecl = flatPslEnums(ast)[0];
-    expect(enumDecl?.name).toBe('ApplicationKind');
-    const mapArg = enumDecl?.attributes.find((a) => a.name === 'map')?.args[0];
-    const mapValue = mapArg && mapArg.kind === 'positional' ? mapArg.value : '';
-    expect(mapValue).toBe('"application_kind"');
-
-    const statusField = flatPslModels(ast)[0]?.fields.find((f) => f.name === 'status');
-    expect(statusField?.typeName).toBe('ApplicationKind');
+    expect(() => sqlSchemaIrToPslAst(schemaIR)).toThrow('application_kind');
   });
 
   it('produces a @default(now()) attribute for raw now() defaults', () => {

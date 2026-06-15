@@ -1,13 +1,15 @@
 import {
   freezeNode,
+  hydrateNamespaceEntities,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import {
+import type {
   MongoCollection,
-  type MongoCollectionInput,
-  type MongoNamespaceEntries,
+  MongoCollectionInput,
+  MongoNamespaceEntries,
 } from '@prisma-next/mongo-contract';
+import { composeMongoEntityKinds } from '@prisma-next/mongo-contract/entity-kinds';
 import { blindCast } from '@prisma-next/utils/casts';
 
 export interface MongoTargetDatabaseInput {
@@ -38,26 +40,16 @@ export class MongoTargetDatabase extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
-    let collection: Readonly<Record<string, MongoCollection>> = Object.freeze({});
-    for (const [kind, rawMap] of Object.entries(input.entries ?? {})) {
-      if (kind === 'collection') {
-        const collectionMap: Record<string, MongoCollection> = {};
-        for (const [name, c] of Object.entries(
-          blindCast<
-            Record<string, MongoCollectionInput>,
-            'entries[collection] holds MongoCollectionInput by construction'
-          >(rawMap),
-        )) {
-          collectionMap[name] = new MongoCollection(c);
-        }
-        collection = Object.freeze(collectionMap);
-      } else {
-        carried[kind] = Object.freeze(rawMap);
-      }
-    }
-
-    this.entries = Object.freeze({ ...carried, collection });
+    const rawEntries: Record<string, Readonly<Record<string, MongoCollectionInput>>> = {
+      collection: {},
+      ...input.entries,
+    };
+    this.entries = Object.freeze(
+      blindCast<
+        MongoNamespaceEntries,
+        'composeMongoEntityKinds() supplies the collection→MongoCollection descriptor, so this open-dict result holds the typed collection member MongoNamespaceEntries declares; the descriptor Map erases that per-kind Node type from the return.'
+      >(hydrateNamespaceEntities(rawEntries, composeMongoEntityKinds(), 'carry')),
+    );
     Object.defineProperty(this, 'kind', {
       value: 'database',
       writable: false,

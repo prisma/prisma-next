@@ -9,7 +9,6 @@ import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
   PG_BYTEA_CODEC_ID,
-  PG_ENUM_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
   PG_FLOAT8_CODEC_ID,
   PG_INT2_CODEC_ID,
@@ -28,7 +27,6 @@ import {
   SQL_CHAR_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
 } from '@prisma-next/target-postgres/codec-ids';
-import { PostgresEnumType } from '@prisma-next/target-postgres/types';
 
 export const textColumn = {
   codecId: PG_TEXT_CODEC_ID,
@@ -185,21 +183,3 @@ export const jsonbColumn = {
   codecId: PG_JSONB_CODEC_ID,
   nativeType: 'jsonb',
 } as const satisfies ColumnTypeDescriptor;
-
-export function enumType<const Values extends readonly string[]>(
-  name: string,
-  values: Values,
-): PostgresEnumType {
-  return new PostgresEnumType({ name, nativeType: name, values });
-}
-
-export function enumColumn<TypeName extends string>(
-  typeName: TypeName,
-  nativeType: string,
-): ColumnTypeDescriptor & { readonly typeRef: TypeName } {
-  return {
-    codecId: PG_ENUM_CODEC_ID,
-    nativeType,
-    typeRef: typeName,
-  };
-}

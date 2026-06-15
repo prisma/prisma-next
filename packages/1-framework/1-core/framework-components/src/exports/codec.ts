@@ -27,4 +27,9 @@ export type {
   ColumnTypeDescriptor,
 } from '../shared/column-spec';
 export { column } from '../shared/column-spec';
-export { materializeCodec, validateCodecTypeParams } from '../shared/resolve-codec';
+export {
+  CONTRACT_CODEC_DESCRIPTOR_MISSING,
+  materializeCodec,
+  resolveCodecDescriptorOrThrow,
+  validateCodecTypeParams,
+} from '../shared/resolve-codec';

@@ -8,12 +8,10 @@
  * see `StorageColumn` or `storageTypes`.
  */
 
-import {
-  isPostgresEnumStorageEntry,
-  type PostgresEnumStorageEntry,
-  type StorageColumn,
-  type StorageTable,
-  type StorageTypeInstance,
+import type {
+  StorageColumn,
+  StorageTable,
+  StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 
@@ -46,7 +44,7 @@ function assertSafeDefaultExpression(expression: string): void {
  */
 export function buildColumnTypeSql(
   column: StorageColumn,
-  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {},
+  storageTypes: Record<string, StorageTypeInstance> = {},
 ): string {
   const resolved = resolveColumnTypeMetadata(column, storageTypes);
   assertSafeNativeType(resolved.nativeType);
@@ -125,7 +123,7 @@ type ResolvedColumnTypeMetadata = Pick<StorageColumn, 'nativeType' | 'codecId' |
 
 export function resolveColumnTypeMetadata(
   column: StorageColumn,
-  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+  storageTypes: Record<string, StorageTypeInstance>,
 ): ResolvedColumnTypeMetadata {
   if (!column.typeRef) {
     return column;
@@ -135,13 +133,6 @@ export function resolveColumnTypeMetadata(
     throw new Error(
       `Storage type "${column.typeRef}" referenced by column is not defined in storage.types.`,
     );
-  }
-  if (isPostgresEnumStorageEntry(referencedType)) {
-    return {
-      codecId: referencedType.codecId,
-      nativeType: referencedType.nativeType,
-      typeParams: { values: referencedType.values } as Record<string, unknown>,
-    };
   }
   return {
     codecId: referencedType.codecId,

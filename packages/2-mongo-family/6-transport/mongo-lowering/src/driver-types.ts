@@ -1,9 +1,10 @@
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
-import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
+import type { AnyMongoDdlWireCommand, AnyMongoDmlWireCommand } from '@prisma-next/mongo-wire';
 import type { Db } from 'mongodb';
 
 export interface MongoDriver {
-  execute<Row>(wireCommand: AnyMongoWireCommand): AsyncIterable<Row>;
+  execute<Row>(wireCommand: AnyMongoDmlWireCommand): AsyncIterable<Row>;
+  run(wireCommand: AnyMongoDdlWireCommand): Promise<void>;
   close(): Promise<void>;
 }
 

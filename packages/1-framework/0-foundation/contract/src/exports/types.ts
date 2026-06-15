@@ -1,7 +1,6 @@
 export type {
   Contract,
   ContractExecutionSection,
-  ContractModelDefinitions,
   ContractValueObjectDefinitions,
 } from '../contract-types';
 export { DomainNamespaceResolutionError } from '../contract-validation-error';

@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { loadContractFromTs } from '@prisma-next/cli';
-import type { Contract, ContractRelation, StorageHashBase } from '@prisma-next/contract/types';
+import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { timeouts } from '@prisma-next/test-utils';
@@ -17,61 +17,37 @@ const execFileAsync = promisify(execFile);
 // Fixture subdirectory for emit-command tests
 const fixtureSubdir = 'emit-command';
 
-type EmittedContract = Contract<
-  {
-    readonly storageHash: StorageHashBase<string>;
-    readonly namespaces: {
-      readonly public: {
-        readonly id: 'public';
-        readonly kind: 'sql-namespace';
-        readonly entries: {
-          readonly table: {
-            readonly user: {
-              readonly columns: {
-                readonly id: {
-                  readonly nativeType: 'int4';
-                  readonly codecId: 'pg/int4@1';
-                  readonly nullable: false;
-                };
-                readonly email: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
+type EmittedContract = Contract<{
+  readonly storageHash: StorageHashBase<string>;
+  readonly namespaces: {
+    readonly public: {
+      readonly id: 'public';
+      readonly kind: 'sql-namespace';
+      readonly entries: {
+        readonly table: {
+          readonly user: {
+            readonly columns: {
+              readonly id: {
+                readonly nativeType: 'int4';
+                readonly codecId: 'pg/int4@1';
+                readonly nullable: false;
               };
-              readonly primaryKey: { readonly columns: readonly ['id'] };
-              readonly uniques: readonly [];
-              readonly indexes: readonly [];
-              readonly foreignKeys: readonly [];
+              readonly email: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
             };
+            readonly primaryKey: { readonly columns: readonly ['id'] };
+            readonly uniques: readonly [];
+            readonly indexes: readonly [];
+            readonly foreignKeys: readonly [];
           };
         };
       };
     };
-  },
-  {
-    readonly User: {
-      readonly fields: {
-        readonly id: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-        };
-        readonly email: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-      };
-      readonly storage: {
-        readonly table: 'user';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly email: { readonly column: 'email' };
-        };
-      };
-      readonly relations: Record<string, ContractRelation>;
-    };
-  }
->;
+  };
+}>;
 
 describe('contract emit command (CLI process e2e)', () => {
   let testDir: string;

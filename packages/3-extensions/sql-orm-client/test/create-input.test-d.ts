@@ -1,72 +1,79 @@
 import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import type { CreateInput } from '../src/types';
 
-type CreateInputContract = Contract<
-  {
-    storageHash: StorageHashBase<string>;
-    namespaces: {
-      __unbound__: {
-        id: '__unbound__';
-        kind: 'sql-namespace';
-        entries: {
-          table: {
-            user: {
-              columns: {
-                id: {
-                  nativeType: 'int4';
-                  codecId: 'pg/int4@1';
-                  nullable: false;
-                  default: {
-                    kind: 'function';
-                    expression: "nextval('user_id_seq'::regclass)";
-                  };
-                };
-                email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-                name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: true };
-                slug: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-                created_at: {
-                  nativeType: 'timestamptz';
-                  codecId: 'pg/text@1';
-                  nullable: false;
-                  default: {
-                    kind: 'function';
-                    expression: 'now()';
-                  };
+type CreateInputStorage = {
+  storageHash: StorageHashBase<string>;
+  namespaces: {
+    __unbound__: {
+      id: '__unbound__';
+      kind: 'sql-namespace';
+      entries: {
+        table: {
+          user: {
+            columns: {
+              id: {
+                nativeType: 'int4';
+                codecId: 'pg/int4@1';
+                nullable: false;
+                default: {
+                  kind: 'function';
+                  expression: "nextval('user_id_seq'::regclass)";
                 };
               };
-              primaryKey: { columns: ['id'] };
-              uniques: [];
-              indexes: [];
-              foreignKeys: [];
+              email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+              name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: true };
+              slug: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+              created_at: {
+                nativeType: 'timestamptz';
+                codecId: 'pg/text@1';
+                nullable: false;
+                default: {
+                  kind: 'function';
+                  expression: 'now()';
+                };
+              };
             };
+            primaryKey: { columns: ['id'] };
+            uniques: [];
+            indexes: [];
+            foreignKeys: [];
           };
         };
       };
     };
-  },
-  {
-    User: {
-      storage: {
-        table: 'user';
-        fields: {
-          id: { column: 'id' };
-          email: { column: 'email' };
-          name: { column: 'name' };
-          slug: { column: 'slug' };
-          createdAt: { column: 'created_at' };
-        };
-      };
+  };
+};
+
+type CreateInputModels = {
+  User: {
+    storage: {
+      table: 'user';
       fields: {
-        id: { type: { kind: 'scalar'; codecId: 'pg/int4@1' }; nullable: false };
-        email: { type: { kind: 'scalar'; codecId: 'pg/text@1' }; nullable: false };
-        name: { type: { kind: 'scalar'; codecId: 'pg/text@1' }; nullable: true };
-        slug: { type: { kind: 'scalar'; codecId: 'pg/text@1' }; nullable: false };
-        createdAt: { type: { kind: 'scalar'; codecId: 'pg/text@1' }; nullable: false };
+        id: { column: 'id' };
+        email: { column: 'email' };
+        name: { column: 'name' };
+        slug: { column: 'slug' };
+        createdAt: { column: 'created_at' };
       };
-      relations: Record<string, never>;
     };
-  }
-> & {
+    fields: {
+      id: { type: { kind: 'scalar'; codecId: 'pg/int4@1' }; nullable: false };
+      email: { type: { kind: 'scalar'; codecId: 'pg/text@1' }; nullable: false };
+      name: { type: { kind: 'scalar'; codecId: 'pg/text@1' }; nullable: true };
+      slug: { type: { kind: 'scalar'; codecId: 'pg/text@1' }; nullable: false };
+      createdAt: { type: { kind: 'scalar'; codecId: 'pg/text@1' }; nullable: false };
+    };
+    relations: Record<string, never>;
+  };
+};
+
+type CreateInputContract = Omit<Contract<CreateInputStorage>, 'domain'> & {
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: { readonly models: CreateInputModels };
+    };
+  };
+} & {
   readonly execution: {
     readonly mutations: {
       readonly defaults: [

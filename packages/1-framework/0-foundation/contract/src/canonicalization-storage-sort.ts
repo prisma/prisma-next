@@ -1,14 +1,11 @@
 import type { StorageSort } from './canonicalization';
+import { isPlainRecord } from './is-plain-record';
 
 export type PathSegment = string | '*';
 
 export interface NamedArraySortTarget {
   readonly path: readonly PathSegment[];
   readonly arrayKeys: readonly string[];
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 // Order by UTF-16 code unit, not locale collation: canonicalization feeds

@@ -4,7 +4,7 @@ import type { FieldOutputTypes } from '../contract';
 import type { Db } from '../db';
 import { collectResults } from './execute-raw';
 
-type Product = FieldOutputTypes['Product'];
+type Product = FieldOutputTypes['__unbound__']['Product'];
 
 export function findProducts(db: Db) {
   return db.orm.products.all();

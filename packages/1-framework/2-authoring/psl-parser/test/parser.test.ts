@@ -2,7 +2,6 @@ import type { AuthoringPslBlockDescriptor } from '@prisma-next/framework-compone
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import {
   flatPslCompositeTypes,
-  flatPslEnums,
   flatPslModels,
   namespacePslExtensionBlocks,
 } from '@prisma-next/framework-components/psl-ast';
@@ -10,77 +9,6 @@ import { describe, expect, it } from 'vitest';
 import { parsePslDocument } from '../src/parser';
 
 describe('parsePslDocument', () => {
-  it('parses representative v1 schema with generic attributes and spans', () => {
-    const schema = `
-types {
-  Email = String @db.VarChar(191)
-}
-
-enum Role {
-  USER
-  ADMIN
-}
-
-model User {
-  id Int @id @default(autoincrement())
-  email Email @unique
-  role Role
-  posts Post[]
-}
-
-model Post {
-  id Int @id @default(autoincrement())
-  userId Int
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: SetNull)
-  createdAt DateTime @default(now())
-  published Boolean @default(true)
-  @@index([userId])
-}
-`;
-
-    const result = parsePslDocument({
-      schema,
-      sourceId: 'schema.prisma',
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.diagnostics).toEqual([]);
-    expect(flatPslModels(result.ast)).toHaveLength(2);
-    expect(flatPslEnums(result.ast)).toHaveLength(1);
-    expect(result.ast.types?.declarations).toHaveLength(1);
-    expect(result.ast.span.start.line).toBe(1);
-    expect(result.ast.span.end.line).toBeGreaterThan(1);
-
-    const userModel = flatPslModels(result.ast).find((model) => model.name === 'User');
-    expect(userModel).toBeDefined();
-    const emailField = userModel?.fields.find((field) => field.name === 'email');
-    expect(emailField?.typeRef).toBe('Email');
-    const namedType = result.ast.types?.declarations[0];
-    expect(namedType?.attributes[0]).toMatchObject({
-      kind: 'attribute',
-      target: 'namedType',
-      name: 'db.VarChar',
-      args: [{ kind: 'positional', value: '191' }],
-    });
-
-    const postModel = flatPslModels(result.ast).find((model) => model.name === 'Post');
-    const relationField = postModel?.fields.find((field) => field.name === 'user');
-    const relationAttribute = relationField?.attributes.find(
-      (attribute) => attribute.name === 'relation',
-    );
-    expect(relationAttribute).toMatchObject({
-      kind: 'attribute',
-      target: 'field',
-      name: 'relation',
-      args: [
-        { kind: 'named', name: 'fields', value: '[userId]' },
-        { kind: 'named', name: 'references', value: '[id]' },
-        { kind: 'named', name: 'onDelete', value: 'Cascade' },
-        { kind: 'named', name: 'onUpdate', value: 'SetNull' },
-      ],
-    });
-  });
-
   it('parses namespaced parameterized attributes generically', () => {
     const schema = `
 types {
@@ -378,76 +306,6 @@ model Account {
       name: 'map',
       args: [{ kind: 'positional', value: '"app_accounts"' }],
     });
-  });
-
-  it('parses enum @@map through generic attributes', () => {
-    const schema = `
-enum UserRole {
-  USER
-  ADMIN
-  @@map("user_role")
-}
-`;
-
-    const result = parsePslDocument({
-      schema,
-      sourceId: 'schema.prisma',
-    });
-
-    expect(result.ok).toBe(true);
-    const userRole = flatPslEnums(result.ast).find((enumBlock) => enumBlock.name === 'UserRole');
-    expect(userRole?.attributes.find((attribute) => attribute.name === 'map')).toMatchObject({
-      kind: 'attribute',
-      target: 'enum',
-      name: 'map',
-      args: [{ kind: 'positional', value: '"user_role"' }],
-    });
-  });
-
-  it('captures per-member @map storage labels', () => {
-    // The printer emits `@map("...")` on a member line whenever it had to
-    // normalise the storage label into a valid PSL identifier (e.g. Postgres
-    // enum labels with hyphens or PSL reserved words). The parser captures
-    // the original storage label as `mapName` on the corresponding
-    // `PslEnumValue`, so a parse → print → parse round-trip preserves it.
-    const schema = `
-enum Status {
-  inProgress @map("in-progress")
-  _enum @map("enum")
-  done
-}
-`;
-
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
-    expect(result.ok).toBe(true);
-    const status = flatPslEnums(result.ast).find((e) => e.name === 'Status');
-    expect(status?.values.map((v) => ({ name: v.name, mapName: v.mapName }))).toEqual([
-      { name: 'inProgress', mapName: 'in-progress' },
-      { name: '_enum', mapName: 'enum' },
-      { name: 'done', mapName: undefined },
-    ]);
-  });
-
-  it('decodes PSL escape sequences in per-member @map storage labels', () => {
-    // The parser must apply the inverse of escapePslString so a label like
-    // `name with "quotes" and \\backslash` survives a parse → print → parse
-    // round-trip without doubling escapes.
-    const schema = `
-enum Quoted {
-  hasQuote @map("with \\"quote\\"")
-  hasBackslash @map("with \\\\back")
-  hasNewline @map("line1\\nline2")
-}
-`;
-
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
-    expect(result.ok).toBe(true);
-    const quoted = flatPslEnums(result.ast).find((e) => e.name === 'Quoted');
-    expect(quoted?.values.map((v) => v.mapName)).toEqual([
-      'with "quote"',
-      'with \\back',
-      'line1\nline2',
-    ]);
   });
 
   it('returns diagnostics for malformed attribute syntax', () => {
@@ -818,42 +676,6 @@ model User {
       ]),
     );
   });
-
-  it('returns diagnostics when named types collide with enum names', () => {
-    const schema = `
-types {
-  Role = String
-}
-
-enum Role {
-  USER
-  ADMIN
-}
-
-model User {
-  id Int @id
-  role Role
-}
-`;
-
-    const result = parsePslDocument({
-      schema,
-      sourceId: 'schema.prisma',
-    });
-
-    expect(result.ok).toBe(false);
-    const messages = result.diagnostics
-      .filter((entry) => entry.code === 'PSL_INVALID_TYPES_MEMBER')
-      .map((entry) => entry.message);
-    expect(messages).toEqual(
-      expect.arrayContaining([expect.stringContaining('conflicts with enum name "Role"')]),
-    );
-
-    const userModel = flatPslModels(result.ast).find((model) => model.name === 'User');
-    const roleField = userModel?.fields.find((field) => field.name === 'role');
-    expect(roleField?.typeName).toBe('Role');
-    expect(roleField?.typeRef).toBeUndefined();
-  });
 });
 
 describe('composite type blocks', () => {
@@ -959,11 +781,6 @@ namespace auth {
   model User {
     id Int @id
   }
-
-  enum Role {
-    ADMIN
-    MEMBER
-  }
 }
 `;
       const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
@@ -973,11 +790,9 @@ namespace auth {
 
       const top = result.ast.namespaces.find((ns) => ns.name === '__unspecified__');
       expect(top?.models.map((m) => m.name)).toEqual(['TopLevel']);
-      expect(top?.enums).toEqual([]);
 
       const auth = result.ast.namespaces.find((ns) => ns.name === 'auth');
       expect(auth?.models.map((m) => m.name)).toEqual(['User']);
-      expect(auth?.enums.map((e) => e.name)).toEqual(['Role']);
     });
 
     it('drops the synthesised __unspecified__ bucket when every declaration is namespaced', () => {
@@ -1002,9 +817,8 @@ namespace auth {
 }
 
 namespace auth {
-  enum Role {
-    ADMIN
-    MEMBER
+  model Post {
+    id Int @id
   }
 }
 `;
@@ -1014,8 +828,7 @@ namespace auth {
       expect(result.ast.namespaces).toHaveLength(1);
       const auth = result.ast.namespaces[0]!;
       expect(auth.name).toBe('auth');
-      expect(auth.models.map((m) => m.name)).toEqual(['User']);
-      expect(auth.enums.map((e) => e.name)).toEqual(['Role']);
+      expect(auth.models.map((m) => m.name)).toEqual(['User', 'Post']);
     });
 
     it('rejects a recursive namespace block as a parse diagnostic', () => {
@@ -1336,31 +1149,6 @@ policy_select ReadPosts {
       expect(nsExtBlocks2).toHaveLength(1);
       expect(nsExtBlocks2[0]?.kind).toBe('test-policy-select');
       expect(nsExtBlocks2[0]?.name).toBe('ReadPosts');
-    });
-
-    it('built-in block parsing is unchanged when pslBlockDescriptors is provided', () => {
-      const schema = `
-model User {
-  id Int @id
-  email String @unique
-}
-
-enum Role {
-  ADMIN
-  EDITOR
-}
-`;
-      const result = parsePslDocument({
-        schema,
-        sourceId: 'schema.prisma',
-        pslBlockDescriptors: { policy_select: policySelectDescriptor },
-      });
-
-      expect(result.ok).toBe(true);
-      expect(result.diagnostics).toEqual([]);
-      expect(flatPslModels(result.ast)).toHaveLength(1);
-      expect(flatPslEnums(result.ast)).toHaveLength(1);
-      expect(namespacePslExtensionBlocks(result.ast.namespaces[0]!)).toHaveLength(0);
     });
 
     it('lands extension blocks in the namespace extensionBlocks slot in source order', () => {

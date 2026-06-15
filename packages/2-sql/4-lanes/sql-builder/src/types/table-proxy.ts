@@ -1,11 +1,10 @@
-import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
 import type {
   ExtractCodecTypes,
   ExtractFieldInputTypes,
-  ExtractFieldOutputTypes,
   ExtractQueryOperationTypes,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
+import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
 import type { Expression, FieldProxy, Functions } from '../expression';
 import type {
   DefaultScope,
@@ -16,98 +15,111 @@ import type {
   Scope,
   StorageTableToScopeTable,
 } from '../scope';
-import type { TableProxyContract, UnboundTables } from './db';
+import type { NamespaceTable, TableProxyContract } from './db';
 import type { DeleteQuery, InsertQuery, InsertValues, UpdateQuery } from './mutation-query';
 import type { WithJoin, WithSelect } from './shared';
 
-type FindModelForTable<C, TableName extends string> = C extends Contract
+type FindModelForTable<
+  C extends TableProxyContract,
+  NsId extends string,
+  TableName extends string,
+> = C['domain']['namespaces'][NsId]['models'] extends infer Models extends Record<string, unknown>
   ? {
-      [M in keyof ContractModelDefinitions<C> & string]: ContractModelDefinitions<C>[M] extends {
+      [M in keyof Models & string]: Models[M] extends {
         readonly storage: { readonly table: TableName };
       }
         ? M
         : never;
-    }[keyof ContractModelDefinitions<C> & string]
+    }[keyof Models & string]
   : never;
 
-type FindFieldForColumn<C, ModelName extends string, ColumnName extends string> = C extends Contract
-  ? ModelName extends keyof ContractModelDefinitions<C>
-    ? {
-        [F in keyof ContractModelDefinitions<C>[ModelName]['storage']['fields'] &
-          string]: ContractModelDefinitions<C>[ModelName]['storage']['fields'][F] extends {
-          readonly column: ColumnName;
-        }
-          ? F
-          : never;
-      }[keyof ContractModelDefinitions<C>[ModelName]['storage']['fields'] & string]
+type FindFieldForColumn<
+  C extends TableProxyContract,
+  NsId extends string,
+  ModelName extends string,
+  ColumnName extends string,
+> = C['domain']['namespaces'][NsId]['models'] extends infer Models extends Record<string, unknown>
+  ? ModelName extends keyof Models
+    ? Models[ModelName] extends {
+        readonly storage: { readonly fields: infer Fields extends Record<string, unknown> };
+      }
+      ? {
+          [F in keyof Fields & string]: Fields[F] extends { readonly column: ColumnName }
+            ? F
+            : never;
+        }[keyof Fields & string]
+      : never
     : never
   : never;
 
+// The select-result row's column types for a table at a namespace coordinate.
+// Each column resolves through `ComputeColumnJsType` with the coordinate, so
+// refined per-namespace output types (e.g. `Vector<N>`) are preserved and
+// same-named tables across namespaces resolve to each namespace's own columns.
+// `ComputeColumnJsType`'s constraint is the minimal `ColumnResolutionContract`,
+// which `TableProxyContract` satisfies, so `C` is indexed directly — no
+// `C extends Contract<SqlStorage>` guard.
 type ResolvedColumnTypes<
-  C,
+  C extends TableProxyContract,
+  NsId extends string,
   TableName extends string,
-  FieldTypes extends Record<string, Record<string, unknown>>,
-> = string extends keyof FieldTypes
-  ? Record<string, never>
-  : FindModelForTable<C, TableName> extends infer ModelName extends string
-    ? ModelName extends keyof FieldTypes
-      ? C extends TableProxyContract
-        ? UnboundTables<C> extends infer Tables extends Record<string, StorageTable>
-          ? TableName extends keyof Tables
-            ? {
-                [ColName in keyof Tables[TableName]['columns'] & string]: FindFieldForColumn<
-                  C,
-                  ModelName,
-                  ColName
-                > extends infer FieldName extends string
-                  ? FieldName extends keyof FieldTypes[ModelName]
-                    ? FieldTypes[ModelName][FieldName]
-                    : unknown
-                  : unknown;
-              }
-            : Record<string, never>
-          : Record<string, never>
-        : Record<string, never>
-      : Record<string, never>
+> =
+  NamespaceTable<C, NsId, TableName> extends infer Table extends StorageTable
+    ? {
+        [ColName in keyof Table['columns'] & string]: ComputeColumnJsType<
+          C,
+          NsId,
+          TableName,
+          ColName,
+          ExtractCodecTypes<C>
+        >;
+      }
     : Record<string, never>;
 
 type ResolvedInsertValues<
-  C,
+  C extends TableProxyContract,
+  NsId extends string,
   Table extends StorageTable,
   TableName extends string,
   CT extends Record<string, { readonly input: unknown }>,
-  FieldInputs extends Record<string, Record<string, unknown>>,
+  FieldInputs extends Record<string, Record<string, Record<string, unknown>>>,
 > = string extends keyof FieldInputs
   ? InsertValues<Table, CT>
-  : FindModelForTable<C, TableName> extends infer ModelName extends string
-    ? ModelName extends keyof FieldInputs
-      ? {
-          [K in keyof Table['columns']]?: FindFieldForColumn<
-            C,
-            ModelName,
-            K & string
-          > extends infer FieldName extends string
-            ? FieldName extends keyof FieldInputs[ModelName]
-              ? Table['columns'][K]['nullable'] extends true
-                ? NonNullable<FieldInputs[ModelName][FieldName]> | null
-                : NonNullable<FieldInputs[ModelName][FieldName]>
-              : Table['columns'][K]['codecId'] extends keyof CT
-                ? CT[Table['columns'][K]['codecId']]['input']
-                : unknown
-            : Table['columns'][K]['codecId'] extends keyof CT
-              ? CT[Table['columns'][K]['codecId']]['input']
-              : unknown;
-        }
+  : NsId extends keyof FieldInputs
+    ? FieldInputs[NsId] extends infer NsInputs extends Record<string, Record<string, unknown>>
+      ? FindModelForTable<C, NsId, TableName> extends infer ModelName extends string
+        ? ModelName extends keyof NsInputs
+          ? {
+              [K in keyof Table['columns']]?: FindFieldForColumn<
+                C,
+                NsId,
+                ModelName,
+                K & string
+              > extends infer FieldName extends string
+                ? FieldName extends keyof NsInputs[ModelName]
+                  ? Table['columns'][K]['nullable'] extends true
+                    ? NonNullable<NsInputs[ModelName][FieldName]> | null
+                    : NonNullable<NsInputs[ModelName][FieldName]>
+                  : Table['columns'][K]['codecId'] extends keyof CT
+                    ? CT[Table['columns'][K]['codecId']]['input']
+                    : unknown
+                : Table['columns'][K]['codecId'] extends keyof CT
+                  ? CT[Table['columns'][K]['codecId']]['input']
+                  : unknown;
+            }
+          : InsertValues<Table, CT>
+        : InsertValues<Table, CT>
       : InsertValues<Table, CT>
     : InsertValues<Table, CT>;
 
 type ResolvedUpdateValues<
-  C,
+  C extends TableProxyContract,
+  NsId extends string,
   Table extends StorageTable,
   TableName extends string,
   CT extends Record<string, { readonly input: unknown }>,
-  FieldInputs extends Record<string, Record<string, unknown>>,
-> = ResolvedInsertValues<C, Table, TableName, CT, FieldInputs>;
+  FieldInputs extends Record<string, Record<string, Record<string, unknown>>>,
+> = ResolvedInsertValues<C, NsId, Table, TableName, CT, FieldInputs>;
 
 type ResolvedUpdateExpressions<Table extends StorageTable> = {
   [K in keyof Table['columns']]?: Expression<{
@@ -116,31 +128,37 @@ type ResolvedUpdateExpressions<Table extends StorageTable> = {
   }>;
 };
 
-export type ContractToQC<C extends TableProxyContract, Name extends string = string> = {
+export type ContractToQC<
+  C extends TableProxyContract,
+  NsId extends string = string,
+  Name extends string = string,
+> = {
   readonly codecTypes: ExtractCodecTypes<C>;
   readonly capabilities: C['capabilities'];
   readonly queryOperationTypes: ExtractQueryOperationTypes<C>;
-  readonly resolvedColumnOutputTypes: ResolvedColumnTypes<C, Name, ExtractFieldOutputTypes<C>>;
+  readonly resolvedColumnOutputTypes: ResolvedColumnTypes<C, NsId, Name>;
 };
 
 export interface TableProxy<
   C extends TableProxyContract,
-  Name extends string & keyof UnboundTables<C>,
+  NsId extends string,
+  Name extends string,
   Alias extends string = Name,
-  AvailableScope extends Scope = DefaultScope<Name, UnboundTables<C>[Name]>,
-  QC extends QueryContext = ContractToQC<C, Name>,
-> extends JoinSource<StorageTableToScopeTable<UnboundTables<C>[Name]>, Alias>,
+  AvailableScope extends Scope = DefaultScope<Name, NamespaceTable<C, NsId, Name>>,
+  QC extends QueryContext = ContractToQC<C, NsId, Name>,
+> extends JoinSource<StorageTableToScopeTable<NamespaceTable<C, NsId, Name>>, Alias>,
     WithSelect<QC, AvailableScope, EmptyRow>,
     WithJoin<QC, AvailableScope, C['capabilities']> {
   as<NewAlias extends string>(
     newAlias: NewAlias,
-  ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>, QC>;
+  ): TableProxy<C, NsId, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>, QC>;
 
   insert(
     rows: ReadonlyArray<
       ResolvedInsertValues<
         C,
-        UnboundTables<C>[Name],
+        NsId,
+        NamespaceTable<C, NsId, Name>,
         Name,
         QC['codecTypes'],
         ExtractFieldInputTypes<C>
@@ -151,7 +169,8 @@ export interface TableProxy<
   update(
     set: ResolvedUpdateValues<
       C,
-      UnboundTables<C>[Name],
+      NsId,
+      NamespaceTable<C, NsId, Name>,
       Name,
       QC['codecTypes'],
       ExtractFieldInputTypes<C>
@@ -162,7 +181,7 @@ export interface TableProxy<
     callback: (
       fields: FieldProxy<AvailableScope>,
       fns: Functions<QC>,
-    ) => ResolvedUpdateExpressions<UnboundTables<C>[Name]>,
+    ) => ResolvedUpdateExpressions<NamespaceTable<C, NsId, Name>>,
   ): UpdateQuery<QC, AvailableScope, EmptyRow>;
 
   delete(): DeleteQuery<QC, AvailableScope, EmptyRow>;

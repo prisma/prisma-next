@@ -65,7 +65,6 @@
     "./data-transform": "./dist/data-transform.mjs",
     "./ddl": "./dist/ddl.mjs",
     "./default-normalizer": "./dist/default-normalizer.mjs",
-    "./enum-planning": "./dist/enum-planning.mjs",
     "./errors": "./dist/errors.mjs",
     "./issue-planner": "./dist/issue-planner.mjs",
     "./migration": "./dist/migration.mjs",
@@ -83,6 +82,7 @@
     "./render-typescript": "./dist/render-typescript.mjs",
     "./rls-canonicalize": "./dist/rls-canonicalize.mjs",
     "./runtime": "./dist/runtime.mjs",
+    "./schema-ir-annotations": "./dist/schema-ir-annotations.mjs",
     "./sql-utils": "./dist/sql-utils.mjs",
     "./types": "./dist/types.mjs",
     "./package.json": "./package.json"

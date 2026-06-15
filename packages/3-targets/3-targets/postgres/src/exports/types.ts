@@ -1,5 +1,3 @@
-export { PostgresEnumType, type PostgresEnumTypeInput } from '../core/postgres-enum-type';
-export { PostgresEnumTypeSchema } from '../core/postgres-enum-type-schema';
 export {
   PostgresRlsPolicy,
   type PostgresRlsPolicyInput,

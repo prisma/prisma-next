@@ -4,11 +4,11 @@ import type { FieldInputTypes } from '../contract';
 import type { Db } from '../db';
 import { collectResults } from './execute-raw';
 
-type EventBase = Omit<FieldInputTypes['Event'], '_id' | 'type'>;
+type EventBase = Omit<FieldInputTypes['__unbound__']['Event'], '_id' | 'type'>;
 
 export function createViewProductEvent(
   db: Db,
-  event: EventBase & FieldInputTypes['ViewProductEvent'],
+  event: EventBase & FieldInputTypes['__unbound__']['ViewProductEvent'],
 ) {
   return db.orm.events.variant('ViewProductEvent').create({
     userId: event.userId,
@@ -21,7 +21,10 @@ export function createViewProductEvent(
   });
 }
 
-export function createSearchEvent(db: Db, event: EventBase & FieldInputTypes['SearchEvent']) {
+export function createSearchEvent(
+  db: Db,
+  event: EventBase & FieldInputTypes['__unbound__']['SearchEvent'],
+) {
   return db.orm.events.variant('SearchEvent').create({
     userId: event.userId,
     sessionId: event.sessionId,
@@ -30,7 +33,10 @@ export function createSearchEvent(db: Db, event: EventBase & FieldInputTypes['Se
   });
 }
 
-export function createAddToCartEvent(db: Db, event: EventBase & FieldInputTypes['AddToCartEvent']) {
+export function createAddToCartEvent(
+  db: Db,
+  event: EventBase & FieldInputTypes['__unbound__']['AddToCartEvent'],
+) {
   return db.orm.events.variant('AddToCartEvent').create({
     userId: event.userId,
     sessionId: event.sessionId,

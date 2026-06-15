@@ -184,6 +184,7 @@ declare const userCollectionWithWhere: Collection<
     readonly hasWhere: true;
     readonly hasUniqueFilter: false;
     readonly variantName: undefined;
+    readonly nsId: never;
   }
 >;
 

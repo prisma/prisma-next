@@ -21,11 +21,6 @@ export {
   ForeignKeyReference,
   type ForeignKeyReferenceInput,
 } from './ir/foreign-key-reference';
-export {
-  isPostgresEnumStorageEntry,
-  POSTGRES_ENUM_KIND,
-  type PostgresEnumStorageEntry,
-} from './ir/postgres-enum-storage-entry';
 export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
@@ -84,11 +79,15 @@ export function applyFkDefaults(
   };
 }
 
+// Field-type maps nested by namespace coordinate: `[namespaceId][model][field]`.
+// Shared by the output and input field-type maps and their extractors.
+export type NamespacedFieldTypeMap = Record<string, Record<string, Record<string, unknown>>>;
+
 export type TypeMaps<
   TCodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
   TQueryOperationTypes extends Record<string, unknown> = Record<string, never>,
-  TFieldOutputTypes extends Record<string, Record<string, unknown>> = Record<string, never>,
-  TFieldInputTypes extends Record<string, Record<string, unknown>> = Record<string, never>,
+  TFieldOutputTypes extends NamespacedFieldTypeMap = Record<string, never>,
+  TFieldInputTypes extends NamespacedFieldTypeMap = Record<string, never>,
 > = {
   readonly codecTypes: TCodecTypes;
   readonly queryOperationTypes: TQueryOperationTypes;
@@ -160,7 +159,7 @@ export type ExtractTypeMapsFromContract<T> = TypeMapsPhantomKey extends keyof T
 export type FieldOutputTypesOf<T> = [T] extends [never]
   ? Record<string, never>
   : T extends { readonly fieldOutputTypes: infer F }
-    ? F extends Record<string, Record<string, unknown>>
+    ? F extends NamespacedFieldTypeMap
       ? F
       : Record<string, never>
     : Record<string, never>;
@@ -168,7 +167,7 @@ export type FieldOutputTypesOf<T> = [T] extends [never]
 export type FieldInputTypesOf<T> = [T] extends [never]
   ? Record<string, never>
   : T extends { readonly fieldInputTypes: infer F }
-    ? F extends Record<string, Record<string, unknown>>
+    ? F extends NamespacedFieldTypeMap
       ? F
       : Record<string, never>
     : Record<string, never>;

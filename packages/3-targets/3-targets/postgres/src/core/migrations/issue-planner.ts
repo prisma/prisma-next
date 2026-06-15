@@ -19,7 +19,6 @@ import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type {
-  PostgresEnumStorageEntry,
   SqlStorage,
   StorageColumn,
   StorageTable,
@@ -32,15 +31,12 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
-import { PostgresEnumType } from '../postgres-enum-type';
-import { isPostgresSchema } from '../postgres-schema';
 import {
   AddColumnCall,
   AddForeignKeyCall,
   AddPrimaryKeyCall,
   AddUniqueCall,
   AlterColumnTypeCall,
-  CreateEnumTypeCall,
   CreateIndexCall,
   CreateSchemaCall,
   CreateTableCall,
@@ -70,19 +66,6 @@ import {
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
 export type { CallMigrationStrategy, StrategyContext };
-
-/**
- * Finds a type entry by explicit namespace coordinate. Reads the named
- * namespace's `enum` slot directly — never scans other namespaces.
- */
-function locateNamespaceTypeInStorage(
-  storage: SqlStorage,
-  namespaceId: string,
-  typeName: string,
-): unknown {
-  const ns = storage.namespaces[namespaceId];
-  return isPostgresSchema(ns) ? ns.type[typeName] : undefined;
-}
 
 // ============================================================================
 // Issue kind ordering (dependency order)
@@ -168,7 +151,7 @@ export interface IssuePlannerOptions {
   readonly fromContract: Contract<SqlStorage> | null;
   readonly schemaName: string;
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
-  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance>>;
   /**
    * Current database schema IR. Strategies read this to detect whether a
    * structure already exists (e.g. `buildSchemaLookupMap` for shared-temp-
@@ -207,13 +190,13 @@ function toDdlColumn(
   name: string,
   column: StorageColumn,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
-  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance>>,
 ): DdlColumn {
   const typeSql = buildColumnTypeSql(column, codecHooks, storageTypes);
   const ddlDefault = postgresDefaultToDdlColumnDefault(column.default);
   const resolved = resolveColumnTypeMetadata(
     column,
-    storageTypes as Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+    storageTypes as Record<string, StorageTypeInstance>,
   );
   const codecRef: CodecRef | undefined = resolved.codecId
     ? {
@@ -490,10 +473,7 @@ function mapIssueToCall(
             ),
           );
         const hooksMap = codecHooks as Map<string, CodecControlHooks>;
-        const typesMap = storageTypes as Record<
-          string,
-          StorageTypeInstance | PostgresEnumStorageEntry
-        >;
+        const typesMap = storageTypes as Record<string, StorageTypeInstance>;
         const qualifiedTargetType = buildColumnTypeSql(column, hooksMap, typesMap, false);
         const formatTypeExpected = buildExpectedFormatType(column, hooksMap, typesMap);
         return ok([
@@ -681,14 +661,7 @@ function mapIssueToCall(
     case 'type_missing': {
       if (!issue.typeName)
         return notOk(issueConflict('unsupportedOperation', 'Type missing issue has no typeName'));
-      // Codec aliases live in storage.types; enum types live in namespace.entries.type.
-      // Check types first; fall back to the namespace-keyed enum slot using the
-      // issue's namespace coordinate (populated by the verifier for enum-related
-      // issues per the BaseSchemaIssue.namespaceId contract).
-      const namespaceId = resolveNamespaceIdForIssue(issue);
-      const typeInstance: unknown =
-        ctx.toContract.storage.types?.[issue.typeName] ??
-        locateNamespaceTypeInStorage(ctx.toContract.storage, namespaceId, issue.typeName);
+      const typeInstance = ctx.toContract.storage.types?.[issue.typeName];
       if (!typeInstance) {
         return notOk(
           issueConflict(
@@ -697,22 +670,10 @@ function mapIssueToCall(
           ),
         );
       }
-      if (typeInstance instanceof PostgresEnumType) {
-        const ddlSchema = resolveDdlSchemaForNamespace(ctx, namespaceId);
-        return ok([
-          new CreateEnumTypeCall(
-            ddlSchema,
-            issue.typeName,
-            typeInstance.values,
-            typeInstance.nativeType,
-          ),
-        ]);
-      }
-      const codecInstance = typeInstance as StorageTypeInstance;
       return notOk(
         issueConflict(
           'unsupportedOperation',
-          `Type "${issue.typeName}" uses codec "${codecInstance.codecId}" — only enum types are supported`,
+          `Type "${issue.typeName}" uses codec "${typeInstance.codecId}" — only value-set types are supported`,
         ),
       );
     }
@@ -761,10 +722,6 @@ function classifyCall(call: PostgresOpFactoryCall): CallCategory {
   switch (call.factoryName) {
     case 'createExtension':
     case 'createSchema':
-    case 'createEnumType':
-    case 'addEnumValues':
-    case 'dropEnumType':
-    case 'renameType':
       return 'dep';
     case 'dropTable':
     case 'dropColumn':
@@ -999,10 +956,10 @@ export function planIssues(
     return notOk(conflicts);
   }
 
-  // Recipe strategies (`nativeEnumPlanCallStrategy`,
-  // `notNullBackfillCallStrategy`, etc.) emit a cohesive sequence that must
+  // Recipe strategies (`notNullBackfillCallStrategy`,
+  // `nullableTighteningCallStrategy`, etc.) emit a cohesive sequence that must
   // stay contiguous. They are inserted at a single pattern slot. Non-recipe
-  // pattern strategies (`dependencyInstallCallStrategy`,
+  // pattern strategies (`checkConstraintPlanCallStrategy`,
   // `storageTypePlanCallStrategy`, `notNullAddColumnCallStrategy`) produce
   // individually classifiable calls that slot into DDL buckets alongside
   // default-mapped calls. Extra calls (e.g. RLS diff calls from planSql)

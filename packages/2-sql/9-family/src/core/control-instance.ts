@@ -675,9 +675,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     }): VerifyDatabaseSchemaResult {
       const contract = deserializeWithTargetSerializer(options.contract) as Contract<SqlStorage>;
       const controlAdapter = getControlAdapter();
-      const resolveExistingEnumValues =
-        controlAdapter.resolveExistingEnumValuesForContract?.(contract) ??
-        controlAdapter.resolveExistingEnumValues;
       const sqlResult = verifySqlSchema({
         contract,
         schema: options.schema,
@@ -686,7 +683,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         frameworkComponents: options.frameworkComponents,
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
-        ...ifDefined('resolveExistingEnumValues', resolveExistingEnumValues),
       });
       const extensionIssues =
         controlAdapter.collectExtensionIssues?.(contract, options.schema) ?? [];

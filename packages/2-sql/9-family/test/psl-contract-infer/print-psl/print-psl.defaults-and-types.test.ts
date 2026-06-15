@@ -240,7 +240,7 @@ describe('printPsl', () => {
     `);
   });
 
-  it('disambiguates named types from scalar, model, and enum identifiers', () => {
+  it('disambiguates named types from scalar and model identifiers', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {
         user: {
@@ -257,34 +257,11 @@ describe('printPsl', () => {
               nativeType: 'character varying(64)',
               nullable: false,
             },
-            role: {
-              name: 'role',
-              nativeType: 'character varying(32)',
-              nullable: false,
-            },
-            status: {
-              name: 'status',
-              nativeType: 'role',
-              nullable: false,
-            },
           },
           primaryKey: { columns: ['id'] },
           foreignKeys: [],
           uniques: [],
           indexes: [],
-        },
-      },
-      annotations: {
-        pg: {
-          enumTypes: {
-            public: {
-              role: {
-                codecId: 'pg/enum@1',
-                nativeType: 'role',
-                typeParams: { values: ['USER', 'ADMIN'] },
-              },
-            },
-          },
         },
       },
     };
@@ -295,24 +272,14 @@ describe('printPsl', () => {
       // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       types {
-        Role2 = String @db.VarChar(32)
         String2 = String @db.VarChar(64)
         User2 = String @db.VarChar(255)
-      }
-
-      enum Role {
-        USER
-        ADMIN
-
-        @@map("role")
       }
 
       model User {
         id     Int     @id
         user   User2
         string String2
-        role   Role2
-        status Role
 
         @@map("user")
       }

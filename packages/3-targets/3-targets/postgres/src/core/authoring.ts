@@ -10,9 +10,6 @@ import type {
   PslExtensionBlockParamRef,
   PslExtensionBlockParamScalarValue,
 } from '@prisma-next/framework-components/authoring';
-import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
-import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
-import { PostgresEnumTypeSchema } from './postgres-enum-type-schema';
 import { PostgresRlsPolicy } from './postgres-rls-policy';
 import { PostgresRole, type PostgresRoleInput } from './postgres-role';
 import { PostgresRlsPolicySchema, PostgresRoleSchema } from './postgres-validators';
@@ -20,41 +17,6 @@ import { computeContentHash, normalizePredicate } from './rls/canonicalize';
 
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
 
-/**
- * Entity type contributions surface as top-level helpers on the
- * composed-helpers shape (e.g. `helpers.enum({...})`), flattened
- * alongside the built-in `model` / `rel` helpers. Pack contributions
- * still ship via the contribution data structure
- * `authoring.entityTypes.<name>`; the composed-helpers template
- * performs the rename in the type system.
- *
- * `enum` is the first real consumer of the entities-namespace mechanism:
- * the factory constructs a `PostgresEnumType` IR-class instance from
- * the user-supplied input. Both authoring runtimes (TS DSL and PSL)
- * dispatch through this single contribution — PSL `enum Status { … }`
- * declarations are lowered by the interpreter into a factory call
- * with the parsed name + value list; TS DSL `helpers.enum({...})`
- * resolves through the same path. Removing this contribution makes
- * both surfaces fail with a "no entity helper named `enum`" type
- * error at the contract-definition site.
- */
-/**
- * The factory constructs a `PostgresEnumType` instance natively — the
- * `SqlStorage.types` slot accepts polymorphic IR (the framework
- * `StorageType` alphabet), so no cast is needed at the contribution
- * surface. The declared return type is the structural
- * `PostgresEnumStorageEntry` so the inferred contract type stays
- * portable (it names a type exported from
- * `@prisma-next/sql-contract/types`, a public surface every consumer
- * already imports). Sharpening the inferred contract type to surface
- * enum-specific narrowing through `EntityHelperFunction` is a
- * separable refinement and lives outside this PR.
- */
-/**
- * The PSL interpreter attaches the enclosing namespace id to the extension
- * block before calling this factory, so the policy can record its schema
- * coordinate without the interpreter containing any RLS-specific knowledge.
- */
 export interface RlsPolicyExtensionBlock extends PslExtensionBlock {
   readonly namespaceId: string;
 }
@@ -122,15 +84,6 @@ function lowerRlsPolicyFromBlock(
 }
 
 export const postgresAuthoringEntityTypes = {
-  enum: {
-    kind: 'entity',
-    discriminator: 'postgres-enum',
-    validatorSchema: PostgresEnumTypeSchema,
-    output: {
-      factory: (input: PostgresEnumTypeInput): PostgresEnumStorageEntry =>
-        new PostgresEnumType(input),
-    },
-  },
   role: {
     kind: 'entity',
     discriminator: 'role',
@@ -139,9 +92,9 @@ export const postgresAuthoringEntityTypes = {
       factory: (input: PostgresRoleInput): PostgresRole => new PostgresRole(input),
     },
   },
-  rlsPolicy: {
+  policy: {
     kind: 'entity',
-    discriminator: 'rlsPolicy',
+    discriminator: 'policy',
     validatorSchema: PostgresRlsPolicySchema,
     output: {
       factory: lowerRlsPolicyFromBlock,

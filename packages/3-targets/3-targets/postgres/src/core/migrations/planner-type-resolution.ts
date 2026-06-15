@@ -1,9 +1,4 @@
-import {
-  isPostgresEnumStorageEntry,
-  type PostgresEnumStorageEntry,
-  type StorageColumn,
-  type StorageTypeInstance,
-} from '@prisma-next/sql-contract/types';
+import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 
 export type ResolvedColumnTypeMetadata = Pick<
   StorageColumn,
@@ -12,7 +7,7 @@ export type ResolvedColumnTypeMetadata = Pick<
 
 export function resolveColumnTypeMetadata(
   column: StorageColumn,
-  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance>>,
 ): ResolvedColumnTypeMetadata {
   if (!column.typeRef) {
     return column;
@@ -21,19 +16,6 @@ export function resolveColumnTypeMetadata(
   const referencedType = storageTypes[column.typeRef];
   if (!referencedType) {
     return column;
-  }
-
-  if (isPostgresEnumStorageEntry(referencedType)) {
-    // Enum types are referenced by name (`quoteIdentifier(nativeType)`),
-    // not via parameterised codec expansion. The structural shape
-    // carries `codecId` as an enumerable property (mirroring the
-    // codec-typed view); `typeParams` is intentionally omitted here so
-    // `expandParameterizedTypeSql` does not try to look up a
-    // (deliberately absent) `expandNativeType` hook for `pg/enum@*`.
-    return {
-      codecId: referencedType.codecId,
-      nativeType: referencedType.nativeType,
-    };
   }
 
   return {

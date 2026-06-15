@@ -71,7 +71,9 @@ const enumContract = defineContract({
 // ---------------------------------------------------------------------------
 
 describe('FieldOutputTypes: enum field narrows to value union', () => {
-  type FOT = ExtractFieldOutputTypes<typeof enumContract>;
+  // Field-type maps are nested by namespace coordinate; this contract's models
+  // lump under the target default namespace (`public`).
+  type FOT = ExtractFieldOutputTypes<typeof enumContract>['public'];
 
   it('non-nullable enum field is the value union (not string)', () => {
     expectTypeOf<FOT['User']['role']>().toEqualTypeOf<'user' | 'admin'>();
@@ -99,7 +101,7 @@ describe('FieldOutputTypes: enum field narrows to value union', () => {
 // ---------------------------------------------------------------------------
 
 describe('FieldInputTypes: enum field write input narrows to value union', () => {
-  type FIT = ExtractFieldInputTypes<typeof enumContract>;
+  type FIT = ExtractFieldInputTypes<typeof enumContract>['public'];
 
   it('non-nullable enum field input is the value union', () => {
     expectTypeOf<FIT['User']['role']>().toEqualTypeOf<'user' | 'admin'>();

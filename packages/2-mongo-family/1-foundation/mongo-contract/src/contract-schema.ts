@@ -312,7 +312,7 @@ const MongoCollectionOptionsSchema = type({
   'clusteredIndex?': ClusteredIndexSchema,
 });
 
-const StorageCollectionSchema = type({
+export const StorageCollectionSchema = type({
   '+': 'reject',
   'kind?': "'mongo-collection'",
   'indexes?': MongoStorageIndexSchema.array(),

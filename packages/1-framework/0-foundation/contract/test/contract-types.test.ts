@@ -35,7 +35,7 @@ describe('unified contract types', () => {
     });
   });
 
-  describe('Contract<TStorage, TModels>', () => {
+  describe('Contract<TStorage>', () => {
     it('accepts a full contract value', () => {
       const hash = 'sha256:abc123' as StorageHashBase<'sha256:abc123'>;
       const profHash = 'sha256:prof' as ProfileHashBase<'sha256:prof'>;

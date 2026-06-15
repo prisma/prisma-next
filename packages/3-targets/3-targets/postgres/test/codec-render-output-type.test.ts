@@ -5,7 +5,6 @@ import {
   pgBitDescriptor,
   pgBoolDescriptor,
   pgCharDescriptor,
-  pgEnumDescriptor,
   pgInt4Descriptor,
   pgIntervalDescriptor,
   pgJsonbDescriptor,
@@ -159,22 +158,6 @@ describe('codec renderOutputType', () => {
 
     it('renders Interval<P>', () => {
       expect(renderer?.({ precision: 3 })).toBe('Interval<3>');
-    });
-  });
-
-  describe('pg/enum@1', () => {
-    const renderer = rendererFor(pgEnumDescriptor);
-
-    it('renders literal union from values', () => {
-      expect(renderer?.({ values: ['USER', 'ADMIN'] })).toBe("'USER' | 'ADMIN'");
-    });
-
-    it('escapes backslashes before single quotes', () => {
-      expect(renderer?.({ values: ["it's", 'back\\slash'] })).toBe("'it\\'s' | 'back\\\\slash'");
-    });
-
-    it('throws when values is missing', () => {
-      expect(() => renderer?.({})).toThrow(/expected array "values"/);
     });
   });
 

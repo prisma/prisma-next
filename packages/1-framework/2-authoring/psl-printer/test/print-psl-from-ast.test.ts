@@ -2,7 +2,6 @@ import type {
   PslAttribute,
   PslCompositeType,
   PslDocumentAst,
-  PslEnum,
   PslModel,
   PslNamedTypeDeclaration,
   PslNamespace,
@@ -10,7 +9,6 @@ import type {
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
 import {
-  flatPslEnums,
   flatPslModels,
   makePslNamespace,
   makePslNamespaceEntries,
@@ -36,21 +34,16 @@ function attr(
   return { kind: 'attribute', target, name, args, span: span(off) };
 }
 
-/**
- * Constructs a minimal `PslNamespace` via `makePslNamespace` so `models`,
- * `enums`, and `compositeTypes` are derived getters over `entries`.
- */
 function makeNs(
   name: string,
   models: PslModel[],
-  enums: PslEnum[],
   compositeTypes: PslCompositeType[],
   off: number,
 ): PslNamespace {
   return makePslNamespace({
     kind: 'namespace',
     name,
-    entries: makePslNamespaceEntries(models, enums, compositeTypes, []),
+    entries: makePslNamespaceEntries(models, compositeTypes, []),
     span: span(off),
   });
 }
@@ -79,7 +72,7 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], [], 0)],
+      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], 0)],
       span: span(0),
     };
     expect(printPslFromAst(ast)).toContain('model X {\n  id Int @id');
@@ -110,62 +103,10 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], [], 0)],
+      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], 0)],
       span: span(0),
     };
     expect(printPslFromAst(ast)).toContain('@@map("foo")');
-  });
-
-  it('prints enum and field referencing enum type', () => {
-    const roleEnum: PslEnum = {
-      kind: 'enum',
-      name: 'Role',
-      values: [
-        { kind: 'enumValue', name: 'Admin', span: span(0) },
-        { kind: 'enumValue', name: 'User', span: span(1) },
-      ],
-      attributes: [],
-      span: span(0),
-    };
-
-    const models: PslModel[] = [
-      {
-        kind: 'model',
-        name: 'User',
-        fields: [
-          {
-            kind: 'field',
-            name: 'id',
-            typeName: 'Int',
-            optional: false,
-            list: false,
-            attributes: [attr('field', 'id', [], 0)],
-            span: span(0),
-          },
-          {
-            kind: 'field',
-            name: 'role',
-            typeName: 'Role',
-            optional: false,
-            list: false,
-            attributes: [],
-            span: span(1),
-          },
-        ],
-        attributes: [],
-        span: span(0),
-      },
-    ];
-    const ast: PslDocumentAst = {
-      kind: 'document',
-      sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [roleEnum], [], 0)],
-      span: span(0),
-    };
-
-    const out = printPslFromAst(ast);
-    expect(out).toContain('enum Role {');
-    expect(out).toContain('role Role');
   });
 
   it('prints types block', () => {
@@ -268,7 +209,7 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], [], 0)],
+      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], 0)],
       span: span(0),
     };
 
@@ -282,7 +223,7 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], [], 0)],
+      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], 0)],
       span: span(0),
     };
     expect(printPslFromAst(ast)).toMatch(/model Empty \{\s*\}/s);
@@ -303,164 +244,10 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], [], 0)],
+      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], 0)],
       span: span(0),
     };
     expect(printPslFromAst(ast)).toContain('@@index([a])');
-  });
-
-  it('handles multiple enums with overlapping member display names via parser normalisation', () => {
-    const enums: PslEnum[] = [
-      {
-        kind: 'enum',
-        name: 'StatusA',
-        values: [{ kind: 'enumValue', name: 'ok', span: span(0) }],
-        attributes: [],
-        span: span(0),
-      },
-      {
-        kind: 'enum',
-        name: 'StatusB',
-        values: [{ kind: 'enumValue', name: 'ok', span: span(1) }],
-        attributes: [],
-        span: span(0),
-      },
-    ];
-    const ast: PslDocumentAst = {
-      kind: 'document',
-      sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, [], enums, [], 0)],
-      span: span(0),
-    };
-    const text = printPslFromAst(ast);
-    expect(text).toContain('enum StatusA');
-    expect(text).toContain('enum StatusB');
-  });
-
-  it('renders @@map on enum', () => {
-    const enums: PslEnum[] = [
-      {
-        kind: 'enum',
-        name: 'Status',
-        values: [{ kind: 'enumValue', name: 'Ok', span: span(0) }],
-        attributes: [
-          attr('enum', 'map', [{ kind: 'positional', value: '"db_status"', span: span(1) }], 2),
-        ],
-        span: span(0),
-      },
-    ];
-    const ast: PslDocumentAst = {
-      kind: 'document',
-      sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, [], enums, [], 0)],
-      span: span(0),
-    };
-    const out = printPslFromAst(ast);
-    expect(out).toContain('enum Status');
-    expect(out).toContain('@@map("db_status")');
-  });
-
-  it('normalises enum members with non-identifier characters and reserved words', () => {
-    const enums: PslEnum[] = [
-      {
-        kind: 'enum',
-        name: 'Mixed',
-        values: [
-          { kind: 'enumValue', name: 'in-progress', span: span(0) },
-          { kind: 'enumValue', name: '123leading', span: span(1) },
-          { kind: 'enumValue', name: 'enum', span: span(2) },
-        ],
-        attributes: [],
-        span: span(0),
-      },
-    ];
-    const ast: PslDocumentAst = {
-      kind: 'document',
-      sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, [], enums, [], 0)],
-      span: span(0),
-    };
-    const out = printPslFromAst(ast);
-    // Each normalised member preserves the original storage label via
-    // `@map(...)` so the round-trip (parse → print → parse) does not lose
-    // the database-side spelling — see the dedicated round-trip test below.
-    expect(out).toContain('inProgress @map("in-progress")');
-    expect(out).toContain('_123leading @map("123leading")');
-    expect(out).toContain('_enum @map("enum")');
-  });
-
-  it('appends a numeric suffix to duplicate normalised enum member names', () => {
-    const enums: PslEnum[] = [
-      {
-        kind: 'enum',
-        name: 'Dupes',
-        values: [
-          { kind: 'enumValue', name: 'foo bar', span: span(0) },
-          { kind: 'enumValue', name: 'foo-bar', span: span(1) },
-        ],
-        attributes: [],
-        span: span(0),
-      },
-    ];
-    const ast: PslDocumentAst = {
-      kind: 'document',
-      sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, [], enums, [], 0)],
-      span: span(0),
-    };
-    const out = printPslFromAst(ast);
-    // The first member keeps the camelCased identifier; the colliding second
-    // member is suffixed with `2`. Both carry an `@map(...)` to preserve their
-    // distinct original storage labels.
-    expect(out).toContain('fooBar @map("foo bar")');
-    expect(out).toContain('fooBar2 @map("foo-bar")');
-  });
-
-  it('preserves normalised enum members across a parser → printer → parser round-trip', () => {
-    // Regression for the previously-lossy `serializeEnum` codepath. Postgres
-    // enum labels often contain hyphens (`'in-progress'`), reserved PSL words
-    // (`'enum'`), or leading digits (`'2x'`) — all of which the printer
-    // normalises into a valid PSL identifier on emission. Without the
-    // per-member `@map(...)`, parsing the emitted PSL would lose the original
-    // storage label and a subsequent `contract emit` would talk to the wrong
-    // value in the live database.
-    const enums: PslEnum[] = [
-      {
-        kind: 'enum',
-        name: 'Status',
-        values: [
-          { kind: 'enumValue', name: 'in-progress', span: span(0) },
-          { kind: 'enumValue', name: 'enum', span: span(1) },
-          { kind: 'enumValue', name: 'done', span: span(2) },
-        ],
-        attributes: [],
-        span: span(0),
-      },
-    ];
-    const ast: PslDocumentAst = {
-      kind: 'document',
-      sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, [], enums, [], 0)],
-      span: span(0),
-    };
-
-    const printed1 = printPslFromAst(ast);
-    const parsed = parsePslDocument({ schema: printed1, sourceId: 'r' });
-    expect(parsed.ok).toBe(true);
-
-    const enumNode = flatPslEnums(parsed.ast).find((e) => e.name === 'Status');
-    expect(enumNode).toBeDefined();
-    const valueShapes = enumNode?.values.map((v) => ({ name: v.name, mapName: v.mapName }));
-    expect(valueShapes).toEqual([
-      { name: 'inProgress', mapName: 'in-progress' },
-      { name: '_enum', mapName: 'enum' },
-      { name: 'done', mapName: undefined },
-    ]);
-
-    // Printing the parsed AST again must produce identical output: the parser
-    // captured `mapName`, the printer re-emits it verbatim.
-    const printed2 = printPslFromAst(parsed.ast);
-    expect(printed2).toBe(printed1);
   });
 
   it('renders optional and list type modifiers, plus @map on field', () => {
@@ -511,7 +298,7 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], [], 0)],
+      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], 0)],
       span: span(0),
     };
     const out = printPslFromAst(ast);
@@ -544,7 +331,7 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], [], 0)],
+      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], 0)],
       span: span(0),
     };
     const out = printPslFromAst(ast);
@@ -577,7 +364,7 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], [], 0)],
+      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], 0)],
       span: span(0),
     };
     const out = printPslFromAst(ast);
@@ -645,7 +432,7 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], [], 0)],
+      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], 0)],
       span: span(0),
     };
     expect(printPslFromAst(ast)).toContain('balance Money(2)');
@@ -702,7 +489,7 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], [], 0)],
+      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], 0)],
       span: span(0),
     };
     expect(() => printPslFromAst(ast)).not.toThrow();
@@ -774,27 +561,6 @@ model Post {
       expect(printed).toContain('model A {');
     });
 
-    it('emits a named namespace block wrapping its declarations', () => {
-      const source = `namespace auth {
-  model User {
-    id Int @id
-  }
-
-  enum Role {
-    ADMIN
-    MEMBER
-  }
-}
-`;
-      const parsed = parsePslDocument({ schema: source, sourceId: 'r' });
-      expect(parsed.ok).toBe(true);
-      const printed = printPslFromAst(parsed.ast);
-      expect(printed).toMatch(/namespace auth \{/);
-      expect(printed).toMatch(/^ {2}model User \{/m);
-      expect(printed).toMatch(/^ {2}enum Role \{/m);
-      expect(printed.trimEnd().endsWith('}')).toBe(true);
-    });
-
     it('round-trips a mixed top-level + namespaced schema through parser → printer → parser', () => {
       const source = `model TopLevel {
   id Int @id
@@ -835,18 +601,6 @@ namespace auth {
       const printed = printPslFromAst(parsed.ast);
       expect(printed.indexOf('namespace auth')).toBeLessThan(printed.indexOf('namespace billing'));
     });
-
-    it('decodes carriage-return and preserves unknown escape sequences in enum @@map values', () => {
-      const source = `enum Status {\n  active\n  inactive\n\n  @@map("a\\rb\\zc")\n}\n`;
-      const parsed = parsePslDocument({ schema: source, sourceId: 't' });
-      expect(parsed.ok).toBe(true);
-      const printed = printPslFromAst(parsed.ast);
-      // Carriage return decodes to a literal CR (re-escapes to \r); the
-      // unrecognised \z escape is preserved verbatim then re-escaped (so the
-      // single backslash becomes \\). The exact bytes matter less than
-      // exercising both branches of unescapePslString.
-      expect(printed).toMatch(/@@map\("a\\rb\\\\zc"\)/);
-    });
   });
 
   describe('qualified field-type rendering', () => {
@@ -884,7 +638,6 @@ namespace auth {
                 span: span(0),
               },
             ],
-            [],
             [],
             0,
           ),
@@ -961,7 +714,6 @@ namespace auth {
                 span: span(0),
               },
             ],
-            [],
             [],
             0,
           ),

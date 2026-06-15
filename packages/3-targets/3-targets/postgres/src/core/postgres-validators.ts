@@ -7,7 +7,7 @@ export const PostgresRoleSchema = type({
 });
 
 export const PostgresRlsPolicySchema = type({
-  kind: "'rlsPolicy'",
+  kind: "'policy'",
   name: 'string',
   prefix: 'string',
   tableName: 'string',

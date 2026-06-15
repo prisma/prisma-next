@@ -51,34 +51,80 @@ changes:
     summary: |
       `SqlNamespace.entries` is now an open dictionary typed
       `Readonly<Record<string, Readonly<Record<string, unknown>>>>`. The previously
-      closed shape (`{ table?: ..., type?: ..., valueSet?: ... }`) is gone — dot-access
+      closed shape (`{ table?: ..., valueSet?: ... }`) is gone — dot-access
       like `.entries.table` or `.entries.collection` no longer compiles. Read tables via
       the `namespaceTables(ns)` helper from `@prisma-next/sql-contract/types`, or via
       bracket notation `entries['table']`. For typed getter access on the concrete
-      class instances use the non-enumerable getters (`ns.table`, `schema.type`,
-      `db.collection`). Annotations and type constraints that hard-code the closed shape
+      class instances use the non-enumerable getters (`ns.table`, `db.collection`).
+      Annotations and type constraints that hard-code the closed shape
       must be widened to the open dict.
     detection:
       glob: "**/*.{ts,tsx}"
       contains:
         - ".entries.table"
         - ".entries.collection"
-        - ".entries.type"
         - ".entries.valueSet"
       anyMatch: true
-  - id: postgres-contract-serializer
+  - id: enum-becomes-domain-concept
     summary: |
-      `SqlContractSerializer` (from `@prisma-next/family-sql/ir`) can no longer
-      deserialize Postgres contracts. The family serializer now rejects the `type` entries
-      key that every Postgres namespace carries. Extension code that deserializes a
-      Postgres-emitted contract via `new SqlContractSerializer().deserializeContract(...)`
-      must switch to `new PostgresContractSerializer()` from
-      `@prisma-next/target-postgres/runtime`. SQLite and non-Postgres contracts are
-      unaffected.
+      The native Postgres enum surface is deleted from the SPI. `PostgresEnumStorageEntry`
+      no longer exists in `@prisma-next/sql-contract/types` — the `SqlStorage.types` slot
+      now holds codec-instance entries only (`StorageTypeInstance`). The `pg/enum@1`
+      codec surface is deleted from `@prisma-next/target-postgres` (`PgEnumDescriptor`,
+      `pgEnumColumn`, `PG_ENUM_CODEC_ID`, the `enum` codec-type-map entry), as are the
+      native `enumType` / `enumColumn` helpers from
+      `@prisma-next/adapter-postgres/column-types`. Enums are domain entities plus a
+      storage `valueSet` enforced by a CHECK constraint; columns reference them as
+      `pg/text@1` (or another codec) with a `valueSet` ref. Extensions that referenced
+      `PostgresEnumStorageEntry` in type constraints drop it (use `StorageTypeInstance`
+      alone); fixtures that used `pg/enum@1` as a codec id must switch to a live codec
+      or an inert fixture id.
     detection:
       glob: "**/*.{ts,tsx}"
       contains:
-        - "SqlContractSerializer"
+        - "PostgresEnumStorageEntry"
+        - "pg/enum@1"
+        - "pgEnumColumn"
+        - "PgEnumDescriptor"
+        - "PG_ENUM_CODEC_ID"
+      anyMatch: true
+  - id: namespaced-type-resolution
+    summary: |
+      Per-namespace type resolution. The emitted TypeMaps `ExtractFieldOutputTypes` /
+      `ExtractFieldInputTypes` (from `@prisma-next/sql-contract`) now nest by namespace —
+      `{ [namespace]: { [model]: { [field] } } }` — and `TableProxy` (from
+      `@prisma-next/sql-builder`) takes a required namespace coordinate: `TableProxy<C, Name>`
+      becomes `TableProxy<C, NsId, Name>`. Extension code that indexes those TypeMaps or
+      constructs `TableProxy` types directly must thread the namespace coordinate
+      (`ExtractFieldOutputTypes<C>[namespace][Model][Field]`, `TableProxy<C, namespace, Name>`):
+      `public` for a standard single-schema contract, the late-bound `__unbound__` namespace
+      for an unbound/SQLite contract. Extensions that only contribute codecs, native types, or
+      migrations and never reference these types are unaffected.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "ExtractFieldOutputTypes"
+        - "ExtractFieldInputTypes"
+        - "TableProxy<"
+      anyMatch: true
+  - id: contract-model-definitions-removed
+    summary: |
+      `ContractModelDefinitions` is removed from `@prisma-next/contract` (and its
+      `/types` export), along with the second `TModels` type parameter on
+      `Contract` (now `Contract<TStorage>`). The flat cross-namespace model union
+      it produced is gone; resolve models per-namespace instead. Replace
+      `ContractModelDefinitions<C>` with
+      `C['domain']['namespaces'][<ns>]['models']` (use `[keyof C['domain']['namespaces']]`
+      for the sole-namespace case). Family wrappers like `MongoContract<S, M>`
+      become single-arg `MongoContract<S>`; carry precise per-model types via an
+      explicit per-namespace `domain` override.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "ContractModelDefinitions"
+        - "Contract<"
+        - "MongoContract<"
+      anyMatch: true
 ---
 
 <!--
@@ -127,6 +173,12 @@ has been removed from every PGlite-backed vitest config (including
 fixed upstream in `@prisma/dev` 0.24.12 (which pulls in the
 `@prisma/streams-local` worker-termination fix). Test-harness only — no
 runtime, contract, or public-API change. Incidental substrate diff only.
+-->
+
+<!--
+#823: `jose` bumped from ^5 to ^6 in `packages/3-extensions/supabase`. The Supabase
+extension's transitive auth dependency only — no extension-author API, runtime, or
+contract-shape change. Incidental substrate diff only.
 -->
 
 <!--
@@ -227,12 +279,11 @@ entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>
 // Previously it was a closed shape:
 entries: {
   table?: Readonly<Record<string, StorageTable>>;
-  type?: Readonly<Record<string, PostgresEnumType>>;
   valueSet?: Readonly<Record<string, StorageValueSet>>;
 }
 ```
 
-Dot-access like `.entries.table`, `.entries.collection`, or `.entries.type` no longer compiles. Migrate to one of the two canonical read styles:
+Dot-access like `.entries.table` or `.entries.collection` no longer compiles. Migrate to one of the two canonical read styles:
 
 **Generic/walker code** — bracket notation:
 
@@ -251,9 +302,6 @@ const tables = ns.entries['table'] as Record<string, StorageTable> | undefined;
 import { namespaceTables, namespaceValueSets } from '@prisma-next/sql-contract/types';
 const tables = namespaceTables(ns);    // Record<string, StorageTable>
 const vsets  = namespaceValueSets(ns); // Record<string, StorageValueSet> | undefined
-
-// Using the non-enumerable class getter (for PostgresSchema instances)
-const enumTypes = schema.type; // Record<string, PostgresEnumType>
 
 // Using the namespaceCollections() helper (for MongoNamespace values)
 import { namespaceCollections } from '@prisma-next/mongo-contract';
@@ -274,20 +322,88 @@ const tables = namespaceTables(ns);
 
 This is a compile-time-only change when using the helpers — no runtime behavior differs. Run `pnpm typecheck` to find all remaining dot-access sites.
 
-## `postgres-contract-serializer`
+## `enum-becomes-domain-concept`
 
-`SqlContractSerializer` (from `@prisma-next/family-sql/ir`) can no longer deserialize Postgres contracts. Every Postgres namespace carries a `type` key in its `entries`; the family serializer validates entries against a built-in registry (`table`, `valueSet` only) and throws a `ContractValidationError` when it encounters `type`.
+Native Postgres enums are removed from the framework. Enums are now a **domain concept**: a domain enum entity plus a storage `valueSet` entity, with member values stored through an ordinary codec (typically `pg/text@1` → a `text` column) and the value set enforced by a planner-generated CHECK constraint. The whole native surface is deleted:
 
-Replace with `PostgresContractSerializer` from `@prisma-next/target-postgres/runtime`:
+- `PostgresEnumStorageEntry` is gone from `@prisma-next/sql-contract/types`. The polymorphic `SqlStorage.types` slot now carries codec-instance entries only. Type constraints that accepted both narrow to `StorageTypeInstance`:
+
+  ```ts
+  // Before
+  import type { PostgresEnumStorageEntry, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+  type TypesConstraint = Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+
+  // After
+  import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+  type TypesConstraint = Record<string, StorageTypeInstance>;
+  ```
+
+- The `pg/enum@1` codec and its registry surface are deleted from `@prisma-next/target-postgres`: `PgEnumDescriptor`, `pgEnumColumn`, `PG_ENUM_CODEC_ID`, and the `enum` entry in the codec type map. Test fixtures that used `'pg/enum@1'` as an opaque codec id must switch to a live codec id or an inert fixture id (e.g. `app/test-enum@1`) — the id no longer resolves to a registered codec.
+- The native `enumType(name, values[])` / `enumColumn(...)` authoring helpers are deleted from `@prisma-next/adapter-postgres/column-types`. The domain authoring surface is `enumType(name, codecRef, ...member(name, value))` + `member` from the target contract-builder, returned under the contract's `enums` key.
+- Introspection no longer adopts native enum types: the adapter records detected native enum type names under `annotations.pg.nativeEnumTypeNames` (names only), and `contract infer` refuses with a diagnostic naming them. The old `annotations.pg.enumTypes` structure is gone.
+
+Columns restricted to an enum now carry `codecId: 'pg/text@1'` (or another codec), `nativeType: 'text'`, and a `valueSet` reference; the owning table carries a check entry. If your extension reads `storage.types` looking for enum shapes, read the namespace's `valueSet` entries instead.
+
+### Validation
+
+`pnpm typecheck` flags every deleted-symbol reference. After fixing, run your extension's standard `pnpm test`.
+
+## `namespaced-type-resolution`
+
+The SQL/ORM type machinery now resolves columns, fields, and models **by namespace coordinate** rather than by bare name across all namespaces. Two type-shape changes affect extension code that depends on these types directly:
+
+1. **Emitted TypeMaps nest by namespace.** `ExtractFieldOutputTypes<C>` / `ExtractFieldInputTypes<C>` (from `@prisma-next/sql-contract`) now return `{ [namespace]: { [model]: { [field]: <type> } } }` instead of the flat `{ [model]: { [field] } }`. Index the namespace first:
 
 ```ts
 // Before
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
-const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
-
-// After
-import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
-const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
+type Row = ExtractFieldOutputTypes<C>['User'];
+// After — name the namespace the model is declared in
+type Row = ExtractFieldOutputTypes<C>['public']['User'];
 ```
 
-Extension code that only uses the target descriptor's serializer (`descriptor.contractSerializer`) is unaffected — the postgres descriptor already exposes a `PostgresContractSerializer` instance. Only code that directly instantiates `SqlContractSerializer` for a Postgres contract needs to change. SQLite and non-Postgres contracts are unaffected.
+2. **`TableProxy` takes a required namespace coordinate.** `TableProxy<C, Name>` (from `@prisma-next/sql-builder`) becomes `TableProxy<C, NsId, Name>`:
+
+```ts
+// Before
+let p: TableProxy<C, 'users'>;
+// After
+let p: TableProxy<C, 'public', 'users'>;
+```
+
+Use `public` for a standard single-schema SQL contract; for an unbound/SQLite contract use the late-bound namespace (`UNBOUND_NAMESPACE_ID` from `@prisma-next/framework-components/ir`); for a multi-namespace contract, name the namespace each model/table actually sits in. There is no codemod — the correct namespace is call-site-specific. `pnpm typecheck` pins every remaining flat access (`Property '<model>' does not exist on type '{ public: ... }'`). Extensions that only contribute codecs, native types, or migrations — and never reference `ExtractFieldOutputTypes` / `ExtractFieldInputTypes` / `TableProxy` directly — need no change.
+
+## `contract-model-definitions-removed`
+
+`ContractModelDefinitions` is removed from `@prisma-next/contract` (and the `@prisma-next/contract/types` re-export), and the `Contract` interface loses its second `TModels` type parameter — `Contract<TStorage, TModels>` becomes `Contract<TStorage>`. The flat, first-name-wins cross-namespace model union is gone; models resolve per-namespace from the domain plane.
+
+Replace any `ContractModelDefinitions<C>` use with a read of a namespace's models:
+
+```ts
+// Before
+import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
+type Models = ContractModelDefinitions<C>;
+type UserModel = Models['User'];
+
+// After — read the sole namespace's models (or name a specific namespace)
+type Models = C['domain']['namespaces'][keyof C['domain']['namespaces']]['models'];
+type UserModel = Models['User'];
+```
+
+If you need a bare model shape rather than the contract's own models, use `ContractModelBase` from `@prisma-next/contract/types`. Family contract aliases drop their model parameter too — `MongoContract<S, M>` becomes `MongoContract<S>`. When you build a contract *type* that must carry precise per-model shapes (e.g. a test fixture or a `defineContract` result type), override the `domain` explicitly:
+
+```ts
+type MyContract = Omit<Contract<MyStorage>, 'domain'> & {
+  readonly domain: {
+    readonly namespaces: {
+      readonly public: { readonly models: MyModels };
+    };
+  };
+};
+```
+
+<!--
+TML-2550: per-namespace typed resolution. The extension-package contract.d.ts fixtures
+(supabase, paradedb, pgvector, postgis) regenerate to the namespace-nested TypeMaps shape
+above; the diff round-trips on a consumer re-emit and needs no extension-author action beyond
+the `namespaced-type-resolution` entry. Incidental substrate diff only.
+-->

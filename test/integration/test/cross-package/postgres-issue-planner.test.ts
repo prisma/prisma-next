@@ -7,17 +7,14 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  type PostgresEnumStorageEntry,
   SqlStorage,
   type SqlStorageInput,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { planIssues } from '@prisma-next/target-postgres/issue-planner';
 import type { CreateTableCall } from '@prisma-next/target-postgres/op-factory-call';
 import { renderCallsToTypeScript } from '@prisma-next/target-postgres/render-typescript';
 import {
-  PostgresEnumType,
   PostgresSchema,
   PostgresUnboundSchema,
   postgresCreateNamespace,
@@ -31,18 +28,14 @@ function makeContract(
   overrides: {
     entries?: {
       table?: Record<string, StorageTableInput>;
-      type?: Record<string, PostgresEnumStorageEntry>;
     };
   } = {},
 ): Contract<SqlStorage> {
-  const { table = {}, type } = overrides.entries ?? {};
-  const unboundNs = postgresCreateNamespace(
-    {
-      id: UNBOUND_NAMESPACE_ID,
-      entries: { table },
-    },
-    type,
-  );
+  const { table = {} } = overrides.entries ?? {};
+  const unboundNs = postgresCreateNamespace({
+    id: UNBOUND_NAMESPACE_ID,
+    entries: { table },
+  });
   return {
     target: 'postgres',
     targetFamily: 'sql',
@@ -64,36 +57,6 @@ const defaultCtx = {
   codecHooks: new Map(),
   storageTypes: {},
 };
-
-function makeSchemaWithEnum(
-  nativeType: string,
-  values: readonly string[],
-  schemaName = UNBOUND_NAMESPACE_ID,
-): SqlSchemaIR {
-  // Introspection nests `enumTypes` by the *live* schema name the adapter
-  // walked — the unbound coordinate resolves to `current_schema()` (`public`
-  // here), never the `__unbound__` DDL-emit sentinel.
-  const liveSchema = schemaName === UNBOUND_NAMESPACE_ID ? 'public' : schemaName;
-  return {
-    tables: {},
-    annotations: {
-      pg: {
-        schema: liveSchema,
-        enumTypes: {
-          [liveSchema]: {
-            [nativeType]: {
-              kind: 'postgres-enum',
-              codecId: 'pg/enum@1',
-              nativeType,
-              values,
-              typeParams: { values },
-            },
-          },
-        },
-      },
-    },
-  };
-}
 
 describe('planIssues', () => {
   describe('missing_table', () => {
@@ -406,143 +369,6 @@ describe('planIssues', () => {
     });
   });
 
-  describe('enumChange call strategy', () => {
-    it('emits AddEnumValuesCall for add-only', () => {
-      const toContract = makeContract({
-        entries: {
-          table: {},
-          type: {
-            status: new PostgresEnumType({
-              name: 'status',
-              values: ['active', 'inactive', 'archived'],
-            }),
-          },
-        },
-      });
-      const fromContract = makeContract({
-        entries: {
-          table: {},
-          type: {
-            status: new PostgresEnumType({
-              name: 'status',
-              values: ['active', 'inactive'],
-            }),
-          },
-        },
-      });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'enum_values_changed',
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          typeName: 'status',
-          addedValues: ['archived'],
-          removedValues: [],
-          message: 'Enum "status" values changed',
-        },
-      ];
-
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract,
-        storageTypes: toContract.storage.types ?? {},
-        schema: makeSchemaWithEnum('status', ['active', 'inactive']),
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      const calls = result.value.calls;
-      expect(calls).toHaveLength(1);
-      expect(calls[0]).toMatchObject({ factoryName: 'addEnumValues' });
-    });
-
-    it('emits DataTransformCall + rebuild recipe for removal', () => {
-      const toContract = makeContract({
-        entries: {
-          table: {
-            user: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                status: {
-                  nativeType: 'status',
-                  codecId: 'pg/enum@1',
-                  nullable: false,
-                  typeRef: 'status',
-                },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-          type: {
-            status: new PostgresEnumType({
-              name: 'status',
-              values: ['active'],
-            }),
-          },
-        },
-      });
-      const fromContract = makeContract({
-        entries: {
-          table: {
-            user: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                status: {
-                  nativeType: 'status',
-                  codecId: 'pg/enum@1',
-                  nullable: false,
-                  typeRef: 'status',
-                },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-          type: {
-            status: new PostgresEnumType({
-              name: 'status',
-              values: ['active', 'inactive'],
-            }),
-          },
-        },
-      });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'enum_values_changed',
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          typeName: 'status',
-          addedValues: [],
-          removedValues: ['inactive'],
-          message: 'Enum "status" values changed',
-        },
-      ];
-
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract,
-        storageTypes: toContract.storage.types ?? {},
-        schema: makeSchemaWithEnum('status', ['active', 'inactive']),
-        policy: { allowedOperationClasses: ['additive', 'destructive', 'widening', 'data'] },
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      const calls = result.value.calls;
-      expect(calls[0]).toMatchObject({ factoryName: 'dataTransform' });
-      expect(calls[1]).toMatchObject({ factoryName: 'createEnumType' });
-      expect(calls.some((c) => c.factoryName === 'dropEnumType')).toBe(true);
-      expect(calls.some((c) => c.factoryName === 'renameType')).toBe(true);
-    });
-  });
-
   describe('index_mismatch', () => {
     it('threads contract index type and options into CreateIndexCall when the index is missing', () => {
       const toContract = makeContract({
@@ -838,7 +664,7 @@ describe('planIssues', () => {
         ...Object.fromEntries(
           Object.entries(namespaces).map(([id, ns]) => [
             id,
-            new PostgresSchema({ id, entries: { table: ns.entries.table, type: {} } }),
+            new PostgresSchema({ id, entries: { table: ns.entries.table } }),
           ]),
         ),
       };
@@ -954,11 +780,11 @@ describe('planIssues', () => {
             [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
             tenant_a: new PostgresSchema({
               id: 'tenant_a',
-              entries: { table: { users: userTable }, type: {} },
+              entries: { table: { users: userTable } },
             }),
             tenant_b: new PostgresSchema({
               id: 'tenant_b',
-              entries: { table: { users: userTable }, type: {} },
+              entries: { table: { users: userTable } },
             }),
           },
         }),

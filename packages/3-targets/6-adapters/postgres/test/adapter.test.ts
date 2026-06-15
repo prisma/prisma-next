@@ -557,7 +557,6 @@ describe('Postgres adapter', () => {
             id: 'public',
             entries: {
               table: contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table ?? {},
-              type: {},
             },
           }),
         },

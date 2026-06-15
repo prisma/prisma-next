@@ -31,21 +31,16 @@ already proven in production use.
 
 ## Current status & next (sequencing decision)
 
-- **Done:** TML-2850 (substrate), TML-2851 (enforcement).
-- **In review:** TML-2852 (read surface) — typed-read machinery, demonstrated via the
-  demo's no-emit workflow; includes the emit-time value-union narrowing that makes
-  emitted contracts carry the union.
-- **Next:** **TML-2882 (transitional PSL `enum2` block)** — the new mechanism becomes
-  PSL-authorable and goes live in the demo's real emitted-contract app.
-- **Then:** **TML-2855 (member defaults)** — its PSL `@default(member)` surface attaches
-  to a real PSL enum field once TML-2882 lands — and **TML-2885 (emit-typed
-  `db.enums`)** — TML-2882's review surfaced that the emitter omits the domain `enum`
-  block from `contract.d.ts`, so emitted-path `db.enums` members type-widen to
-  `JsonValue` (R6 unmet through emit; spec R6 amended 2026-06-10). Both precede
-  **TML-2853 (cutover)**, now reduced to rename + migrate + delete.
-- **Parallel track (any time):** **TML-2884 (Mongo enums, one vertical slice)** — author →
-  `$jsonSchema` enforce → typed read + `db.enums`, end-to-end. Independent of the SQL track
-  and the cutover; can be picked up whenever there's capacity.
+- **Done:** TML-2850 (substrate), TML-2851 (enforcement), TML-2852 (read surface),
+  TML-2882 (transitional PSL `enum2` block), TML-2855 (member defaults), TML-2885
+  (emit-typed `db.enums`) — all merged.
+- **This PR:** **TML-2853 (cutover)** — `enum` keyword repointed to the domain concept,
+  `enum2` retired, the native enum machinery deleted (codec, planner recipe, introspection
+  adoption), the demo's converting migration + replay proof landed, and the 0.13→0.14
+  upgrade entries (user + extension-author) recorded.
+- **Remaining:** **TML-2884 (Mongo enums, one vertical slice)** — author → `$jsonSchema`
+  enforce → typed read + `db.enums`, end-to-end; independent of the SQL track — and
+  **TML-2886 (typing mechanism)**.
 - **Why this changed from the original plan:** the cutover was first parked as a distant
   finale behind an "additive/dark, every merge green" framing; the dark window caused
   recurring confusion and hid a real bug (the read surface merged green while broken

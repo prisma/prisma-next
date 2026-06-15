@@ -11,7 +11,7 @@ import { documentScopedTypes } from './cross-ref-helpers';
 import { unboundTables } from './unbound-tables';
 
 type PortableSqlCodecTypes = {
-  readonly 'pg/enum@1': { output: string };
+  readonly 'app/test-enum@1': { output: string };
   readonly 'sql/char@1': { output: string };
   readonly 'sql/text@1': { output: string };
   readonly 'sql/timestamp@1': { output: string };
@@ -142,7 +142,7 @@ const postgresTargetPack = {
         kind: 'typeConstructor',
         args: [{ kind: 'string' }, { kind: 'stringArray' }],
         output: {
-          codecId: 'pg/enum@1',
+          codecId: 'app/test-enum@1',
           nativeType: { kind: 'arg', index: 0 },
           typeParams: {
             values: { kind: 'arg', index: 1 },
@@ -183,7 +183,7 @@ const pgvectorExtensionPack = {
 const roleTypes = {
   Role: {
     kind: 'codec-instance',
-    codecId: 'pg/enum@1',
+    codecId: 'app/test-enum@1',
     nativeType: 'role',
     typeParams: { values: ['USER', 'ADMIN'] },
   },
@@ -419,7 +419,7 @@ describe('contract DSL helper vocabulary', () => {
     );
 
     expect(unboundTables(contract.storage)['app_user']!.columns['role']).toMatchObject({
-      codecId: 'pg/enum@1',
+      codecId: 'app/test-enum@1',
       nativeType: 'role',
       nullable: false,
       typeRef: 'Role',
@@ -580,12 +580,12 @@ describe('contract DSL helper vocabulary', () => {
 
     expect(documentScopedTypes(contract)?.['Role']).toEqual({
       kind: 'codec-instance',
-      codecId: 'pg/enum@1',
+      codecId: 'app/test-enum@1',
       nativeType: 'role',
       typeParams: { values: ['USER', 'ADMIN'] },
     });
     expect(unboundTables(contract.storage)['app_user']!.columns['role']).toMatchObject({
-      codecId: 'pg/enum@1',
+      codecId: 'app/test-enum@1',
       nativeType: 'role',
       typeRef: 'Role',
     });

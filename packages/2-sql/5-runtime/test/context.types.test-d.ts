@@ -4,43 +4,40 @@ import { expectTypeOf, test } from 'vitest';
 import type { ExecutionContext, TypeHelperRegistry } from '../src/sql-context';
 
 // Contract type with storage.types using literal types (matching emission output)
-type TestContract = Contract<
-  {
-    readonly storageHash: StorageHashBase<string>;
-    readonly namespaces: {
-      readonly __unbound__: {
-        readonly id: '__unbound__';
-        readonly kind: 'sql-namespace';
-        readonly entries: {
-          readonly table: {
-            readonly document: {
-              readonly columns: {
-                readonly id: {
-                  readonly nativeType: 'int4';
-                  readonly codecId: 'pg/int4@1';
-                  nullable: false;
-                };
+type TestContract = Contract<{
+  readonly storageHash: StorageHashBase<string>;
+  readonly namespaces: {
+    readonly __unbound__: {
+      readonly id: '__unbound__';
+      readonly kind: 'sql-namespace';
+      readonly entries: {
+        readonly table: {
+          readonly document: {
+            readonly columns: {
+              readonly id: {
+                readonly nativeType: 'int4';
+                readonly codecId: 'pg/int4@1';
+                nullable: false;
               };
-              readonly primaryKey: { readonly columns: readonly ['id'] };
-              readonly uniques: readonly [];
-              readonly indexes: readonly [];
-              readonly foreignKeys: readonly [];
             };
+            readonly primaryKey: { readonly columns: readonly ['id'] };
+            readonly uniques: readonly [];
+            readonly indexes: readonly [];
+            readonly foreignKeys: readonly [];
           };
         };
       };
     };
-    readonly types: {
-      readonly Vector1536: {
-        readonly kind: 'codec-instance';
-        readonly codecId: 'pg/vector@1';
-        readonly nativeType: 'vector';
-        readonly typeParams: { readonly length: 1536 };
-      };
+  };
+  readonly types: {
+    readonly Vector1536: {
+      readonly kind: 'codec-instance';
+      readonly codecId: 'pg/vector@1';
+      readonly nativeType: 'vector';
+      readonly typeParams: { readonly length: 1536 };
     };
-  },
-  Record<string, never>
->;
+  };
+}>;
 
 test('ExecutionContext.types is TypeHelperRegistry', () => {
   // ExecutionContext.types is intentionally loose (Record<string, unknown>)

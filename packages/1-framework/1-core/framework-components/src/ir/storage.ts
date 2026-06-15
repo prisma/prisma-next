@@ -1,7 +1,10 @@
+import { isPlainRecord } from '@prisma-next/contract/is-plain-record';
 import type { StorageBase } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { IRNode } from './ir-node';
 import type { Namespace } from './namespace';
+
+export { isPlainRecord };
 
 /**
  * Canonical address for a named entity in Contract IR / Schema IR.
@@ -52,10 +55,6 @@ export function* elementCoordinates(
   }
 }
 
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === 'object' && value !== null;
-}
-
 /**
  * Looks up a single entity in a `Storage`-shaped value by its full coordinate.
  * Returns `undefined` if the namespace, entity kind, or entity name is absent.
@@ -69,9 +68,9 @@ export function entityAt<T = unknown>(
   const ns = storage.namespaces[coord.namespaceId];
   if (ns === undefined) return undefined;
   const entries = ns.entries;
-  if (!isRecord(entries)) return undefined;
+  if (!isPlainRecord(entries)) return undefined;
   const kindMap = entries[coord.entityKind];
-  if (!isRecord(kindMap)) return undefined;
+  if (!isPlainRecord(kindMap)) return undefined;
   if (!Object.hasOwn(kindMap, coord.entityName)) return undefined;
   return blindCast<T | undefined, 'caller asserts the entity type at this coordinate'>(
     kindMap[coord.entityName],

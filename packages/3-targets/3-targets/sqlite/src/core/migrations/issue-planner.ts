@@ -18,7 +18,6 @@ import type {
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type {
-  PostgresEnumStorageEntry,
   SqlStorage,
   StorageColumn,
   StorageTable,
@@ -218,13 +217,13 @@ function isMissing(issue: SchemaIssue): boolean {
 export function toColumnSpec(
   name: string,
   column: StorageColumn,
-  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance>>,
   inlineAutoincrementPrimaryKey = false,
 ): SqliteColumnSpec {
   const typeSql = buildColumnTypeSql(
     column,
     blindCast<
-      Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+      Record<string, StorageTypeInstance>,
       'buildColumnTypeSql declares its storageTypes parameter as mutable Record while the planner stores it readonly; the helper does not mutate, so the readonly→mutable narrowing is sound'
     >(storageTypes),
   );
@@ -246,7 +245,7 @@ export function toColumnSpec(
  */
 export function toTableSpec(
   table: StorageTable,
-  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance>>,
 ): SqliteTableSpec {
   const columns: SqliteColumnSpec[] = Object.entries(table.columns).map(([name, column]) =>
     toColumnSpec(name, column, storageTypes, isInlineAutoincrementPrimaryKey(table, name)),
@@ -305,14 +304,14 @@ function sqliteDefaultToDdlColumnDefault(
  */
 export function tableToDdlParts(
   table: StorageTable,
-  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+  storageTypes: Record<string, StorageTypeInstance>,
 ): { columns: DdlColumn[]; constraints: DdlTableConstraint[] } {
   const columns: DdlColumn[] = Object.entries(table.columns).map(([name, column]) => {
     const inlineAutoincrement = isInlineAutoincrementPrimaryKey(table, name);
     const typeSql = buildColumnTypeSql(
       column,
       blindCast<
-        Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+        Record<string, StorageTypeInstance>,
         'buildColumnTypeSql declares its storageTypes parameter as mutable Record while the planner stores it readonly; the helper does not mutate, so the readonly→mutable narrowing is sound'
       >(storageTypes),
     );
@@ -330,7 +329,7 @@ export function tableToDdlParts(
     const resolved = resolveColumnTypeMetadata(
       column,
       blindCast<
-        Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+        Record<string, StorageTypeInstance>,
         'resolveColumnTypeMetadata declares its storageTypes parameter as mutable Record while the planner stores it readonly; the helper does not mutate, so the readonly→mutable narrowing is sound'
       >(storageTypes),
     );
@@ -400,7 +399,7 @@ export interface IssuePlannerOptions {
   readonly toContract: Contract<SqlStorage>;
   readonly fromContract: Contract<SqlStorage> | null;
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
-  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance>>;
   readonly schema?: SqlSchemaIR;
   readonly policy?: MigrationOperationPolicy;
   readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;

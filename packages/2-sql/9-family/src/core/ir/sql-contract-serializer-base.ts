@@ -1,12 +1,16 @@
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
+import { isPlainRecord } from '@prisma-next/contract/is-plain-record';
 import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import {
+  type AnyEntityKindDescriptor,
+  hydrateNamespaceEntities,
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
+import { composeSqlEntityKinds } from '@prisma-next/sql-contract/entity-kinds';
 import {
   buildSqlNamespace,
   type SqlNamespaceTablesInput,
@@ -14,14 +18,9 @@ import {
   type SqlStorageInput,
   type SqlStorageTypeEntry,
   SqlUnboundNamespace,
-  StorageTable,
-  type StorageTableInput,
-  StorageValueSet,
-  type StorageValueSetInput,
 } from '@prisma-next/sql-contract/types';
 import {
   createSqlContractSchema,
-  createSqlEntrySchemaRegistry,
   validateSqlContractFully,
 } from '@prisma-next/sql-contract/validators';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -36,10 +35,6 @@ const NamespaceRawSchema = type({
     '+': 'ignore',
   }),
 });
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 export type SqlEntityHydrationFactory = (entry: unknown) => unknown;
 
@@ -71,23 +66,18 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   implements ContractSerializer<TContract>
 {
   private readonly contractSchema: Type<unknown> | undefined;
+  private readonly entryKinds: ReadonlyMap<string, AnyEntityKindDescriptor>;
 
   constructor(
     protected readonly entityHydrationRegistry: ReadonlyMap<
       string,
       SqlEntityHydrationFactory
     > = new Map(),
-    validatorRegistry: ReadonlyMap<string, Type<unknown>> = new Map(),
+    packEntityKinds: readonly AnyEntityKindDescriptor[] = [],
   ) {
-    // One uniform registry: SQL core's kinds and pack contributions are
-    // composed into the same map. Only build a per-instance contract
-    // schema when pack contributions exist — the cached module-level
-    // default in `validators.ts` is the same composition with no pack
-    // entries and avoids per-instance schema compilation.
+    this.entryKinds = composeSqlEntityKinds(packEntityKinds);
     this.contractSchema =
-      validatorRegistry.size > 0
-        ? createSqlContractSchema(createSqlEntrySchemaRegistry(validatorRegistry))
-        : undefined;
+      packEntityKinds.length > 0 ? createSqlContractSchema(this.entryKinds) : undefined;
   }
 
   deserializeContract<T extends TContract = TContract>(json: unknown): T {
@@ -150,7 +140,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
         // framework `Namespace` to the SQL-family `SqlNamespace`.
         namespaces: blindCast<
           SqlStorageInput['namespaces'],
-          'hydrated SQL namespaces are SqlNamespace instances (family hydration guarantees this)'
+          'hydrateSqlNamespaceMap builds each namespace through the SQL family concretions (SqlBoundNamespace / target schema), so every value is a SqlNamespace; the framework return type only promises the base Namespace.'
         >({ ...hydratedNamespaces, [UNBOUND_NAMESPACE_ID]: unbound }),
       }),
     };
@@ -191,79 +181,28 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       const messages = parsed.map((p: { message: string }) => p.message).join('; ');
       throw new ContractValidationError(`Namespace hydration failed: ${messages}`, 'structural');
     }
-    const entriesOutput: Record<string, Record<string, unknown>> = {};
     const entriesRaw = parsed.entries;
-    if (entriesRaw !== undefined && typeof entriesRaw === 'object' && entriesRaw !== null) {
-      const rawEntries = entriesRaw as Record<string, unknown>;
-      for (const [key, innerMap] of Object.entries(rawEntries)) {
-        const hydrated = this.hydrateEntriesKind(key, innerMap);
-        if (hydrated === undefined) {
-          throw new ContractValidationError(
-            `Unknown entries key "${key}" in namespace "${id}"; no hydration factory registered for this entity kind`,
-            'structural',
-          );
-        }
-        entriesOutput[key] = hydrated;
-      }
+    const rawEntriesMap = isPlainRecord(entriesRaw) ? entriesRaw : {};
+
+    const entriesInput: Record<string, Readonly<Record<string, unknown>>> = {};
+    for (const [key, innerMap] of Object.entries(rawEntriesMap)) {
+      entriesInput[key] = isPlainRecord(innerMap) ? innerMap : Object.freeze({});
     }
+
+    const entriesOutput = hydrateNamespaceEntities(entriesInput, this.entryKinds, 'fail', id);
+
     // Always ensure a 'table' key is present (may be empty).
     if (!Object.hasOwn(entriesOutput, 'table')) {
       entriesOutput['table'] = {};
     }
 
-    return blindCast<SqlNamespaceTablesInput, 'hydrated namespace entries input'>({
+    return blindCast<
+      SqlNamespaceTablesInput,
+      'entriesOutput holds the hydrated SQL entity-kind maps (table always present); this wraps them as the SqlNamespaceTablesInput the family createNamespace consumes.'
+    >({
       id,
       entries: entriesOutput,
     });
-  }
-
-  protected hydrateEntriesKind(
-    key: string,
-    innerMap: unknown,
-  ): Record<string, unknown> | undefined {
-    if (key === 'table') {
-      if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
-        return {};
-      }
-      return Object.fromEntries(
-        Object.entries(
-          blindCast<
-            Record<string, unknown>,
-            'table inner map is a plain record after object check'
-          >(innerMap),
-        ).map(([tableName, table]) => [
-          tableName,
-          new StorageTable(
-            blindCast<
-              StorageTableInput,
-              'each table value is StorageTableInput by contract schema'
-            >(table),
-          ),
-        ]),
-      );
-    }
-    if (key === 'valueSet') {
-      if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
-        return {};
-      }
-      return Object.fromEntries(
-        Object.entries(
-          blindCast<
-            Record<string, unknown>,
-            'valueSet inner map is a plain record after object check'
-          >(innerMap),
-        ).map(([vsName, vs]) => [
-          vsName,
-          new StorageValueSet(
-            blindCast<StorageValueSetInput, 'valueSet entry is StorageValueSetInput after parse'>(
-              vs,
-            ),
-          ),
-        ]),
-      );
-    }
-    // Delegate unknown keys to subclass — return undefined to fail closed.
-    return undefined;
   }
 
   protected hydrateStorageTypeEntry(entry: SqlStorageTypeEntry): SqlStorageTypeEntry {

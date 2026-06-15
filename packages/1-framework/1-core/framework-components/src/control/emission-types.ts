@@ -1,4 +1,4 @@
-import type { Contract, ContractModel } from '@prisma-next/contract/types';
+import type { Contract, ContractModelBase } from '@prisma-next/contract/types';
 import type { TypesImportSpec } from '../shared/types-import-spec';
 
 export interface GenerateContractTypesOptions {
@@ -15,7 +15,7 @@ export interface EmissionSpi {
 
   generateStorageType(contract: Contract, storageHashTypeName: string): string;
 
-  generateModelStorageType(modelName: string, model: ContractModel): string;
+  generateModelStorageType(modelName: string, model: ContractModelBase): string;
 
   getFamilyImports(): string[];
 
@@ -42,7 +42,7 @@ export interface EmissionSpi {
   resolveFieldTypeParams?(
     modelName: string,
     fieldName: string,
-    model: ContractModel,
+    model: ContractModelBase,
     contract: Contract,
   ): Record<string, unknown> | undefined;
 }

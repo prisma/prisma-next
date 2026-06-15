@@ -86,10 +86,7 @@ type DecodeFixtureStorage = {
  * serializer SPI to keep the runtime structural shape honest, then thread
  * `TContract` through `mongoQuery` for the type-level path.
  */
-export type DecodeFixtureContract = Omit<
-  MongoContract<DecodeFixtureStorage, DecodeFixtureModels>,
-  'domain'
-> & {
+export type DecodeFixtureContract = Omit<MongoContract<DecodeFixtureStorage>, 'domain'> & {
   readonly roots: {
     readonly users: CrossReference & { readonly model: 'User' };
     readonly posts: CrossReference & { readonly model: 'Post' };

@@ -31,16 +31,15 @@ import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { isPostgresSchema } from '../postgres-schema';
 import {
+  readPostgresSchemaIrAnnotations,
+  resolveDdlSchemaForNamespaceStorage,
+} from '../postgres-schema-ir-annotations';
+import {
   formatPostgresControlPolicySubjectLabel,
   resolvePostgresCallControlPolicySubject,
   resolvePostgresIssueControlPolicySubject,
   resolvePostgresIssueCreationFactoryName,
 } from './control-policy';
-import {
-  createResolveExistingEnumValues,
-  readPostgresSchemaIrAnnotations,
-  resolveDdlSchemaForNamespaceStorage,
-} from './enum-planning';
 import { planIssues } from './issue-planner';
 import {
   CreatePostgresRlsPolicyCall,
@@ -382,7 +381,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       frameworkComponents: options.frameworkComponents,
       normalizeDefault: parsePostgresDefault,
       normalizeNativeType: normalizeSchemaNativeType,
-      resolveExistingEnumValues: createResolveExistingEnumValues(options.contract.storage),
     };
     const verifyResult = verifySqlSchema(verifyOptions);
     // Schema presence is a Postgres-specific concern (no equivalent in

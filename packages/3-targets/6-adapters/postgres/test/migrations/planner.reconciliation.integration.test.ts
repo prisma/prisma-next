@@ -7,7 +7,6 @@ import {
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { buildSqlNamespace, SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { PostgresEnumType, PostgresSchema } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -996,78 +995,6 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     expect(defaultRow.rows[0]?.column_default).toContain('gen_random_uuid');
   });
 
-  it('changes column type from text to enum', { timeout: testTimeout }, async () => {
-    const baselineContract = makeContract(
-      {
-        item: makeTable({
-          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-        }),
-      },
-      'text-to-enum-baseline',
-    );
-    await applyBaseline(driver!, baselineContract);
-
-    const updatedContract: Contract<SqlStorage> = {
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: profileHash('sha256:test'),
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:reconciliation-integ-text-to-enum-updated'),
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: new PostgresSchema({
-            id: UNBOUND_NAMESPACE_ID,
-            entries: {
-              table: {
-                item: {
-                  columns: {
-                    id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                    status: {
-                      nativeType: 'status_type',
-                      codecId: 'pg/enum@1',
-                      nullable: false,
-                      typeRef: 'status_type',
-                    },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
-              },
-              type: {
-                status_type: new PostgresEnumType({
-                  name: 'status_type',
-                  nativeType: 'status_type',
-                  values: ['active', 'inactive'],
-                }),
-              },
-            },
-          }),
-        },
-      }),
-      roots: {},
-      domain: applicationDomainOf({ models: {} }),
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-    };
-
-    await planAndExecute(driver!, updatedContract);
-
-    const typeRow = await driver!.query<{ formatted_type: string }>(
-      `SELECT format_type(a.atttypid, a.atttypmod) AS formatted_type
-         FROM pg_attribute a
-         JOIN pg_class c ON c.oid = a.attrelid
-         JOIN pg_namespace n ON n.oid = c.relnamespace
-         WHERE n.nspname = 'public'
-           AND c.relname = 'item'
-           AND a.attname = 'status'
-           AND NOT a.attisdropped`,
-    );
-    expect(typeRow.rows[0]?.formatted_type).toBe('status_type');
-  });
-
   it('applies ALTER COLUMN TYPE between parameterized type variants', {
     timeout: testTimeout,
   }, async () => {
@@ -1266,75 +1193,6 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     );
     expect(defaultRow.rows[0]?.column_default).not.toBeNull();
     expect(defaultRow.rows[0]?.column_default).toContain('2023-01-01');
-  });
-
-  // ==========================================================================
-  // P1-4: ALTER COLUMN TYPE to mixed-case enum
-  // ==========================================================================
-
-  it('applies ALTER COLUMN TYPE from text to mixed-case enum', {
-    timeout: testTimeout,
-  }, async () => {
-    const baselineContract = makeContract(
-      {
-        item: makeTable({
-          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-        }),
-      },
-      'text-to-mixed-enum-baseline',
-    );
-    await applyBaseline(driver!, baselineContract);
-
-    const updatedContract: Contract<SqlStorage> = {
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: profileHash('sha256:test'),
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: new PostgresSchema({
-            id: UNBOUND_NAMESPACE_ID,
-            entries: {
-              table: {
-                item: {
-                  columns: {
-                    id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                    status: {
-                      nativeType: 'StatusType',
-                      codecId: 'pg/enum@1',
-                      nullable: false,
-                      typeRef: 'StatusType',
-                    },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
-              },
-              type: {
-                StatusType: new PostgresEnumType({
-                  name: 'StatusType',
-                  nativeType: 'StatusType',
-                  values: ['active', 'inactive'],
-                }),
-              },
-            },
-          }),
-        },
-      }),
-      roots: {},
-      domain: applicationDomainOf({ models: {} }),
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-    };
-
-    // planAndExecute succeeds iff the postcheck passes — the postcheck
-    // compares buildExpectedFormatType output (which conditionally quotes
-    // mixed-case UDT names) against PG's format_type().
-    await expect(planAndExecute(driver!, updatedContract)).resolves.not.toThrow();
   });
 
   // ==========================================================================

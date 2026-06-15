@@ -44,7 +44,7 @@ type TestStorage = {
   };
 };
 
-type TestContract = Omit<MongoContract<TestStorage, TestModels>, 'domain'> & {
+type TestContract = Omit<MongoContract<TestStorage>, 'domain'> & {
   readonly roots: { readonly orders: CrossReference & { readonly model: 'Order' } };
   readonly domain: {
     readonly namespaces: {

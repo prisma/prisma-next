@@ -56,7 +56,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         types: {
           codecTypes: {
             controlPlaneHooks: {
-              'pg/enum@1': hooks,
+              'app/test-type@1': hooks,
             },
           },
         },
@@ -72,7 +72,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         types: {
           Role: {
             kind: 'codec-instance',
-            codecId: 'pg/enum@1',
+            codecId: 'app/test-type@1',
             nativeType: 'role',
             typeParams: { values: ['USER'] },
           },
@@ -87,7 +87,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
                     id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
                     role: {
                       nativeType: 'role',
-                      codecId: 'pg/enum@1',
+                      codecId: 'app/test-type@1',
                       nullable: false,
                       typeRef: 'Role',
                     },
@@ -153,7 +153,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         types: {
           codecTypes: {
             controlPlaneHooks: {
-              'pg/enum@1': hooks,
+              'app/test-type@1': hooks,
             },
           },
         },
@@ -169,7 +169,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         types: {
           Role: {
             kind: 'codec-instance',
-            codecId: 'pg/enum@1',
+            codecId: 'app/test-type@1',
             nativeType: 'role',
             typeParams: { values: ['USER'] },
           },
@@ -232,7 +232,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         types: {
           codecTypes: {
             controlPlaneHooks: {
-              'pg/enum@1': hooks,
+              'app/test-type@1': hooks,
             },
           },
         },
@@ -248,7 +248,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         types: {
           UserKind: {
             kind: 'codec-instance',
-            codecId: 'pg/enum@1',
+            codecId: 'app/test-type@1',
             nativeType: 'UserKind',
             typeParams: { values: ['ADMIN', 'USER'] },
           },
@@ -263,7 +263,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
                     id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
                     kind: {
                       nativeType: 'UserKind',
-                      codecId: 'pg/enum@1',
+                      codecId: 'app/test-type@1',
                       nullable: false,
                       typeRef: 'UserKind',
                     },

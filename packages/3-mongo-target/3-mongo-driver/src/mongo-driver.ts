@@ -1,11 +1,17 @@
 import type { MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
   AggregateWireCommand,
-  AnyMongoWireCommand,
+  AnyMongoDdlWireCommand,
+  AnyMongoDmlWireCommand,
+  CollModWireCommand,
+  CreateCollectionWireCommand,
+  CreateIndexWireCommand,
   DeleteManyResult,
   DeleteManyWireCommand,
   DeleteOneResult,
   DeleteOneWireCommand,
+  DropCollectionWireCommand,
+  DropIndexWireCommand,
   FindOneAndDeleteWireCommand,
   FindOneAndUpdateWireCommand,
   InsertManyResult,
@@ -39,7 +45,7 @@ export class MongoDriverImpl implements MongoDriver {
     return new MongoDriverImpl(db, undefined);
   }
 
-  execute<Row = Record<string, unknown>>(wireCommand: AnyMongoWireCommand): AsyncIterable<Row> {
+  execute<Row = Record<string, unknown>>(wireCommand: AnyMongoDmlWireCommand): AsyncIterable<Row> {
     switch (wireCommand.kind) {
       case 'insertOne':
         return this.executeInsertOneCommand(wireCommand) as AsyncIterable<Row>;
@@ -63,6 +69,26 @@ export class MongoDriverImpl implements MongoDriver {
       default: {
         const _exhaustive: never = wireCommand;
         throw new Error(`Unknown wire command kind: ${(_exhaustive as { kind: string }).kind}`);
+      }
+    }
+  }
+
+  async run(wireCommand: AnyMongoDdlWireCommand): Promise<void> {
+    switch (wireCommand.kind) {
+      case 'createCollection':
+        return this.executeCreateCollectionCommand(wireCommand);
+      case 'createIndex':
+        return this.executeCreateIndexCommand(wireCommand);
+      case 'dropCollection':
+        return this.executeDropCollectionCommand(wireCommand);
+      case 'dropIndex':
+        return this.executeDropIndexCommand(wireCommand);
+      case 'collMod':
+        return this.executeCollModCommand(wireCommand);
+      // v8 ignore next 4
+      default: {
+        const _exhaustive: never = wireCommand;
+        throw new Error(`Unknown DDL wire command kind: ${(_exhaustive as { kind: string }).kind}`);
       }
     }
   }
@@ -160,6 +186,79 @@ export class MongoDriverImpl implements MongoDriver {
     const collection = this.db.collection(cmd.collection);
     const cursor = collection.aggregate(cmd.pipeline as Record<string, unknown>[]);
     yield* cursor as AsyncIterable<Row>;
+  }
+
+  protected async executeCreateCollectionCommand(cmd: CreateCollectionWireCommand): Promise<void> {
+    const {
+      validator,
+      validationLevel,
+      validationAction,
+      capped,
+      size,
+      max,
+      timeseries,
+      collation,
+      changeStreamPreAndPostImages,
+      clusteredIndex,
+    } = cmd;
+    await this.db.createCollection(cmd.collection, {
+      ...(validator !== undefined ? { validator } : {}),
+      ...(validationLevel !== undefined ? { validationLevel } : {}),
+      ...(validationAction !== undefined ? { validationAction } : {}),
+      ...(capped !== undefined ? { capped } : {}),
+      ...(size !== undefined ? { size } : {}),
+      ...(max !== undefined ? { max } : {}),
+      ...(timeseries !== undefined ? { timeseries } : {}),
+      ...(collation !== undefined ? { collation } : {}),
+      ...(changeStreamPreAndPostImages !== undefined ? { changeStreamPreAndPostImages } : {}),
+      ...(clusteredIndex !== undefined ? { clusteredIndex } : {}),
+    });
+  }
+
+  protected async executeCreateIndexCommand(cmd: CreateIndexWireCommand): Promise<void> {
+    const {
+      unique,
+      sparse,
+      expireAfterSeconds,
+      partialFilterExpression,
+      name,
+      wildcardProjection,
+      collation,
+      weights,
+      default_language,
+      language_override,
+    } = cmd;
+    await this.db.collection(cmd.collection).createIndex(cmd.key, {
+      ...(unique !== undefined ? { unique } : {}),
+      ...(sparse !== undefined ? { sparse } : {}),
+      ...(expireAfterSeconds !== undefined ? { expireAfterSeconds } : {}),
+      ...(partialFilterExpression !== undefined ? { partialFilterExpression } : {}),
+      ...(name !== undefined ? { name } : {}),
+      ...(wildcardProjection !== undefined ? { wildcardProjection } : {}),
+      ...(collation !== undefined ? { collation } : {}),
+      ...(weights !== undefined ? { weights } : {}),
+      ...(default_language !== undefined ? { default_language } : {}),
+      ...(language_override !== undefined ? { language_override } : {}),
+    });
+  }
+
+  protected async executeDropCollectionCommand(cmd: DropCollectionWireCommand): Promise<void> {
+    await this.db.collection(cmd.collection).drop();
+  }
+
+  protected async executeDropIndexCommand(cmd: DropIndexWireCommand): Promise<void> {
+    await this.db.collection(cmd.collection).dropIndex(cmd.name);
+  }
+
+  protected async executeCollModCommand(cmd: CollModWireCommand): Promise<void> {
+    const { validator, validationLevel, validationAction, changeStreamPreAndPostImages } = cmd;
+    await this.db.command({
+      collMod: cmd.collection,
+      ...(validator !== undefined ? { validator } : {}),
+      ...(validationLevel !== undefined ? { validationLevel } : {}),
+      ...(validationAction !== undefined ? { validationAction } : {}),
+      ...(changeStreamPreAndPostImages !== undefined ? { changeStreamPreAndPostImages } : {}),
+    });
   }
 }
 

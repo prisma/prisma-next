@@ -6,7 +6,6 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import type { ContractModelDefinitions } from '@prisma-next/contract/types';
 import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import arktypeJsonRuntime from '@prisma-next/extension-arktype-json/runtime';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
@@ -30,6 +29,12 @@ import { type as arktype } from 'arktype';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
+
+// The models map for the contract's sole domain namespace, read per-namespace
+// from `domain.namespaces[ns].models` (the flat top-level models map is gone).
+type SoleNamespaceModels<
+  T extends { domain: { namespaces: Record<string, { models: unknown }> } },
+> = T['domain']['namespaces'][keyof T['domain']['namespaces']]['models'];
 
 const typecheckOnly = process.env['PN_TYPECHECK_ONLY'] === 'true';
 
@@ -160,7 +165,7 @@ test('refined object contract preserves downstream model token inference', () =>
     Record<string, unknown>
   >();
   expectTypeOf<RefinedUserColumns>().toExtend<Record<string, { readonly codecId: string }>>();
-  type ValidatedModels = ContractModelDefinitions<typeof validated>;
+  type ValidatedModels = SoleNamespaceModels<typeof validated>;
   expectTypeOf<ValidatedModels['User']['storage']['table']>().toExtend<string>();
   expectTypeOf<
     NonNullable<ValidatedModels['Post']['storage']['fields']['userId']>['column']
@@ -195,17 +200,7 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
         pgvector: pgvectorPack,
       },
     },
-    ({ enum: enumEntity, type, field, model }) => {
-      // `enum` preserves runtime semantics, but its declarative
-      // type-narrowing (literal tuple capture for `values`) is
-      // constrained by the family-shared
-      // `EntityHelperFunction<Descriptor>` shape — the helper signature
-      // bakes in the descriptor-level factory generic-defaults
-      // (`string` / `readonly string[]`) instead of forwarding fresh
-      // generics. Sharpening `EntityHelperFunction` to forward
-      // descriptor-level generics is a separable cross-family
-      // entities-mechanism refinement and is not gated by M4.
-      const Role = enumEntity({ name: 'role', values: ['USER', 'ADMIN'] as const });
+    ({ type, field, model }) => {
       const Embedding = type.pgvector.Vector(1536);
 
       expectTypeOf(Embedding.codecId).toEqualTypeOf<'pg/vector@1'>();
@@ -213,7 +208,6 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
 
       return {
         types: {
-          Role,
           Embedding,
         },
         models: {
@@ -225,7 +219,6 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
               isActive: field.boolean().default(true),
               score: field.float().optional(),
               profile: field.json().optional(),
-              role: field.namedType(Role),
               embedding: field.namedType(Embedding).optional(),
               createdAt: field.temporal.createdAt(),
             },
@@ -275,9 +268,7 @@ test('integrated callback authoring hides extension namespaces when packs are ab
       family: sqlFamilyPack,
       target: postgresPack,
     },
-    ({ enum: enumEntity, type }) => {
-      enumEntity({ name: 'role', values: ['USER'] as const });
-
+    ({ type }) => {
       if (typecheckOnly) {
         // @ts-expect-error extension-owned helper requires the corresponding pack
         type.pgvector.Vector(1536);

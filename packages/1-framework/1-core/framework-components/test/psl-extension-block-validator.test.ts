@@ -142,7 +142,7 @@ function namespaceWithModel(nsName: string, modelName: string): PslNamespace {
     kind: 'namespace',
     name: nsName,
     span: stubSpan(),
-    entries: makePslNamespaceEntries([model], [], [], []),
+    entries: makePslNamespaceEntries([model], [], []),
   });
 }
 
@@ -151,7 +151,7 @@ function emptyNamespace(nsName: string): PslNamespace {
     kind: 'namespace',
     name: nsName,
     span: stubSpan(),
-    entries: makePslNamespaceEntries([], [], [], []),
+    entries: makePslNamespaceEntries([], [], []),
   });
 }
 

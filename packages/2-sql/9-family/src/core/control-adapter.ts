@@ -8,11 +8,7 @@ import type {
   ControlStack,
   SchemaDiffIssue,
 } from '@prisma-next/framework-components/control';
-import type {
-  PostgresEnumStorageEntry,
-  SqlControlDriverInstance,
-  SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   DdlNode,
@@ -196,33 +192,6 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * before comparison with contract native types during schema verification.
    */
   readonly normalizeNativeType?: NativeTypeNormalizer;
-
-  /**
-   * Optional bridging adapter for resolving the existing values of a
-   * native enum type from the introspected schema IR. Targets supply
-   * this so the family-level schema verifier can walk
-   * `PostgresEnumStorageEntry` entries natively without needing to
-   * know the target-specific `schema.annotations` shape
-   * (e.g. `schema.annotations.pg.storageTypes`).
-   */
-  readonly resolveExistingEnumValues?: (
-    schema: SqlSchemaIR,
-    enumType: PostgresEnumStorageEntry,
-    namespaceId: string,
-  ) => readonly string[] | null;
-  /**
-   * Optional contract-scoped factory for {@link resolveExistingEnumValues}.
-   * Targets that need the contract storage to resolve namespace → DDL schema
-   * supply this; the family control instance prefers it over the bare adapter
-   * hook when present.
-   */
-  readonly resolveExistingEnumValuesForContract?: (
-    contract: Contract<SqlStorage>,
-  ) => (
-    schema: SqlSchemaIR,
-    enumType: PostgresEnumStorageEntry,
-    namespaceId: string,
-  ) => readonly string[] | null;
 
   /**
    * Optional hook for collecting target-extension drift issues during schema

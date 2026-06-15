@@ -5,7 +5,20 @@ export type CapabilitiesBase = Record<string, Record<string, boolean>>;
 
 type NamespaceEntries = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
+// The application-domain models the table-proxy helpers read to map a storage
+// table -> model and column -> field within a namespace coordinate. The index
+// signature lets the helpers index `C['domain']['namespaces'][NsId]` by a
+// generic `NsId` directly, so `FindModelForTable` / `FindFieldForColumn` no
+// longer need a `C extends Contract<SqlStorage>` guard to reach the per-namespace
+// models; concrete emitted contracts (whose models are richer) satisfy it.
+type NamespaceDomain = Readonly<
+  Record<string, { readonly models: Readonly<Record<string, unknown>> }>
+>;
+
 export type TableProxyContract = {
+  readonly domain: {
+    readonly namespaces: NamespaceDomain;
+  };
   readonly storage: {
     readonly namespaces: Readonly<Record<string, { readonly entries: NamespaceEntries }>>;
   };
@@ -38,19 +51,34 @@ export type TableInAnyNamespace<C extends TableProxyContract, Name extends strin
     : never;
 }[keyof C['storage']['namespaces']];
 
+// The exact storage table at a single namespace coordinate. Resolving through
+// the coordinate (rather than the cross-namespace `UnboundTables` union) keeps
+// a bare table name shared across namespaces resolving to each namespace's own
+// table — no per-namespace column intersection. `TablesInNamespace` narrows the
+// open-dict `entries['table']` (`Record<string, unknown>`) back to the typed
+// `StorageTable` map before indexing by the bare name.
+export type NamespaceTable<
+  C extends TableProxyContract,
+  NsId extends string,
+  Name extends string,
+> = TablesInNamespace<C['storage']['namespaces'][NsId]>[Name];
+
 // The tables of a single storage namespace, keyed by bare table name. Lets
 // callers reach a table by its namespace coordinate (`db.<ns>.<table>`) when
-// the same bare name is declared in more than one namespace.
+// the same bare name is declared in more than one namespace. The `NsId`
+// coordinate is threaded into each `TableProxy` so its column/field resolution
+// is a function of `(NsId, Name)`, not `Name` alone.
 export type Namespace<
   C extends TableProxyContract,
-  NsId extends keyof C['storage']['namespaces'],
+  NsId extends string & keyof C['storage']['namespaces'],
 > = {
   readonly [Name in keyof TablesInNamespace<C['storage']['namespaces'][NsId]> & string]: TableProxy<
     C,
+    NsId,
     Name
   >;
 };
 
 export type Db<C extends TableProxyContract> = {
-  readonly [Ns in keyof C['storage']['namespaces']]: Namespace<C, Ns>;
+  readonly [Ns in keyof C['storage']['namespaces'] & string]: Namespace<C, Ns>;
 };

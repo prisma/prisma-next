@@ -24,7 +24,6 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   Contract as ContractType,
-  ContractModelDefinitions,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -46,19 +45,23 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   : _Encoded;
 
 export type FieldOutputTypes = {
-  readonly Item: {
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly description: CodecTypes['pg/text@1']['output'];
-    readonly category: CodecTypes['pg/text@1']['output'];
-    readonly rating: CodecTypes['pg/int4@1']['output'];
+  readonly public: {
+    readonly Item: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly description: CodecTypes['pg/text@1']['output'];
+      readonly category: CodecTypes['pg/text@1']['output'];
+      readonly rating: CodecTypes['pg/int4@1']['output'];
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly Item: {
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly description: CodecTypes['pg/text@1']['input'];
-    readonly category: CodecTypes['pg/text@1']['input'];
-    readonly rating: CodecTypes['pg/int4@1']['input'];
+  readonly public: {
+    readonly Item: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly description: CodecTypes['pg/text@1']['input'];
+      readonly category: CodecTypes['pg/text@1']['input'];
+      readonly rating: CodecTypes['pg/int4@1']['input'];
+    };
   };
 };
 export type TypeMaps = TypeMapsType<
@@ -69,95 +72,59 @@ export type TypeMaps = TypeMapsType<
 >;
 
 type ContractBase = Omit<
-  ContractType<
-    {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'postgres-unbound-schema';
-          readonly entries: { readonly table: {}; readonly type: Record<string, never> };
-        };
-        readonly public: {
-          readonly id: 'public';
-          readonly kind: 'postgres-schema';
-          readonly entries: {
-            readonly table: {
-              readonly item: {
-                columns: {
-                  readonly id: {
-                    readonly nativeType: 'int4';
-                    readonly codecId: 'pg/int4@1';
-                    readonly nullable: false;
-                  };
-                  readonly description: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
-                  readonly category: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
-                  readonly rating: {
-                    readonly nativeType: 'int4';
-                    readonly codecId: 'pg/int4@1';
-                    readonly nullable: false;
-                  };
+  ContractType<{
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'postgres-unbound-schema';
+        readonly entries: { readonly table: {} };
+      };
+      readonly public: {
+        readonly id: 'public';
+        readonly kind: 'postgres-schema';
+        readonly entries: {
+          readonly table: {
+            readonly item: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
                 };
-                primaryKey: { readonly columns: readonly ['id'] };
-                uniques: readonly [];
-                indexes: readonly [
-                  {
-                    readonly columns: readonly ['id', 'description', 'category', 'rating'];
-                    readonly name: 'item_bm25_idx';
-                    readonly type: 'bm25';
-                    readonly options: { readonly key_field: 'id' };
-                  },
-                ];
-                foreignKeys: readonly [];
+                readonly description: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly category: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly rating: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
               };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [
+                {
+                  readonly columns: readonly ['id', 'description', 'category', 'rating'];
+                  readonly name: 'item_bm25_idx';
+                  readonly type: 'bm25';
+                  readonly options: { readonly key_field: 'id' };
+                },
+              ];
+              foreignKeys: readonly [];
             };
-            readonly type: Record<string, never>;
           };
         };
       };
-      readonly storageHash: StorageHash;
-    },
-    {
-      readonly Item: {
-        readonly fields: {
-          readonly id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          };
-          readonly description: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-          readonly category: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-          readonly rating: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: {
-          readonly table: 'item';
-          readonly namespaceId: 'public';
-          readonly fields: {
-            readonly id: { readonly column: 'id' };
-            readonly description: { readonly column: 'description' };
-            readonly category: { readonly column: 'category' };
-            readonly rating: { readonly column: 'rating' };
-          };
-        };
-      };
-    }
-  >,
+    };
+    readonly storageHash: StorageHash;
+  }>,
   'roots' | 'domain'
 > & {
   readonly target: 'postgres';
@@ -244,8 +211,6 @@ type ContractBase = Omit<
 
   readonly profileHash: ProfileHash;
 };
-
-export type Models = ContractModelDefinitions<Contract>;
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 

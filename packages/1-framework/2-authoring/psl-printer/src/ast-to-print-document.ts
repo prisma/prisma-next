@@ -2,7 +2,6 @@ import type {
   PslAttribute,
   PslAttributeArgument,
   PslDocumentAst,
-  PslEnum,
   PslField,
   PslModel,
   PslNamedTypeDeclaration,
@@ -15,7 +14,7 @@ import {
 } from '@prisma-next/framework-components/psl-ast';
 import type { PrintDocument, PrintNamespaceSection } from './print-document';
 import { escapePslString } from './serialize-print-document';
-import type { PrinterEnum, PrinterField, PrinterModel, PrinterNamedType } from './types';
+import type { PrinterField, PrinterModel, PrinterNamedType } from './types';
 
 // `contract infer` produces a starting-point PSL contract from a live database
 // schema; the user is expected to edit it (rename models/fields, tighten types,
@@ -51,14 +50,8 @@ export function astDocumentToPrintDocument(ast: PslDocumentAst): PrintDocument {
       (model) => modelNamespaceIndex.get(model.name) === namespace.name,
     );
     const printerModels = namespaceModels.map((m) => modelToPrinterModel(m));
-    const enums: PrinterEnum[] = namespace.enums.map(enumToPrinterEnum);
     return {
       name: namespace.name,
-      enums: enums.map((e) => ({
-        name: e.name,
-        mapName: e.mapName,
-        values: e.values,
-      })),
       models: printerModels,
       extensionBlocks: namespacePslExtensionBlocks(namespace),
     };
@@ -115,26 +108,6 @@ function formatTypeConstructor(tc: PslTypeConstructorCall): string {
     return path;
   }
   return `${path}(${tc.args.map(renderAttributeArgument).join(', ')})`;
-}
-
-function enumToPrinterEnum(en: PslEnum): PrinterEnum {
-  let mapName: string | undefined;
-  for (const a of en.attributes) {
-    if (a.name === 'map' && a.target === 'enum') {
-      const quoted = getPositionalStringArg(a, 0);
-      if (quoted !== undefined) {
-        mapName = quoted;
-      }
-    }
-  }
-  return {
-    name: en.name,
-    mapName,
-    values: en.values.map((v) => ({
-      name: v.name,
-      ...(v.mapName !== undefined ? { mapName: v.mapName } : {}),
-    })),
-  };
 }
 
 function getPositionalStringArg(attr: PslAttribute, index: number): string | undefined {

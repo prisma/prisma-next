@@ -109,23 +109,6 @@ export const pgIntervalDecode = (wire: string | Record<string, unknown>): string
   return JSON.stringify(wire);
 };
 
-export const pgEnumRenderOutputType = (typeParams: {
-  readonly values?: readonly unknown[];
-}): string => {
-  const values = typeParams.values;
-  if (!Array.isArray(values)) {
-    throw new Error(
-      `renderOutputType: expected array "values" in typeParams for enum, got ${typeof values}`,
-    );
-  }
-  if (!values.every((v): v is string => typeof v === 'string')) {
-    throw new Error(`renderOutputType: expected string[] "values" in typeParams for enum`);
-  }
-  return values
-    .map((value) => `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`)
-    .join(' | ');
-};
-
 export const pgJsonEncode = (value: string | JsonValue): string => JSON.stringify(value);
 export const pgJsonDecode = (wire: string | JsonValue): JsonValue =>
   typeof wire === 'string' ? JSON.parse(wire) : wire;

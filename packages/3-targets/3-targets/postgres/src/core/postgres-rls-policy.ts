@@ -42,13 +42,13 @@ export interface PostgresRlsPolicyInput {
  * Postgres IR class for a row-level security policy (`CREATE POLICY … ON …`).
  *
  * Target-only concept — no SQL-family abstract. Extends `SqlNode` directly.
- * Frozen at construction via `freezeNode(this)`. The `kind: 'rlsPolicy'`
+ * Frozen at construction via `freezeNode(this)`. The `kind: 'policy'`
  * discriminant is enumerable (overrides SqlNode's non-enumerable `'sql'`) so it
  * survives JSON serialization and enables dispatch. The literal matches the
  * entries key (one-string rule: node.kind === entries key === entity kind).
  */
 export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
-  override readonly kind = 'rlsPolicy' as const;
+  override readonly kind = 'policy' as const;
   readonly name: string;
   readonly prefix: string;
   readonly tableName: string;
@@ -84,7 +84,7 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
     return {
       plane: 'storage',
       namespaceId: this.namespaceId,
-      entityKind: 'rlsPolicy',
+      entityKind: 'policy',
       entityName: this.name,
     };
   }

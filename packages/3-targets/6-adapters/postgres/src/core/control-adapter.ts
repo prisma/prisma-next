@@ -19,11 +19,7 @@ import {
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
-import type {
-  PostgresEnumStorageEntry,
-  SqlControlDriverInstance,
-  SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   CodecRef,
@@ -63,17 +59,13 @@ import type {
   PostgresDdlNode,
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
-import {
-  createResolveExistingEnumValues,
-  readExistingEnumValues,
-  readPostgresSchemaIrAnnotations,
-} from '@prisma-next/target-postgres/enum-planning';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import {
   computeContentHash,
   normalizePredicate,
   type RlsPolicyOperation,
 } from '@prisma-next/target-postgres/rls-canonicalize';
+import { readPostgresSchemaIrAnnotations } from '@prisma-next/target-postgres/schema-ir-annotations';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
   isPostgresSchema,
@@ -83,10 +75,6 @@ import {
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { encodeControlQueryParams } from './control-codecs';
-import {
-  introspectPostgresEnumTypes,
-  type PostgresEnumStorageTypeAnnotation,
-} from './enum-control-hooks';
 import {
   execute,
   infoSchemaTables,
@@ -139,27 +127,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    */
   readonly normalizeNativeType = normalizeSchemaNativeType;
 
-  /**
-   * Bridges native `PostgresEnumStorageEntry` IR walks against the Postgres
-   * introspection shape (`schema.annotations.pg.storageTypes`). Lets
-   * the family-level schema verifier walk enum types without reaching
-   * into target-specific annotation layouts itself.
-   */
-  readonly resolveExistingEnumValues = (
-    schema: SqlSchemaIR,
-    enumType: PostgresEnumStorageEntry,
-    namespaceId: string,
-  ): readonly string[] | null => {
-    const schemaName =
-      namespaceId === UNBOUND_NAMESPACE_ID
-        ? (readPostgresSchemaIrAnnotations(schema).schema ?? 'public')
-        : namespaceId;
-    return readExistingEnumValues(schema, schemaName, enumType.nativeType);
-  };
-
-  readonly resolveExistingEnumValuesForContract = (contract: Contract<SqlStorage>) =>
-    createResolveExistingEnumValues(contract.storage);
-
   collectExtensionIssues(
     contract: Contract<SqlStorage>,
     schema: SqlSchemaIR,
@@ -167,15 +134,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const expectedPolicies: PostgresRlsPolicy[] = [];
     for (const ns of Object.values(contract.storage.namespaces)) {
       if (isPostgresSchema(ns)) {
-        for (const policy of Object.values(ns.entries.rlsPolicy ?? {})) {
+        for (const policy of Object.values(ns.policy)) {
           expectedPolicies.push(policy);
         }
       }
     }
     const { rlsPolicies: actualPolicies = [] } = readPostgresSchemaIrAnnotations(schema);
-    // Scope to tables present in the projected schema: after projectSchemaToSpace
-    // prunes tables owned by other spaces, the remaining table names are the ones
-    // this space is responsible for. Policies on pruned tables belong to other spaces.
     const schemaTableNames = new Set(Object.keys(schema.tables));
     const managedActual = actualPolicies.filter(
       (p) => p.prismaManaged && schemaTableNames.has(p.tableName),
@@ -706,36 +670,14 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       }
     }
 
-    const mergedEnumTypes: Record<string, Record<string, PostgresEnumStorageTypeAnnotation>> = {};
-    for (const ir of perSchema) {
-      const enumTypes = blindCast<
-        | { enumTypes?: Record<string, Record<string, PostgresEnumStorageTypeAnnotation>> }
-        | undefined,
-        'pg annotation envelope index slot'
-      >(ir?.annotations?.['pg'])?.enumTypes;
-      if (!enumTypes) continue;
-      for (const [schemaName, byType] of Object.entries(enumTypes)) {
-        const merged = mergedEnumTypes[schemaName] ?? {};
-        Object.assign(merged, byType);
-        mergedEnumTypes[schemaName] = merged;
-      }
-    }
-
     const mergedRlsPolicies: PostgresRlsPolicy[] = [];
     const mergedRlsEnabledByTable: Record<string, boolean> = {};
     for (const ir of perSchema) {
-      const pgAnnotations = blindCast<
-        | {
-            rlsPolicies?: readonly PostgresRlsPolicy[];
-            rlsEnabledByTable?: Readonly<Record<string, boolean>>;
-          }
-        | undefined,
-        'pg annotation envelope index slot'
-      >(ir?.annotations?.['pg']);
-      if (pgAnnotations?.rlsPolicies) {
+      const pgAnnotations = readPostgresSchemaIrAnnotations(ir);
+      if (pgAnnotations.rlsPolicies) {
         mergedRlsPolicies.push(...pgAnnotations.rlsPolicies);
       }
-      if (pgAnnotations?.rlsEnabledByTable) {
+      if (pgAnnotations.rlsEnabledByTable) {
         Object.assign(mergedRlsEnabledByTable, pgAnnotations.rlsEnabledByTable);
       }
     }
@@ -751,10 +693,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         ...firstAnnotations,
         pg: {
           ...firstPg,
-          ...ifDefined(
-            'enumTypes',
-            Object.keys(mergedEnumTypes).length > 0 ? mergedEnumTypes : undefined,
-          ),
           ...ifDefined('rlsPolicies', mergedRlsPolicies.length > 0 ? mergedRlsPolicies : undefined),
           ...ifDefined(
             'rlsEnabledByTable',
@@ -1200,7 +1138,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const rawEnumTypes = await introspectPostgresEnumTypes({ driver, schemaName: schema });
+    const nativeEnumResult = await driver.query<{ typname: string }>(
+      `SELECT t.typname
+         FROM pg_catalog.pg_type t
+         JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+         WHERE t.typtype = 'e'
+           AND n.nspname = $1
+         ORDER BY t.typname`,
+      [schema],
+    );
+    const nativeEnumTypeNames = nativeEnumResult.rows.map((r) => r.typname);
     const policiesResult = await driver.query<{
       schemaname: string;
       tablename: string;
@@ -1233,11 +1180,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
        ORDER BY c.relname`,
       [schema],
     );
-
-    const enumTypes: Record<
-      string,
-      Record<string, PostgresEnumStorageTypeAnnotation>
-    > = Object.keys(rawEnumTypes).length > 0 ? { [schema]: rawEnumTypes } : {};
 
     const rlsPolicies: PostgresRlsPolicy[] = policiesResult.rows.map((row) => {
       const operation = mapPgCmd(row.cmd);
@@ -1280,7 +1222,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       pg: {
         schema,
         version: await this.getPostgresVersion(driver),
-        ...ifDefined('enumTypes', Object.keys(enumTypes).length > 0 ? enumTypes : undefined),
+        ...(nativeEnumTypeNames.length > 0 && { nativeEnumTypeNames }),
         ...ifDefined('rlsPolicies', rlsPolicies.length > 0 ? rlsPolicies : undefined),
         ...ifDefined('roles', roles.length > 0 ? roles : undefined),
         ...ifDefined(
