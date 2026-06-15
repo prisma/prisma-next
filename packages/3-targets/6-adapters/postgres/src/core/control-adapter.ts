@@ -721,6 +721,25 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       }
     }
 
+    const mergedRlsPolicies: PostgresRlsPolicy[] = [];
+    const mergedRlsEnabledByTable: Record<string, boolean> = {};
+    for (const ir of perSchema) {
+      const pgAnnotations = blindCast<
+        | {
+            rlsPolicies?: readonly PostgresRlsPolicy[];
+            rlsEnabledByTable?: Readonly<Record<string, boolean>>;
+          }
+        | undefined,
+        'pg annotation envelope index slot'
+      >(ir?.annotations?.['pg']);
+      if (pgAnnotations?.rlsPolicies) {
+        mergedRlsPolicies.push(...pgAnnotations.rlsPolicies);
+      }
+      if (pgAnnotations?.rlsEnabledByTable) {
+        Object.assign(mergedRlsEnabledByTable, pgAnnotations.rlsEnabledByTable);
+      }
+    }
+
     const firstAnnotations = perSchema[0]?.annotations;
     const firstPg =
       blindCast<Record<string, unknown> | undefined, 'pg annotation envelope index slot'>(
@@ -735,6 +754,11 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           ...ifDefined(
             'enumTypes',
             Object.keys(mergedEnumTypes).length > 0 ? mergedEnumTypes : undefined,
+          ),
+          ...ifDefined('rlsPolicies', mergedRlsPolicies.length > 0 ? mergedRlsPolicies : undefined),
+          ...ifDefined(
+            'rlsEnabledByTable',
+            Object.keys(mergedRlsEnabledByTable).length > 0 ? mergedRlsEnabledByTable : undefined,
           ),
         },
       }),
