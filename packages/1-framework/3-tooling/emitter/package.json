@@ -21,7 +21,7 @@
     "@prisma-next/ts-render": "workspace:0.13.0",
     "@prisma-next/utils": "workspace:0.13.0",
     "arktype": "^2.2.0",
-    "prettier": "^3.8.3"
+    "prettier": "^3.8.4"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:0.13.0",
