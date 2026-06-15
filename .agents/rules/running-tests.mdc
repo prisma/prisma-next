@@ -1,0 +1,40 @@
+---
+description: How to run tests (and other slow verification commands) — save output to a file once, read the file, don't re-run to grep different lines
+alwaysApply: true
+---
+
+# Running tests
+
+When you run tests, save the output to a file and read the file. **Don't re-run the tests to grep different parts of the same output** — that is the single largest waste of agent time in this repo.
+
+Applies to tests and the other slow verification commands (each takes 30s–3min): `pnpm test:packages`, `test:integration`, `test:e2e`, `build`, `lint`, `lint:deps`, `fixtures:check`, `turbo typecheck`. Short commands (`git status`, a single-file `pnpm --filter X test <path>`, etc.) run normally.
+
+## Recipe
+
+Run from the worktree/repo root. `wip/` is gitignored at the repo root, so the log won't appear in diffs.
+
+```bash
+mkdir -p wip
+pnpm test:packages > wip/test-packages.log 2>&1; echo "exit=$?" >> wip/test-packages.log
+tail -1 wip/test-packages.log                              # 1. confirm exit=0 (or read the failure)
+grep -E " FAIL |Test Files" wip/test-packages.log          # 2. then inspect details
+```
+
+If exit≠0 and the log has no `FAIL` lines, the suite crashed before any test ran — read the tail of the log, not just `FAIL` matches.
+
+**Re-running after a fix**: overwrite the same file with `>` (the snippet above already does this). Don't append, don't write to a new path — stale failures from the prior run will confuse the grep.
+
+After a failure, re-run **only the failing test file** — `pnpm --filter <package> test <path>`. That's seconds, not minutes, and doesn't need to be captured.
+
+## Don't
+
+1. **Don't re-run the suite to grep different output.** Grep the file you already wrote. This is the exact pattern this rule exists to prevent.
+2. **Don't pipe the command directly to `tail`/`grep`/`head`.** That discards the rest of the output *and* hides the exit code (`tail`/`grep` return 0).
+3. **Don't pass `--force` to `turbo`.** Run `pnpm turbo typecheck` plain — the cache is correct by default. Only force when this same run edited `tsconfig.json` or a lockfile.
+
+If you must pipe through another tool (e.g. into `jq`), preserve the exit code with `tee` and `PIPESTATUS`:
+
+```bash
+pnpm test:packages 2>&1 | tee wip/test-packages.log | jq …
+echo "exit=${PIPESTATUS[0]}" >> wip/test-packages.log
+```
