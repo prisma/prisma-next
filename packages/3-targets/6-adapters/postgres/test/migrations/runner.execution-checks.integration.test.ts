@@ -41,7 +41,7 @@ describe.sequential('PostgresMigrationRunner - Execution Checks', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   describe('when prechecks and postchecks are disabled', () => {
     it('skips prechecks and postchecks, executes operation successfully', {

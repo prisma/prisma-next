@@ -149,7 +149,7 @@ describe.sequential('ORDER BY on an enum column — declaration order, PGlite', 
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   it('renders array_position over the value-set and sorts by declaration order', {
     timeout: testTimeout,

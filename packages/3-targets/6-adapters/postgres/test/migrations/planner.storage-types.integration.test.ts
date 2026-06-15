@@ -91,7 +91,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   describe('enum types', () => {
     it('creates enum type and table with enum column', { timeout: testTimeout }, async () => {

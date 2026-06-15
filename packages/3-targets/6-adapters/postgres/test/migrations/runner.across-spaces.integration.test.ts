@@ -121,7 +121,7 @@ describe.sequential('PostgresMigrationRunner.execute', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   it('rolls back ALL spaces when one fails (locks AM4-rollback)', {
     timeout: testTimeout,

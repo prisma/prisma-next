@@ -105,7 +105,7 @@ describe.sequential('RLS verify extension issues', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   async function applyContract(
     d: PostgresControlDriver,

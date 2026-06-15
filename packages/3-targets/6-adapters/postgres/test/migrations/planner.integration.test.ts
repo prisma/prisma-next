@@ -45,7 +45,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   it('returns an empty plan for superset schemas', { timeout: testTimeout }, async () => {
     const planner = postgresTargetDescriptor.createPlanner(controlAdapter);

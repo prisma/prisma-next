@@ -39,7 +39,7 @@ describe.sequential('Postgres index introspection — type and options', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   it('leaves type and options unset on a default btree index', {
     timeout: testTimeout,
