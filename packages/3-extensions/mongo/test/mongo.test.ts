@@ -507,11 +507,10 @@ describe('mongo() facade', () => {
 
     function roleAccessor() {
       const db = mongo({ contract: contractWithEnum, url: 'mongodb://localhost:27017/mydb' });
-      // Index-signature access requires bracket notation; non-null safe at runtime (test fixture)
-      return db.enums['__unbound__']!['Role']!;
+      return db.enums['Role']!;
     }
 
-    it('exposes the enum accessor at db.enums[__unbound__][Role]', () => {
+    it('exposes the enum accessor at db.enums.Role', () => {
       expect(roleAccessor().values).toEqual(['user', 'admin']);
     });
 
@@ -544,7 +543,7 @@ describe('mongo() facade', () => {
     it('builds the enums surface eagerly, without connecting the driver', () => {
       const db = mongo({ contract: contractWithEnum, url: 'mongodb://localhost:27017/mydb' });
 
-      expect(db.enums['__unbound__']!['Role']!.values).toEqual(['user', 'admin']);
+      expect(db.enums['Role']!.values).toEqual(['user', 'admin']);
       expect(mocks.driverFromConnection).not.toHaveBeenCalled();
       expect(mocks.createMongoRuntime).not.toHaveBeenCalled();
     });
