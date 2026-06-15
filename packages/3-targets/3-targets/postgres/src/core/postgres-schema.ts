@@ -197,7 +197,7 @@ export class PostgresSchema extends NamespaceBase {
     return new PostgresTableSource({
       name: tableName,
       schema: this.id,
-      ...(alias !== undefined ? { alias } : {}),
+      ...ifDefined('alias', alias),
     });
   }
 
@@ -262,7 +262,7 @@ export class PostgresUnboundSchema extends PostgresSchema {
   override tableSource(tableName: string, alias?: string): PostgresTableSource {
     return new PostgresTableSource({
       name: tableName,
-      ...(alias !== undefined ? { alias } : {}),
+      ...ifDefined('alias', alias),
     });
   }
 }
