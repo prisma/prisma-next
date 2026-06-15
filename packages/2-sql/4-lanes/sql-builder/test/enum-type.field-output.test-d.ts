@@ -42,53 +42,60 @@ type EnumTypeMaps = TypeMaps<
   EnumFieldInputTypes
 >;
 
-type EnumContractBase = Contract<
-  {
-    storageHash: StorageHashBase<string>;
-    namespaces: {
-      readonly __unbound__: {
-        id: '__unbound__';
-        kind: 'sql-namespace';
-        entries: {
-          readonly table: {
-            readonly User: {
-              columns: {
-                readonly role: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-                readonly status: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: true };
-              };
-              primaryKey: { columns: ['role'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
+type EnumStorage = {
+  storageHash: StorageHashBase<string>;
+  namespaces: {
+    readonly __unbound__: {
+      id: '__unbound__';
+      kind: 'sql-namespace';
+      entries: {
+        readonly table: {
+          readonly User: {
+            columns: {
+              readonly role: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+              readonly status: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: true };
             };
+            primaryKey: { columns: ['role'] };
+            uniques: readonly [];
+            indexes: readonly [];
+            foreignKeys: readonly [];
           };
         };
       };
     };
-  },
-  {
-    User: {
-      storage: {
-        table: 'User';
-        fields: {
-          role: { column: 'role' };
-          status: { column: 'status' };
-        };
-      };
+  };
+};
+
+type EnumModels = {
+  User: {
+    storage: {
+      table: 'User';
       fields: {
-        role: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-        };
-        status: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: true;
-        };
+        role: { column: 'role' };
+        status: { column: 'status' };
       };
-      relations: Record<string, never>;
     };
-  }
->;
+    fields: {
+      role: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+      };
+      status: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: true;
+      };
+    };
+    relations: Record<string, never>;
+  };
+};
+
+type EnumContractBase = Omit<Contract<EnumStorage>, 'domain'> & {
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: { readonly models: EnumModels };
+    };
+  };
+};
 
 type EnumContract = ContractWithTypeMaps<EnumContractBase, EnumTypeMaps> & {
   readonly capabilities: Record<string, never>;

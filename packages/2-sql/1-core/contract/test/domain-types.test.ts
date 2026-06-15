@@ -57,9 +57,16 @@ describe('domain type compatibility', () => {
         };
       };
 
-      type ExampleContract = Contract<SqlStorage, ExampleModels>;
+      type ExampleContract = Omit<Contract<SqlStorage>, 'domain'> & {
+        readonly domain: {
+          readonly namespaces: {
+            readonly public: { readonly models: ExampleModels };
+          };
+        };
+      };
 
-      type NameField = ExampleContract['models']['User']['fields']['name'];
+      type NameField =
+        ExampleContract['domain']['namespaces']['public']['models']['User']['fields']['name'];
 
       const _nullable: NameField['nullable'] = true;
       const _codecId: NameField['type']['codecId'] = 'pg/text@1';

@@ -107,6 +107,24 @@ changes:
         - "ExtractFieldInputTypes"
         - "TableProxy<"
       anyMatch: true
+  - id: contract-model-definitions-removed
+    summary: |
+      `ContractModelDefinitions` is removed from `@prisma-next/contract` (and its
+      `/types` export), along with the second `TModels` type parameter on
+      `Contract` (now `Contract<TStorage>`). The flat cross-namespace model union
+      it produced is gone; resolve models per-namespace instead. Replace
+      `ContractModelDefinitions<C>` with
+      `C['domain']['namespaces'][<ns>]['models']` (use `[keyof C['domain']['namespaces']]`
+      for the sole-namespace case). Family wrappers like `MongoContract<S, M>`
+      become single-arg `MongoContract<S>`; carry precise per-model types via an
+      explicit per-namespace `domain` override.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "ContractModelDefinitions"
+        - "Contract<"
+        - "MongoContract<"
+      anyMatch: true
 ---
 
 <!--
@@ -353,6 +371,35 @@ let p: TableProxy<C, 'public', 'users'>;
 ```
 
 Use `public` for a standard single-schema SQL contract; for an unbound/SQLite contract use the late-bound namespace (`UNBOUND_NAMESPACE_ID` from `@prisma-next/framework-components/ir`); for a multi-namespace contract, name the namespace each model/table actually sits in. There is no codemod — the correct namespace is call-site-specific. `pnpm typecheck` pins every remaining flat access (`Property '<model>' does not exist on type '{ public: ... }'`). Extensions that only contribute codecs, native types, or migrations — and never reference `ExtractFieldOutputTypes` / `ExtractFieldInputTypes` / `TableProxy` directly — need no change.
+
+## `contract-model-definitions-removed`
+
+`ContractModelDefinitions` is removed from `@prisma-next/contract` (and the `@prisma-next/contract/types` re-export), and the `Contract` interface loses its second `TModels` type parameter — `Contract<TStorage, TModels>` becomes `Contract<TStorage>`. The flat, first-name-wins cross-namespace model union is gone; models resolve per-namespace from the domain plane.
+
+Replace any `ContractModelDefinitions<C>` use with a read of a namespace's models:
+
+```ts
+// Before
+import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
+type Models = ContractModelDefinitions<C>;
+type UserModel = Models['User'];
+
+// After — read the sole namespace's models (or name a specific namespace)
+type Models = C['domain']['namespaces'][keyof C['domain']['namespaces']]['models'];
+type UserModel = Models['User'];
+```
+
+If you need a bare model shape rather than the contract's own models, use `ContractModelBase` from `@prisma-next/contract/types`. Family contract aliases drop their model parameter too — `MongoContract<S, M>` becomes `MongoContract<S>`. When you build a contract *type* that must carry precise per-model shapes (e.g. a test fixture or a `defineContract` result type), override the `domain` explicitly:
+
+```ts
+type MyContract = Omit<Contract<MyStorage>, 'domain'> & {
+  readonly domain: {
+    readonly namespaces: {
+      readonly public: { readonly models: MyModels };
+    };
+  };
+};
+```
 
 <!--
 TML-2550: per-namespace typed resolution. The extension-package contract.d.ts fixtures

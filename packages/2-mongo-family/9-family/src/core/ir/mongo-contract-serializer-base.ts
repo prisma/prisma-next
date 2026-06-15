@@ -98,7 +98,7 @@ export abstract class MongoContractSerializerBase<TContract>
     // envelope) but not nominally so: the arktype DSL produces a type whose
     // optional/readonly profile, narrowed string-literal positions, and
     // utility-type wrappings (`Type.infer`, `Out`, …) differ from the
-    // hand-authored `MongoContract<S, M>` generic surface. The schema and
+    // hand-authored `MongoContract<S>` generic surface. The schema and
     // the type are kept in lockstep by the round-trip fixtures under
     // `test/validate.test.ts`. The hydration walk below additionally
     // re-shapes `storage.namespaces.*.collections` from plain data into IR-class

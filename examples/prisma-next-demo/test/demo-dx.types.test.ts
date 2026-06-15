@@ -11,10 +11,13 @@ import type { EnumMemberNames, EnumValues } from '@prisma-next/contract/enum-acc
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { expectTypeOf, test } from 'vitest';
-import type { Contract, FieldOutputTypes, Models, TypeMaps } from '../src/prisma/contract.d';
+import type { Contract, FieldOutputTypes, TypeMaps } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { db } from '../src/prisma/db';
 import type { getPostsByPriority } from '../src/queries/get-posts-by-priority';
+
+// Models resolve per-namespace from the domain plane (no flat top-level Models export).
+type Models = Contract['domain']['namespaces']['public']['models'];
 
 test('contract.d.ts exports Contract and TypeMaps separately', () => {
   expectTypeOf<Contract>().toHaveProperty('domain');

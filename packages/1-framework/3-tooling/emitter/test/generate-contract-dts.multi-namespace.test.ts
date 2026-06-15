@@ -25,7 +25,7 @@ describe('generateContractDts domain namespace handling', () => {
     expect(dts).toContain('readonly public:');
   });
 
-  it('emits successfully for multiple namespaces (flatten, first-name-wins)', () => {
+  it('emits successfully for multiple namespaces', () => {
     const contract = {
       ...createTestContract(),
       domain: {
@@ -40,10 +40,10 @@ describe('generateContractDts domain namespace handling', () => {
     expect(dts).toContain('readonly storage:');
   });
 
-  it('first-name-wins when two namespaces declare the same bare model name', () => {
-    // Both namespaces have a 'User' model. 'auth' comes first in iteration order.
-    // The flattened top-level ContractType<…, models> uses auth's User (field 'emailAddress')
-    // and drops public's User (field 'roleLabel') from the flatten.
+  it("emits each namespace's same-bare-name model under its own coordinate", () => {
+    // Both namespaces have a 'User' model. With the flat top-level models map
+    // retired, neither model is dropped: each namespace's own `User` is emitted
+    // under its own coordinate, and field types resolve per-namespace.
     const authUserModel = {
       fields: {
         emailAddress: { type: { kind: 'scalar' as const, codecId: 'pg/text@1' }, nullable: false },
@@ -76,19 +76,15 @@ describe('generateContractDts domain namespace handling', () => {
       },
     };
     const dts = generateContractDts(contract, mockSqlHook, [], HASHES);
-    // The flattened top-level models type is still emitted (first-name-wins, auth's User)
-    // because it backs the public `Models` convenience export and the `ContractType<…, models>`
-    // model param. Internal type resolution no longer reads it — column/field types resolve
-    // per-namespace from the FieldOutputTypes / FieldInputTypes maps, which are now nested by
-    // namespace, so each namespace's own fields appear under their coordinate regardless of the
-    // flatten. Retiring the flat top-level models entirely is a separate follow-up.
+    // No flat top-level models map is emitted, so there is no `Models` export
+    // and no `ContractType<…, models>` second argument to drop fields into.
+    expect(dts).not.toContain('export type Models');
     const emailCount = (dts.match(/emailAddress/g) ?? []).length;
     const roleLabelCount = (dts.match(/roleLabel/g) ?? []).length;
-    // emailAddress appears in: (1) flattened ContractBase models type, (2) per-namespace auth
-    // domain block, (3) FieldOutputTypes[auth], (4) FieldInputTypes[auth].
-    expect(emailCount).toBe(4);
-    // roleLabel is dropped from the flattened top-level models (public.User loses the flatten)
-    // but is now present per-namespace: (1) the per-namespace public domain block,
+    // emailAddress appears per-namespace only: (1) the auth domain block,
+    // (2) FieldOutputTypes[auth], (3) FieldInputTypes[auth].
+    expect(emailCount).toBe(3);
+    // roleLabel appears per-namespace only: (1) the public domain block,
     // (2) FieldOutputTypes[public], (3) FieldInputTypes[public].
     expect(roleLabelCount).toBe(3);
   });

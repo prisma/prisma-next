@@ -2,7 +2,6 @@ import { type Contract, soleDomainNamespaceId } from '@prisma-next/contract/type
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
-import type { Models } from './fixtures/generated/contract';
 import type { MockRuntime, TestContract } from './helpers';
 import {
   createMockRuntime,
@@ -11,7 +10,10 @@ import {
   getTestContract,
 } from './helpers';
 
-export type TestModelName = Extract<keyof Models, string>;
+type SoleNamespaceModels<T extends Contract> =
+  T['domain']['namespaces'][keyof T['domain']['namespaces']]['models'];
+
+export type TestModelName = Extract<keyof SoleNamespaceModels<TestContract>, string>;
 
 export const baseContract = getTestContract();
 

@@ -107,127 +107,132 @@ interface PolyStorage {
 
 type R = Record<string, never>;
 
-type PolyContract = Contract<
-  PolyStorage & SqlStorage,
-  {
-    readonly Task: {
-      readonly fields: {
-        readonly id: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          readonly nullable: false;
-        };
-        readonly title: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-        };
-        readonly type: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-        };
-        readonly projectId: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          readonly nullable: true;
-        };
+type PolyModels = {
+  readonly Task: {
+    readonly fields: {
+      readonly id: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: false;
       };
-      readonly relations: R;
-      readonly storage: {
-        readonly table: 'tasks';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly title: { readonly column: 'title' };
-          readonly type: { readonly column: 'type' };
-          readonly projectId: { readonly column: 'project_id' };
-        };
+      readonly title: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
       };
-      readonly discriminator: { readonly field: 'type' };
-      readonly variants: {
-        readonly Bug: { readonly value: 'bug' };
-        readonly Feature: { readonly value: 'feature' };
+      readonly type: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+      };
+      readonly projectId: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: true;
       };
     };
-    readonly Bug: {
+    readonly relations: R;
+    readonly storage: {
+      readonly table: 'tasks';
       readonly fields: {
-        readonly severity: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: true;
-        };
-      };
-      readonly relations: R;
-      readonly storage: {
-        readonly table: 'tasks';
-        readonly fields: {
-          readonly severity: { readonly column: 'severity' };
-        };
-      };
-      readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
-    };
-    readonly Feature: {
-      readonly fields: {
-        readonly priority: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          readonly nullable: false;
-        };
-      };
-      readonly relations: R;
-      readonly storage: {
-        readonly table: 'features';
-        readonly fields: {
-          readonly priority: { readonly column: 'priority' };
-        };
-      };
-      readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
-    };
-    readonly PlainModel: {
-      readonly fields: {
-        readonly id: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          readonly nullable: false;
-        };
-        readonly name: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-        };
-      };
-      readonly relations: R;
-      readonly storage: {
-        readonly table: 'plain_model';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly name: { readonly column: 'name' };
-        };
+        readonly id: { readonly column: 'id' };
+        readonly title: { readonly column: 'title' };
+        readonly type: { readonly column: 'type' };
+        readonly projectId: { readonly column: 'project_id' };
       };
     };
-    readonly Project: {
+    readonly discriminator: { readonly field: 'type' };
+    readonly variants: {
+      readonly Bug: { readonly value: 'bug' };
+      readonly Feature: { readonly value: 'feature' };
+    };
+  };
+  readonly Bug: {
+    readonly fields: {
+      readonly severity: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: true;
+      };
+    };
+    readonly relations: R;
+    readonly storage: {
+      readonly table: 'tasks';
       readonly fields: {
-        readonly id: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          readonly nullable: false;
-        };
-        readonly name: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly nullable: false;
-        };
+        readonly severity: { readonly column: 'severity' };
       };
-      readonly relations: {
-        readonly tasks: {
-          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
-          readonly cardinality: '1:N';
-          readonly on: {
-            readonly localFields: readonly ['id'];
-            readonly targetFields: readonly ['projectId'];
-          };
-        };
+    };
+    readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+  };
+  readonly Feature: {
+    readonly fields: {
+      readonly priority: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: false;
       };
-      readonly storage: {
-        readonly table: 'projects';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly name: { readonly column: 'name' };
+    };
+    readonly relations: R;
+    readonly storage: {
+      readonly table: 'features';
+      readonly fields: {
+        readonly priority: { readonly column: 'priority' };
+      };
+    };
+    readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+  };
+  readonly PlainModel: {
+    readonly fields: {
+      readonly id: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: false;
+      };
+      readonly name: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+      };
+    };
+    readonly relations: R;
+    readonly storage: {
+      readonly table: 'plain_model';
+      readonly fields: {
+        readonly id: { readonly column: 'id' };
+        readonly name: { readonly column: 'name' };
+      };
+    };
+  };
+  readonly Project: {
+    readonly fields: {
+      readonly id: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: false;
+      };
+      readonly name: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+      };
+    };
+    readonly relations: {
+      readonly tasks: {
+        readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+        readonly cardinality: '1:N';
+        readonly on: {
+          readonly localFields: readonly ['id'];
+          readonly targetFields: readonly ['projectId'];
         };
       };
     };
-  }
->;
+    readonly storage: {
+      readonly table: 'projects';
+      readonly fields: {
+        readonly id: { readonly column: 'id' };
+        readonly name: { readonly column: 'name' };
+      };
+    };
+  };
+};
+
+type PolyContract = Omit<Contract<PolyStorage & SqlStorage>, 'domain'> & {
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: { readonly models: PolyModels };
+    };
+  };
+};
 
 test('InferRootRow for polymorphic base returns discriminated union', () => {
   type TaskRow = InferRootRow<PolyContract, 'Task'>;

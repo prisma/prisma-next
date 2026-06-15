@@ -1,4 +1,3 @@
-import { blindCast } from '@prisma-next/utils/casts';
 import type { ApplicationDomain } from '../../src/domain-envelope';
 import { UNBOUND_DOMAIN_NAMESPACE_ID } from '../../src/domain-envelope';
 import type { ContractModelBase, ContractValueObject } from '../../src/domain-types';
@@ -10,15 +9,13 @@ import type { ContractModelBase, ContractValueObject } from '../../src/domain-ty
  * on contract), so the helper is duplicated here to keep package boundaries
  * one-way.
  */
-export function applicationDomainOf<TModels extends Record<string, ContractModelBase>>(params: {
-  readonly models?: TModels;
+export function applicationDomainOf(params: {
+  readonly models?: Record<string, ContractModelBase>;
   readonly valueObjects?: Record<string, ContractValueObject>;
   readonly namespaceId?: string;
-}): ApplicationDomain<TModels> {
+}): ApplicationDomain {
   const namespaceId = params.namespaceId ?? UNBOUND_DOMAIN_NAMESPACE_ID;
-  const models =
-    params.models ??
-    blindCast<TModels, 'default empty models when applicationDomainOf omits models'>({});
+  const models = params.models ?? {};
   return {
     namespaces: {
       [namespaceId]: {

@@ -162,7 +162,7 @@ type TestStorage = {
   };
 };
 
-export type TestContract = Omit<MongoContract<TestStorage, TestModels>, 'domain'> & {
+export type TestContract = Omit<MongoContract<TestStorage>, 'domain'> & {
   readonly target: 'mongo';
   readonly targetFamily: 'mongo';
   readonly roots: {

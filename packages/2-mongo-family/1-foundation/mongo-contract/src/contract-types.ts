@@ -72,10 +72,7 @@ export type MongoStorageShape<THash extends string = string> = StorageBase<THash
   >;
 };
 
-export type MongoContract<
-  S extends MongoStorageShape = MongoStorageShape,
-  M extends Record<string, MongoModelDefinition> = Record<string, MongoModelDefinition>,
-> = Contract<S, M>;
+export type MongoContract<S extends MongoStorageShape = MongoStorageShape> = Contract<S>;
 
 /**
  * Model map for the contract's sole (unbound) domain namespace. Mongo is

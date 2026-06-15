@@ -83,22 +83,6 @@ export function generateContractDts(
     }
   }
 
-  // Flatten all namespace models into one record — first-name-wins on bare-name collision.
-  // This backs the public `Models` convenience export and the `ContractType<…, models>` param;
-  // internal type resolution no longer reads it (column/field types resolve per-namespace).
-  // Retiring the flat top-level models entirely is a separate follow-up.
-  const modelsRecord: Record<string, ContractModelBase> = {};
-  for (const [, ns] of namespaceEntries) {
-    for (const [modelName, model] of Object.entries(ns.models)) {
-      if (!(modelName in modelsRecord)) {
-        modelsRecord[modelName] = model;
-      }
-    }
-  }
-  const modelsType = generateModelsType(modelsRecord, (name, model) =>
-    emitter.generateModelStorageType(name, model),
-  );
-
   const rootsType = generateRootsType(contract.roots);
 
   // Flatten value objects across all namespaces — first-name-wins on collision.
@@ -195,7 +179,6 @@ ${importLines.join('\n')}
 ${familyImportLines.join('\n')}
 import type {
   Contract as ContractType,
-  ContractModelDefinitions,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -212,10 +195,7 @@ export type FieldInputTypes = ${fieldTypesMaps.input};
 export type TypeMaps = ${typeMapsExpr};
 
 type ContractBase = Omit<
-  ContractType<
-${storageType},
-${modelsType}
-  >,
+  ContractType<${storageType}>,
   'roots' | 'domain'
 > & {
   readonly target: ${serializeValue(contract.target)};
@@ -232,8 +212,6 @@ ${domainNamespacesType};
   ${valueObjects ? `readonly valueObjects: ${valueObjectsDescriptor};` : ''}
   readonly profileHash: ProfileHash;
 };
-
-export type Models = ContractModelDefinitions<Contract>;
 
 ${contractWrapper}
 `;

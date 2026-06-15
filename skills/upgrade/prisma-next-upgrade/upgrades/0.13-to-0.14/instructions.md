@@ -87,6 +87,18 @@ changes:
         - "enum "
         - "enum2 "
       anyMatch: true
+  - id: generated-models-export-removed
+    summary: |
+      The generated `contract.d.ts` no longer emits the flat top-level
+      `export type Models`. Models resolve per-namespace from the domain plane:
+      replace a reference to the generated `Models` with
+      `Contract['domain']['namespaces']['<namespace>']['models']` (use `public`
+      for a standard single-schema Postgres project, `__unbound__` for SQLite or
+      Mongo). Re-emit the contract to drop the export.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "Models"
 ---
 
 <!--
@@ -302,6 +314,25 @@ Note: `prisma-next contract infer` **refuses** databases containing native enum 
 ### 3. Verify
 
 Run `prisma-next db verify` (or your project's test suite) after applying the converting migration: the live schema must now match the contract — `text` column, CHECK constraint present, native type gone.
+
+## `generated-models-export-removed`
+
+The generated `contract.d.ts` no longer emits the flat top-level `export type Models` (the first-name-wins map of every model across namespaces). Models now resolve per-namespace from the domain plane, matching how the runtime and DSL read them.
+
+If your code imported `Models` from the generated contract, read a namespace's models instead:
+
+```ts
+// Before
+import type { Contract, Models } from './prisma/contract';
+type UserModel = Models['User'];
+
+// After — name the namespace the model is declared in
+import type { Contract } from './prisma/contract';
+type Models = Contract['domain']['namespaces']['public']['models'];
+type UserModel = Models['User'];
+```
+
+Use `public` for a standard single-schema Postgres project, or `__unbound__` for SQLite and Mongo. In a multi-schema Postgres contract, name the schema each model is declared in. Re-emit your contract (`prisma-next contract emit`) so the generated `.d.ts` drops the `Models` export; the emitted `contract.json` is unchanged.
 
 <!--
 TML-2882: transitional PSL `enum2` block (PR #805). The demo authors `enum2 Priority`
