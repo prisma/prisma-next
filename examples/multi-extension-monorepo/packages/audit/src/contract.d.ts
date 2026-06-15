@@ -23,7 +23,6 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   Contract as ContractType,
-  ContractModelDefinitions,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -69,77 +68,47 @@ export type TypeMaps = TypeMapsType<
 >;
 
 type ContractBase = Omit<
-  ContractType<
-    {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'postgres-unbound-schema';
-          readonly entries: { readonly table: {} };
-        };
-        readonly public: {
-          readonly id: 'public';
-          readonly kind: 'postgres-schema';
-          readonly entries: {
-            readonly table: {
-              readonly audit_event: {
-                columns: {
-                  readonly id: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
-                  readonly actor: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
-                  readonly action: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
+  ContractType<{
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'postgres-unbound-schema';
+        readonly entries: { readonly table: {} };
+      };
+      readonly public: {
+        readonly id: 'public';
+        readonly kind: 'postgres-schema';
+        readonly entries: {
+          readonly table: {
+            readonly audit_event: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
                 };
-                primaryKey: { readonly columns: readonly ['id'] };
-                uniques: readonly [];
-                indexes: readonly [];
-                foreignKeys: readonly [];
+                readonly actor: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly action: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
               };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [];
+              foreignKeys: readonly [];
             };
           };
         };
       };
-      readonly storageHash: StorageHash;
-    },
-    {
-      readonly AuditEvent: {
-        readonly fields: {
-          readonly id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-          readonly actor: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-          readonly action: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: {
-          readonly table: 'audit_event';
-          readonly namespaceId: 'public';
-          readonly fields: {
-            readonly id: { readonly column: 'id' };
-            readonly actor: { readonly column: 'actor' };
-            readonly action: { readonly column: 'action' };
-          };
-        };
-      };
-    }
-  >,
+    };
+    readonly storageHash: StorageHash;
+  }>,
   'roots' | 'domain'
 > & {
   readonly target: 'postgres';
@@ -205,8 +174,6 @@ type ContractBase = Omit<
 
   readonly profileHash: ProfileHash;
 };
-
-export type Models = ContractModelDefinitions<Contract>;
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 

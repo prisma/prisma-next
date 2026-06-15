@@ -23,7 +23,6 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   Contract as ContractType,
-  ContractModelDefinitions,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -70,102 +69,72 @@ export type TypeMaps = TypeMapsType<
 >;
 
 type ContractBase = Omit<
-  ContractType<
-    {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'sql-namespace';
-          readonly entries: { readonly table: {} };
-        };
-        readonly public: {
-          readonly id: 'public';
-          readonly kind: 'sql-namespace';
-          readonly entries: {
-            readonly table: {
-              readonly profile: {
-                columns: {
-                  readonly id: {
-                    readonly nativeType: 'uuid';
-                    readonly codecId: 'pg/uuid@1';
-                    readonly nullable: false;
-                    readonly typeRef: 'Uuid';
-                  };
-                  readonly username: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
-                  readonly userId: {
-                    readonly nativeType: 'uuid';
-                    readonly codecId: 'pg/uuid@1';
-                    readonly nullable: false;
-                    readonly typeRef: 'Uuid';
-                  };
+  ContractType<{
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'sql-namespace';
+        readonly entries: { readonly table: {} };
+      };
+      readonly public: {
+        readonly id: 'public';
+        readonly kind: 'sql-namespace';
+        readonly entries: {
+          readonly table: {
+            readonly profile: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                  readonly typeRef: 'Uuid';
                 };
-                primaryKey: { readonly columns: readonly ['id'] };
-                uniques: readonly [{ readonly columns: readonly ['userId'] }];
-                indexes: readonly [];
-                foreignKeys: readonly [
-                  {
-                    readonly source: {
-                      readonly namespaceId: 'public' & NamespaceId;
-                      readonly tableName: 'profile';
-                      readonly columns: readonly ['userId'];
-                    };
-                    readonly target: {
-                      readonly namespaceId: 'auth' & NamespaceId;
-                      readonly tableName: 'users';
-                      readonly columns: readonly ['id'];
-                    };
-                    readonly constraint: true;
-                    readonly index: true;
-                  },
-                ];
+                readonly username: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly userId: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                  readonly typeRef: 'Uuid';
+                };
               };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['userId'] }];
+              indexes: readonly [];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'profile';
+                    readonly columns: readonly ['userId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'auth' & NamespaceId;
+                    readonly tableName: 'users';
+                    readonly columns: readonly ['id'];
+                  };
+                  readonly constraint: true;
+                  readonly index: true;
+                },
+              ];
             };
           };
         };
       };
-      readonly types: {
-        readonly Uuid: {
-          readonly kind: 'codec-instance';
-          readonly codecId: 'pg/uuid@1';
-          readonly nativeType: 'uuid';
-          readonly typeParams: Record<string, never>;
-        };
+    };
+    readonly types: {
+      readonly Uuid: {
+        readonly kind: 'codec-instance';
+        readonly codecId: 'pg/uuid@1';
+        readonly nativeType: 'uuid';
+        readonly typeParams: Record<string, never>;
       };
-      readonly storageHash: StorageHash;
-    },
-    {
-      readonly Profile: {
-        readonly fields: {
-          readonly id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
-          };
-          readonly username: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-          readonly userId: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
-          };
-        };
-        readonly relations: { readonly user: never };
-        readonly storage: {
-          readonly table: 'profile';
-          readonly namespaceId: 'public';
-          readonly fields: {
-            readonly id: { readonly column: 'id' };
-            readonly username: { readonly column: 'username' };
-            readonly userId: { readonly column: 'userId' };
-          };
-        };
-      };
-    }
-  >,
+    };
+    readonly storageHash: StorageHash;
+  }>,
   'roots' | 'domain'
 > & {
   readonly target: 'postgres';
@@ -247,8 +216,6 @@ type ContractBase = Omit<
 
   readonly profileHash: ProfileHash;
 };
-
-export type Models = ContractModelDefinitions<Contract>;
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 

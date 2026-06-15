@@ -10,7 +10,6 @@ import type {
 } from '@prisma-next/mongo-contract';
 import type {
   Contract as ContractType,
-  ContractModelDefinitions,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -242,798 +241,451 @@ export type FieldInputTypes = {
 export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>;
 
 type ContractBase = Omit<
-  ContractType<
-    {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'mongo-namespace';
-          readonly entries: {
-            readonly collection: {
-              readonly carts: {
-                readonly kind: 'mongo-collection';
-                readonly indexes: readonly [
-                  {
-                    readonly kind: 'mongo-index';
-                    readonly keys: readonly [{ readonly field: 'userId'; readonly direction: 1 }];
-                    readonly unique: true;
-                  },
-                ];
-                readonly validator: {
-                  readonly kind: 'mongo-validator';
-                  readonly jsonSchema: {
-                    readonly bsonType: 'object';
-                    readonly properties: {
-                      readonly _id: { readonly bsonType: 'objectId' };
-                      readonly userId: { readonly bsonType: 'objectId' };
+  ContractType<{
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'mongo-namespace';
+        readonly entries: {
+          readonly collection: {
+            readonly carts: {
+              readonly kind: 'mongo-collection';
+              readonly indexes: readonly [
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [{ readonly field: 'userId'; readonly direction: 1 }];
+                  readonly unique: true;
+                },
+              ];
+              readonly validator: {
+                readonly kind: 'mongo-validator';
+                readonly jsonSchema: {
+                  readonly bsonType: 'object';
+                  readonly properties: {
+                    readonly _id: { readonly bsonType: 'objectId' };
+                    readonly userId: { readonly bsonType: 'objectId' };
+                    readonly items: {
+                      readonly bsonType: 'array';
                       readonly items: {
-                        readonly bsonType: 'array';
-                        readonly items: {
-                          readonly bsonType: 'object';
-                          readonly properties: {
-                            readonly productId: { readonly bsonType: 'string' };
-                            readonly name: { readonly bsonType: 'string' };
-                            readonly brand: { readonly bsonType: 'string' };
-                            readonly amount: { readonly bsonType: 'int' };
-                            readonly price: {
-                              readonly bsonType: 'object';
-                              readonly properties: {
-                                readonly amount: { readonly bsonType: 'double' };
-                                readonly currency: { readonly bsonType: 'string' };
-                              };
-                              readonly additionalProperties: false;
-                              readonly required: readonly ['amount', 'currency'];
-                            };
-                            readonly image: {
-                              readonly bsonType: 'object';
-                              readonly properties: {
-                                readonly url: { readonly bsonType: 'string' };
-                              };
-                              readonly additionalProperties: false;
-                              readonly required: readonly ['url'];
-                            };
-                          };
-                          readonly additionalProperties: false;
-                          readonly required: readonly [
-                            'amount',
-                            'brand',
-                            'image',
-                            'name',
-                            'price',
-                            'productId',
-                          ];
-                        };
-                      };
-                    };
-                    readonly additionalProperties: false;
-                    readonly required: readonly ['_id', 'items', 'userId'];
-                  };
-                  readonly validationLevel: 'strict';
-                  readonly validationAction: 'error';
-                };
-              };
-              readonly events: {
-                readonly kind: 'mongo-collection';
-                readonly indexes: readonly [
-                  {
-                    readonly kind: 'mongo-index';
-                    readonly keys: readonly [
-                      { readonly field: 'userId'; readonly direction: 1 },
-                      { readonly field: 'timestamp'; readonly direction: -1 },
-                    ];
-                  },
-                  {
-                    readonly kind: 'mongo-index';
-                    readonly keys: readonly [
-                      { readonly field: 'timestamp'; readonly direction: 1 },
-                    ];
-                    readonly expireAfterSeconds: 7776000;
-                  },
-                ];
-                readonly validator: {
-                  readonly kind: 'mongo-validator';
-                  readonly jsonSchema: {
-                    readonly bsonType: 'object';
-                    readonly properties: {
-                      readonly _id: { readonly bsonType: 'objectId' };
-                      readonly userId: { readonly bsonType: 'string' };
-                      readonly sessionId: { readonly bsonType: 'string' };
-                      readonly type: { readonly bsonType: 'string' };
-                      readonly timestamp: { readonly bsonType: 'date' };
-                    };
-                    readonly required: readonly ['_id', 'sessionId', 'timestamp', 'type', 'userId'];
-                    readonly oneOf: readonly [
-                      {
-                        readonly properties: {
-                          readonly _id: { readonly bsonType: 'objectId' };
-                          readonly userId: { readonly bsonType: 'string' };
-                          readonly sessionId: { readonly bsonType: 'string' };
-                          readonly type: { readonly enum: readonly ['view-product'] };
-                          readonly timestamp: { readonly bsonType: 'date' };
-                          readonly productId: { readonly bsonType: 'string' };
-                          readonly subCategory: { readonly bsonType: 'string' };
-                          readonly brand: { readonly bsonType: 'string' };
-                          readonly exitMethod: { readonly bsonType: readonly ['null', 'string'] };
-                        };
-                        readonly required: readonly ['brand', 'productId', 'subCategory', 'type'];
-                        readonly additionalProperties: false;
-                      },
-                      {
-                        readonly properties: {
-                          readonly _id: { readonly bsonType: 'objectId' };
-                          readonly userId: { readonly bsonType: 'string' };
-                          readonly sessionId: { readonly bsonType: 'string' };
-                          readonly type: { readonly enum: readonly ['search'] };
-                          readonly timestamp: { readonly bsonType: 'date' };
-                          readonly query: { readonly bsonType: 'string' };
-                        };
-                        readonly required: readonly ['query', 'type'];
-                        readonly additionalProperties: false;
-                      },
-                      {
-                        readonly properties: {
-                          readonly _id: { readonly bsonType: 'objectId' };
-                          readonly userId: { readonly bsonType: 'string' };
-                          readonly sessionId: { readonly bsonType: 'string' };
-                          readonly type: { readonly enum: readonly ['add-to-cart'] };
-                          readonly timestamp: { readonly bsonType: 'date' };
-                          readonly productId: { readonly bsonType: 'string' };
-                          readonly brand: { readonly bsonType: 'string' };
-                        };
-                        readonly required: readonly ['brand', 'productId', 'type'];
-                        readonly additionalProperties: false;
-                      },
-                    ];
-                  };
-                  readonly validationLevel: 'strict';
-                  readonly validationAction: 'error';
-                };
-              };
-              readonly invoices: {
-                readonly kind: 'mongo-collection';
-                readonly indexes: readonly [
-                  {
-                    readonly kind: 'mongo-index';
-                    readonly keys: readonly [{ readonly field: 'orderId'; readonly direction: 1 }];
-                  },
-                  {
-                    readonly kind: 'mongo-index';
-                    readonly keys: readonly [
-                      { readonly field: 'issuedAt'; readonly direction: -1 },
-                    ];
-                    readonly sparse: true;
-                  },
-                ];
-                readonly validator: {
-                  readonly kind: 'mongo-validator';
-                  readonly jsonSchema: {
-                    readonly bsonType: 'object';
-                    readonly properties: {
-                      readonly _id: { readonly bsonType: 'objectId' };
-                      readonly orderId: { readonly bsonType: 'objectId' };
-                      readonly items: {
-                        readonly bsonType: 'array';
-                        readonly items: {
-                          readonly bsonType: 'object';
-                          readonly properties: {
-                            readonly name: { readonly bsonType: 'string' };
-                            readonly amount: { readonly bsonType: 'int' };
-                            readonly unitPrice: { readonly bsonType: 'double' };
-                            readonly lineTotal: { readonly bsonType: 'double' };
-                          };
-                          readonly additionalProperties: false;
-                          readonly required: readonly ['amount', 'lineTotal', 'name', 'unitPrice'];
-                        };
-                      };
-                      readonly subtotal: { readonly bsonType: 'double' };
-                      readonly tax: { readonly bsonType: 'double' };
-                      readonly total: { readonly bsonType: 'double' };
-                      readonly issuedAt: { readonly bsonType: 'date' };
-                    };
-                    readonly additionalProperties: false;
-                    readonly required: readonly [
-                      '_id',
-                      'issuedAt',
-                      'items',
-                      'orderId',
-                      'subtotal',
-                      'tax',
-                      'total',
-                    ];
-                  };
-                  readonly validationLevel: 'strict';
-                  readonly validationAction: 'error';
-                };
-              };
-              readonly locations: {
-                readonly kind: 'mongo-collection';
-                readonly indexes: readonly [
-                  {
-                    readonly kind: 'mongo-index';
-                    readonly keys: readonly [
-                      { readonly field: 'city'; readonly direction: 1 },
-                      { readonly field: 'country'; readonly direction: 1 },
-                    ];
-                    readonly collation: { readonly locale: 'en'; readonly strength: 2 };
-                  },
-                ];
-                readonly validator: {
-                  readonly kind: 'mongo-validator';
-                  readonly jsonSchema: {
-                    readonly bsonType: 'object';
-                    readonly properties: {
-                      readonly _id: { readonly bsonType: 'objectId' };
-                      readonly name: { readonly bsonType: 'string' };
-                      readonly streetAndNumber: { readonly bsonType: 'string' };
-                      readonly city: { readonly bsonType: 'string' };
-                      readonly postalCode: { readonly bsonType: 'string' };
-                      readonly country: { readonly bsonType: 'string' };
-                    };
-                    readonly additionalProperties: false;
-                    readonly required: readonly [
-                      '_id',
-                      'city',
-                      'country',
-                      'name',
-                      'postalCode',
-                      'streetAndNumber',
-                    ];
-                  };
-                  readonly validationLevel: 'strict';
-                  readonly validationAction: 'error';
-                };
-              };
-              readonly orders: {
-                readonly kind: 'mongo-collection';
-                readonly indexes: readonly [
-                  {
-                    readonly kind: 'mongo-index';
-                    readonly keys: readonly [{ readonly field: 'userId'; readonly direction: 1 }];
-                  },
-                ];
-                readonly validator: {
-                  readonly kind: 'mongo-validator';
-                  readonly jsonSchema: {
-                    readonly bsonType: 'object';
-                    readonly properties: {
-                      readonly _id: { readonly bsonType: 'objectId' };
-                      readonly userId: { readonly bsonType: 'objectId' };
-                      readonly items: {
-                        readonly bsonType: 'array';
-                        readonly items: {
-                          readonly bsonType: 'object';
-                          readonly properties: {
-                            readonly productId: { readonly bsonType: 'string' };
-                            readonly name: { readonly bsonType: 'string' };
-                            readonly brand: { readonly bsonType: 'string' };
-                            readonly amount: { readonly bsonType: 'int' };
-                            readonly price: {
-                              readonly bsonType: 'object';
-                              readonly properties: {
-                                readonly amount: { readonly bsonType: 'double' };
-                                readonly currency: { readonly bsonType: 'string' };
-                              };
-                              readonly additionalProperties: false;
-                              readonly required: readonly ['amount', 'currency'];
-                            };
-                            readonly image: {
-                              readonly bsonType: 'object';
-                              readonly properties: {
-                                readonly url: { readonly bsonType: 'string' };
-                              };
-                              readonly additionalProperties: false;
-                              readonly required: readonly ['url'];
-                            };
-                          };
-                          readonly additionalProperties: false;
-                          readonly required: readonly [
-                            'amount',
-                            'brand',
-                            'image',
-                            'name',
-                            'price',
-                            'productId',
-                          ];
-                        };
-                      };
-                      readonly shippingAddress: { readonly bsonType: 'string' };
-                      readonly type: { readonly bsonType: 'string' };
-                      readonly statusHistory: {
-                        readonly bsonType: 'array';
-                        readonly items: {
-                          readonly bsonType: 'object';
-                          readonly properties: {
-                            readonly status: { readonly bsonType: 'string' };
-                            readonly timestamp: { readonly bsonType: 'date' };
-                          };
-                          readonly additionalProperties: false;
-                          readonly required: readonly ['status', 'timestamp'];
-                        };
-                      };
-                    };
-                    readonly additionalProperties: false;
-                    readonly required: readonly [
-                      '_id',
-                      'items',
-                      'shippingAddress',
-                      'statusHistory',
-                      'type',
-                      'userId',
-                    ];
-                  };
-                  readonly validationLevel: 'strict';
-                  readonly validationAction: 'error';
-                };
-              };
-              readonly products: {
-                readonly kind: 'mongo-collection';
-                readonly indexes: readonly [
-                  {
-                    readonly kind: 'mongo-index';
-                    readonly keys: readonly [
-                      { readonly field: 'name'; readonly direction: 'text' },
-                      { readonly field: 'description'; readonly direction: 'text' },
-                    ];
-                    readonly weights: { readonly name: 10; readonly description: 1 };
-                  },
-                  {
-                    readonly kind: 'mongo-index';
-                    readonly keys: readonly [
-                      { readonly field: 'brand'; readonly direction: 1 },
-                      { readonly field: 'subCategory'; readonly direction: 1 },
-                    ];
-                  },
-                  {
-                    readonly kind: 'mongo-index';
-                    readonly keys: readonly [
-                      { readonly field: 'primaryCategory'; readonly direction: 1 },
-                      { readonly field: 'articleType'; readonly direction: 1 },
-                    ];
-                  },
-                  {
-                    readonly kind: 'mongo-index';
-                    readonly keys: readonly [
-                      { readonly field: 'code'; readonly direction: 'hashed' },
-                    ];
-                  },
-                ];
-                readonly validator: {
-                  readonly kind: 'mongo-validator';
-                  readonly jsonSchema: {
-                    readonly bsonType: 'object';
-                    readonly properties: {
-                      readonly _id: { readonly bsonType: 'objectId' };
-                      readonly name: { readonly bsonType: 'string' };
-                      readonly brand: { readonly bsonType: 'string' };
-                      readonly code: { readonly bsonType: 'string' };
-                      readonly description: { readonly bsonType: 'string' };
-                      readonly primaryCategory: { readonly bsonType: 'string' };
-                      readonly subCategory: { readonly bsonType: 'string' };
-                      readonly articleType: { readonly bsonType: 'string' };
-                      readonly price: {
                         readonly bsonType: 'object';
                         readonly properties: {
-                          readonly amount: { readonly bsonType: 'double' };
-                          readonly currency: { readonly bsonType: 'string' };
-                        };
-                        readonly additionalProperties: false;
-                        readonly required: readonly ['amount', 'currency'];
-                      };
-                      readonly image: {
-                        readonly bsonType: 'object';
-                        readonly properties: { readonly url: { readonly bsonType: 'string' } };
-                        readonly additionalProperties: false;
-                        readonly required: readonly ['url'];
-                      };
-                    };
-                    readonly additionalProperties: false;
-                    readonly required: readonly [
-                      '_id',
-                      'articleType',
-                      'brand',
-                      'code',
-                      'description',
-                      'image',
-                      'name',
-                      'price',
-                      'primaryCategory',
-                      'subCategory',
-                    ];
-                  };
-                  readonly validationLevel: 'strict';
-                  readonly validationAction: 'error';
-                };
-              };
-              readonly users: {
-                readonly kind: 'mongo-collection';
-                readonly indexes: readonly [
-                  {
-                    readonly kind: 'mongo-index';
-                    readonly keys: readonly [{ readonly field: 'email'; readonly direction: 1 }];
-                    readonly unique: true;
-                  },
-                ];
-                readonly validator: {
-                  readonly kind: 'mongo-validator';
-                  readonly jsonSchema: {
-                    readonly bsonType: 'object';
-                    readonly properties: {
-                      readonly _id: { readonly bsonType: 'objectId' };
-                      readonly name: { readonly bsonType: 'string' };
-                      readonly email: { readonly bsonType: 'string' };
-                      readonly address: {
-                        readonly oneOf: readonly [
-                          { readonly bsonType: 'null' },
-                          {
+                          readonly productId: { readonly bsonType: 'string' };
+                          readonly name: { readonly bsonType: 'string' };
+                          readonly brand: { readonly bsonType: 'string' };
+                          readonly amount: { readonly bsonType: 'int' };
+                          readonly price: {
                             readonly bsonType: 'object';
                             readonly properties: {
-                              readonly streetAndNumber: { readonly bsonType: 'string' };
-                              readonly city: { readonly bsonType: 'string' };
-                              readonly postalCode: { readonly bsonType: 'string' };
-                              readonly country: { readonly bsonType: 'string' };
+                              readonly amount: { readonly bsonType: 'double' };
+                              readonly currency: { readonly bsonType: 'string' };
                             };
                             readonly additionalProperties: false;
-                            readonly required: readonly [
-                              'city',
-                              'country',
-                              'postalCode',
-                              'streetAndNumber',
-                            ];
-                          },
+                            readonly required: readonly ['amount', 'currency'];
+                          };
+                          readonly image: {
+                            readonly bsonType: 'object';
+                            readonly properties: { readonly url: { readonly bsonType: 'string' } };
+                            readonly additionalProperties: false;
+                            readonly required: readonly ['url'];
+                          };
+                        };
+                        readonly additionalProperties: false;
+                        readonly required: readonly [
+                          'amount',
+                          'brand',
+                          'image',
+                          'name',
+                          'price',
+                          'productId',
                         ];
                       };
                     };
-                    readonly additionalProperties: false;
-                    readonly required: readonly ['_id', 'email', 'name'];
                   };
-                  readonly validationLevel: 'strict';
-                  readonly validationAction: 'error';
+                  readonly additionalProperties: false;
+                  readonly required: readonly ['_id', 'items', 'userId'];
                 };
+                readonly validationLevel: 'strict';
+                readonly validationAction: 'error';
+              };
+            };
+            readonly events: {
+              readonly kind: 'mongo-collection';
+              readonly indexes: readonly [
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [
+                    { readonly field: 'userId'; readonly direction: 1 },
+                    { readonly field: 'timestamp'; readonly direction: -1 },
+                  ];
+                },
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [{ readonly field: 'timestamp'; readonly direction: 1 }];
+                  readonly expireAfterSeconds: 7776000;
+                },
+              ];
+              readonly validator: {
+                readonly kind: 'mongo-validator';
+                readonly jsonSchema: {
+                  readonly bsonType: 'object';
+                  readonly properties: {
+                    readonly _id: { readonly bsonType: 'objectId' };
+                    readonly userId: { readonly bsonType: 'string' };
+                    readonly sessionId: { readonly bsonType: 'string' };
+                    readonly type: { readonly bsonType: 'string' };
+                    readonly timestamp: { readonly bsonType: 'date' };
+                  };
+                  readonly required: readonly ['_id', 'sessionId', 'timestamp', 'type', 'userId'];
+                  readonly oneOf: readonly [
+                    {
+                      readonly properties: {
+                        readonly _id: { readonly bsonType: 'objectId' };
+                        readonly userId: { readonly bsonType: 'string' };
+                        readonly sessionId: { readonly bsonType: 'string' };
+                        readonly type: { readonly enum: readonly ['view-product'] };
+                        readonly timestamp: { readonly bsonType: 'date' };
+                        readonly productId: { readonly bsonType: 'string' };
+                        readonly subCategory: { readonly bsonType: 'string' };
+                        readonly brand: { readonly bsonType: 'string' };
+                        readonly exitMethod: { readonly bsonType: readonly ['null', 'string'] };
+                      };
+                      readonly required: readonly ['brand', 'productId', 'subCategory', 'type'];
+                      readonly additionalProperties: false;
+                    },
+                    {
+                      readonly properties: {
+                        readonly _id: { readonly bsonType: 'objectId' };
+                        readonly userId: { readonly bsonType: 'string' };
+                        readonly sessionId: { readonly bsonType: 'string' };
+                        readonly type: { readonly enum: readonly ['search'] };
+                        readonly timestamp: { readonly bsonType: 'date' };
+                        readonly query: { readonly bsonType: 'string' };
+                      };
+                      readonly required: readonly ['query', 'type'];
+                      readonly additionalProperties: false;
+                    },
+                    {
+                      readonly properties: {
+                        readonly _id: { readonly bsonType: 'objectId' };
+                        readonly userId: { readonly bsonType: 'string' };
+                        readonly sessionId: { readonly bsonType: 'string' };
+                        readonly type: { readonly enum: readonly ['add-to-cart'] };
+                        readonly timestamp: { readonly bsonType: 'date' };
+                        readonly productId: { readonly bsonType: 'string' };
+                        readonly brand: { readonly bsonType: 'string' };
+                      };
+                      readonly required: readonly ['brand', 'productId', 'type'];
+                      readonly additionalProperties: false;
+                    },
+                  ];
+                };
+                readonly validationLevel: 'strict';
+                readonly validationAction: 'error';
+              };
+            };
+            readonly invoices: {
+              readonly kind: 'mongo-collection';
+              readonly indexes: readonly [
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [{ readonly field: 'orderId'; readonly direction: 1 }];
+                },
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [{ readonly field: 'issuedAt'; readonly direction: -1 }];
+                  readonly sparse: true;
+                },
+              ];
+              readonly validator: {
+                readonly kind: 'mongo-validator';
+                readonly jsonSchema: {
+                  readonly bsonType: 'object';
+                  readonly properties: {
+                    readonly _id: { readonly bsonType: 'objectId' };
+                    readonly orderId: { readonly bsonType: 'objectId' };
+                    readonly items: {
+                      readonly bsonType: 'array';
+                      readonly items: {
+                        readonly bsonType: 'object';
+                        readonly properties: {
+                          readonly name: { readonly bsonType: 'string' };
+                          readonly amount: { readonly bsonType: 'int' };
+                          readonly unitPrice: { readonly bsonType: 'double' };
+                          readonly lineTotal: { readonly bsonType: 'double' };
+                        };
+                        readonly additionalProperties: false;
+                        readonly required: readonly ['amount', 'lineTotal', 'name', 'unitPrice'];
+                      };
+                    };
+                    readonly subtotal: { readonly bsonType: 'double' };
+                    readonly tax: { readonly bsonType: 'double' };
+                    readonly total: { readonly bsonType: 'double' };
+                    readonly issuedAt: { readonly bsonType: 'date' };
+                  };
+                  readonly additionalProperties: false;
+                  readonly required: readonly [
+                    '_id',
+                    'issuedAt',
+                    'items',
+                    'orderId',
+                    'subtotal',
+                    'tax',
+                    'total',
+                  ];
+                };
+                readonly validationLevel: 'strict';
+                readonly validationAction: 'error';
+              };
+            };
+            readonly locations: {
+              readonly kind: 'mongo-collection';
+              readonly indexes: readonly [
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [
+                    { readonly field: 'city'; readonly direction: 1 },
+                    { readonly field: 'country'; readonly direction: 1 },
+                  ];
+                  readonly collation: { readonly locale: 'en'; readonly strength: 2 };
+                },
+              ];
+              readonly validator: {
+                readonly kind: 'mongo-validator';
+                readonly jsonSchema: {
+                  readonly bsonType: 'object';
+                  readonly properties: {
+                    readonly _id: { readonly bsonType: 'objectId' };
+                    readonly name: { readonly bsonType: 'string' };
+                    readonly streetAndNumber: { readonly bsonType: 'string' };
+                    readonly city: { readonly bsonType: 'string' };
+                    readonly postalCode: { readonly bsonType: 'string' };
+                    readonly country: { readonly bsonType: 'string' };
+                  };
+                  readonly additionalProperties: false;
+                  readonly required: readonly [
+                    '_id',
+                    'city',
+                    'country',
+                    'name',
+                    'postalCode',
+                    'streetAndNumber',
+                  ];
+                };
+                readonly validationLevel: 'strict';
+                readonly validationAction: 'error';
+              };
+            };
+            readonly orders: {
+              readonly kind: 'mongo-collection';
+              readonly indexes: readonly [
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [{ readonly field: 'userId'; readonly direction: 1 }];
+                },
+              ];
+              readonly validator: {
+                readonly kind: 'mongo-validator';
+                readonly jsonSchema: {
+                  readonly bsonType: 'object';
+                  readonly properties: {
+                    readonly _id: { readonly bsonType: 'objectId' };
+                    readonly userId: { readonly bsonType: 'objectId' };
+                    readonly items: {
+                      readonly bsonType: 'array';
+                      readonly items: {
+                        readonly bsonType: 'object';
+                        readonly properties: {
+                          readonly productId: { readonly bsonType: 'string' };
+                          readonly name: { readonly bsonType: 'string' };
+                          readonly brand: { readonly bsonType: 'string' };
+                          readonly amount: { readonly bsonType: 'int' };
+                          readonly price: {
+                            readonly bsonType: 'object';
+                            readonly properties: {
+                              readonly amount: { readonly bsonType: 'double' };
+                              readonly currency: { readonly bsonType: 'string' };
+                            };
+                            readonly additionalProperties: false;
+                            readonly required: readonly ['amount', 'currency'];
+                          };
+                          readonly image: {
+                            readonly bsonType: 'object';
+                            readonly properties: { readonly url: { readonly bsonType: 'string' } };
+                            readonly additionalProperties: false;
+                            readonly required: readonly ['url'];
+                          };
+                        };
+                        readonly additionalProperties: false;
+                        readonly required: readonly [
+                          'amount',
+                          'brand',
+                          'image',
+                          'name',
+                          'price',
+                          'productId',
+                        ];
+                      };
+                    };
+                    readonly shippingAddress: { readonly bsonType: 'string' };
+                    readonly type: { readonly bsonType: 'string' };
+                    readonly statusHistory: {
+                      readonly bsonType: 'array';
+                      readonly items: {
+                        readonly bsonType: 'object';
+                        readonly properties: {
+                          readonly status: { readonly bsonType: 'string' };
+                          readonly timestamp: { readonly bsonType: 'date' };
+                        };
+                        readonly additionalProperties: false;
+                        readonly required: readonly ['status', 'timestamp'];
+                      };
+                    };
+                  };
+                  readonly additionalProperties: false;
+                  readonly required: readonly [
+                    '_id',
+                    'items',
+                    'shippingAddress',
+                    'statusHistory',
+                    'type',
+                    'userId',
+                  ];
+                };
+                readonly validationLevel: 'strict';
+                readonly validationAction: 'error';
+              };
+            };
+            readonly products: {
+              readonly kind: 'mongo-collection';
+              readonly indexes: readonly [
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [
+                    { readonly field: 'name'; readonly direction: 'text' },
+                    { readonly field: 'description'; readonly direction: 'text' },
+                  ];
+                  readonly weights: { readonly name: 10; readonly description: 1 };
+                },
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [
+                    { readonly field: 'brand'; readonly direction: 1 },
+                    { readonly field: 'subCategory'; readonly direction: 1 },
+                  ];
+                },
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [
+                    { readonly field: 'primaryCategory'; readonly direction: 1 },
+                    { readonly field: 'articleType'; readonly direction: 1 },
+                  ];
+                },
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [
+                    { readonly field: 'code'; readonly direction: 'hashed' },
+                  ];
+                },
+              ];
+              readonly validator: {
+                readonly kind: 'mongo-validator';
+                readonly jsonSchema: {
+                  readonly bsonType: 'object';
+                  readonly properties: {
+                    readonly _id: { readonly bsonType: 'objectId' };
+                    readonly name: { readonly bsonType: 'string' };
+                    readonly brand: { readonly bsonType: 'string' };
+                    readonly code: { readonly bsonType: 'string' };
+                    readonly description: { readonly bsonType: 'string' };
+                    readonly primaryCategory: { readonly bsonType: 'string' };
+                    readonly subCategory: { readonly bsonType: 'string' };
+                    readonly articleType: { readonly bsonType: 'string' };
+                    readonly price: {
+                      readonly bsonType: 'object';
+                      readonly properties: {
+                        readonly amount: { readonly bsonType: 'double' };
+                        readonly currency: { readonly bsonType: 'string' };
+                      };
+                      readonly additionalProperties: false;
+                      readonly required: readonly ['amount', 'currency'];
+                    };
+                    readonly image: {
+                      readonly bsonType: 'object';
+                      readonly properties: { readonly url: { readonly bsonType: 'string' } };
+                      readonly additionalProperties: false;
+                      readonly required: readonly ['url'];
+                    };
+                  };
+                  readonly additionalProperties: false;
+                  readonly required: readonly [
+                    '_id',
+                    'articleType',
+                    'brand',
+                    'code',
+                    'description',
+                    'image',
+                    'name',
+                    'price',
+                    'primaryCategory',
+                    'subCategory',
+                  ];
+                };
+                readonly validationLevel: 'strict';
+                readonly validationAction: 'error';
+              };
+            };
+            readonly users: {
+              readonly kind: 'mongo-collection';
+              readonly indexes: readonly [
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [{ readonly field: 'email'; readonly direction: 1 }];
+                  readonly unique: true;
+                },
+              ];
+              readonly validator: {
+                readonly kind: 'mongo-validator';
+                readonly jsonSchema: {
+                  readonly bsonType: 'object';
+                  readonly properties: {
+                    readonly _id: { readonly bsonType: 'objectId' };
+                    readonly name: { readonly bsonType: 'string' };
+                    readonly email: { readonly bsonType: 'string' };
+                    readonly address: {
+                      readonly oneOf: readonly [
+                        { readonly bsonType: 'null' },
+                        {
+                          readonly bsonType: 'object';
+                          readonly properties: {
+                            readonly streetAndNumber: { readonly bsonType: 'string' };
+                            readonly city: { readonly bsonType: 'string' };
+                            readonly postalCode: { readonly bsonType: 'string' };
+                            readonly country: { readonly bsonType: 'string' };
+                          };
+                          readonly additionalProperties: false;
+                          readonly required: readonly [
+                            'city',
+                            'country',
+                            'postalCode',
+                            'streetAndNumber',
+                          ];
+                        },
+                      ];
+                    };
+                  };
+                  readonly additionalProperties: false;
+                  readonly required: readonly ['_id', 'email', 'name'];
+                };
+                readonly validationLevel: 'strict';
+                readonly validationAction: 'error';
               };
             };
           };
         };
       };
-      readonly storageHash: StorageHash;
-    },
-    {
-      readonly AddToCartEvent: {
-        readonly fields: {
-          readonly productId: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly brand: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: { readonly collection: 'events' };
-        readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Event' };
-      };
-      readonly Cart: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-          readonly userId: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-          readonly items: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'CartItem' };
-            readonly many: true;
-          };
-        };
-        readonly relations: {
-          readonly user: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'User';
-            };
-            readonly cardinality: 'N:1';
-            readonly on: {
-              readonly localFields: readonly ['userId'];
-              readonly targetFields: readonly ['_id'];
-            };
-          };
-        };
-        readonly storage: { readonly collection: 'carts' };
-      };
-      readonly Event: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-          readonly userId: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly sessionId: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly type: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly timestamp: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/date@1' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: { readonly collection: 'events' };
-        readonly discriminator: { readonly field: 'type' };
-        readonly variants: {
-          readonly ViewProductEvent: { readonly value: 'view-product' };
-          readonly SearchEvent: { readonly value: 'search' };
-          readonly AddToCartEvent: { readonly value: 'add-to-cart' };
-        };
-      };
-      readonly Invoice: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-          readonly orderId: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-          readonly items: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'InvoiceLineItem' };
-            readonly many: true;
-          };
-          readonly subtotal: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/double@1' };
-          };
-          readonly tax: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/double@1' };
-          };
-          readonly total: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/double@1' };
-          };
-          readonly issuedAt: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/date@1' };
-          };
-        };
-        readonly relations: {
-          readonly order: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Order';
-            };
-            readonly cardinality: 'N:1';
-            readonly on: {
-              readonly localFields: readonly ['orderId'];
-              readonly targetFields: readonly ['_id'];
-            };
-          };
-        };
-        readonly storage: { readonly collection: 'invoices' };
-      };
-      readonly Location: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-          readonly name: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly streetAndNumber: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly city: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly postalCode: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly country: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: { readonly collection: 'locations' };
-      };
-      readonly Order: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-          readonly userId: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-          readonly items: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'OrderLineItem' };
-            readonly many: true;
-          };
-          readonly shippingAddress: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly type: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly statusHistory: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'StatusEntry' };
-            readonly many: true;
-          };
-        };
-        readonly relations: {
-          readonly user: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'User';
-            };
-            readonly cardinality: 'N:1';
-            readonly on: {
-              readonly localFields: readonly ['userId'];
-              readonly targetFields: readonly ['_id'];
-            };
-          };
-          readonly invoices: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Invoice';
-            };
-            readonly cardinality: '1:N';
-            readonly on: {
-              readonly localFields: readonly ['_id'];
-              readonly targetFields: readonly ['orderId'];
-            };
-          };
-        };
-        readonly storage: { readonly collection: 'orders' };
-      };
-      readonly Product: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-          readonly name: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly brand: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly code: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly description: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly primaryCategory: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly subCategory: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly articleType: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly price: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'Price' };
-          };
-          readonly image: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'Image' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: { readonly collection: 'products' };
-      };
-      readonly SearchEvent: {
-        readonly fields: {
-          readonly query: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: { readonly collection: 'events' };
-        readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Event' };
-      };
-      readonly User: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-          readonly name: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly email: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly address: {
-            readonly nullable: true;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
-          };
-        };
-        readonly relations: {
-          readonly carts: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Cart';
-            };
-            readonly cardinality: '1:N';
-            readonly on: {
-              readonly localFields: readonly ['_id'];
-              readonly targetFields: readonly ['userId'];
-            };
-          };
-          readonly orders: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Order';
-            };
-            readonly cardinality: '1:N';
-            readonly on: {
-              readonly localFields: readonly ['_id'];
-              readonly targetFields: readonly ['userId'];
-            };
-          };
-        };
-        readonly storage: { readonly collection: 'users' };
-      };
-      readonly ViewProductEvent: {
-        readonly fields: {
-          readonly productId: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly subCategory: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly brand: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly exitMethod: {
-            readonly nullable: true;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: { readonly collection: 'events' };
-        readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Event' };
-      };
-    }
-  >,
+    };
+    readonly storageHash: StorageHash;
+  }>,
   'roots' | 'domain'
 > & {
   readonly target: 'mongo';
@@ -1673,7 +1325,5 @@ type ContractBase = Omit<
   };
   readonly profileHash: ProfileHash;
 };
-
-export type Models = ContractModelDefinitions<Contract>;
 
 export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>;

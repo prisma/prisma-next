@@ -10,7 +10,6 @@ import type {
 } from '@prisma-next/mongo-contract';
 import type {
   Contract as ContractType,
-  ContractModelDefinitions,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -38,30 +37,16 @@ export type FieldInputTypes = {
 export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>;
 
 type ContractBase = Omit<
-  ContractType<
-    {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'mongo-namespace';
-          readonly entries: { readonly collection: { readonly notes: MongoCollection } };
-        };
+  ContractType<{
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'mongo-namespace';
+        readonly entries: { readonly collection: { readonly notes: MongoCollection } };
       };
-      readonly storageHash: StorageHash;
-    },
-    {
-      readonly Note: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: { readonly collection: 'notes' };
-      };
-    }
-  >,
+    };
+    readonly storageHash: StorageHash;
+  }>,
   'roots' | 'domain'
 > & {
   readonly target: 'mongo';
@@ -93,7 +78,5 @@ type ContractBase = Omit<
 
   readonly profileHash: ProfileHash;
 };
-
-export type Models = ContractModelDefinitions<Contract>;
 
 export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>;
