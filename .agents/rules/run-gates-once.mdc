@@ -23,12 +23,6 @@ After a failure, re-run **just the failing file**, not the whole suite:
 pnpm --filter @prisma-next/cli test test/commands/migration-list-json-golden.test.ts
 ```
 
-For programmatic consumption, use a structured reporter on the first run:
-
-```bash
-pnpm test:packages --reporter=json --outputFile=wip/test-packages.json
-```
-
 ## Don't
 
 - Pipe the gate directly to `tail`/`grep`/`head` — discards the rest of the output *and* hides the exit code (tail/grep return 0).
