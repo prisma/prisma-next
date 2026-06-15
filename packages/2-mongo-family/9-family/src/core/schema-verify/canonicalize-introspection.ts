@@ -26,7 +26,9 @@ import {
   MongoSchemaIndex as MongoSchemaIndexCtor,
   MongoSchemaIR as MongoSchemaIRCtor,
 } from '@prisma-next/mongo-schema-ir';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { CollationOptions } from 'mongodb';
 
 export interface CanonicalizedSchemas {
   readonly live: MongoSchemaIR;
@@ -154,7 +156,7 @@ function canonicalizeLiveIndex(
 ): MongoSchemaIndex {
   const projectedKeys = sortTextKeys(projectTextIndexKeys(liveIndex));
   const collation = liveIndex.collation
-    ? stripUnspecifiedFields(liveIndex.collation, expectedIndex?.collation)
+    ? stripCollationFields(liveIndex.collation, expectedIndex?.collation)
     : liveIndex.collation;
 
   // Text-index server defaults: when the contract did not set
@@ -288,7 +290,7 @@ function canonicalizeLiveOptions(
   expectedOptions: MongoSchemaCollectionOptions | undefined,
 ): MongoSchemaCollectionOptions | undefined {
   const collation = liveOptions.collation
-    ? stripUnspecifiedFields(liveOptions.collation, expectedOptions?.collation)
+    ? stripCollationFields(liveOptions.collation, expectedOptions?.collation)
     : undefined;
 
   // Timeseries: drop `bucketMaxSpanSeconds` (and any other server-applied
@@ -376,6 +378,23 @@ function isDisabledChangeStream(value: { enabled: boolean } | undefined): boolea
  * server-attached collation/timeseries/clusteredIndex that the contract
  * never asked for, hiding real drift.)
  */
+function stripCollationFields(
+  live: CollationOptions,
+  expected: CollationOptions | undefined,
+): CollationOptions {
+  return blindCast<
+    CollationOptions,
+    'locale is required in CollationOptions so stripUnspecifiedFields always preserves it'
+  >(
+    stripUnspecifiedFields(
+      blindCast<Record<string, unknown>, 'CollationOptions is a plain object'>(live),
+      expected !== undefined
+        ? blindCast<Record<string, unknown>, 'CollationOptions is a plain object'>(expected)
+        : undefined,
+    ),
+  );
+}
+
 function stripUnspecifiedFields(
   live: Record<string, unknown>,
   expected: Record<string, unknown> | undefined,

@@ -24,6 +24,7 @@
     "@prisma-next/mongo-schema-ir": "workspace:0.13.0",
     "@prisma-next/utils": "workspace:0.13.0",
     "arktype": "catalog:",
+    "mongodb": "catalog:",
     "pathe": "^2.0.3"
   },
   "devDependencies": {

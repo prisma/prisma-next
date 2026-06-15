@@ -1,4 +1,5 @@
 import { freezeNode } from '@prisma-next/framework-components/ir';
+import type { CollationOptions } from 'mongodb';
 import { MongoSchemaIRNode } from './schema-node';
 import type { MongoSchemaVisitor } from './visitor';
 
@@ -9,7 +10,7 @@ export interface MongoSchemaCollectionOptionsInput {
     metaField?: string;
     granularity?: 'seconds' | 'minutes' | 'hours';
   };
-  readonly collation?: Record<string, unknown>;
+  readonly collation?: CollationOptions;
   readonly changeStreamPreAndPostImages?: { enabled: boolean };
   readonly clusteredIndex?: { name?: string };
 }
@@ -20,7 +21,7 @@ export class MongoSchemaCollectionOptions extends MongoSchemaIRNode {
   readonly timeseries?:
     | { timeField: string; metaField?: string; granularity?: 'seconds' | 'minutes' | 'hours' }
     | undefined;
-  readonly collation?: Record<string, unknown> | undefined;
+  readonly collation?: CollationOptions | undefined;
   readonly changeStreamPreAndPostImages?: { enabled: boolean } | undefined;
   readonly clusteredIndex?: { name?: string } | undefined;
 

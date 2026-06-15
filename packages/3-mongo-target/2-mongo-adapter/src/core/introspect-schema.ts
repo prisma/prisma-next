@@ -6,7 +6,8 @@ import {
   MongoSchemaIR,
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
-import type { Db, Document } from 'mongodb';
+import { blindCast } from '@prisma-next/utils/casts';
+import type { CollationOptions, Db, Document } from 'mongodb';
 
 const PRISMA_MIGRATIONS_COLLECTION = '_prisma_migrations';
 
@@ -39,7 +40,11 @@ function parseIndex(doc: Document): MongoSchemaIndex {
     expireAfterSeconds: doc['expireAfterSeconds'] as number | undefined,
     partialFilterExpression: doc['partialFilterExpression'] as Record<string, unknown> | undefined,
     wildcardProjection: doc['wildcardProjection'] as Record<string, 0 | 1> | undefined,
-    collation: doc['collation'] as Record<string, unknown> | undefined,
+    collation: doc['collation']
+      ? blindCast<CollationOptions, 'collation from mongodb listIndexes result has locale'>(
+          doc['collation'],
+        )
+      : undefined,
     weights: doc['weights'] as Record<string, number> | undefined,
     default_language: doc['default_language'] as string | undefined,
     language_override: doc['language_override'] as string | undefined,
@@ -70,7 +75,11 @@ function parseCollectionOptions(info: Document): MongoSchemaCollectionOptions | 
   const timeseries = options['timeseries'] as
     | { timeField: string; metaField?: string; granularity?: 'seconds' | 'minutes' | 'hours' }
     | undefined;
-  const collation = options['collation'] as Record<string, unknown> | undefined;
+  const collation = options['collation']
+    ? blindCast<CollationOptions, 'collation from mongodb listCollections result has locale'>(
+        options['collation'],
+      )
+    : undefined;
   const changeStreamPreAndPostImages = options['changeStreamPreAndPostImages'] as
     | { enabled: boolean }
     | undefined;

@@ -13,11 +13,6 @@ import {
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 
-function stripIrKind(node: object): Record<string, unknown> {
-  const { kind: _kind, ...rest } = node as Record<string, unknown>;
-  return rest;
-}
-
 function convertIndex(index: MongoIndex): MongoSchemaIndex {
   return new MongoSchemaIndex({
     keys: index.keys,
@@ -52,7 +47,21 @@ function convertOptions(o: MongoCollectionOptions): MongoSchemaCollectionOptions
       },
     }),
     ...(o.collation !== undefined && {
-      collation: stripIrKind(o.collation),
+      collation: {
+        locale: o.collation.locale,
+        ...(o.collation.caseLevel !== undefined && { caseLevel: o.collation.caseLevel }),
+        ...(o.collation.caseFirst !== undefined && { caseFirst: o.collation.caseFirst }),
+        ...(o.collation.strength !== undefined && { strength: o.collation.strength }),
+        ...(o.collation.numericOrdering !== undefined && {
+          numericOrdering: o.collation.numericOrdering,
+        }),
+        ...(o.collation.alternate !== undefined && { alternate: o.collation.alternate }),
+        ...(o.collation.maxVariable !== undefined && { maxVariable: o.collation.maxVariable }),
+        ...(o.collation.backwards !== undefined && { backwards: o.collation.backwards }),
+        ...(o.collation.normalization !== undefined && {
+          normalization: o.collation.normalization,
+        }),
+      },
     }),
     ...(o.changeStreamPreAndPostImages !== undefined && {
       changeStreamPreAndPostImages: { enabled: o.changeStreamPreAndPostImages.enabled },

@@ -21,6 +21,7 @@
     "@prisma-next/mongo-contract": "workspace:0.13.0",
     "@prisma-next/psl-parser": "workspace:0.13.0",
     "@prisma-next/utils": "workspace:0.13.0",
+    "mongodb": "catalog:",
     "pathe": "^2.0.3"
   },
   "devDependencies": {

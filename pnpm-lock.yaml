@@ -1963,6 +1963,9 @@ importers:
       arktype:
         specifier: 'catalog:'
         version: 2.2.0
+      mongodb:
+        specifier: 'catalog:'
+        version: 7.2.0(socks@2.8.9)
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:0.13.0
@@ -2021,6 +2024,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:0.13.0
         version: link:../../../1-framework/0-foundation/utils
+      mongodb:
+        specifier: 'catalog:'
+        version: 7.2.0(socks@2.8.9)
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
@@ -2126,6 +2132,9 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:0.13.0
         version: link:../../1-foundation/mongo-contract
+      mongodb:
+        specifier: 'catalog:'
+        version: 7.2.0(socks@2.8.9)
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:0.13.0
@@ -2442,6 +2451,9 @@ importers:
       arktype:
         specifier: 'catalog:'
         version: 2.2.0
+      mongodb:
+        specifier: 'catalog:'
+        version: 7.2.0(socks@2.8.9)
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
