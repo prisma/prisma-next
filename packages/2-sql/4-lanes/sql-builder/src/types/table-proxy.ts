@@ -19,8 +19,7 @@ import type { NamespaceTable, TableProxyContract } from './db';
 import type { DeleteQuery, InsertQuery, InsertValues, UpdateQuery } from './mutation-query';
 import type { WithJoin, WithSelect } from './shared';
 
-// Resolve the model name for a table within an explicit namespace coordinate,
-// reading the per-namespace domain block rather than the flat model map.
+// Reads the per-namespace domain block rather than the flat model map.
 type FindModelForTable<
   C extends TableProxyContract,
   NsId extends string,
@@ -35,7 +34,6 @@ type FindModelForTable<
     }[keyof Models & string]
   : never;
 
-// Resolve the field name for a column within an explicit namespace coordinate.
 type FindFieldForColumn<
   C extends TableProxyContract,
   NsId extends string,

@@ -7,20 +7,8 @@
  * model name (`User`) lives in both, and `public.Profile` carries a
  * cross-namespace foreign key to `auth.User`.
  *
- * The fixture is authored through `buildSqlContractFromDefinition` and emitted
- * to a committed `contract.json` + `contract.d.ts` under
- * `namespaced-accessors/fixtures/` (the precise per-namespace contract type the
- * test type-checks against). The contract is loaded through the
- * `postgres<Contract>({ contractJson })` facade and driven against a real
- * database:
- *
- *  - `db.sql.public.users` / `db.sql.auth.users`: select / insert / update /
- *    delete on both namespaces, with the emitted SQL qualified per schema
- *    (`"public"."users"` vs `"auth"."users"`).
- *  - `db.orm.public.User` / `db.orm.auth.User`: create / find / update /
- *    delete on both namespaces, returning per-namespace-correct rows.
- *  - the cross-namespace `Profile.user` relation read returns the `auth.User`
- *    row (distinct `token` column) for a `public.Profile`.
+ * The fixture type-checks against a committed per-namespace `contract.d.ts` and
+ * is driven against a real database through the `postgres<Contract>` facade.
  *
  * The distinct per-namespace columns are the discriminator at BOTH levels: a
  * mis-qualified query would read the wrong table's columns or fail outright,

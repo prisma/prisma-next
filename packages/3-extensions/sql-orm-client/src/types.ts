@@ -142,8 +142,6 @@ export type DefaultCollectionTypeState = {
   readonly nsId: never;
 };
 
-// Stamp a namespace coordinate onto a collection type-state (used by the
-// `orm.<ns>.<Model>` facet). Preserves the rest of the state.
 export type WithNsId<State extends CollectionTypeState, NsId extends string> = Omit<
   State,
   'nsId'
@@ -622,9 +620,8 @@ export type ShorthandWhereFilter<
     | undefined;
 }>;
 
-// The model map at an explicit namespace coordinate (the per-namespace domain
-// block). Used by the facet resolution path so same-named models across
-// namespaces resolve to each namespace's own model.
+// Read by the facet resolution path so same-named models across namespaces
+// resolve to each namespace's own model.
 type NamespaceModelsOf<
   TContract extends Contract<SqlStorage>,
   NsId extends string,
@@ -648,9 +645,6 @@ type ScannedModelDef<TContract extends Contract<SqlStorage>, ModelName extends s
     : never;
 }[keyof TContract['domain']['namespaces']];
 
-// Resolve a model definition. With an explicit namespace coordinate it reads the
-// per-namespace domain block; without one (`never`) it scans every namespace
-// block (flat-map-free) for non-facet / single-namespace callers.
 type ModelDef<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
@@ -661,9 +655,8 @@ type ModelDef<
     ? NamespaceModelsOf<TContract, NsId>[ModelName]
     : never;
 
-// The storage namespace id that declares a given table, found by scanning the
-// storage namespaces. Used as a fallback when a (flat) model definition does
-// not carry its own `storage.namespaceId`.
+// Fallback for a (flat) model definition that does not carry its own
+// `storage.namespaceId`: the storage namespace whose block declares the table.
 type NamespaceContainingTable<TContract extends Contract<SqlStorage>, TableName extends string> = {
   [K in keyof TContract['storage']['namespaces'] &
     string]: TContract['storage']['namespaces'][K] extends {
@@ -762,8 +755,6 @@ type FieldColumnName<
     : FieldName) &
   string;
 
-// The storage table for a table name at an explicit namespace coordinate. With
-// `never` it scans every namespace for the table (single-namespace / flat).
 type NamespaceTableDef<
   TContract extends Contract<SqlStorage>,
   TableName extends string,
@@ -854,10 +845,10 @@ type NamespaceFieldOutputType<
       : never
     : never;
 
-// The JS type of a model field. The emitter's per-namespace `FieldOutputTypes`
-// is the source of truth (refined codecs + value objects + nullability); for a
-// column-mapped field absent from that map (e.g. a namespace not present in the
-// emitted output map) it falls back to the codec-based storage resolution.
+// The emitter's per-namespace `FieldOutputTypes` is the source of truth (refined
+// codecs + value objects + nullability); for a column-mapped field absent from
+// that map (e.g. a namespace not present in the emitted output map) it falls
+// back to the codec-based storage resolution.
 type FieldJsType<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,

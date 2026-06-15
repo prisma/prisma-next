@@ -38,9 +38,7 @@ export type ColumnResolutionContract = {
 };
 
 /**
- * The application-domain models declared within a single namespace coordinate,
- * read from the per-namespace `domain` block the emitter stamps for each
- * namespace. Resolving here keeps table/column resolution anchored to the
+ * Resolving models per-namespace keeps table/column resolution anchored to the
  * namespace the caller asked for, rather than a flat cross-namespace view that
  * collapses same-named tables across namespaces.
  */
@@ -53,10 +51,6 @@ type NamespaceModels<
   ? Models
   : never;
 
-/**
- * Extracts the model name for a given table within a namespace coordinate by
- * finding the namespace's model whose `storage.table` matches.
- */
 type ExtractTableToModel<
   TContract extends ColumnResolutionContract,
   NsId extends string,
@@ -72,11 +66,6 @@ type ExtractTableToModel<
       }[keyof Models & string]
     : never;
 
-/**
- * Extracts the field name for a given column within a namespace coordinate by
- * finding the field in the namespace model's `storage.fields` whose `column`
- * matches.
- */
 type ExtractColumnToField<
   TContract extends ColumnResolutionContract,
   NsId extends string,
@@ -100,10 +89,9 @@ type ExtractColumnToField<
     : never;
 
 /**
- * The storage column metadata for a column within a namespace coordinate, read
- * from the per-namespace `storage` block. Resolves to `never` when the table or
- * column is absent in that namespace — so a column unique to another namespace
- * does not leak in through a flat cross-namespace view.
+ * Resolves to `never` when the table or column is absent in the namespace — so a
+ * column unique to another namespace does not leak in through a flat
+ * cross-namespace view.
  */
 type NamespaceStorageColumn<
   TContract extends ColumnResolutionContract,
@@ -167,11 +155,9 @@ type NamespaceFieldOutput<
     : never;
 
 /**
- * Codec-output fallback for a storage column not backed by a domain model field
- * in the namespace (e.g. a column with no corresponding field). Resolves the
- * column's `codecId` against `CodecTypes`; `never` when the column is absent in
- * the namespace. This is the secondary path — refined model fields resolve via
- * {@link NamespaceFieldOutput}.
+ * The secondary resolution path, taken for a storage column not backed by a
+ * domain model field in the namespace (e.g. a column with no corresponding
+ * field); refined model fields resolve via {@link NamespaceFieldOutput}.
  */
 type ColumnCodecFallback<
   TContract extends ColumnResolutionContract,
