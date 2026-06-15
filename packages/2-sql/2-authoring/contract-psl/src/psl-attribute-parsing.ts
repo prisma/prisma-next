@@ -1,43 +1,44 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { ControlPolicy } from '@prisma-next/contract/types';
-import type { PslAttribute, PslSpan } from '@prisma-next/psl-parser';
-import { getPositionalArgument, parseQuotedStringLiteral } from '@prisma-next/psl-parser';
+import type { PslSpan } from '@prisma-next/psl-parser';
+import type { ExpressionAst, ResolvedAttribute } from '@prisma-next/psl-parser/syntax';
+import { ArrayLiteralAst } from '@prisma-next/psl-parser/syntax';
+import { argText, getAttribute, getNamedArgText } from './resolved-read-shims';
 
-export { getPositionalArgument, parseQuotedStringLiteral };
+export { getAttribute };
 
 export function lowerFirst(value: string): string {
   if (value.length === 0) return value;
   return value[0]?.toLowerCase() + value.slice(1);
 }
 
-export function getAttribute(
-  attributes: readonly PslAttribute[] | undefined,
-  name: string,
-): PslAttribute | undefined {
-  return attributes?.find((attribute) => attribute.name === name);
+/**
+ * Strips matching outer quotes from a raw argument's source text, returning the
+ * inner text, or `undefined` when the text is not a quoted string literal. No
+ * escape decoding — the inner bytes are returned verbatim (matching the legacy
+ * `parseQuotedStringLiteral`). Callers pass {@link argText} of a CST expression.
+ */
+export function parseQuotedStringLiteral(value: string): string | undefined {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(['"])(.*)\1$/);
+  if (!match) return undefined;
+  return match[2] ?? '';
 }
 
-export function getNamedArgument(attribute: PslAttribute, name: string): string | undefined {
-  const entry = attribute.args.find((arg) => arg.kind === 'named' && arg.name === name);
-  if (!entry || entry.kind !== 'named') {
-    return undefined;
-  }
-  return entry.value;
+export function getNamedArgument(attribute: ResolvedAttribute, name: string): string | undefined {
+  return getNamedArgText(attribute, name);
 }
 
-export function getPositionalArgumentEntry(
-  attribute: PslAttribute,
+/**
+ * The first positional argument's expression node, or `undefined` when absent.
+ * Replaces the legacy `getPositionalArgumentEntry` `{ value, span }` accessor:
+ * callers read the raw text via {@link argText} and derive spans from the CST.
+ */
+export function getPositionalArgumentExpr(
+  attribute: ResolvedAttribute,
   index = 0,
-): { value: string; span: PslSpan } | undefined {
-  const entries = attribute.args.filter((arg) => arg.kind === 'positional');
-  const entry = entries[index];
-  if (!entry || entry.kind !== 'positional') {
-    return undefined;
-  }
-  return {
-    value: entry.value,
-    span: entry.span,
-  };
+): ExpressionAst | undefined {
+  return attribute.positionalArg(index);
 }
 
 export function unquoteStringLiteral(value: string): string {
@@ -49,21 +50,28 @@ export function unquoteStringLiteral(value: string): string {
   return match[2] ?? '';
 }
 
-export function parseFieldList(value: string): readonly string[] | undefined {
-  const trimmed = value.trim();
-  if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
+/**
+ * The bare names listed in an array-literal argument expression (e.g. the
+ * `[id, name]` of `@@id([id, name])`), or `undefined` when the expression is
+ * not an array literal. Element names are read from the CST element nodes via
+ * {@link argText} (preserving the raw source text the legacy comma-split
+ * produced).
+ */
+export function parseFieldList(value: ExpressionAst): readonly string[] | undefined {
+  const array = ArrayLiteralAst.cast(value.syntax);
+  if (!array) {
     return undefined;
   }
-  const body = trimmed.slice(1, -1);
-  const parts = body
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
+  const parts: string[] = [];
+  for (const element of array.elements()) {
+    const text = argText(element).trim();
+    if (text.length > 0) parts.push(text);
+  }
   return parts;
 }
 
 export function parseMapName(input: {
-  readonly attribute: PslAttribute | undefined;
+  readonly attribute: ResolvedAttribute | undefined;
   readonly defaultValue: string;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
@@ -74,23 +82,23 @@ export function parseMapName(input: {
     return input.defaultValue;
   }
 
-  const value = getPositionalArgument(input.attribute);
+  const value = input.attribute.positionalArg(0);
   if (!value) {
     input.diagnostics.push({
       code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
       message: `${input.entityLabel} @map requires a positional quoted string literal argument`,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return input.defaultValue;
   }
-  const parsed = parseQuotedStringLiteral(value);
+  const parsed = parseQuotedStringLiteral(argText(value));
   if (parsed === undefined) {
     input.diagnostics.push({
       code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
       message: `${input.entityLabel} @map requires a positional quoted string literal argument`,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return input.defaultValue;
   }
@@ -98,7 +106,7 @@ export function parseMapName(input: {
 }
 
 export function parseConstraintMapArgument(input: {
-  readonly attribute: PslAttribute | undefined;
+  readonly attribute: ResolvedAttribute | undefined;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly entityLabel: string;
@@ -128,10 +136,8 @@ export function parseConstraintMapArgument(input: {
   return undefined;
 }
 
-export function getPositionalArguments(attribute: PslAttribute): readonly string[] {
-  return attribute.args
-    .filter((arg) => arg.kind === 'positional')
-    .map((arg) => (arg.kind === 'positional' ? arg.value : ''));
+export function getPositionalArguments(attribute: ResolvedAttribute): readonly string[] {
+  return attribute.args.filter((arg) => arg.name === undefined).map((arg) => argText(arg.value));
 }
 
 /**
@@ -276,18 +282,19 @@ export function pushInvalidAttributeArgument(input: {
 }
 
 export function parseOptionalSingleIntegerArgument(input: {
-  readonly attribute: PslAttribute;
+  readonly attribute: ResolvedAttribute;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
+  readonly span: PslSpan;
   readonly entityLabel: string;
   readonly minimum: number;
   readonly valueLabel: string;
 }): number | null | undefined {
-  if (input.attribute.args.some((arg) => arg.kind === 'named')) {
+  if (input.attribute.args.some((arg) => arg.name !== undefined)) {
     return pushInvalidAttributeArgument({
       diagnostics: input.diagnostics,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
       message: `${input.entityLabel} @${input.attribute.name} accepts zero or one positional integer argument.`,
     });
   }
@@ -297,7 +304,7 @@ export function parseOptionalSingleIntegerArgument(input: {
     return pushInvalidAttributeArgument({
       diagnostics: input.diagnostics,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
       message: `${input.entityLabel} @${input.attribute.name} accepts zero or one positional integer argument.`,
     });
   }
@@ -310,7 +317,7 @@ export function parseOptionalSingleIntegerArgument(input: {
     return pushInvalidAttributeArgument({
       diagnostics: input.diagnostics,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
       message: `${input.entityLabel} @${input.attribute.name} requires a ${input.valueLabel}.`,
     });
   }
@@ -319,16 +326,17 @@ export function parseOptionalSingleIntegerArgument(input: {
 }
 
 export function parseOptionalNumericArguments(input: {
-  readonly attribute: PslAttribute;
+  readonly attribute: ResolvedAttribute;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
+  readonly span: PslSpan;
   readonly entityLabel: string;
 }): { precision: number; scale?: number } | null | undefined {
-  if (input.attribute.args.some((arg) => arg.kind === 'named')) {
+  if (input.attribute.args.some((arg) => arg.name !== undefined)) {
     return pushInvalidAttributeArgument({
       diagnostics: input.diagnostics,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
       message: `${input.entityLabel} @${input.attribute.name} accepts zero, one, or two positional integer arguments.`,
     });
   }
@@ -338,7 +346,7 @@ export function parseOptionalNumericArguments(input: {
     return pushInvalidAttributeArgument({
       diagnostics: input.diagnostics,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
       message: `${input.entityLabel} @${input.attribute.name} accepts zero, one, or two positional integer arguments.`,
     });
   }
@@ -351,7 +359,7 @@ export function parseOptionalNumericArguments(input: {
     return pushInvalidAttributeArgument({
       diagnostics: input.diagnostics,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
       message: `${input.entityLabel} @${input.attribute.name} requires a positive integer precision.`,
     });
   }
@@ -365,7 +373,7 @@ export function parseOptionalNumericArguments(input: {
     return pushInvalidAttributeArgument({
       diagnostics: input.diagnostics,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
       message: `${input.entityLabel} @${input.attribute.name} requires a non-negative integer scale.`,
     });
   }
@@ -374,29 +382,32 @@ export function parseOptionalNumericArguments(input: {
 }
 
 export function parseAttributeFieldList(input: {
-  readonly attribute: PslAttribute;
+  readonly attribute: ResolvedAttribute;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
+  readonly span: PslSpan;
   readonly code: string;
   readonly entityLabel: string;
 }): readonly string[] | undefined {
-  const raw = getNamedArgument(input.attribute, 'fields') ?? getPositionalArgument(input.attribute);
-  if (!raw) {
+  const arg =
+    input.attribute.args.find((entry) => entry.name === 'fields')?.value ??
+    input.attribute.positionalArg(0);
+  if (!arg) {
     input.diagnostics.push({
       code: input.code,
       message: `${input.entityLabel} requires fields list argument`,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return undefined;
   }
-  const fields = parseFieldList(raw);
+  const fields = parseFieldList(arg);
   if (!fields || fields.length === 0) {
     input.diagnostics.push({
       code: input.code,
       message: `${input.entityLabel} requires bracketed field list argument`,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return undefined;
   }
@@ -426,18 +437,19 @@ function isControlPolicyLiteral(value: string): value is ControlPolicy {
 }
 
 export function parseControlPolicyAttribute(input: {
-  readonly attribute: PslAttribute;
+  readonly attribute: ResolvedAttribute;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
+  readonly span: PslSpan;
 }): ControlPolicy | undefined {
-  const namedArgs = input.attribute.args.filter((arg) => arg.kind === 'named');
+  const namedArgs = input.attribute.args.filter((arg) => arg.name !== undefined);
   if (namedArgs.length > 0) {
     input.diagnostics.push({
       code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
       message:
         '`@@control` does not accept named arguments; pass the policy positionally as `@@control(external)`.',
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return undefined;
   }
@@ -449,7 +461,7 @@ export function parseControlPolicyAttribute(input: {
       message:
         '`@@control` requires exactly one positional argument: `managed`, `tolerated`, `external`, or `observed`.',
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return undefined;
   }
@@ -458,7 +470,7 @@ export function parseControlPolicyAttribute(input: {
       code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
       message: `\`@@control\` accepts exactly one positional argument; got ${positionalArgs.length}.`,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return undefined;
   }
@@ -469,7 +481,7 @@ export function parseControlPolicyAttribute(input: {
       code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
       message: `\`@@control\` argument \`${token}\` is not a known policy. Allowed: \`managed\`, \`tolerated\`, \`external\`, \`observed\`.`,
       sourceId: input.sourceId,
-      span: input.attribute.span,
+      span: input.span,
     });
     return undefined;
   }

@@ -1,12 +1,50 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { PslSpan } from '@prisma-next/psl-parser';
+import { parse, type ResolvedAttribute, resolve } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
-import { parseObjectLiteralStringMap } from '../src/psl-attribute-parsing';
+import {
+  getNamedArgument,
+  getPositionalArgumentExpr,
+  getPositionalArguments,
+  parseAttributeFieldList,
+  parseConstraintMapArgument,
+  parseControlPolicyAttribute,
+  parseFieldList,
+  parseMapName,
+  parseObjectLiteralStringMap,
+  parseOptionalNumericArguments,
+  parseOptionalSingleIntegerArgument,
+} from '../src/psl-attribute-parsing';
 
 const span: PslSpan = {
   start: { offset: 0, line: 1, column: 1 },
   end: { offset: 1, line: 1, column: 2 },
 };
+
+function modelAttribute(schema: string, model: string, attribute: string): ResolvedAttribute {
+  const { document } = parse(schema);
+  const resolved = resolve(document);
+  const ns = [...resolved.namespaces.values()][0];
+  const target = ns?.models.get(model);
+  const found = target?.attributes.find((attr) => attr.name === attribute);
+  if (!found) throw new Error(`attribute @@${attribute} not found on ${model}`);
+  return found;
+}
+
+function fieldAttribute(
+  schema: string,
+  model: string,
+  field: string,
+  attribute: string,
+): ResolvedAttribute {
+  const { document } = parse(schema);
+  const resolved = resolve(document);
+  const ns = [...resolved.namespaces.values()][0];
+  const target = ns?.models.get(model)?.fields.get(field);
+  const found = target?.attributes.find((attr) => attr.name === attribute);
+  if (!found) throw new Error(`attribute @${attribute} not found on ${model}.${field}`);
+  return found;
+}
 
 function callParse(raw: string): {
   result: Record<string, string> | undefined;
@@ -153,5 +191,275 @@ describe('parseObjectLiteralStringMap', () => {
     const { result, diagnostics } = callParse('{ 1bad: "x", 2bad: "y" }');
     expect(result).toBeUndefined();
     expect(diagnostics).toHaveLength(1);
+  });
+});
+
+describe('getNamedArgument over CST', () => {
+  it('returns the raw quoted text of a named argument', () => {
+    const attr = fieldAttribute(
+      `model Post {
+        id Int @id
+        authorId Int
+        author User @relation(name: "PostAuthor", fields: [authorId], references: [id])
+      }
+      model User { id Int @id }`,
+      'Post',
+      'author',
+      'relation',
+    );
+    expect(getNamedArgument(attr, 'name')).toBe('"PostAuthor"');
+  });
+
+  it('returns undefined for an absent named argument', () => {
+    const attr = fieldAttribute(`model User { id Int @id @map("user_id") }`, 'User', 'id', 'map');
+    expect(getNamedArgument(attr, 'map')).toBeUndefined();
+  });
+});
+
+describe('getPositionalArguments / getPositionalArgumentExpr over CST', () => {
+  it('reads positional args as raw source text', () => {
+    const attr = fieldAttribute(
+      'model User { id String @id @db.VarChar(255) }',
+      'User',
+      'id',
+      'db.VarChar',
+    );
+    expect(getPositionalArguments(attr)).toEqual(['255']);
+    const first = getPositionalArgumentExpr(attr);
+    expect(first?.syntax.kind).toBe('NumberLiteralExpr');
+  });
+});
+
+describe('parseFieldList over CST', () => {
+  it('reads bare field names from an array-literal expression', () => {
+    const attr = modelAttribute(
+      `model User {
+        firstName String
+        lastName String
+        @@id([firstName, lastName])
+      }`,
+      'User',
+      'id',
+    );
+    const arg = getPositionalArgumentExpr(attr)!;
+    expect(parseFieldList(arg)).toEqual(['firstName', 'lastName']);
+  });
+
+  it('returns undefined when the argument is not an array literal', () => {
+    const attr = fieldAttribute(`model User { id Int @id @map("user_id") }`, 'User', 'id', 'map');
+    const arg = getPositionalArgumentExpr(attr)!;
+    expect(parseFieldList(arg)).toBeUndefined();
+  });
+});
+
+describe('parseMapName over CST', () => {
+  it('reads the quoted positional map name', () => {
+    const attr = fieldAttribute(`model User { id Int @id @map("user_id") }`, 'User', 'id', 'map');
+    const diagnostics: ContractSourceDiagnostic[] = [];
+    const result = parseMapName({
+      attribute: attr,
+      defaultValue: 'id',
+      sourceId: 'schema.prisma',
+      diagnostics,
+      entityLabel: 'model User field id',
+      span,
+    });
+    expect(result).toBe('user_id');
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it('returns the default and diagnoses when the value is not a quoted string', () => {
+    const attr = fieldAttribute('model User { id Int @id @map(user_id) }', 'User', 'id', 'map');
+    const diagnostics: ContractSourceDiagnostic[] = [];
+    const result = parseMapName({
+      attribute: attr,
+      defaultValue: 'id',
+      sourceId: 'schema.prisma',
+      diagnostics,
+      entityLabel: 'model User field id',
+      span,
+    });
+    expect(result).toBe('id');
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.message).toBe(
+      'model User field id @map requires a positional quoted string literal argument',
+    );
+  });
+});
+
+describe('parseConstraintMapArgument over CST', () => {
+  it('reads a quoted named map argument', () => {
+    const attr = modelAttribute(
+      `model User {
+        id Int @id
+        email String
+        @@unique([email], map: "user_email_key")
+      }`,
+      'User',
+      'unique',
+    );
+    const diagnostics: ContractSourceDiagnostic[] = [];
+    const result = parseConstraintMapArgument({
+      attribute: attr,
+      sourceId: 'schema.prisma',
+      diagnostics,
+      entityLabel: 'model User @@unique',
+      span,
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+    });
+    expect(result).toBe('user_email_key');
+    expect(diagnostics).toHaveLength(0);
+  });
+});
+
+describe('parseAttributeFieldList over CST', () => {
+  it('reads the named fields list', () => {
+    const attr = modelAttribute(
+      `model User {
+        id Int @id
+        a String
+        b String
+        @@unique(fields: [a, b])
+      }`,
+      'User',
+      'unique',
+    );
+    const diagnostics: ContractSourceDiagnostic[] = [];
+    const result = parseAttributeFieldList({
+      attribute: attr,
+      sourceId: 'schema.prisma',
+      diagnostics,
+      span,
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      entityLabel: 'model User @@unique',
+    });
+    expect(result).toEqual(['a', 'b']);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it('diagnoses a missing field list', () => {
+    const attr = modelAttribute(
+      `model User {
+        id Int @id
+        @@unique()
+      }`,
+      'User',
+      'unique',
+    );
+    const diagnostics: ContractSourceDiagnostic[] = [];
+    const result = parseAttributeFieldList({
+      attribute: attr,
+      sourceId: 'schema.prisma',
+      diagnostics,
+      span,
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      entityLabel: 'model User @@unique',
+    });
+    expect(result).toBeUndefined();
+    expect(diagnostics[0]?.message).toBe('model User @@unique requires fields list argument');
+  });
+});
+
+describe('parseControlPolicyAttribute over CST', () => {
+  it('reads a known policy literal', () => {
+    const attr = modelAttribute(
+      `model User {
+        id Int @id
+        @@control(external)
+      }`,
+      'User',
+      'control',
+    );
+    const diagnostics: ContractSourceDiagnostic[] = [];
+    const result = parseControlPolicyAttribute({
+      attribute: attr,
+      sourceId: 'schema.prisma',
+      diagnostics,
+      span,
+    });
+    expect(result).toBe('external');
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it('diagnoses an unknown policy verbatim', () => {
+    const attr = modelAttribute(
+      `model User {
+        id Int @id
+        @@control(bogus)
+      }`,
+      'User',
+      'control',
+    );
+    const diagnostics: ContractSourceDiagnostic[] = [];
+    const result = parseControlPolicyAttribute({
+      attribute: attr,
+      sourceId: 'schema.prisma',
+      diagnostics,
+      span,
+    });
+    expect(result).toBeUndefined();
+    expect(diagnostics[0]?.message).toBe(
+      '`@@control` argument `bogus` is not a known policy. Allowed: `managed`, `tolerated`, `external`, `observed`.',
+    );
+  });
+});
+
+describe('parseOptionalSingleIntegerArgument over CST', () => {
+  it('reads a single positional integer', () => {
+    const attr = fieldAttribute(
+      'model User { id String @id @db.VarChar(255) }',
+      'User',
+      'id',
+      'db.VarChar',
+    );
+    const diagnostics: ContractSourceDiagnostic[] = [];
+    const result = parseOptionalSingleIntegerArgument({
+      attribute: attr,
+      diagnostics,
+      sourceId: 'schema.prisma',
+      span,
+      entityLabel: 'model User field id',
+      minimum: 1,
+      valueLabel: 'positive integer length',
+    });
+    expect(result).toBe(255);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it('returns null when no positional argument is present', () => {
+    const attr = fieldAttribute('model User { id String @id @db.Text }', 'User', 'id', 'db.Text');
+    const diagnostics: ContractSourceDiagnostic[] = [];
+    const result = parseOptionalSingleIntegerArgument({
+      attribute: attr,
+      diagnostics,
+      sourceId: 'schema.prisma',
+      span,
+      entityLabel: 'model User field id',
+      minimum: 1,
+      valueLabel: 'positive integer length',
+    });
+    expect(result).toBeNull();
+    expect(diagnostics).toHaveLength(0);
+  });
+});
+
+describe('parseOptionalNumericArguments over CST', () => {
+  it('reads precision and scale', () => {
+    const attr = fieldAttribute(
+      'model Price { id Int @id amount Decimal @db.Decimal(10, 2) }',
+      'Price',
+      'amount',
+      'db.Decimal',
+    );
+    const diagnostics: ContractSourceDiagnostic[] = [];
+    const result = parseOptionalNumericArguments({
+      attribute: attr,
+      diagnostics,
+      sourceId: 'schema.prisma',
+      span,
+      entityLabel: 'model Price field amount',
+    });
+    expect(result).toEqual({ precision: 10, scale: 2 });
+    expect(diagnostics).toHaveLength(0);
   });
 });
