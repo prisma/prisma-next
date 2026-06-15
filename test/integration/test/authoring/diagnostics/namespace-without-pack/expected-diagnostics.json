@@ -4,7 +4,7 @@
     {
       "code": "PSL_EXTENSION_NAMESPACE_NOT_COMPOSED",
       "sourceId": "./schema.prisma",
-      "startLine": 5
+      "startLine": 4
     }
   ]
 }

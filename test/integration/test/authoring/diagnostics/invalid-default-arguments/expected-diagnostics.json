@@ -4,17 +4,17 @@
     {
       "code": "PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT",
       "sourceId": "./schema.prisma",
+      "startLine": 4
+    },
+    {
+      "code": "PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT",
+      "sourceId": "./schema.prisma",
       "startLine": 5
     },
     {
       "code": "PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT",
       "sourceId": "./schema.prisma",
       "startLine": 6
-    },
-    {
-      "code": "PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT",
-      "sourceId": "./schema.prisma",
-      "startLine": 7
     }
   ]
 }
