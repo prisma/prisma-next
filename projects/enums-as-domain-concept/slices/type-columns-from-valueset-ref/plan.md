@@ -88,7 +88,12 @@ stay green. Reviewer verifies the blast radius first.
 - Make the no-emit authoring-ts path carry literal `valueSet` refs on storage
   columns / domain fields, so the lanes can drop the baked-map fallback entirely and
   the no-emit path ref-follows too (full §5 "no baked map"). Separate contract-ts
-  change; file a ticket at slice close.
+  change; filed as [TML-2917].
+- `renderEnumRefUnion` (and the lane resolvers) ignore `ValueSetRef.spaceId`: a
+  cross-space enum reference would index the local `ContractBase` and resolve wrong.
+  Pre-existing (U3's baker had the same gap), unreachable today (cross-space enum
+  authoring is out of scope, rides TML-2500). Handle `spaceId` before cross-space
+  enum refs become authorable — TML-2500.
 
 ## Risk notes (from discovery)
 
