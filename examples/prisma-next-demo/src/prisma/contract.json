@@ -1077,7 +1077,7 @@
     }
   },
   "execution": {
-    "executionHash": "sha256:121c95f63b02bdb28df5144a60628a5b77975d6946fe146da451075d1f3115d8",
+    "executionHash": "sha256:6dcd81f86735007ae62319a6ecb5c147052e6792d7c5a2b9e396b45823090f28",
     "mutations": {
       "defaults": [
         {
@@ -1098,6 +1098,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "tag"
           }
         },
@@ -1108,6 +1109,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "task"
           }
         },

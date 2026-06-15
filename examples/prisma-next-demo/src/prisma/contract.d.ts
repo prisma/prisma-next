@@ -38,7 +38,7 @@ import type {
 export type StorageHash =
   StorageHashBase<'sha256:d1a720d7254dfa4cd2dc39353b21de48198fc5aa75dc9a471c95f0e9f1be889f'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:121c95f63b02bdb28df5144a60628a5b77975d6946fe146da451075d1f3115d8'>;
+  ExecutionHashBase<'sha256:6dcd81f86735007ae62319a6ecb5c147052e6792d7c5a2b9e396b45823090f28'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
@@ -1265,11 +1265,19 @@ type ContractBase = Omit<
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
         {
-          readonly ref: { readonly table: 'tag'; readonly column: 'id' };
+          readonly ref: {
+            readonly namespace: 'public';
+            readonly table: 'tag';
+            readonly column: 'id';
+          };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
         {
-          readonly ref: { readonly table: 'task'; readonly column: 'id' };
+          readonly ref: {
+            readonly namespace: 'public';
+            readonly table: 'task';
+            readonly column: 'id';
+          };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
         {
