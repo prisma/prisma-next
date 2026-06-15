@@ -48,8 +48,8 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { CollationOptions } from 'mongodb';
 import { type } from 'arktype';
+import type { CollationOptions } from 'mongodb';
 
 const IndexKeyDirection = type('1 | -1 | "text" | "2dsphere" | "2d" | "hashed"');
 const IndexKeyJson = type({ field: 'string', direction: IndexKeyDirection });

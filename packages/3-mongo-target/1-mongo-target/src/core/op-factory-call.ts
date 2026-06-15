@@ -36,7 +36,6 @@ import type {
 } from '@prisma-next/mongo-schema-ir';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import { blindCast } from '@prisma-next/utils/casts';
-import type { CollationOptions } from 'mongodb';
 import {
   collMod,
   createCollection,
@@ -219,11 +218,7 @@ export function schemaIndexToCreateIndexOptions(index: MongoSchemaIndex): Create
     expireAfterSeconds: index.expireAfterSeconds,
     partialFilterExpression: index.partialFilterExpression,
     wildcardProjection: index.wildcardProjection,
-    collation: index.collation
-      ? blindCast<CollationOptions, 'collation from mongodb introspection has locale'>(
-          index.collation,
-        )
-      : undefined,
+    collation: index.collation,
     weights: index.weights,
     default_language: index.default_language,
     language_override: index.language_override,
@@ -241,15 +236,13 @@ export function schemaCollectionToCreateCollectionOptions(
     size: opts?.capped?.size,
     max: opts?.capped?.max,
     timeseries: opts?.timeseries,
-    collation: opts?.collation
-      ? blindCast<CollationOptions, 'collation from mongodb introspection has locale'>(
-          opts.collation,
-        )
-      : undefined,
+    collation: opts?.collation,
     clusteredIndex: opts?.clusteredIndex
       ? {
-          key: { _id: 1 } as Record<string, number>,
-          unique: true as boolean,
+          key: blindCast<Record<string, number>, 'createCollection clusteredIndex key shape'>({
+            _id: 1,
+          }),
+          unique: true,
           ...(opts.clusteredIndex.name != null ? { name: opts.clusteredIndex.name } : {}),
         }
       : undefined,
