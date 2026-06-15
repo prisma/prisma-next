@@ -59,16 +59,20 @@ block (per the explicit-opt-in-over-diagnostics and namespace-diagnostic-wording
 rules, the wording names what was found and what to do). The
 `print-psl.enums.test.ts` native round-trip tests convert to assert the diagnostic.
 
-**4. Migration history must keep replaying.** Committed migrations (the demo's
-initial migration creates `user_type` via the native ops) must not break when the op
-*planning* is deleted. Decide at dispatch with this pinned default: **keep the
-minimal op-execution/replay surface for the four native ops** (the call shapes that
-committed `migration.ts`/`ops.json` files reference) in a clearly-marked
-legacy-replay module, while deleting all planning/diffing/emission — the planner can
-never *produce* them again. If investigation shows committed artifacts don't actually
-import the builders (pure JSON replay), delete everything and record that instead. A
-third option — rewriting the demo's migration history — is **out** (history is the
-product surface the migration system exists to preserve).
+**4. Regenerate the demo migration history from scratch (REVISED 2026-06-15, operator
+override).** The original pin here kept the native ops replayable and ruled
+history-rewriting OUT. The operator overruled it on PR #817 review: a migration that
+demonstrates transitioning **from a state the system can no longer produce** (a native
+`CREATE TYPE … AS ENUM`) **to** the current representation is an incoherent teaching
+artifact — worse than no history. So the demo's `examples/prisma-next-demo/migrations/app/`
+chain (every folder, including the `20260611T1856_convert_user_type_to_value_set`
+self-edge added earlier in this slice) is **deleted and regenerated from scratch via
+the CLI migration flow** against the current contract, so the chain authors the
+value-set/domain-enum representation directly and no native-enum start-state ever
+appears. The earlier convert-in-place migration and any legacy-replay surface for
+native ops are removed entirely. Tests that depend on the old chain's shape
+(`migration-integrity` — the no-op-bookend subject — and `migration-replay`) are
+re-pointed at the regenerated chain.
 
 **5. Migrate the stragglers** (inventory: the demo's `user_type` + `User.kind`, the
 cloudflare-worker example's copy, the cli-e2e `contract-status-enum*` fixtures + the
