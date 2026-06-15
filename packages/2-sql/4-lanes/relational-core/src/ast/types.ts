@@ -1539,6 +1539,10 @@ export class SelectAst extends QueryAst {
 
     if (this.from?.kind === 'derived-table-source') {
       pushRefs(this.from.query.collectColumnRefs());
+    } else if (this.from?.kind === 'function-source') {
+      for (const arg of this.from.args) {
+        pushRefs(arg.collectColumnRefs());
+      }
     }
 
     for (const projection of this.projection) {
@@ -1565,6 +1569,10 @@ export class SelectAst extends QueryAst {
     for (const join of this.joins ?? []) {
       if (join.source.kind === 'derived-table-source') {
         pushRefs(join.source.query.collectColumnRefs());
+      } else if (join.source.kind === 'function-source') {
+        for (const arg of join.source.args) {
+          pushRefs(arg.collectColumnRefs());
+        }
       }
       if (join.on.kind === 'eq-col-join-on') {
         refs.push(join.on.left, join.on.right);
@@ -1620,6 +1628,10 @@ export class SelectAst extends QueryAst {
     for (const join of this.joins ?? []) {
       if (join.source.kind === 'derived-table-source') {
         pushRefs(join.source.query.collectParamRefs());
+      } else if (join.source.kind === 'function-source') {
+        for (const arg of join.source.args) {
+          pushRefs(arg.collectParamRefs());
+        }
       }
       if (!(join.on.kind === 'eq-col-join-on')) {
         pushRefs(join.on.collectParamRefs());
