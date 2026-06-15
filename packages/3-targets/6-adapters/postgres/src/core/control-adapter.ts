@@ -167,7 +167,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const expectedPolicies: PostgresRlsPolicy[] = [];
     for (const ns of Object.values(contract.storage.namespaces)) {
       if (isPostgresSchema(ns)) {
-        for (const policy of Object.values(ns.entries.rlsPolicy)) {
+        for (const policy of Object.values(ns.entries.rlsPolicy ?? {})) {
           expectedPolicies.push(policy);
         }
       }
@@ -1176,41 +1176,39 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const [rawEnumTypes, policiesResult, rolesResult, rlsEnabledResult] = await Promise.all([
-      introspectPostgresEnumTypes({ driver, schemaName: schema }),
-      driver.query<{
-        schemaname: string;
-        tablename: string;
-        policyname: string;
-        cmd: string;
-        roles: string[];
-        qual: string | null;
-        with_check: string | null;
-        permissive: string;
-      }>(
-        `SELECT schemaname, tablename, policyname, cmd, roles, qual, with_check, permissive
-         FROM pg_catalog.pg_policies
-         WHERE schemaname = $1
-         ORDER BY tablename, policyname`,
-        [schema],
-      ),
-      driver.query<{ rolname: string }>(
-        `SELECT rolname
-         FROM pg_catalog.pg_roles
-         WHERE rolname NOT LIKE 'pg_%'
-           AND rolname != 'postgres'
-         ORDER BY rolname`,
-      ),
-      driver.query<{ relname: string; relrowsecurity: boolean }>(
-        `SELECT c.relname, c.relrowsecurity
-         FROM pg_catalog.pg_class c
-         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-         WHERE n.nspname = $1
-           AND c.relkind = 'r'
-         ORDER BY c.relname`,
-        [schema],
-      ),
-    ]);
+    const rawEnumTypes = await introspectPostgresEnumTypes({ driver, schemaName: schema });
+    const policiesResult = await driver.query<{
+      schemaname: string;
+      tablename: string;
+      policyname: string;
+      cmd: string;
+      roles: string[];
+      qual: string | null;
+      with_check: string | null;
+      permissive: string;
+    }>(
+      `SELECT schemaname, tablename, policyname, cmd, roles, qual, with_check, permissive
+       FROM pg_catalog.pg_policies
+       WHERE schemaname = $1
+       ORDER BY tablename, policyname`,
+      [schema],
+    );
+    const rolesResult = await driver.query<{ rolname: string }>(
+      `SELECT rolname
+       FROM pg_catalog.pg_roles
+       WHERE rolname NOT LIKE 'pg_%'
+         AND rolname != 'postgres'
+       ORDER BY rolname`,
+    );
+    const rlsEnabledResult = await driver.query<{ relname: string; relrowsecurity: boolean }>(
+      `SELECT c.relname, c.relrowsecurity
+       FROM pg_catalog.pg_class c
+       JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = $1
+         AND c.relkind = 'r'
+       ORDER BY c.relname`,
+      [schema],
+    );
 
     const enumTypes: Record<
       string,

@@ -15,7 +15,7 @@ const emptyTableInput = {
 describe('PostgresRole', () => {
   it('constructs with required fields and defaults namespaceId to UNBOUND_NAMESPACE_ID', () => {
     const role = new PostgresRole({ name: 'authenticated' });
-    expect(role.kind).toBe('postgres-role');
+    expect(role.kind).toBe('role');
     expect(role.name).toBe('authenticated');
     expect(role.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
   });
@@ -36,7 +36,7 @@ describe('PostgresRole', () => {
   it('kind is enumerable and survives JSON round-trip', () => {
     const role = new PostgresRole({ name: 'authenticated' });
     const json = JSON.parse(JSON.stringify(role)) as Record<string, unknown>;
-    expect(json['kind']).toBe('postgres-role');
+    expect(json['kind']).toBe('role');
     expect(json['name']).toBe('authenticated');
     expect(json['namespaceId']).toBe(UNBOUND_NAMESPACE_ID);
   });
@@ -55,7 +55,7 @@ describe('PostgresRlsPolicy', () => {
 
   it('constructs with all fields', () => {
     const policy = new PostgresRlsPolicy(policyInput);
-    expect(policy.kind).toBe('postgres-rls-policy');
+    expect(policy.kind).toBe('rlsPolicy');
     expect(policy.name).toBe('user_select_a1b2c3d4');
     expect(policy.prefix).toBe('user_select');
     expect(policy.tableName).toBe('user');
@@ -100,7 +100,7 @@ describe('PostgresRlsPolicy', () => {
   it('kind is enumerable and survives JSON round-trip', () => {
     const policy = new PostgresRlsPolicy(policyInput);
     const json = JSON.parse(JSON.stringify(policy)) as Record<string, unknown>;
-    expect(json['kind']).toBe('postgres-rls-policy');
+    expect(json['kind']).toBe('rlsPolicy');
     expect(json['name']).toBe('user_select_a1b2c3d4');
     expect(json['prefix']).toBe('user_select');
     expect(json['operation']).toBe('select');

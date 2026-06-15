@@ -1,13 +1,13 @@
 import { type } from 'arktype';
 
 export const PostgresRoleSchema = type({
-  kind: "'postgres-role'",
+  kind: "'role'",
   name: 'string',
   namespaceId: 'string',
 });
 
 export const PostgresRlsPolicySchema = type({
-  kind: "'postgres-rls-policy'",
+  kind: "'rlsPolicy'",
   name: 'string',
   prefix: 'string',
   tableName: 'string',

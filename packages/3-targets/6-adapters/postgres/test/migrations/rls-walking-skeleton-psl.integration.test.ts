@@ -115,28 +115,32 @@ describe.sequential('RLS walking skeleton — PSL author → plan → apply → 
     if (database) await database.close();
   }, testTimeout);
 
-  it('PSL lowers to a contract with an rlsPolicy entry in the public namespace', () => {
-    const result = buildPslContract();
+  it(
+    'PSL lowers to a contract with an rlsPolicy entry in the public namespace',
+    () => {
+      const result = buildPslContract();
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
 
-    const ns = result.value.storage.namespaces['public'] as PostgresSchema;
-    expect(ns).toBeInstanceOf(PostgresSchema);
-    expect(Object.keys(ns.entries.rlsPolicy)).toHaveLength(1);
+      const ns = result.value.storage.namespaces['public'] as PostgresSchema;
+      expect(ns).toBeInstanceOf(PostgresSchema);
+      expect(Object.keys(ns.entries.rlsPolicy)).toHaveLength(1);
 
-    const [policyKey] = Object.keys(ns.entries.rlsPolicy);
-    const policy = ns.entries.rlsPolicy[policyKey!]!;
-    expect(policy).toBeInstanceOf(PostgresRlsPolicy);
-    expect(policy.operation).toBe('select');
-    expect(policy.permissive).toBe(true);
-    expect(policy.namespaceId).toBe('public');
-    expect(policy.tableName).toBe('profile');
-    expect(policy.roles).toEqual(['app_user']);
-    expect(policy.using).toBe("owner_id = current_setting('app.uid')::int");
-    expect(policy.prefix).toBe('p_read');
-    expect(policy.name).toMatch(/^p_read_[0-9a-f]{8}$/);
-  });
+      const [policyKey] = Object.keys(ns.entries.rlsPolicy);
+      const policy = ns.entries.rlsPolicy[policyKey!]!;
+      expect(policy).toBeInstanceOf(PostgresRlsPolicy);
+      expect(policy.operation).toBe('select');
+      expect(policy.permissive).toBe(true);
+      expect(policy.namespaceId).toBe('public');
+      expect(policy.tableName).toBe('profile');
+      expect(policy.roles).toEqual(['app_user']);
+      expect(policy.using).toBe("owner_id = current_setting('app.uid')::int");
+      expect(policy.prefix).toBe('p_read');
+      expect(policy.name).toMatch(/^p_read_[0-9a-f]{8}$/);
+    },
+    testTimeout,
+  );
 
   it(
     'applies an RLS policy authored in PSL, enforces row isolation under SET ROLE, and re-verifies clean',
@@ -165,7 +169,8 @@ describe.sequential('RLS walking skeleton — PSL author → plan → apply → 
       expect(planResult.kind).toBe('success');
       if (planResult.kind !== 'success') return;
 
-      const allSql = planResult.plan.operations
+      const ops = await Promise.all(planResult.plan.operations);
+      const allSql = ops
         .flatMap((op) => [...op.precheck, ...op.execute, ...op.postcheck])
         .map((step) => step.sql);
 
@@ -174,7 +179,7 @@ describe.sequential('RLS walking skeleton — PSL author → plan → apply → 
       expect(allSql.some((s) => s.includes('CREATE POLICY'))).toBe(true);
 
       // Apply all operations.
-      for (const op of planResult.plan.operations) {
+      for (const op of ops) {
         for (const step of [...op.precheck, ...op.execute, ...op.postcheck]) {
           await driver.query(step.sql, step.params ?? []);
         }

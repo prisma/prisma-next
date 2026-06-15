@@ -21,7 +21,8 @@ import type { Type } from 'arktype';
 import { postgresAuthoringEntityTypes } from './authoring';
 import type { PostgresEnumType } from './postgres-enum-type';
 import { PostgresEnumTypeSchema } from './postgres-enum-type-schema';
-import type { PostgresRlsPolicy } from './postgres-rls-policy';
+import { PostgresRlsPolicy, type PostgresRlsPolicyInput } from './postgres-rls-policy';
+import type { PostgresRole } from './postgres-role';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 import { PostgresRlsPolicySchema, PostgresRoleSchema } from './postgres-validators';
 
@@ -79,13 +80,13 @@ const POSTGRES_VALIDATOR_REGISTRY: ReadonlyMap<string, Type<unknown>> = new Map<
 
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   private readonly enumFactory: SqlEntityHydrationFactory | undefined;
-  private readonly rlsPolicyFactory: SqlEntityHydrationFactory | undefined;
+  private readonly roleFactory: SqlEntityHydrationFactory | undefined;
 
   constructor() {
     const storageTypesHydrators = collectStorageTypesHydrators(postgresAuthoringEntityTypes);
     super(storageTypesHydrators, POSTGRES_VALIDATOR_REGISTRY);
     this.enumFactory = storageTypesHydrators.get('type');
-    this.rlsPolicyFactory = storageTypesHydrators.get('rlsPolicy');
+    this.roleFactory = storageTypesHydrators.get('role');
   }
 
   protected override hydrateEntriesKind(
@@ -116,8 +117,25 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
           blindCast<Record<string, unknown>, 'checked object, non-null, non-array above'>(innerMap),
         ).map(([name, entry]) => [
           name,
-          blindCast<PostgresRlsPolicy, 'PostgresSchema constructor accepts PostgresRlsPolicyInput'>(
-            this.rlsPolicyFactory !== undefined ? this.rlsPolicyFactory(entry) : entry,
+          new PostgresRlsPolicy(
+            blindCast<PostgresRlsPolicyInput, 'validated by POSTGRES_VALIDATOR_REGISTRY above'>(
+              entry,
+            ),
+          ),
+        ]),
+      );
+    }
+    if (key === 'role') {
+      if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
+        return {};
+      }
+      return Object.fromEntries(
+        Object.entries(
+          blindCast<Record<string, unknown>, 'checked object, non-null, non-array above'>(innerMap),
+        ).map(([name, entry]) => [
+          name,
+          blindCast<PostgresRole, 'role factory returns PostgresRole'>(
+            this.roleFactory !== undefined ? this.roleFactory(entry) : entry,
           ),
         ]),
       );

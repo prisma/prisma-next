@@ -128,7 +128,7 @@ namespace public {
     expect(publicNs).toBeDefined();
     const blocks = namespacePslExtensionBlocks(publicNs!);
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]).toMatchObject({ kind: 'postgres-rls-policy', name: 'p_read' });
+    expect(blocks[0]).toMatchObject({ kind: 'rlsPolicy', name: 'p_read' });
   });
 
   it('lowers the block to a PostgresRlsPolicy with the expected fields', () => {
@@ -319,7 +319,7 @@ describe('PostgresContractSerializer rlsPolicy round-trip', () => {
               ...base.storage.namespaces['public']!.entries,
               rlsPolicy: {
                 [wireName]: {
-                  kind: 'postgres-rls-policy',
+                  kind: 'rlsPolicy',
                   name: wireName,
                   prefix: 'p_read',
                   tableName: 'profile',

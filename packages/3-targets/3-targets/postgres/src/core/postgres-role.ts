@@ -19,10 +19,11 @@ export interface PostgresRoleInput {
  * Roles are cluster-scoped, so their namespace coordinate is always
  * `UNBOUND_NAMESPACE_ID`. Target-only concept — no SQL-family abstract.
  * Extends `SqlNode` directly, frozen at construction via `freezeNode(this)`.
- * The `kind: 'postgres-role'` discriminant is enumerable so it survives JSON.
+ * The `kind: 'role'` discriminant is enumerable so it survives JSON.
+ * Matches the entries key (one-string rule).
  */
 export class PostgresRole extends SqlNode implements DiffableNode {
-  override readonly kind = 'postgres-role' as const;
+  override readonly kind = 'role' as const;
   readonly name: string;
   readonly namespaceId: string;
 

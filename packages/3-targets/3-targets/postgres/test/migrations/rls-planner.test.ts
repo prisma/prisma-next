@@ -11,7 +11,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
@@ -22,8 +22,11 @@ import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 
 /** Minimal lowerer that produces stub SQL for `createTable` DDL nodes. */
-const stubLowerer: Lowerer = {
+const stubLowerer: ExecuteRequestLowerer = {
   lower(_ast, _ctx) {
+    return { sql: 'CREATE TABLE stub', params: [] };
+  },
+  async lowerToExecuteRequest(_ast, _ctx) {
     return { sql: 'CREATE TABLE stub', params: [] };
   },
 };
@@ -82,7 +85,7 @@ function buildContractWithPolicy(): Contract<SqlStorage> {
 const emptySchema = { tables: {} };
 
 describe('RLS planner diff-wiring', () => {
-  it('produces CREATE TABLE → ENABLE ROW LEVEL SECURITY → CREATE POLICY for a fresh contract', () => {
+  it('produces CREATE TABLE → ENABLE ROW LEVEL SECURITY → CREATE POLICY for a fresh contract', async () => {
     const contract = buildContractWithPolicy();
     const planner = createPostgresMigrationPlanner(stubLowerer);
 
@@ -98,7 +101,8 @@ describe('RLS planner diff-wiring', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
-    const opIds = result.plan.operations.map((op) => op.id);
+    const ops = await Promise.all(result.plan.operations);
+    const opIds = ops.map((op) => op.id);
 
     const createTableIdx = opIds.findIndex((id) => id.startsWith('table.'));
     const enableRlsIdx = opIds.findIndex((id) => id.startsWith('rowLevelSecurity.'));
@@ -112,7 +116,7 @@ describe('RLS planner diff-wiring', () => {
     expect(enableRlsIdx).toBeLessThan(createPolicyIdx);
   });
 
-  it('emits ENABLE ROW LEVEL SECURITY with ALTER TABLE DDL', () => {
+  it('emits ENABLE ROW LEVEL SECURITY with ALTER TABLE DDL', async () => {
     const contract = buildContractWithPolicy();
     const planner = createPostgresMigrationPlanner(stubLowerer);
 
@@ -128,14 +132,13 @@ describe('RLS planner diff-wiring', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
-    const allExecuteSql = result.plan.operations.flatMap((op) =>
-      op.execute.map((step) => step.sql),
-    );
+    const ops = await Promise.all(result.plan.operations);
+    const allExecuteSql = ops.flatMap((op) => op.execute.map((step) => step.sql));
     const enableRlsSql = allExecuteSql.find((s) => s.includes('ENABLE ROW LEVEL SECURITY'));
     expect(enableRlsSql).toContain(TABLE_NAME);
   });
 
-  it('emits CREATE POLICY with the correct wire name and USING clause', () => {
+  it('emits CREATE POLICY with the correct wire name and USING clause', async () => {
     const contract = buildContractWithPolicy();
     const planner = createPostgresMigrationPlanner(stubLowerer);
 
@@ -151,9 +154,8 @@ describe('RLS planner diff-wiring', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
-    const allExecuteSql = result.plan.operations.flatMap((op) =>
-      op.execute.map((step) => step.sql),
-    );
+    const ops = await Promise.all(result.plan.operations);
+    const allExecuteSql = ops.flatMap((op) => op.execute.map((step) => step.sql));
     const createPolicySql = allExecuteSql.find((s) => s.includes('CREATE POLICY'));
     expect(createPolicySql).toContain('read_own_profiles_a1b2c3d4');
     expect(createPolicySql).toContain('auth.uid()');

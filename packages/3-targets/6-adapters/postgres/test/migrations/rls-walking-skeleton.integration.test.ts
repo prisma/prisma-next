@@ -132,7 +132,8 @@ describe.sequential('RLS walking skeleton — author → plan → apply → filt
       expect(planResult.kind).toBe('success');
       if (planResult.kind !== 'success') return;
 
-      const allSql = planResult.plan.operations
+      const ops = await Promise.all(planResult.plan.operations);
+      const allSql = ops
         .flatMap((op) => [...op.precheck, ...op.execute, ...op.postcheck])
         .map((step) => step.sql);
 
@@ -142,7 +143,7 @@ describe.sequential('RLS walking skeleton — author → plan → apply → filt
       expect(allSql.some((s) => s.includes('CREATE POLICY'))).toBe(true);
 
       // Step 4: apply all operations.
-      for (const op of planResult.plan.operations) {
+      for (const op of ops) {
         for (const step of [...op.precheck, ...op.execute, ...op.postcheck]) {
           await driver.query(step.sql, step.params ?? []);
         }

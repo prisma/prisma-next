@@ -330,14 +330,14 @@ describe('role + rlsPolicy round-trip', () => {
               ...base.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries,
               role: {
                 app_user: {
-                  kind: 'postgres-role',
+                  kind: 'role',
                   name: 'app_user',
                   namespaceId: UNBOUND_NAMESPACE_ID,
                 },
               },
               rlsPolicy: {
                 posts_select_own_a1b2c3d4: {
-                  kind: 'postgres-rls-policy',
+                  kind: 'rlsPolicy',
                   name: 'posts_select_own_a1b2c3d4',
                   prefix: 'posts_select_own',
                   tableName: 'posts',
@@ -347,7 +347,7 @@ describe('role + rlsPolicy round-trip', () => {
                   permissive: true,
                 },
                 posts_insert_restrictive_b5c6d7e8: {
-                  kind: 'postgres-rls-policy',
+                  kind: 'rlsPolicy',
                   name: 'posts_insert_restrictive_b5c6d7e8',
                   prefix: 'posts_insert_restrictive',
                   tableName: 'posts',
@@ -449,7 +449,7 @@ describe('role + rlsPolicy round-trip', () => {
               table: {},
               rlsPolicy: {
                 bad_policy: {
-                  kind: 'postgres-rls-policy',
+                  kind: 'rlsPolicy',
                   name: 'bad_policy_a1b2c3d4',
                   prefix: 'bad_policy',
                   tableName: 'posts',
@@ -480,7 +480,7 @@ describe('role + rlsPolicy round-trip', () => {
     const insertPolicy = ns.entries.rlsPolicy['posts_insert_restrictive_b5c6d7e8'];
 
     expect(selectPolicy).toEqual({
-      kind: 'postgres-rls-policy',
+      kind: 'rlsPolicy',
       name: 'posts_select_own_a1b2c3d4',
       prefix: 'posts_select_own',
       tableName: 'posts',
@@ -491,7 +491,7 @@ describe('role + rlsPolicy round-trip', () => {
       permissive: true,
     });
     expect(insertPolicy).toEqual({
-      kind: 'postgres-rls-policy',
+      kind: 'rlsPolicy',
       name: 'posts_insert_restrictive_b5c6d7e8',
       prefix: 'posts_insert_restrictive',
       tableName: 'posts',
@@ -515,7 +515,7 @@ describe('role + rlsPolicy round-trip', () => {
               table: {},
               rlsPolicy: {
                 bad_policy: {
-                  kind: 'postgres-rls-policy',
+                  kind: 'rlsPolicy',
                   name: 'bad_policy_a1b2c3d4',
                   prefix: 'bad_policy',
                   tableName: 'posts',

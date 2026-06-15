@@ -22,8 +22,8 @@ import { escapeLiteral } from './sql-utils';
 
 export type PostgresNamespaceEntries = SqlNamespaceEntries & {
   readonly type?: Readonly<Record<string, PostgresEnumType>>;
-  readonly role?: Readonly<Record<string, PostgresRole>>;
-  readonly rlsPolicy?: Readonly<Record<string, PostgresRlsPolicy>>;
+  readonly role: Readonly<Record<string, PostgresRole>>;
+  readonly rlsPolicy: Readonly<Record<string, PostgresRlsPolicy>>;
 };
 
 export interface PostgresSchemaInput {
@@ -67,8 +67,8 @@ export class PostgresSchema extends NamespaceBase {
     let table: Readonly<Record<string, StorageTable>> = Object.freeze({});
     let type: Readonly<Record<string, PostgresEnumType>> = Object.freeze({});
     let valueSet: Readonly<Record<string, StorageValueSet>> | undefined;
-    let role: Readonly<Record<string, PostgresRole>> | undefined;
-    let rlsPolicy: Readonly<Record<string, PostgresRlsPolicy>> | undefined;
+    let role: Readonly<Record<string, PostgresRole>> = Object.freeze({});
+    let rlsPolicy: Readonly<Record<string, PostgresRlsPolicy>> = Object.freeze({});
     for (const [kind, rawMap] of Object.entries(input.entries)) {
       if (kind === 'table') {
         const tableMap: Record<string, StorageTable> = {};
@@ -109,28 +109,24 @@ export class PostgresSchema extends NamespaceBase {
         const roleMap: Record<string, PostgresRole> = {};
         for (const [name, v] of Object.entries(
           blindCast<
-            Record<string, PostgresRoleInput>,
-            'entries[role] holds PostgresRoleInput by construction'
+            Record<string, PostgresRoleInput | PostgresRole>,
+            'entries[role] holds PostgresRoleInput or PostgresRole by construction'
           >(rawMap),
         )) {
-          roleMap[name] = new PostgresRole(v);
+          roleMap[name] = v instanceof PostgresRole ? v : new PostgresRole(v);
         }
-        if (Object.keys(roleMap).length > 0) {
-          role = Object.freeze(roleMap);
-        }
+        role = Object.freeze(roleMap);
       } else if (kind === 'rlsPolicy') {
         const policyMap: Record<string, PostgresRlsPolicy> = {};
         for (const [name, v] of Object.entries(
           blindCast<
-            Record<string, PostgresRlsPolicyInput>,
-            'entries[rlsPolicy] holds PostgresRlsPolicyInput by construction'
+            Record<string, PostgresRlsPolicyInput | PostgresRlsPolicy>,
+            'entries[rlsPolicy] holds PostgresRlsPolicyInput or PostgresRlsPolicy by construction'
           >(rawMap),
         )) {
-          policyMap[name] = new PostgresRlsPolicy(v);
+          policyMap[name] = v instanceof PostgresRlsPolicy ? v : new PostgresRlsPolicy(v);
         }
-        if (Object.keys(policyMap).length > 0) {
-          rlsPolicy = Object.freeze(policyMap);
-        }
+        rlsPolicy = Object.freeze(policyMap);
       } else {
         carried[kind] = Object.freeze(rawMap);
       }
@@ -141,8 +137,8 @@ export class PostgresSchema extends NamespaceBase {
       table,
       type,
       ...ifDefined('valueSet', valueSet),
-      ...ifDefined('role', role),
-      ...ifDefined('rlsPolicy', rlsPolicy),
+      role,
+      rlsPolicy,
     });
     Object.defineProperty(this, 'kind', {
       value: 'schema',
