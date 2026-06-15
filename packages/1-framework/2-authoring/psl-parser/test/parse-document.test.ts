@@ -14,7 +14,11 @@ import {
   parseNamespace,
   parseTypesBlock,
 } from '../src/parse';
-import { AttributeArgListAst, FieldAttributeAst } from '../src/syntax/ast/attributes';
+import {
+  AttributeArgListAst,
+  FieldAttributeAst,
+  ModelAttributeAst,
+} from '../src/syntax/ast/attributes';
 import {
   CompositeTypeDeclarationAst,
   DocumentAst,
@@ -26,7 +30,11 @@ import {
   NamespaceDeclarationAst,
   TypesBlockAst,
 } from '../src/syntax/ast/declarations';
-import { NumberLiteralExprAst, ObjectLiteralExprAst } from '../src/syntax/ast/expressions';
+import {
+  NumberLiteralExprAst,
+  ObjectLiteralExprAst,
+  StringLiteralExprAst,
+} from '../src/syntax/ast/expressions';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
 import { highlight, printTree } from './support';
 
@@ -258,6 +266,66 @@ describe('parse() well-formed document conformance', () => {
     `);
     expect(greenText(result.document.syntax.green)).toBe(source);
     expect(result.diagnostics).toEqual([]);
+  });
+
+  it('parses a @@-block attribute inside a generic block as a ModelAttribute member, not a spurious invalid member', () => {
+    const source = 'enum2 Priority {\n  @@type("pg/text@1")\n  Low = "low"\n}';
+    const result = parse(source);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        GenericBlockDeclaration
+          Ident "enum2"
+          Whitespace " "
+          Identifier
+            Ident "Priority"
+          Whitespace " "
+          LBrace "{"
+          Newline "\\n"
+          Whitespace "  "
+          ModelAttribute
+            DoubleAt "@@"
+            Identifier
+              Ident "type"
+            AttributeArgList
+              LParen "("
+              AttributeArg
+                StringLiteralExpr
+                  StringLiteral "\\"pg/text@1\\""
+              RParen ")"
+          Newline "\\n"
+          Whitespace "  "
+          KeyValuePair
+            Identifier
+              Ident "Low"
+            Whitespace " "
+            Equals "="
+            Whitespace " "
+            StringLiteralExpr
+              StringLiteral "\\"low\\""
+          Newline "\\n"
+          RBrace "}""
+    `);
+
+    const block = Array.from(result.document.declarations())[0];
+    expect(block).toBeInstanceOf(GenericBlockDeclarationAst);
+    if (!(block instanceof GenericBlockDeclarationAst)) return;
+
+    const attributes = Array.from(block.attributes());
+    expect(attributes).toHaveLength(1);
+    expect(attributes[0]).toBeInstanceOf(ModelAttributeAst);
+    expect(attributes[0]!.name()?.token()?.text).toBe('type');
+    const args = Array.from(attributes[0]!.argList()?.args() ?? []);
+    expect(args).toHaveLength(1);
+    const argValue = args[0]!.value();
+    expect(argValue && StringLiteralExprAst.cast(argValue.syntax)?.value()).toBe('pg/text@1');
+
+    const entries = Array.from(block.entries());
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.key()?.token()?.text).toBe('Low');
   });
 
   it('reproduces a composite type declaration', () => {

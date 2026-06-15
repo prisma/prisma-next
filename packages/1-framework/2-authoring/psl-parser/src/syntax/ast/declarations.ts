@@ -246,6 +246,10 @@ export class GenericBlockDeclarationAst implements AstNode {
     yield* filterChildren(this.syntax, KeyValuePairAst.cast);
   }
 
+  *attributes(): Iterable<ModelAttributeAst> {
+    yield* filterChildren(this.syntax, ModelAttributeAst.cast);
+  }
+
   static cast(node: SyntaxNode): GenericBlockDeclarationAst | undefined {
     return node.kind === 'GenericBlockDeclaration'
       ? new GenericBlockDeclarationAst(node)

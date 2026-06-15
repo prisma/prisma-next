@@ -695,8 +695,15 @@ function parseNamedTypeMember(cursor: Cursor): void {
   }
 }
 
+/**
+ * A generic-block member is either a `@@`-block attribute (e.g. `@@type("…")`,
+ * yielding a `ModelAttribute` — the same node model/enum/composite blocks use) or
+ * a `key = value` entry. The block-attribute alternative is purely syntactic: it
+ * parses the `@@attr(args)` shape and does not judge whether the attribute is
+ * valid for the block's kind — that stays a `resolve` semantic concern.
+ */
 function parseKeyValueMember(cursor: Cursor): void {
-  const node = parseKeyValue(cursor);
+  const node = parseBlockAttribute(cursor) ?? parseKeyValue(cursor);
   if (!node) {
     invalidMember(cursor, 'PSL_INVALID_EXTENSION_BLOCK_MEMBER', 'Invalid block entry');
   }
