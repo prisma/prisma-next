@@ -266,12 +266,12 @@ class Resolver {
   ): TypeTarget {
     if (!annotation) return { kind: 'unresolved', typeName: '' };
 
-    const constructorCall = annotation.constructorCall();
-    if (constructorCall) {
+    const argList = annotation.argList();
+    if (argList) {
       return {
         kind: 'constructor',
-        path: constructorCall.path(),
-        args: [...constructorCall.args()].flatMap((arg) => {
+        path: annotation.qualifiedName()?.path() ?? [],
+        args: [...argList.args()].flatMap((arg) => {
           const value = arg.value();
           return value === undefined ? [] : [value];
         }),

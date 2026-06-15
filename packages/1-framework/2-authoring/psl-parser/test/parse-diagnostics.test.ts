@@ -541,14 +541,16 @@ describe('parse() attribute attachment is newline-insensitive', () => {
               Ident "id"
             Whitespace " "
             TypeAnnotation
-              Identifier
-                Ident "Int"
+              QualifiedName
+                Identifier
+                  Ident "Int"
             Newline "\\n"
             Whitespace "  "
             FieldAttribute
               At "@"
-              Identifier
-                Ident "id"
+              QualifiedName
+                Identifier
+                  Ident "id"
           Newline "\\n"
           RBrace "}""
     `);

@@ -1,15 +1,24 @@
 import type { Token } from '../../tokenizer';
 import type { AstNode } from '../ast-helpers';
 import { filterChildren, findChildToken, findFirstChild } from '../ast-helpers';
-import { SyntaxNode } from '../red';
-import { FunctionCallAst } from './expressions';
+import type { SyntaxNode } from '../red';
+import { AttributeArgListAst } from './attributes';
 import { IdentifierAst } from './identifier';
+import { QualifiedNameAst } from './qualified-name';
 
 export class TypeAnnotationAst implements AstNode {
   readonly syntax: SyntaxNode;
 
   constructor(syntax: SyntaxNode) {
     this.syntax = syntax;
+  }
+
+  /**
+   * The qualified-name unit `[space ':']? Ident ('.' Ident)*` — the annotation's
+   * reference, or the callee of a constructor when an {@link argList} follows.
+   */
+  qualifiedName(): QualifiedNameAst | undefined {
+    return findFirstChild(this.syntax, QualifiedNameAst.cast);
   }
 
   #lastSegment(): IdentifierAst | undefined {
@@ -31,48 +40,53 @@ export class TypeAnnotationAst implements AstNode {
   }
 
   name(): IdentifierAst | undefined {
-    return this.#lastSegment();
+    return this.qualifiedName()?.name() ?? this.#lastSegment();
   }
 
   colon(): Token | undefined {
-    return findChildToken(this.syntax, 'Colon');
+    return this.qualifiedName()?.colon() ?? findChildToken(this.syntax, 'Colon');
   }
 
   dot(): Token | undefined {
-    return findChildToken(this.syntax, 'Dot');
-  }
-
-  #separatorCount(kind: 'Dot' | 'Colon'): number {
-    let count = 0;
-    for (const child of this.syntax.children()) {
-      if (!(child instanceof SyntaxNode) && child.kind === kind) count++;
-    }
-    return count;
+    return this.qualifiedName()?.dot() ?? findChildToken(this.syntax, 'Dot');
   }
 
   /**
    * Whether this annotation carries more qualifier segments than a well-formed
-   * type allows (a second `.`-namespace or a second `:`-space). This mirrors the
+   * type allows (a second `.`-namespace or a second `:`-space). Mirrors the
    * `parse`-side over-qualification check that emits `PSL_INVALID_QUALIFIED_TYPE`,
    * so the resolver can recognise an annotation `parse` has already flagged and
    * not double-report it as an unresolved reference.
    */
   isOverQualified(): boolean {
-    return this.#separatorCount('Dot') > 1 || this.#separatorCount('Colon') > 1;
+    return this.qualifiedName()?.isOverQualified() ?? false;
   }
 
   spaceName(): IdentifierAst | undefined {
+    const qualified = this.qualifiedName();
+    if (qualified) return qualified.space();
     if (!this.colon()) return undefined;
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
   namespaceName(): IdentifierAst | undefined {
+    const qualified = this.qualifiedName();
+    if (qualified) return qualified.namespace();
     if (!this.dot()) return undefined;
     return this.#penultimateSegment();
   }
 
-  constructorCall(): FunctionCallAst | undefined {
-    return findFirstChild(this.syntax, FunctionCallAst.cast);
+  /**
+   * The constructor argument list, present when the annotation is a constructor
+   * (`Vector(1536)`, `pgvector.Vector(1536)`) rather than a plain reference — i.e.
+   * a `(` followed the {@link qualifiedName}.
+   */
+  argList(): AttributeArgListAst | undefined {
+    return findFirstChild(this.syntax, AttributeArgListAst.cast);
+  }
+
+  isConstructor(): boolean {
+    return this.argList() !== undefined;
   }
 
   lbracket(): Token | undefined {

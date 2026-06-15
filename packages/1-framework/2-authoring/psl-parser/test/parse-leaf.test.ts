@@ -11,6 +11,7 @@ import {
   parseIdentifierExpr,
   parseNumberLiteralExpr,
   parseObjectLiteralExpr,
+  parseQualifiedName,
   parseStringLiteralExpr,
   parseTypeAnnotation,
 } from '../src/parse';
@@ -111,8 +112,9 @@ describe('parseAttribute well-formed', () => {
     expect(printTree(node)).toMatchInlineSnapshot(`
       "FieldAttribute
         At "@"
-        Identifier
-          Ident "id""
+        QualifiedName
+          Identifier
+            Ident "id""
     `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
@@ -125,11 +127,12 @@ describe('parseAttribute well-formed', () => {
     expect(printTree(node)).toMatchInlineSnapshot(`
       "FieldAttribute
         At "@"
-        Identifier
-          Ident "db"
-        Dot "."
-        Identifier
-          Ident "VarChar""
+        QualifiedName
+          Identifier
+            Ident "db"
+          Dot "."
+          Identifier
+            Ident "VarChar""
     `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
@@ -142,14 +145,16 @@ describe('parseAttribute well-formed', () => {
     expect(printTree(node)).toMatchInlineSnapshot(`
       "FieldAttribute
         At "@"
-        Identifier
-          Ident "default"
+        QualifiedName
+          Identifier
+            Ident "default"
         AttributeArgList
           LParen "("
           AttributeArg
             FunctionCall
-              Identifier
-                Ident "autoincrement"
+              QualifiedName
+                Identifier
+                  Ident "autoincrement"
               LParen "("
               RParen ")"
           RParen ")""
@@ -165,8 +170,9 @@ describe('parseAttribute well-formed', () => {
     expect(printTree(node)).toMatchInlineSnapshot(`
       "ModelAttribute
         DoubleAt "@@"
-        Identifier
-          Ident "map""
+        QualifiedName
+          Identifier
+            Ident "map""
     `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
@@ -270,8 +276,9 @@ describe('parseExpression well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "FunctionCall
-        Identifier
-          Ident "autoincrement"
+        QualifiedName
+          Identifier
+            Ident "autoincrement"
         LParen "("
         RParen ")""
     `);
@@ -308,8 +315,9 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        Identifier
-          Ident "String""
+        QualifiedName
+          Identifier
+            Ident "String""
     `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
@@ -321,11 +329,12 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        Identifier
-          Ident "auth"
-        Dot "."
-        Identifier
-          Ident "User""
+        QualifiedName
+          Identifier
+            Ident "auth"
+          Dot "."
+          Identifier
+            Ident "User""
     `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
@@ -337,14 +346,15 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        Identifier
-          Ident "supabase"
-        Colon ":"
-        Identifier
-          Ident "auth"
-        Dot "."
-        Identifier
-          Ident "User"
+        QualifiedName
+          Identifier
+            Ident "supabase"
+          Colon ":"
+          Identifier
+            Ident "auth"
+          Dot "."
+          Identifier
+            Ident "User"
         Question "?""
     `);
     expect(greenText(node)).toBe(source);
@@ -357,11 +367,12 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        Identifier
-          Ident "supabase"
-        Colon ":"
-        Identifier
-          Ident "User""
+        QualifiedName
+          Identifier
+            Ident "supabase"
+          Colon ":"
+          Identifier
+            Ident "User""
     `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
@@ -373,9 +384,10 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        FunctionCall
+        QualifiedName
           Identifier
             Ident "Vector"
+        AttributeArgList
           LParen "("
           AttributeArg
             NumberLiteralExpr
@@ -392,12 +404,13 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        FunctionCall
+        QualifiedName
           Identifier
             Ident "pgvector"
           Dot "."
           Identifier
             Ident "Vector"
+        AttributeArgList
           LParen "("
           AttributeArg
             NumberLiteralExpr
@@ -414,12 +427,13 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        FunctionCall
+        QualifiedName
           Identifier
             Ident "pgvector"
           Dot "."
           Identifier
             Ident "Vector"
+        AttributeArgList
           LParen "("
           AttributeArg
             Identifier
@@ -441,8 +455,9 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        Identifier
-          Ident "String"
+        QualifiedName
+          Identifier
+            Ident "String"
         LBracket "["
         RBracket "]""
     `);
@@ -484,6 +499,41 @@ describe('parseTypeAnnotation fault tolerance', () => {
          ~
       "
     `);
+  });
+});
+
+describe('parseQualifiedName', () => {
+  const run = (cursor: Cursor): GreenNode => {
+    parseQualifiedName(cursor);
+    cursor.startNode('Document');
+    while (cursor.peekKind() !== 'Eof') cursor.bump();
+    cursor.flushTrivia();
+    return cursor.finishNode();
+  };
+
+  it('consumes a space:namespace.name chain into one QualifiedName, round-tripping', () => {
+    const source = 'supabase:auth.User';
+    const cursor = new Cursor(source);
+    parseQualifiedName(cursor);
+    cursor.startNode('Document');
+    cursor.flushTrivia();
+    const trailing = cursor.finishNode();
+    expect(cursor.diagnostics).toEqual([]);
+    expect(cursor.peekKind()).toBe('Eof');
+    expect(greenText(trailing)).toBe('');
+  });
+
+  it('stops at the first non-segment token, leaving it for the caller to peek', () => {
+    // The `(` is left unconsumed: the caller decides constructor-vs-reference.
+    const cursor = new Cursor('pgvector.Vector(1536)');
+    parseQualifiedName(cursor);
+    expect(cursor.peekKind()).toBe('LParen');
+    expect(cursor.diagnostics).toEqual([]);
+  });
+
+  it('emits no diagnostic of its own for over-qualification; the position decides', () => {
+    const { diagnostics } = parse('a.b.c', run);
+    expect(diagnostics).toEqual([]);
   });
 });
 

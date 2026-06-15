@@ -54,6 +54,7 @@ export {
 } from '../syntax/ast/expressions';
 // AST wrappers
 export { IdentifierAst } from '../syntax/ast/identifier';
+export { QualifiedNameAst } from '../syntax/ast/qualified-name';
 export { TypeAnnotationAst } from '../syntax/ast/type-annotation';
 export type { AstNode } from '../syntax/ast-helpers';
 export { filterChildren, findChildToken, findFirstChild } from '../syntax/ast-helpers';

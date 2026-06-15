@@ -70,13 +70,15 @@ describe('parse() well-formed document conformance', () => {
               Ident "id"
             Whitespace " "
             TypeAnnotation
-              Identifier
-                Ident "Int"
+              QualifiedName
+                Identifier
+                  Ident "Int"
             Whitespace " "
             FieldAttribute
               At "@"
-              Identifier
-                Ident "id"
+              QualifiedName
+                Identifier
+                  Ident "id"
           Newline "\\n"
           RBrace "}""
     `);
@@ -104,13 +106,15 @@ describe('parse() well-formed document conformance', () => {
               Ident "id"
             Whitespace " "
             TypeAnnotation
-              Identifier
-                Ident "Int"
+              QualifiedName
+                Identifier
+                  Ident "Int"
           Newline "\\n"
           ModelAttribute
             DoubleAt "@@"
-            Identifier
-              Ident "map"
+            QualifiedName
+              Identifier
+                Ident "map"
           Newline "\\n"
           RBrace "}""
     `);
@@ -165,8 +169,9 @@ describe('parse() well-formed document conformance', () => {
           Whitespace "  "
           ModelAttribute
             DoubleAt "@@"
-            Identifier
-              Ident "type"
+            QualifiedName
+              Identifier
+                Ident "type"
             AttributeArgList
               LParen "("
               AttributeArg
@@ -209,8 +214,9 @@ describe('parse() well-formed document conformance', () => {
             Equals "="
             Whitespace " "
             TypeAnnotation
-              Identifier
-                Ident "Int"
+              QualifiedName
+                Identifier
+                  Ident "Int"
           Newline "\\n"
           RBrace "}""
     `);
@@ -237,13 +243,15 @@ describe('parse() well-formed document conformance', () => {
             Equals "="
             Whitespace " "
             TypeAnnotation
-              Identifier
-                Ident "Int"
+              QualifiedName
+                Identifier
+                  Ident "Int"
             Whitespace " "
             FieldAttribute
               At "@"
-              Identifier
-                Ident "db"
+              QualifiedName
+                Identifier
+                  Ident "db"
           Newline "\\n"
           RBrace "}""
     `);
@@ -301,8 +309,9 @@ describe('parse() well-formed document conformance', () => {
           Whitespace "  "
           ModelAttribute
             DoubleAt "@@"
-            Identifier
-              Ident "type"
+            QualifiedName
+              Identifier
+                Ident "type"
             AttributeArgList
               LParen "("
               AttributeArg
@@ -359,12 +368,14 @@ describe('parse() well-formed document conformance', () => {
               Ident "street"
             Whitespace " "
             TypeAnnotation
-              Identifier
-                Ident "String"
+              QualifiedName
+                Identifier
+                  Ident "String"
           ModelAttribute
             DoubleAt "@@"
-            Identifier
-              Ident "map"
+            QualifiedName
+              Identifier
+                Ident "map"
           RBrace "}""
     `);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -975,9 +986,9 @@ function onlyTypeConstructorArgs(source: string): readonly ExpressionAst[] {
     (decl): decl is TypesBlockAst => decl instanceof TypesBlockAst,
   );
   const named = Array.from(typesBlock?.declarations() ?? [])[0];
-  const ctor = named?.typeAnnotation()?.constructorCall();
-  if (!ctor) throw new Error('expected a type constructor call');
-  return Array.from(ctor.args(), (arg) => arg.value()).filter(
+  const argList = named?.typeAnnotation()?.argList();
+  if (!argList) throw new Error('expected a type constructor call');
+  return Array.from(argList.args(), (arg) => arg.value()).filter(
     (v): v is ExpressionAst => v !== undefined,
   );
 }

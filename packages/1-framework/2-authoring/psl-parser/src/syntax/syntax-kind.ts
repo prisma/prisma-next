@@ -19,6 +19,11 @@ export type SyntaxKind =
   | 'AttributeArg'
   | 'TypeAnnotation'
   | 'Identifier'
+  // A namespace-qualified name `[space ':']? Ident ('.' Ident)*`, parsed as a
+  // single unit and reused in every position a qualified name appears: type
+  // annotations, qualified constructor/function calls, qualified default-function
+  // calls, and qualified `@@`-block attribute names.
+  | 'QualifiedName'
   | 'FunctionCall'
   | 'ArrayLiteral'
   | 'StringLiteralExpr'

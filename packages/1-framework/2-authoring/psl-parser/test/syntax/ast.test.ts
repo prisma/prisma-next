@@ -28,6 +28,7 @@ import {
   StringLiteralExprAst,
 } from '../../src/syntax/ast/expressions';
 import { IdentifierAst } from '../../src/syntax/ast/identifier';
+import { QualifiedNameAst } from '../../src/syntax/ast/qualified-name';
 import { TypeAnnotationAst } from '../../src/syntax/ast/type-annotation';
 import { GreenNodeBuilder } from '../../src/syntax/green-builder';
 import { createSyntaxTree, type SyntaxNode } from '../../src/syntax/red';
@@ -89,6 +90,7 @@ describe('static cast', () => {
     ['EnumValueDeclarationAst', EnumValueDeclarationAst.cast, 'EnumValueDeclaration'],
     ['NamedTypeDeclarationAst', NamedTypeDeclarationAst.cast, 'NamedTypeDeclaration'],
     ['TypeAnnotationAst', TypeAnnotationAst.cast, 'TypeAnnotation'],
+    ['QualifiedNameAst', QualifiedNameAst.cast, 'QualifiedName'],
     ['FieldAttributeAst', FieldAttributeAst.cast, 'FieldAttribute'],
     ['ModelAttributeAst', ModelAttributeAst.cast, 'ModelAttribute'],
     ['AttributeArgListAst', AttributeArgListAst.cast, 'AttributeArgList'],
@@ -1102,6 +1104,7 @@ describe('TypeAnnotationAst qualified references', () => {
     // auth.User
     const b = new GreenNodeBuilder();
     b.startNode('TypeAnnotation');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'auth');
     b.finishNode();
@@ -1109,13 +1112,15 @@ describe('TypeAnnotationAst qualified references', () => {
     b.startNode('Identifier');
     b.token('Ident', 'User');
     b.finishNode();
+    b.finishNode();
     const root = createSyntaxTree(b.finishNode());
     const ta = TypeAnnotationAst.cast(root)!;
     expect(ta.dot()?.text).toBe('.');
     expect(ta.namespaceName()?.token()?.text).toBe('auth');
     expect(ta.name()?.token()?.text).toBe('User');
     expect(ta.spaceName()).toBeUndefined();
-    expect(ta.constructorCall()).toBeUndefined();
+    expect(ta.argList()).toBeUndefined();
+    expect(ta.isConstructor()).toBe(false);
     expect(ta.isList()).toBe(false);
     expect(ta.isOptional()).toBe(false);
   });
@@ -1167,10 +1172,12 @@ describe('TypeAnnotationAst qualified references', () => {
     // Vector(1536)
     const b = new GreenNodeBuilder();
     b.startNode('TypeAnnotation');
-    b.startNode('FunctionCall');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'Vector');
     b.finishNode();
+    b.finishNode();
+    b.startNode('AttributeArgList');
     b.token('LParen', '(');
     b.startNode('AttributeArg');
     b.startNode('NumberLiteralExpr');
@@ -1181,10 +1188,12 @@ describe('TypeAnnotationAst qualified references', () => {
     b.finishNode();
     const root = createSyntaxTree(b.finishNode());
     const ta = TypeAnnotationAst.cast(root)!;
-    const ctor = ta.constructorCall();
-    expect(ctor).toBeInstanceOf(FunctionCallAst);
-    expect(ctor!.name()?.token()?.text).toBe('Vector');
-    expect(ta.name()).toBeUndefined();
+    expect(ta.isConstructor()).toBe(true);
+    expect(ta.qualifiedName()?.path()).toEqual(['Vector']);
+    expect(ta.name()?.token()?.text).toBe('Vector');
+    const argList = ta.argList();
+    expect(argList).toBeInstanceOf(AttributeArgListAst);
+    expect(Array.from(argList!.args())).toHaveLength(1);
     expect(ta.namespaceName()).toBeUndefined();
     expect(ta.spaceName()).toBeUndefined();
   });
@@ -1192,14 +1201,77 @@ describe('TypeAnnotationAst qualified references', () => {
   it('returns base name for bare reference', () => {
     const b = new GreenNodeBuilder();
     b.startNode('TypeAnnotation');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'String');
+    b.finishNode();
     b.finishNode();
     const root = createSyntaxTree(b.finishNode());
     const ta = TypeAnnotationAst.cast(root)!;
     expect(ta.name()?.token()?.text).toBe('String');
     expect(ta.namespaceName()).toBeUndefined();
     expect(ta.spaceName()).toBeUndefined();
-    expect(ta.constructorCall()).toBeUndefined();
+    expect(ta.argList()).toBeUndefined();
+    expect(ta.isConstructor()).toBe(false);
+  });
+});
+
+describe('QualifiedNameAst', () => {
+  function ident(b: GreenNodeBuilder, text: string): void {
+    b.startNode('Identifier');
+    b.token('Ident', text);
+    b.finishNode();
+  }
+
+  it('reads a bare name as its only segment', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'Vector');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.path()).toEqual(['Vector']);
+    expect(qn.name()?.token()?.text).toBe('Vector');
+    expect(qn.namespace()).toBeUndefined();
+    expect(qn.space()).toBeUndefined();
+    expect(qn.isOverQualified()).toBe(false);
+  });
+
+  it('reads a dot-qualified namespace.name', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'pgvector');
+    b.token('Dot', '.');
+    ident(b, 'Vector');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.path()).toEqual(['pgvector', 'Vector']);
+    expect(qn.namespace()?.token()?.text).toBe('pgvector');
+    expect(qn.name()?.token()?.text).toBe('Vector');
+    expect(qn.space()).toBeUndefined();
+  });
+
+  it('reads a colon-prefixed space:namespace.name', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'supabase');
+    b.token('Colon', ':');
+    ident(b, 'auth');
+    b.token('Dot', '.');
+    ident(b, 'User');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.space()?.token()?.text).toBe('supabase');
+    expect(qn.namespace()?.token()?.text).toBe('auth');
+    expect(qn.name()?.token()?.text).toBe('User');
+    expect(qn.path()).toEqual(['supabase', 'auth', 'User']);
+  });
+
+  it('flags a second dot or colon as over-qualified', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'a');
+    b.token('Dot', '.');
+    ident(b, 'b');
+    b.token('Dot', '.');
+    ident(b, 'c');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.isOverQualified()).toBe(true);
   });
 });

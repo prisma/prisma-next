@@ -195,7 +195,6 @@ export function parseExpression(cursor: Cursor): GreenNode | undefined {
     parseNumberLiteralExpr(cursor) ??
     parseArrayLiteral(cursor) ??
     parseObjectLiteralExpr(cursor) ??
-    parseQualifiedFunctionCallExpr(cursor) ??
     parseFunctionCall(cursor) ??
     parseBooleanLiteralExpr(cursor) ??
     parseIdentifierExpr(cursor)
@@ -221,9 +220,70 @@ export function parseNumberLiteralExpr(cursor: Cursor): GreenNode | undefined {
   return cursor.finishNode();
 }
 
+/**
+ * The diagnostic hooks a position supplies to {@link parseQualifiedName}. Both
+ * receive the offending separator's {@link DiagnosticMark}. `onExtraSegment`
+ * fires for a separator beyond the first of its kind (over-qualification);
+ * `onTrailingSeparator` fires for a separator that no identifier follows. The
+ * parser itself emits nothing — each position keeps its own wording: the
+ * type-annotation position diagnoses over-qualification, the attribute position
+ * diagnoses a trailing dot, and the call positions diagnose neither.
+ */
+interface QualifiedNameHooks {
+  readonly onExtraSegment?: (separator: DiagnosticMark) => void;
+  readonly onTrailingSeparator?: () => void;
+}
+
+/**
+ * Parses a namespace-qualified name `[space ':']? Ident ('.' Ident)*` into a
+ * single {@link QualifiedName} node, consuming the whole chain greedily. It emits
+ * no diagnostics of its own; positions diagnose over-qualification and trailing
+ * separators through {@link QualifiedNameHooks}. The leading `Ident` is the
+ * caller's precondition — `parseQualifiedName` is only entered once
+ * `peekKind() === 'Ident'`.
+ *
+ * Parsing the chain up front is the point: a position then decides
+ * constructor-vs-reference by peeking exactly one token for `(`, with no scan of
+ * the dotted chain's length.
+ */
+export function parseQualifiedName(cursor: Cursor, hooks: QualifiedNameHooks = {}): void {
+  cursor.startNode('QualifiedName');
+  parseIdentifier(cursor); // first segment: the space, namespace, or bare name
+  parseQualifiedSegments(cursor, 'Colon', hooks);
+  parseQualifiedSegments(cursor, 'Dot', hooks);
+  cursor.finishNode();
+}
+
+/**
+ * Consumes a run of `<separator> Ident` segments inside an open `QualifiedName`.
+ * A well-formed name carries at most one colon-introduced space and one
+ * dot-introduced namespace; each separator past the first of its kind is reported
+ * through `onExtraSegment`, and a separator no identifier follows through
+ * `onTrailingSeparator`. The separator is consumed regardless, so the subtree —
+ * and the lossless round-trip — stays intact.
+ */
+function parseQualifiedSegments(
+  cursor: Cursor,
+  separator: 'Colon' | 'Dot',
+  hooks: QualifiedNameHooks,
+): void {
+  let seen = 0;
+  while (cursor.peekKind() === separator) {
+    seen++;
+    const separatorMark = cursor.mark();
+    cursor.bump(); // separator
+    if (seen > 1) hooks.onExtraSegment?.(separatorMark);
+    if (cursor.peekKind() === 'Ident') {
+      parseIdentifier(cursor);
+    } else {
+      hooks.onTrailingSeparator?.();
+    }
+  }
+}
+
 // Ordering among the `Ident`-leading alternatives is load-bearing: the
-// `LParen` lookahead of `parseFunctionCall` must win before the boolean check,
-// so `true(` stays a function call named `true` rather than a boolean literal.
+// `LParen`/`Dot` lookahead of `parseCall` must win before the boolean check, so
+// `true(` stays a function call named `true` rather than a boolean literal.
 export function parseBooleanLiteralExpr(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
   const text = cursor.peekToken().text;
@@ -318,67 +378,28 @@ export function parseObjectField(cursor: Cursor): GreenNode {
   return cursor.finishNode();
 }
 
+/**
+ * Parses a function/constructor call in expression position — bare
+ * `autoincrement()` or namespace-qualified `temporal.updatedAt()` — into a
+ * {@link FunctionCall} whose callee is a single {@link QualifiedName}, so
+ * `FunctionCallAst.path()` reads the full `['temporal', 'updatedAt']` chain. A
+ * no-op (returns `undefined`) unless the lead is an identifier that either opens
+ * a paren (`Ident(`) or carries a qualifying dot (`Ident.`), leaving the
+ * `parseExpression` `??` chain to fall through to the boolean and bare-identifier
+ * forms. The qualifying-dot entry is what lets the call be recognised by parsing
+ * the {@link QualifiedName} and then peeking one token for `(`, rather than
+ * scanning the dotted chain ahead to find the paren.
+ */
 export function parseFunctionCall(cursor: Cursor): GreenNode | undefined {
-  if (cursor.peekKind() !== 'Ident' || cursor.peekKind(1) !== 'LParen') return undefined;
+  if (cursor.peekKind() !== 'Ident') return undefined;
+  const next = cursor.peekKind(1);
+  if (next !== 'LParen' && next !== 'Dot') return undefined;
   cursor.startNode('FunctionCall');
-  parseIdentifier(cursor);
-  parseParenArgs(cursor);
-  return cursor.finishNode();
-}
-
-/**
- * Parses a namespace-qualified call (`temporal.updatedAt()`) in expression
- * position — e.g. inside `@default(...)` — into the same {@link FunctionCall}
- * node the bare and type-annotation forms produce, so `FunctionCallAst.path()`
- * reads the full `['temporal', 'updatedAt']` chain. A no-op (returns
- * `undefined`) unless the lookahead is a dot-qualified call, leaving the
- * `parseExpression` `??` chain to fall through to the bare {@link
- * parseFunctionCall} and the identifier forms.
- */
-export function parseQualifiedFunctionCallExpr(cursor: Cursor): GreenNode | undefined {
-  if (!isQualifiedConstructorCall(cursor)) return undefined;
-  cursor.startNode('FunctionCall');
-  parseIdentifier(cursor); // first namespace segment
-  while (cursor.peekKind() === 'Dot' && cursor.peekKind(1) === 'Ident') {
-    cursor.bump(); // Dot
-    parseIdentifier(cursor); // next segment (the last is the call name)
+  parseQualifiedName(cursor);
+  if (cursor.peekKind() === 'LParen') {
+    parseParenArgs(cursor);
   }
-  parseParenArgs(cursor);
   return cursor.finishNode();
-}
-
-/**
- * The largest dot-qualified path the constructor/call grammar recognises. A
- * qualified type or default call carries at most a space/namespace qualifier and
- * the constructor name (`pgvector.Vector`, `temporal.updatedAt`), so two
- * segments is the deepest well-formed chain; the cap keeps the lookahead bounded
- * while admitting one extra segment of slack before bailing out.
- */
-const MAX_QUALIFIED_CALL_SEGMENTS = 4;
-
-/**
- * Lookahead for a namespace-qualified constructor call — `ns.Ctor(`,
- * `a.b.Ctor(`, … — i.e. an identifier chain joined by `.` with at least one dot
- * segment, followed by `(`. The bare `Ctor(` form is owned by
- * {@link parseFunctionCall}; this predicate requires the qualifying dot so the
- * two branches stay disjoint. The peek is bounded to
- * {@link MAX_QUALIFIED_CALL_SEGMENTS} so a pathological identifier chain can
- * never drive an unbounded scan; a longer chain simply does not match here and
- * falls through to the bare/identifier alternatives.
- */
-function isQualifiedConstructorCall(cursor: Cursor): boolean {
-  if (cursor.peekKind() !== 'Ident') return false;
-  let ahead = 1;
-  let dots = 0;
-  while (
-    dots < MAX_QUALIFIED_CALL_SEGMENTS &&
-    cursor.peekKind(ahead) === 'Dot' &&
-    cursor.peekKind(ahead + 1) === 'Ident'
-  ) {
-    dots++;
-    ahead += 2;
-  }
-  return dots > 0 && cursor.peekKind(ahead) === 'LParen';
 }
 
 /**
@@ -427,19 +448,14 @@ export function parseAttribute(cursor: Cursor): GreenNode {
   cursor.startNode(isBlockAttribute ? 'ModelAttribute' : 'FieldAttribute');
   cursor.bump(); // At or DoubleAt
   if (cursor.peekKind() === 'Ident') {
-    parseIdentifier(cursor);
-    if (cursor.peekKind() === 'Dot') {
-      cursor.bump(); // Dot
-      if (cursor.peekKind() === 'Ident') {
-        parseIdentifier(cursor);
-      } else {
+    parseQualifiedName(cursor, {
+      onTrailingSeparator: () =>
         cursor.diagnostic(
           'PSL_INVALID_ATTRIBUTE_SYNTAX',
           'Attribute name expected after "."',
           cursor.mark(),
-        );
-      }
-    }
+        ),
+    });
   } else {
     cursor.diagnostic('PSL_INVALID_ATTRIBUTE_SYNTAX', 'Attribute name expected', attributeMark);
   }
@@ -449,16 +465,28 @@ export function parseAttribute(cursor: Cursor): GreenNode {
   return cursor.finishNode();
 }
 
+/**
+ * A type annotation recomposes as `QualifiedName (argList)? ([])? (?)?`: the one
+ * qualified-name unit, then — decided by peeking a single token for `(` — an
+ * optional constructor argument list (`pgvector.Vector(1536)`), then the list and
+ * optional suffixes. Over-qualification (a second `:`-space or `.`-namespace) is
+ * flagged with `PSL_INVALID_QUALIFIED_TYPE` at the offending separator; the
+ * subtree still round-trips losslessly.
+ */
 export function parseTypeAnnotation(cursor: Cursor): GreenNode {
   cursor.startNode('TypeAnnotation');
-  if (cursor.peekKind() === 'Ident' && cursor.peekKind(1) === 'LParen') {
-    parseFunctionCall(cursor); // inline constructor, e.g. Vector(1536)
-  } else if (isQualifiedConstructorCall(cursor)) {
-    parseQualifiedFunctionCallExpr(cursor); // qualified constructor, e.g. pgvector.Vector(1536)
-  } else if (cursor.peekKind() === 'Ident') {
-    parseIdentifier(cursor); // base name or space/namespace segment
-    parseQualifierSegments(cursor, 'Colon');
-    parseQualifierSegments(cursor, 'Dot');
+  if (cursor.peekKind() === 'Ident') {
+    parseQualifiedName(cursor, {
+      onExtraSegment: (separator) =>
+        cursor.diagnostic(
+          'PSL_INVALID_QUALIFIED_TYPE',
+          'Qualified type reference has too many segments',
+          separator,
+        ),
+    });
+    if (cursor.peekKind() === 'LParen') {
+      parseAttributeArgList(cursor); // constructor args, e.g. Vector(1536)
+    }
   }
   if (cursor.peekKind() === 'LBracket') {
     cursor.bump();
@@ -470,32 +498,6 @@ export function parseTypeAnnotation(cursor: Cursor): GreenNode {
     cursor.bump();
   }
   return cursor.finishNode();
-}
-
-/**
- * Consumes a run of `<separator> Ident` qualifier segments. A well-formed type
- * carries at most one colon-introduced space and one dot-introduced namespace;
- * any second separator of the same kind is over-qualification and emits
- * `PSL_INVALID_QUALIFIED_TYPE` pointed at the offending separator, while still
- * consuming the segment so the subtree (and the round-trip) stays intact.
- */
-function parseQualifierSegments(cursor: Cursor, separator: 'Colon' | 'Dot'): void {
-  let seen = 0;
-  while (cursor.peekKind() === separator) {
-    seen++;
-    const separatorMark = cursor.mark();
-    cursor.bump(); // separator
-    if (seen > 1) {
-      cursor.diagnostic(
-        'PSL_INVALID_QUALIFIED_TYPE',
-        'Qualified type reference has too many segments',
-        separatorMark,
-      );
-    }
-    if (cursor.peekKind() === 'Ident') {
-      parseIdentifier(cursor);
-    }
-  }
 }
 
 type MemberParser = (cursor: Cursor) => void;

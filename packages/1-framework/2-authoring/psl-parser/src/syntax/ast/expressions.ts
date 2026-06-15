@@ -3,6 +3,7 @@ import type { AstNode } from '../ast-helpers';
 import { filterChildren, findChildToken, findFirstChild } from '../ast-helpers';
 import { SyntaxNode } from '../red';
 import { IdentifierAst } from './identifier';
+import { QualifiedNameAst } from './qualified-name';
 
 export class FunctionCallAst implements AstNode {
   readonly syntax: SyntaxNode;
@@ -11,8 +12,18 @@ export class FunctionCallAst implements AstNode {
     this.syntax = syntax;
   }
 
+  /**
+   * The qualified-name callee — present for parser-produced calls, whose callee
+   * is a single {@link QualifiedName}. `undefined` for a call whose identifier
+   * segments sit directly under the node.
+   */
+  qualifiedName(): QualifiedNameAst | undefined {
+    return findFirstChild(this.syntax, QualifiedNameAst.cast);
+  }
+
   name(): IdentifierAst | undefined {
-    return findFirstChild(this.syntax, IdentifierAst.cast);
+    const qualified = this.qualifiedName();
+    return findFirstChild(qualified?.syntax ?? this.syntax, IdentifierAst.cast);
   }
 
   /**
@@ -21,8 +32,9 @@ export class FunctionCallAst implements AstNode {
    * `['pgvector', 'Vector']`. Empty when the call carries no identifier.
    */
   path(): readonly string[] {
+    const qualified = this.qualifiedName();
     const segments: string[] = [];
-    for (const segment of filterChildren(this.syntax, IdentifierAst.cast)) {
+    for (const segment of filterChildren(qualified?.syntax ?? this.syntax, IdentifierAst.cast)) {
       const text = segment.token()?.text;
       if (text !== undefined) segments.push(text);
     }
