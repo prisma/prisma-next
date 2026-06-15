@@ -45,6 +45,7 @@
   "exports": {
     ".": "./dist/index.mjs",
     "./canonicalization-hooks": "./dist/canonicalization-hooks.mjs",
+    "./entry-construction-registry": "./dist/entry-construction-registry.mjs",
     "./package.json": "./package.json"
   },
   "engines": {

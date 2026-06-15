@@ -3,17 +3,23 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import {
+import type {
   MongoCollection,
-  type MongoCollectionInput,
-  type MongoNamespaceEntries,
+  MongoCollectionInput,
+  MongoNamespaceEntries,
 } from '@prisma-next/mongo-contract';
+import {
+  createMongoEntryConstructionRegistry,
+  dispatchMongoEntriesToRegistryCarrying,
+} from '@prisma-next/mongo-contract/entry-construction-registry';
 import { blindCast } from '@prisma-next/utils/casts';
 
 export interface MongoTargetDatabaseInput {
   readonly id: string;
   readonly entries?: Readonly<Record<string, Readonly<Record<string, MongoCollectionInput>>>>;
 }
+
+const coreRegistry = createMongoEntryConstructionRegistry();
 
 /**
  * Mongo target `Namespace` concretion. In Mongo the "namespace" concept
@@ -38,26 +44,15 @@ export class MongoTargetDatabase extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
-    let collection: Readonly<Record<string, MongoCollection>> = Object.freeze({});
-    for (const [kind, rawMap] of Object.entries(input.entries ?? {})) {
-      if (kind === 'collection') {
-        const collectionMap: Record<string, MongoCollection> = {};
-        for (const [name, c] of Object.entries(
-          blindCast<
-            Record<string, MongoCollectionInput>,
-            'entries[collection] holds MongoCollectionInput by construction'
-          >(rawMap),
-        )) {
-          collectionMap[name] = new MongoCollection(c);
-        }
-        collection = Object.freeze(collectionMap);
-      } else {
-        carried[kind] = Object.freeze(rawMap);
-      }
-    }
-
-    this.entries = Object.freeze({ ...carried, collection });
+    const rawEntries: Record<string, Readonly<Record<string, MongoCollectionInput>>> = {
+      collection: {},
+      ...input.entries,
+    };
+    this.entries = Object.freeze(
+      blindCast<MongoNamespaceEntries, 'registry dispatch produces MongoNamespaceEntries'>(
+        dispatchMongoEntriesToRegistryCarrying(rawEntries, coreRegistry),
+      ),
+    );
     Object.defineProperty(this, 'kind', {
       value: 'database',
       writable: false,

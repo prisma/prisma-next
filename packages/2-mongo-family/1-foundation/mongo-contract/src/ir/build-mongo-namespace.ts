@@ -4,7 +4,11 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
-import { MongoCollection, type MongoCollectionInput } from './mongo-collection';
+import {
+  createMongoEntryConstructionRegistry,
+  dispatchMongoEntriesToRegistryCarrying,
+} from '../entry-construction-registry';
+import type { MongoCollection } from './mongo-collection';
 import type {
   MongoNamespace,
   MongoNamespaceCollectionsInput,
@@ -13,6 +17,8 @@ import type {
 import { MongoUnboundNamespace } from './mongo-unbound-namespace';
 
 const MONGO_NAMESPACE_KIND = 'mongo-namespace' as const;
+
+const coreRegistry = createMongoEntryConstructionRegistry();
 
 class MongoBoundNamespace extends NamespaceBase {
   declare readonly kind: string;
@@ -34,26 +40,12 @@ class MongoBoundNamespace extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const carried: Record<string, Readonly<Record<string, unknown>>> = {};
-    let collection: Readonly<Record<string, MongoCollection>> = Object.freeze({});
-    for (const [kind, rawMap] of Object.entries(input.entries)) {
-      if (kind === 'collection') {
-        const collectionMap: Record<string, MongoCollection> = {};
-        for (const [name, c] of Object.entries(
-          blindCast<
-            Record<string, MongoCollectionInput>,
-            'entries[collection] holds MongoCollectionInput by construction'
-          >(rawMap),
-        )) {
-          collectionMap[name] = new MongoCollection(c);
-        }
-        collection = Object.freeze(collectionMap);
-      } else {
-        carried[kind] = Object.freeze(rawMap);
-      }
-    }
-
-    this.entries = Object.freeze({ ...carried, collection });
+    const rawEntries = { collection: {}, ...input.entries };
+    this.entries = Object.freeze(
+      blindCast<MongoNamespaceEntries, 'registry dispatch produces MongoNamespaceEntries'>(
+        dispatchMongoEntriesToRegistryCarrying(rawEntries, coreRegistry),
+      ),
+    );
     Object.defineProperty(this, 'kind', {
       value: MONGO_NAMESPACE_KIND,
       writable: false,
