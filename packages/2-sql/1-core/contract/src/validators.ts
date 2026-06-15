@@ -7,6 +7,7 @@ import {
 } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import {
+  type AnyEntityKindDescriptor,
   isPlainRecord,
   type Namespace,
   UNBOUND_NAMESPACE_ID,
@@ -212,7 +213,7 @@ export const CheckConstraintSchema = type({
   valueSet: StorageValueSetRefSchema,
 });
 
-const StorageTableSchema = type({
+export const StorageTableSchema = type({
   '+': 'reject',
   columns: type({ '[string]': StorageColumnSchema }),
   'primaryKey?': PrimaryKeySchema,
@@ -224,47 +225,51 @@ const StorageTableSchema = type({
 });
 
 /**
- * Composes the single entry-validator registry consulted during
- * structural validation. SQL core registers its own kinds (`'table'`,
- * `'valueSet'`) into the same registry targets extend — there is no
- * separate built-in fallback tier. Target packs pass their contributed
- * kinds (e.g. postgres passes `'type'` → the postgres enum schema).
+ * Derives a schema map from a descriptor map: maps each kind's key to its
+ * `schema` field. Used by validation functions to validate entries.
  */
-export function createSqlEntrySchemaRegistry(
-  packSchemas?: ReadonlyMap<string, Type<unknown>>,
+function schemaViewOf(
+  kinds: ReadonlyMap<string, AnyEntityKindDescriptor>,
 ): ReadonlyMap<string, Type<unknown>> {
-  const registry = new Map<string, Type<unknown>>([
-    ['table', castAs<Type<unknown>>(StorageTableSchema)],
-    ['valueSet', castAs<Type<unknown>>(StorageValueSetSchema)],
-  ]);
-  if (packSchemas !== undefined) {
-    for (const [kind, schema] of packSchemas) {
-      if (registry.has(kind)) {
-        throw new Error(
-          `createSqlEntrySchemaRegistry: pack schema "${kind}" collides with a core kind — pack schemas cannot override "table" or "valueSet"`,
-        );
-      }
-      registry.set(kind, schema);
-    }
-  }
-  return registry;
+  return new Map([...kinds].map(([k, d]) => [k, castAs<Type<unknown>>(d.schema)]));
 }
+
+/**
+ * Default SQL entry kind descriptors used for module-level schema constants.
+ * Inline to avoid circular import with entity-kinds.ts.
+ */
+const DEFAULT_SQL_KINDS: ReadonlyMap<string, AnyEntityKindDescriptor> = new Map([
+  [
+    'table',
+    {
+      kind: 'table',
+      schema: castAs<Type<never>>(StorageTableSchema),
+      construct: (input: never) => input,
+    },
+  ],
+  [
+    'valueSet',
+    {
+      kind: 'valueSet',
+      schema: castAs<Type<never>>(StorageValueSetSchema),
+      construct: (input: never) => input,
+    },
+  ],
+]);
 
 /**
  * Builds the per-namespace entry schema for `storage.namespaces[id]`.
  *
- * Validation is registry-driven: the `registry` parameter maps each
- * entries key to an arktype schema that validates a single inner-map
- * value for that kind. Compose the registry with
- * {@link createSqlEntrySchemaRegistry} — SQL core's kinds and pack
- * contributions live in the same map. An unregistered key fails
- * validation naming the kind and the namespace id, so validation fails
- * closed.
+ * Validation is descriptor-driven: the `kinds` map carries both the schema
+ * (used here for structural validation) and the construct function (used at
+ * hydration time). An unregistered key fails validation naming the kind and
+ * the namespace id, so validation fails closed.
  */
 export function createNamespaceEntrySchema(
-  registry: ReadonlyMap<string, Type<unknown>>,
+  kinds: ReadonlyMap<string, AnyEntityKindDescriptor>,
 ): Type<unknown> {
-  const knownKinds = new Set(registry.keys());
+  const schemas = schemaViewOf(kinds);
+  const knownKinds = new Set(kinds.keys());
   return type({
     '+': 'reject',
     id: 'string',
@@ -285,7 +290,7 @@ export function createNamespaceEntrySchema(
           expected: `entries["${key}"] in namespace "${ns.id}" must be an object`,
         });
       }
-      const entrySchema = castAs<Type<unknown>>(registry.get(key));
+      const entrySchema = castAs<Type<unknown>>(schemas.get(key));
       for (const [, value] of Object.entries(innerMap)) {
         const parsed = entrySchema(value);
         if (parsed instanceof type.errors) {
@@ -304,9 +309,9 @@ export function createNamespaceEntrySchema(
  * storage hash stay family-shared.
  */
 export function createSqlStorageSchema(
-  registry: ReadonlyMap<string, Type<unknown>>,
+  kinds: ReadonlyMap<string, AnyEntityKindDescriptor>,
 ): Type<unknown> {
-  const namespaceEntry = createNamespaceEntrySchema(registry);
+  const namespaceEntry = createNamespaceEntrySchema(kinds);
   return type({
     '+': 'reject',
     storageHash: 'string',
@@ -320,7 +325,7 @@ export function createSqlStorageSchema(
   }) as Type<unknown>;
 }
 
-const StorageSchema = createSqlStorageSchema(createSqlEntrySchemaRegistry());
+const StorageSchema = createSqlStorageSchema(DEFAULT_SQL_KINDS);
 
 type NamespacedStorageWalk = {
   readonly namespaces: Readonly<
@@ -459,9 +464,9 @@ const ContractMetaSchema = type({
  * of the contract envelope is family-shared.
  */
 export function createSqlContractSchema(
-  registry: ReadonlyMap<string, Type<unknown>>,
+  kinds: ReadonlyMap<string, AnyEntityKindDescriptor>,
 ): Type<unknown> {
-  const storage = createSqlStorageSchema(registry);
+  const storage = createSqlStorageSchema(kinds);
   return type({
     '+': 'reject',
     target: 'string',
@@ -487,7 +492,7 @@ export function createSqlContractSchema(
   }) as Type<unknown>;
 }
 
-const SqlContractSchema = createSqlContractSchema(createSqlEntrySchemaRegistry());
+const SqlContractSchema = createSqlContractSchema(DEFAULT_SQL_KINDS);
 
 // NOTE: StorageColumnSchema, StorageTableSchema, and StorageSchema use bare type()
 // instead of type.declare<T>().type() because the ColumnDefault union's value field

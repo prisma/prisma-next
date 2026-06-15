@@ -1,4 +1,5 @@
 import {
+  constructEntries,
   freezeNode,
   type Namespace,
   NamespaceBase,
@@ -6,17 +7,13 @@ import {
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import {
-  createSqlEntryConstructionRegistry,
-  dispatchEntriesToRegistry,
-} from '../entry-construction-registry';
+import { composeSqlEntityKinds } from '../entity-kinds';
 import type { SqlNamespace, SqlNamespaceEntries, SqlNamespaceTablesInput } from './sql-storage';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
 import type { StorageTable } from './storage-table';
 import type { StorageValueSet } from './storage-value-set';
 
 const SQL_NAMESPACE_KIND = 'sql-namespace' as const;
-const CORE_REGISTRY = createSqlEntryConstructionRegistry();
 
 function isMaterializedSqlNamespace(ns: Namespace | SqlNamespaceTablesInput): ns is SqlNamespace {
   if (typeof ns !== 'object' || ns === null) {
@@ -58,21 +55,22 @@ class SqlBoundNamespace extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const dispatched = dispatchEntriesToRegistry(
+    const dispatched = constructEntries(
       blindCast<
         Record<string, Readonly<Record<string, unknown>>>,
         'SqlNamespaceTablesInput.entries values are plain record maps'
       >(input.entries),
-      CORE_REGISTRY,
+      composeSqlEntityKinds(),
+      'carry',
     );
 
     const table = blindCast<
       Readonly<Record<string, StorageTable>>,
-      'CORE_REGISTRY constructs StorageTable for the table kind'
+      'CORE_KINDS constructs StorageTable for the table kind'
     >(dispatched['table'] ?? Object.freeze({}));
     const valueSet = blindCast<
       Readonly<Record<string, StorageValueSet>> | undefined,
-      'CORE_REGISTRY constructs StorageValueSet for the valueSet kind'
+      'CORE_KINDS constructs StorageValueSet for the valueSet kind'
     >(dispatched['valueSet']);
     const { table: _t, valueSet: _vs, ...carried } = dispatched;
 

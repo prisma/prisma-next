@@ -3,12 +3,12 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createContract } from '@prisma-next/test-utils';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
+import { composeSqlEntityKinds } from '../src/entity-kinds';
 import { col, fk, index, model, pk, table, unique } from '../src/factories';
 import { CheckConstraint } from '../src/ir/check-constraint';
 import { StorageTable } from '../src/ir/storage-table';
 import type { ReferentialAction, SqlStorage } from '../src/types';
 import {
-  createSqlEntrySchemaRegistry,
   createSqlStorageSchema,
   StorageValueSetSchema,
   validateModel,
@@ -1278,7 +1278,7 @@ describe('SQL contract validators', () => {
   });
 
   describe('ValueSetRef call-site-narrowed schemas', () => {
-    const storageSchema = createSqlStorageSchema(createSqlEntrySchemaRegistry());
+    const storageSchema = createSqlStorageSchema(composeSqlEntityKinds());
 
     function makeStorageWithCheckRef(ref: Record<string, unknown>) {
       return {
@@ -1390,30 +1390,48 @@ describe('SQL contract validators', () => {
     });
   });
 
-  describe('createSqlEntrySchemaRegistry', () => {
-    it('throws when a pack schema collides with a core kind (table)', () => {
-      const packSchemas = new Map([[' table', type('unknown')]]);
-      expect(() => createSqlEntrySchemaRegistry(packSchemas)).not.toThrow();
+  describe('composeSqlEntityKinds', () => {
+    it('accepts a non-colliding pack kind', () => {
+      const packDescriptor = {
+        kind: ' table',
+        schema: type('unknown'),
+        construct: (v: unknown) => v,
+      };
+      expect(() => composeSqlEntityKinds([packDescriptor])).not.toThrow();
+    });
 
-      const collidingPackSchemas = new Map([['table', type('unknown')]]);
-      expect(() => createSqlEntrySchemaRegistry(collidingPackSchemas)).toThrow(
+    it('throws when a pack kind collides with a core kind (table)', () => {
+      const collidingDescriptor = {
+        kind: 'table',
+        schema: type('unknown'),
+        construct: (v: unknown) => v,
+      };
+      expect(() => composeSqlEntityKinds([collidingDescriptor])).toThrow(
         /collides with a core kind/,
       );
     });
 
-    it('throws when a pack schema collides with a core kind (valueSet)', () => {
-      const collidingPackSchemas = new Map([['valueSet', type('unknown')]]);
-      expect(() => createSqlEntrySchemaRegistry(collidingPackSchemas)).toThrow(
+    it('throws when a pack kind collides with a core kind (valueSet)', () => {
+      const collidingDescriptor = {
+        kind: 'valueSet',
+        schema: type('unknown'),
+        construct: (v: unknown) => v,
+      };
+      expect(() => composeSqlEntityKinds([collidingDescriptor])).toThrow(
         /collides with a core kind/,
       );
     });
 
-    it('registers non-colliding pack schemas', () => {
-      const packSchemas = new Map([['type', type('unknown')]]);
-      const registry = createSqlEntrySchemaRegistry(packSchemas);
-      expect(registry.has('type')).toBe(true);
-      expect(registry.has('table')).toBe(true);
-      expect(registry.has('valueSet')).toBe(true);
+    it('registers non-colliding pack kinds', () => {
+      const packDescriptor = {
+        kind: 'type',
+        schema: type('unknown'),
+        construct: (v: unknown) => v,
+      };
+      const kinds = composeSqlEntityKinds([packDescriptor]);
+      expect(kinds.has('type')).toBe(true);
+      expect(kinds.has('table')).toBe(true);
+      expect(kinds.has('valueSet')).toBe(true);
     });
   });
 });

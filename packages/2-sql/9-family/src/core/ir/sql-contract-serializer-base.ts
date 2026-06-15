@@ -1,16 +1,16 @@
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
+import { isPlainRecord } from '@prisma-next/contract/is-plain-record';
 import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import {
+  type AnyEntityKindDescriptor,
+  constructEntries,
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
-import {
-  createSqlEntryConstructionRegistry,
-  type EntryFactory,
-} from '@prisma-next/sql-contract/entry-construction-registry';
+import { composeSqlEntityKinds } from '@prisma-next/sql-contract/entity-kinds';
 import {
   buildSqlNamespace,
   type SqlNamespaceTablesInput,
@@ -21,7 +21,6 @@ import {
 } from '@prisma-next/sql-contract/types';
 import {
   createSqlContractSchema,
-  createSqlEntrySchemaRegistry,
   validateSqlContractFully,
 } from '@prisma-next/sql-contract/validators';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -36,10 +35,6 @@ const NamespaceRawSchema = type({
     '+': 'ignore',
   }),
 });
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 export type SqlEntityHydrationFactory = (entry: unknown) => unknown;
 
@@ -71,23 +66,18 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   implements ContractSerializer<TContract>
 {
   private readonly contractSchema: Type<unknown> | undefined;
-  private readonly entriesRegistry: ReadonlyMap<string, EntryFactory>;
+  private readonly entryKinds: ReadonlyMap<string, AnyEntityKindDescriptor>;
 
   constructor(
     protected readonly entityHydrationRegistry: ReadonlyMap<
       string,
       SqlEntityHydrationFactory
     > = new Map(),
-    validatorRegistry: ReadonlyMap<string, Type<unknown>> = new Map(),
-    packEntryFactories: ReadonlyMap<string, EntryFactory> = new Map(),
+    packEntityKinds: readonly AnyEntityKindDescriptor[] = [],
   ) {
+    this.entryKinds = composeSqlEntityKinds(packEntityKinds);
     this.contractSchema =
-      validatorRegistry.size > 0
-        ? createSqlContractSchema(createSqlEntrySchemaRegistry(validatorRegistry))
-        : undefined;
-    this.entriesRegistry = createSqlEntryConstructionRegistry(
-      packEntryFactories.size > 0 ? packEntryFactories : undefined,
-    );
+      packEntityKinds.length > 0 ? createSqlContractSchema(this.entryKinds) : undefined;
   }
 
   deserializeContract<T extends TContract = TContract>(json: unknown): T {
@@ -191,21 +181,23 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       const messages = parsed.map((p: { message: string }) => p.message).join('; ');
       throw new ContractValidationError(`Namespace hydration failed: ${messages}`, 'structural');
     }
-    const entriesOutput: Record<string, Record<string, unknown>> = {};
     const entriesRaw = parsed.entries;
-    if (entriesRaw !== undefined && typeof entriesRaw === 'object' && entriesRaw !== null) {
-      const rawEntries = entriesRaw as Record<string, unknown>;
-      for (const [key, innerMap] of Object.entries(rawEntries)) {
-        const hydrated = this.hydrateEntriesKind(key, innerMap);
-        if (hydrated === undefined) {
-          throw new ContractValidationError(
-            `Unknown entries key "${key}" in namespace "${id}"; no hydration factory registered for this entity kind`,
-            'structural',
-          );
-        }
-        entriesOutput[key] = hydrated;
+    const rawEntriesMap =
+      entriesRaw !== null && typeof entriesRaw === 'object' && !Array.isArray(entriesRaw)
+        ? (entriesRaw as Record<string, unknown>)
+        : {};
+
+    const entriesInput: Record<string, Readonly<Record<string, unknown>>> = {};
+    for (const [key, innerMap] of Object.entries(rawEntriesMap)) {
+      if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
+        entriesInput[key] = Object.freeze({});
+      } else {
+        entriesInput[key] = innerMap as Readonly<Record<string, unknown>>;
       }
     }
+
+    const entriesOutput = constructEntries(entriesInput, this.entryKinds, 'fail', id);
+
     // Always ensure a 'table' key is present (may be empty).
     if (!Object.hasOwn(entriesOutput, 'table')) {
       entriesOutput['table'] = {};
@@ -215,27 +207,6 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       id,
       entries: entriesOutput,
     });
-  }
-
-  protected hydrateEntriesKind(
-    key: string,
-    innerMap: unknown,
-  ): Record<string, unknown> | undefined {
-    const factory = this.entriesRegistry.get(key);
-    if (factory !== undefined) {
-      if (innerMap === null || typeof innerMap !== 'object' || Array.isArray(innerMap)) {
-        return {};
-      }
-      return Object.fromEntries(
-        Object.entries(
-          blindCast<Record<string, unknown>, 'entries inner map is a plain record after check'>(
-            innerMap,
-          ),
-        ).map(([name, value]) => [name, factory(value)]),
-      );
-    }
-    // Unknown key — delegate to subclass. Return undefined to fail closed.
-    return undefined;
   }
 
   protected hydrateStorageTypeEntry(entry: SqlStorageTypeEntry): SqlStorageTypeEntry {

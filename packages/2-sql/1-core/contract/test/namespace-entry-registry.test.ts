@@ -1,14 +1,14 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
+import { composeSqlEntityKinds } from '../src/entity-kinds';
 import {
   createNamespaceEntrySchema,
-  createSqlEntrySchemaRegistry,
   createSqlStorageSchema,
   StorageValueSetSchema,
 } from '../src/validators';
 
-// Synthetic pack-contributed schema used to test registry dispatch without
+// Synthetic pack-contributed schema used to test descriptor dispatch without
 // depending on a target-specific schema (PostgresEnumTypeSchema now lives in
 // the postgres target pack).
 const SyntheticPackEntrySchema = type({
@@ -44,9 +44,9 @@ function makeStorage(entries: Record<string, unknown>) {
 // createNamespaceEntrySchema — registry dispatch
 // ---------------------------------------------------------------------------
 
-describe('createNamespaceEntrySchema — registry-driven validation', () => {
+describe('createNamespaceEntrySchema — descriptor-driven validation', () => {
   it('accepts a namespace with core-registered table entries', () => {
-    const schema = createNamespaceEntrySchema(createSqlEntrySchemaRegistry());
+    const schema = createNamespaceEntrySchema(composeSqlEntityKinds());
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: { table: { users: minimalTable } },
@@ -55,7 +55,7 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
   });
 
   it('accepts a namespace with core-registered valueSet entries', () => {
-    const schema = createNamespaceEntrySchema(createSqlEntrySchemaRegistry());
+    const schema = createNamespaceEntrySchema(composeSqlEntityKinds());
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
@@ -67,7 +67,7 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
   });
 
   it('rejects a namespace with an unregistered entries key naming the kind', () => {
-    const schema = createNamespaceEntrySchema(createSqlEntrySchemaRegistry());
+    const schema = createNamespaceEntrySchema(composeSqlEntityKinds());
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
@@ -79,11 +79,11 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
     expect(String(result)).toMatch(/bogus/);
   });
 
-  it('accepts a namespace with a pack-registered entries key', () => {
-    const registry = createSqlEntrySchemaRegistry(
-      new Map<string, ReturnType<typeof type>>([['synth', SyntheticPackEntrySchema]]),
-    );
-    const schema = createNamespaceEntrySchema(registry);
+  it('accepts a namespace with a pack-contributed entries key', () => {
+    const kinds = composeSqlEntityKinds([
+      { kind: 'synth', schema: SyntheticPackEntrySchema, construct: (v) => v },
+    ]);
+    const schema = createNamespaceEntrySchema(kinds);
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
@@ -94,11 +94,11 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
     expect(result).not.toBeInstanceOf(type.errors);
   });
 
-  it('rejects a pack-registered entry with a non-conforming value', () => {
-    const registry = createSqlEntrySchemaRegistry(
-      new Map<string, ReturnType<typeof type>>([['synth', SyntheticPackEntrySchema]]),
-    );
-    const schema = createNamespaceEntrySchema(registry);
+  it('rejects a pack-contributed entry with a non-conforming value', () => {
+    const kinds = composeSqlEntityKinds([
+      { kind: 'synth', schema: SyntheticPackEntrySchema, construct: (v) => v },
+    ]);
+    const schema = createNamespaceEntrySchema(kinds);
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
@@ -109,11 +109,11 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
     expect(result).toBeInstanceOf(type.errors);
   });
 
-  it('rejects an unknown entries key even when a pack registry is provided', () => {
-    const registry = createSqlEntrySchemaRegistry(
-      new Map<string, ReturnType<typeof type>>([['synth', SyntheticPackEntrySchema]]),
-    );
-    const schema = createNamespaceEntrySchema(registry);
+  it('rejects an unknown entries key even when a pack descriptor is provided', () => {
+    const kinds = composeSqlEntityKinds([
+      { kind: 'synth', schema: SyntheticPackEntrySchema, construct: (v) => v },
+    ]);
+    const schema = createNamespaceEntrySchema(kinds);
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
@@ -127,7 +127,7 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
   });
 
   it('rejects a Date passed as an inner entries map', () => {
-    const schema = createNamespaceEntrySchema(createSqlEntrySchemaRegistry());
+    const schema = createNamespaceEntrySchema(composeSqlEntityKinds());
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: { table: new Date() },
@@ -136,7 +136,7 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
   });
 
   it('rejects a Map passed as an inner entries map', () => {
-    const schema = createNamespaceEntrySchema(createSqlEntrySchemaRegistry());
+    const schema = createNamespaceEntrySchema(composeSqlEntityKinds());
     const result = schema({
       id: UNBOUND_NAMESPACE_ID,
       entries: { table: new Map([['users', minimalTable]]) },
@@ -155,7 +155,7 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
   });
 
   it('unregistered-kind error names the kind and the namespace id', () => {
-    const schema = createNamespaceEntrySchema(createSqlEntrySchemaRegistry());
+    const schema = createNamespaceEntrySchema(composeSqlEntityKinds());
     const result = schema({
       id: 'analytics',
       entries: { bogus: { Foo: {} } },
@@ -170,9 +170,9 @@ describe('createNamespaceEntrySchema — registry-driven validation', () => {
 // createSqlStorageSchema — storage-level validation with registry
 // ---------------------------------------------------------------------------
 
-describe('createSqlStorageSchema — registry-driven storage validation', () => {
+describe('createSqlStorageSchema — descriptor-driven storage validation', () => {
   it('accepts storage with core-registered table + valueSet entries', () => {
-    const schema = createSqlStorageSchema(createSqlEntrySchemaRegistry());
+    const schema = createSqlStorageSchema(composeSqlEntityKinds());
     const result = schema(
       makeStorage({
         table: { users: minimalTable },
@@ -183,7 +183,7 @@ describe('createSqlStorageSchema — registry-driven storage validation', () => 
   });
 
   it('rejects storage with an unregistered entries key, error names the kind', () => {
-    const schema = createSqlStorageSchema(createSqlEntrySchemaRegistry());
+    const schema = createSqlStorageSchema(composeSqlEntityKinds());
     const result = schema(
       makeStorage({
         table: { users: minimalTable },
@@ -194,11 +194,11 @@ describe('createSqlStorageSchema — registry-driven storage validation', () => 
     expect(String(result)).toMatch(/bogus/);
   });
 
-  it('accepts storage with a pack-registered entries key', () => {
-    const registry = createSqlEntrySchemaRegistry(
-      new Map<string, ReturnType<typeof type>>([['synth', SyntheticPackEntrySchema]]),
-    );
-    const schema = createSqlStorageSchema(registry);
+  it('accepts storage with a pack-contributed entries key', () => {
+    const kinds = composeSqlEntityKinds([
+      { kind: 'synth', schema: SyntheticPackEntrySchema, construct: (v) => v },
+    ]);
+    const schema = createSqlStorageSchema(kinds);
     const result = schema(
       makeStorage({
         table: {},
