@@ -1,7 +1,10 @@
+import { isPlainRecord } from '@prisma-next/contract/is-plain-record';
 import type { StorageBase } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { IRNode } from './ir-node';
 import type { Namespace } from './namespace';
+
+export { isPlainRecord };
 
 /**
  * Canonical address for a named entity in Contract IR / Schema IR.
@@ -50,18 +53,6 @@ export function* elementCoordinates(
       }
     }
   }
-}
-
-/**
- * Strict plain-object guard: accepts only objects with `Object.prototype`
- * or `null` as their prototype. Rejects arrays, class instances, and other
- * non-plain objects. Used to distinguish raw-data records from IR class
- * instances in validation and hydration paths.
- */
-export function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  const proto = Object.getPrototypeOf(value) as unknown;
-  return proto === Object.prototype || proto === null;
 }
 
 /**

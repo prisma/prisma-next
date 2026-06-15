@@ -1,4 +1,6 @@
 export { domainElementCoordinates } from '../ir/domain';
+export type { AnyEntityKindDescriptor, EntityKindDescriptor } from '../ir/entity-kind';
+export { constructEntries } from '../ir/entity-kind';
 export type { IRNode } from '../ir/ir-node';
 export { freezeNode, IRNodeBase } from '../ir/ir-node';
 export type { Namespace } from '../ir/namespace';
