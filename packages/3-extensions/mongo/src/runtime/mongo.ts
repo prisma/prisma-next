@@ -1,4 +1,5 @@
 import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
+import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contract/enum-accessor';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
@@ -17,6 +18,7 @@ import {
   createMongoRuntime,
 } from '@prisma-next/mongo-runtime';
 import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type MongoBinding,
@@ -33,6 +35,7 @@ export interface MongoClient<
   readonly orm: MongoOrmClient<TContract>;
   readonly query: ReturnType<typeof mongoQuery<TContract>>;
   readonly contract: TContract;
+  readonly enums: NamespacedEnums<TContract>;
   connect(bindingInput?: MongoBindingInput): Promise<MongoRuntime>;
   runtime(): Promise<MongoRuntime>;
   close(): Promise<void>;
@@ -186,10 +189,16 @@ export default function mongo<
     },
   });
 
+  const enums = blindCast<
+    NamespacedEnums<TContract>,
+    'buildNamespacedEnums returns the namespace-keyed accessor map this contract types'
+  >(Object.freeze(buildNamespacedEnums(contract.domain)));
+
   return {
     orm,
     query,
     contract,
+    enums,
 
     async connect(bindingInput?: MongoBindingInput): Promise<MongoRuntime> {
       if (closed) {

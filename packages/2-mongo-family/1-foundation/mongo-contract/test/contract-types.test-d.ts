@@ -13,6 +13,131 @@ import type { MongoCollection } from '../src/ir/mongo-collection';
 import type { MongoCollectionOptionsAuthoringInput } from '../src/ir/mongo-collection-options';
 import type { MongoIndexOptionsInput } from '../src/ir/mongo-index-options';
 
+// ---------------------------------------------------------------------------
+// Enum value-union narrowing tests
+// ---------------------------------------------------------------------------
+
+type RoleEnum = {
+  readonly codecId: 'mongo/string@1';
+  readonly members: readonly [
+    { readonly name: 'User'; readonly value: 'user' },
+    { readonly name: 'Admin'; readonly value: 'admin' },
+  ];
+};
+
+type ContractWithEnum = MongoContractWithTypeMaps<
+  {
+    readonly target: 'mongo';
+    readonly targetFamily: 'mongo';
+    readonly profileHash: ProfileHashBase<'sha256:enum-test'>;
+    readonly capabilities: Record<string, never>;
+    readonly extensionPacks: Record<string, never>;
+    readonly meta: Record<string, never>;
+    readonly roots: Record<string, never>;
+    readonly domain: {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly enum: { readonly Role: RoleEnum };
+          readonly models: {
+            readonly Account: {
+              readonly fields: {
+                readonly _id: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+                };
+                readonly role: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                  readonly valueSet: {
+                    readonly plane: 'domain';
+                    readonly entityKind: 'enum';
+                    readonly namespaceId: '__unbound__';
+                    readonly entityName: 'Role';
+                  };
+                };
+                readonly nullableRole: {
+                  readonly nullable: true;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                  readonly valueSet: {
+                    readonly plane: 'domain';
+                    readonly entityKind: 'enum';
+                    readonly namespaceId: '__unbound__';
+                    readonly entityName: 'Role';
+                  };
+                };
+                readonly manyRoles: {
+                  readonly nullable: false;
+                  readonly many: true;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                  readonly valueSet: {
+                    readonly plane: 'domain';
+                    readonly entityKind: 'enum';
+                    readonly namespaceId: '__unbound__';
+                    readonly entityName: 'Role';
+                  };
+                };
+                readonly manyNullableRoles: {
+                  readonly nullable: true;
+                  readonly many: true;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                  readonly valueSet: {
+                    readonly plane: 'domain';
+                    readonly entityKind: 'enum';
+                    readonly namespaceId: '__unbound__';
+                    readonly entityName: 'Role';
+                  };
+                };
+              };
+              readonly relations: Record<string, never>;
+              readonly storage: { readonly collection: 'accounts' };
+            };
+          };
+          readonly valueObjects: Record<string, never>;
+        };
+      };
+    };
+    readonly storage: {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly id: '__unbound__';
+          readonly kind: 'mongo-namespace';
+          readonly entries: { readonly collection: Record<string, never> };
+        };
+      };
+      readonly storageHash: StorageHashBase<'sha256:enum-test-storage'>;
+    };
+  },
+  MongoTypeMaps<{
+    readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
+    readonly 'mongo/string@1': { readonly input: string; readonly output: string };
+  }>
+>;
+
+test('enum-typed field narrows to the literal value union', () => {
+  type Row = InferModelRow<ContractWithEnum, 'Account'>;
+  expectTypeOf<Row['role']>().toEqualTypeOf<'user' | 'admin'>();
+});
+
+test('nullable enum field narrows to value union | null', () => {
+  type Row = InferModelRow<ContractWithEnum, 'Account'>;
+  expectTypeOf<Row['nullableRole']>().toEqualTypeOf<'user' | 'admin' | null>();
+});
+
+test('many enum field narrows to value union array', () => {
+  type Row = InferModelRow<ContractWithEnum, 'Account'>;
+  expectTypeOf<Row['manyRoles']>().toEqualTypeOf<('user' | 'admin')[]>();
+});
+
+test('many + nullable enum field narrows to value union array | null', () => {
+  type Row = InferModelRow<ContractWithEnum, 'Account'>;
+  expectTypeOf<Row['manyNullableRoles']>().toEqualTypeOf<('user' | 'admin')[] | null>();
+});
+
+test('non-enum field still resolves via codec output', () => {
+  type Row = InferModelRow<ContractWithEnum, 'Account'>;
+  expectTypeOf<Row['_id']>().toEqualTypeOf<string>();
+});
+
 type TestCodecTypes = {
   readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
   readonly 'mongo/string@1': { readonly input: string; readonly output: string };
