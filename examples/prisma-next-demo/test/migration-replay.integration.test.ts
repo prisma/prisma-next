@@ -2,13 +2,14 @@
  * Replay proof: executing the shipped app migration chain from scratch lands
  * a database whose live schema matches the current contract.
  *
- * The chain's early migrations create the native `user_type` enum
- * (`CREATE TYPE … AS ENUM`) and type `"user"."kind"` with it; the converting
- * migration (`convert_user_type_to_value_set`) rewrites that to the domain
- * enum shape the contract describes: a text column whose value set is
- * enforced by the `user_kind_check` CHECK constraint, with the native type
- * dropped. This test replays every execute step in chain order against a
- * fresh dev database, then introspects and verifies against the contract.
+ * The chain is a multi-step incremental history that exercises the migration
+ * CLI's apply-successive-migrations path. The initial migration creates
+ * `user.kind` as a `text` column with a `user_kind_check` CHECK constraint —
+ * the domain-enum representation — from the start; no native Postgres enum type
+ * is ever created. Later migrations add `displayName`, the MTI variant link
+ * columns, and the `post.priority` value-set column with its default. This test
+ * replays every execute step in chain order against a fresh dev database, then
+ * introspects and verifies against the contract.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -76,7 +77,7 @@ describe('demo migration replay (dev database)', () => {
             }
           }
 
-          // The native enum must be gone, replaced by text + check.
+          // `kind` is a text column with a CHECK constraint — never a native enum.
           const kindType = await driver.query<{ udt_name: string }>(
             `SELECT udt_name FROM information_schema.columns
              WHERE table_schema = 'public' AND table_name = 'user' AND column_name = 'kind'`,
