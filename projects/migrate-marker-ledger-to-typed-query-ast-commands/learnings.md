@@ -84,3 +84,13 @@ The SQLite typed verification checks need their param codec (`sqlite/text@1`) re
 2. A reviewer's "this is unnecessary" is as fallible as an implementer's "correct improvement" — both were overturned here by running the right tests. Resolve necessity EMPIRICALLY (revert + run the execution path), never by armchair reasoning (the orchestrator did this wrong too, trusting the reviewer's conclusion).
 3. `test:packages` failures under load shift suite-to-suite and pass isolated (contention flakes) — but "confirm isolated at low load" is mandatory before dismissing, because that exact discipline separated the genuine PG flakes from the real SQLite runner regression in the same run.
 4. Prefer intention-revealing predicates over incidental ones (`renderOutputType === undefined`, not `startsWith('sqlite/')`): the incidental form worked only by luck (excluded codecs happened to be identity encoders) and would silently re-break when a future codec violated the unstated invariant.
+
+## Local gates omitted test:integration — a missed consumer shipped to CI (PR #825 review loop)
+
+The slice's local verification ran `test:packages` + targeted suites + fixtures + typecheck, but NOT `pnpm test:integration`. A consumer in `test/integration/test/cli-journeys/migration-round-trip.e2e.test.ts` still called the removed bare `setNotNull` factory (the file was only partially converted — `this.addColumn` updated, bare `setNotNull` left). Nothing local exercised it, so it first failed in CI's "Integration Tests" job.
+
+Compounding orchestrator error: I examined only the "Test" CI job's failures (PGlite flakes) and declared ALL the CI red "confirmed flake" without reading the "Integration Tests" job's distinct failure — which was a real `AssertionError` (emit exit 1), not the flake's `connection error`/`Hook timed out` signature. Two different jobs, two different causes; I conflated them.
+
+**Lessons:**
+1. A breaking-change sweep's verification must run EVERY test lane that exercises the changed API — `test:integration` and e2e lanes, not just `test:packages`. A repo-wide grep for the removed symbols would also have caught it (it found exactly the one missed file once run).
+2. When multiple CI jobs are red, read EACH job's failures separately. "Job A's failures are flakes" does not license "all red is flake." Classify per-job, by failure signature (assertion vs connection/timeout).
