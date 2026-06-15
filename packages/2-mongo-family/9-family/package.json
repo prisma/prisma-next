@@ -22,6 +22,7 @@
     "@prisma-next/mongo-emitter": "workspace:0.13.0",
     "@prisma-next/mongo-query-ast": "workspace:0.13.0",
     "@prisma-next/mongo-schema-ir": "workspace:0.13.0",
+    "@prisma-next/mongo-value": "workspace:0.13.0",
     "@prisma-next/utils": "workspace:0.13.0",
     "arktype": "catalog:",
     "mongodb": "catalog:",
