@@ -7,7 +7,14 @@ alwaysApply: true
 
 ## 1. Run a test suite
 
-Each slow command has an `:agent` variant. Every run is saved to a timestamped file (`wip/<name>.<timestamp>.<pid>.log` and `.exit`); `wip/<name>.log` and `wip/<name>.exit` are symlinks that always point to the **latest** run. Read the symlink names — historical runs are preserved next to them when you need to compare. Contents of `wip/` are gitignored.
+Each slow command has an `:agent` variant. The first line of its output prints the exact log path:
+
+```
+$ pnpm test:packages:agent
+log: wip/test-packages.20260615-190441.32317.log
+```
+
+The full output goes to that file. The exit code is written to a sibling `.exit` file (same path with `.log` → `.exit`). Use the path printed by the command — don't guess one. Every run gets its own timestamped path, so history is preserved automatically. Contents of `wip/` are gitignored.
 
 | Command | Purpose |
 |---|---|
@@ -44,29 +51,23 @@ pnpm --filter @prisma-next/cli test test/commands/migration-list-json-golden.tes
 
 ## 4. Find specific failures in the captured output
 
-Check the exit code first:
+Use the log path the `:agent` command printed (the shell exit status tells you pass/fail; the `.exit` sibling file records the same number). If non-zero, list failing files and assertions:
 
 ```bash
-cat wip/test-packages.exit
+grep -nE " FAIL |Test Files" wip/test-packages.20260615-190441.32317.log
+grep -B2 -A20 "FAIL "         wip/test-packages.20260615-190441.32317.log
 ```
 
-If non-zero, list failing files and assertions:
+If exit is non-zero but the log has no `FAIL` lines, the suite crashed before any test ran — read the tail:
 
 ```bash
-grep -nE " FAIL |Test Files" wip/test-packages.log
-grep -B2 -A20 "FAIL " wip/test-packages.log
-```
-
-If `.exit` is non-zero but the log has no `FAIL` lines, the suite crashed before any test ran — read the tail:
-
-```bash
-tail -50 wip/test-packages.log
+tail -50 wip/test-packages.20260615-190441.32317.log
 ```
 
 ## Don't
 
 - **Don't run the full suite when you already know which file is failing.** Use the targeted commands in §3 — they run in seconds.
 - **Don't run the bare canonical commands (`pnpm test:packages`, etc.) for a full-suite run.** They dump the entire output into your context window. Use the `:agent` variant.
-- **Don't pipe a `:agent` command to `tail`/`grep`/`head`.** The point is that the output is already on disk — read `wip/<name>.log`.
+- **Don't pipe a `:agent` command to `tail`/`grep`/`head`.** The point is that the output is already on disk — read the log path the `:agent` command printed.
 - **Don't re-run a suite to refine a grep.** Grep the file you already have.
 - **Don't pass `--force` to `turbo`.** The cache is correct by default. Only force when this same run edited `tsconfig.json` or a lockfile.
