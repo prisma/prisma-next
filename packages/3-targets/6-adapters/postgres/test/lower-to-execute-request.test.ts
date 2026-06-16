@@ -10,16 +10,13 @@ import {
 } from '@prisma-next/framework-components/codec';
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  type StorageTableInput,
-} from '@prisma-next/sql-contract/types';
+import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
 import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
 import { jsonb, pgTable, text } from '@prisma-next/target-postgres/contract-free';
 import { PostgresCreateTable } from '@prisma-next/target-postgres/ddl';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { createContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
@@ -305,7 +302,7 @@ function buildExtContractAndTable() {
     label: { codecId: EXT_CODEC_ID, nativeType: 'text', nullable: false },
     name: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
   };
-  const ns = buildSqlNamespace({
+  const ns = postgresCreateNamespace({
     id: UNBOUND_NAMESPACE_ID,
     entries: {
       table: {

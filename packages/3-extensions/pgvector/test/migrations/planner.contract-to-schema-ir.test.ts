@@ -18,7 +18,6 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  buildSqlNamespace,
   SqlStorage,
   type SqlStorageInput,
   type StorageColumn,
@@ -27,6 +26,7 @@ import {
 import { postgresRenderDefault } from '@prisma-next/target-postgres/control';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
@@ -42,7 +42,7 @@ const expandParameterizedNativeType: NativeTypeExpander = (input) => {
 function ns(tables: Record<string, StorageTable>): Pick<SqlStorageInput, 'namespaces'> {
   return {
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+      [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
         id: UNBOUND_NAMESPACE_ID,
         entries: { table: tables },
       }),

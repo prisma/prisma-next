@@ -2,15 +2,15 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  SqlUnboundNamespace,
-} from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../../src/core/migrations/planner';
+import {
+  SqliteUnboundDatabase,
+  sqliteCreateNamespace,
+} from '../../src/core/sqlite-unbound-database';
 
 const stubLowerer: ExecuteRequestLowerer = {
   lower: () => {
@@ -27,7 +27,7 @@ function createContract(): Contract<SqlStorage> {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:to'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {
@@ -59,7 +59,7 @@ function fromContractWithHash(hash: string): Contract<SqlStorage> {
     ...createContract(),
     storage: new SqlStorage({
       storageHash: coreHash(hash),
-      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqliteUnboundDatabase.instance },
     }),
   };
 }

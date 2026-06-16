@@ -15,7 +15,8 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -61,7 +62,7 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
     storage: new SqlStorage({
       storageHash: coreHash(`sha256:ext-contract-v${version}`),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {
@@ -452,7 +453,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:app-with-hooked-email'),
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
             id: UNBOUND_NAMESPACE_ID,
             entries: {
               table: {
