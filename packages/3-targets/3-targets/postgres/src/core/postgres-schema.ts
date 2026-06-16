@@ -1,16 +1,16 @@
 import {
   freezeNode,
   hydrateNamespaceEntities,
-  NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { composeSqlEntityKinds } from '@prisma-next/sql-contract/entity-kinds';
-import type {
-  SqlNamespaceEntries,
-  SqlNamespaceTablesInput,
-  SqlStorage,
-  StorageTable,
-  StorageValueSet,
+import {
+  SqlNamespace,
+  type SqlNamespaceEntries,
+  type SqlNamespaceTablesInput,
+  type SqlStorage,
+  type StorageTable,
+  type StorageValueSet,
 } from '@prisma-next/sql-contract/types';
 import { type CfExpr, cfExpr } from '@prisma-next/sql-relational-core/contract-free';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -38,7 +38,7 @@ export interface PostgresSchemaInput {
  * prefix entirely — call sites stay polymorphic and never branch on
  * `id === UNBOUND_NAMESPACE_ID`.
  */
-export class PostgresSchema extends NamespaceBase {
+export class PostgresSchema extends SqlNamespace {
   /**
    * Stable singleton reference for the late-bound slot. Materialised
    * lazily below the singleton subclass declaration so the static

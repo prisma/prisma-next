@@ -113,16 +113,8 @@ export interface InterpretPslDocumentToSqlContractInput {
    * emits `PSL_UNKNOWN_CROSS_SPACE_TARGET`.
    */
   readonly composedExtensionContracts: ReadonlyMap<string, Contract>;
-  /**
-   * Target-supplied `Namespace` factory threaded into
-   * `buildSqlContractFromDefinition` for the contract's
-   * `SqlStorage.namespaces` population. Required when the document
-   * contains any explicit `namespace { … }` block on Postgres; the
-   * single-namespace path (top-level declarations only) stays valid
-   * without the factory and falls back to the family
-   * `SqlUnboundNamespace` singleton.
-   */
-  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  /** Target-supplied factory that materialises a `Namespace` concretion for each namespace coordinate. */
+  readonly createNamespace: (input: SqlNamespaceTablesInput) => Namespace;
   readonly codecLookup?: CodecLookup;
 }
 
@@ -2122,7 +2114,7 @@ export function interpretPslDocumentToSqlContract(
     ),
     ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
     ...(Object.keys(validEnumHandles).length > 0 ? { enums: validEnumHandles } : {}),
-    ...ifDefined('createNamespace', input.createNamespace),
+    createNamespace: input.createNamespace,
     models: stiColumnModelNodes.map((model) => ({
       ...model,
       ...(modelRelations.has(model.modelName)

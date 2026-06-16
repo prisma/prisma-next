@@ -25,7 +25,7 @@ export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
 export {
-  type SqlNamespace,
+  SqlNamespace,
   type SqlNamespaceEntries,
   type SqlNamespaceTablesInput,
   SqlStorage,

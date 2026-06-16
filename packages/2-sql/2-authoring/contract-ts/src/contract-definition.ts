@@ -168,7 +168,7 @@ export interface ContractDefinition {
    */
   readonly namespaces?: readonly string[];
   /** Target-supplied factory that materialises a `Namespace` concretion for a declared namespace coordinate. */
-  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly createNamespace: (input: SqlNamespaceTablesInput) => Namespace;
   readonly models: readonly ModelNode[];
   readonly valueObjects?: readonly ValueObjectNode[];
   /**

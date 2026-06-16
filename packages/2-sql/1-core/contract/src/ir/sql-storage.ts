@@ -1,5 +1,5 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
-import { freezeNode, type Namespace, type Storage } from '@prisma-next/framework-components/ir';
+import { freezeNode, NamespaceBase, type Storage } from '@prisma-next/framework-components/ir';
 import { SqlNode } from './sql-node';
 import type { StorageTable } from './storage-table';
 import {
@@ -63,22 +63,17 @@ export type SqlNamespaceEntries = Readonly<Record<string, Readonly<Record<string
 };
 
 /**
- * SQL family namespace. `entries` is the open ADR 224 dictionary —
- * `entries[entityKind][entityName]` addresses any entity. Emitted
- * contract literals satisfy this structurally (no prototype getters
- * needed). For typed access to specific kinds, use the class getters
- * on the concretion or `ns.entries.table` / `ns.entries.valueSet` directly.
+ * Abstract SQL family namespace. Target concretions (`PostgresSchema`,
+ * `SqliteDatabase`, …) extend this class — it is never instantiated directly.
+ * `entries` is the open ADR 224 dictionary: `entries[entityKind][entityName]`
+ * addresses any entity.
  */
-export type SqlNamespace = Namespace & {
-  readonly entries: SqlNamespaceEntries;
-  /**
-   * Render a dialect-qualified table reference for runtime SQL emission.
-   * Present on materialised target concretions (`PostgresSchema`,
-   * `SqliteDatabase`, …) and family placeholders; omitted on emitted
-   * contract structural namespace literals (methods are not serialised).
-   */
-  qualifyTable?(tableName: string): string;
-};
+export abstract class SqlNamespace extends NamespaceBase {
+  abstract override readonly id: string;
+  abstract override readonly entries: SqlNamespaceEntries;
+
+  abstract qualifyTable(tableName: string): string;
+}
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;

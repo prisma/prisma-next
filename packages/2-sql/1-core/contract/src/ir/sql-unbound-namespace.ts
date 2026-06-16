@@ -1,10 +1,6 @@
-import {
-  freezeNode,
-  NamespaceBase,
-  UNBOUND_NAMESPACE_ID,
-} from '@prisma-next/framework-components/ir';
+import { freezeNode, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
-import type { SqlNamespaceEntries } from './sql-storage';
+import { SqlNamespace, type SqlNamespaceEntries } from './sql-storage';
 import type { StorageTable } from './storage-table';
 
 /**
@@ -38,7 +34,7 @@ import type { StorageTable } from './storage-table';
  * fields safely, lift `freezeNode` to a leaf-class `seal()` hook each
  * leaf calls explicitly at the end of its own constructor.
  */
-export class SqlUnboundNamespace extends NamespaceBase {
+export class SqlUnboundNamespace extends SqlNamespace {
   static readonly instance: SqlUnboundNamespace = new SqlUnboundNamespace();
 
   readonly id = UNBOUND_NAMESPACE_ID;

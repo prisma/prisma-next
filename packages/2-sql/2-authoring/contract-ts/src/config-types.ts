@@ -3,6 +3,8 @@ import type { ContractConfig } from '@prisma-next/config/config-types';
 import { applySpecifierDefaultControlPolicy } from '@prisma-next/contract/apply-specifier-default-control-policy';
 import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
+import type { Namespace } from '@prisma-next/framework-components/ir';
+import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { ok } from '@prisma-next/utils/result';
 import { extname } from 'pathe';
@@ -27,12 +29,17 @@ export interface TypeScriptContractSpecifierOptions {
 export function emptyContract(options: {
   readonly output?: string;
   readonly target: TargetPackRef<'sql', string>;
+  readonly createNamespace: (input: SqlNamespaceTablesInput) => Namespace;
   readonly defaultControlPolicy?: ControlPolicy;
 }): ContractConfig {
   return {
     source: {
       load: async () => {
-        const built = buildSqlContractFromDefinition({ target: options.target, models: [] });
+        const built = buildSqlContractFromDefinition({
+          target: options.target,
+          createNamespace: options.createNamespace,
+          models: [],
+        });
         return ok(applySpecifierDefaultControlPolicy(built, options.defaultControlPolicy));
       },
     },

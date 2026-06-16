@@ -17,7 +17,7 @@ export interface PrismaContractOptions {
   readonly output?: string;
   readonly target: TargetPackRef<'sql', string>;
   readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
-  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly createNamespace: (input: SqlNamespaceTablesInput) => Namespace;
   readonly defaultControlPolicy?: ControlPolicy;
 }
 
@@ -114,7 +114,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
               : undefined,
           ),
           controlMutationDefaults: context.controlMutationDefaults,
-          ...ifDefined('createNamespace', options.createNamespace),
+          createNamespace: options.createNamespace,
           codecLookup: context.codecLookup,
         });
         if (!interpreted.ok) {

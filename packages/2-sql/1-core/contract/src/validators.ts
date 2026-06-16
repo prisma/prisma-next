@@ -10,13 +10,11 @@ import {
   type AnyEntityKindDescriptor,
   isPlainRecord,
   type Namespace,
-  UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
 import { composeSqlEntityKinds } from './entity-kinds';
-import { buildSqlNamespaceMap } from './ir/build-sql-namespace';
 
 export {
   CheckConstraintSchema,
@@ -32,7 +30,6 @@ export {
   StorageValueSetSchema,
 } from './ir/storage-entry-schemas';
 
-import { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 import {
   type SqlModelStorage,
   SqlStorage,
@@ -389,22 +386,19 @@ export function validateStorage(value: unknown): SqlStorage {
   // Arktype validates the JSON-safe envelope, but the `ColumnDefault`
   // union carries runtime-only `bigint | Date` that the validation DSL
   // can't express (see NOTE above), so bridge the validated shape to the
-  // input type. Construction below re-materialises nested IR fields.
+  // input type. Namespace IR construction requires a target concretion and
+  // must happen via the target serializer's hydration path — not here.
   const validated = blindCast<
     SqlStorageInput & { readonly namespaces?: SqlStorageInput['namespaces'] },
     'arktype validated the JSON envelope but its output type is unknown (ColumnDefault carries runtime-only bigint|Date); bridge to the input shape'
   >(result);
-  const namespaces = buildSqlNamespaceMap(validated.namespaces ?? {});
-  // Compatibility shim: inject the empty unbound singleton when absent so that
-  // production code paths which address __unbound__ for table metadata have a
-  // slot to read or write into. The `SqlStorageInput['namespaces']` type no
-  // longer requires __unbound__, so this is a runtime convenience, not a type
-  // invariant.
-  const unbound = namespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance;
   return new SqlStorage({
     storageHash: validated.storageHash,
     ...ifDefined('types', validated.types),
-    namespaces: { ...namespaces, [UNBOUND_NAMESPACE_ID]: unbound },
+    namespaces: blindCast<
+      SqlStorageInput['namespaces'],
+      'namespace IR construction requires a target concretion; caller must hydrate via target serializer'
+    >(validated.namespaces ?? {}),
   });
 }
 

@@ -2,30 +2,24 @@ import {
   freezeNode,
   hydrateNamespaceEntities,
   type Namespace,
-  NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { composeSqlEntityKinds } from '../entity-kinds';
-import type { SqlNamespace, SqlNamespaceEntries, SqlNamespaceTablesInput } from './sql-storage';
+import {
+  SqlNamespace,
+  type SqlNamespaceEntries,
+  type SqlNamespaceTablesInput,
+} from './sql-storage';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
 import type { StorageTable } from './storage-table';
 import type { StorageValueSet } from './storage-value-set';
 
-const SQL_NAMESPACE_KIND = 'sql-namespace' as const;
-
 function isMaterializedSqlNamespace(ns: Namespace | SqlNamespaceTablesInput): ns is SqlNamespace {
-  if (typeof ns !== 'object' || ns === null) {
-    return false;
-  }
-  const proto = Object.getPrototypeOf(ns);
-  if (proto === Object.prototype || proto === null) {
-    return false;
-  }
-  return (ns as Namespace).kind === SQL_NAMESPACE_KIND;
+  return ns instanceof SqlNamespace;
 }
 
-class SqlBoundNamespace extends NamespaceBase {
+class SqlBoundNamespace extends SqlNamespace {
   declare readonly kind: string;
 
   readonly id: string;
@@ -63,7 +57,7 @@ class SqlBoundNamespace extends NamespaceBase {
       >(dispatched),
     );
     Object.defineProperty(this, 'kind', {
-      value: SQL_NAMESPACE_KIND,
+      value: 'sql-namespace',
       writable: false,
       enumerable: false,
       configurable: true,

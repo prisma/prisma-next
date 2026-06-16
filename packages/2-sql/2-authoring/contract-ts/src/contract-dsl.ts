@@ -1506,7 +1506,7 @@ export type ContractInput<
    * before targets ship their factory stay byte-stable; multi-namespace
    * contracts must pass the factory through.
    */
-  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly createNamespace: (input: SqlNamespaceTablesInput) => Namespace;
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;

@@ -33,7 +33,6 @@ import {
 } from '@prisma-next/sql-contract/index-types';
 import {
   applyFkDefaults,
-  buildSqlNamespace,
   type CheckConstraintInput,
   type SqlNamespaceTablesInput,
   SqlStorage,
@@ -307,7 +306,7 @@ function ensureUnboundNamespaceSlot(
     id: UNBOUND_NAMESPACE_ID,
     entries: { table: {} },
   };
-  const unbound = createNamespace ? createNamespace(unboundInput) : buildSqlNamespace(unboundInput);
+  const unbound = createNamespace(unboundInput);
   return blindCast<
     SqlStorageInput['namespaces'],
     'createNamespace may return a target namespace concretion; the unbound slot matches SqlNamespace at runtime'
@@ -739,7 +738,7 @@ export function buildSqlContractFromDefinition(
               : {}),
           },
         };
-        return [id, createNamespace ? createNamespace(nsInput) : buildSqlNamespace(nsInput)];
+        return [id, createNamespace(nsInput)];
       }),
     ),
   );

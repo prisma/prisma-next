@@ -1,14 +1,14 @@
 import {
   freezeNode,
   hydrateNamespaceEntities,
-  NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { tableEntityKind } from '@prisma-next/sql-contract/entity-kinds';
-import type {
-  SqlNamespaceEntries,
-  SqlNamespaceTablesInput,
-  StorageTable,
+import {
+  SqlNamespace,
+  type SqlNamespaceEntries,
+  type SqlNamespaceTablesInput,
+  type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 
@@ -24,7 +24,7 @@ const SQLITE_NAMESPACE_KIND = 'sqlite-namespace' as const;
  * `entries.table` and unqualified `qualifyTable()` emission for runtime
  * SQL rendering.
  */
-export class SqliteDatabase extends NamespaceBase {
+export class SqliteDatabase extends SqlNamespace {
   declare readonly kind: string;
 
   readonly id: string;
