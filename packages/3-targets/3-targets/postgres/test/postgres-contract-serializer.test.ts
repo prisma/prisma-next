@@ -273,7 +273,7 @@ describe('postgresTargetDescriptor', () => {
   });
 });
 
-describe('role + rlsPolicy round-trip', () => {
+describe('role + policy round-trip', () => {
   function makeContractWithRolesAndPolicies() {
     const base = createSqlContract({
       storage: {
@@ -323,9 +323,9 @@ describe('role + rlsPolicy round-trip', () => {
                   namespaceId: UNBOUND_NAMESPACE_ID,
                 },
               },
-              rlsPolicy: {
+              policy: {
                 posts_select_own_a1b2c3d4: {
-                  kind: 'rlsPolicy',
+                  kind: 'policy',
                   name: 'posts_select_own_a1b2c3d4',
                   prefix: 'posts_select_own',
                   tableName: 'posts',
@@ -335,7 +335,7 @@ describe('role + rlsPolicy round-trip', () => {
                   permissive: true,
                 },
                 posts_insert_restrictive_b5c6d7e8: {
-                  kind: 'rlsPolicy',
+                  kind: 'policy',
                   name: 'posts_insert_restrictive_b5c6d7e8',
                   prefix: 'posts_insert_restrictive',
                   tableName: 'posts',
@@ -353,7 +353,7 @@ describe('role + rlsPolicy round-trip', () => {
     };
   }
 
-  it('preserves role + rlsPolicy entries through serialize → deserialize', () => {
+  it('preserves role + policy entries through serialize → deserialize', () => {
     const serializer = new PostgresContractSerializer();
     const input = makeContractWithRolesAndPolicies();
 
@@ -373,9 +373,9 @@ describe('role + rlsPolicy round-trip', () => {
     expect(role?.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
 
     // RLS policies preserved with prefix + full name both distinct
-    expect(Object.keys(ns.entries.rlsPolicy)).toHaveLength(2);
+    expect(Object.keys(ns.policy)).toHaveLength(2);
 
-    const selectPolicy = ns.entries.rlsPolicy['posts_select_own_a1b2c3d4'];
+    const selectPolicy = ns.policy['posts_select_own_a1b2c3d4'];
     expect(selectPolicy).toBeInstanceOf(PostgresRlsPolicy);
     expect(selectPolicy?.name).toBe('posts_select_own_a1b2c3d4');
     expect(selectPolicy?.prefix).toBe('posts_select_own');
@@ -386,7 +386,7 @@ describe('role + rlsPolicy round-trip', () => {
     expect(selectPolicy?.withCheck).toBeUndefined();
     expect(selectPolicy?.permissive).toBe(true);
 
-    const insertPolicy = ns.entries.rlsPolicy['posts_insert_restrictive_b5c6d7e8'];
+    const insertPolicy = ns.policy['posts_insert_restrictive_b5c6d7e8'];
     expect(insertPolicy).toBeInstanceOf(PostgresRlsPolicy);
     expect(insertPolicy?.name).toBe('posts_insert_restrictive_b5c6d7e8');
     expect(insertPolicy?.prefix).toBe('posts_insert_restrictive');
@@ -405,7 +405,7 @@ describe('role + rlsPolicy round-trip', () => {
 
     const ns = roundTripped.storage.namespaces[UNBOUND_NAMESPACE_ID] as PostgresSchema;
     const role = ns.entries.role['app_user']!;
-    const policy = ns.entries.rlsPolicy['posts_select_own_a1b2c3d4']!;
+    const policy = ns.policy['posts_select_own_a1b2c3d4']!;
 
     expect(Object.isFrozen(role)).toBe(true);
     expect(Object.isFrozen(policy)).toBe(true);
@@ -426,7 +426,7 @@ describe('role + rlsPolicy round-trip', () => {
     expect(ns).toBe(PostgresSchema.unbound);
   });
 
-  it('rejects a malformed rlsPolicy entry (bad operation literal)', () => {
+  it('rejects a malformed policy entry (bad operation literal)', () => {
     const serializer = new PostgresContractSerializer();
     const input = createSqlContract({
       storage: {
@@ -435,9 +435,9 @@ describe('role + rlsPolicy round-trip', () => {
             id: UNBOUND_NAMESPACE_ID,
             entries: {
               table: {},
-              rlsPolicy: {
+              policy: {
                 bad_policy: {
-                  kind: 'rlsPolicy',
+                  kind: 'policy',
                   name: 'bad_policy_a1b2c3d4',
                   prefix: 'bad_policy',
                   tableName: 'posts',
@@ -455,7 +455,7 @@ describe('role + rlsPolicy round-trip', () => {
     expect(() => serializer.deserializeContract(input)).toThrow();
   });
 
-  it('serialized rlsPolicy does not contain prismaManaged', () => {
+  it('serialized policy does not contain prismaManaged', () => {
     const serializer = new PostgresContractSerializer();
     const input = makeContractWithRolesAndPolicies();
 
@@ -464,11 +464,11 @@ describe('role + rlsPolicy round-trip', () => {
     const reparsed = JSON.parse(JSON.stringify(json));
 
     const ns = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID];
-    const selectPolicy = ns.entries.rlsPolicy['posts_select_own_a1b2c3d4'];
-    const insertPolicy = ns.entries.rlsPolicy['posts_insert_restrictive_b5c6d7e8'];
+    const selectPolicy = ns.entries.policy['posts_select_own_a1b2c3d4'];
+    const insertPolicy = ns.entries.policy['posts_insert_restrictive_b5c6d7e8'];
 
     expect(selectPolicy).toEqual({
-      kind: 'rlsPolicy',
+      kind: 'policy',
       name: 'posts_select_own_a1b2c3d4',
       prefix: 'posts_select_own',
       tableName: 'posts',
@@ -479,7 +479,7 @@ describe('role + rlsPolicy round-trip', () => {
       permissive: true,
     });
     expect(insertPolicy).toEqual({
-      kind: 'rlsPolicy',
+      kind: 'policy',
       name: 'posts_insert_restrictive_b5c6d7e8',
       prefix: 'posts_insert_restrictive',
       tableName: 'posts',
@@ -492,7 +492,7 @@ describe('role + rlsPolicy round-trip', () => {
     });
   });
 
-  it('rejects a malformed rlsPolicy entry (missing permissive)', () => {
+  it('rejects a malformed policy entry (missing permissive)', () => {
     const serializer = new PostgresContractSerializer();
     const input = createSqlContract({
       storage: {
@@ -501,9 +501,9 @@ describe('role + rlsPolicy round-trip', () => {
             id: UNBOUND_NAMESPACE_ID,
             entries: {
               table: {},
-              rlsPolicy: {
+              policy: {
                 bad_policy: {
-                  kind: 'rlsPolicy',
+                  kind: 'policy',
                   name: 'bad_policy_a1b2c3d4',
                   prefix: 'bad_policy',
                   tableName: 'posts',

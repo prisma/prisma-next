@@ -65,20 +65,11 @@ type VerifySqlSchemaOptionsWithComponents = Parameters<typeof verifySqlSchema>[0
   readonly frameworkComponents: PlannerFrameworkComponents;
 };
 
-/**
- * Reads every `entries['rlsPolicy']` entry across the contract's namespaces and
- * returns them as a flat array. Each policy retains its original `namespaceId`.
- */
 function readExpectedRlsPolicies(contract: Contract<SqlStorage>): readonly PostgresRlsPolicy[] {
   const policies: PostgresRlsPolicy[] = [];
   for (const ns of Object.values(contract.storage.namespaces)) {
     if (isPostgresSchema(ns)) {
-      for (const policy of Object.values(
-        blindCast<
-          Record<string, PostgresRlsPolicy>,
-          'entries[rlsPolicy] holds PostgresRlsPolicy by construction'
-        >(ns.entries['rlsPolicy'] ?? {}),
-      )) {
+      for (const policy of Object.values(ns.policy)) {
         policies.push(policy);
       }
     }

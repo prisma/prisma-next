@@ -55,7 +55,7 @@ describe('PostgresRlsPolicy', () => {
 
   it('constructs with all fields', () => {
     const policy = new PostgresRlsPolicy(policyInput);
-    expect(policy.kind).toBe('rlsPolicy');
+    expect(policy.kind).toBe('policy');
     expect(policy.name).toBe('user_select_a1b2c3d4');
     expect(policy.prefix).toBe('user_select');
     expect(policy.tableName).toBe('user');
@@ -100,7 +100,7 @@ describe('PostgresRlsPolicy', () => {
   it('kind is enumerable and survives JSON round-trip', () => {
     const policy = new PostgresRlsPolicy(policyInput);
     const json = JSON.parse(JSON.stringify(policy)) as Record<string, unknown>;
-    expect(json['kind']).toBe('rlsPolicy');
+    expect(json['kind']).toBe('policy');
     expect(json['name']).toBe('user_select_a1b2c3d4');
     expect(json['prefix']).toBe('user_select');
     expect(json['operation']).toBe('select');
@@ -121,13 +121,13 @@ describe('StorageTable', () => {
   });
 });
 
-describe('PostgresSchema role and rlsPolicy slots', () => {
-  it('exposes empty role and rlsPolicy maps when not provided', () => {
+describe('PostgresSchema role and policy slots', () => {
+  it('exposes empty role and policy maps when not provided', () => {
     const schema = new PostgresSchema({ id: 'public', entries: { table: {}, type: {} } });
-    expect(schema.entries.role).toEqual({});
-    expect(Object.isFrozen(schema.entries.role)).toBe(true);
-    expect(schema.entries.rlsPolicy).toEqual({});
-    expect(Object.isFrozen(schema.entries.rlsPolicy)).toBe(true);
+    expect(schema.role).toEqual({});
+    expect(Object.isFrozen(schema.role)).toBe(true);
+    expect(schema.policy).toEqual({});
+    expect(Object.isFrozen(schema.policy)).toBe(true);
   });
 
   it('normalises plain role input into PostgresRole instances', () => {
@@ -144,13 +144,13 @@ describe('PostgresSchema role and rlsPolicy slots', () => {
     expect(role?.name).toBe('authenticated');
   });
 
-  it('normalises plain rlsPolicy input into PostgresRlsPolicy instances', () => {
+  it('normalises plain policy input into PostgresRlsPolicy instances', () => {
     const schema = new PostgresSchema({
       id: 'public',
       entries: {
         table: {},
         type: {},
-        rlsPolicy: {
+        policy: {
           user_select_a1b2c3d4: {
             name: 'user_select_a1b2c3d4',
             prefix: 'user_select',
@@ -162,7 +162,7 @@ describe('PostgresSchema role and rlsPolicy slots', () => {
         },
       },
     });
-    const policy = schema.entries.rlsPolicy['user_select_a1b2c3d4'];
+    const policy = schema.policy['user_select_a1b2c3d4'];
     expect(policy).toBeInstanceOf(PostgresRlsPolicy);
     expect(policy?.tableName).toBe('user');
   });

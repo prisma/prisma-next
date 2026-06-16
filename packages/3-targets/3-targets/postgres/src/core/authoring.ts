@@ -135,7 +135,7 @@ export const postgresAuthoringPslBlockDescriptors = {
   policy_select: {
     kind: 'pslBlock',
     keyword: 'policy_select',
-    discriminator: 'rlsPolicy',
+    discriminator: 'policy',
     name: { required: true },
     parameters: {
       target: { kind: 'ref', refKind: 'model', scope: 'same-namespace', required: true },
