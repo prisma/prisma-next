@@ -159,13 +159,6 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "entries": {
-          "table": {}
-        },
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema"
-      },
       "public": {
         "entries": {
           "table": {
@@ -268,7 +261,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:09975600e08efb9329edff697b91d03a80436c0cbee3f7a1b1337af99a1682cd",
+    "storageHash": "sha256:6c2de2dd04e4425aa3a8ba8e05df0c812204ef610bb975ae1b2b7d19c74fbdb2",
     "types": {
       "WgsGeometry": {
         "codecId": "pg/geometry@1",

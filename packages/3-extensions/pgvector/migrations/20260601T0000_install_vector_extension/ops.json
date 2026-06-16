@@ -15,7 +15,8 @@
     "precheck": [
       {
         "description": "verify extension \"vector\" is not already enabled",
-        "sql": "SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')"
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_extension\" WHERE \"extname\" = $1) AS \"result\"",
+        "params": ["vector"]
       }
     ],
     "execute": [
@@ -27,7 +28,8 @@
     "postcheck": [
       {
         "description": "confirm extension \"vector\" is enabled",
-        "sql": "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_extension\" WHERE \"extname\" = $1) AS \"result\"",
+        "params": ["vector"]
       }
     ]
   }

@@ -1,6 +1,6 @@
 [
   {
-    "id": "column.post.priority",
+    "id": "column.public.post.priority",
     "label": "Add column \"priority\" to \"post\"",
     "operationClass": "additive",
     "target": {

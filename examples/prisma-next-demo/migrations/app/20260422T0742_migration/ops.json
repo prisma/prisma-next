@@ -1,6 +1,6 @@
 [
   {
-    "id": "column.user.displayName",
+    "id": "column.public.user.displayName",
     "label": "Add column \"displayName\" to \"user\"",
     "operationClass": "additive",
     "target": {
