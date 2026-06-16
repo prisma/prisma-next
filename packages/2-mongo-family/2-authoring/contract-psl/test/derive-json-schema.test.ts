@@ -571,14 +571,17 @@ describe('deriveJsonSchema — enum fields', () => {
     );
 
     const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
-    // nullable on an array field means the field itself may be absent/null (not that
-    // individual elements are null), so null belongs to the outer bsonType, not items.
-    // The existing nullable+many shape keeps bsonType:'array' on the outer; enum goes in items.
     expect(props['roles']).toEqual({
       bsonType: 'array',
       items: { bsonType: 'string', enum: ['user', 'admin'] },
     });
     expect(props['roles']).not.toHaveProperty('enum');
+    // Intentional asymmetry: nullable+many keeps bsonType:'array' (not ['null','array']).
+    // MongoDB treats a document missing the field as absent (allowed when not in required[]);
+    // a document with the field present as null is rejected because null is not an array.
+    // The cross-family convention is: nullable-array = "field may be absent", not "field may be null".
+    expect(props['roles']?.['bsonType']).toBe('array');
+    expect(props['roles']?.['bsonType']).not.toEqual(['null', 'array']);
   });
 
   it('preserves member value declaration order', () => {
