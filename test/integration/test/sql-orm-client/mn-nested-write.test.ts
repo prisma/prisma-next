@@ -66,7 +66,7 @@ function buildExecutionDefaultedTagsContract(): TestContract {
     throw new Error('Test contract is missing the execution block');
   }
   execution.mutations.defaults.push({
-    ref: { table: 'user_tags', column: 'created_at' },
+    ref: { namespace: 'public', table: 'user_tags', column: 'created_at' },
     onCreate: { kind: 'generator', id: 'uuidv4' },
   });
 
