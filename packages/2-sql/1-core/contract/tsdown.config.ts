@@ -12,5 +12,6 @@ export default defineConfig({
     'src/exports/index-types.ts',
     'src/exports/index-type-validation.ts',
     'src/exports/canonicalization-hooks.ts',
+    'src/test-support.ts',
   ],
 });
