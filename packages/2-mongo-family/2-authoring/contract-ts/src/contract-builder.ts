@@ -491,6 +491,34 @@ type DefinitionValueObjects<Definition> = Definition extends {
   ? ValueObjects
   : Record<never, never>;
 
+type DefinitionEnums<Definition> = Definition extends {
+  readonly enums?: infer E;
+}
+  ? Present<E> extends Record<string, EnumTypeHandle>
+    ? string extends keyof Present<E>
+      ? Record<never, never>
+      : Present<E>
+    : Record<never, never>
+  : Record<never, never>;
+
+type EnumHandleAccessorType<Handle> =
+  Handle extends EnumTypeHandle<infer _Name, infer Values, infer Names, infer MembersMap>
+    ? {
+        readonly values: Values;
+        readonly names: Names;
+        readonly members: MembersMap;
+        has(v: Values[number]): boolean;
+        nameOf(v: Values[number]): string | undefined;
+        ordinalOf(v: Values[number]): number;
+      }
+    : never;
+
+type BuiltEnumAccessors<Definition> = {
+  readonly [K in keyof DefinitionEnums<Definition>]: EnumHandleAccessorType<
+    DefinitionEnums<Definition>[K]
+  >;
+};
+
 type DefinitionRoots<Definition> = Definition extends {
   readonly roots?: infer Roots extends Record<string, ModelNameInput>;
 }
@@ -553,6 +581,7 @@ type MongoContractBaseFromDefinition<Definition> = Simplify<{
   readonly profileHash: ProfileHashBase<string>;
   readonly meta: Record<string, never>;
   readonly defaultControlPolicy?: ControlPolicy;
+  readonly enumAccessors: BuiltEnumAccessors<Definition>;
 }>;
 
 type CodecTypesFromDefinition<Definition> = MongoCodecTypes &

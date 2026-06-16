@@ -5,6 +5,7 @@ import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mong
 import type { IncludedRow, NoIncludes } from '@prisma-next/mongo-orm';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../../../2-mongo-family/1-foundation/mongo-contract/test/fixtures/orm-contract';
+import { defineContract, enumType, field, member, model } from '../src/exports/contract-builder';
 import type { MongoClient } from '../src/runtime/mongo';
 
 type UserRow = IncludedRow<Contract, 'User', NoIncludes>;
@@ -112,4 +113,33 @@ test('db.enums.Role.values carries the literal member values', () => {
 
 test('db.enums.Role.members.User is the literal "user"', () => {
   expectTypeOf<(typeof enumDb)['enums']['Role']['members']['User']>().toEqualTypeOf<'user'>();
+});
+
+// ---------------------------------------------------------------------------
+// A03: TS DSL defineContract path exposes typed db.enums (no cast required)
+// ---------------------------------------------------------------------------
+
+const Role = enumType(
+  'Role',
+  { codecId: 'mongo/string@1', nativeType: 'string' },
+  member('User', 'user'),
+  member('Admin', 'admin'),
+);
+
+const dslContract = defineContract({
+  enums: { Role },
+  models: {
+    Account: model('Account', { collection: 'accounts', fields: { _id: field.objectId() } }),
+  },
+});
+
+declare const dslDb: MongoClient<typeof dslContract>;
+
+test('TS DSL defineContract: db.enums.Role.values resolves to the literal tuple', () => {
+  type Values = (typeof dslDb)['enums']['Role']['values'];
+  expectTypeOf<Values>().toEqualTypeOf<readonly ['user', 'admin']>();
+});
+
+test('TS DSL defineContract: db.enums.Role.members.User resolves to "user" literal', () => {
+  expectTypeOf<(typeof dslDb)['enums']['Role']['members']['User']>().toEqualTypeOf<'user'>();
 });
