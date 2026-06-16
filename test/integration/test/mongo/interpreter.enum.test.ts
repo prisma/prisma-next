@@ -4,12 +4,12 @@ import {
 } from '@prisma-next/family-mongo/pack';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { parsePslDocument } from '@prisma-next/psl-parser';
-import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToMongoContractInput,
   interpretPslDocumentToMongoContract,
-} from '../src/interpreter';
+} from '@prisma-next/mongo-contract-psl';
+import { parsePslDocument } from '@prisma-next/psl-parser';
+import { describe, expect, it } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Authoring contributions — use the production mongo family descriptors
@@ -59,7 +59,7 @@ function interpret(
   schema: string,
   overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'document'>>,
 ) {
-  const contributions = overrides?.authoringContributions ?? authoringContributions;
+  const contributions = overrides?.['authoringContributions'] ?? authoringContributions;
   const descriptors = contributions?.pslBlockDescriptors;
   const document = parsePslDocument({
     schema,
@@ -222,7 +222,9 @@ model Account {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.failure.diagnostics.some((d) => d.code === 'PSL_ENUM_MISSING_TYPE')).toBe(true);
+    expect(
+      result.failure.diagnostics.some((d: { code: string }) => d.code === 'PSL_ENUM_MISSING_TYPE'),
+    ).toBe(true);
   });
 
   it('fails when enum references an unknown codec', () => {
@@ -238,9 +240,11 @@ model Account {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.failure.diagnostics.some((d) => d.code === 'PSL_EXTENSION_INVALID_VALUE')).toBe(
-      true,
-    );
+    expect(
+      result.failure.diagnostics.some(
+        (d: { code: string }) => d.code === 'PSL_EXTENSION_INVALID_VALUE',
+      ),
+    ).toBe(true);
   });
 
   it('non-enum fields are unaffected', () => {
