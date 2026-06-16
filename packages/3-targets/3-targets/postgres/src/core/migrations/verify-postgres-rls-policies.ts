@@ -23,6 +23,9 @@ function rlsPoliciesFromAnnotations(schema: SqlSchemaIR): readonly PostgresRlsPo
  * schema name (e.g. 'public'). The table-name filter already scopes results to
  * tables present in the introspected schema IR.
  *
+ * Issues carry the contract namespace key (not the policy's namespaceId field),
+ * so downstream mapIssueToCall can locate the namespace in the contract directly.
+ *
  * `strict` mirrors the family verifier's strict flag: `extra_rls_policy` issues
  * are only emitted when strict is true (widening or destructive ops allowed).
  * Callers using additive-only policy (e.g. `db init`) skip extra issues, matching
@@ -39,37 +42,36 @@ export function verifyPostgresRlsPolicies(input: {
 }): readonly SchemaIssue[] {
   const { contract, schema, strict = false } = input;
 
-  const expectedPolicies: PostgresRlsPolicy[] = [];
-  for (const ns of Object.values(contract.storage.namespaces)) {
-    if (isPostgresSchema(ns)) {
-      for (const policy of Object.values(ns.policy)) {
-        expectedPolicies.push(policy);
-      }
-    }
-  }
-
   const actualPolicies = rlsPoliciesFromAnnotations(schema);
   const schemaTableNames = new Set(Object.keys(schema.tables));
   const scopedActual = actualPolicies.filter((p) => schemaTableNames.has(p.tableName));
-
-  const expectedByName = new Map(expectedPolicies.map((p) => [p.name, p]));
   const actualByName = new Map(scopedActual.map((p) => [p.name, p]));
 
   const issues: SchemaIssue[] = [];
 
-  for (const [name, policy] of expectedByName) {
-    if (!actualByName.has(name)) {
-      issues.push({
-        kind: 'missing_rls_policy',
-        namespaceId: policy.namespaceId,
-        table: policy.tableName,
-        indexOrConstraint: policy.name,
-        message: `RLS policy "${policy.name}" on table "${policy.tableName}" is missing from the database`,
-      });
+  for (const [namespaceKey, ns] of Object.entries(contract.storage.namespaces)) {
+    if (!isPostgresSchema(ns)) continue;
+    for (const policy of Object.values(ns.policy)) {
+      if (!actualByName.has(policy.name)) {
+        issues.push({
+          kind: 'missing_rls_policy',
+          namespaceId: namespaceKey,
+          table: policy.tableName,
+          indexOrConstraint: policy.name,
+          message: `RLS policy "${policy.name}" on table "${policy.tableName}" is missing from the database`,
+        });
+      }
     }
   }
 
   if (strict) {
+    const expectedByName = new Map<string, string>();
+    for (const [namespaceKey, ns] of Object.entries(contract.storage.namespaces)) {
+      if (!isPostgresSchema(ns)) continue;
+      for (const policy of Object.values(ns.policy)) {
+        expectedByName.set(policy.name, namespaceKey);
+      }
+    }
     for (const [name, policy] of actualByName) {
       if (!expectedByName.has(name)) {
         issues.push({
