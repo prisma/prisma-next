@@ -1,4 +1,4 @@
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { TestSqlContractSerializer as SqlContractSerializer } from '@prisma-next/family-sql/test-utils';
 import {
   type AnyQueryAst,
   BinaryExpr,

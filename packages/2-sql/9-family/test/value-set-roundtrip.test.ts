@@ -5,7 +5,7 @@ import { type SqlStorage, StorageValueSet } from '@prisma-next/sql-contract/type
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { defineContract, enumType, member } from '@prisma-next/sql-contract-ts/contract-builder';
 import { describe, expect, it } from 'vitest';
-import { SqlContractSerializer } from '../src/core/ir/sql-contract-serializer';
+import { TestSqlContractSerializer as SqlContractSerializer } from './test-sql-contract-serializer';
 
 // ---------------------------------------------------------------------------
 // Minimal pack stubs — codec is passed explicitly to enumType

@@ -1,5 +1,5 @@
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { TestSqlContractSerializer as SqlContractSerializer } from '@prisma-next/family-sql/test-utils';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   BinaryExpr,

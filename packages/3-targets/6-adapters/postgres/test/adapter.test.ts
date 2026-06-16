@@ -1,5 +1,5 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { TestSqlContractSerializer as SqlContractSerializer } from '@prisma-next/family-sql/test-utils';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import {

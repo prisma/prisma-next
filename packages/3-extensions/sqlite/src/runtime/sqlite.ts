@@ -3,7 +3,6 @@ import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contrac
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqliteBinding } from '@prisma-next/driver-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
@@ -31,7 +30,9 @@ import {
   createSqlExecutionStack,
   withTransaction,
 } from '@prisma-next/sql-runtime';
-import sqliteTarget from '@prisma-next/target-sqlite/runtime';
+import sqliteTarget, {
+  SqliteContractSerializer as SqlContractSerializer,
+} from '@prisma-next/target-sqlite/runtime';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';

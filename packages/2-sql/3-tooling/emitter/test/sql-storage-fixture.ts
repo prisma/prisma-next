@@ -1,16 +1,17 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
+function makeRawNamespace(id: string, entries: Record<string, unknown>) {
+  return { id, kind: 'test-sql-namespace', entries };
+}
+
 export function namespacedSqlStorage(parts: {
   readonly tables: Record<string, unknown>;
   readonly types?: Record<string, unknown>;
 }) {
   return {
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: {
-        id: UNBOUND_NAMESPACE_ID,
-        entries: { table: parts.tables },
-      },
+      [UNBOUND_NAMESPACE_ID]: makeRawNamespace(UNBOUND_NAMESPACE_ID, { table: parts.tables }),
     },
     ...(parts.types !== undefined ? { types: parts.types } : {}),
   };
@@ -34,13 +35,8 @@ export function normalizeRootSqlStorage(
           }
           if ('tables' in ns) {
             changed = true;
-            return [
-              id,
-              {
-                id: typeof ns.id === 'string' ? ns.id : id,
-                entries: { table: ns.tables as Record<string, unknown> },
-              },
-            ];
+            const nsId = typeof ns.id === 'string' ? ns.id : id;
+            return [id, makeRawNamespace(nsId, { table: ns.tables as Record<string, unknown> })];
           }
           return [id, ns];
         }),

@@ -1,4 +1,4 @@
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { TestSqlContractSerializer as SqlContractSerializer } from '@prisma-next/family-sql/test-utils';
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { RuntimeExtensionDescriptor } from '@prisma-next/framework-components/execution';
