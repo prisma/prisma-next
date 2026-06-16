@@ -62,7 +62,6 @@ function buildContractWithPolicy(): Contract<SqlStorage> {
           indexes: [],
         }),
       },
-      type: {},
       policy: { [policy.name]: policy },
     },
   });
@@ -179,7 +178,6 @@ describe.sequential('RLS verify extension issues', () => {
             indexes: [],
           }),
         },
-        type: {},
         policy: {},
       },
     });
@@ -235,7 +233,6 @@ describe.sequential('RLS verify extension issues', () => {
             indexes: [],
           }),
         },
-        type: {},
         policy: {},
       },
     });

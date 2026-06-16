@@ -61,7 +61,6 @@ function buildContractWithPolicy(): Contract<SqlStorage> {
           indexes: [],
         }),
       },
-      type: {},
       policy: { [policy.name]: policy },
     },
   });
@@ -454,7 +453,6 @@ describe('F07: rlsEnabledByTable cross-schema collision', () => {
             indexes: [],
           }),
         },
-        type: {},
         policy: { [policy.name]: policy },
       },
     });
@@ -545,7 +543,6 @@ describe('F07: rlsEnabledByTable cross-schema collision', () => {
             indexes: [],
           }),
         },
-        type: {},
         policy: { [policy.name]: policy },
       },
     });
@@ -633,7 +630,6 @@ function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<Sql
           indexes: [],
         }),
       },
-      type: {},
       policy: policyEntries,
     },
   });

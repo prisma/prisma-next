@@ -123,7 +123,7 @@ describe('StorageTable', () => {
 
 describe('PostgresSchema role and policy slots', () => {
   it('exposes empty role and policy maps when not provided', () => {
-    const schema = new PostgresSchema({ id: 'public', entries: { table: {}, type: {} } });
+    const schema = new PostgresSchema({ id: 'public', entries: { table: {} } });
     expect(schema.role).toEqual({});
     expect(Object.isFrozen(schema.role)).toBe(true);
     expect(schema.policy).toEqual({});
@@ -135,7 +135,6 @@ describe('PostgresSchema role and policy slots', () => {
       id: 'public',
       entries: {
         table: {},
-        type: {},
         role: { authenticated: { name: 'authenticated' } },
       },
     });
@@ -149,7 +148,6 @@ describe('PostgresSchema role and policy slots', () => {
       id: 'public',
       entries: {
         table: {},
-        type: {},
         policy: {
           user_select_a1b2c3d4: {
             name: 'user_select_a1b2c3d4',
@@ -171,7 +169,7 @@ describe('PostgresSchema role and policy slots', () => {
     const role = new PostgresRole({ name: 'authenticated' });
     const schema = new PostgresSchema({
       id: 'public',
-      entries: { table: {}, type: {}, role: { authenticated: role } },
+      entries: { table: {}, role: { authenticated: role } },
     });
     const hydrated = schema.role['authenticated'];
     expect(hydrated).toBeInstanceOf(PostgresRole);
@@ -180,7 +178,7 @@ describe('PostgresSchema role and policy slots', () => {
   });
 
   it('is frozen after construction', () => {
-    const schema = new PostgresSchema({ id: 'public', entries: { table: {}, type: {} } });
+    const schema = new PostgresSchema({ id: 'public', entries: { table: {} } });
     expect(Object.isFrozen(schema)).toBe(true);
     expect(Object.isFrozen(schema.entries)).toBe(true);
   });
