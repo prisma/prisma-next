@@ -1,6 +1,10 @@
 import { generateContractDts } from '@prisma-next/emitter';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { deriveJsonSchema } from '@prisma-next/mongo-contract-psl';
 import { mongoEmission } from '@prisma-next/mongo-emitter';
 import { timeouts } from '@prisma-next/test-utils';
+import { blindCast } from '@prisma-next/utils/casts';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, describe, expect, expectTypeOf, it } from 'vitest';
@@ -47,28 +51,53 @@ const contract = defineContract({
 // Codec lookup for validator derivation
 // ---------------------------------------------------------------------------
 
-const BSON_TYPES: Record<string, string> = {
-  'mongo/string@1': 'string',
-  'mongo/objectId@1': 'objectId',
+const mongoTargetTypes: Record<string, readonly string[]> = {
+  'mongo/string@1': ['string'],
+  'mongo/objectId@1': ['objectId'],
 };
 
-// Hand-derived $jsonSchema matching what deriveJsonSchema produces for Account.
-// D3 unit tests prove deriveJsonSchema emits this exact shape; D5 proves the DB
-// enforces it.
-const ACCOUNT_JSON_SCHEMA = {
-  bsonType: 'object',
-  required: ['_id', 'role', 'tags'],
-  properties: {
-    _id: { bsonType: BSON_TYPES['mongo/objectId@1'] },
-    role: { bsonType: BSON_TYPES['mongo/string@1'], enum: ['user', 'admin'] },
-    mood: { bsonType: ['null', BSON_TYPES['mongo/string@1']!], enum: ['user', 'admin', null] },
-    tags: {
-      bsonType: 'array',
-      items: { bsonType: BSON_TYPES['mongo/string@1'], enum: ['user', 'admin'] },
-    },
+const codecLookup: CodecLookup = {
+  get: (id: string) => {
+    const targetTypes = mongoTargetTypes[id];
+    if (!targetTypes) return undefined;
+    return {
+      id,
+      encode: async (v: unknown) => v,
+      decode: async (w: unknown) => w,
+      encodeJson: (v: unknown) => v,
+      decodeJson: (j: unknown) => j,
+    } as ReturnType<CodecLookup['get']>;
   },
-  additionalProperties: false,
-} as const;
+  targetTypesFor: (id: string) => mongoTargetTypes[id],
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
+};
+
+// Derive the $jsonSchema validator from the contract via the production deriver.
+// This ensures a regression in deriveJsonSchema (e.g. placing enum outside items
+// for array fields) breaks this test — not just the unit tests in derive-json-schema.test.ts.
+//
+// The namespace type omits the `enum` slot because enumAccessors carries the
+// literal-typed accessors for the TS-DSL path. The builder does set it at runtime,
+// so we read it via a cast here.
+const ns = contract.domain.namespaces[UNBOUND_NAMESPACE_ID];
+const accountFields = ns?.models['Account']?.fields ?? {};
+type RuntimeNs = {
+  readonly enum?: Record<
+    string,
+    { codecId: string; members: readonly { name: string; value: unknown }[] }
+  >;
+};
+const contractEnums = blindCast<RuntimeNs, 'enum is set at runtime by the builder'>(ns).enum;
+const ACCOUNT_VALIDATOR = deriveJsonSchema(
+  accountFields,
+  undefined,
+  codecLookup,
+  blindCast<
+    Record<string, import('@prisma-next/contract/types').ContractEnum>,
+    'enum member values are JsonValue-compatible at runtime'
+  >(contractEnums),
+);
 
 // ---------------------------------------------------------------------------
 // MMS harness
@@ -91,9 +120,9 @@ describe('mongo enum — end-to-end (replica set)', {
     db = nativeClient.db(dbName);
 
     await db.createCollection('accounts', {
-      validator: { $jsonSchema: ACCOUNT_JSON_SCHEMA },
-      validationLevel: 'strict',
-      validationAction: 'error',
+      validator: { $jsonSchema: ACCOUNT_VALIDATOR.jsonSchema },
+      validationLevel: ACCOUNT_VALIDATOR.validationLevel,
+      validationAction: ACCOUNT_VALIDATOR.validationAction,
     });
   }, timeouts.spinUpMongoMemoryServer);
 
@@ -110,11 +139,13 @@ describe('mongo enum — end-to-end (replica set)', {
     it('rejects an insert with a role value not in the enum', async () => {
       await expect(
         db.collection('accounts').insertOne({ role: 'nope', tags: [] }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: 121 });
     });
 
     it('rejects an insert with a null value on a non-nullable field', async () => {
-      await expect(db.collection('accounts').insertOne({ role: null, tags: [] })).rejects.toThrow();
+      await expect(
+        db.collection('accounts').insertOne({ role: null, tags: [] }),
+      ).rejects.toMatchObject({ code: 121 });
     });
   });
 
@@ -150,7 +181,7 @@ describe('mongo enum — end-to-end (replica set)', {
     it('rejects an out-of-set value on a nullable enum field', async () => {
       await expect(
         db.collection('accounts').insertOne({ role: 'user', mood: 'bogus', tags: [] }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: 121 });
     });
   });
 
@@ -171,7 +202,7 @@ describe('mongo enum — end-to-end (replica set)', {
     it('rejects an array containing an out-of-set element', async () => {
       await expect(
         db.collection('accounts').insertOne({ role: 'user', tags: ['bogus'] }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: 121 });
     });
   });
 
@@ -180,44 +211,31 @@ describe('mongo enum — end-to-end (replica set)', {
   // -------------------------------------------------------------------------
 
   describe('db.enums via mongo() facade', () => {
-    type AnyEnums = Record<
-      string,
-      {
-        readonly values: readonly unknown[];
-        readonly members: Record<string, unknown>;
-        ordinalOf(v: unknown): number;
-      }
-    >;
-
     it('exposes the enum accessor at db.enums.Role without namespace key', () => {
       const db2 = mongo({ contract, uri: replSet.getUri(), dbName });
-      const enums = db2.enums as unknown as AnyEnums;
-      expect(enums['Role']).toBeDefined();
-      expect(enums['Role']?.values).toEqual(['user', 'admin']);
+      expect(db2.enums['Role']).toBeDefined();
+      expect(db2.enums['Role'].values).toEqual(['user', 'admin']);
     });
 
     it('db.enums.Role.values returns the ordered tuple', () => {
       const db2 = mongo({ contract, uri: replSet.getUri(), dbName });
-      const enums = db2.enums as unknown as AnyEnums;
-      expect(enums['Role']?.values).toEqual(['user', 'admin']);
+      expect(db2.enums['Role'].values).toEqual(['user', 'admin']);
     });
 
     it('db.enums.Role.members.User === "user"', () => {
       const db2 = mongo({ contract, uri: replSet.getUri(), dbName });
-      const enums = db2.enums as unknown as AnyEnums;
-      expect(enums['Role']?.members['User']).toBe('user');
+      expect(db2.enums['Role'].members['User']).toBe('user');
     });
 
     it('db.enums.Status.ordinalOf returns declaration-order indices (not lexical)', () => {
       const db2 = mongo({ contract, uri: replSet.getUri(), dbName });
-      const enums = db2.enums as unknown as AnyEnums;
-      const status = enums['Status'];
+      const status = db2.enums['Status'];
       expect(status).toBeDefined();
       // Declaration order: Pending=0, Active=1, Inactive=2
       // Lexical order would be: Active=0, Inactive=1, Pending=2 — different.
-      expect(status?.ordinalOf('pending')).toBe(0);
-      expect(status?.ordinalOf('active')).toBe(1);
-      expect(status?.ordinalOf('inactive')).toBe(2);
+      expect(status.ordinalOf('pending')).toBe(0);
+      expect(status.ordinalOf('active')).toBe(1);
+      expect(status.ordinalOf('inactive')).toBe(2);
     });
 
     it('contract domain carries a scalar role field (compile-time)', () => {
@@ -265,6 +283,9 @@ describe('emit-then-consume: value-union narrowing through the emitted contract.
     // The enum field narrows to the literal value union (not the codec channel).
     expect(outputMap).toContain("readonly role: 'user' | 'admin'");
     expect(outputMap).not.toContain("readonly role: CodecTypes['mongo/string@1']['output']");
+    // Negative: must not widen to a union with string or the full codec channel.
+    expect(outputMap).not.toContain("readonly role: 'user' | 'admin' | string");
+    expect(outputMap).not.toContain('readonly role: string');
 
     // The non-enum fields are unchanged.
     expect(dts).toContain("CodecTypes['mongo/objectId@1']");
@@ -284,6 +305,8 @@ describe('emit-then-consume: value-union narrowing through the emitted contract.
     );
 
     expect(outputMap).toContain("readonly mood: 'user' | 'admin' | null");
+    expect(outputMap).not.toContain("readonly mood: 'user' | 'admin' | null | string");
+    expect(outputMap).not.toContain('readonly mood: string | null');
   });
 
   it('emits ReadonlyArray value union for an array enum field', () => {
@@ -300,6 +323,8 @@ describe('emit-then-consume: value-union narrowing through the emitted contract.
     );
 
     expect(outputMap).toContain("readonly tags: ReadonlyArray<'user' | 'admin'>");
+    expect(outputMap).not.toContain("readonly tags: ReadonlyArray<'user' | 'admin' | string>");
+    expect(outputMap).not.toContain('readonly tags: ReadonlyArray<string>');
   });
 
   it('non-vacuous: emits the enum domain block in the namespace type (contract.d.ts carries it)', () => {

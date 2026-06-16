@@ -840,6 +840,8 @@ function resolveNonRelationField(
     return field.list ? { ...result, many: true } : result;
   }
 
+  // Parallel to SQL's enumTypeDescriptors lookup, but reduced to codecId only —
+  // Mongo has no named-type system, so there is no nativeType table to populate.
   const enumCodecId = enumCodecIds.get(field.typeName);
   if (enumCodecId !== undefined) {
     const valueSet: ValueSetRef = {
