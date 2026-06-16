@@ -3,17 +3,6 @@ import type { ContractWithTypeMaps, TypeMaps } from '@prisma-next/sql-contract/t
 import { assertType, expectTypeOf, test } from 'vitest';
 import type { ExtractOutputType, TableToSelection } from '../src/selection';
 
-// ---------------------------------------------------------------------------
-// Minimal enum-typed contract fixture for query-builder lane.
-//
-// The query surface types a column by indexing the storage lookup
-// `StorageColumnTypes[ns][table][column]` (output) directly — no cross-plane
-// model→field walk. So the value union and codec output both come from the
-// storage maps below. A raw value-set column (`audit_action`) with no domain
-// field still types correctly because the storage lookup does not require a
-// model field to exist.
-// ---------------------------------------------------------------------------
-
 type EnumCodecTypes = {
   'pg/text@1': {
     output: string;
@@ -34,9 +23,7 @@ type EnumStorageColumnTypes = {
     User: {
       role: 'user' | 'admin';
       status: 'active' | 'inactive' | null;
-      // A storage column with a value-set but no domain field.
       audit_action: 'create' | 'update' | 'delete';
-      // A plain (non-enum) column resolves to the codec output.
       name: string;
     };
   };
@@ -116,11 +103,7 @@ type EnumModels = {
   };
 };
 
-// A plain structural base (not derived from `Contract<…>` via `Omit`): the
-// phantom `TypeMaps` key survives reliably on a plain object intersection, so
-// `ExtractStorageColumnTypes` resolves. (`ExtractOutputType` only needs the
-// storage namespaces — for `UnboundTables` — plus the phantom.) This matches
-// `Contract<SqlStorage>` structurally for the fields the lane reads.
+// Plain object base (not `Omit<Contract<…>>`); `Omit` loses the phantom key.
 type EnumContractBase = {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
@@ -139,12 +122,9 @@ type EnumContractBase = {
 
 type EnumContract = ContractWithTypeMaps<EnumContractBase, EnumTypeMaps>;
 
-// ---------------------------------------------------------------------------
-// Read output: ExtractOutputType reads StorageColumnTypes[ns][table][column].
-// ---------------------------------------------------------------------------
-
 test('query-builder: non-nullable enum column output is value union, not string', () => {
   type RoleOutput = ExtractOutputType<EnumContract, 'User', 'role'>;
+  // assertType catches a `never` regression that toEqualTypeOf would silently pass.
   assertType<RoleOutput>('user');
   expectTypeOf<RoleOutput>().toEqualTypeOf<'user' | 'admin'>();
 });

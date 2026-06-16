@@ -20,9 +20,8 @@ import type { NamespaceTable, TableProxyContract } from './db';
 import type { DeleteQuery, InsertQuery, InsertValues, UpdateQuery } from './mutation-query';
 import type { WithJoin, WithSelect } from './shared';
 
-// Homomorphic mapped form so the result is always `Record<string, unknown>`,
-// satisfying `QueryContext['resolvedColumnOutputTypes']` even while `C` is
-// generic. Empty `ColumnKeys` yields `Record<string, never>`.
+// Homomorphic mapped form: result is always `Record<string, unknown>` even when
+// `C` is generic, so it satisfies `QueryContext['resolvedColumnOutputTypes']`.
 type ResolvedColumnTypes<
   C extends TableProxyContract,
   NsId extends string,

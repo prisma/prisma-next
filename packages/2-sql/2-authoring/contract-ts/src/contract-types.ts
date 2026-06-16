@@ -735,15 +735,6 @@ type FieldChannelTypes<Definition, Channel extends 'output' | 'input'> = {
   };
 };
 
-// The storage-column type lookup for the in-memory authoring path, keyed by
-// `[ns][table][column]` to mirror the emitter's `StorageColumnTypes` /
-// `StorageColumnInputTypes`. Each model is re-keyed to its storage table and
-// each field to its storage column; the per-column type reuses
-// `FieldChannelType`, so an enum column narrows to its value union and a plain
-// column resolves to the codec channel — matching what the emitted map carries.
-// This keeps `defineContract`-authored contracts consistent with emitted ones,
-// so the sql-builder/query-builder storage surfaces type columns the same way
-// for both.
 type StorageColumnChannelTypes<Definition, Channel extends 'output' | 'input'> = {
   readonly [Ns in DefaultStorageNamespaceId<Definition>]: {
     readonly [ModelName in ModelNames<Definition> as BuiltModelTableName<Definition, ModelName>]: {

@@ -10,14 +10,10 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type { DrainOuterGeneric } from './type-atoms';
 
-// Flat table map for the query-builder surface: every table name declared in
-// any storage namespace, with colliding names unioned.
 export type UnboundTables<TContract extends Contract<SqlStorage>> = SqlBuilderUnboundTables<
   TContract & TableProxyContract
 >;
 
-// The column's output type, indexed from `StorageColumnTypes[ns][table][column]`
-// across every namespace that declares the table.
 export type ExtractOutputType<
   TContract extends Contract<SqlStorage>,
   TTableName extends keyof UnboundTables<TContract> & string,

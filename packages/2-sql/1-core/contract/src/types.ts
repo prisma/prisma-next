@@ -83,9 +83,6 @@ export function applyFkDefaults(
 // Shared by the output and input field-type maps and their extractors.
 export type NamespacedFieldTypeMap = Record<string, Record<string, Record<string, unknown>>>;
 
-// Storage-column type maps nested by namespace coordinate:
-// `[namespaceId][table][column]`. Same three-level record shape as a field map,
-// but keyed by storage table/column rather than domain model/field.
 export type NamespacedStorageColumnTypeMap = Record<
   string,
   Record<string, Record<string, unknown>>

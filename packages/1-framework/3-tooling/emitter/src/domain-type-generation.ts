@@ -291,10 +291,6 @@ export type FieldTypeParamsResolver = (
   model: ContractModelBase,
 ) => Record<string, unknown> | undefined;
 
-// Resolves a domain enum reference to its members; the framework reads
-// `contract.domain.namespaces[ref.namespaceId].enum[ref.entityName]` so it can
-// narrow a `field.valueSet`-bearing field to the literal member values without
-// any family-specific knowledge.
 export type DomainEnumLookup = (ref: ValueSetRef) => ContractEnum | undefined;
 
 function renderEnumMemberLiteral(value: JsonValue): string | undefined {

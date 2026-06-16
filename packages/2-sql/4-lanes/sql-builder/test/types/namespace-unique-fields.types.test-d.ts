@@ -26,9 +26,6 @@ import type {
  * and resolves to its own type, while the other namespace's column is absent.
  */
 
-// `StorageColumnTypes` extended to include `auth.users` columns, so
-// `ContractToQC<TwoNamespaceContract, 'auth', 'users'>` resolves to the auth
-// namespace's column types rather than `Record<string, never>`.
 type TwoNamespaceStorageColumnTypes = StorageColumnTypes & {
   readonly auth: {
     readonly users: {

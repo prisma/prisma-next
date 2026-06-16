@@ -31,9 +31,6 @@ export interface EmissionSpi {
 
   getContractWrapper(contractBaseName: string, typeMapsName: string): string;
 
-  // Family-specific typeParams resolution for the parameterized-codec render
-  // path (e.g. SQL `column.typeRef` -> `storage.types[ref].typeParams`). Inline
-  // `field.type.typeParams` wins; consulted only when the field has none.
   resolveFieldTypeParams?(
     modelName: string,
     fieldName: string,
@@ -41,8 +38,5 @@ export interface EmissionSpi {
     contract: Contract,
   ): Record<string, unknown> | undefined;
 
-  // Family-specific top-level type exports that describe the storage plane
-  // (e.g. SQL's `StorageColumnTypes` / `StorageColumnInputTypes`). Inserted
-  // after the framework's `FieldOutputTypes`/`FieldInputTypes` exports.
   getStorageTypeExports?(contract: Contract, codecLookup?: CodecLookup): string | undefined;
 }

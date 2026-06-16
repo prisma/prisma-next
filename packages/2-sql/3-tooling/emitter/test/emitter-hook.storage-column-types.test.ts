@@ -282,8 +282,6 @@ describe('StorageColumnTypes', () => {
   });
 
   it('includes a value-set column with no domain field in StorageColumnTypes (raw value-set case)', () => {
-    // A storage column may reference a value-set even when no domain model field maps to it.
-    // StorageColumnTypes must include it; FieldOutputTypes must NOT (A3).
     const contract = createContract({
       domain: {
         namespaces: {
@@ -293,7 +291,6 @@ describe('StorageColumnTypes', () => {
                 storage: {
                   namespaceId: UNBOUND_NAMESPACE_ID,
                   table: 'audit',
-                  // 'action' column exists in storage but has no domain field.
                   fields: { id: { column: 'id' } },
                 },
                 fields: {
@@ -342,10 +339,7 @@ describe('StorageColumnTypes', () => {
 
     const dts = generateContractDts(contract, sqlEmission, [], testHashes);
 
-    // StorageColumnTypes has the raw value-set column.
     expect(dts).toContain("readonly action: 'create' | 'update' | 'delete'");
-    // FieldOutputTypes must NOT have 'action' (it has no domain field).
-    // It only has 'id'.
     const fieldOutputMatch = dts.match(/export type FieldOutputTypes = ({[\s\S]*?});/);
     expect(fieldOutputMatch).not.toBeNull();
     const fieldOutputBlock = fieldOutputMatch![0];
@@ -652,11 +646,6 @@ describe('StorageColumnTypes', () => {
   });
 
   it('FieldOutputTypes uses the field element codec for a many[] field, not the storage column codec', () => {
-    // A `many` (array) field is stored as a single container column (e.g. jsonb),
-    // but its element type comes from the domain field's own codec (pg/text@1).
-    // The storage lookup override must NOT fire for many/dict fields — the field
-    // map keeps the framework default (element codec), while StorageColumnTypes
-    // shows the container column codec.
     const contract = createContract({
       models: {
         Config: {
@@ -678,7 +667,6 @@ describe('StorageColumnTypes', () => {
         tables: {
           config: {
             columns: {
-              // The column stores the array as jsonb (container codec differs).
               tags: { nativeType: 'jsonb', codecId: 'pg/jsonb@1', nullable: false },
             },
             primaryKey: { columns: ['tags'] },
@@ -694,13 +682,11 @@ describe('StorageColumnTypes', () => {
 
     const fieldOutputMatch = dts.match(/export type FieldOutputTypes = ({.+?});/s);
     expect(fieldOutputMatch).not.toBeNull();
-    // Field map: element codec (text), wrapped in ReadonlyArray.
     expect(fieldOutputMatch![0]).toContain(
       "readonly tags: ReadonlyArray<CodecTypes['pg/text@1']['output']>",
     );
     expect(fieldOutputMatch![0]).not.toContain('jsonb');
 
-    // StorageColumnTypes: the container column codec (jsonb).
     const storageColumnMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
     expect(storageColumnMatch).not.toBeNull();
     expect(storageColumnMatch![0]).toContain("readonly tags: CodecTypes['pg/jsonb@1']['output']");
