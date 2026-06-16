@@ -20,8 +20,8 @@ import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import {
-  buildSqlNamespace,
   SqlStorage,
   type SqlStorageInput,
   SqlUnboundNamespace,
@@ -446,8 +446,8 @@ export function createStubAdapter(): StubAdapter {
 
 export function unboundNamespaceWithTables(
   tables: Record<string, StorageTableInput>,
-): ReturnType<typeof buildSqlNamespace> {
-  return buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } });
+): ReturnType<typeof createTestSqlNamespace> {
+  return createTestSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } });
 }
 
 export function emptySqlTestDomain() {

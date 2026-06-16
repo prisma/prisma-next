@@ -1,13 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import {
-  freezeNode,
-  type IRNode,
-  type Namespace,
-  NamespaceBase,
-} from '@prisma-next/framework-components/ir';
-import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
-import { blindCast } from '@prisma-next/utils/casts';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { enumType, member } from '../src/enum-type';
@@ -297,36 +291,6 @@ describe('enumType() authoring → contract structure', () => {
 // not at the model's own namespace.
 // ---------------------------------------------------------------------------
 
-class StubNamespace extends NamespaceBase {
-  readonly kind = 'schema' as const;
-  readonly id: string;
-  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
-
-  constructor(id: string, tables: Readonly<Record<string, IRNode>> = {}) {
-    super();
-    this.id = id;
-    this.entries = Object.freeze({ table: Object.freeze({ ...tables }) });
-    freezeNode(this);
-  }
-
-  qualifier(): string {
-    return `"${this.id}"`;
-  }
-
-  qualifyTable(name: string): string {
-    return `"${this.id}"."${name}"`;
-  }
-}
-
-function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
-  return new StubNamespace(
-    input.id,
-    blindCast<Readonly<Record<string, IRNode>>, 'entries[table] holds only IRNode-shaped tables'>(
-      input.entries['table'],
-    ),
-  );
-}
-
 describe('enumType() — valueSet ref namespace (non-default model namespace)', () => {
   it('field/column valueSet refs point at the default namespace even when the model is in a non-default namespace', () => {
     const Role = enumType('Role', pgText, member('User', 'user'), member('Admin', 'admin'));
@@ -336,7 +300,7 @@ describe('enumType() — valueSet ref namespace (non-default model namespace)', 
       target: postgresTargetPack,
       enums: { Role },
       namespaces: ['public', 'auth'],
-      createNamespace: createStubNamespace,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', {
           namespace: 'auth',

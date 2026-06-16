@@ -3,41 +3,9 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
-import {
-  freezeNode,
-  type IRNode,
-  type Namespace,
-  NamespaceBase,
-} from '@prisma-next/framework-components/ir';
-import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { describe, expect, it } from 'vitest';
 import { defineContract } from '../src/contract-builder';
-
-class StubNamespace extends NamespaceBase {
-  readonly kind = 'schema' as const;
-  readonly id: string;
-  readonly entries = Object.freeze({
-    table: Object.freeze({}) as Readonly<Record<string, IRNode>>,
-  });
-
-  constructor(id: string) {
-    super();
-    this.id = id;
-    freezeNode(this);
-  }
-
-  qualifier(): string {
-    return `"${this.id}"`;
-  }
-
-  qualifyTable(name: string): string {
-    return `"${this.id}"."${name}"`;
-  }
-}
-
-function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
-  return new StubNamespace(input.id);
-}
 
 const sqlFamilyPack = {
   kind: 'family',
@@ -171,7 +139,7 @@ describe('defineContract namespace declaration runtime guards', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         namespaces: ['public', 'auth'],
-        createNamespace: createStubNamespace,
+        createNamespace: createTestSqlNamespace,
         models: {},
       }),
     ).not.toThrow();

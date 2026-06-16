@@ -8,7 +8,8 @@ import type {
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
@@ -66,7 +67,7 @@ function buildContract(
     storage: new SqlStorage({
       storageHash: coreHash(hash),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: { table: allTables as never },
         }),

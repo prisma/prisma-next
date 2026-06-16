@@ -4,11 +4,8 @@ import type {
   CodecDescriptor,
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  type SqlStorageTypeEntry,
-} from '@prisma-next/sql-contract/types';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
+import { SqlStorage, type SqlStorageTypeEntry } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -60,7 +57,7 @@ function createParamTypesTestContract(
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
       namespaces: {
-        __unbound__: buildSqlNamespace({
+        __unbound__: createTestSqlNamespace({
           id: '__unbound__',
           entries: {
             table: {

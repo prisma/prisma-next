@@ -1,10 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  type StorageTableInput,
-} from '@prisma-next/sql-contract/types';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
+import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createStubAdapter, createTestContext } from './utils';
@@ -38,11 +35,11 @@ function twoNamespaceContract(): Contract<SqlStorage> {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
       namespaces: {
-        public: buildSqlNamespace({
+        public: createTestSqlNamespace({
           id: 'public',
           entries: { table: { users: table({ id: 'pg/int4@1', email: 'pg/text@1' }) } },
         }),
-        auth: buildSqlNamespace({
+        auth: createTestSqlNamespace({
           id: 'auth',
           entries: { table: { users: table({ id: 'pg/int4@1', token: 'sql/varchar@1' }) } },
         }),

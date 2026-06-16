@@ -1,10 +1,10 @@
 import type { ValueSetRef } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
-import { buildSqlNamespace } from '../src/ir/build-sql-namespace';
 import { StorageColumn } from '../src/ir/storage-column';
 import { StorageTable } from '../src/ir/storage-table';
 import { StorageValueSet } from '../src/ir/storage-value-set';
+import { createTestSqlNamespace } from '../src/test-support';
 
 const baseColumn = { codecId: 'pg/text@1', nativeType: 'text', nullable: false };
 
@@ -46,7 +46,7 @@ describe('SqlNamespace with valueSet entries', () => {
   it('accepts a namespace with a valueSet slot alongside the table slot', () => {
     const roleVs = new StorageValueSet({ kind: 'valueSet', values: ['user', 'admin'] });
 
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
         table: { users: baseTable },
@@ -61,7 +61,7 @@ describe('SqlNamespace with valueSet entries', () => {
   });
 
   it('leaves the valueSet slot absent when not provided', () => {
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: UNBOUND_NAMESPACE_ID,
       entries: { table: { users: baseTable } },
     });
@@ -123,7 +123,7 @@ describe('StorageColumn with valueSet restriction', () => {
       namespaceId: UNBOUND_NAMESPACE_ID,
       entityName: 'Role',
     };
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
         table: {},

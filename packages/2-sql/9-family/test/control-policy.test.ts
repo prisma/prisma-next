@@ -1,10 +1,7 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  type StorageTableInput,
-} from '@prisma-next/sql-contract/types';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
+import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import {
@@ -20,7 +17,7 @@ function makeContract(
   const storage = new SqlStorage({
     storageHash: coreHash('sha256:test'),
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+      [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
         id: UNBOUND_NAMESPACE_ID,
         entries: { table: tables },
       }),

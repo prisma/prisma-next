@@ -1,8 +1,8 @@
 import { coreHash } from '@prisma-next/contract/types';
 import { elementCoordinates, entityAt } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
-import { buildSqlNamespace } from '../src/ir/build-sql-namespace';
 import { SqlStorage } from '../src/ir/sql-storage';
+import { createTestSqlNamespace } from '../src/test-support';
 
 const emptyTableInput = {
   columns: {},
@@ -16,7 +16,7 @@ describe('elementCoordinates with SqlStorage', () => {
     const storage = new SqlStorage({
       storageHash: coreHash('sha256:element-coordinates-sql'),
       namespaces: {
-        app: buildSqlNamespace({ id: 'app', entries: { table: { users: emptyTableInput } } }),
+        app: createTestSqlNamespace({ id: 'app', entries: { table: { users: emptyTableInput } } }),
       },
     });
 
@@ -35,7 +35,7 @@ describe('coordinate-resolution acceptance — every elementCoordinates tuple re
     const storage = new SqlStorage({
       storageHash: coreHash('sha256:coord-resolution-sql'),
       namespaces: {
-        app: buildSqlNamespace({
+        app: createTestSqlNamespace({
           id: 'app',
           entries: {
             table: { users: emptyTableInput, posts: emptyTableInput },

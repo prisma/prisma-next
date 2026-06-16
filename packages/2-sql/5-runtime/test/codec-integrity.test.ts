@@ -3,7 +3,8 @@ import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -120,7 +121,7 @@ describe('createExecutionContext — column codec integrity', () => {
     const storage: SqlStorage = new SqlStorage({
       storageHash: coreHash('sha256:test'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {
@@ -221,7 +222,7 @@ describe('createExecutionContext — column codec integrity', () => {
     const storage: SqlStorage = new SqlStorage({
       storageHash: coreHash('sha256:test'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {
@@ -348,7 +349,7 @@ describe('createExecutionContext — column codec integrity', () => {
     const storage: SqlStorage = new SqlStorage({
       storageHash: coreHash('sha256:test'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {

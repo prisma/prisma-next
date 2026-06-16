@@ -1,7 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
-import { buildSqlNamespace, type SqlStorage } from '@prisma-next/sql-contract/types';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
+import type { SqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -28,9 +29,7 @@ function tableWithColumn(codecId: string) {
   };
 }
 
-function contractWithNamespaces(
-  namespaces: Record<string, ReturnType<typeof buildSqlNamespace>>,
-): Contract<SqlStorage> {
+function contractWithNamespaces(namespaces: Record<string, SqlNamespace>): Contract<SqlStorage> {
   return {
     targetFamily: 'sql',
     target: 'postgres',
@@ -45,7 +44,7 @@ function contractWithNamespaces(
 describe('validateContractCodecMappings', () => {
   it('passes when every column codec is registered', () => {
     const contract = contractWithNamespaces({
-      app: buildSqlNamespace({
+      app: createTestSqlNamespace({
         id: 'app',
         entries: { table: { docs: tableWithColumn('pg/text@1') } },
       }),
@@ -55,11 +54,11 @@ describe('validateContractCodecMappings', () => {
 
   it('reports a missing codec even when another namespace has the same table.column with a registered codec', () => {
     const contract = contractWithNamespaces({
-      app: buildSqlNamespace({
+      app: createTestSqlNamespace({
         id: 'app',
         entries: { table: { docs: tableWithColumn('pg/text@1') } },
       }),
-      analytics: buildSqlNamespace({
+      analytics: createTestSqlNamespace({
         id: 'analytics',
         entries: { table: { docs: tableWithColumn('ext/missing@1') } },
       }),

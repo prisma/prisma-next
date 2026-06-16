@@ -2,10 +2,10 @@ import { coreHash } from '@prisma-next/contract/types';
 import { elementCoordinates, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { buildSqlNamespace } from '../src/ir/build-sql-namespace';
 import { SqlUnboundNamespace } from '../src/ir/sql-unbound-namespace';
 import { StorageTable } from '../src/ir/storage-table';
 import { StorageValueSet } from '../src/ir/storage-value-set';
+import { createTestSqlNamespace } from '../src/test-support';
 
 const emptyTableInput = {
   columns: {},
@@ -24,46 +24,61 @@ const tableWithColumn = {
   foreignKeys: [],
 } as const;
 
-describe('SqlBoundNamespace — entries open dictionary', () => {
+describe('TestSqlNamespace — entries open dictionary', () => {
   it('exact-shape serialization: JSON.stringify emits only id and entries', () => {
-    const ns = buildSqlNamespace({ id: 'app', entries: { table: { users: emptyTableInput } } });
+    const ns = createTestSqlNamespace({
+      id: 'app',
+      entries: { table: { users: emptyTableInput } },
+    });
     const parsed = JSON.parse(JSON.stringify(ns)) as Record<string, unknown>;
     expect(Object.keys(parsed).sort()).toEqual(['entries', 'id']);
   });
 
   it('kind is non-enumerable', () => {
-    const ns = buildSqlNamespace({ id: 'app', entries: { table: {} } });
+    const ns = createTestSqlNamespace({ id: 'app', entries: { table: {} } });
     expect(Object.keys(ns)).not.toContain('kind');
     expect(ns.kind).toBeDefined();
   });
 
   it('entries is frozen after construction', () => {
-    const ns = buildSqlNamespace({ id: 'app', entries: { table: { users: emptyTableInput } } });
+    const ns = createTestSqlNamespace({
+      id: 'app',
+      entries: { table: { users: emptyTableInput } },
+    });
     expect(Object.isFrozen(ns.entries)).toBe(true);
   });
 
   it('inner table map is frozen', () => {
-    const ns = buildSqlNamespace({ id: 'app', entries: { table: { users: emptyTableInput } } });
+    const ns = createTestSqlNamespace({
+      id: 'app',
+      entries: { table: { users: emptyTableInput } },
+    });
     expect(Object.isFrozen(ns.entries['table'])).toBe(true);
   });
 
   it('table getter returns the frozen name-keyed map from entries', () => {
-    const ns = buildSqlNamespace({ id: 'app', entries: { table: { users: emptyTableInput } } });
+    const ns = createTestSqlNamespace({
+      id: 'app',
+      entries: { table: { users: emptyTableInput } },
+    });
     expect(ns.table).toBe(ns.entries['table']);
   });
 
   it('table getter is non-enumerable', () => {
-    const ns = buildSqlNamespace({ id: 'app', entries: { table: {} } });
+    const ns = createTestSqlNamespace({ id: 'app', entries: { table: {} } });
     expect(Object.keys(ns)).not.toContain('table');
   });
 
   it('table getter returns StorageTable instances', () => {
-    const ns = buildSqlNamespace({ id: 'app', entries: { table: { users: emptyTableInput } } });
+    const ns = createTestSqlNamespace({
+      id: 'app',
+      entries: { table: { users: emptyTableInput } },
+    });
     expect(ns.table['users']).toBeInstanceOf(StorageTable);
   });
 
   it('valueSet getter returns the frozen name-keyed map when present', () => {
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: 'app',
       entries: {
         table: {},
@@ -74,17 +89,17 @@ describe('SqlBoundNamespace — entries open dictionary', () => {
   });
 
   it('valueSet getter is non-enumerable', () => {
-    const ns = buildSqlNamespace({ id: 'app', entries: { table: {} } });
+    const ns = createTestSqlNamespace({ id: 'app', entries: { table: {} } });
     expect(Object.keys(ns)).not.toContain('valueSet');
   });
 
   it('valueSet getter returns undefined when absent (no valueSet in entries)', () => {
-    const ns = buildSqlNamespace({ id: 'app', entries: { table: {} } });
+    const ns = createTestSqlNamespace({ id: 'app', entries: { table: {} } });
     expect(ns.valueSet).toBeUndefined();
   });
 
   it('valueSet getter returns StorageValueSet instances', () => {
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: 'app',
       entries: {
         table: {},
@@ -95,7 +110,7 @@ describe('SqlBoundNamespace — entries open dictionary', () => {
   });
 
   it('inner valueSet map is frozen when present', () => {
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: 'app',
       entries: {
         table: {},
@@ -106,7 +121,7 @@ describe('SqlBoundNamespace — entries open dictionary', () => {
   });
 
   it('construction dispatches table entries by key', () => {
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: 'app',
       entries: {
         table: { users: tableWithColumn },
@@ -117,7 +132,7 @@ describe('SqlBoundNamespace — entries open dictionary', () => {
   });
 
   it('construction dispatches valueSet entries by key', () => {
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: 'app',
       entries: {
         table: {},
@@ -129,13 +144,13 @@ describe('SqlBoundNamespace — entries open dictionary', () => {
   });
 
   it('node itself is frozen', () => {
-    const ns = buildSqlNamespace({ id: 'app', entries: { table: {} } });
+    const ns = createTestSqlNamespace({ id: 'app', entries: { table: {} } });
     expect(Object.isFrozen(ns)).toBe(true);
   });
 
   it('carries an unknown kind through frozen as-is (permissive-carry)', () => {
     const bogusMap = Object.freeze({ foo: { x: 1 } });
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: 'app',
       entries: { table: {}, bogus: bogusMap } as never,
     });
@@ -144,7 +159,7 @@ describe('SqlBoundNamespace — entries open dictionary', () => {
   });
 
   it('unknown kind survives JSON.stringify round-trip', () => {
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: 'app',
       entries: { table: {}, bogus: { item: { value: 42 } } } as never,
     });
@@ -155,7 +170,7 @@ describe('SqlBoundNamespace — entries open dictionary', () => {
   });
 
   it('unbound id with only an unknown kind does not return the unbound singleton', () => {
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: UNBOUND_NAMESPACE_ID,
       entries: { bogus: { item: {} } } as never,
     });
@@ -164,7 +179,7 @@ describe('SqlBoundNamespace — entries open dictionary', () => {
   });
 
   it('elementCoordinates yields unknown-kind entries', () => {
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: 'app',
       entries: { table: {}, bogus: { myEntity: {} } } as never,
     });
@@ -182,7 +197,7 @@ describe('SqlBoundNamespace — entries open dictionary', () => {
   });
 
   it('entries[kind][name] resolves the same as the getter[name]', () => {
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: 'app',
       entries: { table: { users: emptyTableInput } },
     });
@@ -218,10 +233,5 @@ describe('SqlUnboundNamespace — entries open dictionary', () => {
 
   it('id is the unbound sentinel', () => {
     expect(SqlUnboundNamespace.instance.id).toBe(UNBOUND_NAMESPACE_ID);
-  });
-
-  it('is the singleton returned for empty unbound input', () => {
-    const ns = buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
-    expect(ns).toBe(SqlUnboundNamespace.instance);
   });
 });

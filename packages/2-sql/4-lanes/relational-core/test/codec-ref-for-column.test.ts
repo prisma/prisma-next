@@ -1,5 +1,5 @@
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import {
-  buildSqlNamespace,
   SqlStorage,
   type SqlStorage as SqlStorageType,
   StorageTable,
@@ -29,11 +29,11 @@ function twoNamespaceSameTableName(): SqlStorage {
   return new SqlStorage({
     storageHash: STORAGE_HASH,
     namespaces: {
-      public: buildSqlNamespace({
+      public: createTestSqlNamespace({
         id: 'public',
         entries: { table: { users: usersTable('email_addr', 'pg/text@1') } },
       }),
-      auth: buildSqlNamespace({
+      auth: createTestSqlNamespace({
         id: 'auth',
         entries: { table: { users: usersTable('token_col', 'pg/int4@1') } },
       }),
@@ -64,7 +64,7 @@ describe('codecRefForStorageColumn', () => {
     const storage = new SqlStorage({
       storageHash: STORAGE_HASH,
       namespaces: {
-        public: buildSqlNamespace({
+        public: createTestSqlNamespace({
           id: 'public',
           entries: { table: { users: usersTable('email_addr', 'pg/text@1') } },
         }),

@@ -1,12 +1,6 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import {
-  freezeNode,
-  type IRNode,
-  type Namespace,
-  NamespaceBase,
-} from '@prisma-next/framework-components/ir';
-import type { SqlNamespace, SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
-import { blindCast } from '@prisma-next/utils/casts';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
+import type { SqlNamespace } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -36,36 +30,6 @@ const sqliteTargetPack: TargetPackRef<'sql', 'sqlite'> = {
   defaultNamespaceId: '__unbound__',
 };
 
-class StubNamespace extends NamespaceBase {
-  readonly kind = 'schema' as const;
-  readonly id: string;
-  readonly entries: Readonly<{ readonly table: Readonly<Record<string, IRNode>> }>;
-
-  constructor(id: string, tables: Readonly<Record<string, IRNode>> = {}) {
-    super();
-    this.id = id;
-    this.entries = Object.freeze({ table: Object.freeze({ ...tables }) });
-    freezeNode(this);
-  }
-
-  qualifier(): string {
-    return `"${this.id}"`;
-  }
-
-  qualifyTable(name: string): string {
-    return `"${this.id}"."${name}"`;
-  }
-}
-
-function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
-  return new StubNamespace(
-    input.id,
-    blindCast<Readonly<Record<string, IRNode>>, 'entries[table] holds only IRNode-shaped tables'>(
-      input.entries['table'],
-    ),
-  );
-}
-
 const int4Column = columnDescriptor('pg/int4@1');
 
 const userModelArgs = {
@@ -80,7 +44,7 @@ describe('per-model `namespace` field (TS builder)', () => {
       family: sqlFamilyPack,
       target: postgresTargetPack,
       namespaces: ['public', 'auth'],
-      createNamespace: createStubNamespace,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', { namespace: 'auth', ...userModelArgs }),
       },
@@ -98,7 +62,7 @@ describe('per-model `namespace` field (TS builder)', () => {
       family: sqlFamilyPack,
       target: postgresTargetPack,
       namespaces: ['public', 'auth'],
-      createNamespace: createStubNamespace,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', userModelArgs),
       },
@@ -114,7 +78,7 @@ describe('per-model `namespace` field (TS builder)', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         namespaces: ['public'],
-        createNamespace: createStubNamespace,
+        createNamespace: createTestSqlNamespace,
         models: {
           User: model('User', { namespace: 'auth', ...userModelArgs }),
         },
