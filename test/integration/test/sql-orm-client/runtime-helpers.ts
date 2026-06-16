@@ -10,7 +10,7 @@ import type { RuntimeQueryable } from '@prisma-next/sql-orm-client';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-import { Pool } from 'pg';
+import { Client } from 'pg';
 import { getTestContract } from './helpers';
 
 interface SeedUser {
@@ -79,14 +79,22 @@ export async function createPgIntegrationRuntime(
   // sql-orm-client fixture.
   contractOverride?: Contract<SqlStorage>,
 ): Promise<PgIntegrationRuntime> {
-  const pool = new Pool({ connectionString });
-  // Wrap stack/runtime construction so any failure between pool creation and
-  // a working runtime releases the pool back to PG. Without this, an early
-  // throw (e.g. missing adapter/driver descriptor) leaks the pool's
-  // connections until the test process exits.
+  // Use a single client, not a pool: the `@prisma/dev` server is PGlite-backed
+  // and allows only one concurrent connection. The mutation path opens a
+  // transaction via `connection().transaction()`, which holds the connection
+  // across statements; a pool would hand the ORM's read/readback a *second*
+  // connection and the single backend would reject it. The direct driver
+  // serializes all access onto this one client, so transactions commit/roll back
+  // atomically and `query()` shares the same backend.
+  const client = new Client({ connectionString });
+  await client.connect();
+  // Wrap stack/runtime construction so any failure between client connect and
+  // a working runtime closes the client. Without this, an early throw
+  // (e.g. missing adapter/driver descriptor) leaks the connection until the
+  // test process exits.
   const setup = await (async () => {
     try {
-      await pool.query('select 1');
+      await client.query('select 1');
 
       const contract = contractOverride ?? getTestContract();
 
@@ -113,7 +121,7 @@ export async function createPgIntegrationRuntime(
       if (!driver) {
         throw new Error('Driver descriptor missing from execution stack');
       }
-      await driver.connect({ kind: 'pgPool', pool });
+      await driver.connect({ kind: 'pgClient', client });
 
       const realRuntime = new PostgresRuntimeImpl({
         context,
@@ -122,7 +130,7 @@ export async function createPgIntegrationRuntime(
       });
       return { adapter, realRuntime, contract };
     } catch (err) {
-      await pool.end();
+      await client.end();
       throw err;
     }
   })();
@@ -150,13 +158,27 @@ export async function createPgIntegrationRuntime(
     };
   };
 
+  // Records every executed plan (for the per-test execution-count assertions)
+  // before delegating to the real scope. Used by the top-level `execute` and by
+  // the scopes returned from `connection()`/`transaction()` so reads and
+  // mutations are instrumented identically regardless of which path runs them.
+  const recordAndDelegate = <Row>(
+    delegate: (
+      plan: (SqlExecutionPlan | SqlQueryPlan) & { readonly _row?: Row },
+    ) => AsyncIterableResult<Row>,
+    plan: (SqlExecutionPlan | SqlQueryPlan) & { readonly _row?: Row },
+  ): AsyncIterableResult<Row> => {
+    executions.push(toLoweredPlan(plan));
+    return delegate(plan);
+  };
+
   const runtime: PgIntegrationRuntime = {
     executions,
     async query<Row extends Record<string, unknown> = Record<string, unknown>>(
       sqlText: string,
       params: readonly unknown[] = [],
     ): Promise<readonly Row[]> {
-      const result = await pool.query<Row>(sqlText, [...params]);
+      const result = await client.query<Row>(sqlText, [...params]);
       return result.rows;
     },
     resetExecutions() {
@@ -168,8 +190,29 @@ export async function createPgIntegrationRuntime(
     execute<Row>(
       plan: (SqlExecutionPlan | SqlQueryPlan) & { readonly _row?: Row },
     ): AsyncIterableResult<Row> {
-      executions.push(toLoweredPlan(plan));
-      return realRuntime.execute(plan);
+      return recordAndDelegate((p) => realRuntime.execute(p), plan);
+    },
+    // Expose a connection so `withMutationScope` takes the transactional path
+    // (`connection().transaction()`): nested-write graphs commit/roll back
+    // atomically, matching production. Reads also acquire a connection here, so
+    // the returned scope (and its transaction) must keep recording executions —
+    // otherwise the per-test execution-count assertions would miss them.
+    async connection() {
+      const conn = await realRuntime.connection();
+      const recordingConnection = {
+        ...conn,
+        execute: <Row>(plan: (SqlExecutionPlan | SqlQueryPlan) & { readonly _row?: Row }) =>
+          recordAndDelegate((p) => conn.execute(p), plan),
+        transaction: async () => {
+          const tx = await conn.transaction();
+          return {
+            ...tx,
+            execute: <Row>(plan: (SqlExecutionPlan | SqlQueryPlan) & { readonly _row?: Row }) =>
+              recordAndDelegate((p) => tx.execute(p), plan),
+          };
+        },
+      };
+      return recordingConnection as unknown as Awaited<ReturnType<typeof realRuntime.connection>>;
     },
   };
 

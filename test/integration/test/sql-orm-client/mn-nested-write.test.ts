@@ -271,6 +271,40 @@ describe('integration/mn-nested-write', () => {
     timeouts.spinUpPpgDev,
   );
 
+  it(
+    'create(): nested tag create failing after the parent insert rolls back the parent and junction',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        // Seed the tag so the nested target INSERT collides on the tags pkey.
+        // Unlike the connect-preflight cases, this failure happens *after* the
+        // parent user is inserted (the target INSERT runs in the apply phase that
+        // follows the parent insert), so it exercises transactional rollback of
+        // an already-written parent row — not just preflight rejection.
+        await seedTags(runtime, [{ id: TAG_RUST, name: 'Rust' }]);
+
+        await expect(
+          users.create({
+            id: 2,
+            name: 'Bob',
+            email: 'bob@example.com',
+            tags: (t) => t.create([{ id: TAG_RUST, name: 'Rust (duplicate)' }]),
+          }),
+        ).rejects.toThrow(/duplicate key|unique constraint/i);
+
+        const userRows = await runtime.query<{ id: number }>('select id from users');
+        expect(userRows).toEqual([]);
+
+        const junctionRows = await runtime.query<{ user_id: number; tag_id: string }>(
+          'select user_id, tag_id from user_tags',
+        );
+        expect(junctionRows).toEqual([]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
   // ===========================================================================
   // disconnect — update() parent flow (only supported path)
   // ===========================================================================

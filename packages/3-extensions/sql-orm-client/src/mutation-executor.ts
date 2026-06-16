@@ -17,11 +17,7 @@ import {
   resolveModelTableName,
   resolvePrimaryKeyColumn,
 } from './collection-contract';
-import {
-  acquireRuntimeScope,
-  mapModelDataToStorageRow,
-  mapStorageRowToModelFields,
-} from './collection-runtime';
+import { mapModelDataToStorageRow, mapStorageRowToModelFields } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import { and, shorthandToWhereExpr } from './filters';
 import {
@@ -44,6 +40,7 @@ import type {
   RelationCardinalityTag,
   RelationMutation,
   RuntimeQueryable,
+  RuntimeTransaction,
 } from './types';
 import { emptyState } from './types';
 
@@ -167,29 +164,46 @@ export async function withMutationScope<T>(
   runtime: RuntimeQueryable,
   run: (scope: RuntimeScope) => Promise<T>,
 ): Promise<T> {
+  // A top-level transaction wins when the runtime exposes one directly.
   if (typeof runtime.transaction === 'function') {
-    const transaction = await runtime.transaction();
+    return runInTransaction(await runtime.transaction(), run);
+  }
+
+  // Otherwise open a connection and run the whole mutation graph inside its
+  // transaction. The top-level `Runtime` exposes `transaction()` only on a
+  // connection (`connection().transaction()`), so without this a multi-statement
+  // graph that fails after the first write would leave a partial write behind.
+  if (typeof runtime.connection === 'function') {
+    const connection = await runtime.connection();
     try {
-      const result = await run(transaction);
-      if (typeof transaction.commit === 'function') {
-        await transaction.commit();
+      if (typeof connection.transaction === 'function') {
+        return await runInTransaction(await connection.transaction(), run);
       }
-      return result;
-    } catch (error) {
-      if (typeof transaction.rollback === 'function') {
-        await transaction.rollback();
-      }
-      throw error;
+      return await run(connection);
+    } finally {
+      await connection.release?.();
     }
   }
 
-  const { scope, release } = await acquireRuntimeScope(runtime);
+  // Bare runtimes (e.g. unit-test stubs) expose neither: run directly.
+  return run(runtime);
+}
+
+async function runInTransaction<T>(
+  transaction: RuntimeTransaction,
+  run: (scope: RuntimeScope) => Promise<T>,
+): Promise<T> {
   try {
-    return await run(scope);
-  } finally {
-    if (release) {
-      await release();
+    const result = await run(transaction);
+    if (typeof transaction.commit === 'function') {
+      await transaction.commit();
     }
+    return result;
+  } catch (error) {
+    if (typeof transaction.rollback === 'function') {
+      await transaction.rollback();
+    }
+    throw error;
   }
 }
 
