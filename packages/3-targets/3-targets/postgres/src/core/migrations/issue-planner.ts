@@ -1020,12 +1020,13 @@ export function planIssues(
     return true;
   });
 
+  // RLS enable + policy creation run after column/alter steps: a policy
+  // predicate may reference a column added in the same migration, so the
+  // column must exist before CREATE POLICY runs.
   const calls: PostgresOpFactoryCall[] = [
     ...byCategory('dep'),
     ...byCategory('drop'),
     ...byCategory('table'),
-    ...deduplicatedRlsEnable,
-    ...byCategory('rlsPolicy'),
     ...byCategory('column'),
     ...gatedRecipe,
     ...byCategory('alter'),
@@ -1033,6 +1034,8 @@ export function planIssues(
     ...byCategory('unique'),
     ...byCategory('index'),
     ...byCategory('foreignKey'),
+    ...deduplicatedRlsEnable,
+    ...byCategory('rlsPolicy'),
   ];
 
   return ok({ calls });
