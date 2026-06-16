@@ -6,9 +6,6 @@ import type {
   AuthoringPslBlockDescriptorNamespace,
   AuthoringTypeNamespace,
   PslExtensionBlock,
-  PslExtensionBlockParamList,
-  PslExtensionBlockParamRef,
-  PslExtensionBlockParamScalarValue,
 } from '@prisma-next/framework-components/authoring';
 import { PostgresRlsPolicy } from './postgres-rls-policy';
 import { PostgresRole, type PostgresRoleInput } from './postgres-role';
@@ -23,27 +20,18 @@ export interface RlsPolicyExtensionBlock extends PslExtensionBlock {
 
 function readRefParam(block: PslExtensionBlock, key: string): string | undefined {
   const param = block.parameters[key];
-  if (param === undefined) return undefined;
-  const p = param as PslExtensionBlockParamRef;
-  return p.kind === 'ref' ? p.identifier : undefined;
+  return param?.kind === 'ref' ? param.identifier : undefined;
 }
 
 function readValueParam(block: PslExtensionBlock, key: string): string | undefined {
   const param = block.parameters[key];
-  if (param === undefined) return undefined;
-  const p = param as PslExtensionBlockParamScalarValue;
-  return p.kind === 'value' ? p.raw : undefined;
+  return param?.kind === 'value' ? param.raw : undefined;
 }
 
 function readListRefParams(block: PslExtensionBlock, key: string): string[] {
   const param = block.parameters[key];
-  if (param === undefined) return [];
-  const p = param as PslExtensionBlockParamList;
-  if (p.kind !== 'list') return [];
-  return p.items.flatMap((item) => {
-    const ref = item as PslExtensionBlockParamRef;
-    return ref.kind === 'ref' ? [ref.identifier] : [];
-  });
+  if (param?.kind !== 'list') return [];
+  return param.items.flatMap((item) => (item.kind === 'ref' ? [item.identifier] : []));
 }
 
 function unwrapQuotedString(raw: string): string {

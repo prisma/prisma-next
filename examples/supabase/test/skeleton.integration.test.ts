@@ -494,7 +494,7 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
         await pgClient.query(`DROP POLICY "${POLICY_WIRE_NAME}" ON public.profile`);
       });
 
-      const deserializedContract = new PostgresContractSerializer().deserializeContract(
+      const deserializedContract = new PostgresContractSerializer().deserializeContract<Contract>(
         contractJson,
       );
       const verifyResult = await client.dbVerify({
