@@ -487,6 +487,14 @@ substrate diff only.
 -->
 
 <!--
+TML-2916: un-namespaced Postgres extension contracts (pgvector, paradedb, postgis,
+supabase) regenerate to drop the spurious empty `__unbound__` storage namespace slot
+the authoring + serializer pipeline was injecting, restoring ADR 223 compliance.
+Migration `head.json` and `migration.ts` hashes update. No extension-author action:
+re-emit picks up the new shape. Incidental substrate diff only.
+-->
+
+<!--
 TML-2886 (redo, PR #841): type SQL enum columns via a baked storage column lookup.
 The SQL emitter generates a new `StorageColumnTypes` map in `contract.d.ts`, keyed
 `[namespace][table][column]`; `FieldOutputTypes`/`FieldInputTypes` are derived from it

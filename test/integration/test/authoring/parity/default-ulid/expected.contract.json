@@ -43,12 +43,6 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "entries": {
-          "table": {}
-        },
-        "id": "__unbound__"
-      },
       "public": {
         "entries": {
           "table": {
@@ -75,7 +69,7 @@
         "id": "public"
       }
     },
-    "storageHash": "sha256:dc4762149c1e3129a6d8ee6ed73100b5c909d3d0410ce5878819ad25dc10c107"
+    "storageHash": "sha256:ab8522ed921711d00e2df546a124c1af785827dd4966669387d632699f932b2a"
   },
   "execution": {
     "executionHash": "sha256:be7281d1c2ce558161258237932f58bce1c6042415816e21b99f32842d54fa23",

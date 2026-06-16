@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:aacf75841f73dad8be9b7135b876791bf574686fe3ea8fa9a138c85c0057e5ea'>;
+  StorageHashBase<'sha256:e9c4781cc6e826298109a5f96b633553fc9c7fe6d0cd7bacb7baec90e79e7d6a'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -133,7 +133,6 @@ export type FieldInputTypes = {
   };
 };
 export type StorageColumnTypes = {
-  readonly __unbound__: {};
   readonly public: {
     readonly accounts: {
       readonly id: CodecTypes['pg/int4@1']['output'];
@@ -185,7 +184,6 @@ export type StorageColumnTypes = {
   };
 };
 export type StorageColumnInputTypes = {
-  readonly __unbound__: {};
   readonly public: {
     readonly accounts: {
       readonly id: CodecTypes['pg/int4@1']['input'];
@@ -248,11 +246,6 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = Omit<
   ContractType<{
     readonly namespaces: {
-      readonly __unbound__: {
-        readonly id: '__unbound__';
-        readonly kind: 'postgres-unbound-schema';
-        readonly entries: { readonly table: {} };
-      };
       readonly public: {
         readonly id: 'public';
         readonly kind: 'postgres-schema';

@@ -129,7 +129,19 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     // deserialized JSON (e.g. buildMixedPolyContract) working by providing a slot to
     // write into. Once runtime-qualification routes table lookups by namespace, this
     // shim should be removed.
-    const unbound = hydratedNamespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance;
+    //
+    // TML-2916: the shim only fires when the target's default namespace IS unbound
+    // (SQLite, Mongo). On Postgres (`defaultNamespaceId === 'public'`) injecting an
+    // empty `__unbound__` slot violates ADR 223 — un-namespaced PG models belong in
+    // `public`, not `__unbound__`.
+    const withInjectedUnbound =
+      this.defaultNamespaceId === UNBOUND_NAMESPACE_ID
+        ? {
+            ...hydratedNamespaces,
+            [UNBOUND_NAMESPACE_ID]:
+              hydratedNamespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance,
+          }
+        : hydratedNamespaces;
 
     return {
       ...validated,
@@ -141,10 +153,12 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
         namespaces: blindCast<
           SqlStorageInput['namespaces'],
           'hydrateSqlNamespaceMap builds each namespace through the SQL family concretions (SqlBoundNamespace / target schema), so every value is a SqlNamespace; the framework return type only promises the base Namespace.'
-        >({ ...hydratedNamespaces, [UNBOUND_NAMESPACE_ID]: unbound }),
+        >(withInjectedUnbound),
       }),
     };
   }
+
+  protected abstract get defaultNamespaceId(): string;
 
   protected hydrateSqlNamespaceMap(
     namespaces: Readonly<Record<string, Namespace | Record<string, unknown>>>,

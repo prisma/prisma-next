@@ -1,7 +1,7 @@
 {
-  "from": "sha256:ca7dc29135114fe62434821b39aede307bc99b0d9b92da12d7d7a14bdadc462f",
-  "to": "sha256:440a13d96bde518960481a41681ec2ccef1f7559f60fbc5d77ca9cccca5d864a",
+  "from": "sha256:e4a035f4b5357858f774ed20d5854fe3c142668df154c60d065421f2fdd73104",
+  "to": "sha256:7bdb036457641dc63b862e773f4b07cbdf4bb329d0267b1272de46766e7a0084",
   "providedInvariants": [],
   "createdAt": "2026-06-10T00:00:00.000Z",
-  "migrationHash": "sha256:728fd4927cf07aebb235e13026cb5cee4b24aa7fe64ec731bd314641de08fbb2"
+  "migrationHash": "sha256:a5cfe1626e5b7e70e5c26fa34475a20432b2c37e55fe9c23acd821dfa2ca8ae7"
 }

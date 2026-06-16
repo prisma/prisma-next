@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:243b32f6d85850c069a9e5e30297ba13e67719b94fe18cf3824ce20c165c6b62'>;
+  StorageHashBase<'sha256:718881dff463472bd68e0d58a0f4edcc04bdafe806078e16c2e06c9425b78b7b'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -79,7 +79,6 @@ export type FieldInputTypes = {
   };
 };
 export type StorageColumnTypes = {
-  readonly __unbound__: {};
   readonly auth: {
     readonly users: {
       readonly id: CodecTypes['pg/int4@1']['output'];
@@ -98,7 +97,6 @@ export type StorageColumnTypes = {
   };
 };
 export type StorageColumnInputTypes = {
-  readonly __unbound__: {};
   readonly auth: {
     readonly users: {
       readonly id: CodecTypes['pg/int4@1']['input'];
@@ -128,11 +126,6 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = Omit<
   ContractType<{
     readonly namespaces: {
-      readonly __unbound__: {
-        readonly id: '__unbound__';
-        readonly kind: 'sql-namespace';
-        readonly entries: { readonly table: {} };
-      };
       readonly auth: {
         readonly id: 'auth';
         readonly kind: 'sql-namespace';

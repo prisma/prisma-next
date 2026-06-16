@@ -50,12 +50,6 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "entries": {
-          "table": {}
-        },
-        "id": "__unbound__"
-      },
       "public": {
         "entries": {
           "table": {
@@ -89,7 +83,7 @@
         "id": "public"
       }
     },
-    "storageHash": "sha256:e162fd807d4aed619f0ad5153736d12a9596304a84e75d15f6b473d22743ca82",
+    "storageHash": "sha256:c6fb73b38593ad549f3c8cf7579dddd5349e0fa7c3028246701974036c6ebff4",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

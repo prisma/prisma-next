@@ -532,3 +532,12 @@ surface is already covered by `qualify-flat-builder-accessors` above — this sl
 the type-resolution fix beneath it. No user action: re-emit picks up the new shape.
 Incidental substrate diff only.
 -->
+
+<!--
+TML-2916: un-namespaced Postgres models now correctly default to the `public`
+namespace per ADR 223, dropping the spurious empty `__unbound__` storage slot the
+authoring + serializer pipeline was injecting. Example contract.json / contract.d.ts /
+end-contract.* / migration.json files regenerate to drop the `__unbound__` slot;
+migration content hashes update. No user action: re-emit picks up the new shape.
+Incidental substrate diff only.
+-->

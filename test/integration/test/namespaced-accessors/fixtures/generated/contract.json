@@ -140,13 +140,6 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "entries": {
-          "table": {}
-        },
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema"
-      },
       "auth": {
         "entries": {
           "table": {
@@ -249,7 +242,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:243b32f6d85850c069a9e5e30297ba13e67719b94fe18cf3824ce20c165c6b62"
+    "storageHash": "sha256:718881dff463472bd68e0d58a0f4edcc04bdafe806078e16c2e06c9425b78b7b"
   },
   "capabilities": {
     "postgres": {
