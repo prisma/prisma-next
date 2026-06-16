@@ -5,11 +5,11 @@ import { deriveJsonSchema } from '@prisma-next/mongo-contract-psl';
 import { mongoEmission } from '@prisma-next/mongo-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { blindCast } from '@prisma-next/utils/casts';
-import { type Db, MongoClient } from 'mongodb';
+import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, describe, expect, expectTypeOf, it } from 'vitest';
 import { defineContract, enumType, field, member, model } from '../src/exports/contract-builder';
-import mongo from '../src/runtime/mongo';
+import mongo, { type MongoClient as MongoFacadeClient } from '../src/runtime/mongo';
 
 // ---------------------------------------------------------------------------
 // Contract authoring — TS DSL
@@ -108,128 +108,168 @@ describe('mongo enum — end-to-end (replica set)', {
 }, () => {
   let replSet: MongoMemoryReplSet;
   let nativeClient: MongoClient;
-  let db: Db;
+  let db: MongoFacadeClient<typeof contract>;
+  // The TS-DSL `MongoContractResult` does not surface the `enum` slot at the
+  // type level (architect review A03), so the ORM `create` input narrows
+  // `role`/`mood`/`tags` to `never` for this contract. The runtime is
+  // correct — the facade builds `db.enums` from `domain.namespaces[...].enum`
+  // at runtime, and writes flow through the ORM into MongoDB which enforces
+  // the `$jsonSchema.enum`. We cast the `accounts` collection to a permissive
+  // write surface once at the test boundary so the write payloads remain
+  // readable.
+  type AccountInput = {
+    role?: string | null;
+    mood?: string | null;
+    tags?: readonly string[];
+  };
+  type AccountRow = {
+    readonly _id: unknown;
+    readonly role: string;
+    readonly mood: string | null;
+    readonly tags: readonly string[];
+  };
+  type AccountsCollection = {
+    create(data: AccountInput): Promise<AccountRow>;
+    where(predicate: { readonly _id: unknown }): { first(): Promise<AccountRow | null> };
+  };
   const dbName = 'enum_e2e_test';
+  let accounts: AccountsCollection;
 
   beforeAll(async () => {
     replSet = await MongoMemoryReplSet.create({
       replSet: { count: 1, storageEngine: 'wiredTiger' },
     });
+
+    // Create the collection with the derived validator via the native driver.
+    // The validator is collection-scoped, so attach it at creation; subsequent
+    // ORM writes target the same collection and are validated by MongoDB.
     nativeClient = new MongoClient(replSet.getUri());
     await nativeClient.connect();
-    db = nativeClient.db(dbName);
-
-    await db.createCollection('accounts', {
+    await nativeClient.db(dbName).createCollection('accounts', {
       validator: { $jsonSchema: ACCOUNT_VALIDATOR.jsonSchema },
       validationLevel: ACCOUNT_VALIDATOR.validationLevel,
       validationAction: ACCOUNT_VALIDATOR.validationAction,
     });
+
+    // Now build the ORM facade against the same replica set + dbName. Writes
+    // go through db.orm.accounts.create(...) and hit the validator at the
+    // MongoDB layer; reads of db.enums come from the same facade.
+    db = mongo({ contract, uri: replSet.getUri(), dbName });
+    await db.connect();
+    accounts = blindCast<
+      AccountsCollection,
+      'A03: TS-DSL MongoContractResult does not surface enum value union at the type level; the runtime ORM call path is correct'
+    >(db.orm.accounts);
   }, timeouts.spinUpMongoMemoryServer);
 
   afterAll(async () => {
+    await db?.close();
     await nativeClient?.close();
     await replSet?.stop();
   }, timeouts.spinUpMongoMemoryServer);
 
   // -------------------------------------------------------------------------
-  // Part A: Author → Enforce (validator rejection / acceptance)
+  // Part A: Author → Enforce (validator rejection / acceptance) via the
+  // ORM client — proves the codec layer + validator wire-up end-to-end.
   // -------------------------------------------------------------------------
 
   describe('out-of-set scalar write is rejected', () => {
     it('rejects an insert with a role value not in the enum', async () => {
-      await expect(
-        db.collection('accounts').insertOne({ role: 'nope', tags: [] }),
-      ).rejects.toMatchObject({ code: 121 });
+      await expect(accounts.create({ role: 'nope', tags: [] })).rejects.toMatchObject({
+        code: 121,
+      });
     });
 
     it('rejects an insert with a null value on a non-nullable field', async () => {
-      await expect(
-        db.collection('accounts').insertOne({ role: null, tags: [] }),
-      ).rejects.toMatchObject({ code: 121 });
+      await expect(accounts.create({ role: null, tags: [] })).rejects.toMatchObject({
+        code: 121,
+      });
     });
   });
 
   describe('in-set scalar write succeeds', () => {
     it('accepts a valid role value and round-trips it', async () => {
-      const result = await db.collection('accounts').insertOne({ role: 'user', tags: [] });
-      expect(result.acknowledged).toBe(true);
+      const created = await accounts.create({ role: 'user', tags: [] });
+      expect(created._id).toBeTruthy();
+      expect(created.role).toBe('user');
 
-      const found = await db.collection('accounts').findOne({ _id: result.insertedId });
-      expect(found?.['role']).toBe('user');
+      const found = await accounts.where({ _id: created._id }).first();
+      expect(found?.role).toBe('user');
     });
   });
 
   describe('nullable scalar enum', () => {
     it('accepts null for a nullable enum field', async () => {
-      const result = await db.collection('accounts').insertOne({
+      const created = await accounts.create({
         role: 'admin',
         mood: null,
         tags: [],
       });
-      expect(result.acknowledged).toBe(true);
+      expect(created._id).toBeTruthy();
 
-      const found = await db.collection('accounts').findOne({ _id: result.insertedId });
-      expect(found?.['mood']).toBeNull();
+      const found = await accounts.where({ _id: created._id }).first();
+      expect(found?.mood).toBeNull();
     });
 
     it('accepts an in-set value for a nullable enum field', async () => {
-      await expect(
-        db.collection('accounts').insertOne({ role: 'user', mood: 'admin', tags: [] }),
-      ).resolves.toMatchObject({ acknowledged: true });
+      const created = await accounts.create({
+        role: 'user',
+        mood: 'admin',
+        tags: [],
+      });
+      expect(created._id).toBeTruthy();
+      expect(created.mood).toBe('admin');
     });
 
     it('rejects an out-of-set value on a nullable enum field', async () => {
       await expect(
-        db.collection('accounts').insertOne({ role: 'user', mood: 'bogus', tags: [] }),
+        accounts.create({ role: 'user', mood: 'bogus', tags: [] }),
       ).rejects.toMatchObject({ code: 121 });
     });
   });
 
   describe('array enum field', () => {
     it('accepts an array of in-set values', async () => {
-      const result = await db.collection('accounts').insertOne({
+      const created = await accounts.create({
         role: 'user',
         tags: ['user', 'admin'],
       });
-      expect(result.acknowledged).toBe(true);
+      expect(created._id).toBeTruthy();
+      expect(created.tags).toEqual(['user', 'admin']);
     });
 
     it('accepts an empty array', async () => {
-      const result = await db.collection('accounts').insertOne({ role: 'admin', tags: [] });
-      expect(result.acknowledged).toBe(true);
+      const created = await accounts.create({ role: 'admin', tags: [] });
+      expect(created._id).toBeTruthy();
     });
 
     it('rejects an array containing an out-of-set element', async () => {
-      await expect(
-        db.collection('accounts').insertOne({ role: 'user', tags: ['bogus'] }),
-      ).rejects.toMatchObject({ code: 121 });
+      await expect(accounts.create({ role: 'user', tags: ['bogus'] })).rejects.toMatchObject({
+        code: 121,
+      });
     });
   });
 
   // -------------------------------------------------------------------------
-  // Part A: Read — db.enums assertions via mongo() facade
+  // Part A: Read — db.enums assertions via the same mongo() facade.
   // -------------------------------------------------------------------------
 
   describe('db.enums via mongo() facade', () => {
     it('exposes the enum accessor at db.enums.Role without namespace key', () => {
-      const db2 = mongo({ contract, uri: replSet.getUri(), dbName });
-      expect(db2.enums['Role']).toBeDefined();
-      expect(db2.enums['Role'].values).toEqual(['user', 'admin']);
+      expect(db.enums['Role']).toBeDefined();
+      expect(db.enums['Role'].values).toEqual(['user', 'admin']);
     });
 
     it('db.enums.Role.values returns the ordered tuple', () => {
-      const db2 = mongo({ contract, uri: replSet.getUri(), dbName });
-      expect(db2.enums['Role'].values).toEqual(['user', 'admin']);
+      expect(db.enums['Role'].values).toEqual(['user', 'admin']);
     });
 
     it('db.enums.Role.members.User === "user"', () => {
-      const db2 = mongo({ contract, uri: replSet.getUri(), dbName });
-      expect(db2.enums['Role'].members['User']).toBe('user');
+      expect(db.enums['Role'].members['User']).toBe('user');
     });
 
     it('db.enums.Status.ordinalOf returns declaration-order indices (not lexical)', () => {
-      const db2 = mongo({ contract, uri: replSet.getUri(), dbName });
-      const status = db2.enums['Status'];
+      const status = db.enums['Status'];
       expect(status).toBeDefined();
       // Declaration order: Pending=0, Active=1, Inactive=2
       // Lexical order would be: Active=0, Inactive=1, Pending=2 — different.
