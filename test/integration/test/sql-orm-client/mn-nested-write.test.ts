@@ -21,16 +21,13 @@ import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sq
 import type { Char } from '@prisma-next/target-postgres/codec-types';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { describe, expect, it } from 'vitest';
-import { withReturningCapability } from './collection-fixtures';
-import type { TestContract } from './helpers';
-import { deserializeTestContract, getTestContract } from './helpers';
+import { getExecutionDefaultedTagsContract } from './helpers';
 import {
   createReturningUsersCollection,
   timeouts,
   withCollectionRuntime,
 } from './integration-helpers';
 import { seedRoles, seedTags, seedUserRoles, seedUsers, seedUserTags } from './runtime-helpers';
-import { unboundTables } from './unbound-tables';
 
 const TAG_RUST = 'tag-rust' as Char<36>;
 const TAG_TS = 'tag-typescript' as Char<36>;
@@ -38,40 +35,6 @@ const ROLE_ADMIN = 'role-admin' as Char<36>;
 const ROLE_EDITOR = 'role-editor' as Char<36>;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-// Builds a contract clone where the junction payload column
-// `user_tags.created_at` loses its storage default and instead carries an
-// execution-time `onCreate` default (the `uuidv4` generator the postgres
-// test stack already registers; the column is text). Connect/create on
-// User.tags then pass the required-payload gates *only* via the execution
-// default, so the junction INSERT must apply it or hit NOT NULL on the DB.
-function buildExecutionDefaultedTagsContract(): TestContract {
-  const contract = JSON.parse(
-    JSON.stringify(withReturningCapability(getTestContract())),
-  ) as TestContract;
-
-  const userTagsTable = unboundTables(contract.storage)['user_tags'] as unknown as
-    | { columns: Record<string, Record<string, unknown>> }
-    | undefined;
-  const createdAt = userTagsTable?.columns['created_at'];
-  if (!createdAt) {
-    throw new Error('Test contract is missing user_tags.created_at');
-  }
-  delete createdAt['default'];
-
-  const execution = contract.execution as unknown as
-    | { mutations: { defaults: Array<Record<string, unknown>> } }
-    | undefined;
-  if (!execution) {
-    throw new Error('Test contract is missing the execution block');
-  }
-  execution.mutations.defaults.push({
-    ref: { namespace: 'public', table: 'user_tags', column: 'created_at' },
-    onCreate: { kind: 'generator', id: 'uuidv4' },
-  });
-
-  return deserializeTestContract(contract);
-}
 
 describe('integration/mn-nested-write', () => {
   // ===========================================================================
@@ -610,16 +573,15 @@ describe('integration/mn-nested-write', () => {
   it(
     'create(): connect applies an execution-time onCreate default to a junction payload column',
     async () => {
-      const contract = buildExecutionDefaultedTagsContract();
+      // Emitted fixture: `user_tags.created_at` is NOT NULL with an execution-time
+      // onCreate default and no storage/DB default, so if the junction INSERT
+      // fails to apply the execution default the test dies with a NOT NULL
+      // violation rather than silently passing via a database default.
+      const contract = getExecutionDefaultedTagsContract();
 
       await withCollectionRuntime(async (runtime) => {
-        // Drop the DB-side default too: if the junction INSERT fails to apply
-        // the execution default, this test dies with a NOT NULL violation
-        // instead of silently passing via the database default.
-        await runtime.query('alter table user_tags alter column created_at drop default');
-
         // The defaults applier closes over the contract the context was
-        // created from, so build the context from the patched contract.
+        // created from, so build the context from the same emitted contract.
         const context = createExecutionContext({
           contract,
           stack: createSqlExecutionStack({
