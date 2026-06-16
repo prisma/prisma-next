@@ -171,7 +171,7 @@ describe.sequential('RLS walking skeleton — author → plan → apply → filt
       expect(filtered.rows).toHaveLength(1);
       expect(filtered.rows[0]).toMatchObject({ id: 1, owner_id: 101 });
 
-      // Step 6: re-verify clean — schemaDiffIssues must be empty.
+      // Step 6: re-verify clean — no RLS policy issues.
       const introspected = await familyInstance.introspect({ driver, contract });
       const verifyResult = familyInstance.verifySchema({
         contract,
@@ -180,7 +180,10 @@ describe.sequential('RLS walking skeleton — author → plan → apply → filt
         frameworkComponents,
       });
 
-      expect(verifyResult.schema.schemaDiffIssues).toEqual([]);
+      const rlsIssues = verifyResult.schema.issues.filter(
+        (i) => i.kind === 'missing_rls_policy' || i.kind === 'extra_rls_policy',
+      );
+      expect(rlsIssues).toEqual([]);
     },
     testTimeout,
   );

@@ -31,6 +31,8 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
+import { isPostgresSchema } from '../postgres-schema';
+import { resolveDdlSchemaForNamespaceStorage } from '../postgres-schema-ir-annotations';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -38,6 +40,7 @@ import {
   AddUniqueCall,
   AlterColumnTypeCall,
   CreateIndexCall,
+  CreatePostgresRlsPolicyCall,
   CreateSchemaCall,
   CreateTableCall,
   DropCheckConstraintCall,
@@ -46,7 +49,9 @@ import {
   DropDefaultCall,
   DropIndexCall,
   DropNotNullCall,
+  DropPostgresRlsPolicyCall,
   DropTableCall,
+  EnableRowLevelSecurityCall,
   type PostgresOpFactoryCall,
   postgresDefaultToDdlColumnDefault,
   SetDefaultCall,
@@ -113,6 +118,10 @@ const ISSUE_KIND_ORDER: Record<string, number> = {
   check_missing: 53,
   check_mismatch: 54,
   check_removed: 55,
+
+  // RLS policies (after tables so ENABLE/CREATE fire once the table exists)
+  missing_rls_policy: 61,
+  extra_rls_policy: 62,
 };
 
 function issueOrder(issue: SchemaIssue): number {
@@ -172,14 +181,6 @@ export interface IssuePlannerOptions {
    */
   readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   readonly strategies?: readonly CallMigrationStrategy[];
-  /**
-   * Pre-built calls to include in the bucketable pool alongside
-   * issue-derived calls. They are classified by `classifyCall()` and
-   * land in the same dependency-order buckets as all other calls. Used
-   * by the planner to inject RLS diff calls without routing them through
-   * `mapIssueToCall`.
-   */
-  readonly extraBucketableCalls?: readonly PostgresOpFactoryCall[];
 }
 
 export interface IssuePlannerValue {
@@ -615,6 +616,47 @@ function mapIssueToCall(
       ]);
     }
 
+    case 'missing_rls_policy': {
+      if (!issue.table || !issue.indexOrConstraint || !issue.namespaceId) {
+        return notOk(
+          issueConflict('unsupportedOperation', 'Missing RLS policy issue is incomplete'),
+        );
+      }
+      const ns = ctx.toContract.storage.namespaces[issue.namespaceId];
+      const policy = isPostgresSchema(ns) ? ns.policy[issue.indexOrConstraint] : undefined;
+      if (!policy) {
+        return notOk(
+          issueConflict(
+            'unsupportedOperation',
+            `RLS policy "${issue.indexOrConstraint}" not found in contract namespace "${issue.namespaceId}"`,
+          ),
+        );
+      }
+      const schemaForTable = resolveDdlSchemaForNamespaceStorage(
+        ctx.toContract.storage,
+        issue.namespaceId,
+        ctx.schema,
+      );
+      return ok([
+        new EnableRowLevelSecurityCall(schemaForTable, issue.table),
+        new CreatePostgresRlsPolicyCall(schemaForTable, issue.table, policy),
+      ]);
+    }
+
+    case 'extra_rls_policy': {
+      if (!issue.table || !issue.indexOrConstraint || !issue.namespaceId) {
+        return notOk(issueConflict('unsupportedOperation', 'Extra RLS policy issue is incomplete'));
+      }
+      const schemaForTable = resolveDdlSchemaForNamespaceStorage(
+        ctx.toContract.storage,
+        issue.namespaceId,
+        ctx.schema,
+      );
+      return ok([
+        new DropPostgresRlsPolicyCall(schemaForTable, issue.table, issue.indexOrConstraint),
+      ]);
+    }
+
     case 'foreign_key_mismatch':
       if (!issue.table)
         return notOk(issueConflict('foreignKeyConflict', 'Foreign key issue has no table name'));
@@ -928,10 +970,6 @@ export function planIssues(
   let gatedDefault = defaultCalls;
   let gatedRecipe = recipeCalls;
   let gatedBucketable = bucketablePatternCalls;
-  // Extra calls (e.g. same-prefix replace-drop) are filtered silently when
-  // disallowed: they are best-effort cleanup and do not cause a hard failure.
-  // The schema drifts (old + new coexist) and verify-drift catches it.
-  let gatedExtra: readonly PostgresOpFactoryCall[] = options.extraBucketableCalls ?? [];
   if (policyProvided) {
     const keepIfAllowed = (bucket: PostgresOpFactoryCall[]) => (call: PostgresOpFactoryCall) => {
       if (allowed.includes(call.operationClass)) {
@@ -949,7 +987,6 @@ export function planIssues(
     gatedDefault = gatedDefaultBucket;
     gatedRecipe = gatedRecipeBucket;
     gatedBucketable = gatedBucketableBucket;
-    gatedExtra = gatedExtra.filter((call) => allowed.includes(call.operationClass));
   }
 
   if (conflicts.length > 0) {
@@ -962,18 +999,27 @@ export function planIssues(
   // pattern strategies (`checkConstraintPlanCallStrategy`,
   // `storageTypePlanCallStrategy`, `notNullAddColumnCallStrategy`) produce
   // individually classifiable calls that slot into DDL buckets alongside
-  // default-mapped calls. Extra calls (e.g. RLS diff calls from planSql)
-  // are merged here so they sort into the same dependency-order buckets.
-  // `gatedExtra` has already been filtered by the operation-class policy above.
-  const combinedBucketable = [...gatedDefault, ...gatedBucketable, ...gatedExtra];
+  // default-mapped calls.
+  const combinedBucketable = [...gatedDefault, ...gatedBucketable];
   const byCategory = (cat: CallCategory) =>
     combinedBucketable.filter((c) => classifyCall(c) === cat);
+
+  // Deduplicate EnableRowLevelSecurityCall by (schemaName, tableName): when
+  // multiple missing_rls_policy issues for the same table each emit one, keep only
+  // the first.
+  const seenRlsEnableTables = new Set<string>();
+  const deduplicatedRlsEnable = byCategory('rlsEnable').filter((c) => {
+    const key = `${(c as EnableRowLevelSecurityCall).schemaName}.${(c as EnableRowLevelSecurityCall).tableName}`;
+    if (seenRlsEnableTables.has(key)) return false;
+    seenRlsEnableTables.add(key);
+    return true;
+  });
 
   const calls: PostgresOpFactoryCall[] = [
     ...byCategory('dep'),
     ...byCategory('drop'),
     ...byCategory('table'),
-    ...byCategory('rlsEnable'),
+    ...deduplicatedRlsEnable,
     ...byCategory('rlsPolicy'),
     ...byCategory('column'),
     ...gatedRecipe,

@@ -409,7 +409,6 @@ describe('formatSchemaVerifyOutput', () => {
           message: 'Table "post" is missing from database',
         },
       ],
-      schemaDiffIssues: [],
       root: createVerificationNode(),
       counts: {
         pass: 3,
@@ -601,24 +600,21 @@ describe('formatSchemaVerifyOutput', () => {
     expect(stripped).toContain('⚠');
   });
 
-  it('renders schema-diff issues with their message, naming each drifted policy', () => {
+  it('renders RLS policy drift issues with their message, naming each drifted policy', () => {
     const policyWireName = 'read_own_profiles_abc12345';
     const result: VerifyDatabaseSchemaResult = {
       ...createResult(),
       ok: false,
-      summary: 'Database schema does not satisfy contract (1 schema-diff issue)',
+      summary: 'Database schema does not satisfy contract (1 failure)',
       schema: {
         ...createResult().schema,
-        schemaDiffIssues: [
+        issues: [
           {
-            coordinate: {
-              plane: 'storage',
-              entityKind: 'policy',
-              namespaceId: 'public',
-              entityName: policyWireName,
-            },
-            outcome: 'missing',
-            message: `missing: policy '${policyWireName}' in namespace 'public'`,
+            kind: 'missing_rls_policy' as const,
+            namespaceId: 'public',
+            table: 'profiles',
+            indexOrConstraint: policyWireName,
+            message: `RLS policy "${policyWireName}" on table "profiles" is missing from the database`,
           },
         ],
       },
@@ -629,8 +625,8 @@ describe('formatSchemaVerifyOutput', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain(policyWireName);
-    expect(stripped).toContain('Schema-diff issues');
-    expect(stripped).toContain('✖ Database schema does not satisfy contract (1 schema-diff issue)');
+    expect(stripped).toContain('Schema drift');
+    expect(stripped).toContain('✖ Database schema does not satisfy contract (1 failure)');
   });
 });
 
@@ -649,7 +645,6 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
-        schemaDiffIssues: [],
         root: {
           status: 'pass',
           kind: 'schema',
@@ -707,7 +702,6 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
-        schemaDiffIssues: [],
         root: {
           status: 'pass',
           kind: 'schema',
@@ -755,7 +749,6 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
-        schemaDiffIssues: [],
         root: {
           status: 'pass',
           kind: 'schema',
@@ -810,7 +803,6 @@ describe('formatSchemaVerifyJson', () => {
             message: 'Table "post" is missing',
           },
         ],
-        schemaDiffIssues: [],
         root: {
           status: 'fail',
           kind: 'schema',

@@ -1,4 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import type { BaseSchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -160,7 +161,7 @@ describe('verifyPostgresRlsPolicies', () => {
 
     const issues = verifyPostgresRlsPolicies({ contract, schema });
 
-    for (const issue of issues) {
+    for (const issue of issues as readonly BaseSchemaIssue[]) {
       expect(issue.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
       expect(issue.table).toBe(TABLE_NAME);
     }

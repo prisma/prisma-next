@@ -284,7 +284,6 @@ function buildSkippedSchemaResult(member: ContractSpaceMember): VerifyDatabaseSc
         children: [],
       },
       counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
-      schemaDiffIssues: [],
     },
     timings: { total: 0 },
   };

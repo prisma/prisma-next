@@ -21,19 +21,10 @@ import type {
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
-import { diffNodes } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
-import type { PostgresRlsPolicy } from '../postgres-rls-policy';
-import { isPostgresSchema } from '../postgres-schema';
-import {
-  readPostgresSchemaIrAnnotations,
-  resolveDdlSchemaForNamespaceStorage,
-} from '../postgres-schema-ir-annotations';
 import {
   formatPostgresControlPolicySubjectLabel,
   resolvePostgresCallControlPolicySubject,
@@ -41,15 +32,11 @@ import {
   resolvePostgresIssueCreationFactoryName,
 } from './control-policy';
 import { planIssues } from './issue-planner';
-import {
-  CreatePostgresRlsPolicyCall,
-  DropPostgresRlsPolicyCall,
-  EnableRowLevelSecurityCall,
-  type PostgresOpFactoryCall,
-} from './op-factory-call';
+import type { PostgresOpFactoryCall } from './op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
 import { verifyPostgresNamespacePresence } from './verify-postgres-namespaces';
+import { verifyPostgresRlsPolicies } from './verify-postgres-rls-policies';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -64,94 +51,6 @@ type PlannerOptionsWithComponents = SqlMigrationPlannerPlanOptions & {
 type VerifySqlSchemaOptionsWithComponents = Parameters<typeof verifySqlSchema>[0] & {
   readonly frameworkComponents: PlannerFrameworkComponents;
 };
-
-function readExpectedRlsPolicies(contract: Contract<SqlStorage>): readonly PostgresRlsPolicy[] {
-  const policies: PostgresRlsPolicy[] = [];
-  for (const ns of Object.values(contract.storage.namespaces)) {
-    if (isPostgresSchema(ns)) {
-      for (const policy of Object.values(ns.policy)) {
-        policies.push(policy);
-      }
-    }
-  }
-  return policies;
-}
-
-/**
- * Runs the RLS diff (expected vs actual) and returns the calls needed to
- * bring the live database to the expected state. Only `missing` outcomes are
- * actioned in this slice; `extra` and `mismatch` are left for a later slice.
- *
- * One `EnableRowLevelSecurityCall` is emitted per table the first time a
- * missing policy references it and RLS is not already enabled on that table.
- *
- * For each missing policy being created, also emits a `DropPostgresRlsPolicyCall`
- * for any actual policy on the same `(namespaceId, tableName)` that shares the
- * same prefix, has a different wire name, and is not in the expected set. This
- * handles the edit-trap: a policy that was renamed (new content hash) gets its
- * old version dropped rather than left as a stale duplicate.
- *
- * Different-prefix policies are never touched here — they are external policies
- * and their lifecycle is slice 2.
- *
- * Matcher used: `actual.prefix === policy.prefix`. The control adapter derives
- * `prefix` from the wire name by stripping the content-hash suffix, so this
- * field is reliably populated for real introspection. In unit tests, `prefix`
- * is set explicitly on the `PostgresRlsPolicy` constructor.
- */
-function buildRlsDiffCalls(
-  contract: Contract<SqlStorage>,
-  schema: SqlSchemaIR,
-): readonly PostgresOpFactoryCall[] {
-  const expectedPolicies = readExpectedRlsPolicies(contract);
-  if (expectedPolicies.length === 0) return [];
-
-  const { rlsPolicies: actualPolicies = [], rlsEnabledByTable = {} } =
-    readPostgresSchemaIrAnnotations(schema);
-
-  const issues = diffNodes(expectedPolicies, actualPolicies);
-
-  const calls: PostgresOpFactoryCall[] = [];
-  const rlsEnabledEmitted = new Set<string>();
-  const droppedActualNames = new Set<string>();
-
-  const expectedNames = new Set(expectedPolicies.map((p) => p.name));
-
-  for (const issue of issues) {
-    if (issue.outcome !== 'missing') continue;
-
-    const policy = expectedPolicies.find((p) => p.name === issue.coordinate.entityName);
-    if (!policy) continue;
-
-    const schemaName = resolveDdlSchemaForNamespaceStorage(contract.storage, policy.namespaceId);
-    const tableKey = `${schemaName}.${policy.tableName}`;
-
-    if (!rlsEnabledByTable[tableKey] && !rlsEnabledEmitted.has(tableKey)) {
-      rlsEnabledEmitted.add(tableKey);
-      calls.push(new EnableRowLevelSecurityCall(schemaName, policy.tableName));
-    }
-
-    calls.push(new CreatePostgresRlsPolicyCall(schemaName, policy.tableName, policy));
-
-    // Emit a drop for every actual policy on the same table that shares this
-    // prefix but has a different wire name and is not in the expected set.
-    for (const actual of actualPolicies) {
-      if (
-        actual.prefix === policy.prefix &&
-        actual.namespaceId === policy.namespaceId &&
-        actual.tableName === policy.tableName &&
-        actual.name !== policy.name &&
-        !expectedNames.has(actual.name) &&
-        !droppedActualNames.has(actual.name)
-      ) {
-        droppedActualNames.add(actual.name);
-        calls.push(new DropPostgresRlsPolicyCall(schemaName, actual.tableName, actual.name));
-      }
-    }
-  }
-
-  return calls;
-}
 
 export function createPostgresMigrationPlanner(
   lowerer: ExecuteRequestLowerer,
@@ -274,8 +173,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         formatPostgresControlPolicySubjectLabel(factoryName, subject, options.contract),
     });
 
-    const rlsDiffCalls = buildRlsDiffCalls(options.contract, options.schema);
-
     const result = planIssues({
       issues: issuePartition.plannable,
       toContract: options.contract,
@@ -292,7 +189,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       policy: options.policy,
       frameworkComponents: options.frameworkComponents,
       strategies: postgresPlannerStrategies,
-      extraBucketableCalls: rlsDiffCalls,
     });
 
     if (!result.ok) {
@@ -379,13 +275,20 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // rather than in the family verifier. Stitch it in here so a single
     // `SchemaIssue[]` flows through `planIssues` and the planner emits
     // CREATE SCHEMA in the dep bucket before any CreateTableCall.
+    // Schema presence and RLS policy drift are Postgres-specific concerns.
+    // Both are stitched in here so a single SchemaIssue[] flows through planIssues.
     const namespaceIssues = verifyPostgresNamespacePresence({
       contract: options.contract,
       schema: options.schema,
     });
-    if (namespaceIssues.length === 0) {
+    const rlsIssues = verifyPostgresRlsPolicies({
+      contract: options.contract,
+      schema: options.schema,
+    });
+    const extra = [...namespaceIssues, ...rlsIssues];
+    if (extra.length === 0) {
       return verifyResult.schema.issues;
     }
-    return [...namespaceIssues, ...verifyResult.schema.issues];
+    return [...extra, ...verifyResult.schema.issues];
   }
 }

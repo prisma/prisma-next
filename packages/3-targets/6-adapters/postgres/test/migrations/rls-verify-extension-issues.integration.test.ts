@@ -1,6 +1,6 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, type BaseSchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import {
@@ -140,7 +140,7 @@ describe.sequential('RLS verify extension issues', () => {
     }
   }
 
-  it('schemaDiffIssues is empty when the declared policy exists in the database', {
+  it('no RLS policy issues when the declared policy exists in the database', {
     timeout: testTimeout,
   }, async () => {
     const contract = buildContractWithPolicy();
@@ -154,10 +154,13 @@ describe.sequential('RLS verify extension issues', () => {
       frameworkComponents,
     });
 
-    expect(result.schema.schemaDiffIssues).toEqual([]);
+    const rlsIssues = result.schema.issues.filter(
+      (i) => i.kind === 'missing_rls_policy' || i.kind === 'extra_rls_policy',
+    );
+    expect(rlsIssues).toEqual([]);
   });
 
-  it('schemaDiffIssues has one missing issue when policy is declared but absent in the database', {
+  it('emits a missing_rls_policy SchemaIssue when policy is declared but absent in the database', {
     timeout: testTimeout,
   }, async () => {
     const contract = buildContractWithPolicy();
@@ -206,11 +209,11 @@ describe.sequential('RLS verify extension issues', () => {
       frameworkComponents,
     });
 
-    expect(result.schema.schemaDiffIssues).toHaveLength(1);
-    const issue = result.schema.schemaDiffIssues[0];
-    expect(issue?.outcome).toBe('missing');
-    expect(issue?.coordinate.entityKind).toBe('policy');
-    expect(issue?.coordinate.entityName).toBe(policy.name);
+    const rlsIssues = result.schema.issues.filter((i) => i.kind === 'missing_rls_policy');
+    expect(rlsIssues).toHaveLength(1);
+    const issue = rlsIssues[0] as BaseSchemaIssue | undefined;
+    expect(issue?.kind).toBe('missing_rls_policy');
+    expect(issue?.indexOrConstraint).toBe(policy.name);
   });
 
   it('verify result is ok:false when a declared policy is absent from the database', {
@@ -261,6 +264,7 @@ describe.sequential('RLS verify extension issues', () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.schema.schemaDiffIssues[0]?.message).toContain(policy.name);
+    const rlsIssues = result.schema.issues.filter((i) => i.kind === 'missing_rls_policy');
+    expect(rlsIssues[0]?.message).toContain(policy.name);
   });
 });

@@ -52,6 +52,7 @@ export function verifyPostgresRlsPolicies(input: {
         kind: 'missing_rls_policy',
         namespaceId: policy.namespaceId,
         table: policy.tableName,
+        indexOrConstraint: policy.name,
         message: `RLS policy "${policy.name}" on table "${policy.tableName}" is missing from the database`,
       });
     } else if (diff.outcome === 'extra') {
@@ -61,6 +62,7 @@ export function verifyPostgresRlsPolicies(input: {
         kind: 'extra_rls_policy',
         namespaceId: policy.namespaceId,
         table: policy.tableName,
+        indexOrConstraint: policy.name,
         message: `RLS policy "${policy.name}" on table "${policy.tableName}" is present in the database but not in the contract`,
       });
     }

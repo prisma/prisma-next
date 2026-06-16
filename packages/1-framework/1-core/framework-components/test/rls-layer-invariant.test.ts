@@ -1,11 +1,10 @@
 /**
  * Structural invariant: no RLS-specific symbols in packages/1-framework or packages/2-sql.
  *
- * The generic differ and schemaDiffIssues plumbing are target-agnostic. Postgres RLS types
- * and identifiers live exclusively in packages/3-targets. This test fails if an RLS symbol
- * leaks into a shared layer.
+ * Generic differ utilities (diffNodes, SchemaDiffIssue) are target-agnostic and live in
+ * packages/1-framework. Postgres RLS types and identifiers live exclusively in packages/3-targets.
+ * This test fails if an RLS symbol leaks into a shared layer.
  *
- * Generic tokens (schemaDiffIssues, diffNodes, SchemaDiffIssue) are allowed.
  * Comments are excluded from the scan — only code tokens are checked.
  *
  * Note: dependency-cruiser enforces import-level containment (no RLS module imports into

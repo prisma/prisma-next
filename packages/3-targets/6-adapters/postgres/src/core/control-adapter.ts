@@ -11,11 +11,7 @@ import {
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
-import {
-  APP_SPACE_ID,
-  diffNodes,
-  type SchemaDiffIssue,
-} from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, type SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
@@ -60,14 +56,11 @@ import type {
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
+import { verifyPostgresRlsPolicies } from '@prisma-next/target-postgres/planner';
 import type { RlsPolicyOperation } from '@prisma-next/target-postgres/rls-canonicalize';
 import { readPostgresSchemaIrAnnotations } from '@prisma-next/target-postgres/schema-ir-annotations';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
-import {
-  isPostgresSchema,
-  PostgresRlsPolicy,
-  PostgresRole,
-} from '@prisma-next/target-postgres/types';
+import { PostgresRlsPolicy, PostgresRole } from '@prisma-next/target-postgres/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { encodeControlQueryParams } from './control-codecs';
@@ -123,22 +116,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    */
   readonly normalizeNativeType = normalizeSchemaNativeType;
 
-  collectSchemaDiffIssues(
-    contract: Contract<SqlStorage>,
-    schema: SqlSchemaIR,
-  ): readonly SchemaDiffIssue[] {
-    const expectedPolicies: PostgresRlsPolicy[] = [];
-    for (const ns of Object.values(contract.storage.namespaces)) {
-      if (isPostgresSchema(ns)) {
-        for (const policy of Object.values(ns.policy)) {
-          expectedPolicies.push(policy);
-        }
-      }
-    }
-    const { rlsPolicies: actualPolicies = [] } = readPostgresSchemaIrAnnotations(schema);
-    const schemaTableNames = new Set(Object.keys(schema.tables));
-    const scopedActual = actualPolicies.filter((p) => schemaTableNames.has(p.tableName));
-    return diffNodes(expectedPolicies, scopedActual);
+  collectSchemaIssues(contract: Contract<SqlStorage>, schema: SqlSchemaIR): readonly SchemaIssue[] {
+    return verifyPostgresRlsPolicies({ contract, schema });
   }
 
   bootstrapControlTableQueries(): readonly DdlNode[] {

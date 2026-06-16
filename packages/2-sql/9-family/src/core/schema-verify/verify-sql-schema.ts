@@ -238,7 +238,6 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
       issues,
       root,
       counts,
-      schemaDiffIssues: [],
     },
     meta: {
       strict,

@@ -1,5 +1,5 @@
 import type {
-  SchemaDiffIssue,
+  SchemaIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
@@ -10,7 +10,7 @@ function makeResult(overrides: {
   ok: boolean;
   summary: string;
   fail?: number;
-  schemaDiffIssues?: readonly SchemaDiffIssue[];
+  issues?: readonly SchemaIssue[];
 }): VerifyDatabaseSchemaResult {
   const fail = overrides.fail ?? (overrides.ok ? 0 : 1);
   const result: VerifyDatabaseSchemaResult = {
@@ -19,8 +19,7 @@ function makeResult(overrides: {
     contract: { storageHash: `sha256:${overrides.spaceId}-storage` },
     target: { expected: 'postgres' },
     schema: {
-      issues: [],
-      schemaDiffIssues: overrides.schemaDiffIssues ?? [],
+      issues: overrides.issues ?? [],
       root: {
         status: overrides.ok ? 'pass' : 'fail',
         kind: 'space',
@@ -192,26 +191,21 @@ describe('combineSchemaResults', () => {
     });
   });
 
-  it('concatenates schemaDiffIssues from all members into the combined result', () => {
-    const appIssue: SchemaDiffIssue = {
-      coordinate: {
-        plane: 'storage',
-        entityKind: 'policy',
-        namespaceId: 'public',
-        entityName: 'policy_app_abc',
-      },
-      outcome: 'missing',
-      message: "missing: policy 'policy_app_abc' in namespace 'public'",
+  it('concatenates issues from all members into the combined result', () => {
+    const appIssue: SchemaIssue = {
+      kind: 'missing_rls_policy',
+      namespaceId: 'public',
+      table: 'profiles',
+      indexOrConstraint: 'policy_app_abc',
+      message: "RLS policy 'policy_app_abc' on table 'profiles' is missing from the database",
     };
-    const extIssue: SchemaDiffIssue = {
-      coordinate: {
-        plane: 'storage',
-        entityKind: 'policy',
-        namespaceId: 'public',
-        entityName: 'policy_cipher_def',
-      },
-      outcome: 'extra',
-      message: "extra: policy 'policy_cipher_def' in namespace 'public'",
+    const extIssue: SchemaIssue = {
+      kind: 'extra_rls_policy',
+      namespaceId: 'public',
+      table: 'profiles',
+      indexOrConstraint: 'policy_cipher_def',
+      message:
+        "RLS policy 'policy_cipher_def' on table 'profiles' is present in the database but not in the contract",
     };
 
     const perSpace = new Map<string, VerifyDatabaseSchemaResult>([
@@ -221,7 +215,7 @@ describe('combineSchemaResults', () => {
           spaceId: 'app',
           ok: true,
           summary: 'Database schema satisfies contract',
-          schemaDiffIssues: [appIssue],
+          issues: [appIssue],
         }),
       ],
       [
@@ -230,13 +224,13 @@ describe('combineSchemaResults', () => {
           spaceId: 'cipher',
           ok: true,
           summary: 'Schema matches contract',
-          schemaDiffIssues: [extIssue],
+          issues: [extIssue],
         }),
       ],
     ]);
 
     const combined = combineSchemaResults(perSpace, 'app', false);
 
-    expect(combined.schema.schemaDiffIssues).toEqual([appIssue, extIssue]);
+    expect(combined.schema.issues).toEqual([appIssue, extIssue]);
   });
 });

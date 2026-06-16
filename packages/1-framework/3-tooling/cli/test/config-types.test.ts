@@ -57,7 +57,6 @@ describe('defineConfig', () => {
               actual: null,
               children: [],
             },
-            schemaDiffIssues: [],
             counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
           },
           timings: { total: 0 },
