@@ -3,6 +3,7 @@ import {
   DdlNode,
   type DdlTableConstraint,
 } from '@prisma-next/sql-relational-core/ast';
+import type { RlsPolicyOperation } from '../rls/canonicalize';
 
 // ---------------------------------------------------------------------------
 // AlterTableAction — nested polymorphic hierarchy
@@ -42,6 +43,8 @@ export interface PostgresDdlVisitor<R> {
   createTable(node: PostgresCreateTable): R;
   createSchema(node: PostgresCreateSchema): R;
   alterTable(node: PostgresAlterTable): R;
+  createPolicy(node: PostgresCreatePolicy): R;
+  dropPolicy(node: PostgresDropPolicy): R;
 }
 
 export abstract class PostgresDdlNode extends DdlNode {
@@ -127,4 +130,68 @@ export class PostgresAlterTable extends PostgresDdlNode {
   }
 }
 
-export type AnyPostgresDdlNode = PostgresCreateTable | PostgresCreateSchema | PostgresAlterTable;
+export type { RlsPolicyOperation };
+
+export class PostgresCreatePolicy extends PostgresDdlNode {
+  readonly kind = 'create-policy' as const;
+  readonly schema: string;
+  readonly table: string;
+  readonly name: string;
+  readonly permissive: boolean;
+  readonly operation: RlsPolicyOperation;
+  readonly roles: ReadonlyArray<string>;
+  readonly using: string | undefined;
+  readonly withCheck: string | undefined;
+
+  constructor(options: {
+    readonly schema: string;
+    readonly table: string;
+    readonly name: string;
+    readonly permissive: boolean;
+    readonly operation: RlsPolicyOperation;
+    readonly roles: readonly string[];
+    readonly using?: string;
+    readonly withCheck?: string;
+  }) {
+    super();
+    this.schema = options.schema;
+    this.table = options.table;
+    this.name = options.name;
+    this.permissive = options.permissive;
+    this.operation = options.operation;
+    this.roles = Object.freeze([...options.roles]);
+    this.using = options.using;
+    this.withCheck = options.withCheck;
+    this.freeze();
+  }
+
+  override accept<R>(visitor: PostgresDdlVisitor<R>): R {
+    return visitor.createPolicy(this);
+  }
+}
+
+export class PostgresDropPolicy extends PostgresDdlNode {
+  readonly kind = 'drop-policy' as const;
+  readonly schema: string;
+  readonly table: string;
+  readonly name: string;
+
+  constructor(options: { readonly schema: string; readonly table: string; readonly name: string }) {
+    super();
+    this.schema = options.schema;
+    this.table = options.table;
+    this.name = options.name;
+    this.freeze();
+  }
+
+  override accept<R>(visitor: PostgresDdlVisitor<R>): R {
+    return visitor.dropPolicy(this);
+  }
+}
+
+export type AnyPostgresDdlNode =
+  | PostgresCreateTable
+  | PostgresCreateSchema
+  | PostgresAlterTable
+  | PostgresCreatePolicy
+  | PostgresDropPolicy;

@@ -50,14 +50,16 @@ import type {
   AddColumnAction,
   AlterTableActionVisitor,
   PostgresAlterTable,
+  PostgresCreatePolicy,
   PostgresCreateSchema,
   PostgresCreateTable,
   PostgresDdlNode,
+  PostgresDropPolicy,
+  RlsPolicyOperation,
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { verifyPostgresRlsPolicies } from '@prisma-next/target-postgres/planner';
-import type { RlsPolicyOperation } from '@prisma-next/target-postgres/rls-canonicalize';
 import { readPostgresSchemaIrAnnotations } from '@prisma-next/target-postgres/schema-ir-annotations';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import { PostgresRlsPolicy, PostgresRole } from '@prisma-next/target-postgres/types';
@@ -1648,6 +1650,37 @@ async function pgRenderAlterTable(
   };
 }
 
+const POLICY_OPERATION_SQL: Record<RlsPolicyOperation, string> = {
+  select: 'SELECT',
+  insert: 'INSERT',
+  update: 'UPDATE',
+  delete: 'DELETE',
+  all: 'ALL',
+};
+
+function pgRenderCreatePolicy(node: PostgresCreatePolicy): SqlExecuteRequest {
+  const tableRef = `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`;
+  const permissiveness = node.permissive ? 'PERMISSIVE' : 'RESTRICTIVE';
+  const command = POLICY_OPERATION_SQL[node.operation];
+  const roles = node.roles.length === 0 ? 'PUBLIC' : node.roles.join(', ');
+  let sql = `CREATE POLICY ${quoteIdentifier(node.name)} ON ${tableRef} AS ${permissiveness} FOR ${command} TO ${roles}`;
+  if (node.using !== undefined) {
+    sql += ` USING (${node.using})`;
+  }
+  if (node.withCheck !== undefined) {
+    sql += ` WITH CHECK (${node.withCheck})`;
+  }
+  return { sql, params: [] };
+}
+
+function pgRenderDropPolicy(node: PostgresDropPolicy): SqlExecuteRequest {
+  const tableRef = `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`;
+  return {
+    sql: `DROP POLICY ${quoteIdentifier(node.name)} ON ${tableRef}`,
+    params: [],
+  };
+}
+
 async function pgRenderDdlExecuteRequest(
   ast: PostgresDdlNode,
   codecLookup: CodecLookup,
@@ -1656,6 +1689,8 @@ async function pgRenderDdlExecuteRequest(
     createTable: (node: PostgresCreateTable) => pgRenderCreateTable(node, codecLookup),
     createSchema: (node: PostgresCreateSchema) => Promise.resolve(pgRenderCreateSchema(node)),
     alterTable: (node: PostgresAlterTable) => pgRenderAlterTable(node, codecLookup),
+    createPolicy: (node: PostgresCreatePolicy) => Promise.resolve(pgRenderCreatePolicy(node)),
+    dropPolicy: (node: PostgresDropPolicy) => Promise.resolve(pgRenderDropPolicy(node)),
   };
   return ast.accept(visitor);
 }

@@ -3,8 +3,11 @@ import {
   AddColumnAction,
   type AnyAlterTableAction,
   PostgresAlterTable,
+  PostgresCreatePolicy,
   PostgresCreateSchema,
   PostgresCreateTable,
+  PostgresDropPolicy,
+  type RlsPolicyOperation,
 } from '../core/ddl/nodes';
 
 /**
@@ -61,4 +64,36 @@ export function alterTable(options: {
   readonly actions: readonly AnyAlterTableAction[];
 }): PostgresAlterTable {
   return new PostgresAlterTable(options);
+}
+
+/**
+ * Build a Postgres `CREATE POLICY` DDL node.
+ *
+ * Identifiers (`schema`, `table`, `name`) are quoted by the renderer.
+ * `using` and `withCheck` are emitted verbatim as predicate SQL — callers
+ * must supply safe, pre-validated SQL expressions.
+ */
+export function createPolicy(options: {
+  readonly schema: string;
+  readonly table: string;
+  readonly name: string;
+  readonly permissive: boolean;
+  readonly operation: RlsPolicyOperation;
+  readonly roles: readonly string[];
+  readonly using?: string;
+  readonly withCheck?: string;
+}): PostgresCreatePolicy {
+  return new PostgresCreatePolicy(options);
+}
+
+/**
+ * Build a Postgres `DROP POLICY` DDL node.
+ * Identifiers (`schema`, `table`, `name`) are quoted by the renderer.
+ */
+export function dropPolicy(options: {
+  readonly schema: string;
+  readonly table: string;
+  readonly name: string;
+}): PostgresDropPolicy {
+  return new PostgresDropPolicy(options);
 }

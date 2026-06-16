@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
+import { PostgresCreatePolicy } from '../../src/exports/ddl';
 
 const stubLowerer: ExecuteRequestLowerer = {
   lower(_ast, _ctx) {
@@ -182,7 +183,15 @@ describe('RLS planner diff-wiring', () => {
 
   it('emits CREATE POLICY with the correct wire name and USING clause', async () => {
     const contract = buildContractWithPolicy();
-    const planner = createPostgresMigrationPlanner(stubLowerer);
+    const received: unknown[] = [];
+    const recordingLowerer: ExecuteRequestLowerer = {
+      lower: stubLowerer.lower,
+      lowerToExecuteRequest: async (ast) => {
+        received.push(ast);
+        return { sql: 'stub', params: [] };
+      },
+    };
+    const planner = createPostgresMigrationPlanner(recordingLowerer);
 
     const result = planner.plan({
       contract,
@@ -196,11 +205,13 @@ describe('RLS planner diff-wiring', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
-    const ops = await Promise.all(result.plan.operations);
-    const allExecuteSql = ops.flatMap((op) => op.execute.map((step) => step.sql));
-    const createPolicySql = allExecuteSql.find((s) => s.includes('CREATE POLICY'));
-    expect(createPolicySql).toContain('read_own_profiles_a1b2c3d4');
-    expect(createPolicySql).toContain('auth.uid()');
+    await Promise.all(result.plan.operations);
+    const createPolicyNode = received.find((n) => n instanceof PostgresCreatePolicy) as
+      | PostgresCreatePolicy
+      | undefined;
+    expect(createPolicyNode).toBeDefined();
+    expect(createPolicyNode?.name).toContain('read_own_profiles_a1b2c3d4');
+    expect(createPolicyNode?.using).toContain('auth.uid()');
   });
 
   it('does not emit RLS ops when the policy already exists in the introspected schema', async () => {
