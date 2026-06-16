@@ -147,7 +147,7 @@ export default function mongo<
     return createMongoRuntime({
       context,
       driver,
-      ...(options.mode !== undefined ? { mode: options.mode } : {}),
+      ...ifDefined('mode', options.mode),
       ...ifDefined('middleware', options.middleware),
     });
   };

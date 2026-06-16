@@ -48,6 +48,7 @@ import type {
 import { nodePslSpan } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { deriveJsonSchema, derivePolymorphicJsonSchema } from './derive-json-schema';
 import {
@@ -957,7 +958,7 @@ export function interpretPslDocumentToMongoContract(
     entityContext: {
       family: 'mongo',
       target: 'mongo',
-      ...(codecLookup !== undefined ? { codecLookup } : {}),
+      ...ifDefined('codecLookup', codecLookup),
       sourceId,
       diagnostics: {
         push: (d) => {
@@ -1007,9 +1008,7 @@ export function interpretPslDocumentToMongoContract(
             modelName: pslModel.name,
             fieldName: field.name,
             targetModelName: field.typeName,
-            ...(relation?.relationName !== undefined
-              ? { relationName: relation.relationName }
-              : {}),
+            ...ifDefined('relationName', relation?.relationName),
             cardinality: field.list ? '1:N' : '1:1',
             field,
           });
@@ -1038,7 +1037,7 @@ export function interpretPslDocumentToMongoContract(
             declaringModel: pslModel.name,
             fieldName: field.name,
             targetModel: field.typeName,
-            ...(relation.relationName !== undefined ? { relationName: relation.relationName } : {}),
+            ...ifDefined('relationName', relation.relationName),
             localFields: localMapped,
             targetFields: targetMapped,
           });
