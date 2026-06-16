@@ -29,7 +29,11 @@ type PostgresResult<
   typeof buildBoundContract<
     SqlFamily,
     PostgresPack,
-    PostgresDefinition<Types, Models, ExtensionPacks, Enums> & {
+    {
+      readonly types?: Types;
+      readonly models?: Models;
+      readonly extensionPacks?: ExtensionPacks;
+      readonly enums?: Enums;
       readonly createNamespace: (input: SqlNamespaceInput) => Namespace;
     }
   >

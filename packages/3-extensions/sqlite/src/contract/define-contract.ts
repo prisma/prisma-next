@@ -25,7 +25,10 @@ type SqliteResult<
   typeof buildBoundContract<
     SqlFamily,
     SqlitePack,
-    SqliteDefinition<Types, Models, ExtensionPacks> & {
+    {
+      readonly types?: Types;
+      readonly models?: Models;
+      readonly extensionPacks?: ExtensionPacks;
       readonly createNamespace: (input: SqlNamespaceInput) => Namespace;
     }
   >
