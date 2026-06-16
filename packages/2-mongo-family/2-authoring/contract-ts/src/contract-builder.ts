@@ -560,10 +560,34 @@ type MaybeValueObjectsSection<ValueObjects extends Record<string, AnyValueObject
         readonly valueObjects: ContractValueObjectsFromRecord<ValueObjects>;
       };
 
+// Project EnumTypeHandle to the namespace enum-entry shape.
+// Uses enumMembers (which carries Values[number] literals) rather than
+// ContractEnum.members (which uses JsonValue and erases literals).
+type EnumHandleToEntry<Handle> =
+  Handle extends EnumTypeHandle<string, infer Values, infer _Names, infer _MembersMap>
+    ? {
+        readonly codecId: string;
+        readonly members: readonly { readonly name: string; readonly value: Values[number] }[];
+      }
+    : never;
+
+type ContractEnumsFromRecord<Enums extends Record<string, EnumTypeHandle>> = {
+  readonly [K in keyof Enums as Enums[K] extends EnumTypeHandle<infer Name>
+    ? Name
+    : never]: EnumHandleToEntry<Enums[K]>;
+};
+
+type MaybeEnumsSection<Enums extends Record<string, EnumTypeHandle>> = keyof Enums extends never
+  ? EmptyObject
+  : {
+      readonly enum: ContractEnumsFromRecord<Enums>;
+    };
+
 type MongoDomainNamespaceFromDefinition<Definition> = Simplify<
   {
     readonly models: ContractModelsFromRecord<DefinitionModels<Definition>>;
-  } & MaybeValueObjectsSection<DefinitionValueObjects<Definition>>
+  } & MaybeValueObjectsSection<DefinitionValueObjects<Definition>> &
+    MaybeEnumsSection<DefinitionEnums<Definition>>
 >;
 
 type MongoContractBaseFromDefinition<Definition> = Simplify<{
@@ -581,7 +605,7 @@ type MongoContractBaseFromDefinition<Definition> = Simplify<{
   readonly profileHash: ProfileHashBase<string>;
   readonly meta: Record<string, never>;
   readonly defaultControlPolicy?: ControlPolicy;
-  readonly enumAccessors: BuiltEnumAccessors<Definition>;
+  readonly enumAccessors?: BuiltEnumAccessors<Definition>;
 }>;
 
 type CodecTypesFromDefinition<Definition> = MongoCodecTypes &
@@ -632,6 +656,9 @@ type ExtractValueObjectFields<TBuilder> =
   TBuilder extends NamedValueObjectBuilder<string, infer Fields> ? Fields : Record<never, never>;
 
 // The JS output type for one field builder: base type with nullable/many applied.
+// Compose many first (array wrapping), then add nullability. This avoids the
+// TypeScript operator-precedence trap where `A | B extends infer X` infers X
+// only from B, not from `A | B`.
 type BuilderFieldOutputType<
   TBuilder,
   TValueObjects extends Record<string, AnyValueObjectBuilder>,
@@ -643,12 +670,10 @@ type BuilderFieldOutputType<
     infer Many extends boolean
   >
     ?
-        | BuilderBaseOutputType<TBuilder, TValueObjects, TCodecTypes>
-        | (Nullable extends true ? null : never) extends infer BaseType
-      ? Many extends true
-        ? BaseType[]
-        : BaseType
-      : never
+        | (Many extends true
+            ? BuilderBaseOutputType<TBuilder, TValueObjects, TCodecTypes>[]
+            : BuilderBaseOutputType<TBuilder, TValueObjects, TCodecTypes>)
+        | (Nullable extends true ? null : never)
     : never;
 
 type ExtractModelFields<TBuilder> =

@@ -7,6 +7,7 @@ import type {
 } from '@prisma-next/mongo-contract';
 import { expectTypeOf, test } from 'vitest';
 import { defineContract, field, index, model, valueObject } from '../src/contract-builder';
+import { enumType, member } from '../src/enum-type';
 
 const mongoFamilyPack = {
   kind: 'family',
@@ -209,4 +210,73 @@ test('Mongo option types reject unsupported authoring shapes', () => {
     },
   } satisfies MongoCollectionOptionsAuthoringInput;
   _invalidCollectionOptionValue;
+});
+
+// ---------------------------------------------------------------------------
+// F11: BuilderFieldOutputType nullable+many corner (operator precedence)
+//
+// Prior to the F11 fix, the nullable+many case produced (Base | null)[]
+// (array-of-nullable) due to TS operator precedence (`extends` binds tighter
+// than `|`). The fix composes Many first, then adds nullability, producing
+// Base[] | null. This is the same corner exercised by the runtime asymmetry
+// the slice already documents — the type-level mirror was silently wrong.
+//
+// Also adds the F14 enumType registration so the namespace enum? slot test
+// verifies literal preservation through MongoDomainNamespaceFromDefinition.
+// ---------------------------------------------------------------------------
+
+const F11Role = enumType(
+  'F11Role',
+  { codecId: 'mongo/string@1', nativeType: 'string' },
+  member('User', 'user'),
+  member('Admin', 'admin'),
+);
+
+const F11Contract = defineContract({
+  family: mongoFamilyPack,
+  target: mongoTargetPack,
+  enums: { F11Role },
+  models: {
+    F11Account: model('F11Account', {
+      collection: 'f11_accounts',
+      fields: {
+        _id: field.objectId(),
+        scalarField: field.string(),
+        nullableField: field.string().optional(),
+        manyField: field.string().many(),
+        nullableManyField: field.string().optional().many(),
+      },
+    }),
+  },
+});
+
+type F11Row = InferModelRow<typeof F11Contract, 'F11Account'>;
+
+test('F11: scalar field resolves to codec base type', () => {
+  expectTypeOf<F11Row['scalarField']>().toEqualTypeOf<string>();
+});
+
+test('F11: nullable field resolves to Base | null', () => {
+  expectTypeOf<F11Row['nullableField']>().toEqualTypeOf<string | null>();
+});
+
+test('F11: many field resolves to Base[]', () => {
+  expectTypeOf<F11Row['manyField']>().toEqualTypeOf<string[]>();
+});
+
+test('F11: nullable+many field resolves to Base[] | null, not (Base | null)[]', () => {
+  // The precedence bug produced (string | null)[]; the fix produces string[] | null.
+  expectTypeOf<F11Row['nullableManyField']>().toEqualTypeOf<string[] | null>();
+  expectTypeOf<F11Row['nullableManyField']>().not.toEqualTypeOf<(string | null)[]>();
+});
+
+// ---------------------------------------------------------------------------
+// F14: namespace enum? slot carries literal-preserving entries
+// ---------------------------------------------------------------------------
+
+test('F14: namespace enum slot is typed with literal value preservation', () => {
+  type Ns = (typeof F11Contract)['domain']['namespaces']['__unbound__'];
+  type RoleEntry = NonNullable<Ns['enum']>['F11Role'];
+  type MemberValue = RoleEntry['members'][number]['value'];
+  expectTypeOf<MemberValue>().toEqualTypeOf<'user' | 'admin'>();
 });
