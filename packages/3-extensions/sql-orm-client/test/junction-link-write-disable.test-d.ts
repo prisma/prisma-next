@@ -4,6 +4,7 @@ import { expectTypeOf, test } from 'vitest';
 import type { MutationCreateInput, MutationUpdateInput } from '../src/types';
 import { defineContract, field, model, rel } from './contract-builder';
 import type { Contract } from './fixtures/generated/contract';
+import type { Contract as JunctionNsContract } from './fixtures/junction-namespaces/generated/contract';
 
 type RoleCreate = MutationCreateInput<Contract, 'Role'>;
 type TagCreate = MutationCreateInput<Contract, 'Tag'>;
@@ -118,6 +119,19 @@ const shadowTargetCriterion = { id: 1 } as {
   readonly id: NonNullable<ShadowTargetCreate['id']>;
 };
 
+// Emitted two-namespace fixture where `public` and `shadow` each declare the
+// SAME junction table `user_roles` with the SAME payload column `token`, but
+// only `public.user_roles.token` carries an execution-time onCreate default.
+// Execution-default refs are namespace-scoped, so the junction-payload type gate
+// must match `(namespace, table, column)`: `shadow.user_roles.token` is a
+// required payload column with no default and must NOT borrow `public`'s.
+// Sourced from an emitted fixture (not a DSL `typeof`) so the gate's
+// namespace-keyed model resolution has literal namespace keys to work against.
+type JnsPublicRoleCreate = MutationCreateInput<JunctionNsContract, 'Role'>;
+const jnsPublicRoleCreate = { id: 'admin', name: 'Admin' } as JnsPublicRoleCreate;
+type JnsShadowRoleCreate = MutationCreateInput<JunctionNsContract, 'ShadowRole'>;
+const jnsShadowRoleCreate = { id: 'admin', name: 'Admin' } as JnsShadowRoleCreate;
+
 test('nested create on a relation whose junction has a required payload column is a type error', () => {
   type Input = MutationCreateInput<Contract, 'User'>;
 
@@ -146,13 +160,15 @@ test('connect on a required-payload junction relation is a type error', () => {
   expectTypeOf(input).toExtend<Input>();
 });
 
-test('disconnect remains available on a required-payload junction relation', () => {
+test('disconnect is unavailable on a junction relation in create input', () => {
   type Input = MutationCreateInput<Contract, 'User'>;
 
   const input: Input = {
     name: 'Alice',
     email: 'alice@test.com',
-    roles: (mutator) => mutator.disconnect([roleCriterion]),
+    roles: (mutator) =>
+      // @ts-expect-error - disconnect() is update-only; createGraph rejects junction disconnect during create()
+      mutator.disconnect([roleCriterion]),
   };
 
   expectTypeOf(input).toExtend<Input>();
@@ -229,7 +245,7 @@ test('pure junction relation lookup is namespace-aware', () => {
   expectTypeOf(createInput).toExtend<Input>();
 });
 
-test('connect and disconnect remain available on a pure junction relation', () => {
+test('connect stays available but disconnect is unavailable on a pure junction relation in create input', () => {
   type Input = MutationCreateInput<Contract, 'User'>;
 
   const connectInput: Input = {
@@ -241,11 +257,23 @@ test('connect and disconnect remain available on a pure junction relation', () =
   const disconnectInput: Input = {
     name: 'Alice',
     email: 'alice@test.com',
-    tags: (mutator) => mutator.disconnect([tagCriterion]),
+    tags: (mutator) =>
+      // @ts-expect-error - disconnect() is update-only; createGraph rejects junction disconnect during create()
+      mutator.disconnect([tagCriterion]),
   };
 
   expectTypeOf(connectInput).toExtend<Input>();
   expectTypeOf(disconnectInput).toExtend<Input>();
+});
+
+test('criteria disconnect stays available on a pure junction relation in update input', () => {
+  type Input = MutationUpdateInput<Contract, 'User'>;
+
+  const input: Input = {
+    tags: (mutator) => mutator.disconnect([tagCriterion]),
+  };
+
+  expectTypeOf(input).toExtend<Input>();
 });
 
 test('bare disconnect stays accepted for a plain 1:N relation', () => {
@@ -320,5 +348,33 @@ test('execution-defaulted junction payload column keeps create and connect enabl
   };
 
   expectTypeOf(connectInput).toExtend<Input>();
+  expectTypeOf(createInput).toExtend<Input>();
+});
+
+test('execution default keeps create enabled in its own namespace (public side of a collision)', () => {
+  type Input = MutationCreateInput<JunctionNsContract, 'User'>;
+
+  const createInput: Input = {
+    id: 1,
+    name: 'Alice',
+    email: 'alice@test.com',
+    roles: (mutator) => mutator.create(jnsPublicRoleCreate),
+  };
+
+  expectTypeOf(createInput).toExtend<Input>();
+});
+
+test('execution default does not leak across namespaces to a same-named junction column', () => {
+  type Input = MutationCreateInput<JunctionNsContract, 'ShadowUser'>;
+
+  const createInput: Input = {
+    id: 1,
+    name: 'Alice',
+    email: 'alice@test.com',
+    roles: (mutator) =>
+      // @ts-expect-error - shadow.user_roles.token is a required payload column with no default in `shadow`; public's execution default for the same-named column must not make it look optional
+      mutator.create(jnsShadowRoleCreate),
+  };
+
   expectTypeOf(createInput).toExtend<Input>();
 });
