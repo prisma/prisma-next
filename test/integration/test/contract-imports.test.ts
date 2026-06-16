@@ -372,6 +372,9 @@ type CodecIntType = CodecTypes['pg/int4@1'];
             '@prisma-next/family-sql/ir': [
               `${relativeToWorkspace}/packages/2-sql/9-family/dist/ir.d.mts`,
             ],
+            '@prisma-next/family-sql/test-utils': [
+              `${relativeToWorkspace}/packages/2-sql/9-family/dist/test-utils.d.mts`,
+            ],
             '@prisma-next/family-sql/*': [`${relativeToWorkspace}/packages/2-sql/9-family/dist/*`],
             '@prisma-next/adapter-postgres/*': [
               `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/*`,
