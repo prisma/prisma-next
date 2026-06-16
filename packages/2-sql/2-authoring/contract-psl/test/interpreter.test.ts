@@ -9,6 +9,7 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  createTestNamespace,
   modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
@@ -40,6 +41,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
       composedExtensionContracts: new Map(),
+      createNamespace: createTestNamespace,
       ...input,
     });
 
@@ -61,6 +63,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       ]),
       composedExtensionContracts: new Map(),
       controlMutationDefaults: builtinControlMutationDefaults,
+      createNamespace: createTestNamespace,
     });
 
     expect(result.ok).toBe(true);
@@ -126,6 +129,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
       composedExtensionContracts: new Map(),
+      createNamespace: createTestNamespace,
     });
 
     expect(result.ok).toBe(true);
@@ -168,6 +172,7 @@ describe('interpretPslDocumentToSqlContract', () => {
         ]),
         generatorDescriptors: [{ id: 'slugid', applicableCodecIds: ['pg/text@1'] }],
       },
+      createNamespace: createTestNamespace,
     });
 
     expect(result.ok).toBe(true);

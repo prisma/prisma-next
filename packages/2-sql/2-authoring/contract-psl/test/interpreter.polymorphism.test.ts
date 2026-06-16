@@ -9,6 +9,7 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  createTestNamespace,
   documentScopedTypes,
   modelsOf,
   postgresScalarTypeDescriptors,
@@ -28,6 +29,7 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
+      createNamespace: createTestNamespace,
       ...input,
     });
 

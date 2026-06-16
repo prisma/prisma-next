@@ -11,7 +11,11 @@ import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/
 import { countSemanticLines } from '@prisma-next/test-utils/semantic-lines';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
-import { createBuiltinLikeControlMutationDefaults, testEnumEntityContributions } from './fixtures';
+import {
+  createBuiltinLikeControlMutationDefaults,
+  createTestNamespace,
+  testEnumEntityContributions,
+} from './fixtures';
 
 const sqlFamilyPack = {
   kind: 'family',
@@ -300,6 +304,7 @@ function buildSqliteTimestampTsContract() {
     {
       family: bareSqlFamilyPack,
       target: sqliteTimestampTargetPack,
+      createNamespace: createTestNamespace,
     },
     ({ field, model }) => ({
       models: {
@@ -321,6 +326,7 @@ function buildPostgresTimestampTsContract() {
     {
       family: bareSqlFamilyPack,
       target: postgresTimestampTargetPack,
+      createNamespace: createTestNamespace,
     },
     ({ field, model }) => ({
       models: {
@@ -372,6 +378,7 @@ describe('TS and PSL authoring parity', () => {
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions: target.authoringContributions,
+      createNamespace: createTestNamespace,
     });
 
     expect(interpreted.ok).toBe(true);
@@ -422,6 +429,7 @@ model Post {
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions,
+      createNamespace: createTestNamespace,
     });
 
     expect(pslContract.ok).toBe(true);
@@ -454,6 +462,7 @@ model Post {
       target: portablePostgresTargetPack,
       namespaces: ['auth'],
       models: { User, Post },
+      createNamespace: createTestNamespace,
     });
 
     const pslStorage = pslContract.value.storage as unknown as SqlStorage;

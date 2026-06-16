@@ -639,3 +639,5 @@ export function buildEnumCapturingFactory(): {
   };
   return { createNamespace, capturedEnumTypes };
 }
+
+export { buildSqlNamespace as createTestNamespace };

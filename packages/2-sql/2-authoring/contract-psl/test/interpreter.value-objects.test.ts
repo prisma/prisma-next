@@ -6,6 +6,7 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  createTestNamespace,
   modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
@@ -25,6 +26,7 @@ describe('interpretPslDocumentToSqlContract value objects and list fields', () =
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
+      createNamespace: createTestNamespace,
       ...input,
     });
 

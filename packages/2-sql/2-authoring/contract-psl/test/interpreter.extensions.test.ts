@@ -2,6 +2,7 @@ import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
+  createTestNamespace,
   documentScopedTypes,
   pgvectorAuthoringContributions,
   pgvectorExtensionPack,
@@ -13,6 +14,7 @@ const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
+  createNamespace: createTestNamespace,
 } as const;
 
 describe('interpretPslDocumentToSqlContract extensions', () => {

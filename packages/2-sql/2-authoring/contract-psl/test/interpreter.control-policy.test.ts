@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  createTestNamespace,
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
@@ -22,6 +23,7 @@ function interpretSchema(schema: string) {
     scalarTypeDescriptors: postgresScalarTypeDescriptors,
     composedExtensionContracts: new Map(),
     controlMutationDefaults: builtinControlMutationDefaults,
+    createNamespace: createTestNamespace,
   });
 }
 

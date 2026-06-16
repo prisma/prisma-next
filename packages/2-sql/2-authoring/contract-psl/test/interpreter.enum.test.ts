@@ -16,6 +16,7 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  createTestNamespace,
   postgresScalarTypeDescriptors,
   postgresTarget,
   testEnumEntityContributions,
@@ -96,6 +97,7 @@ function interpret(schema: string, overrides?: Partial<InterpretPslDocumentToSql
     controlMutationDefaults: builtinControlMutationDefaults,
     authoringContributions: contributions,
     codecLookup: testCodecLookup,
+    createNamespace: createTestNamespace,
     ...overrides,
   });
 }
@@ -151,6 +153,7 @@ model Post {
       family: sqlFamilyPack,
       target: postgresTargetPack,
       enums: { Priority: PriorityHandle },
+      createNamespace: createTestNamespace,
       models: {
         Post: model('Post', {
           fields: {
@@ -232,6 +235,7 @@ model Post {
       family: sqlFamilyPack,
       target: postgresTargetPack,
       enums: { Priority: PriorityHandle },
+      createNamespace: createTestNamespace,
       models: {
         Post: model('Post', {
           fields: {

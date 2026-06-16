@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  createTestNamespace,
   documentScopedTypes,
   postgresScalarTypeDescriptors,
   postgresTarget,
@@ -15,6 +16,7 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
   composedExtensionContracts: new Map(),
+  createNamespace: createTestNamespace,
 } as const;
 
 describe('interpretPslDocumentToSqlContract types', () => {

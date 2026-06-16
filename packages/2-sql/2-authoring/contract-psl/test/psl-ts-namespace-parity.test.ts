@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  createTestNamespace,
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
@@ -56,6 +57,7 @@ namespace public {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
+      createNamespace: createTestNamespace,
     });
 
     expect(pslResult.ok).toBe(true);
@@ -90,6 +92,7 @@ namespace public {
       target: postgresTarget,
       namespaces: ['auth', 'public'] as const,
       models: { User, Post },
+      createNamespace: createTestNamespace,
     });
 
     const pslStorage = pslResult.value.storage as SqlStorage;
@@ -179,6 +182,7 @@ namespace public {
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       composedExtensionPacks: ['supabase'],
       composedExtensionContracts: new Map([['supabase', syntheticExtensionContract]]),
+      createNamespace: createTestNamespace,
     });
 
     expect(pslResult.ok).toBe(true);
@@ -211,6 +215,7 @@ namespace public {
       target: postgresTarget,
       extensionPacks: { supabase: supabaseExtensionPackRef },
       models: { Profile },
+      createNamespace: createTestNamespace,
     });
 
     const pslStorage = pslResult.value.storage as SqlStorage;
@@ -247,6 +252,7 @@ namespace public {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionPacks: ['supabase'],
       composedExtensionContracts: new Map(),
+      createNamespace: createTestNamespace,
     });
 
     expect(result.ok).toBe(false);

@@ -8,6 +8,7 @@ import {
 
 import {
   createBuiltinLikeControlMutationDefaults,
+  createTestNamespace,
   documentScopedTypes,
   postgresScalarTypeDescriptors,
   postgresTarget,
@@ -19,6 +20,7 @@ const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
+  createNamespace: createTestNamespace,
 } as const;
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
@@ -1104,6 +1106,7 @@ model User {
         composedExtensionContracts: new Map(),
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
+        createNamespace: createTestNamespace,
       });
 
       expect(result.ok).toBe(false);
@@ -1139,6 +1142,7 @@ model User {
         composedExtensionContracts: new Map(),
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
+        createNamespace: createTestNamespace,
       });
 
       expect(result.ok).toBe(false);

@@ -8,7 +8,7 @@ import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
 } from '../src/interpreter';
-import { postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
+import { createTestNamespace, postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
 
 describe('composed mutation default registries', () => {
   const interpretPslDocumentToSqlContract = (
@@ -22,6 +22,7 @@ describe('composed mutation default registries', () => {
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
+      createNamespace: createTestNamespace,
       ...input,
     });
 

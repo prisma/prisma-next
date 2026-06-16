@@ -4,10 +4,16 @@ import {
   SqlContractSerializerBase,
   type SqlEntityHydrationFactory,
 } from '@prisma-next/family-sql/ir';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
+  type Namespace,
+  NamespaceBase,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
+import {
+  buildSqlNamespace,
   ForeignKey,
   PrimaryKey,
+  type SqlNamespaceTablesInput,
   SqlStorage,
   StorageColumn,
   StorageTable,
@@ -160,6 +166,20 @@ describe('PostgresContractSerializer', () => {
     class RegistryDispatchProbeSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
       constructor() {
         super(registry);
+      }
+
+      protected override hydrateSqlNamespaceEntry(
+        nsId: string,
+        raw: Namespace | Record<string, unknown>,
+      ): Namespace | SqlNamespaceTablesInput {
+        if (raw instanceof NamespaceBase) {
+          return raw;
+        }
+        const input = super.hydrateSqlNamespaceEntry(nsId, raw);
+        if (input instanceof NamespaceBase) {
+          return input;
+        }
+        return buildSqlNamespace(input as SqlNamespaceTablesInput);
       }
 
       protected override parseSqlContractStructure(_json: unknown): Contract<SqlStorage> {

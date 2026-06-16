@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  createTestNamespace,
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
@@ -100,6 +101,7 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
   composedExtensionContracts: new Map(),
+  createNamespace: createTestNamespace,
 } as const;
 
 describe('interpretPslDocumentToSqlContract cross-namespace FK resolution', () => {

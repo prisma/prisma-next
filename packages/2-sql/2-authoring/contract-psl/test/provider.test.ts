@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { prismaContract } from '../src/exports/provider';
 import {
   createPostgresTestContext,
+  createTestNamespace,
   modelsOf,
   pgvectorAuthoringContributions,
   pgvectorExtensionPack,
@@ -20,6 +21,7 @@ describe('prismaContract provider helper', () => {
   const tempDirs: string[] = [];
   const baseOptions = {
     target: postgresTarget,
+    createNamespace: createTestNamespace,
   } as const;
 
   afterEach(async () => {

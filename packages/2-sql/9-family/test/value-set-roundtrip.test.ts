@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { type SqlStorage, StorageValueSet } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { defineContract, enumType, member } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -47,6 +48,7 @@ describe('value-set serializer hydration + round-trip', () => {
     {
       family: sqlFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       enums: { Role },
     },
     ({ field: f, model: m }) =>
@@ -161,6 +163,7 @@ describe('validators — value-set and enum', () => {
     {
       family: sqlFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       enums: { Role },
     },
     ({ field: f, model: m }) =>

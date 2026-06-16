@@ -6,6 +6,7 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  createTestNamespace,
   postgresScalarTypeDescriptors,
   postgresTarget,
   sqliteScalarTypeDescriptors,
@@ -27,6 +28,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
+      createNamespace: createTestNamespace,
       ...input,
     });
   it('lowers supported default functions into execution and storage contract shapes', () => {
@@ -495,6 +497,7 @@ model UuidNativeBad {
       composedExtensionContracts: new Map(),
       controlMutationDefaults: builtinControlMutationDefaults,
       authoringContributions: sqliteTemporalContributions,
+      createNamespace: createTestNamespace,
     });
 
     expect(result.ok).toBe(true);
