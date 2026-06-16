@@ -19,6 +19,7 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../../src/core/adapter';
 import type { PostgresContract } from '../../src/core/types';
@@ -34,7 +35,6 @@ import {
   postgresTargetDescriptor,
   resetDatabase,
   synthEdges,
-  testTimeout,
 } from './fixtures/runner-fixtures';
 
 const pgText = { codecId: 'pg/text@1' as const, nativeType: 'text' };
@@ -131,28 +131,28 @@ describe.sequential('ORDER BY on an enum column — declaration order, PGlite', 
 
   beforeAll(async () => {
     database = await createTestDatabase();
-  }, testTimeout);
+  }, timeouts.spinUpPpgDev);
 
   afterAll(async () => {
     if (database) {
       await database.close();
     }
-  }, testTimeout);
+  }, timeouts.spinUpPpgDev);
 
   beforeEach(async () => {
     driver = await createDriver(database.connectionString);
     await resetDatabase(driver);
-  }, testTimeout);
+  }, timeouts.spinUpPpgDev);
 
   afterEach(async () => {
     if (driver) {
       await driver.close();
       driver = undefined;
     }
-  }, testTimeout);
+  }, timeouts.spinUpPpgDev);
 
   it('renders array_position over the value-set and sorts by declaration order', {
-    timeout: testTimeout,
+    timeout: timeouts.spinUpPpgDev,
   }, async () => {
     const contract = makeTaskContract();
     await migrate(driver!, contract);
@@ -182,7 +182,7 @@ describe.sequential('ORDER BY on an enum column — declaration order, PGlite', 
   });
 
   it('intercepts an unqualified identifier-ref order column (sql-builder .orderBy form)', {
-    timeout: testTimeout,
+    timeout: timeouts.spinUpPpgDev,
   }, async () => {
     const contract = makeTaskContract();
     await migrate(driver!, contract);
@@ -211,7 +211,7 @@ describe.sequential('ORDER BY on an enum column — declaration order, PGlite', 
   });
 
   it('leaves an ambiguous unqualified order column unrewritten across a join', {
-    timeout: testTimeout,
+    timeout: timeouts.spinUpPpgDev,
   }, async () => {
     const contract = makeTaskNoteContract();
 
@@ -234,7 +234,7 @@ describe.sequential('ORDER BY on an enum column — declaration order, PGlite', 
   });
 
   it('sorts NULLs last (ASC) alongside declaration-ordered non-null values', {
-    timeout: testTimeout,
+    timeout: timeouts.spinUpPpgDev,
   }, async () => {
     const contract = makeTaskContract();
     await migrate(driver!, contract);
@@ -258,7 +258,7 @@ describe.sequential('ORDER BY on an enum column — declaration order, PGlite', 
   });
 
   it('distinctOn on a value-set column renders array_position, matching orderBy', {
-    timeout: testTimeout,
+    timeout: timeouts.spinUpPpgDev,
   }, async () => {
     const contract = makeTaskContract();
 
@@ -282,7 +282,7 @@ describe.sequential('ORDER BY on an enum column — declaration order, PGlite', 
   });
 
   it('distinctOn on a value-set column executes without error', {
-    timeout: testTimeout,
+    timeout: timeouts.spinUpPpgDev,
   }, async () => {
     const contract = makeTaskContract();
     await migrate(driver!, contract);

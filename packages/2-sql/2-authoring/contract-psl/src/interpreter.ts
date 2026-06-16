@@ -318,22 +318,16 @@ function buildEntityTypesByDiscriminator(
   const namespace = contributions?.entityTypes;
   if (namespace === undefined) return result;
 
-  const walk = (node: Readonly<Record<string, unknown>>): void => {
+  const walk = (node: object): void => {
     for (const value of Object.values(node)) {
       if (isAuthoringEntityTypeDescriptor(value)) {
         result.set(value.discriminator, value);
       } else if (typeof value === 'object' && value !== null) {
-        walk(
-          blindCast<Readonly<Record<string, unknown>>, 'walking nested entity type namespace'>(
-            value,
-          ),
-        );
+        walk(value);
       }
     }
   };
-  walk(
-    blindCast<Readonly<Record<string, unknown>>, 'walking root entity type namespace'>(namespace),
-  );
+  walk(namespace);
   return result;
 }
 
@@ -377,11 +371,7 @@ function lowerExtensionBlocksForNamespace(
     const entriesKey = descriptor.discriminator;
     const slot = result[entriesKey] ?? {};
     result[entriesKey] = slot;
-    const entityRecord = blindCast<
-      Record<string, unknown>,
-      'factory output placed under entries key (discriminator === entries key by one-string rule)'
-    >(slot);
-    entityRecord[block.name] = entity;
+    slot[block.name] = entity;
   }
 
   return result;
