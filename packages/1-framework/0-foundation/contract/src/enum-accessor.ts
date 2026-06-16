@@ -1,3 +1,4 @@
+import { blindCast } from '@prisma-next/utils/casts';
 import type { Contract } from './contract-types';
 import { UNBOUND_DOMAIN_NAMESPACE_ID } from './default-namespace';
 import type { ContractEnum } from './domain-types';
@@ -215,9 +216,12 @@ export type UnboundEnumsOf<TContract extends Contract> =
 export function buildUnboundEnums<TContract extends Contract>(
   domain: TContract['domain'],
 ): UnboundEnumsOf<TContract> {
-  const allNamespaces = buildNamespacedEnums(domain) as Record<
-    string,
-    Record<string, EnumAccessor>
-  >;
-  return (allNamespaces[UNBOUND_DOMAIN_NAMESPACE_ID] ?? {}) as UnboundEnumsOf<TContract>;
+  const allNamespaces = blindCast<
+    Record<string, Record<string, EnumAccessor>>,
+    'buildNamespacedEnums returns Record<string, Record<string, EnumAccessor>>; the literal namespace keys are erased'
+  >(buildNamespacedEnums(domain));
+  return blindCast<
+    UnboundEnumsOf<TContract>,
+    'unbound-namespace projection: drops the namespace key and exposes the inner enum-accessor map'
+  >(allNamespaces[UNBOUND_DOMAIN_NAMESPACE_ID] ?? {});
 }

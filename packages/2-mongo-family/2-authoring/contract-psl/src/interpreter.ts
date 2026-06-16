@@ -11,6 +11,7 @@ import {
   type ContractValueObject,
   type CrossReference,
   crossRef,
+  type JsonValue,
   type ValueSetRef,
 } from '@prisma-next/contract/types';
 import type { EnumTypeHandle } from '@prisma-next/contract-authoring';
@@ -917,7 +918,9 @@ function processEnumDeclarations(input: {
       codecId: handle.codecId,
       members: handle.enumMembers.map((m) => ({
         name: m.name,
-        value: m.value,
+        value: blindCast<JsonValue, 'factory-validated enum members are JsonValue-compatible'>(
+          m.value,
+        ),
       })),
     };
   }

@@ -918,7 +918,7 @@ export function instantiateAuthoringTypeConstructor(
 
 export function instantiateAuthoringEntityType<TOutput = unknown>(
   helperPath: string,
-  descriptor: AuthoringEntityTypeDescriptor<never, TOutput>,
+  descriptor: AuthoringEntityTypeDescriptor,
   args: readonly unknown[],
   ctx: AuthoringEntityContext,
 ): TOutput {
