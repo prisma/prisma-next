@@ -192,24 +192,3 @@ export function renderDefaultLiteral(value: unknown, column?: StorageColumn): st
   }
   return `'${escapeLiteral(json)}'`;
 }
-
-export function buildAddColumnSql(
-  qualifiedTableName: string,
-  columnName: string,
-  column: StorageColumn,
-  codecHooks: ReadonlyMap<string, CodecControlHooks>,
-  temporaryDefault?: string | null,
-  storageTypes: Record<string, StorageTypeInstance> = {},
-): string {
-  const typeSql = buildColumnTypeSql(column, codecHooks, storageTypes);
-  const defaultSql =
-    buildColumnDefaultSql(column.default, column) ||
-    (temporaryDefault ? `DEFAULT ${temporaryDefault}` : '');
-  const parts = [
-    `ALTER TABLE ${qualifiedTableName}`,
-    `ADD COLUMN ${quoteIdentifier(columnName)} ${typeSql}`,
-    defaultSql,
-    column.nullable ? '' : 'NOT NULL',
-  ].filter(Boolean);
-  return parts.join(' ');
-}

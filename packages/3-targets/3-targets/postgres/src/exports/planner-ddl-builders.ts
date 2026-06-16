@@ -1,5 +1,4 @@
 export {
-  buildAddColumnSql,
   buildColumnDefaultSql,
   buildColumnTypeSql,
   buildCreateTableSql,
