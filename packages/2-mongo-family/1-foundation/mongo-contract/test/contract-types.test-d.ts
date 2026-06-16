@@ -407,3 +407,139 @@ test('Mongo option input types reject unsupported keys', () => {
   const _invalidCollectionOptions: MongoCollectionOptionsAuthoringInput = { unsupported: true };
   _invalidCollectionOptions;
 });
+
+// ---------------------------------------------------------------------------
+// Stress test: a model with 32 fields (mix of enum, scalar, nullable, many)
+// must not trigger "Type instantiation is excessively deep" when InferModelRow
+// is evaluated. If the current recursive InferFieldType hits the depth limit,
+// this test-d compile fails with TS2589.
+// ---------------------------------------------------------------------------
+
+type ScalarField<CId extends string, Nullable extends boolean = false> = {
+  readonly nullable: Nullable;
+  readonly type: { readonly kind: 'scalar'; readonly codecId: CId };
+};
+type EnumField<
+  CId extends string,
+  NsId extends string,
+  EName extends string,
+  Nullable extends boolean = false,
+> = {
+  readonly nullable: Nullable;
+  readonly type: { readonly kind: 'scalar'; readonly codecId: CId };
+  readonly valueSet: {
+    readonly plane: 'domain';
+    readonly entityKind: 'enum';
+    readonly namespaceId: NsId;
+    readonly entityName: EName;
+  };
+};
+type ManyEnumField<
+  CId extends string,
+  NsId extends string,
+  EName extends string,
+  Nullable extends boolean = false,
+> = {
+  readonly nullable: Nullable;
+  readonly many: true;
+  readonly type: { readonly kind: 'scalar'; readonly codecId: CId };
+  readonly valueSet: {
+    readonly plane: 'domain';
+    readonly entityKind: 'enum';
+    readonly namespaceId: NsId;
+    readonly entityName: EName;
+  };
+};
+
+type BigModelEnum = {
+  readonly codecId: 'mongo/string@1';
+  readonly members: readonly [
+    { readonly name: 'A'; readonly value: 'a' },
+    { readonly name: 'B'; readonly value: 'b' },
+    { readonly name: 'C'; readonly value: 'c' },
+  ];
+};
+
+type BigContract = MongoContractWithTypeMaps<
+  {
+    readonly target: 'mongo';
+    readonly targetFamily: 'mongo';
+    readonly profileHash: ProfileHashBase<'sha256:stress'>;
+    readonly capabilities: Record<string, never>;
+    readonly extensionPacks: Record<string, never>;
+    readonly meta: Record<string, never>;
+    readonly roots: Record<string, never>;
+    readonly domain: {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly enum: { readonly Status: BigModelEnum };
+          readonly models: {
+            readonly BigModel: {
+              readonly relations: Record<string, never>;
+              readonly storage: { readonly collection: 'big' };
+              readonly fields: {
+                readonly f01: ScalarField<'mongo/objectId@1'>;
+                readonly f02: EnumField<'mongo/string@1', '__unbound__', 'Status'>;
+                readonly f03: EnumField<'mongo/string@1', '__unbound__', 'Status', true>;
+                readonly f04: ManyEnumField<'mongo/string@1', '__unbound__', 'Status'>;
+                readonly f05: ManyEnumField<'mongo/string@1', '__unbound__', 'Status', true>;
+                readonly f06: ScalarField<'mongo/string@1'>;
+                readonly f07: ScalarField<'mongo/string@1', true>;
+                readonly f08: EnumField<'mongo/string@1', '__unbound__', 'Status'>;
+                readonly f09: EnumField<'mongo/string@1', '__unbound__', 'Status', true>;
+                readonly f10: ManyEnumField<'mongo/string@1', '__unbound__', 'Status'>;
+                readonly f11: ScalarField<'mongo/objectId@1'>;
+                readonly f12: EnumField<'mongo/string@1', '__unbound__', 'Status'>;
+                readonly f13: EnumField<'mongo/string@1', '__unbound__', 'Status', true>;
+                readonly f14: ManyEnumField<'mongo/string@1', '__unbound__', 'Status'>;
+                readonly f15: ManyEnumField<'mongo/string@1', '__unbound__', 'Status', true>;
+                readonly f16: ScalarField<'mongo/string@1'>;
+                readonly f17: ScalarField<'mongo/string@1', true>;
+                readonly f18: EnumField<'mongo/string@1', '__unbound__', 'Status'>;
+                readonly f19: EnumField<'mongo/string@1', '__unbound__', 'Status', true>;
+                readonly f20: ManyEnumField<'mongo/string@1', '__unbound__', 'Status'>;
+                readonly f21: ScalarField<'mongo/objectId@1'>;
+                readonly f22: EnumField<'mongo/string@1', '__unbound__', 'Status'>;
+                readonly f23: EnumField<'mongo/string@1', '__unbound__', 'Status', true>;
+                readonly f24: ManyEnumField<'mongo/string@1', '__unbound__', 'Status'>;
+                readonly f25: ManyEnumField<'mongo/string@1', '__unbound__', 'Status', true>;
+                readonly f26: ScalarField<'mongo/string@1'>;
+                readonly f27: ScalarField<'mongo/string@1', true>;
+                readonly f28: EnumField<'mongo/string@1', '__unbound__', 'Status'>;
+                readonly f29: EnumField<'mongo/string@1', '__unbound__', 'Status', true>;
+                readonly f30: ManyEnumField<'mongo/string@1', '__unbound__', 'Status'>;
+                readonly f31: ScalarField<'mongo/string@1'>;
+                readonly f32: EnumField<'mongo/string@1', '__unbound__', 'Status'>;
+              };
+            };
+          };
+          readonly valueObjects: Record<string, never>;
+        };
+      };
+    };
+    readonly storage: {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly id: '__unbound__';
+          readonly kind: 'mongo-namespace';
+          readonly entries: { readonly collection: Record<string, never> };
+        };
+      };
+      readonly storageHash: StorageHashBase<'sha256:stress-storage'>;
+    };
+  },
+  MongoTypeMaps<{
+    readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
+    readonly 'mongo/string@1': { readonly input: string; readonly output: string };
+  }>
+>;
+
+test('InferModelRow on a 32-field model compiles without excessive depth error', () => {
+  type Row = InferModelRow<BigContract, 'BigModel'>;
+  expectTypeOf<Row['f01']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['f02']>().toEqualTypeOf<'a' | 'b' | 'c'>();
+  expectTypeOf<Row['f03']>().toEqualTypeOf<'a' | 'b' | 'c' | null>();
+  expectTypeOf<Row['f04']>().toEqualTypeOf<('a' | 'b' | 'c')[]>();
+  expectTypeOf<Row['f05']>().toEqualTypeOf<('a' | 'b' | 'c')[] | null>();
+  expectTypeOf<Row['f32']>().toEqualTypeOf<'a' | 'b' | 'c'>();
+});

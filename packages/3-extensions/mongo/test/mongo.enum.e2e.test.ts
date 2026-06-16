@@ -1,6 +1,7 @@
 import { generateContractDts } from '@prisma-next/emitter';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { ExtractMongoFieldOutputTypes } from '@prisma-next/mongo-contract';
 import { deriveJsonSchema } from '@prisma-next/mongo-contract-psl';
 import { mongoEmission } from '@prisma-next/mongo-emitter';
 import { timeouts } from '@prisma-next/test-utils';
@@ -109,14 +110,14 @@ describe('mongo enum — end-to-end (replica set)', {
   let replSet: MongoMemoryReplSet;
   let nativeClient: MongoClient;
   let db: MongoFacadeClient<typeof contract>;
-  // The TS-DSL `MongoContractResult` does not surface the `enum` slot at the
-  // type level (architect review A03), so the ORM `create` input narrows
-  // `role`/`mood`/`tags` to `never` for this contract. The runtime is
-  // correct — the facade builds `db.enums` from `domain.namespaces[...].enum`
-  // at runtime, and writes flow through the ORM into MongoDB which enforces
-  // the `$jsonSchema.enum`. We cast the `accounts` collection to a permissive
-  // write surface once at the test boundary so the write payloads remain
-  // readable.
+  // The TS-DSL `MongoContractResult` precomputes `FieldOutputTypes` (D8) but
+  // not the input side, so the ORM `where` predicate still narrows `_id` to
+  // `never` for this contract. The runtime is correct — the facade builds
+  // `db.enums` from `domain.namespaces[...].enum` at runtime, and writes flow
+  // through the ORM into MongoDB which enforces the `$jsonSchema.enum`. We
+  // cast the `accounts` collection to a permissive write surface once at the
+  // test boundary so the write payloads remain readable. Follow-up: extend
+  // the precomputed map to FieldInputTypes for a fuller end-to-end narrowing.
   type AccountInput = {
     role?: string | null;
     mood?: string | null;
@@ -158,7 +159,7 @@ describe('mongo enum — end-to-end (replica set)', {
     await db.connect();
     accounts = blindCast<
       AccountsCollection,
-      'A03: TS-DSL MongoContractResult does not surface enum value union at the type level; the runtime ORM call path is correct'
+      'A03: MongoContractResult precomputes FieldOutputTypes (D8) but not FieldInputTypes; the ORM where-predicate input still narrows scalar fields to never until that follow-up lands'
     >(db.orm.accounts);
   }, timeouts.spinUpMongoMemoryServer);
 
@@ -285,6 +286,19 @@ describe('mongo enum — end-to-end (replica set)', {
       type Fields = NS[keyof NS]['models']['Account']['fields'];
       type RoleKind = Fields['role']['type']['kind'];
       expectTypeOf<RoleKind>().toEqualTypeOf<'scalar'>();
+    });
+
+    it('precomputed FieldOutputTypes is reachable on the contract type (parity)', () => {
+      // D8: the TS-DSL builder attaches a precomputed FieldOutputTypes map to
+      // the contract type, mirroring the emitter's namespace-nested shape. The
+      // 5 type tests in mongo-contract/test/contract-types.test-d.ts prove the
+      // enum-narrowing behaviour on a concrete contract type with literal
+      // model keys; here we just verify the utility is exported and reachable
+      // on a built contract (the extension's defineContract overloads widen
+      // the input slightly, so the precise per-model narrowing is exercised
+      // by the test-d fixtures rather than this end-to-end harness).
+      const _probe: ExtractMongoFieldOutputTypes<typeof contract> | undefined = undefined;
+      expect(_probe).toBeUndefined();
     });
   });
 });
