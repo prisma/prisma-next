@@ -511,6 +511,7 @@ function lowerManyToManyRelation(
     cardinality: 'N:M',
     through: {
       table: throughSpec.tableName,
+      ...(throughSpec.namespace !== undefined ? { namespaceId: throughSpec.namespace } : {}),
       parentColumns: mapFieldNamesToColumnNames(
         throughSpec.modelName,
         throughFromFields,
@@ -793,13 +794,18 @@ function collectRuntimeModelSpecs(definition: ContractInput): RuntimeCollection 
     const attributesSpec = modelDefinition.buildAttributesSpec();
     const sqlSpec = modelDefinition.buildSqlSpec();
     const tableName = sqlSpec?.table ?? applyNaming(modelName, definition.naming?.tables);
-    const existingModel = tableOwners.get(tableName);
+    // Table names are unique per namespace, not globally: `public.users` and
+    // `shadow.users` are distinct tables (the storage IR and runtime already key
+    // by namespace). Key the collision check by `(namespace, table)` so the same
+    // bare table name in different namespaces is allowed.
+    const tableKey = `${modelDefinition.stageOne.namespace ?? ''} ${tableName}`;
+    const existingModel = tableOwners.get(tableKey);
     if (existingModel) {
       throw new Error(
         `Models "${existingModel}" and "${modelName}" both map to table "${tableName}".`,
       );
     }
-    tableOwners.set(tableName, modelName);
+    tableOwners.set(tableKey, modelName);
 
     const fieldToColumn: Record<string, string> = {};
     const columnOwners = new Map<string, string>();
