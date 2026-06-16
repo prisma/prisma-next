@@ -10,7 +10,6 @@ export interface PostgresSchemaIrAnnotations {
   readonly schema?: string;
   readonly rlsPolicies?: readonly PostgresRlsPolicy[];
   readonly roles?: readonly PostgresRole[];
-  readonly rlsEnabledByTable?: Readonly<Record<string, boolean>>;
   readonly nativeEnumTypeNames?: readonly string[];
 }
 
@@ -23,7 +22,6 @@ export function readPostgresSchemaIrAnnotations(schema: SqlSchemaIR): PostgresSc
   const schemaField = Reflect.get(raw, 'schema');
   const rlsPoliciesRaw = Reflect.get(raw, 'rlsPolicies');
   const rolesRaw = Reflect.get(raw, 'roles');
-  const rlsEnabledByTableRaw = Reflect.get(raw, 'rlsEnabledByTable');
   const nativeEnumTypeNamesRaw = Reflect.get(raw, 'nativeEnumTypeNames');
 
   return {
@@ -32,11 +30,6 @@ export function readPostgresSchemaIrAnnotations(schema: SqlSchemaIR): PostgresSc
       ? { rlsPolicies: rlsPoliciesRaw as readonly PostgresRlsPolicy[] }
       : {}),
     ...(Array.isArray(rolesRaw) ? { roles: rolesRaw as readonly PostgresRole[] } : {}),
-    ...(rlsEnabledByTableRaw !== null &&
-    typeof rlsEnabledByTableRaw === 'object' &&
-    !Array.isArray(rlsEnabledByTableRaw)
-      ? { rlsEnabledByTable: rlsEnabledByTableRaw as Readonly<Record<string, boolean>> }
-      : {}),
     ...(Array.isArray(nativeEnumTypeNamesRaw)
       ? { nativeEnumTypeNames: nativeEnumTypeNamesRaw as readonly string[] }
       : {}),

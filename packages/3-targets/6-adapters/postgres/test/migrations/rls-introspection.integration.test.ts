@@ -79,23 +79,6 @@ describe.sequential('RLS introspection', () => {
     expect(policy!.permissive).toBe(true);
   });
 
-  it('returns rlsEnabledByTable map with per-table RLS state', {
-    timeout: testTimeout,
-  }, async () => {
-    await driver!.query('CREATE TABLE rls_on (id int PRIMARY KEY)');
-    await driver!.query('CREATE TABLE rls_off (id int PRIMARY KEY)');
-    await driver!.query('ALTER TABLE rls_on ENABLE ROW LEVEL SECURITY');
-
-    const schema = await familyInstance.introspect({ driver: driver! });
-
-    const pg = schema.annotations?.['pg'] as Record<string, unknown> | undefined;
-    const rlsEnabledByTable = pg?.['rlsEnabledByTable'] as Record<string, boolean> | undefined;
-
-    expect(rlsEnabledByTable).toBeDefined();
-    expect(rlsEnabledByTable!['public.rls_on']).toBe(true);
-    expect(rlsEnabledByTable!['public.rls_off']).toBe(false);
-  });
-
   it('returns roles excluding system roles', {
     timeout: testTimeout,
   }, async () => {

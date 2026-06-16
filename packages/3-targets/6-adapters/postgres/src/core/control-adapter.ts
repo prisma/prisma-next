@@ -644,14 +644,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     }
 
     const mergedRlsPolicies: PostgresRlsPolicy[] = [];
-    const mergedRlsEnabledByTable: Record<string, boolean> = {};
     for (const ir of perSchema) {
       const pgAnnotations = readPostgresSchemaIrAnnotations(ir);
       if (pgAnnotations.rlsPolicies) {
         mergedRlsPolicies.push(...pgAnnotations.rlsPolicies);
-      }
-      if (pgAnnotations.rlsEnabledByTable) {
-        Object.assign(mergedRlsEnabledByTable, pgAnnotations.rlsEnabledByTable);
       }
     }
 
@@ -667,10 +663,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         pg: {
           ...firstPg,
           ...ifDefined('rlsPolicies', mergedRlsPolicies.length > 0 ? mergedRlsPolicies : undefined),
-          ...ifDefined(
-            'rlsEnabledByTable',
-            Object.keys(mergedRlsEnabledByTable).length > 0 ? mergedRlsEnabledByTable : undefined,
-          ),
         },
       }),
     };
@@ -1144,16 +1136,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          AND rolname != 'postgres'
        ORDER BY rolname`,
     );
-    const rlsEnabledResult = await driver.query<{ relname: string; relrowsecurity: boolean }>(
-      `SELECT c.relname, c.relrowsecurity
-       FROM pg_catalog.pg_class c
-       JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-       WHERE n.nspname = $1
-         AND c.relkind = 'r'
-       ORDER BY c.relname`,
-      [schema],
-    );
-
     const rlsPolicies: PostgresRlsPolicy[] = policiesResult.rows.map((row) => {
       const operation = mapPgCmd(row.cmd);
       const roles = [...new Set(parsePgNameArray(row.roles).map((r) => r.toLowerCase()))].sort();
@@ -1177,11 +1159,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       (row) => new PostgresRole({ name: row.rolname }),
     );
 
-    const rlsEnabledByTable: Record<string, boolean> = {};
-    for (const row of rlsEnabledResult.rows) {
-      rlsEnabledByTable[`${schema}.${row.relname}`] = row.relrowsecurity;
-    }
-
     const annotations = {
       pg: {
         schema,
@@ -1189,10 +1166,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         ...(nativeEnumTypeNames.length > 0 && { nativeEnumTypeNames }),
         ...ifDefined('rlsPolicies', rlsPolicies.length > 0 ? rlsPolicies : undefined),
         ...ifDefined('roles', roles.length > 0 ? roles : undefined),
-        ...ifDefined(
-          'rlsEnabledByTable',
-          Object.keys(rlsEnabledByTable).length > 0 ? rlsEnabledByTable : undefined,
-        ),
       },
     };
 
