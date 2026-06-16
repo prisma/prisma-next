@@ -251,17 +251,45 @@ type InferFieldType<
         : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes, TDomainNamespaces>
   : never;
 
+// When the contract carries a precomputed field output types map (produced by
+// the TS-DSL builder at definition time), resolve each field via a single
+// indexed access instead of re-evaluating the conditional-type chain. The
+// fallback (`never`) means "no usable precomputed map" — either because the
+// contract carries no type maps, the map is the widened default, or its top
+// level is not nested under `__unbound__`.
+type PrecomputedModelRow<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof MongoModelsMap<TContract>,
+> = [MongoUnboundFieldOutputTypes<TContract>] extends [never]
+  ? never
+  : string extends keyof MongoUnboundFieldOutputTypes<TContract>
+    ? never
+    : ModelName extends keyof MongoUnboundFieldOutputTypes<TContract>
+      ? {
+          -readonly [FieldName in keyof MongoModelsMap<TContract>[ModelName]['fields']]: FieldName extends keyof MongoUnboundFieldOutputTypes<TContract>[ModelName]
+            ? MongoUnboundFieldOutputTypes<TContract>[ModelName][FieldName]
+            : InferFieldType<
+                MongoModelsMap<TContract>[ModelName]['fields'][FieldName],
+                ExtractValueObjects<TContract>,
+                ExtractMongoCodecTypes<TContract>,
+                TContract['domain']['namespaces']
+              >;
+        }
+      : never;
+
 export type InferModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
   TFields extends Record<string, ContractField> = MongoModelsMap<TContract>[ModelName]['fields'],
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
   TValueObjects extends Record<string, ContractValueObject> = ExtractValueObjects<TContract>,
-> = {
-  -readonly [FieldName in keyof TFields]: InferFieldType<
-    TFields[FieldName],
-    TValueObjects,
-    TCodecTypes,
-    TContract['domain']['namespaces']
-  >;
-};
+> = [PrecomputedModelRow<TContract, ModelName>] extends [never]
+  ? {
+      -readonly [FieldName in keyof TFields]: InferFieldType<
+        TFields[FieldName],
+        TValueObjects,
+        TCodecTypes,
+        TContract['domain']['namespaces']
+      >;
+    }
+  : PrecomputedModelRow<TContract, ModelName>;

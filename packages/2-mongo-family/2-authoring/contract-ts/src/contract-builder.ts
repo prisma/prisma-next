@@ -587,9 +587,96 @@ type MongoContractBaseFromDefinition<Definition> = Simplify<{
 type CodecTypesFromDefinition<Definition> = MongoCodecTypes &
   MergeExtensionCodecTypesSafe<DefinitionExtensionPacks<Definition>>;
 
+// The enum value union for a field builder — `EnumTypeHandle['values'][number]`
+// when the builder carries an enum handle, `never` otherwise.
+type BuilderEnumValueUnion<TBuilder> =
+  TBuilder extends FieldBuilder<ContractFieldType, boolean, boolean>
+    ? TBuilder extends { readonly __enumHandle: EnumTypeHandle<string, infer Values> }
+      ? readonly unknown[] extends Values
+        ? never
+        : Values[number]
+      : never
+    : never;
+
+// The base codec/enum/value-object output type for a builder field, before
+// nullable/many modifiers.
+type BuilderBaseOutputType<
+  TBuilder,
+  TValueObjects extends Record<string, AnyValueObjectBuilder>,
+  TCodecTypes extends Record<string, { output: unknown }>,
+> =
+  TBuilder extends FieldBuilder<infer Type extends ContractFieldType, boolean, boolean>
+    ? [BuilderEnumValueUnion<TBuilder>] extends [never]
+      ? Type extends {
+          readonly kind: 'scalar';
+          readonly codecId: infer CId extends keyof TCodecTypes;
+        }
+        ? TCodecTypes[CId]['output']
+        : Type extends { readonly kind: 'valueObject'; readonly name: infer VOName extends string }
+          ? VOName extends keyof TValueObjects
+            ? {
+                -readonly [K in keyof ExtractValueObjectFields<
+                  TValueObjects[VOName]
+                >]: BuilderFieldOutputType<
+                  ExtractValueObjectFields<TValueObjects[VOName]>[K],
+                  TValueObjects,
+                  TCodecTypes
+                >;
+              }
+            : unknown
+          : unknown
+      : BuilderEnumValueUnion<TBuilder>
+    : never;
+
+type ExtractValueObjectFields<TBuilder> =
+  TBuilder extends NamedValueObjectBuilder<string, infer Fields> ? Fields : Record<never, never>;
+
+// The JS output type for one field builder: base type with nullable/many applied.
+type BuilderFieldOutputType<
+  TBuilder,
+  TValueObjects extends Record<string, AnyValueObjectBuilder>,
+  TCodecTypes extends Record<string, { output: unknown }>,
+> =
+  TBuilder extends FieldBuilder<
+    ContractFieldType,
+    infer Nullable extends boolean,
+    infer Many extends boolean
+  >
+    ?
+        | BuilderBaseOutputType<TBuilder, TValueObjects, TCodecTypes>
+        | (Nullable extends true ? null : never) extends infer BaseType
+      ? Many extends true
+        ? BaseType[]
+        : BaseType
+      : never
+    : never;
+
+type ExtractModelFields<TBuilder> =
+  TBuilder extends NamedModelBuilder<string, infer Fields> ? Fields : Record<never, never>;
+
+// Precomputed per-model field output type map from the builder definition —
+// mirrors the emitter's FieldOutputTypes but derived from builder handles
+// rather than emitted IR. Nested under UNBOUND_NAMESPACE_ID to match the
+// emitter's namespace-nested shape and satisfy MongoTypeMaps<..., FieldOutputTypes>.
+type FieldOutputTypesFromDefinition<Definition> = {
+  readonly [K in typeof UNBOUND_NAMESPACE_ID]: {
+    readonly [ModelKey in keyof DefinitionModels<Definition> as ExtractModelName<
+      DefinitionModels<Definition>[ModelKey]
+    >]: {
+      readonly [FieldName in keyof ExtractModelFields<
+        DefinitionModels<Definition>[ModelKey]
+      >]: BuilderFieldOutputType<
+        ExtractModelFields<DefinitionModels<Definition>[ModelKey]>[FieldName],
+        DefinitionValueObjects<Definition>,
+        CodecTypesFromDefinition<Definition>
+      >;
+    };
+  };
+};
+
 export type MongoContractResult<Definition> = MongoContractWithTypeMaps<
   MongoContractBaseFromDefinition<Definition>,
-  MongoTypeMaps<CodecTypesFromDefinition<Definition>>
+  MongoTypeMaps<CodecTypesFromDefinition<Definition>, FieldOutputTypesFromDefinition<Definition>>
 >;
 
 type ExtractEntitiesNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
@@ -736,7 +823,7 @@ function createFieldBuilder<
     __type: spec.type,
     __nullable: spec.nullable,
     __many: spec.many,
-    ...(enumHandle !== undefined ? { __enumHandle: enumHandle } : {}),
+    ...ifDefined('__enumHandle', enumHandle),
     optional() {
       return createFieldBuilder<Type, true, Many>(
         { type: spec.type, nullable: true, many: spec.many },
@@ -1407,20 +1494,16 @@ function toStorageCollectionOptions(
     ...(opts.capped
       ? { capped: { size: opts.size ?? 0, ...(opts.max != null && { max: opts.max }) } }
       : {}),
-    ...(opts.storageEngine !== undefined && { storageEngine: opts.storageEngine }),
-    ...(opts.indexOptionDefaults !== undefined && {
-      indexOptionDefaults: opts.indexOptionDefaults,
-    }),
-    ...(opts.collation !== undefined && { collation: opts.collation }),
-    ...(opts.timeseries !== undefined && { timeseries: opts.timeseries }),
+    ...ifDefined('storageEngine', opts.storageEngine),
+    ...ifDefined('indexOptionDefaults', opts.indexOptionDefaults),
+    ...ifDefined('collation', opts.collation),
+    ...ifDefined('timeseries', opts.timeseries),
     ...(opts.clusteredIndex !== undefined && {
       clusteredIndex:
         opts.clusteredIndex.name !== undefined ? { name: opts.clusteredIndex.name } : {},
     }),
-    ...(opts.expireAfterSeconds !== undefined && { expireAfterSeconds: opts.expireAfterSeconds }),
-    ...(opts.changeStreamPreAndPostImages !== undefined && {
-      changeStreamPreAndPostImages: opts.changeStreamPreAndPostImages,
-    }),
+    ...ifDefined('expireAfterSeconds', opts.expireAfterSeconds),
+    ...ifDefined('changeStreamPreAndPostImages', opts.changeStreamPreAndPostImages),
   };
   return new MongoCollectionOptions(input);
 }
