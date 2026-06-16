@@ -1,4 +1,5 @@
 import type { Contract } from './contract-types';
+import { UNBOUND_DOMAIN_NAMESPACE_ID } from './default-namespace';
 import type { ContractEnum } from './domain-types';
 import type { JsonValue } from './types';
 
@@ -189,3 +190,34 @@ export type NamespaceEnumAccessors<
 export type NamespacedEnums<TContract extends Contract> = {
   readonly [Ns in keyof TContract['domain']['namespaces']]: NamespaceEnumAccessors<TContract, Ns>;
 };
+
+// ---------------------------------------------------------------------------
+// Single-namespace (unbound) projection helpers
+//
+// Single-namespace targets (SQLite, Mongo) collapse the namespaced map down
+// to just the unbound namespace. These helpers provide a shared home so each
+// target facade does not re-define the same projection inline.
+// ---------------------------------------------------------------------------
+
+/**
+ * The enum accessor map for the unbound namespace of a single-namespace
+ * contract. Equivalent to `NamespacedEnums<TContract>[typeof UNBOUND_DOMAIN_NAMESPACE_ID]`.
+ */
+export type UnboundEnumsOf<TContract extends Contract> =
+  NamespacedEnums<TContract>[typeof UNBOUND_DOMAIN_NAMESPACE_ID];
+
+/**
+ * Build the enum accessor map for the unbound namespace of a
+ * single-namespace contract. Use this instead of indexing
+ * `buildNamespacedEnums(domain)[UNBOUND_NAMESPACE_ID]` inline in each target
+ * facade.
+ */
+export function buildUnboundEnums<TContract extends Contract>(
+  domain: TContract['domain'],
+): UnboundEnumsOf<TContract> {
+  const allNamespaces = buildNamespacedEnums(domain) as Record<
+    string,
+    Record<string, EnumAccessor>
+  >;
+  return (allNamespaces[UNBOUND_DOMAIN_NAMESPACE_ID] ?? {}) as UnboundEnumsOf<TContract>;
+}
