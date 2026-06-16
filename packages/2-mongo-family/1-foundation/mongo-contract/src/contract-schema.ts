@@ -43,6 +43,7 @@ const ContractEnumSchema = type({
     value: 'string | number | boolean | null | unknown[] | Record<string, unknown>',
   })
     .array()
+    .atLeastLength(1)
     .readonly(),
 });
 

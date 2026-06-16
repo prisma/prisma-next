@@ -123,6 +123,26 @@ describe('builder accumulation + contract-schema acceptance', () => {
   });
 });
 
+describe('MongoContractSchema — enum validation', () => {
+  it('rejects an enum with empty members array', () => {
+    const malformed = {
+      targetFamily: 'mongo',
+      roots: {},
+      domain: {
+        namespaces: {
+          __unbound__: {
+            models: {},
+            enum: { Role: { codecId: 'mongo/string@1', members: [] } },
+          },
+        },
+      },
+      storage: { namespaces: {} },
+    };
+    const result = MongoContractSchema(malformed);
+    expect(result instanceof type.errors).toBe(true);
+  });
+});
+
 describe('enumType() — error cases', () => {
   it('throws on empty member list', () => {
     expect(() => enumType('Status', mongoString)).toThrow('must have at least one member');
