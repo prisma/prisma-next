@@ -386,7 +386,7 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
   }
 
   for (const decl of input.enumBlocks) {
-    const handle = instantiateAuthoringEntityType(
+    const handle = instantiateAuthoringEntityType<EnumTypeHandle | undefined>(
       'enum',
       enumDescriptor,
       [decl],
@@ -395,11 +395,10 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
 
     if (handle === undefined || handle === null) continue;
 
-    const enumHandle = blindCast<EnumTypeHandle, 'enum factory returns EnumTypeHandle'>(handle);
-    enumHandles[decl.name] = enumHandle;
+    enumHandles[decl.name] = handle;
     enumTypeDescriptors.set(decl.name, {
-      codecId: enumHandle.codecId,
-      nativeType: enumHandle.nativeType,
+      codecId: handle.codecId,
+      nativeType: handle.nativeType,
     });
   }
 

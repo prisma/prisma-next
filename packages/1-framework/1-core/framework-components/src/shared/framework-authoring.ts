@@ -916,12 +916,12 @@ export function instantiateAuthoringTypeConstructor(
   return resolveAuthoringStorageTypeTemplate(descriptor.output, args);
 }
 
-export function instantiateAuthoringEntityType(
+export function instantiateAuthoringEntityType<TOutput = unknown>(
   helperPath: string,
-  descriptor: AuthoringEntityTypeDescriptor,
+  descriptor: AuthoringEntityTypeDescriptor<never, TOutput>,
   args: readonly unknown[],
   ctx: AuthoringEntityContext,
-): unknown {
+): TOutput {
   // Factory-output entities carry their input contract on the factory
   // signature itself — TypeScript narrows callers via
   // `EntityHelperFunction`'s extracted `input` parameter, and the factory
@@ -939,11 +939,13 @@ export function instantiateAuthoringEntityType(
     const factory = descriptor.output.factory as (
       input: unknown,
       ctx: AuthoringEntityContext,
-    ) => unknown;
+    ) => TOutput;
     return factory(input, ctx);
   }
   validateAuthoringHelperArguments(helperPath, descriptor.args, args);
-  return resolveAuthoringTemplateValue(descriptor.output.template, args);
+  return blindCast<TOutput, 'template-output resolves to the declared TOutput by convention'>(
+    resolveAuthoringTemplateValue(descriptor.output.template, args),
+  );
 }
 
 export function instantiateAuthoringFieldPreset(
