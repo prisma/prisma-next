@@ -1,33 +1,43 @@
 ---
-description: "Cannot find module/package '@prisma-next/*' (ERR_MODULE_NOT_FOUND) means node_modules is stale — run pnpm install, do not chase it as a code bug"
+description: "Cannot find module/package '@prisma-next/*' (ERR_MODULE_NOT_FOUND) is almost never a code bug — verify with require.resolve (pnpm links per-consumer, not at repo root), then pnpm build (stale dist) / pnpm install (new dep)"
 globs: []
 alwaysApply: true
 ---
 
-# A missing `@prisma-next/*` workspace package means run `pnpm install`
+# A missing `@prisma-next/*` workspace package is a build/install state issue, not a code bug
 
 ## The error
 
-If a build, typecheck, or test fails with any of these for an **`@prisma-next/*`** package:
+A build, typecheck, or test fails with, for an **`@prisma-next/*`** package:
 
-- `Cannot find module '@prisma-next/<pkg>'`
-- `Cannot find package '@prisma-next/<pkg>'`
+- `Cannot find module '@prisma-next/<pkg>'` / `Cannot find package '@prisma-next/<pkg>'`
 - `ERR_MODULE_NOT_FOUND` / `MODULE_NOT_FOUND` naming an `@prisma-next/*` package
-- a missing symlink at `node_modules/@prisma-next/<pkg>`
 
-…the workspace is **stale**, not broken. The dependency graph changed (a package was added, renamed, or moved) and `node_modules` / the pnpm workspace symlinks weren't refreshed.
+Do **not** chase it as a code/import bug (don't edit import paths, tsconfig `paths`, or deps).
 
-## The fix
+## First: verify it's actually unresolvable — a shallow check LIES
 
-Run **`pnpm install`** from the repo root, then rebuild (`pnpm build`) before re-running tests. That's it.
+pnpm links workspace packages into the **consumer's** `node_modules`, **not** the repo-root `node_modules/@prisma-next/`. So `ls node_modules/@prisma-next/<pkg>` at the root is a **false negative** — the link lives at e.g. `packages/<consumer>/node_modules/@prisma-next/<pkg>`. Confirm real resolvability before concluding anything:
 
-This is almost always the case right after: `git merge`, `git rebase`, `git checkout <branch>`, or `git pull` — any operation that can change the dependency graph. **After such an operation, run `pnpm install` before building** — same discipline as rebuilding `dist` before running downstream tests.
+```bash
+node -e "console.log(require.resolve('@prisma-next/<pkg>', { paths: ['packages/<consumer-dir>'] }))"
+```
 
-## Do / Don't
+If that prints a path (usually into the package's `dist/`), the package resolves — your "missing" was a bad check; the real failure is elsewhere (often **stale dist**: the consumer rebuilt against an old shape — see below).
 
-- **Do** run `pnpm install` the moment you see a missing `@prisma-next/*` module, especially post-merge/rebase/checkout.
-- **Don't** chase it as a code/import/resolution bug — don't edit import paths, tsconfig `paths`, or package.json deps to "find" the module.
-- **Don't** hand-edit `pnpm-lock.yaml` (see [no-direct-lockfile-edits](no-direct-lockfile-edits.mdc)); `pnpm install` reconciles it. If install changes the lockfile, that's expected — commit it.
-- **Don't** declare a "real regression" from a module-not-found until after a clean `pnpm install` + `pnpm build`.
+## Then: the two real causes + fixes
 
-> A module-not-found for a third-party (non-`@prisma-next`) package can also be a stale install, but may instead be a genuinely missing dependency — there, `pnpm install` first, and only if it persists, add the dep with `pnpm add`.
+These are tsdown packages whose `exports` point at `dist/`. A `@prisma-next/*` import fails for one of:
+
+1. **Stale or missing `dist`** (the common one). After changing a package's exported types, or after a merge/rebase, the consumer resolves to a `dist/` that's old or absent. **Fix: `pnpm build`** to refresh `dist` before re-running downstream typecheck/tests. (This is the same "rebuild before testing" discipline; never run a suite against stale `dist`.)
+2. **A genuinely new dependency** the graph gained (rare). **Fix: `pnpm install`** to link it. Never hand-edit `pnpm-lock.yaml` ([no-direct-lockfile-edits](no-direct-lockfile-edits.mdc)); commit any lockfile change install makes.
+
+## After any `git merge` / `rebase` / `checkout` / `pull`
+
+Run **`pnpm install` then `pnpm build`** before building/testing — install links any new packages, build refreshes all `dist`. Do this before declaring any "module not found" or test failure a real regression.
+
+## Don't
+
+- Don't trust a repo-root `node_modules/@prisma-next/<pkg>` check — verify with `require.resolve` from the consumer.
+- Don't edit imports/tsconfig/deps to "find" a workspace module.
+- Don't call a module-not-found (or a test that depends on a rebuilt package) a "real regression" until after a clean `pnpm install` + `pnpm build`.
