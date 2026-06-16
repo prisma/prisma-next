@@ -114,6 +114,7 @@ describe('contract.d.ts imports resolution', () => {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
+              kind: 'schema' as const,
               entries: {
                 table: {
                   user: {
@@ -131,17 +132,17 @@ describe('contract.d.ts imports resolution', () => {
                     indexes: [],
                     foreignKeys: [],
                   },
-                },
-                post: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                    userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                  post: {
+                    columns: {
+                      id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                      title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                      userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                    },
+                    primaryKey: { columns: ['id'] },
+                    uniques: [],
+                    indexes: [],
+                    foreignKeys: [],
                   },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
                 },
               },
             },
@@ -272,6 +273,7 @@ type UserIdColumn = UserColumns['id'];
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
+              kind: 'schema' as const,
               entries: {
                 table: {
                   user: {
