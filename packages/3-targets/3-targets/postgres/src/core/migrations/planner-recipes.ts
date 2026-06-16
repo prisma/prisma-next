@@ -10,11 +10,9 @@ import {
   columnNullabilityAst,
 } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
-import { quoteIdentifier } from '../sql-utils';
 import { boundSchema } from './bound-schema';
 import { step } from './operations/shared';
 import { buildColumnTypeSql } from './planner-ddl-builders';
-import { qualifyTableName } from './planner-sql-checks';
 import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
 
 export function buildAddColumnOperationIdentity(
@@ -56,7 +54,6 @@ export async function buildAddNotNullColumnWithTemporaryDefaultOperation(options
     temporaryDefault,
     lowerer,
   } = options;
-  const qualified = qualifyTableName(schema, tableName);
 
   // The recipe handles NOT NULL columns that carry no contract default, so the
   // temporary backfill value is the only default. It is a pre-rendered SQL
@@ -71,6 +68,13 @@ export async function buildAddNotNullColumnWithTemporaryDefaultOperation(options
       ...ifDefined('schema', boundSchema(schema)),
       table: tableName,
       actions: [contractFreeDdl.addColumnAction(ddlColumn)],
+    }),
+  );
+  const dropTempDefault = await lowerer.lowerToExecuteRequest(
+    contractFreeDdl.alterTable({
+      ...ifDefined('schema', boundSchema(schema)),
+      table: tableName,
+      actions: [contractFreeDdl.dropDefaultAction(columnName)],
     }),
   );
 
@@ -98,7 +102,7 @@ export async function buildAddNotNullColumnWithTemporaryDefaultOperation(options
       },
       {
         description: `drop temporary default from column "${columnName}"`,
-        sql: `ALTER TABLE ${qualified} ALTER COLUMN ${quoteIdentifier(columnName)} DROP DEFAULT`,
+        sql: dropTempDefault.sql,
       },
     ],
     postcheck: [

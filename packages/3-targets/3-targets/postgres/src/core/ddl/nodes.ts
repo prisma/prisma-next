@@ -10,6 +10,7 @@ import {
 
 export interface AlterTableActionVisitor<R> {
   addColumn(action: AddColumnAction): R;
+  dropDefault(action: DropDefaultAction): R;
 }
 
 export abstract class AlterTableAction {
@@ -32,7 +33,22 @@ export class AddColumnAction extends AlterTableAction {
   }
 }
 
-export type AnyAlterTableAction = AddColumnAction;
+export class DropDefaultAction extends AlterTableAction {
+  readonly kind = 'drop-default' as const;
+  readonly columnName: string;
+
+  constructor(columnName: string) {
+    super();
+    this.columnName = columnName;
+    Object.freeze(this);
+  }
+
+  override accept<R>(visitor: AlterTableActionVisitor<R>): R {
+    return visitor.dropDefault(this);
+  }
+}
+
+export type AnyAlterTableAction = AddColumnAction | DropDefaultAction;
 
 // ---------------------------------------------------------------------------
 // Top-level DDL visitor

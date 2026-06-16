@@ -246,12 +246,18 @@ export async function dropDefault(
   columnName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
   const { present } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
     column: columnName,
   });
+  const dropDefaultExec = await lowerer.lowerToExecuteRequest(
+    contractFreeDdl.alterTable({
+      ...ifDefined('schema', boundSchema(schemaName)),
+      table: tableName,
+      actions: [contractFreeDdl.dropDefaultAction(columnName)],
+    }),
+  );
   const noDefault = await lowerer.lowerToExecuteRequest(
     columnDefaultAst({ schema: schemaName, table: tableName, column: columnName }).defaultAbsent(),
   );
@@ -261,12 +267,7 @@ export async function dropDefault(
     operationClass: 'destructive',
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
-    execute: [
-      step(
-        `drop default on "${columnName}"`,
-        `ALTER TABLE ${qualified} ALTER COLUMN ${quoteIdentifier(columnName)} DROP DEFAULT`,
-      ),
-    ],
+    execute: [step(`drop default on "${columnName}"`, dropDefaultExec.sql)],
     postcheck: [
       step(`verify column "${columnName}" has no default`, noDefault.sql, noDefault.params),
     ],

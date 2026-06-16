@@ -2,6 +2,7 @@ import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-
 import {
   AddColumnAction,
   type AnyAlterTableAction,
+  DropDefaultAction,
   PostgresAlterTable,
   PostgresCreateSchema,
   PostgresCreateTable,
@@ -52,8 +53,16 @@ export function addColumnAction(column: DdlColumn): AddColumnAction {
 }
 
 /**
+ * Build a `DROP DEFAULT` action (`ALTER COLUMN "<name>" DROP DEFAULT`) for
+ * use inside {@link alterTable}. The renderer quotes the column name.
+ */
+export function dropDefaultAction(columnName: string): DropDefaultAction {
+  return new DropDefaultAction(columnName);
+}
+
+/**
  * Build a Postgres `ALTER TABLE` query node carrying one or more actions.
- * See {@link addColumnAction} for building actions.
+ * See {@link addColumnAction} / {@link dropDefaultAction} for building actions.
  */
 export function alterTable(options: {
   readonly table: string;
