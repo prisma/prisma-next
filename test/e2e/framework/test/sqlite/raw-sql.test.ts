@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { sqliteRawCodecInferer } from '@prisma-next/adapter-sqlite/adapter';
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { TestSqlContractSerializer as SqlContractSerializer } from '@prisma-next/family-sql/test-utils';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sql } from '@prisma-next/sql-builder/runtime';

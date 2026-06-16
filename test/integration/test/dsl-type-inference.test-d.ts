@@ -1,5 +1,5 @@
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { TestSqlContractSerializer as SqlContractSerializer } from '@prisma-next/family-sql/test-utils';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
 import { sql } from '@prisma-next/sql-builder/runtime';

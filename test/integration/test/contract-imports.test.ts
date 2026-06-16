@@ -315,7 +315,7 @@ type UserIdColumn = UserColumns['id'];
 
       // Create a comprehensive test file that uses all exported types
       const testFileContent = `import type { Contract, CodecTypes, Namespaces } from './contract';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { TestSqlContractSerializer as SqlContractSerializer } from '@prisma-next/family-sql/test-utils';
 import contractJson from './contract.json' with { type: 'json' };
 
 // Verify we can validate the contract

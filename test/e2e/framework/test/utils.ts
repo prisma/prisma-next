@@ -12,7 +12,7 @@ import arktypeJsonRuntime from '@prisma-next/extension-arktype-json/runtime';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import sql from '@prisma-next/family-sql/control';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { TestSqlContractSerializer as SqlContractSerializer } from '@prisma-next/family-sql/test-utils';
 import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';

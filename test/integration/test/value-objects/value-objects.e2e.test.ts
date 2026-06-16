@@ -1,7 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { TestSqlContractSerializer as SqlContractSerializer } from '@prisma-next/family-sql/test-utils';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
