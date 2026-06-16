@@ -171,6 +171,41 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     ]);
   });
 
+  it('AddColumnCall includes codecRef in the rendered col() call when present', () => {
+    const codecRef = { codecId: 'pg/uuid@1' };
+    const column = col('id', 'uuid', { codecRef });
+    const call = new AddColumnCall('public', 'user', column);
+    expect(call.renderTypeScript()).toBe(
+      'this.addColumn({ schema: "public", table: "user", column: col("id", "uuid", { codecRef: { codecId: "pg/uuid@1" } }) })',
+    );
+
+    const callWithTypeParams = new AddColumnCall(
+      'public',
+      'user',
+      col('data', 'jsonb', { codecRef: { codecId: 'pg/json@1', typeParams: { schema: 'v1' } } }),
+    );
+    expect(callWithTypeParams.renderTypeScript()).toContain(
+      'codecRef: { codecId: "pg/json@1", typeParams: { schema: "v1" } }',
+    );
+  });
+
+  it('codecRef round-trip: col() built from the rendered arguments equals the original DdlColumn', () => {
+    const originalCodecRef = { codecId: 'pg/uuid@1' };
+    const originalColumn = col('id', 'uuid', { codecRef: originalCodecRef, notNull: true });
+
+    const roundTrippedColumn = col('id', 'uuid', {
+      notNull: true,
+      codecRef: { codecId: 'pg/uuid@1' },
+    });
+    expect(roundTrippedColumn).toEqual(originalColumn);
+    expect(roundTrippedColumn.codecRef).toEqual(originalCodecRef);
+  });
+
+  it('AddColumnCall without codecRef renders col() with no codecRef property', () => {
+    const call = new AddColumnCall('public', 'user', col('score', 'integer'));
+    expect(call.renderTypeScript()).not.toContain('codecRef');
+  });
+
   it('DropColumnCall emits this.dropColumn({...}) and contributes no imports', () => {
     const call = new DropColumnCall('public', 'user', 'legacy');
     expect(call.renderTypeScript()).toBe(

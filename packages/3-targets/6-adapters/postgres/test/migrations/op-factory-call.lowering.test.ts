@@ -109,7 +109,7 @@ describe('renderOps', () => {
         details: schemaObject('table', 'stale'),
       },
       {
-        id: 'column.user.email',
+        id: 'column.public.user.email',
         operationClass: 'additive',
         details: schemaObject('column', 'email', 'user'),
       },
