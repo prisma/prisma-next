@@ -60,11 +60,7 @@ import type {
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
-import {
-  computeContentHash,
-  normalizePredicate,
-  type RlsPolicyOperation,
-} from '@prisma-next/target-postgres/rls-canonicalize';
+import type { RlsPolicyOperation } from '@prisma-next/target-postgres/rls-canonicalize';
 import { readPostgresSchemaIrAnnotations } from '@prisma-next/target-postgres/schema-ir-annotations';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
@@ -141,10 +137,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     }
     const { rlsPolicies: actualPolicies = [] } = readPostgresSchemaIrAnnotations(schema);
     const schemaTableNames = new Set(Object.keys(schema.tables));
-    const managedActual = actualPolicies.filter(
-      (p) => p.prismaManaged && schemaTableNames.has(p.tableName),
-    );
-    return diffNodes(expectedPolicies, managedActual);
+    const scopedActual = actualPolicies.filter((p) => schemaTableNames.has(p.tableName));
+    return diffNodes(expectedPolicies, scopedActual);
   }
 
   bootstrapControlTableQueries(): readonly DdlNode[] {
@@ -1185,27 +1179,18 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       const operation = mapPgCmd(row.cmd);
       const roles = [...new Set(parsePgNameArray(row.roles).map((r) => r.toLowerCase()))].sort();
       const permissive = row.permissive.toUpperCase() === 'PERMISSIVE';
-      const hash = computeContentHash({
-        ...(row.qual !== null ? { using: row.qual } : {}),
-        ...(row.with_check !== null ? { withCheck: row.with_check } : {}),
-        roles,
-        operation,
-        permissive,
-      });
-      const suffix = `_${hash}`;
-      const prismaManaged = row.policyname.endsWith(suffix);
-      const prefix = prismaManaged ? row.policyname.slice(0, -suffix.length) : row.policyname;
+      const hashSuffixMatch = /^(.+)_([0-9a-f]{8})$/.exec(row.policyname);
+      const prefix = hashSuffixMatch ? hashSuffixMatch[1]! : row.policyname;
       return new PostgresRlsPolicy({
-        name: `${prefix}_${hash}`,
+        name: row.policyname,
         prefix,
         tableName: row.tablename,
         namespaceId: row.schemaname,
         operation,
         roles,
-        ...(row.qual !== null ? { using: normalizePredicate(row.qual) } : {}),
-        ...(row.with_check !== null ? { withCheck: normalizePredicate(row.with_check) } : {}),
+        ...(row.qual !== null ? { using: row.qual } : {}),
+        ...(row.with_check !== null ? { withCheck: row.with_check } : {}),
         permissive,
-        prismaManaged,
       });
     });
 

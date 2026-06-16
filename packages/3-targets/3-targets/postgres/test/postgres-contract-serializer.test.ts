@@ -455,7 +455,7 @@ describe('role + policy round-trip', () => {
     expect(() => serializer.deserializeContract(input)).toThrow();
   });
 
-  it('serialized policy does not contain prismaManaged', () => {
+  it('serialized policy matches expected shape', () => {
     const serializer = new PostgresContractSerializer();
     const input = makeContractWithRolesAndPolicies();
 

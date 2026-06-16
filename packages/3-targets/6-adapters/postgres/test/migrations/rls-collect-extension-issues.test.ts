@@ -32,13 +32,12 @@ function managedPolicy(): PostgresRlsPolicy {
     roles: ['app_user'],
     using: USING,
     permissive: true,
-    prismaManaged: true,
   });
 }
 
 function externalPolicy(): PostgresRlsPolicy {
   return new PostgresRlsPolicy({
-    name: `legacy_admin_policy_${HASH}`,
+    name: 'legacy_admin_policy',
     prefix: 'legacy_admin_policy',
     tableName: TABLE_NAME,
     namespaceId: 'public',
@@ -46,7 +45,6 @@ function externalPolicy(): PostgresRlsPolicy {
     roles: ['app_user'],
     using: USING,
     permissive: true,
-    prismaManaged: false,
   });
 }
 
@@ -120,13 +118,15 @@ describe('collectExtensionIssues — orphan detection', () => {
     expect(issues[0]?.coordinate.entityName).toBe(WIRE_NAME);
   });
 
-  it('no contract policy + external DB policy → no issues', () => {
+  it('no contract policy + external DB policy → one extra issue', () => {
     const issues = controlAdapter.collectExtensionIssues!(
       emptyContractNoPolicies(),
       schemaWithPolicies([externalPolicy()]),
     );
 
-    expect(issues).toHaveLength(0);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.outcome).toBe('extra');
+    expect(issues[0]?.coordinate.entityName).toBe('legacy_admin_policy');
   });
 
   it('matching contract + DB policy → no issues', () => {

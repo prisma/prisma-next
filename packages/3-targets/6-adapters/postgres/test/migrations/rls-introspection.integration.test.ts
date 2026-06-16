@@ -37,23 +37,21 @@ describe.sequential('RLS introspection', () => {
     }
   }, testTimeout);
 
-  it('returns rlsPolicies with recomputed wire name and correct namespaceId', {
+  it('returns rlsPolicies with verbatim policyname and correct namespaceId', {
     timeout: testTimeout,
   }, async () => {
     await driver!.query('CREATE TABLE posts (id int PRIMARY KEY, user_id int NOT NULL)');
     await driver!.query('ALTER TABLE posts ENABLE ROW LEVEL SECURITY');
 
-    // Compute the expected hash first so we can create a policy with the correct
-    // content-addressed name — this is the happy-path case where the DB policy
-    // was created by the framework and has the correct suffix already.
     const expectedHash = computeContentHash({
       using: normalizePredicate('user_id = 1'),
       roles: ['public'],
       operation: 'select',
       permissive: true,
     });
+    const wireName = `posts_select_own_${expectedHash}`;
     await driver!.query(
-      `CREATE POLICY posts_select_own_${expectedHash} ON posts
+      `CREATE POLICY ${wireName} ON posts
          AS PERMISSIVE FOR SELECT TO PUBLIC
          USING (user_id = 1)`,
     );
@@ -71,9 +69,8 @@ describe.sequential('RLS introspection', () => {
     expect(policy).toBeDefined();
     expect(policy).toBeInstanceOf(PostgresRlsPolicy);
 
-    // The introspector recognises the suffix and recomputes the wire name from
-    // the catalog body — the result matches what the framework would produce.
-    expect(policy!.name).toBe(`posts_select_own_${expectedHash}`);
+    // Introspect reads policyname verbatim from pg_policies — no hash recompute.
+    expect(policy!.name).toBe(wireName);
     expect(policy!.prefix).toBe('posts_select_own');
 
     // namespaceId must reflect the real schema, not UNBOUND_NAMESPACE_ID.
