@@ -72,7 +72,7 @@ function buildRlsWalkingSkeletonContract(): Contract<SqlStorage> {
       },
       type: {},
       role: { [role.name]: role },
-      rlsPolicy: { [policy.name]: policy },
+      policy: { [policy.name]: policy },
     },
   });
 

@@ -613,12 +613,12 @@ describe('formatSchemaVerifyOutput', () => {
           {
             coordinate: {
               plane: 'storage',
-              entityKind: 'rlsPolicy',
+              entityKind: 'policy',
               namespaceId: 'public',
               entityName: policyWireName,
             },
             outcome: 'missing',
-            message: `missing: rlsPolicy '${policyWireName}' in namespace 'public'`,
+            message: `missing: policy '${policyWireName}' in namespace 'public'`,
           },
         ],
       },

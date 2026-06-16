@@ -15,12 +15,12 @@ describe('PostgresRlsPolicy DiffableNode', () => {
     permissive: true,
   };
 
-  it('identity() returns a storage coordinate with rlsPolicy entityKind and the wire name', () => {
+  it('identity() returns a storage coordinate with policy entityKind and the wire name', () => {
     const policy = new PostgresRlsPolicy(baseInput);
     expect(policy.identity()).toEqual({
       plane: 'storage',
       namespaceId: 'public',
-      entityKind: 'rlsPolicy',
+      entityKind: 'policy',
       entityName: 'read_own_profiles_a1b2c3d4',
     });
   });

@@ -116,7 +116,7 @@ describe.sequential('RLS walking skeleton — PSL author → plan → apply → 
   }, testTimeout);
 
   it(
-    'PSL lowers to a contract with an rlsPolicy entry in the public namespace',
+    'PSL lowers to a contract with a policy entry in the public namespace',
     () => {
       const result = buildPslContract();
 
@@ -125,10 +125,10 @@ describe.sequential('RLS walking skeleton — PSL author → plan → apply → 
 
       const ns = result.value.storage.namespaces['public'] as PostgresSchema;
       expect(ns).toBeInstanceOf(PostgresSchema);
-      expect(Object.keys(ns.entries.rlsPolicy)).toHaveLength(1);
+      expect(Object.keys(ns.entries.policy)).toHaveLength(1);
 
-      const [policyKey] = Object.keys(ns.entries.rlsPolicy);
-      const policy = ns.entries.rlsPolicy[policyKey!]!;
+      const [policyKey] = Object.keys(ns.entries.policy);
+      const policy = ns.entries.policy[policyKey!]!;
       expect(policy).toBeInstanceOf(PostgresRlsPolicy);
       expect(policy.operation).toBe('select');
       expect(policy.permissive).toBe(true);

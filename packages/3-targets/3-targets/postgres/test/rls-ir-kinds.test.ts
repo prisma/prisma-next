@@ -167,13 +167,16 @@ describe('PostgresSchema role and policy slots', () => {
     expect(policy?.tableName).toBe('user');
   });
 
-  it('passes through already-constructed instances', () => {
+  it('normalises already-constructed role instances (structural equality preserved)', () => {
     const role = new PostgresRole({ name: 'authenticated' });
     const schema = new PostgresSchema({
       id: 'public',
       entries: { table: {}, type: {}, role: { authenticated: role } },
     });
-    expect(schema.entries.role['authenticated']).toBe(role);
+    const hydrated = schema.entries.role['authenticated'];
+    expect(hydrated).toBeInstanceOf(PostgresRole);
+    expect(hydrated?.name).toBe(role.name);
+    expect(hydrated?.namespaceId).toBe(role.namespaceId);
   });
 
   it('is frozen after construction', () => {

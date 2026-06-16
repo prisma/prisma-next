@@ -196,22 +196,22 @@ describe('combineSchemaResults', () => {
     const appIssue: SchemaDiffIssue = {
       coordinate: {
         plane: 'storage',
-        entityKind: 'rlsPolicy',
+        entityKind: 'policy',
         namespaceId: 'public',
         entityName: 'policy_app_abc',
       },
       outcome: 'missing',
-      message: "missing: rlsPolicy 'policy_app_abc' in namespace 'public'",
+      message: "missing: policy 'policy_app_abc' in namespace 'public'",
     };
     const extIssue: SchemaDiffIssue = {
       coordinate: {
         plane: 'storage',
-        entityKind: 'rlsPolicy',
+        entityKind: 'policy',
         namespaceId: 'public',
         entityName: 'policy_cipher_def',
       },
       outcome: 'extra',
-      message: "extra: rlsPolicy 'policy_cipher_def' in namespace 'public'",
+      message: "extra: policy 'policy_cipher_def' in namespace 'public'",
     };
 
     const perSpace = new Map<string, VerifyDatabaseSchemaResult>([

@@ -33,7 +33,7 @@ describe('diffNodes', () => {
   });
 
   it('reports missing when an expected node has no match in actual', () => {
-    const expected = [makeNode('public', 'rlsPolicy', 'read_own_abcd1234')];
+    const expected = [makeNode('public', 'policy', 'read_own_abcd1234')];
     const issues = diffNodes(expected, []);
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
@@ -41,14 +41,14 @@ describe('diffNodes', () => {
       coordinate: {
         plane: 'storage',
         namespaceId: 'public',
-        entityKind: 'rlsPolicy',
+        entityKind: 'policy',
         entityName: 'read_own_abcd1234',
       },
     });
   });
 
   it('reports extra when an actual node has no match in expected', () => {
-    const actual = [makeNode('public', 'rlsPolicy', 'stale_policy_deadbeef')];
+    const actual = [makeNode('public', 'policy', 'stale_policy_deadbeef')];
     const issues = diffNodes([], actual);
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
@@ -56,15 +56,15 @@ describe('diffNodes', () => {
       coordinate: {
         plane: 'storage',
         namespaceId: 'public',
-        entityKind: 'rlsPolicy',
+        entityKind: 'policy',
         entityName: 'stale_policy_deadbeef',
       },
     });
   });
 
   it('reports mismatch when both sides have the node but isEqualTo returns false', () => {
-    const expected = [makeNode('public', 'rlsPolicy', 'read_own_abcd1234', 'body-v1')];
-    const actual = [makeNode('public', 'rlsPolicy', 'read_own_abcd1234', 'body-v2')];
+    const expected = [makeNode('public', 'policy', 'read_own_abcd1234', 'body-v1')];
+    const actual = [makeNode('public', 'policy', 'read_own_abcd1234', 'body-v2')];
     const issues = diffNodes(expected, actual);
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
@@ -72,16 +72,16 @@ describe('diffNodes', () => {
       coordinate: {
         plane: 'storage',
         namespaceId: 'public',
-        entityKind: 'rlsPolicy',
+        entityKind: 'policy',
         entityName: 'read_own_abcd1234',
       },
     });
   });
 
   it('returns no issues when expected and actual match exactly', () => {
-    const node = makeNode('public', 'rlsPolicy', 'read_own_abcd1234', 'same-body');
+    const node = makeNode('public', 'policy', 'read_own_abcd1234', 'same-body');
     const expected = [node];
-    const actual = [makeNode('public', 'rlsPolicy', 'read_own_abcd1234', 'same-body')];
+    const actual = [makeNode('public', 'policy', 'read_own_abcd1234', 'same-body')];
     const issues = diffNodes(expected, actual);
     expect(issues).toEqual([]);
   });

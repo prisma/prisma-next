@@ -6,10 +6,10 @@
  *     table name, operation, roles, and predicate text.
  *
  *  2. Serializer round-trip: a contract carrying a `PostgresRlsPolicy` in
- *     `entries.rlsPolicy` serializes and deserializes without data loss.
+ *     `entries.policy` serializes and deserializes without data loss.
  *
  *  3. Interpreter end-to-end: `interpretPslDocumentToSqlContract` on a doc with a
- *     `policy_select` block lowers it into `entries.rlsPolicy` via the production
+ *     `policy_select` block lowers it into `entries.policy` via the production
  *     factory chain (no test-side hand-lowering).
  */
 
@@ -128,7 +128,7 @@ namespace public {
     expect(publicNs).toBeDefined();
     const blocks = namespacePslExtensionBlocks(publicNs!);
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]).toMatchObject({ kind: 'rlsPolicy', name: 'p_read' });
+    expect(blocks[0]).toMatchObject({ kind: 'policy', name: 'p_read' });
   });
 
   it('lowers the block to a PostgresRlsPolicy with the expected fields', () => {
@@ -194,7 +194,7 @@ namespace public {
   });
 });
 
-describe('interpretPslDocumentToSqlContract policy_select → entries.rlsPolicy', () => {
+describe('interpretPslDocumentToSqlContract policy_select → entries.policy', () => {
   const source = `
 namespace public {
   model profile {
@@ -232,7 +232,7 @@ namespace public {
     ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
   ]);
 
-  it('lowers a policy_select block to entries.rlsPolicy without test-side hand-lowering', () => {
+  it('lowers a policy_select block to entries.policy without test-side hand-lowering', () => {
     const document = parsePslDocument({
       schema: source,
       sourceId: 'schema.prisma',
@@ -256,10 +256,10 @@ namespace public {
 
     const ns = result.value.storage.namespaces['public'] as PostgresSchema;
     expect(ns).toBeInstanceOf(PostgresSchema);
-    expect(Object.keys(ns.entries.rlsPolicy)).toHaveLength(1);
+    expect(Object.keys(ns.entries.policy)).toHaveLength(1);
 
-    const [policyKey] = Object.keys(ns.entries.rlsPolicy);
-    const policy = ns.entries.rlsPolicy[policyKey!]!;
+    const [policyKey] = Object.keys(ns.entries.policy);
+    const policy = ns.entries.policy[policyKey!]!;
     expect(policy).toBeInstanceOf(PostgresRlsPolicy);
     expect(policy.operation).toBe('select');
     expect(policy.permissive).toBe(true);
@@ -272,7 +272,7 @@ namespace public {
   });
 });
 
-describe('PostgresContractSerializer rlsPolicy round-trip', () => {
+describe('PostgresContractSerializer policy round-trip', () => {
   function makeContractWithPolicy() {
     const predicate = "owner_id = current_setting('app.uid')::int";
     const roles = ['app_user'];
@@ -317,9 +317,9 @@ describe('PostgresContractSerializer rlsPolicy round-trip', () => {
             ...base.storage.namespaces['public']!,
             entries: {
               ...base.storage.namespaces['public']!.entries,
-              rlsPolicy: {
+              policy: {
                 [wireName]: {
-                  kind: 'rlsPolicy',
+                  kind: 'policy',
                   name: wireName,
                   prefix: 'p_read',
                   tableName: 'profile',
@@ -337,7 +337,7 @@ describe('PostgresContractSerializer rlsPolicy round-trip', () => {
     };
   }
 
-  it('preserves the rlsPolicy entry through serialize → deserialize', () => {
+  it('preserves the policy entry through serialize → deserialize', () => {
     const serializer = new PostgresContractSerializer();
     const input = makeContractWithPolicy();
 
@@ -348,10 +348,10 @@ describe('PostgresContractSerializer rlsPolicy round-trip', () => {
 
     const ns = roundTripped.storage.namespaces['public'] as PostgresSchema;
     expect(ns).toBeInstanceOf(PostgresSchema);
-    expect(Object.keys(ns.entries.rlsPolicy)).toHaveLength(1);
+    expect(Object.keys(ns.entries.policy)).toHaveLength(1);
 
-    const [policyKey] = Object.keys(ns.entries.rlsPolicy);
-    const policy = ns.entries.rlsPolicy[policyKey!]!;
+    const [policyKey] = Object.keys(ns.entries.policy);
+    const policy = ns.entries.policy[policyKey!]!;
     expect(policy).toBeInstanceOf(PostgresRlsPolicy);
     expect(policy.operation).toBe('select');
     expect(policy.permissive).toBe(true);
@@ -363,7 +363,7 @@ describe('PostgresContractSerializer rlsPolicy round-trip', () => {
     expect(Object.isFrozen(policy)).toBe(true);
   });
 
-  it('produces a frozen PostgresRlsPolicy after round-trip', () => {
+  it('produces a frozen PostgresRlsPolicy after round-trip (policy entries key)', () => {
     const serializer = new PostgresContractSerializer();
     const input = makeContractWithPolicy();
     const roundTripped = serializer.deserializeContract(
@@ -371,8 +371,8 @@ describe('PostgresContractSerializer rlsPolicy round-trip', () => {
     );
 
     const ns = roundTripped.storage.namespaces['public'] as PostgresSchema;
-    const [key] = Object.keys(ns.entries.rlsPolicy);
-    const policy = ns.entries.rlsPolicy[key!]!;
+    const [key] = Object.keys(ns.entries.policy);
+    const policy = ns.entries.policy[key!]!;
     expect(Object.isFrozen(policy)).toBe(true);
     expect(() => {
       (policy as { name: string }).name = 'mutated';

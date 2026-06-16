@@ -86,9 +86,9 @@
       },
       "public": {
         "entries": {
-          "rlsPolicy": {
+          "policy": {
             "profile_owner_read": {
-              "kind": "rlsPolicy",
+              "kind": "policy",
               "name": "profile_owner_read_3486711c",
               "namespaceId": "public",
               "operation": "select",

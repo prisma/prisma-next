@@ -63,7 +63,7 @@ function buildContractWithPolicy(): Contract<SqlStorage> {
         }),
       },
       type: {},
-      rlsPolicy: { [policy.name]: policy },
+      policy: { [policy.name]: policy },
     },
   });
 
@@ -163,7 +163,7 @@ describe.sequential('RLS verify extension issues', () => {
   }, async () => {
     const contract = buildContractWithPolicy();
 
-    // Apply only the table (no policy) by using a contract without rlsPolicy.
+    // Apply only the table (no policy) by using a contract without any entries.policy.
     const noPolicySchema = new PostgresSchema({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
@@ -180,7 +180,7 @@ describe.sequential('RLS verify extension issues', () => {
           }),
         },
         type: {},
-        rlsPolicy: {},
+        policy: {},
       },
     });
     const noPolicyContract: Contract<SqlStorage> = {
@@ -211,7 +211,7 @@ describe.sequential('RLS verify extension issues', () => {
     expect(result.schema.extensionIssues).toHaveLength(1);
     const issue = result.schema.extensionIssues[0];
     expect(issue?.outcome).toBe('missing');
-    expect(issue?.coordinate.entityKind).toBe('rlsPolicy');
+    expect(issue?.coordinate.entityKind).toBe('policy');
     expect(issue?.coordinate.entityName).toBe(policy.name);
   });
 
@@ -236,7 +236,7 @@ describe.sequential('RLS verify extension issues', () => {
           }),
         },
         type: {},
-        rlsPolicy: {},
+        policy: {},
       },
     });
     const noPolicyContract: Contract<SqlStorage> = {

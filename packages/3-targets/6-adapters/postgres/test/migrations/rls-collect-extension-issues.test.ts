@@ -68,7 +68,7 @@ function schemaWithPolicies(policies: PostgresRlsPolicy[]): SqlSchemaIR {
 function emptyContractNoPolicies(): Contract<SqlStorage> {
   const schema = new PostgresSchema({
     id: UNBOUND_NAMESPACE_ID,
-    entries: { table: {}, type: {}, rlsPolicy: {} },
+    entries: { table: {}, type: {}, policy: {} },
   });
   return {
     target: 'postgres',
@@ -90,7 +90,7 @@ function contractWithPolicy(): Contract<SqlStorage> {
   const policy = managedPolicy();
   const schema = new PostgresSchema({
     id: UNBOUND_NAMESPACE_ID,
-    entries: { table: {}, type: {}, rlsPolicy: { [WIRE_NAME]: policy } },
+    entries: { table: {}, type: {}, policy: { [WIRE_NAME]: policy } },
   });
   return {
     target: 'postgres',

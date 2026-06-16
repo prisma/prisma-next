@@ -62,7 +62,7 @@ function buildContractWithPolicy(): Contract<SqlStorage> {
         }),
       },
       type: {},
-      rlsPolicy: { [policy.name]: policy },
+      policy: { [policy.name]: policy },
     },
   });
 
@@ -455,7 +455,7 @@ describe('F07: rlsEnabledByTable cross-schema collision', () => {
           }),
         },
         type: {},
-        rlsPolicy: { [policy.name]: policy },
+        policy: { [policy.name]: policy },
       },
     });
 
@@ -546,7 +546,7 @@ describe('F07: rlsEnabledByTable cross-schema collision', () => {
           }),
         },
         type: {},
-        rlsPolicy: { [policy.name]: policy },
+        policy: { [policy.name]: policy },
       },
     });
 
@@ -613,9 +613,9 @@ describe('F07: rlsEnabledByTable cross-schema collision', () => {
 // ---------------------------------------------------------------------------
 
 function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<SqlStorage> {
-  const rlsPolicy: Record<string, PostgresRlsPolicy> = {};
+  const policyEntries: Record<string, PostgresRlsPolicy> = {};
   for (const p of policies) {
-    rlsPolicy[p.name] = p;
+    policyEntries[p.name] = p;
   }
 
   const schema = new PostgresSchema({
@@ -634,7 +634,7 @@ function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<Sql
         }),
       },
       type: {},
-      rlsPolicy,
+      policy: policyEntries,
     },
   });
 
