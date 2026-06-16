@@ -19,7 +19,7 @@ import type { StorageValueSet } from './storage-value-set';
  */
 export type SqlStorageTypeEntry = StorageTypeInstance | StorageTypeInstanceInput;
 
-export interface SqlNamespaceTablesInput {
+export interface SqlNamespaceInput {
   readonly id: string;
   readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }

@@ -5,12 +5,7 @@ import {
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { composeSqlEntityKinds } from './entity-kinds';
-import {
-  SqlNamespace,
-  type SqlNamespaceEntries,
-  type SqlNamespaceTablesInput,
-} from './ir/sql-storage';
-import { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
+import { SqlNamespace, type SqlNamespaceEntries, type SqlNamespaceInput } from './ir/sql-storage';
 import type { StorageTable } from './ir/storage-table';
 import type { StorageValueSet } from './ir/storage-value-set';
 
@@ -26,7 +21,7 @@ export class TestSqlNamespace extends SqlNamespace {
   readonly id: string;
   readonly entries: SqlNamespaceEntries;
 
-  constructor(input: SqlNamespaceTablesInput) {
+  constructor(input: SqlNamespaceInput) {
     super();
     this.id = input.id;
     const dispatched = hydrateNamespaceEntities(input.entries, composeSqlEntityKinds(), 'carry');
@@ -61,9 +56,6 @@ export class TestSqlNamespace extends SqlNamespace {
   }
 }
 
-export function createTestSqlNamespace(input: SqlNamespaceTablesInput): SqlNamespace {
-  if (input.id === UNBOUND_NAMESPACE_ID && Object.keys(input.entries).length === 0) {
-    return SqlUnboundNamespace.instance;
-  }
+export function createTestSqlNamespace(input: SqlNamespaceInput): SqlNamespace {
   return new TestSqlNamespace(input);
 }

@@ -34,7 +34,7 @@ import {
 import {
   applyFkDefaults,
   type CheckConstraintInput,
-  type SqlNamespaceTablesInput,
+  type SqlNamespaceInput,
   SqlStorage,
   type SqlStorageInput,
   type StorageColumn,
@@ -302,7 +302,7 @@ function ensureUnboundNamespaceSlot(
   if (Object.hasOwn(namespaces, UNBOUND_NAMESPACE_ID)) {
     return namespaces;
   }
-  const unboundInput: SqlNamespaceTablesInput = {
+  const unboundInput: SqlNamespaceInput = {
     id: UNBOUND_NAMESPACE_ID,
     entries: { table: {} },
   };
@@ -729,7 +729,7 @@ export function buildSqlContractFromDefinition(
     Object.fromEntries(
       [...namespaceCoordinateIds].sort().map((id) => {
         const valueSetEntries = storageValueSetsByNs[id];
-        const nsInput: SqlNamespaceTablesInput = {
+        const nsInput: SqlNamespaceInput = {
           id,
           entries: {
             table: tablesByNamespace[id] ?? {},

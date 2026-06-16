@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AdapterProfile } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { applicationDomainOf } from '@prisma-next/test-utils';
@@ -17,7 +18,9 @@ const testContract: Contract<SqlStorage> = {
   roots: {},
   storage: new SqlStorage({
     storageHash: coreHash('sha256:test-hash'),
-    namespaces: { __unbound__: SqlUnboundNamespace.instance },
+    namespaces: {
+      __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
+    },
   }),
   extensionPacks: {},
   capabilities: {},

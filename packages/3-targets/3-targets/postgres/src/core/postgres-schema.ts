@@ -7,7 +7,7 @@ import { composeSqlEntityKinds } from '@prisma-next/sql-contract/entity-kinds';
 import {
   SqlNamespace,
   type SqlNamespaceEntries,
-  type SqlNamespaceTablesInput,
+  type SqlNamespaceInput,
   type SqlStorage,
   type StorageTable,
   type StorageValueSet,
@@ -247,7 +247,7 @@ export function isPostgresSchema(ns: unknown): ns is PostgresSchema {
  * by reference and trust the resulting `SqlStorage.namespaces` map to
  * be value-stable for a given input set.
  */
-export function postgresCreateNamespace(input: SqlNamespaceTablesInput): PostgresSchema {
+export function postgresCreateNamespace(input: SqlNamespaceInput): PostgresSchema {
   const schemaInput: PostgresSchemaInput = {
     id: input.id,
     entries: {

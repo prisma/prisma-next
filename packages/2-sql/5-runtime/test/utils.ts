@@ -24,7 +24,6 @@ import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import {
   SqlStorage,
   type SqlStorageInput,
-  SqlUnboundNamespace,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import type {
@@ -473,11 +472,15 @@ export function createTestContract(
       ? new SqlStorage({
           ...rest['storage'],
           storageHash: storageHashValue,
-          namespaces: rest['storage'].namespaces ?? { __unbound__: SqlUnboundNamespace.instance },
+          namespaces: rest['storage'].namespaces ?? {
+            __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
+          },
         })
       : new SqlStorage({
           storageHash: storageHashValue,
-          namespaces: { __unbound__: SqlUnboundNamespace.instance },
+          namespaces: {
+            __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
+          },
         }),
     domain: rest['domain'] ?? applicationDomainOf({ models: rest['models'] ?? {} }),
     roots: rest['roots'] ?? {},

@@ -7,16 +7,14 @@ import {
   hydrateNamespaceEntities,
   type Namespace,
   NamespaceBase,
-  UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { composeSqlEntityKinds } from '@prisma-next/sql-contract/entity-kinds';
 import {
-  type SqlNamespaceTablesInput,
+  type SqlNamespaceInput,
   SqlStorage,
   type SqlStorageInput,
   type SqlStorageTypeEntry,
-  SqlUnboundNamespace,
 } from '@prisma-next/sql-contract/types';
 import {
   createSqlContractSchema,
@@ -120,27 +118,16 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       );
     }
     const hydratedNamespaces = this.hydrateSqlNamespaceMap(rawNamespaces);
-    // Compatibility shim: production code that addresses `__unbound__` for table
-    // metadata lookups (collection-contract, query-plan-mutations, model-accessor,
-    // query-plan-meta, where-binding) uses optional chaining and tolerates absence,
-    // but runtime-qualification (TML-2605) has not yet landed cross-namespace table
-    // routing. Injecting the empty singleton here keeps helpers that augment the
-    // deserialized JSON (e.g. buildMixedPolyContract) working by providing a slot to
-    // write into. Once runtime-qualification routes table lookups by namespace, this
-    // shim should be removed.
-    const unbound = hydratedNamespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance;
 
     return {
       ...validated,
       storage: new SqlStorage({
         storageHash: validated.storage.storageHash,
         ...ifDefined('types', hydratedTypes),
-        // Cast narrows the result of hydrateSqlNamespaceMap from the wider
-        // framework `Namespace` to the SQL-family `SqlNamespace`.
         namespaces: blindCast<
           SqlStorageInput['namespaces'],
-          'hydrateSqlNamespaceMap builds each namespace through the SQL family concretions (SqlBoundNamespace / target schema), so every value is a SqlNamespace; the framework return type only promises the base Namespace.'
-        >({ ...hydratedNamespaces, [UNBOUND_NAMESPACE_ID]: unbound }),
+          'hydrateSqlNamespaceMap builds each namespace through the target serializer override, so every value is a SqlNamespace; the framework return type only promises the base Namespace.'
+        >(hydratedNamespaces),
       }),
     };
   }
@@ -164,7 +151,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   protected hydrateSqlNamespaceEntry(
     nsId: string,
     raw: Namespace | Record<string, unknown>,
-  ): Namespace | SqlNamespaceTablesInput {
+  ): Namespace | SqlNamespaceInput {
     if (raw instanceof NamespaceBase) {
       return raw;
     }
@@ -191,8 +178,8 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     }
 
     return blindCast<
-      SqlNamespaceTablesInput,
-      'entriesOutput holds the hydrated SQL entity-kind maps (table always present); this wraps them as the SqlNamespaceTablesInput the family createNamespace consumes.'
+      SqlNamespaceInput,
+      'entriesOutput holds the hydrated SQL entity-kind maps (table always present); this wraps them as the SqlNamespaceInput the target createNamespace consumes.'
     >({
       id,
       entries: entriesOutput,

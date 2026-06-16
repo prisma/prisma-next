@@ -41,7 +41,7 @@ function createTestContract(
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
-          kind: 'sql-namespace',
+          kind: 'postgres-schema',
           entries: {
             table: Object.fromEntries(
               Object.entries(tables).map(([name, { columns, uniques = [] }]) => [

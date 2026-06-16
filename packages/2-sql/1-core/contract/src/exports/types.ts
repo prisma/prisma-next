@@ -25,8 +25,8 @@ export type {
   SqlModelFieldStorage,
   SqlModelStorage,
   SqlNamespaceEntries,
+  SqlNamespaceInput,
   SqlNamespaceShape,
-  SqlNamespaceTablesInput,
   SqlQueryOperationTypes,
   SqlStorageInput,
   SqlStorageTypeEntry,
@@ -41,8 +41,6 @@ export type {
 } from '../types';
 export {
   applyFkDefaults,
-  buildSqlNamespace,
-  buildSqlNamespaceMap,
   CheckConstraint,
   CODEC_INSTANCE_KIND,
   DEFAULT_FK_CONSTRAINT,
@@ -55,7 +53,6 @@ export {
   SqlNamespace,
   SqlNode,
   SqlStorage,
-  SqlUnboundNamespace,
   StorageColumn,
   StorageTable,
   StorageValueSet,

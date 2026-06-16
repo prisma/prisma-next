@@ -37,7 +37,7 @@ import type {
 } from '@prisma-next/psl-parser';
 import type {
   SqlModelStorage,
-  SqlNamespaceTablesInput,
+  SqlNamespaceInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import {
@@ -114,7 +114,7 @@ export interface InterpretPslDocumentToSqlContractInput {
    */
   readonly composedExtensionContracts: ReadonlyMap<string, Contract>;
   /** Target-supplied factory that materialises a `Namespace` concretion for each namespace coordinate. */
-  readonly createNamespace: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly createNamespace: (input: SqlNamespaceInput) => Namespace;
   readonly codecLookup?: CodecLookup;
 }
 

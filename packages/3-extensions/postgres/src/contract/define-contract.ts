@@ -1,7 +1,7 @@
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import type { ExtensionPackRef } from '@prisma-next/framework-components/components';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import type { SqlNamespaceTablesInput, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceInput, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type {
   ComposedAuthoringHelpers,
   ContractInput,
@@ -30,7 +30,7 @@ type PostgresResult<
     SqlFamily,
     PostgresPack,
     PostgresDefinition<Types, Models, ExtensionPacks, Enums> & {
-      readonly createNamespace: (input: SqlNamespaceTablesInput) => Namespace;
+      readonly createNamespace: (input: SqlNamespaceInput) => Namespace;
     }
   >
 >;

@@ -7,7 +7,7 @@ import { tableEntityKind } from '@prisma-next/sql-contract/entity-kinds';
 import {
   SqlNamespace,
   type SqlNamespaceEntries,
-  type SqlNamespaceTablesInput,
+  type SqlNamespaceInput,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -94,7 +94,7 @@ export class SqliteUnboundDatabase extends SqliteDatabase {
 }
 
 export function buildSqliteNamespace(
-  input: SqlNamespaceTablesInput,
+  input: SqlNamespaceInput,
 ): SqliteDatabase | SqliteUnboundDatabase {
   if (input.id !== UNBOUND_NAMESPACE_ID) {
     throw new Error(
@@ -121,7 +121,7 @@ export function buildSqliteNamespace(
  * safety net rather than a user-facing surface.
  */
 export function sqliteCreateNamespace(
-  input: SqlNamespaceTablesInput,
+  input: SqlNamespaceInput,
 ): SqliteDatabase | SqliteUnboundDatabase {
   return buildSqliteNamespace(input);
 }

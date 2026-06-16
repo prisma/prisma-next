@@ -9,7 +9,7 @@ import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-com
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
   ReferentialAction,
-  SqlNamespaceTablesInput,
+  SqlNamespaceInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { EnumTypeHandle } from './enum-type';
@@ -168,7 +168,7 @@ export interface ContractDefinition {
    */
   readonly namespaces?: readonly string[];
   /** Target-supplied factory that materialises a `Namespace` concretion for a declared namespace coordinate. */
-  readonly createNamespace: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly createNamespace: (input: SqlNamespaceInput) => Namespace;
   readonly models: readonly ModelNode[];
   readonly valueObjects?: readonly ValueObjectNode[];
   /**

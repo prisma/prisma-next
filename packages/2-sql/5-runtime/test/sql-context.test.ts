@@ -2,7 +2,7 @@ import { type Contract, coreHash, executionHash, profileHash } from '@prisma-nex
 import { mergeCapabilityMatrices } from '@prisma-next/framework-components/components';
 import type { RuntimeDriverDescriptor } from '@prisma-next/framework-components/execution';
 import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
-import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import { applicationDomainOf } from '@prisma-next/test-utils';
@@ -31,7 +31,9 @@ const testContract: Contract<SqlStorage> = {
   roots: {},
   storage: new SqlStorage({
     storageHash: coreHash('sha256:test'),
-    namespaces: { __unbound__: SqlUnboundNamespace.instance },
+    namespaces: {
+      __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
+    },
   }),
   extensionPacks: {},
   capabilities: {},

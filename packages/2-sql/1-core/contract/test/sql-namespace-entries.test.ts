@@ -2,7 +2,6 @@ import { coreHash } from '@prisma-next/contract/types';
 import { elementCoordinates, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { SqlUnboundNamespace } from '../src/ir/sql-unbound-namespace';
 import { StorageTable } from '../src/ir/storage-table';
 import { StorageValueSet } from '../src/ir/storage-value-set';
 import { createTestSqlNamespace } from '../src/test-support';
@@ -169,13 +168,12 @@ describe('TestSqlNamespace — entries open dictionary', () => {
     });
   });
 
-  it('unbound id with only an unknown kind does not return the unbound singleton', () => {
+  it('unbound id with only an unknown kind preserves the unknown entry', () => {
     const ns = createTestSqlNamespace({
       id: UNBOUND_NAMESPACE_ID,
       entries: { bogus: { item: {} } } as never,
     });
     expect(ns.entries['bogus']).toBeDefined();
-    expect(ns).not.toBe(SqlUnboundNamespace.instance);
   });
 
   it('elementCoordinates yields unknown-kind entries', () => {
@@ -202,36 +200,5 @@ describe('TestSqlNamespace — entries open dictionary', () => {
       entries: { table: { users: emptyTableInput } },
     });
     expect(ns.entries['table']?.['users']).toBe(ns.table['users']);
-  });
-});
-
-describe('SqlUnboundNamespace — entries open dictionary', () => {
-  it('exact-shape serialization: JSON.stringify emits only id and entries', () => {
-    const parsed = JSON.parse(JSON.stringify(SqlUnboundNamespace.instance)) as Record<
-      string,
-      unknown
-    >;
-    expect(Object.keys(parsed).sort()).toEqual(['entries', 'id']);
-  });
-
-  it('entries is frozen', () => {
-    expect(Object.isFrozen(SqlUnboundNamespace.instance.entries)).toBe(true);
-  });
-
-  it('inner table map is frozen', () => {
-    expect(Object.isFrozen(SqlUnboundNamespace.instance.entries['table'])).toBe(true);
-  });
-
-  it('table getter returns the frozen empty map', () => {
-    expect(SqlUnboundNamespace.instance.table).toBe(SqlUnboundNamespace.instance.entries['table']);
-    expect(SqlUnboundNamespace.instance.table).toEqual({});
-  });
-
-  it('table getter is non-enumerable', () => {
-    expect(Object.keys(SqlUnboundNamespace.instance)).not.toContain('table');
-  });
-
-  it('id is the unbound sentinel', () => {
-    expect(SqlUnboundNamespace.instance.id).toBe(UNBOUND_NAMESPACE_ID);
   });
 });

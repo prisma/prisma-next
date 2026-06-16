@@ -73,12 +73,12 @@ type ContractBase = Omit<
     readonly namespaces: {
       readonly __unbound__: {
         readonly id: '__unbound__';
-        readonly kind: 'sql-namespace';
+        readonly kind: 'postgres-unbound-schema';
         readonly entries: { readonly table: {} };
       };
       readonly public: {
         readonly id: 'public';
-        readonly kind: 'sql-namespace';
+        readonly kind: 'postgres-schema';
         readonly entries: {
           readonly table: {
             readonly profile: {

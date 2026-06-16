@@ -47,7 +47,7 @@ type EnumStorage = {
   namespaces: {
     readonly __unbound__: {
       id: '__unbound__';
-      kind: 'sql-namespace';
+      kind: 'test-sql-namespace';
       entries: {
         readonly table: {
           readonly User: {

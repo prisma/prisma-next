@@ -390,8 +390,6 @@ function generateNamespaceValueSetType(
   return `{ ${entries.join('; ')} }`;
 }
 
-const SQL_NAMESPACE_KIND_FALLBACK = 'sql-namespace' as const;
-
 function namespaceSerializedKind(ns: Namespace): string {
   const kind = ns.kind;
   if (kind === 'schema') {
@@ -402,12 +400,9 @@ function namespaceSerializedKind(ns: Namespace): string {
   if (typeof kind === 'string') {
     return `readonly kind: ${serializeValue(kind)}`;
   }
-  // Plain-literal namespaces built via the contract-ts DSL bypass the
-  // class-level `Object.defineProperty(this, 'kind', { value, enumerable: false })`
-  // path, so `ns.kind` is missing on the runtime object. Surfacing the
-  // framework-default kind here keeps the emitted `.d.ts` literal
-  // structurally assignable to `Namespace`, which now requires `kind`.
-  return `readonly kind: '${SQL_NAMESPACE_KIND_FALLBACK}'`;
+  throw new Error(
+    `Namespace '${ns.id}' has no string kind — all namespaces must be target concretions with a defined kind property.`,
+  );
 }
 
 function generateTableLiteralType(table: StorageTable): string {

@@ -16,7 +16,7 @@ import type {
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import type { SqlNamespaceTablesInput, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceInput, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { NamedConstraintSpec } from './authoring-type-utils';
@@ -1499,14 +1499,8 @@ export type ContractInput<
    * `StorageTable.namespaceId` referenced by a model, and the
    * framework `UNBOUND_NAMESPACE_ID` sentinel (always present so the
    * late-bound slot stays available regardless of authoring choices).
-   *
-   * When omitted, the family layer falls back to its placeholder
-   * `SqlUnboundNamespace` singleton for the unbound slot and rejects
-   * any non-unbound coordinate — single-namespace contracts authored
-   * before targets ship their factory stay byte-stable; multi-namespace
-   * contracts must pass the factory through.
    */
-  readonly createNamespace: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly createNamespace: (input: SqlNamespaceInput) => Namespace;
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;

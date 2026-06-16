@@ -10,10 +10,9 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import {
-  buildSqlNamespace,
   ForeignKey,
   PrimaryKey,
-  type SqlNamespaceTablesInput,
+  type SqlNamespaceInput,
   SqlStorage,
   StorageColumn,
   StorageTable,
@@ -23,6 +22,7 @@ import {
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
+import { postgresCreateNamespace } from '../src/core/postgres-schema';
 import postgresTargetDescriptor from '../src/exports/control';
 
 function makeValidContractJson() {
@@ -171,7 +171,7 @@ describe('PostgresContractSerializer', () => {
       protected override hydrateSqlNamespaceEntry(
         nsId: string,
         raw: Namespace | Record<string, unknown>,
-      ): Namespace | SqlNamespaceTablesInput {
+      ): Namespace | SqlNamespaceInput {
         if (raw instanceof NamespaceBase) {
           return raw;
         }
@@ -179,7 +179,7 @@ describe('PostgresContractSerializer', () => {
         if (input instanceof NamespaceBase) {
           return input;
         }
-        return buildSqlNamespace(input as SqlNamespaceTablesInput);
+        return postgresCreateNamespace(input as SqlNamespaceInput);
       }
 
       protected override parseSqlContractStructure(_json: unknown): Contract<SqlStorage> {

@@ -7,7 +7,7 @@ import type {
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import type { SqlNamespaceTablesInput, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceInput, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { buildSqlContractFromDefinition } from './build-contract';
@@ -68,7 +68,7 @@ type ContractDefinition<
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
   readonly defaultControlPolicy?: ControlPolicy;
   readonly namespaces?: Namespaces;
-  readonly createNamespace: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly createNamespace: (input: SqlNamespaceInput) => Namespace;
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
@@ -93,7 +93,7 @@ type ContractScaffold<
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
   readonly defaultControlPolicy?: ControlPolicy;
   readonly namespaces?: Namespaces;
-  readonly createNamespace: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly createNamespace: (input: SqlNamespaceInput) => Namespace;
   readonly types?: never;
   readonly models?: never;
   readonly codecLookup?: CodecLookup;
@@ -314,7 +314,7 @@ type BoundDefinitionInput<
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
   readonly defaultControlPolicy?: ControlPolicy;
   readonly namespaces?: Namespaces;
-  readonly createNamespace: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly createNamespace: (input: SqlNamespaceInput) => Namespace;
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;

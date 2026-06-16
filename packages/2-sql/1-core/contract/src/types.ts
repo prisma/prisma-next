@@ -10,7 +10,6 @@ export interface SqlControlDriverInstance<T extends string = string>
   ): Promise<{ readonly rows: Row[] }>;
 }
 
-export { buildSqlNamespace, buildSqlNamespaceMap } from './ir/build-sql-namespace';
 export { CheckConstraint, type CheckConstraintInput } from './ir/check-constraint';
 export {
   ForeignKey,
@@ -27,13 +26,12 @@ export { SqlNode } from './ir/sql-node';
 export {
   SqlNamespace,
   type SqlNamespaceEntries,
+  type SqlNamespaceInput,
   type SqlNamespaceShape,
-  type SqlNamespaceTablesInput,
   SqlStorage,
   type SqlStorageInput,
   type SqlStorageTypeEntry,
 } from './ir/sql-storage';
-export { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';
 export { StorageTable, type StorageTableInput } from './ir/storage-table';
 export {

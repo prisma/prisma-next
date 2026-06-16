@@ -12,9 +12,9 @@ import {
 } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import {
   applyFkDefaults,
-  buildSqlNamespace,
   type ReferentialAction,
   SqlStorage,
   StorageTable,
@@ -45,7 +45,10 @@ export function createTestContract(
     defaultControlPolicy?: ControlPolicy;
   },
 ): Contract<SqlStorage> {
-  const namespace = buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } });
+  const namespace = createTestSqlNamespace({
+    id: UNBOUND_NAMESPACE_ID,
+    entries: { table: tables },
+  });
   return {
     target: 'postgres',
     targetFamily: 'sql',

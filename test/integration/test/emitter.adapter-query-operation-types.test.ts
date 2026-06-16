@@ -3,8 +3,9 @@ import type { Contract } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import { extractQueryOperationTypeImports } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { type SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
@@ -17,7 +18,12 @@ describe('emitter + postgres adapter descriptor', () => {
       domain: applicationDomainOf({ models: {} }),
       storage: {
         storageHash: 'storage:sha256:test' as never,
-        namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
+            id: UNBOUND_NAMESPACE_ID,
+            entries: { table: {} },
+          }),
+        },
       },
       capabilities: {},
       extensionPacks: {},
