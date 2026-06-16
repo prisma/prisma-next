@@ -1,5 +1,7 @@
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
+import { rlsEnabledAst, rlsPolicyExistsAst } from '../../../contract-free/checks';
 import type { PostgresRlsPolicy, RlsPolicyOperation } from '../../postgres-rls-policy';
-import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
+import { quoteIdentifier } from '../../sql-utils';
 import { qualifyTableName } from '../planner-sql-checks';
 import { type Op, step, targetDetails } from './shared';
 
@@ -10,32 +12,6 @@ const OPERATION_SQL: Record<RlsPolicyOperation, string> = {
   delete: 'DELETE',
   all: 'ALL',
 };
-
-function rlsPolicyExistsCheck(
-  schemaName: string,
-  tableName: string,
-  policyName: string,
-  exists: boolean,
-): string {
-  const existsClause = exists ? 'EXISTS' : 'NOT EXISTS';
-  return `SELECT ${existsClause} (
-  SELECT 1 FROM pg_policies
-  WHERE schemaname = '${escapeLiteral(schemaName)}'
-    AND tablename = '${escapeLiteral(tableName)}'
-    AND policyname = '${escapeLiteral(policyName)}'
-)`;
-}
-
-function rlsEnabledCheck(schemaName: string, tableName: string, enabled: boolean): string {
-  const boolLiteral = enabled ? 'true' : 'false';
-  return `SELECT EXISTS (
-  SELECT 1 FROM pg_class c
-  JOIN pg_namespace n ON n.oid = c.relnamespace
-  WHERE n.nspname = '${escapeLiteral(schemaName)}'
-    AND c.relname = '${escapeLiteral(tableName)}'
-    AND c.relrowsecurity = ${boolLiteral}
-)`;
-}
 
 const PLAIN_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$]*$/;
 
@@ -67,21 +43,26 @@ function renderCreatePolicySql(
   return sql;
 }
 
-export function createRlsPolicy(
+export async function createRlsPolicy(
   schemaName: string,
   tableName: string,
   policy: PostgresRlsPolicy,
-): Op {
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
+  const checks = rlsPolicyExistsAst({
+    schema: schemaName,
+    table: tableName,
+    policyName: policy.name,
+  });
+  const absent = await lowerer.lowerToExecuteRequest(checks.policyAbsent());
+  const present = await lowerer.lowerToExecuteRequest(checks.policyPresent());
   return {
     id: `rlsPolicy.${schemaName}.${tableName}.${policy.name}`,
     label: `Create RLS policy "${policy.name}" on "${tableName}"`,
     operationClass: 'additive',
     target: targetDetails('rlsPolicy', policy.name, schemaName, tableName),
     precheck: [
-      step(
-        `ensure RLS policy "${policy.name}" does not exist`,
-        rlsPolicyExistsCheck(schemaName, tableName, policy.name, false),
-      ),
+      step(`ensure RLS policy "${policy.name}" does not exist`, absent.sql, absent.params),
     ],
     execute: [
       step(
@@ -89,53 +70,50 @@ export function createRlsPolicy(
         renderCreatePolicySql(schemaName, tableName, policy),
       ),
     ],
-    postcheck: [
-      step(
-        `verify RLS policy "${policy.name}" exists`,
-        rlsPolicyExistsCheck(schemaName, tableName, policy.name, true),
-      ),
-    ],
+    postcheck: [step(`verify RLS policy "${policy.name}" exists`, present.sql, present.params)],
   };
 }
 
-export function dropRlsPolicy(schemaName: string, tableName: string, policyName: string): Op {
+export async function dropRlsPolicy(
+  schemaName: string,
+  tableName: string,
+  policyName: string,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
+  const checks = rlsPolicyExistsAst({ schema: schemaName, table: tableName, policyName });
+  const present = await lowerer.lowerToExecuteRequest(checks.policyPresent());
+  const absent = await lowerer.lowerToExecuteRequest(checks.policyAbsent());
   return {
     id: `rlsPolicy.${schemaName}.${tableName}.${policyName}.drop`,
     label: `Drop RLS policy "${policyName}" on "${tableName}"`,
     operationClass: 'destructive',
     target: targetDetails('rlsPolicy', policyName, schemaName, tableName),
-    precheck: [
-      step(
-        `ensure RLS policy "${policyName}" exists`,
-        rlsPolicyExistsCheck(schemaName, tableName, policyName, true),
-      ),
-    ],
+    precheck: [step(`ensure RLS policy "${policyName}" exists`, present.sql, present.params)],
     execute: [
       step(
         `drop RLS policy "${policyName}"`,
         `DROP POLICY ${quoteIdentifier(policyName)} ON ${qualifyTableName(schemaName, tableName)}`,
       ),
     ],
-    postcheck: [
-      step(
-        `verify RLS policy "${policyName}" is absent`,
-        rlsPolicyExistsCheck(schemaName, tableName, policyName, false),
-      ),
-    ],
+    postcheck: [step(`verify RLS policy "${policyName}" is absent`, absent.sql, absent.params)],
   };
 }
 
-export function enableRowLevelSecurity(schemaName: string, tableName: string): Op {
+export async function enableRowLevelSecurity(
+  schemaName: string,
+  tableName: string,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
+  const checks = rlsEnabledAst(schemaName, tableName);
+  const disabled = await lowerer.lowerToExecuteRequest(checks.rlsDisabled());
+  const enabled = await lowerer.lowerToExecuteRequest(checks.rlsEnabled());
   return {
     id: `rowLevelSecurity.${schemaName}.${tableName}`,
     label: `Enable row-level security on "${tableName}"`,
     operationClass: 'additive',
     target: targetDetails('rowLevelSecurity', tableName, schemaName),
     precheck: [
-      step(
-        `check RLS is not already enabled on "${tableName}"`,
-        rlsEnabledCheck(schemaName, tableName, false),
-      ),
+      step(`check RLS is not already enabled on "${tableName}"`, disabled.sql, disabled.params),
     ],
     execute: [
       step(
@@ -144,10 +122,7 @@ export function enableRowLevelSecurity(schemaName: string, tableName: string): O
       ),
     ],
     postcheck: [
-      step(
-        `verify row-level security is enabled on "${tableName}"`,
-        rlsEnabledCheck(schemaName, tableName, true),
-      ),
+      step(`verify row-level security is enabled on "${tableName}"`, enabled.sql, enabled.params),
     ],
   };
 }

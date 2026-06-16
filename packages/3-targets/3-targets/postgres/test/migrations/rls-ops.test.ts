@@ -1,4 +1,6 @@
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { describe, expect, it } from 'vitest';
+import { rlsEnabledAst, rlsPolicyExistsAst } from '../../src/contract-free/checks';
 import {
   CreatePostgresRlsPolicyCall,
   DropPostgresRlsPolicyCall,
@@ -10,6 +12,21 @@ import {
   enableRowLevelSecurity,
 } from '../../src/core/migrations/operations/rls';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
+
+function recordingCheckLowerer(): { lowerer: ExecuteRequestLowerer; received: unknown[] } {
+  const received: unknown[] = [];
+  const lowerer: ExecuteRequestLowerer = {
+    lower: () => Object.freeze({ sql: 'UNUSED', params: Object.freeze([]) }),
+    lowerToExecuteRequest: async (ast) => {
+      received.push(ast);
+      return Object.freeze({
+        sql: `LOWERED ${received.length}`,
+        params: Object.freeze([`p${received.length}`]),
+      });
+    },
+  };
+  return { lowerer, received };
+}
 
 describe('renderCreatePolicySql role-name validation', () => {
   function policyWithRoles(roles: string[]): PostgresRlsPolicy {
@@ -25,38 +42,49 @@ describe('renderCreatePolicySql role-name validation', () => {
     });
   }
 
-  it('renders TO PUBLIC when roles is empty', () => {
-    const op = createRlsPolicy('public', 'profiles', policyWithRoles([]));
+  it('renders TO PUBLIC when roles is empty', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    const op = await createRlsPolicy('public', 'profiles', policyWithRoles([]), lowerer);
     expect(op.execute[0]?.sql).toContain('TO PUBLIC');
     expect(op.execute[0]?.sql).not.toContain('TO ,');
   });
 
-  it('renders a plain SQL identifier role without error', () => {
-    const op = createRlsPolicy('public', 'profiles', policyWithRoles(['app_user']));
+  it('renders a plain SQL identifier role without error', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    const op = await createRlsPolicy('public', 'profiles', policyWithRoles(['app_user']), lowerer);
     expect(op.execute[0]?.sql).toContain('TO app_user');
   });
 
-  it('renders multiple valid role names', () => {
-    const op = createRlsPolicy('public', 'profiles', policyWithRoles(['app_user', 'read_only']));
+  it('renders multiple valid role names', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    const op = await createRlsPolicy(
+      'public',
+      'profiles',
+      policyWithRoles(['app_user', 'read_only']),
+      lowerer,
+    );
     expect(op.execute[0]?.sql).toContain('TO app_user, read_only');
   });
 
-  it('rejects a role name containing a double-quote', () => {
-    expect(() => createRlsPolicy('public', 'profiles', policyWithRoles(['a"b']))).toThrow(
-      /invalid role name/i,
-    );
+  it('rejects a role name containing a double-quote', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    await expect(
+      createRlsPolicy('public', 'profiles', policyWithRoles(['a"b']), lowerer),
+    ).rejects.toThrow(/invalid role name/i);
   });
 
-  it('rejects a role name containing a space', () => {
-    expect(() => createRlsPolicy('public', 'profiles', policyWithRoles(['my role']))).toThrow(
-      /invalid role name/i,
-    );
+  it('rejects a role name containing a space', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    await expect(
+      createRlsPolicy('public', 'profiles', policyWithRoles(['my role']), lowerer),
+    ).rejects.toThrow(/invalid role name/i);
   });
 
-  it('rejects a role name containing a semicolon', () => {
-    expect(() =>
-      createRlsPolicy('public', 'profiles', policyWithRoles(['role;DROP TABLE'])),
-    ).toThrow(/invalid role name/i);
+  it('rejects a role name containing a semicolon', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    await expect(
+      createRlsPolicy('public', 'profiles', policyWithRoles(['role;DROP TABLE']), lowerer),
+    ).rejects.toThrow(/invalid role name/i);
   });
 });
 
@@ -72,15 +100,16 @@ const basePolicy = new PostgresRlsPolicy({
 });
 
 describe('createRlsPolicy op', () => {
-  it('emits the correct CREATE POLICY DDL', () => {
-    const op = createRlsPolicy('public', 'profiles', basePolicy);
-    const executeSql = op.execute[0]?.sql;
-    expect(executeSql).toBe(
+  it('emits the correct CREATE POLICY DDL', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    const op = await createRlsPolicy('public', 'profiles', basePolicy, lowerer);
+    expect(op.execute[0]?.sql).toBe(
       `CREATE POLICY "read_own_profiles_ab12cd34" ON "public"."profiles" AS PERMISSIVE FOR SELECT TO authenticated USING ((auth.uid() = user_id))`,
     );
   });
 
-  it('emits WITH CHECK clause when present', () => {
+  it('emits WITH CHECK clause when present', async () => {
+    const { lowerer } = recordingCheckLowerer();
     const policy = new PostgresRlsPolicy({
       name: 'insert_own_profiles_ab12cd34',
       prefix: 'insert_own_profiles',
@@ -91,107 +120,137 @@ describe('createRlsPolicy op', () => {
       withCheck: '(auth.uid() = user_id)',
       permissive: true,
     });
-    const op = createRlsPolicy('public', 'profiles', policy);
-    const executeSql = op.execute[0]?.sql;
-    expect(executeSql).toBe(
+    const op = await createRlsPolicy('public', 'profiles', policy, lowerer);
+    expect(op.execute[0]?.sql).toBe(
       `CREATE POLICY "insert_own_profiles_ab12cd34" ON "public"."profiles" AS PERMISSIVE FOR INSERT TO authenticated WITH CHECK ((auth.uid() = user_id))`,
     );
   });
 
-  it('emits AS RESTRICTIVE when permissive is false', () => {
+  it('emits AS RESTRICTIVE when permissive is false', async () => {
+    const { lowerer } = recordingCheckLowerer();
     const policy = new PostgresRlsPolicy({
       ...basePolicy,
       name: 'restrict_profiles_ab12cd34',
       prefix: 'restrict_profiles',
       permissive: false,
     });
-    const op = createRlsPolicy('public', 'profiles', policy);
+    const op = await createRlsPolicy('public', 'profiles', policy, lowerer);
     expect(op.execute[0]?.sql).toContain('AS RESTRICTIVE');
   });
 
-  it('emits precheck asserting policy is absent', () => {
-    const op = createRlsPolicy('public', 'profiles', basePolicy);
-    const precheckSql = op.precheck[0]?.sql ?? '';
-    expect(precheckSql).toContain('pg_policies');
-    expect(precheckSql).toContain('NOT EXISTS');
-    expect(precheckSql).toContain('read_own_profiles_ab12cd34');
+  it('lowers a parameterized policy-absent precheck (name never inlined)', async () => {
+    const { lowerer, received } = recordingCheckLowerer();
+    const op = await createRlsPolicy('public', 'profiles', basePolicy, lowerer);
+    expect(received).toContainEqual(
+      rlsPolicyExistsAst({
+        schema: 'public',
+        table: 'profiles',
+        policyName: 'read_own_profiles_ab12cd34',
+      }).policyAbsent(),
+    );
+    expect(op.precheck[0]?.params).toEqual(['p1']);
+    expect(op.precheck[0]?.sql).not.toContain('read_own_profiles_ab12cd34');
   });
 
-  it('emits postcheck asserting policy is present', () => {
-    const op = createRlsPolicy('public', 'profiles', basePolicy);
-    const postcheckSql = op.postcheck[0]?.sql ?? '';
-    expect(postcheckSql).toContain('pg_policies');
-    expect(postcheckSql).not.toContain('NOT EXISTS');
-    expect(postcheckSql).toContain('read_own_profiles_ab12cd34');
+  it('lowers a parameterized policy-present postcheck', async () => {
+    const { lowerer, received } = recordingCheckLowerer();
+    const op = await createRlsPolicy('public', 'profiles', basePolicy, lowerer);
+    expect(received).toContainEqual(
+      rlsPolicyExistsAst({
+        schema: 'public',
+        table: 'profiles',
+        policyName: 'read_own_profiles_ab12cd34',
+      }).policyPresent(),
+    );
+    expect(op.postcheck[0]?.params).toEqual(['p2']);
   });
 
-  it('operationClass is additive', () => {
-    const op = createRlsPolicy('public', 'profiles', basePolicy);
+  it('operationClass is additive', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    const op = await createRlsPolicy('public', 'profiles', basePolicy, lowerer);
     expect(op.operationClass).toBe('additive');
   });
 });
 
 describe('enableRowLevelSecurity op', () => {
-  it('emits the correct ALTER TABLE DDL', () => {
-    const op = enableRowLevelSecurity('public', 'profiles');
+  it('emits the correct ALTER TABLE DDL', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    const op = await enableRowLevelSecurity('public', 'profiles', lowerer);
     expect(op.execute[0]?.sql).toBe(`ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY`);
   });
 
-  it('emits precheck reading pg_class.relrowsecurity', () => {
-    const op = enableRowLevelSecurity('public', 'profiles');
-    const precheckSql = op.precheck[0]?.sql ?? '';
-    expect(precheckSql).toContain('pg_class');
-    expect(precheckSql).toContain('relrowsecurity');
+  it('lowers a parameterized rls-disabled precheck', async () => {
+    const { lowerer, received } = recordingCheckLowerer();
+    await enableRowLevelSecurity('public', 'profiles', lowerer);
+    expect(received).toContainEqual(rlsEnabledAst('public', 'profiles').rlsDisabled());
   });
 
-  it('emits postcheck asserting relrowsecurity = true', () => {
-    const op = enableRowLevelSecurity('public', 'profiles');
-    const postcheckSql = op.postcheck[0]?.sql ?? '';
-    expect(postcheckSql).toContain('pg_class');
-    expect(postcheckSql).toContain('relrowsecurity');
+  it('lowers a parameterized rls-enabled postcheck', async () => {
+    const { lowerer, received } = recordingCheckLowerer();
+    await enableRowLevelSecurity('public', 'profiles', lowerer);
+    expect(received).toContainEqual(rlsEnabledAst('public', 'profiles').rlsEnabled());
   });
 
-  it('operationClass is additive', () => {
-    const op = enableRowLevelSecurity('public', 'profiles');
+  it('operationClass is additive', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    const op = await enableRowLevelSecurity('public', 'profiles', lowerer);
     expect(op.operationClass).toBe('additive');
   });
 });
 
 describe('dropRlsPolicy op', () => {
-  it('emits the correct DROP POLICY DDL', () => {
-    const op = dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34');
-    const executeSql = op.execute[0]?.sql;
-    expect(executeSql).toBe(`DROP POLICY "read_own_profiles_ab12cd34" ON "public"."profiles"`);
+  it('emits the correct DROP POLICY DDL', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    const op = await dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34', lowerer);
+    expect(op.execute[0]?.sql).toBe(
+      `DROP POLICY "read_own_profiles_ab12cd34" ON "public"."profiles"`,
+    );
   });
 
-  it('emits precheck asserting policy is present', () => {
-    const op = dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34');
-    const precheckSql = op.precheck[0]?.sql ?? '';
-    expect(precheckSql).toContain('pg_policies');
-    expect(precheckSql).toContain('EXISTS');
-    expect(precheckSql).not.toContain('NOT EXISTS');
-    expect(precheckSql).toContain('read_own_profiles_ab12cd34');
+  it('lowers a parameterized policy-present precheck (name never inlined)', async () => {
+    const { lowerer, received } = recordingCheckLowerer();
+    const op = await dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34', lowerer);
+    expect(received).toContainEqual(
+      rlsPolicyExistsAst({
+        schema: 'public',
+        table: 'profiles',
+        policyName: 'read_own_profiles_ab12cd34',
+      }).policyPresent(),
+    );
+    expect(op.precheck[0]?.sql).not.toContain('read_own_profiles_ab12cd34');
   });
 
-  it('emits postcheck asserting policy is absent', () => {
-    const op = dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34');
-    const postcheckSql = op.postcheck[0]?.sql ?? '';
-    expect(postcheckSql).toContain('pg_policies');
-    expect(postcheckSql).toContain('NOT EXISTS');
-    expect(postcheckSql).toContain('read_own_profiles_ab12cd34');
+  it('lowers a parameterized policy-absent postcheck', async () => {
+    const { lowerer, received } = recordingCheckLowerer();
+    await dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34', lowerer);
+    expect(received).toContainEqual(
+      rlsPolicyExistsAst({
+        schema: 'public',
+        table: 'profiles',
+        policyName: 'read_own_profiles_ab12cd34',
+      }).policyAbsent(),
+    );
   });
 
-  it('operationClass is destructive', () => {
-    const op = dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34');
+  it('operationClass is destructive', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    const op = await dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34', lowerer);
     expect(op.operationClass).toBe('destructive');
   });
 });
 
 describe('CreatePostgresRlsPolicyCall', () => {
-  it('toOp() returns the same DDL as createRlsPolicy()', () => {
+  it('toOp() returns the same DDL as createRlsPolicy()', async () => {
+    const { lowerer } = recordingCheckLowerer();
     const call = new CreatePostgresRlsPolicyCall('public', 'profiles', basePolicy);
-    const directOp = createRlsPolicy('public', 'profiles', basePolicy);
-    expect(call.toOp().execute[0]?.sql).toBe(directOp.execute[0]?.sql);
+    const directOp = await createRlsPolicy('public', 'profiles', basePolicy, lowerer);
+    const callOp = await call.toOp(lowerer);
+    expect(callOp.execute[0]?.sql).toBe(directOp.execute[0]?.sql);
+  });
+
+  it('toOp() throws when no lowerer is provided', async () => {
+    const call = new CreatePostgresRlsPolicyCall('public', 'profiles', basePolicy);
+    await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
   });
 
   it('renderTypeScript() round-trips the call', () => {
@@ -214,11 +273,16 @@ describe('CreatePostgresRlsPolicyCall', () => {
 });
 
 describe('EnableRowLevelSecurityCall', () => {
-  it('toOp() returns the correct DDL', () => {
+  it('toOp() returns the correct DDL', async () => {
+    const { lowerer } = recordingCheckLowerer();
     const call = new EnableRowLevelSecurityCall('public', 'profiles');
-    expect(call.toOp().execute[0]?.sql).toBe(
-      `ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY`,
-    );
+    const op = await call.toOp(lowerer);
+    expect(op.execute[0]?.sql).toBe(`ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY`);
+  });
+
+  it('toOp() throws when no lowerer is provided', async () => {
+    const call = new EnableRowLevelSecurityCall('public', 'profiles');
+    await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
   });
 
   it('renderTypeScript() round-trips the call', () => {
@@ -241,10 +305,22 @@ describe('EnableRowLevelSecurityCall', () => {
 });
 
 describe('DropPostgresRlsPolicyCall', () => {
-  it('toOp() returns the same DDL as dropRlsPolicy()', () => {
+  it('toOp() returns the same DDL as dropRlsPolicy()', async () => {
+    const { lowerer } = recordingCheckLowerer();
     const call = new DropPostgresRlsPolicyCall('public', 'profiles', 'read_own_profiles_ab12cd34');
-    const directOp = dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34');
-    expect(call.toOp().execute[0]?.sql).toBe(directOp.execute[0]?.sql);
+    const directOp = await dropRlsPolicy(
+      'public',
+      'profiles',
+      'read_own_profiles_ab12cd34',
+      lowerer,
+    );
+    const callOp = await call.toOp(lowerer);
+    expect(callOp.execute[0]?.sql).toBe(directOp.execute[0]?.sql);
+  });
+
+  it('toOp() throws when no lowerer is provided', async () => {
+    const call = new DropPostgresRlsPolicyCall('public', 'profiles', 'read_own_profiles_ab12cd34');
+    await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
   });
 
   it('renderTypeScript() round-trips the call', () => {

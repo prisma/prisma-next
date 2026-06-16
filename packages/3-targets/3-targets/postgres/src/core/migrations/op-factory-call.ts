@@ -1395,8 +1395,13 @@ export class CreatePostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
-    return createRlsPolicy(this.schemaName, this.tableName, this.policy);
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `CreatePostgresRlsPolicyCall.toOp: a lowerer is required on the Postgres planner path (policy "${this.policy.name}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    return createRlsPolicy(this.schemaName, this.tableName, this.policy, lowerer);
   }
 
   renderTypeScript(): string {
@@ -1421,8 +1426,13 @@ export class DropPostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
-    return dropRlsPolicy(this.schemaName, this.tableName, this.policyName);
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `DropPostgresRlsPolicyCall.toOp: a lowerer is required on the Postgres planner path (policy "${this.policyName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    return dropRlsPolicy(this.schemaName, this.tableName, this.policyName, lowerer);
   }
 
   renderTypeScript(): string {
@@ -1445,8 +1455,13 @@ export class EnableRowLevelSecurityCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
-    return enableRowLevelSecurity(this.schemaName, this.tableName);
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `EnableRowLevelSecurityCall.toOp: a lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    return enableRowLevelSecurity(this.schemaName, this.tableName, lowerer);
   }
 
   renderTypeScript(): string {
