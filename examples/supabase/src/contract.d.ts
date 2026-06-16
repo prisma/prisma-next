@@ -61,6 +61,16 @@ export type FieldInputTypes = {
     };
   };
 };
+export type StorageColumnTypes = {
+  readonly __unbound__: {};
+  readonly public: {
+    readonly profile: {
+      readonly id: CodecTypes['pg/uuid@1']['output'];
+      readonly userId: CodecTypes['pg/uuid@1']['output'];
+      readonly username: CodecTypes['pg/text@1']['output'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,

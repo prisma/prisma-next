@@ -1,4 +1,10 @@
-import type { Contract, ContractModel, ContractModelBase } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractField,
+  ContractModel,
+  ContractModelBase,
+  JsonValue,
+} from '@prisma-next/contract/types';
 import {
   serializeNamespaceId,
   serializeObjectKey,
@@ -6,6 +12,7 @@ import {
 } from '@prisma-next/emitter/domain-type-generation';
 import type {
   GenerateContractTypesOptions,
+  ResolvedFieldTypeStrings,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
 import {
@@ -20,6 +27,7 @@ import type {
   StorageTypeInstance,
   StorageValueSet,
 } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 
 function serializeTypeParamsLiteral(params: Record<string, unknown> | undefined): string {
   if (!params || Object.keys(params).length === 0) {
@@ -305,6 +313,63 @@ export const sqlEmission = {
     return column.typeParams;
   },
 
+  resolveFieldType(
+    _modelName: string,
+    fieldName: string,
+    field: ContractField,
+    model: ContractModelBase,
+    contract: Contract,
+  ): ResolvedFieldTypeStrings | undefined {
+    const sqlModel = blindCast<
+      ContractModel<SqlModelStorage>,
+      'same pattern as resolveFieldTypeParams above'
+    >(model);
+    const storageField = sqlModel.storage?.fields?.[fieldName];
+    if (!storageField) return undefined;
+
+    const storage = blindCast<
+      SqlStorage | undefined,
+      'contract.storage is SqlStorage for sql family'
+    >(contract.storage);
+    if (!storage) return undefined;
+
+    const tableName = sqlModel.storage.table;
+    const storageNamespaceId = sqlModel.storage.namespaceId;
+    if (!storageNamespaceId) return undefined;
+
+    const table = entityAt<StorageTable>(storage, {
+      namespaceId: storageNamespaceId,
+      entityKind: 'table',
+      entityName: tableName,
+    });
+    if (!table) return undefined;
+
+    const column = table.columns[storageField.column];
+    if (!column?.valueSet) return undefined;
+
+    const valueSet = entityAt<StorageValueSet>(storage, {
+      namespaceId: column.valueSet.namespaceId,
+      entityKind: column.valueSet.entityKind,
+      entityName: column.valueSet.entityName,
+    });
+    if (!valueSet) return undefined;
+
+    const union = renderValueSetUnion(valueSet.values, field.nullable);
+    if (!union) return undefined;
+
+    return { output: union, input: union };
+  },
+
+  getExtraTypeExports(contract: Contract): string | undefined {
+    const storage = blindCast<
+      SqlStorage | undefined,
+      'contract.storage is SqlStorage for sql family'
+    >(contract.storage);
+    if (!storage?.namespaces) return undefined;
+    const storageColumnTypes = generateStorageColumnTypesMap(storage);
+    return `export type StorageColumnTypes = ${storageColumnTypes};`;
+  },
+
   getFamilyImports(): string[] {
     return [
       'import type {',
@@ -346,6 +411,82 @@ export const sqlEmission = {
     ].join('\n');
   },
 } as const;
+
+function renderValueSetLiteral(value: JsonValue): string | undefined {
+  if (typeof value === 'string') return serializeValue(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return undefined;
+}
+
+function renderValueSetUnion(values: readonly JsonValue[], nullable: boolean): string | undefined {
+  if (values.length === 0) return undefined;
+  const literals: string[] = [];
+  for (const v of values) {
+    const lit = renderValueSetLiteral(v);
+    if (lit === undefined) return undefined;
+    literals.push(lit);
+  }
+  const union = literals.join(' | ');
+  return nullable ? `${union} | null` : union;
+}
+
+function generateStorageColumnTypesMap(storage: SqlStorage): string {
+  const namespaceEntries = Object.entries(storage.namespaces ?? {}).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  if (namespaceEntries.length === 0) return 'Record<string, never>';
+
+  const nsParts: string[] = [];
+  for (const [nsId, ns] of namespaceEntries) {
+    const tables = blindCast<
+      Readonly<Record<string, StorageTable>>,
+      'same pattern as generateTablesMapType below'
+    >(ns.entries.table ?? {});
+    const tableEntries = Object.entries(tables).sort(([a], [b]) => a.localeCompare(b));
+    const tableParts: string[] = [];
+
+    for (const [tableName, table] of tableEntries) {
+      const colEntries = Object.entries(table.columns).sort(([a], [b]) => a.localeCompare(b));
+      const colParts: string[] = [];
+
+      for (const [colName, col] of colEntries) {
+        let colType: string;
+
+        if (col.valueSet) {
+          const valueSet = entityAt<StorageValueSet>(storage, {
+            namespaceId: col.valueSet.namespaceId,
+            entityKind: col.valueSet.entityKind,
+            entityName: col.valueSet.entityName,
+          });
+          const union = valueSet ? renderValueSetUnion(valueSet.values, col.nullable) : undefined;
+          if (union !== undefined) {
+            colType = union;
+          } else {
+            const codecAccessor = `CodecTypes[${serializeValue(col.codecId)}]`;
+            colType = col.nullable
+              ? `${codecAccessor}['output'] | null`
+              : `${codecAccessor}['output']`;
+          }
+        } else {
+          const codecAccessor = `CodecTypes[${serializeValue(col.codecId)}]`;
+          colType = col.nullable
+            ? `${codecAccessor}['output'] | null`
+            : `${codecAccessor}['output']`;
+        }
+
+        colParts.push(`readonly ${serializeObjectKey(colName)}: ${colType}`);
+      }
+
+      const colMap = colParts.length > 0 ? `{ ${colParts.join('; ')} }` : '{}';
+      tableParts.push(`readonly ${serializeObjectKey(tableName)}: ${colMap}`);
+    }
+
+    const tableMap = tableParts.length > 0 ? `{ ${tableParts.join('; ')} }` : '{}';
+    nsParts.push(`readonly ${serializeObjectKey(nsId)}: ${tableMap}`);
+  }
+
+  return `{ ${nsParts.join('; ')} }`;
+}
 
 function generateDocumentScopedStorageTypesType(types: SqlStorage['types']): string | undefined {
   if (!types || Object.keys(types).length === 0) {

@@ -1,4 +1,4 @@
-import type { Contract, ContractModelBase } from '@prisma-next/contract/types';
+import type { Contract, ContractField, ContractModelBase } from '@prisma-next/contract/types';
 import type { TypesImportSpec } from '../shared/types-import-spec';
 
 export interface GenerateContractTypesOptions {
@@ -8,6 +8,11 @@ export interface GenerateContractTypesOptions {
 export interface ValidationContext {
   readonly codecTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds?: ReadonlyArray<string>;
+}
+
+export interface ResolvedFieldTypeStrings {
+  readonly output: string;
+  readonly input: string;
 }
 
 export interface EmissionSpi {
@@ -45,4 +50,31 @@ export interface EmissionSpi {
     model: ContractModelBase,
     contract: Contract,
   ): Record<string, unknown> | undefined;
+
+  /**
+   * Per-family hook that fully overrides the rendered output/input type for a
+   * single domain field. Called before the framework's default scalar/enum
+   * narrowing logic runs. The SQL family uses this to source the type from the
+   * storage column's value-set (baked literal union) rather than from the
+   * domain enum block, keeping value-set narrowing inside the SQL family.
+   *
+   * Returns `undefined` to fall through to the framework's default logic.
+   */
+  resolveFieldType?(
+    modelName: string,
+    fieldName: string,
+    field: ContractField,
+    model: ContractModelBase,
+    contract: Contract,
+  ): ResolvedFieldTypeStrings | undefined;
+
+  /**
+   * Optional hook for emitting a family-specific top-level type export that
+   * depends on the full contract (e.g. SQL's `StorageColumnTypes` map).
+   *
+   * Returns a string of one or more `export type ...` declarations to insert
+   * after the standard `FieldOutputTypes`/`FieldInputTypes` exports, or
+   * `undefined` if the family has nothing to add.
+   */
+  getExtraTypeExports?(contract: Contract): string | undefined;
 }

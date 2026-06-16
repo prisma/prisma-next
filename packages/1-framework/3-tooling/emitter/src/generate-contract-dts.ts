@@ -1,6 +1,7 @@
 import type {
   Contract,
   ContractEnum,
+  ContractField,
   ContractModelBase,
   ContractValueObject,
 } from '@prisma-next/contract/types';
@@ -14,7 +15,7 @@ import type {
 import { blindCast } from '@prisma-next/utils/casts';
 import {
   deduplicateImports,
-  type EnumValuesResolver,
+  type FieldTypeResolver,
   generateCodecTypeIntersection,
   generateFieldTypesMapsByNamespace,
   generateHashTypeAliases,
@@ -151,12 +152,10 @@ export function generateContractDts(
         emitter.resolveFieldTypeParams?.(modelName, fieldName, model, contract)
     : undefined;
 
-  const resolveEnumValues: EnumValuesResolver = (ref) =>
-    ref.entityKind === 'enum'
-      ? contract.domain.namespaces[ref.namespaceId]?.enum?.[ref.entityName]?.members.map(
-          (m) => m.value,
-        )
-      : undefined;
+  const resolveFieldTypeOverride: FieldTypeResolver | undefined = emitter.resolveFieldType
+    ? (modelName: string, fieldName: string, field: ContractField, model: ContractModelBase) =>
+        emitter.resolveFieldType?.(modelName, fieldName, field, model, contract)
+    : undefined;
 
   const namespaceModelsForFieldTypes = namespaceEntries.map(
     ([nsId, ns]) => [nsId, ns.models] as const,
@@ -166,8 +165,10 @@ export function generateContractDts(
     namespaceModelsForFieldTypes,
     codecLookup,
     resolveFieldTypeParams,
-    resolveEnumValues,
+    resolveFieldTypeOverride,
   );
+
+  const extraTypeExports = emitter.getExtraTypeExports?.(contract);
 
   const contractWrapper = emitter.getContractWrapper('ContractBase', 'TypeMaps');
 
@@ -192,7 +193,7 @@ ${familyTypeAliases}
 ${valueObjectTypeAliases}
 export type FieldOutputTypes = ${fieldTypesMaps.output};
 export type FieldInputTypes = ${fieldTypesMaps.input};
-export type TypeMaps = ${typeMapsExpr};
+${extraTypeExports ? `${extraTypeExports}\n` : ''}export type TypeMaps = ${typeMapsExpr};
 
 type ContractBase = Omit<
   ContractType<${storageType}>,

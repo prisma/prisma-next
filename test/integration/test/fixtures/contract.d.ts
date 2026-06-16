@@ -60,6 +60,16 @@ export type FieldInputTypes = {
     };
   };
 };
+export type StorageColumnTypes = {
+  readonly __unbound__: {};
+  readonly public: {
+    readonly user: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly email: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/int4@1']['output'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,

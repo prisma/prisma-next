@@ -78,6 +78,25 @@ export type FieldInputTypes = {
     };
   };
 };
+export type StorageColumnTypes = {
+  readonly __unbound__: {};
+  readonly auth: {
+    readonly users: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly token: CodecTypes['pg/text@1']['output'];
+    };
+  };
+  readonly public: {
+    readonly profile: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly user_id: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly users: {
+      readonly email: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/int4@1']['output'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,

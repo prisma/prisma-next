@@ -86,7 +86,11 @@ describe('sqlEmission.resolveFieldTypeParams (integration via generateContractDt
     );
 
     expect(dts).toContain('readonly embedding: Vector<1536> | null');
-    expect(dts).not.toContain("CodecTypes['pg/vector@1']['output']");
+    // FieldOutputTypes must use the rendered Vector<1536> type, not the raw codec accessor.
+    // (StorageColumnTypes may still use the raw accessor since there is no valueSet on this column.)
+    const fieldOutputMatch = dts.match(/export type FieldOutputTypes = ({.+?});/s);
+    expect(fieldOutputMatch).not.toBeNull();
+    expect(fieldOutputMatch![0]).not.toContain("CodecTypes['pg/vector@1']['output']");
   });
 
   it('inline column typeParams continue to win over the resolver', () => {

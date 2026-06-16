@@ -84,6 +84,28 @@ export type FieldInputTypes = {
     };
   };
 };
+export type StorageColumnTypes = {
+  readonly __unbound__: {};
+  readonly public: {
+    readonly telemetry_event: {
+      readonly agent: CodecTypes['pg/text@1']['output'] | null;
+      readonly arch: CodecTypes['pg/text@1']['output'];
+      readonly command: CodecTypes['pg/text@1']['output'];
+      readonly databaseTarget: CodecTypes['pg/text@1']['output'] | null;
+      readonly extensions: CodecTypes['pg/jsonb@1']['output'];
+      readonly flags: CodecTypes['pg/jsonb@1']['output'];
+      readonly id: CodecTypes['pg/int8@1']['output'];
+      readonly ingestedAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly installationId: CodecTypes['pg/text@1']['output'];
+      readonly os: CodecTypes['pg/text@1']['output'];
+      readonly packageManager: CodecTypes['pg/text@1']['output'] | null;
+      readonly runtimeName: CodecTypes['pg/text@1']['output'];
+      readonly runtimeVersion: CodecTypes['pg/text@1']['output'];
+      readonly tsVersion: CodecTypes['pg/text@1']['output'] | null;
+      readonly version: CodecTypes['pg/text@1']['output'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,

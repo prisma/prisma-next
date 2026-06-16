@@ -108,6 +108,38 @@ export type FieldInputTypes = {
     };
   };
 };
+export type StorageColumnTypes = {
+  readonly __unbound__: {};
+  readonly public: {
+    readonly articles: {
+      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly title: CodecTypes['pg/text@1']['output'];
+    };
+    readonly comments: {
+      readonly body: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly post_id: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly posts: {
+      readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly title: CodecTypes['pg/text@1']['output'];
+      readonly user_id: CodecTypes['pg/int4@1']['output'];
+      readonly views: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly profiles: {
+      readonly bio: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly user_id: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly users: {
+      readonly email: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly invited_by_id: CodecTypes['pg/int4@1']['output'] | null;
+      readonly name: CodecTypes['pg/text@1']['output'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,

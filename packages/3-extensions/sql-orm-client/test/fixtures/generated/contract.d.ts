@@ -182,6 +182,70 @@ export type FieldInputTypes = {
     };
   };
 };
+export type StorageColumnTypes = {
+  readonly __unbound__: {};
+  readonly public: {
+    readonly articles: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly reviewer_id: CodecTypes['pg/int4@1']['output'];
+      readonly title: CodecTypes['pg/text@1']['output'];
+    };
+    readonly comments: {
+      readonly body: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly post_id: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly posts: {
+      readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly title: CodecTypes['pg/text@1']['output'];
+      readonly user_id: CodecTypes['pg/int4@1']['output'];
+      readonly views: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly profiles: {
+      readonly bio: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly user_id: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly project_links: {
+      readonly dst_id: CodecTypes['pg/int4@1']['output'];
+      readonly dst_tenant_id: CodecTypes['pg/int4@1']['output'];
+      readonly src_id: CodecTypes['pg/int4@1']['output'];
+      readonly src_tenant_id: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly projects: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly tenant_id: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly roles: {
+      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+    };
+    readonly tags: {
+      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+    };
+    readonly user_roles: {
+      readonly level: CodecTypes['pg/int4@1']['output'];
+      readonly role_id: CodecTypes['pg/text@1']['output'];
+      readonly user_id: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly user_tags: {
+      readonly created_at: CodecTypes['pg/text@1']['output'];
+      readonly note: CodecTypes['pg/text@1']['output'] | null;
+      readonly tag_id: CodecTypes['pg/text@1']['output'];
+      readonly user_id: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly users: {
+      readonly address: CodecTypes['pg/jsonb@1']['output'] | null;
+      readonly email: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly invited_by_id: CodecTypes['pg/int4@1']['output'] | null;
+      readonly name: CodecTypes['pg/text@1']['output'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,

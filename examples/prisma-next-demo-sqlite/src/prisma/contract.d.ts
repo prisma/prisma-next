@@ -61,6 +61,22 @@ export type FieldInputTypes = {
     };
   };
 };
+export type StorageColumnTypes = {
+  readonly __unbound__: {
+    readonly post: {
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
+      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly title: CodecTypes['sqlite/text@1']['output'];
+      readonly userId: CodecTypes['sql/char@1']['output'];
+    };
+    readonly user: {
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
+      readonly displayName: CodecTypes['sqlite/text@1']['output'];
+      readonly email: CodecTypes['sqlite/text@1']['output'];
+      readonly id: CodecTypes['sql/char@1']['output'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,

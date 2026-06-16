@@ -87,6 +87,26 @@ export type FieldInputTypes = {
     };
   };
 };
+export type StorageColumnTypes = {
+  readonly __unbound__: {};
+  readonly public: {
+    readonly cafe: {
+      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly location: CodecTypes['pg/geometry@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+    };
+    readonly neighborhood: {
+      readonly boundary: CodecTypes['pg/geometry@1']['output'];
+      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+    };
+    readonly route: {
+      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly path: CodecTypes['pg/geometry@1']['output'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
