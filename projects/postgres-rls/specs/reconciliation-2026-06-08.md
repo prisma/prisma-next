@@ -1,6 +1,8 @@
 # postgres-rls spec reconciliation — 2026-06-08
 
-Provenance note for the spec/plan rewrite. Captures where the weeks-old spec diverges
+> **Superseded (2026-06-16).** Several items below describe the pre-rebase model that was replaced on the branch. Preserved for historical provenance. The authoritative design is in `spec.md`, `plan.md`, and the slice specs. Do not rely on §§ D1 (StorageTable.rls), §§ Architectural placement corrections (the `rls?` field), or § Two open design decisions (D1/D2/D3 — all settled). Delete on project close-out.
+
+Provenance note for the spec/plan rewrite. Captures where the weeks-old spec diverged
 from the **actual landed code** of its now-merged dependencies. Produced by three
 parallel code investigations against the worktree. Delete on project close-out.
 
@@ -31,12 +33,15 @@ exists at `packages/3-extensions/supabase/test/supabase-bootstrap.ts` but delibe
 
 ## Architectural placement corrections
 
+> **Partially superseded.** The `StorageTable.rls` bullet below was removed in the shipped model. See note at top.
+
 - **`PostgresRlsPolicy` / `PostgresRole` attach to `PostgresSchema.entries`** (new slots, following the
   `PostgresEnumType` precedent in `entries.type`), **NOT to a table class**. Register via
   `postgresAuthoringEntityTypes` (`entityTypes` contribution) — same precedent as `enum`.
-  See `packages/3-targets/3-targets/postgres/src/core/authoring.ts`.
-- **`StorageTable` gains `rls: 'auto'|'enabled'|'disabled'`**; policies live at schema level, cross-referenced
-  to tables by name. (`StorageTable` already carries `control?: ControlPolicy`.)
+  See `packages/3-targets/3-targets/postgres/src/core/authoring.ts`. Entity kind key is `policy` (not `rlsPolicy`).
+- ~~**`StorageTable` gains `rls: 'auto'|'enabled'|'disabled'`**~~ — **Removed in shipped model.** RLS-enabled
+  state is *derived* (planner emits `ENABLE ROW LEVEL SECURITY` when a table has ≥1 declared policy); no `rls`
+  field on `StorageTable`.
 - **Serializer**: extend `PostgresContractSerializer.serializePostgresNamespace()` + `hydrateSqlNamespaceEntry()`
   (`packages/3-targets/3-targets/postgres/src/core/postgres-contract-serializer.ts`).
 - **Verifier seam**: `PostgresSchemaVerifier.verifyTargetExtensions()` is a stub returning `[]` — the exact seam
@@ -48,51 +53,37 @@ exists at `packages/3-extensions/supabase/test/supabase-bootstrap.ts` but delibe
 
 ## Control-policy dispatch — more nuanced than the spec's prose
 
-Real shape is **two layers**:
-1. `classifySqlVerifierIssueKind(kind) → VerifierIssueCategory` (SQL family) —
-   `packages/2-sql/9-family/src/core/schema-verify/verifier-disposition.ts`.
-2. `dispositionForCategory(controlPolicy, category) → 'fail'|'warn'|'suppress'` (framework) —
-   `packages/1-framework/1-core/framework-components/src/control/verifier-disposition.ts`.
+> **Superseded.** The shipped model uses `SchemaDiffIssue {coordinate, outcome}` (generic differ, no framework RLS
+> issue kinds). The old `SchemaIssue` widening approach below was rejected. The control-policy severity
+> integration for RLS drift is slice 2 work. See `spec.md § D5` and `plan.md § Slice 2`.
 
-New issue kinds must be categorized: `missing_rls_policy → declaredMissing`, `extra_rls_policy → extraAuxiliary`,
-`missing_role → declaredMissing`. Emit via `emitIssueUnderControlPolicy(...)` / `emitIssueAndNodeUnderControlPolicy(...)`.
+~~Real shape is **two layers**:~~
+~~1. `classifySqlVerifierIssueKind(kind) → VerifierIssueCategory`~~
+~~2. `dispositionForCategory(controlPolicy, category) → 'fail'|'warn'|'suppress'`~~
 
-**Correction to spec prose:** outcomes are `fail|warn|suppress` (not `error`). Under `external`, **declaredMissing still
-FAILS** — `external` only suppresses *extras*. So a declared role with `control:'external'` absent from `pg_roles`
-**does** surface (AC9 holds), but the spec sentence "external ignores both [missing and extra]" is wrong. `observed → warn`,
-not silent.
+~~New issue kinds must be categorized: `missing_rls_policy → declaredMissing`, `extra_rls_policy → extraAuxiliary`,
+`missing_role → declaredMissing`. Emit via `emitIssueUnderControlPolicy(...)`~~
 
-**Planner:** control gating is a **pre-filter** (`partitionIssuesByControlPolicy`, called in `planner.ts` before
-`planIssues`), not a planner-internal switch. Hook new RLS issue kinds into `resolvePostgresIssueControlPolicySubject`
-(+ `POSTGRES_ISSUE_CREATION_FACTORY` for the creation-flavored `missing_role`) in
-`packages/3-targets/3-targets/postgres/src/core/migrations/control-policy.ts`.
+~~**Correction to spec prose:** outcomes are `fail|warn|suppress` (not `error`). Under `external`, **declaredMissing still
+FAILS**~~
+
+~~**Planner:** control gating is a **pre-filter** (`partitionIssuesByControlPolicy`)~~
 
 ## Two open design decisions the rewrite must settle
 
-### D1 — `SchemaIssue` widening (was assumed "free" target-side; it is NOT)
-`SchemaIssue` is a **closed discriminated union in the framework package** (`control-result-types.ts`). There is no
-target-side widening mechanism — TML-2459 explicitly deferred it (comment in `schema-verifier.ts`). Options:
-- **(a)** Add `rls_policy_renamed | rls_policy_tampered | rls_not_enabled` to the framework union (small framework touch;
-  follows the existing `EnumValuesChangedIssue` precedent).
-- **(b)** Define a Postgres-local `PostgresSchemaIssue = SchemaIssue | RlsIssue` for the verifier and only fold
-  framework-typed issues back into the shared pipeline.
-Lean: (a) — matches the `EnumValuesChangedIssue` precedent and avoids a parallel issue type. Confirm during specify.
+> **Superseded.** All three decisions below were settled. See `spec.md § D3/D5` and `plan.md § Architecture decisions`.
 
-### D2 — PSL keyword shape (spec contradicts the landed substrate)
-Spec wants a single `policy <name> { operation = select|insert|... }` block. The landed target-contributed-psl-blocks
-substrate **deliberately rejects** conditional-parameter blocks in favor of **per-operation keywords**
-(`policy_select`, `policy_insert`, `policy_update`, `policy_delete`, `policy_all`), each with a fixed unconditional
-parameter set (fixture: `declarative-policy-select-extension.ts`). The substrate's declarative SPI only supports
-`ref|value|option|list` params — no conditional bodies.
-Lean: **adopt per-operation keywords** to align with the substrate (the design already landed). The rewrite should
-update the PSL grammar accordingly and note the TS `.rls([{ operation }])` array surface stays as-is (TS is unconstrained).
+### D1 — `SchemaIssue` widening (**settled: rejected**)
 
-### D3 — `.rls()` method gating (pack-aware *presence*, which doesn't exist yet)
-`PackAwareSqlConstraints<IndexTypes>` gates index **option shapes** inside `.sql()`, NOT method *presence*. Making
-`.rls()` visible only under Postgres needs a capability-set type param on `ContractModelBuilder`. `ExtractPackCapabilities`
-type machinery exists in `contract-types.ts` but is **not wired** to method visibility. Options: build the capability-gating
-mechanism (larger), or expose `.rls()` always and make it a lowering error off-Postgres (smaller, matches the
-"explicit-opt-in-over-diagnostics" posture loosely). Decide during specify/plan.
+Widening the framework `SchemaIssue` union is the layering violation. Shipped model: generic `SchemaDiffIssue {coordinate, outcome}` — the framework enumerates nothing. See `spec.md § D5 Alternatives`.
+
+### D2 — PSL keyword shape (**settled: per-operation keywords adopted**)
+
+`policy_select`, `policy_insert`, `policy_update`, `policy_delete`, `policy_all`. See `spec.md § D3`.
+
+### D3 — `.rls()` method gating (**settled: top-level helper, not builder method**)
+
+`policySelect(model, { … })` top-level helper (Postgres-contributed via `entityTypes`), not a chained builder method. See `spec.md § D3`.
 
 ## Usable substrate (build directly on these)
 1. Declarative PSL-block SPI (`AuthoringPslBlockDescriptor`, `ref/value/option/list` params, generic parser/printer,

@@ -19,7 +19,7 @@ Two new IR node kinds, registered as Postgres **entity kinds** via `postgresAuth
 ```ts
 // packages/3-targets/3-targets/postgres/src/core/ — Postgres-target-only IR.
 
-class PostgresRlsPolicy {            // stored at entries['rlsPolicy'][name]
+class PostgresRlsPolicy {            // stored at entries['policy'][name]
   kind: 'postgres-rls-policy';
   name: string;          // FULL wire name: `${prefix}_${hash}` (see D2)
   prefix: string;        // what the user typed (the human-readable identity)
@@ -116,7 +116,7 @@ The verifier does **not** enumerate RLS issue kinds anywhere in the framework or
 - **Generic diff.** A framework differ walks the two trees, aligning nodes by `identity()` and comparing matched pairs by `isEqualTo(other)` — both virtual methods on the IR node hierarchy. It emits only `{ coordinate, outcome: missing | extra | mismatch, expected?, actual? }`. There is **no `kind` vocabulary**; the framework references nothing about RLS.
 - **Per-node planning.** Each node type defines `create / delete / update(from,to) → OpFactoryCall[]` (ADR 195) — methods on target-only nodes (policy/role); target-contributed strategies for family-shared nodes (SQLite/Postgres DDL diverge). `missing → create`, `extra → delete`, `mismatch → update`/drop+create. Coarse-bucket ordering sequences roles → tables → policies + `ENABLE ROW LEVEL SECURITY`.
 
-RLS is the clean consumer: a policy's `identity()` *is* its content-addressed wire name (D2), so identity already settles equality; introspection recomputes the hash, so **rename** (matching hash, different prefix → `ALTER POLICY … RENAME TO`) and **tamper** (recomputed hash ≠ the suffix → drop+create) both fall out of the generic extra/missing diff — no dedicated issue kinds. The table RLS-enabled state and a missing role (`pg_roles` existence) are ordinary `mismatch`/`missing` outcomes. Severity for the control-policy-governed outcomes flows through the **landed** `ControlPolicy` disposition (`dispositionForCategory`), reused, not reinvented.
+RLS is the clean consumer: a policy's `identity()` *is* its content-addressed wire name (D2), so identity already settles equality. Introspection reads `pg_policies.policyname` verbatim (the catalog name is the wire name; Postgres never rewrites it). A separate tamper-check step recomputes the hash from the introspected body and compares it to the suffix, so **rename** (matching hash, different prefix → `ALTER POLICY … RENAME TO`) and **tamper** (recomputed hash ≠ the suffix → drop+create) both fall out of the generic extra/missing diff — no dedicated issue kinds. The table RLS-enabled state and a missing role (`pg_roles` existence) are ordinary `mismatch`/`missing` outcomes. Severity for the control-policy-governed outcomes flows through the **landed** `ControlPolicy` disposition (`dispositionForCategory`), reused, not reinvented.
 
 The generic differ ships scoped to the **top-level-entity layer** RLS needs; porting the relational kinds onto it is a separate project (`plan.md` follow-on A). Until then the legacy per-kind verifier runs **side-by-side**, untouched; the new path emits only `{coordinate, outcome}` into its own channel and never produces a framework `SchemaIssue`. Design detail: `plan.md § Architecture decisions`.
 

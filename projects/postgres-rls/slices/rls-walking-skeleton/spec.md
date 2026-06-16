@@ -53,9 +53,9 @@ The line numbers below are from research on 2026-06-09 and may drift — confirm
 ## 5. Settled decisions (do not relitigate; rationale in the design record)
 
 - **Reuse `PostgresRlsPolicy` / `PostgresRole` as the canonical diff nodes.** Do **not** create a parallel SchemaIR policy/role hierarchy. The contract IR classes *are* the canonical nodes; introspection builds the same classes; the differ compares them. (For RLS, "derive contract → SchemaIR" is identity — the policy IR is already canonical.)
-- **Reuse the framework `EntityCoordinate`** (`framework-components/src/ir/storage.ts`: `{plane, namespaceId, entityKind, entityName}`) as the diff coordinate. For a policy: `entityKind: 'rlsPolicy'`, `entityName:` the full wire name. For a role: `entityKind: 'role'`, `entityName:` the role name. No new coordinate type (nested coordinates are the relational-port project's concern).
+- **Reuse the framework `EntityCoordinate`** (`framework-components/src/ir/storage.ts`: `{plane, namespaceId, entityKind, entityName}`) as the diff coordinate. For a policy: `entityKind: 'policy'`, `entityName:` the full wire name. For a role: `entityKind: 'role'`, `entityName:` the role name. No new coordinate type (nested coordinates are the relational-port project's concern).
 - **Identity = wire name for policies** (the content hash encodes the body), **= name for roles**. So `isEqualTo` for a policy is wire-name equality; for a role, name equality.
-- **Introspection recomputes the wire name** from the introspected body via the existing `computeContentHash`/`normalizePredicate` (`postgres/src/core/rls/canonicalize.ts`). So a reformatted-but-equivalent body recomputes to the same name (no false drift); this slice only needs `missing` + clean, but build introspection to recompute (don't trust the catalog name blindly).
+- **Introspection reads `pg_policies.policyname` verbatim** as the node name — it does not recompute the wire name from the database body. Postgres never rewrites the catalog name, so the verbatim catalog name is the wire name that was authored. The clean re-diff holds because name-equality on an immutable name is sufficient.
 - **Enable-RLS is derived:** when the differ reports a `missing` policy on a table whose introspected `relrowsecurity` is false, the planner emits `EnableRowLevelSecurityCall` for that table in addition to `CreatePostgresRlsPolicyCall`. No `StorageTable.rls` field.
 
 ## 6. Build — components (each: files · change · done-check)
@@ -83,9 +83,9 @@ Delete or relocate exactly these (confirm each by grep; the line numbers are fro
 - `packages/2-sql/1-core/contract/src/validators.ts` — remove `'rls?'` from `StorageTableSchema` (~223).
 
 **Relocate (Postgres entity validators currently in SQL core → Postgres target):**
-- Move `PostgresRoleSchema` (~229-233) and `PostgresRlsPolicySchema` (~239-249) out of `packages/2-sql/1-core/contract/src/validators.ts` into the Postgres target, contributed via the existing `entityTypes` `validatorSchema` fragment channel in `packages/3-targets/3-targets/postgres/src/core/authoring.ts` (the `role`/`rlsPolicy` entries at ~59-74 already exist; attach the schemas there). Remove the hardcoded `role?`/`rlsPolicy?` fallback wiring in `createNamespaceEntrySchema` (`validators.ts:348-349`) — the fragment channel supplies them.
+- Move `PostgresRoleSchema` (~229-233) and `PostgresRlsPolicySchema` (~239-249) out of `packages/2-sql/1-core/contract/src/validators.ts` into the Postgres target, contributed via the existing `entityTypes` `validatorSchema` fragment channel in `packages/3-targets/3-targets/postgres/src/core/authoring.ts` (the `role`/`policy` entries at ~86-116 already exist; attach the schemas there). Remove the hardcoded `role?`/`rlsPolicy?` fallback wiring in `createNamespaceEntrySchema` (`validators.ts:348-349`) — the fragment channel supplies them.
 
-**Keep (these are correctly target-owned — do not touch):** `PostgresRlsPolicy`, `PostgresRole`, their `entityTypes` registration, `PostgresSchema.entries.role/rlsPolicy`, the serializer slots, `canonicalize.ts`.
+**Keep (these are correctly target-owned — do not touch):** `PostgresRlsPolicy`, `PostgresRole`, their `entityTypes` registration, `PostgresSchema.entries.role/policy`, the serializer slots, `canonicalize.ts`.
 
 **Done-check:** `pnpm typecheck` workspace-green after a build; `pnpm lint:deps` clean; `grep` for `rls`/`RlsMode`/`rls_policy_` over `packages/1-framework` and `packages/2-sql` returns nothing (except the generic differ added in B). The existing foundation tests for the IR classes + serializer still pass.
 
@@ -124,7 +124,7 @@ export function diffNodes(
 ### C. `PostgresRlsPolicy` / `PostgresRole` implement `DiffableNode`
 
 `packages/3-targets/3-targets/postgres/src/core/postgres-rls-policy.ts` and `postgres-role.ts`: implement the framework `DiffableNode` interface.
-- `PostgresRlsPolicy.identity()` → `{ plane: 'storage', namespaceId, entityKind: 'rlsPolicy', entityName: this.name }` (the full wire name).
+- `PostgresRlsPolicy.identity()` → `{ plane: 'storage', namespaceId, entityKind: 'policy', entityName: this.name }` (the full wire name).
 - `PostgresRlsPolicy.isEqualTo(other)` → narrow `other` to `PostgresRlsPolicy` (assert kind), return `this.name === other.name` (wire name encodes the body — content-addressed equality).
 - `PostgresRole.identity()` → `{ …, entityKind: 'role', entityName: this.name }`; `isEqualTo` → `this.name === other.name`.
 
@@ -135,17 +135,17 @@ export function diffNodes(
 ### D. RLS introspection (Postgres adapter)
 
 `packages/3-targets/3-targets/postgres/src/core/control-adapter.ts` — extend `introspectSchema` (~660) with three `driver.query` calls (mirror the existing `information_schema`/`pg_catalog` query pattern at ~665-891):
-- `pg_policies` (schemaname, tablename, policyname, cmd, roles, qual, with_check, permissive) → build `PostgresRlsPolicy` instances. **Recompute** the wire name: normalize `qual`/`with_check` via `normalizePredicate` and `computeContentHash` (`postgres/src/core/rls/canonicalize.ts`); the `prefix` is the catalog `policyname` minus its `_<8hex>` suffix (or store the catalog name as `name` and `prefix` as catalog-name-without-suffix — confirm with the content-hash ADR). For the skeleton, map `cmd` → `operation`, `roles` → sorted role names, `permissive` → boolean.
+- `pg_policies` (schemaname, tablename, policyname, cmd, roles, qual, with_check, permissive) → build `PostgresRlsPolicy` instances. Set `name = row.policyname` verbatim — do **not** recompute the hash from the database body. Postgres never rewrites the catalog policy name, so the catalog name is the wire name authored during `create policy`. Extract the `prefix` by stripping the `_<8hex>` suffix from the catalog name (regex `^(.+)_([0-9a-f]{8})$`). Map `cmd` → `operation`, `roles` → sorted role names, `permissive` → boolean.
 - `pg_roles` (rolname) → `PostgresRole` instances (filter to non-system roles; confirm a sane filter — e.g. exclude `pg_*` and the bootstrap superuser).
 - `pg_class.relrowsecurity` joined to the schema's tables → a per-table `boolean` "RLS enabled" map.
 
 Stash these on the introspection output. Since `SqlSchemaIR` has **no** policy/role slots, follow the existing `annotations.pg` pattern (how `storageTypes` is stashed at ~1103-1112) — add `annotations.pg.rlsPolicies`, `annotations.pg.roles`, `annotations.pg.rlsEnabledByTable`. **Do not** add policy/role slots to the family-shared `SqlSchemaIR`.
 
-**Done-check:** an integration test (PGlite) that `CREATE POLICY`s a row manually, then `introspect()`, finds the policy as a `PostgresRlsPolicy` with a recomputed wire name matching what the contract would produce for the same body.
+**Done-check:** an integration test (PGlite) that `CREATE POLICY`s a row manually using a content-hash name, then `introspect()`, finds the policy as a `PostgresRlsPolicy` with `name` equal to the verbatim catalog name.
 
 ### E. Contract → expected RLS nodes (derivation)
 
-For RLS the derivation is trivial: the contract's `PostgresSchema.entries.rlsPolicy` / `entries.role` values **are** the expected `PostgresRlsPolicy` / `PostgresRole` nodes. Add a small Postgres-side helper that reads them off the contract for a namespace (mirror how the serializer reads `entries` at `postgres-contract-serializer.ts:121-146`). No new node type.
+For RLS the derivation is trivial: the contract's `PostgresSchema.entries.policy` / `entries.role` values **are** the expected `PostgresRlsPolicy` / `PostgresRole` nodes. Add a small Postgres-side helper that reads them off the contract for a namespace (mirror how the serializer reads `entries` at `postgres-contract-serializer.ts:121-146`). No new node type.
 
 **Done-check:** covered by the verify/plan tests in H/I.
 
@@ -165,7 +165,7 @@ Planner wiring — `packages/3-targets/3-targets/postgres/src/core/migrations/is
 
 `packages/3-targets/3-targets/postgres/src/core/authoring.ts` — add a `pslBlockDescriptors.policy_select` contribution (the Postgres pack has **none** today). Mirror the landed fixture `packages/1-framework/2-authoring/psl-printer/test/fixtures/declarative-policy-select-extension.ts` (~157-187): `keyword: 'policy_select'`, `discriminator: 'postgres-rls-policy'`, `name.required: true`, parameters `target: {kind:'ref', refKind:'model', scope:'same-namespace', required:true}`, `roles: {kind:'list', of:{kind:'ref', refKind:'role', scope:'cross-space'}}` (**mirror the fixture, which uses `cross-space`** — corrected 2026-06-09 after D4 review; my earlier `same-namespace` was wrong: roles are *entity types*, not PSL blocks, so `entries['role']` is empty in a parsed doc and a `same-namespace` role ref spuriously fails. `cross-space` here rides the substrate's deferred **no-op pass-through**, so the role name flows through **unvalidated** for now; real role-ref resolution is slice 4), `using: {kind:'value', codecId:'pg/text@1', required:true}`. Wire the descriptor so the block lowers to a `PostgresRlsPolicy` with `operation: 'select'`, `permissive: true`, the content-hash wire `name` computed from the body (reuse `computeContentHash`). Confirm descriptors are collected via `descriptor.authoring.pslBlockDescriptors` (control-stack.ts ~188-205).
 
-**Done-check:** a parse→lower test: a PSL `policy_select` block produces a `PostgresRlsPolicy` in `entries.rlsPolicy` with the expected wire name + fields. Round-trips through the serializer (foundation already supports this).
+**Done-check:** a parse→lower test: a PSL `policy_select` block produces a `PostgresRlsPolicy` in `entries.policy` with the expected wire name + fields. Round-trips through the serializer (foundation already supports this).
 
 ### H. Verify wiring (the new channel, side-by-side)
 
@@ -193,7 +193,7 @@ New test under `packages/3-targets/6-adapters/postgres/test/migrations/` (mirror
 - [ ] **AC1 — leaks gone.** No `rls`/`RlsMode`/`rls_policy_*`/Postgres-validator reference in `packages/1-framework/**` or `packages/2-sql/**` (except the generic `SchemaDiffIssue`/`DiffableNode`/`diffNodes`). `pnpm lint:deps` clean; workspace `pnpm typecheck` green post-build.
 - [ ] **AC2 — generic differ.** `diffNodes` + `SchemaDiffIssue` + `DiffableNode` exist in the framework, RLS-agnostic, unit-tested for missing/extra/mismatch/clean.
 - [ ] **AC3 — PSL authoring.** A `policy_select` block lowers to a `PostgresRlsPolicy` with the content-hash wire name and round-trips through the serializer.
-- [ ] **AC4 — introspection.** `introspect()` reads `pg_policies`/`pg_roles`/`relrowsecurity` into `PostgresRlsPolicy`/`PostgresRole` (recomputed wire names) under `annotations.pg`; family `SqlSchemaIR` unchanged.
+- [ ] **AC4 — introspection.** `introspect()` reads `pg_policies`/`pg_roles`/`relrowsecurity` into `PostgresRlsPolicy`/`PostgresRole` (verbatim catalog names, no recompute) under `annotations.pg`; family `SqlSchemaIR` unchanged.
 - [ ] **AC5 — plan.** `plan()` emits `CREATE TABLE` + `ENABLE ROW LEVEL SECURITY` + `CREATE POLICY` for a contract with one table + one policy against an empty schema; RLS calls do not go through `mapIssueToCall`.
 - [ ] **AC6 — walking skeleton (the spine).** The §6-I PGlite test passes: author → plan → apply → `SET ROLE` → **only the owner's row returns** → re-verify clean (`extensionIssues` empty).
 - [ ] **AC7 — side-by-side / no re-emission.** The new path emits `SchemaDiffIssue` + new `OpFactoryCall`s only; the legacy relational verifier/planner is unmodified (beyond §6-A guard deletions); SQLite + Mongo suites green; `pnpm fixtures:check` clean.
@@ -210,7 +210,7 @@ New test under `packages/3-targets/6-adapters/postgres/test/migrations/` (mirror
 
 | Edge case | Disposition |
 | --- | --- |
-| Postgres reprints the policy body on store, so the introspected `qual` differs textually from the authored body | Handled by recomputing the wire name from the normalized introspected body (the content-addressing trick). This slice only needs `missing`→create + clean re-diff, but introspection **must** recompute (not trust the catalog name) so the clean re-diff actually holds. |
+| Postgres reprints the policy body on store, so the introspected `qual` differs textually from the authored body | Not a problem. Introspection reads `policyname` verbatim — the catalog name is the wire name, and Postgres never rewrites it even when it reprints the body. The clean re-diff rests on name-equality, not body-equality, so body reprinting cannot produce false drift. |
 | `app_user` role absent from `pg_roles` | Out of scope (that's slice 3's `missing_role`). The test **pre-creates** the role so it exists. |
 | Table already has RLS enabled | `enableRowLevelSecurity` precheck should no-op / be idempotent; for the greenfield skeleton the table starts with RLS off, so `ENABLE` always fires. |
 | Two policies with the same body, different prefix | Not exercised here (that's rename, slice 3). One policy only. |

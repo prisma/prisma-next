@@ -60,6 +60,19 @@ A developer can author the same policies in **TypeScript** instead of PSL, with 
 - **TS/PSL parity test:** the same policies authored both ways lower to structurally identical IR with identical wire names.
 - **DoD (operator-observable):** the slice-1 example-app scenario authored in TS instead of PSL behaves identically (filtered rows, lifecycle, drift→verify-fails); the parity test pins identical contracts.
 
+## Management model — locked decision (2026-06-16)
+
+**Default is exclusive management at the table level.**
+
+A table is either `managed` (the contract owns its full policy set) or `external` (the contract does not touch it). There is no per-policy granularity — no "is this policy ours?" flag on individual policies.
+
+Consequences:
+- A policy present in the DB but absent from the contract on a **managed** table is `extra` → dropped on migrate.
+- A policy on an **external** table is never reconciled — the differ skips it entirely; no `extra` issued.
+- The `external` vs `managed` distinction is table-level authoring (on `StorageTable`'s Postgres-target annotation, not on `StorageTable` itself — no SQL-family leak).
+
+The slice-4 resolution: when introspecting for the differ, only collect policies for tables that are `managed`; for `external` tables, the introspected policy set is treated as empty (nothing to diff against). This avoids needing per-policy provenance metadata or a `prismaManaged` flag on the catalog row.
+
 ## Not in this project's plan-of-record (operator cut, 2026-06-10)
 
 - **Cross-space role-ref *validation* / role authoring** — roles are external (platform-provided; shim-seeded in tests); policies reference them by name. The substrate's cross-space pass-through stands; real role-ref validation arrives with slice 2's role traversal only to the extent of "referenced role exists in the DB," not authoring-time cross-space resolution.
