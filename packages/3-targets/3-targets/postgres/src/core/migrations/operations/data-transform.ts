@@ -113,12 +113,10 @@ export async function dataTransform<TContract extends Contract<SqlStorage>>(
     runClosures.map((closure) => invokeAndLower(closure, contract, adapter, name)),
   );
 
-  // Sanctioned user-SQL-adjacent remnant: `checkPlan.sql` is the user's check
-  // query, already lowered to text by the adapter above. The EXISTS wrapper
-  // can't be typed via `cfExpr.exists()` (which takes a pre-lowering
-  // `CfExprSelectQuery`, not a lowered SQL string) without a new
-  // raw-subquery-as-EXISTS-source builder primitive. Typing the wrapper is
-  // scoped separately; see TML-2919 spike verdict.
+  // The wrapper stays as raw SQL: by this point `checkPlan.sql` is already a
+  // lowered SQL string, and the typed `EXISTS` builder only accepts a
+  // pre-lowering query node. Typing the wrapper would need new AST substrate
+  // (raw-subquery-as-EXISTS-source); tracked separately.
   const precheck: readonly SqlMigrationPlanOperationStep[] = checkPlan
     ? [
         {
