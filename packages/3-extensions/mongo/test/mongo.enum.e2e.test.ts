@@ -77,27 +77,16 @@ const codecLookup: CodecLookup = {
 // Derive the $jsonSchema validator from the contract via the production deriver.
 // This ensures a regression in deriveJsonSchema (e.g. placing enum outside items
 // for array fields) breaks this test — not just the unit tests in derive-json-schema.test.ts.
-//
-// The namespace type omits the `enum` slot because enumAccessors carries the
-// literal-typed accessors for the TS-DSL path. The builder does set it at runtime,
-// so we read it via a cast here.
 const ns = contract.domain.namespaces[UNBOUND_NAMESPACE_ID];
 const accountFields = ns?.models['Account']?.fields ?? {};
-type RuntimeNs = {
-  readonly enum?: Record<
-    string,
-    { codecId: string; members: readonly { name: string; value: unknown }[] }
-  >;
-};
-const contractEnums = blindCast<RuntimeNs, 'enum is set at runtime by the builder'>(ns).enum;
 const ACCOUNT_VALIDATOR = deriveJsonSchema(
   accountFields,
   undefined,
   codecLookup,
   blindCast<
     Record<string, import('@prisma-next/contract/types').ContractEnum>,
-    'enum member values are JsonValue-compatible at runtime'
-  >(contractEnums),
+    'enum member values are JsonValue-compatible at runtime; namespace enum? slot types values as a union not JsonValue'
+  >(ns?.enum),
 );
 
 // ---------------------------------------------------------------------------
@@ -288,17 +277,24 @@ describe('mongo enum — end-to-end (replica set)', {
       expectTypeOf<RoleKind>().toEqualTypeOf<'scalar'>();
     });
 
-    it('precomputed FieldOutputTypes is reachable on the contract type (parity)', () => {
-      // D8: the TS-DSL builder attaches a precomputed FieldOutputTypes map to
-      // the contract type, mirroring the emitter's namespace-nested shape. The
-      // 5 type tests in mongo-contract/test/contract-types.test-d.ts prove the
-      // enum-narrowing behaviour on a concrete contract type with literal
-      // model keys; here we just verify the utility is exported and reachable
-      // on a built contract (the extension's defineContract overloads widen
-      // the input slightly, so the precise per-model narrowing is exercised
-      // by the test-d fixtures rather than this end-to-end harness).
-      const _probe: ExtractMongoFieldOutputTypes<typeof contract> | undefined = undefined;
-      expect(_probe).toBeUndefined();
+    it('precomputed FieldOutputTypes is reachable on the built contract type (D8)', () => {
+      // D8 attaches FieldOutputTypesFromDefinition to MongoContractResult. The
+      // per-model narrowing through this utility is exercised by the hand-built
+      // ContractWithEnum fixture in mongo-contract/test/contract-types.test-d.ts
+      // (which includes the manyNullableRoles case that F11's precedence fix
+      // ensures resolves to Base[] | null, not (Base | null)[]).
+      type _Probe = ExtractMongoFieldOutputTypes<typeof contract>;
+      expectTypeOf<_Probe>().not.toBeNever();
+    });
+
+    it('namespace enum slot is typed on TS-DSL contract (no cast needed, F14)', () => {
+      // F14: MongoDomainNamespaceFromDefinition now carries enum?, so the
+      // namespace enum entries are accessible without a RuntimeNs cast.
+      // The members tuple preserves the literal value union via EnumTypeHandle.
+      type Ns = (typeof contract)['domain']['namespaces']['__unbound__'];
+      type RoleEntry = NonNullable<Ns['enum']>['Role'];
+      type MemberValue = RoleEntry['members'][number]['value'];
+      expectTypeOf<MemberValue>().toEqualTypeOf<'user' | 'admin'>();
     });
   });
 });
