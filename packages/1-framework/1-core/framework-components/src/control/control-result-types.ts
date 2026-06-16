@@ -63,7 +63,9 @@ export interface BaseSchemaIssue {
     | 'extra_default'
     | 'check_missing'
     | 'check_removed'
-    | 'check_mismatch';
+    | 'check_mismatch'
+    | 'missing_rls_policy'
+    | 'extra_rls_policy';
   readonly table?: string;
   /**
    * Namespace coordinate of the issue's subject (e.g. the schema a SQL
