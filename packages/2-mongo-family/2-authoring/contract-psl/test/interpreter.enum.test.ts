@@ -1,13 +1,10 @@
-import type { JsonValue } from '@prisma-next/contract/types';
-import type {
-  AuthoringEntityContext,
-  AuthoringEntityTypeNamespace,
-} from '@prisma-next/framework-components/authoring';
+import {
+  mongoFamilyEntityTypes,
+  mongoFamilyPslBlockDescriptors,
+} from '@prisma-next/family-mongo/pack';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { PslExtensionBlock } from '@prisma-next/psl-parser';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToMongoContractInput,
@@ -15,102 +12,14 @@ import {
 } from '../src/interpreter';
 
 // ---------------------------------------------------------------------------
-// Minimal enum entity factory — mirrors mongoFamilyEnumEntityDescriptor
+// Authoring contributions — use the production mongo family descriptors
 // ---------------------------------------------------------------------------
 
-function parseQuotedString(raw: string): string | undefined {
-  if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) return raw.slice(1, -1);
-  return undefined;
-}
-
-function testEnumFactory(block: PslExtensionBlock, ctx: AuthoringEntityContext) {
-  const sourceId = ctx.sourceId ?? 'unknown';
-  const diagnostics = ctx.diagnostics;
-
-  const typeAttr = block.blockAttributes.find((a) => a.name === 'type');
-  if (!typeAttr) {
-    diagnostics?.push({
-      code: 'PSL_ENUM_MISSING_TYPE',
-      message: `enum "${block.name}" is missing a @@type("codecId") attribute`,
-      sourceId,
-      span: block.span,
-    });
-    return undefined;
-  }
-
-  const rawCodecArg = typeAttr.args[0]?.value;
-  const codecId = rawCodecArg !== undefined ? parseQuotedString(rawCodecArg) : undefined;
-  if (!codecId) {
-    diagnostics?.push({
-      code: 'PSL_ENUM_MISSING_TYPE',
-      message: `enum "${block.name}" @@type attribute must have a quoted codec id argument`,
-      sourceId,
-      span: typeAttr.span,
-    });
-    return undefined;
-  }
-
-  const nativeType = ctx.codecLookup?.targetTypesFor(codecId)?.[0];
-  if (nativeType === undefined) {
-    diagnostics?.push({
-      code: 'PSL_EXTENSION_INVALID_VALUE',
-      message: `enum "${block.name}" @@type references unknown codec "${codecId}"`,
-      sourceId,
-      span: typeAttr.args[0]?.span ?? typeAttr.span,
-    });
-    return undefined;
-  }
-
-  const codec = ctx.codecLookup?.get(codecId);
-  if (codec === undefined) return undefined;
-
-  const members: { name: string; value: unknown }[] = [];
-  for (const [memberName, paramValue] of Object.entries(block.parameters)) {
-    if (paramValue.kind === 'bare') {
-      members.push({ name: memberName, value: codec.decodeJson(memberName) });
-    } else if (paramValue.kind === 'value') {
-      const jsonValue = JSON.parse(paramValue.raw) as unknown;
-      members.push({
-        name: memberName,
-        value: codec.decodeJson(
-          blindCast<JsonValue, 'JSON.parse is JsonValue-compatible'>(jsonValue),
-        ),
-      });
-    }
-  }
-
-  if (members.length === 0) return undefined;
-
-  return {
-    enumName: block.name,
-    codecId,
-    nativeType,
-    enumMembers: members.map((m) => ({ name: m.name, value: m.value as JsonValue })),
-  };
-}
-
-const testEnumEntityContributions: AuthoringEntityTypeNamespace = {
-  enum: {
-    kind: 'entity',
-    discriminator: 'enum',
-    output: { factory: testEnumFactory },
-  },
-};
-
-const enumPslBlockDescriptor = {
-  kind: 'pslBlock' as const,
-  keyword: 'enum',
-  discriminator: 'enum',
-  name: { required: true },
-  parameters: {},
-  variadicParameters: true,
-};
-
 const authoringContributions = {
-  entityTypes: testEnumEntityContributions,
+  entityTypes: mongoFamilyEntityTypes,
   field: {},
   type: {},
-  pslBlockDescriptors: { enum: enumPslBlockDescriptor },
+  pslBlockDescriptors: mongoFamilyPslBlockDescriptors,
 };
 
 const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
@@ -196,11 +105,8 @@ model Account {
 
     const ns = contract.domain.namespaces[UNBOUND_NAMESPACE_ID];
     expect(ns).toBeDefined();
-    const enumSlot = (ns as unknown as Record<string, unknown>)['enum'] as
-      | Record<string, unknown>
-      | undefined;
-    expect(enumSlot).toBeDefined();
-    expect(enumSlot?.['Role']).toEqual({
+    expect(ns?.enum).toBeDefined();
+    expect(ns?.enum?.['Role']).toEqual({
       codecId: 'mongo/string@1',
       members: [
         { name: 'User', value: 'user' },
@@ -223,10 +129,7 @@ model Account {
 `);
 
     const ns = contract.domain.namespaces[UNBOUND_NAMESPACE_ID];
-    const roleField = (ns?.models['Account'] as Record<string, unknown> | undefined)?.['fields'] as
-      | Record<string, unknown>
-      | undefined;
-    expect(roleField?.['role']).toMatchObject({
+    expect(ns?.models['Account']?.fields['role']).toMatchObject({
       valueSet: {
         plane: 'domain',
         entityKind: 'enum',
@@ -250,12 +153,9 @@ model Account {
 `);
 
     const pslNs = pslContract.domain.namespaces[UNBOUND_NAMESPACE_ID];
-    const pslEnum = (pslNs as unknown as Record<string, unknown>)['enum'] as
-      | Record<string, unknown>
-      | undefined;
 
     // D1 TS DSL produces exactly this shape:
-    expect(pslEnum?.['Role']).toEqual({
+    expect(pslNs?.enum?.['Role']).toEqual({
       codecId: 'mongo/string@1',
       members: [
         { name: 'User', value: 'user' },
@@ -264,13 +164,7 @@ model Account {
     });
 
     // D1 TS DSL stamps this exact valueSet on the field:
-    const roleField = (
-      (pslNs?.models['Account'] as Record<string, unknown> | undefined)?.['fields'] as
-        | Record<string, unknown>
-        | undefined
-    )?.['role'] as Record<string, unknown> | undefined;
-
-    expect(roleField?.['valueSet']).toEqual({
+    expect(pslNs?.models['Account']?.fields['role']?.valueSet).toEqual({
       plane: 'domain',
       entityKind: 'enum',
       namespaceId: UNBOUND_NAMESPACE_ID,
@@ -292,14 +186,9 @@ model Account {
 `);
 
     const ns = contract.domain.namespaces[UNBOUND_NAMESPACE_ID];
-    const roleField = (
-      (ns?.models['Account'] as Record<string, unknown> | undefined)?.['fields'] as
-        | Record<string, unknown>
-        | undefined
-    )?.['role'] as Record<string, unknown> | undefined;
-
-    expect(roleField?.['type']).toEqual({ kind: 'scalar', codecId: 'mongo/string@1' });
-    expect(roleField?.['nullable']).toBe(false);
+    const roleField = ns?.models['Account']?.fields['role'];
+    expect(roleField?.type).toEqual({ kind: 'scalar', codecId: 'mongo/string@1' });
+    expect(roleField?.nullable).toBe(false);
   });
 
   it('optional enum field is nullable', () => {
@@ -316,14 +205,9 @@ model Account {
 `);
 
     const ns = contract.domain.namespaces[UNBOUND_NAMESPACE_ID];
-    const roleField = (
-      (ns?.models['Account'] as Record<string, unknown> | undefined)?.['fields'] as
-        | Record<string, unknown>
-        | undefined
-    )?.['role'] as Record<string, unknown> | undefined;
-
-    expect(roleField?.['nullable']).toBe(true);
-    expect(roleField?.['valueSet']).toBeDefined();
+    const roleField = ns?.models['Account']?.fields['role'];
+    expect(roleField?.nullable).toBe(true);
+    expect(roleField?.valueSet).toBeDefined();
   });
 
   it('fails when enum is missing @@type attribute', () => {
@@ -374,12 +258,8 @@ model Account {
 `);
 
     const ns = contract.domain.namespaces[UNBOUND_NAMESPACE_ID];
-    const fields = (ns?.models['Account'] as Record<string, unknown> | undefined)?.['fields'] as
-      | Record<string, unknown>
-      | undefined;
-
-    const nameField = fields?.['name'] as Record<string, unknown> | undefined;
-    expect(nameField?.['type']).toEqual({ kind: 'scalar', codecId: 'mongo/string@1' });
-    expect(nameField?.['valueSet']).toBeUndefined();
+    const nameField = ns?.models['Account']?.fields['name'];
+    expect(nameField?.type).toEqual({ kind: 'scalar', codecId: 'mongo/string@1' });
+    expect(nameField?.valueSet).toBeUndefined();
   });
 });
