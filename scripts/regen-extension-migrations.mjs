@@ -282,6 +282,13 @@ function processExtension(extDir) {
   return 'updated';
 }
 
+// Additional extension package roots outside packages/3-extensions/ that also
+// carry on-disk migrations + head refs and need to stay consistent.
+const extraExtensionRoots = [
+  join(repoRoot, 'examples', 'multi-extension-monorepo', 'packages', 'audit'),
+  join(repoRoot, 'examples', 'multi-extension-monorepo', 'packages', 'feature-flags'),
+];
+
 function main() {
   let entries;
   try {
@@ -300,6 +307,19 @@ function main() {
       const result = processExtension(extDir);
       if (result === 'updated') {
         process.stdout.write(`regen-extension-migrations: updated ${entry.name}\n`);
+      }
+    } catch (err) {
+      process.stderr.write(`${err.message}\n`);
+      errors++;
+    }
+  }
+
+  for (const extDir of extraExtensionRoots) {
+    if (!existsSync(extDir)) continue;
+    try {
+      const result = processExtension(extDir);
+      if (result === 'updated') {
+        process.stdout.write(`regen-extension-migrations: updated ${extDir}\n`);
       }
     } catch (err) {
       process.stderr.write(`${err.message}\n`);

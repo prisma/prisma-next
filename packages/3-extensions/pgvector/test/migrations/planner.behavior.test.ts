@@ -663,7 +663,11 @@ function planAddColumn(
     buildUserTableSchemaWithoutEmail(),
     options,
   );
-  return getRequiredOperation(operationsPromise, `column.user.${columnName}`);
+  const usesAddColumnCall = columnDef.nullable || columnDef.default !== undefined;
+  const opId = usesAddColumnCall
+    ? `column.__unbound__.user.${columnName}`
+    : `column.user.${columnName}`;
+  return getRequiredOperation(operationsPromise, opId);
 }
 
 function createPlannerControlHookComponent(

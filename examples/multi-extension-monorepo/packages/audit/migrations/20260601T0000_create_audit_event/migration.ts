@@ -21,7 +21,7 @@ export default class M extends Migration {
   override describe() {
     return {
       from: null,
-      to: 'sha256:975333779a8ca7ec4dacc25cd0e6816b04896d8f5227e2c6e4921760c60ebaa1',
+      to: 'sha256:b0d547223488b4a8cea642a0bb2cc8e8f6cd9b2a6e490f23832865146ac51468',
     };
   }
 

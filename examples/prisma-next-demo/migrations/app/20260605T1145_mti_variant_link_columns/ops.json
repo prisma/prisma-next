@@ -1,6 +1,6 @@
 [
   {
-    "id": "column.bug.id",
+    "id": "column.public.bug.id",
     "label": "Add column \"id\" to \"bug\"",
     "operationClass": "additive",
     "target": {
@@ -73,7 +73,7 @@
     ]
   },
   {
-    "id": "column.feature.id",
+    "id": "column.public.feature.id",
     "label": "Add column \"id\" to \"feature\"",
     "operationClass": "additive",
     "target": {

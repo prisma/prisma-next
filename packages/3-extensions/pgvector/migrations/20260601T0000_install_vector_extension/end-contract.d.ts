@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:8ac1bfb344d599a74f9b5f6870cdddb912706594dc90228038ef218fd9a45965'>;
+  StorageHashBase<'sha256:c7bb9818eb8d86182fff73219e9c27c4f42ff7918bdcabf003324a7c6c814e20'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -42,8 +42,8 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   ? CodecTypes[CodecId]['output']
   : _Encoded;
 
-export type FieldOutputTypes = Record<string, never>;
-export type FieldInputTypes = Record<string, never>;
+export type FieldOutputTypes = { readonly public: Record<string, never> };
+export type FieldInputTypes = { readonly public: Record<string, never> };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
@@ -52,30 +52,24 @@ export type TypeMaps = TypeMapsType<
 >;
 
 type ContractBase = Omit<
-  ContractType<
-    {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'postgres-unbound-schema';
-          readonly entries: { readonly table: {}; readonly type: Record<string, never> };
-        };
-        readonly public: {
-          readonly id: 'public';
-          readonly kind: 'postgres-schema';
-          readonly entries: { readonly table: {}; readonly type: Record<string, never> };
-        };
+  ContractType<{
+    readonly namespaces: {
+      readonly public: {
+        readonly id: 'public';
+        readonly kind: 'postgres-schema';
+        readonly entries: { readonly table: {} };
       };
-      readonly types: {
-        readonly vector: {
-          readonly kind: 'codec-instance';
-          readonly codecId: 'pg/vector@1';
-          readonly nativeType: 'vector';
-          readonly typeParams: Record<string, never>;
-        };
+    };
+    readonly types: {
+      readonly vector: {
+        readonly kind: 'codec-instance';
+        readonly codecId: 'pg/vector@1';
+        readonly nativeType: 'vector';
+        readonly typeParams: Record<string, never>;
       };
-      readonly storageHash: StorageHash;
-    }>,
+    };
+    readonly storageHash: StorageHash;
+  }>,
   'roots' | 'domain'
 > & {
   readonly target: 'postgres';
@@ -109,7 +103,6 @@ type ContractBase = Omit<
 
   readonly profileHash: ProfileHash;
 };
-
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 

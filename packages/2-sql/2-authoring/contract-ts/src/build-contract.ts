@@ -744,7 +744,10 @@ export function buildSqlContractFromDefinition(
   );
   const storageWithoutHash = {
     ...(Object.keys(documentTypes).length > 0 ? { types: documentTypes } : {}),
-    namespaces: ensureUnboundNamespaceSlot(namespaces, createNamespace),
+    namespaces:
+      defaultNamespaceId === UNBOUND_NAMESPACE_ID
+        ? ensureUnboundNamespaceSlot(namespaces, createNamespace)
+        : namespaces,
   };
   const storageHash: StorageHashBase<string> = definition.storageHash
     ? coreHash(definition.storageHash)

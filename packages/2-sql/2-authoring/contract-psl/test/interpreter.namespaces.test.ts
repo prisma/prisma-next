@@ -104,6 +104,29 @@ const baseInput = {
   createNamespace: createTestNamespace,
 } as const;
 
+describe('un-namespaced PG model defaults to public namespace (TML-2916)', () => {
+  it('places a bare model in domain.namespaces.public and storage.namespaces.public, with no __unbound__ slot', () => {
+    const document = parsePslDocument({
+      schema: `model user {
+  id String @id @default(uuid())
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const { domain, storage } = result.value;
+    expect(domain.namespaces['public']).toBeDefined();
+    expect(domain.namespaces['__unbound__']).toBeUndefined();
+    expect((storage as SqlStorage).namespaces['public']).toBeDefined();
+    expect((storage as SqlStorage).namespaces['__unbound__']).toBeUndefined();
+  });
+});
+
 describe('interpretPslDocumentToSqlContract cross-namespace FK resolution', () => {
   it('lowers a qualified relation field type to a FK with target.namespaceId from the qualifier', () => {
     const document = parsePslDocument({

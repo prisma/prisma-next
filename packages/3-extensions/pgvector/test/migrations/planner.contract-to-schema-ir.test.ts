@@ -871,7 +871,7 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
     )) as SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
     const opIds = ops.map((op) => op.id);
 
-    expect(opIds).toEqual(['column.user.name']);
+    expect(opIds).toEqual(['column.__unbound__.user.name']);
     expect(opIds.filter((id) => id.startsWith('type.'))).toHaveLength(0);
   });
 

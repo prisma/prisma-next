@@ -146,6 +146,7 @@ function renderDdlColumnAsTsCall(col: DdlColumn): string {
   if (col.notNull) opts.push('notNull: true');
   if (col.primaryKey) opts.push('primaryKey: true');
   if (col.default) opts.push(`default: ${renderDdlColumnDefault(col.default)}`);
+  if (col.codecRef) opts.push(`codecRef: ${jsonToTsSource(col.codecRef)}`);
   const optsStr = opts.length > 0 ? `, { ${opts.join(', ')} }` : '';
   return `col(${jsonToTsSource(col.name)}, ${jsonToTsSource(col.type)}${optsStr})`;
 }
@@ -365,7 +366,7 @@ export class AddColumnCall extends PostgresOpFactoryCallNode {
     const absent = await lowerer.lowerToExecuteRequest(colChecks.columnAbsent());
     const present = await lowerer.lowerToExecuteRequest(colChecks.columnPresent());
     return {
-      id: `column.${tableName}.${columnName}`,
+      id: `column.${schemaName}.${tableName}.${columnName}`,
       label: `Add column "${columnName}" to "${tableName}"`,
       operationClass: 'additive',
       target: targetDetails('column', columnName, schemaName, tableName),

@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:975333779a8ca7ec4dacc25cd0e6816b04896d8f5227e2c6e4921760c60ebaa1'>;
+  StorageHashBase<'sha256:b0d547223488b4a8cea642a0bb2cc8e8f6cd9b2a6e490f23832865146ac51468'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -43,17 +43,21 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   : _Encoded;
 
 export type FieldOutputTypes = {
-  readonly AuditEvent: {
-    readonly id: CodecTypes['pg/text@1']['output'];
-    readonly actor: CodecTypes['pg/text@1']['output'];
-    readonly action: CodecTypes['pg/text@1']['output'];
+  readonly public: {
+    readonly AuditEvent: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly actor: CodecTypes['pg/text@1']['output'];
+      readonly action: CodecTypes['pg/text@1']['output'];
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly AuditEvent: {
-    readonly id: CodecTypes['pg/text@1']['input'];
-    readonly actor: CodecTypes['pg/text@1']['input'];
-    readonly action: CodecTypes['pg/text@1']['input'];
+  readonly public: {
+    readonly AuditEvent: {
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly actor: CodecTypes['pg/text@1']['input'];
+      readonly action: CodecTypes['pg/text@1']['input'];
+    };
   };
 };
 export type TypeMaps = TypeMapsType<
@@ -64,48 +68,42 @@ export type TypeMaps = TypeMapsType<
 >;
 
 type ContractBase = Omit<
-  ContractType<
-    {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'postgres-schema';
-          readonly entries: { readonly table: {} };
-        };
-        readonly public: {
-          readonly id: 'public';
-          readonly kind: 'postgres-schema';
-          readonly entries: {
-            readonly table: {
-              readonly audit_event: {
-                columns: {
-                  readonly id: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
-                  readonly actor: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
-                  readonly action: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
+  ContractType<{
+    readonly namespaces: {
+      readonly public: {
+        readonly id: 'public';
+        readonly kind: 'postgres-schema';
+        readonly entries: {
+          readonly table: {
+            readonly audit_event: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
                 };
-                primaryKey: { readonly columns: readonly ['id'] };
-                uniques: readonly [];
-                indexes: readonly [];
-                foreignKeys: readonly [];
+                readonly actor: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly action: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
               };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [];
+              foreignKeys: readonly [];
             };
           };
         };
       };
-      readonly storageHash: StorageHash;
-    }>,
+    };
+    readonly storageHash: StorageHash;
+  }>,
   'roots' | 'domain'
 > & {
   readonly target: 'postgres';
@@ -171,7 +169,6 @@ type ContractBase = Omit<
 
   readonly profileHash: ProfileHash;
 };
-
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 

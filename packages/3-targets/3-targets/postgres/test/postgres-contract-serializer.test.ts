@@ -168,6 +168,10 @@ describe('PostgresContractSerializer', () => {
         super(registry);
       }
 
+      protected override get defaultNamespaceId(): string {
+        return UNBOUND_NAMESPACE_ID;
+      }
+
       protected override hydrateSqlNamespaceEntry(
         nsId: string,
         raw: Namespace | Record<string, unknown>,
