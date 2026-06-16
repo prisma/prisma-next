@@ -12,7 +12,6 @@ import {
   type Namespace,
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
-import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
 import { composeSqlEntityKinds } from './entity-kinds';
 
@@ -30,13 +29,7 @@ export {
   StorageValueSetSchema,
 } from './ir/storage-entry-schemas';
 
-import {
-  type SqlModelStorage,
-  SqlStorage,
-  type SqlStorageInput,
-  type StorageTable,
-  type StorageTypeInstanceInput,
-} from './types';
+import type { SqlModelStorage, SqlStorage, StorageTable, StorageTypeInstanceInput } from './types';
 
 const generatorKindSchema = type("'generator'");
 const ControlPolicySchema = type("'managed' | 'tolerated' | 'external' | 'observed'");
@@ -364,42 +357,21 @@ export function createSqlContractSchema(
 
 const SqlContractSchema = createSqlContractSchema(DEFAULT_SQL_KINDS);
 
-// NOTE: StorageColumnSchema, StorageTableSchema, and StorageSchema use bare type()
-// instead of type.declare<T>().type() because the ColumnDefault union's value field
-// includes bigint | Date (runtime-only types after decoding) which cannot be expressed
-// in Arktype's JSON validation DSL. The `as SqlStorage` cast in validateStorage() bridges
-// the gap between the JSON-safe Arktype output and the runtime TypeScript type.
-
 /**
- * Validates the structural shape of SqlStorage using Arktype.
+ * Validates the structural shape of SqlStorage using Arktype. Pure
+ * structural check: namespace IR is never materialized here (that needs
+ * a target concretion via the serializer hydration path), so this throws
+ * on invalid input and constructs nothing.
  *
  * @param value - The storage value to validate
- * @returns The validated storage if structure is valid
  * @throws Error if the storage structure is invalid
  */
-export function validateStorage(value: unknown): SqlStorage {
+export function validateStorage(value: unknown): void {
   const result = StorageSchema(value);
   if (result instanceof type.errors) {
     const messages = result.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Storage validation failed: ${messages}`);
   }
-  // Arktype validates the JSON-safe envelope, but the `ColumnDefault`
-  // union carries runtime-only `bigint | Date` that the validation DSL
-  // can't express (see NOTE above), so bridge the validated shape to the
-  // input type. Namespace IR construction requires a target concretion and
-  // must happen via the target serializer's hydration path — not here.
-  const validated = blindCast<
-    SqlStorageInput & { readonly namespaces?: SqlStorageInput['namespaces'] },
-    'arktype validated the JSON envelope but its output type is unknown (ColumnDefault carries runtime-only bigint|Date); bridge to the input shape'
-  >(result);
-  return new SqlStorage({
-    storageHash: validated.storageHash,
-    ...ifDefined('types', validated.types),
-    namespaces: blindCast<
-      SqlStorageInput['namespaces'],
-      'namespace IR construction requires a target concretion; caller must hydrate via target serializer'
-    >(validated.namespaces ?? {}),
-  });
 }
 
 export function validateModel(value: unknown): unknown {
