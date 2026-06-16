@@ -485,3 +485,15 @@ assert the new `column.${schema}.${table}.${column}` op-id format for add-column
 operations. Test-only assertion updates — no extension-author API change. Incidental
 substrate diff only.
 -->
+
+<!--
+TML-2919: typed-DDL conversion of the not-null-with-temporary-default recipe. The
+recipe's ADD COLUMN execute step now lowers a typed `PostgresAlterTable` DDL node
+through the adapter, with the temporary backfill value carried as a
+`FunctionColumnDefault` — so the emitted DEFAULT clause parenthesizes its expression
+(e.g. `DEFAULT ('')` instead of the previous `DEFAULT ''`). Semantically identical
+in PostgreSQL (parenthesizing an atomic primary expression in a `DEFAULT` clause is
+a no-op). The pgvector `planner.behavior.test.ts` assertion that pins the recipe's
+emitted ADD COLUMN SQL was updated to the parenthesized form. Test-only assertion
+update — no extension-author API change. Incidental substrate diff only.
+-->
