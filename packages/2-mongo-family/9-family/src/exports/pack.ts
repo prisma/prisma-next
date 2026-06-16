@@ -16,3 +16,4 @@ const mongoFamilyPack = {
 } as const satisfies FamilyPackRef<'mongo'>;
 
 export default mongoFamilyPack;
+export { mongoFamilyEntityTypes, mongoFamilyPslBlockDescriptors };
