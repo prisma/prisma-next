@@ -119,7 +119,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
     const call = new AddColumnCall('public', 'user', col('email', 'text', { notNull: true }));
     const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe('ALTER TABLE "public"."user" ADD COLUMN "email" text NOT NULL');
-    expect(op.id).toBe('column.user.email');
+    expect(op.id).toBe('column.public.user.email');
     expect(op.operationClass).toBe('additive');
     expect(op.target).toMatchObject({
       id: 'postgres',
@@ -131,5 +131,15 @@ describe('Postgres call classes - construction + toOp parity', () => {
     const call = new AddColumnCall('__unbound__', 'item', col('score', 'int'));
     const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe('ALTER TABLE "item" ADD COLUMN "score" int');
+  });
+
+  it('AddColumnCall.toOp: identical table+column in different schemas produce distinct op ids', async () => {
+    const callPublic = new AddColumnCall('public', 'user', col('email', 'text'));
+    const callAudit = new AddColumnCall('audit', 'user', col('email', 'text'));
+    const opPublic = await callPublic.toOp(testAdapter);
+    const opAudit = await callAudit.toOp(testAdapter);
+    expect(opPublic.id).toBe('column.public.user.email');
+    expect(opAudit.id).toBe('column.audit.user.email');
+    expect(opPublic.id).not.toBe(opAudit.id);
   });
 });

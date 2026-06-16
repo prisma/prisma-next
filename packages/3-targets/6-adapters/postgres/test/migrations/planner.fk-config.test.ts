@@ -241,7 +241,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
 
     const ops = await Promise.all(result.plan.operations);
     const operationIds = ops.map((op) => op.id);
-    expect(operationIds).toContain('column.workflow_states.state');
+    expect(operationIds).toContain('column.__unbound__.workflow_states.state');
     expect(operationIds).not.toContain('dropConstraint.workflow_states.fk(workflow_id)');
     expect(ops).not.toContainEqual(
       expect.objectContaining({

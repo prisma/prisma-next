@@ -365,7 +365,7 @@ export class AddColumnCall extends PostgresOpFactoryCallNode {
     const absent = await lowerer.lowerToExecuteRequest(colChecks.columnAbsent());
     const present = await lowerer.lowerToExecuteRequest(colChecks.columnPresent());
     return {
-      id: `column.${tableName}.${columnName}`,
+      id: `column.${schemaName}.${tableName}.${columnName}`,
       label: `Add column "${columnName}" to "${tableName}"`,
       operationClass: 'additive',
       target: targetDetails('column', columnName, schemaName, tableName),
