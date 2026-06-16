@@ -6,6 +6,7 @@ import sql from '@prisma-next/family-sql/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
 import postgresPackRef from '@prisma-next/target-postgres/pack';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 
 export default defineConfig({
   family: sql,
@@ -16,6 +17,7 @@ export default defineConfig({
   contract: prismaContract('./src/contract.prisma', {
     output: 'src/contract.json',
     target: postgresPackRef,
+    createNamespace: postgresCreateNamespace,
   }),
   migrations: {
     dir: 'migrations',

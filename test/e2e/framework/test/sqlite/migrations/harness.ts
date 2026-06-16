@@ -22,7 +22,7 @@ import { buildSynthMigrationEdge } from '@prisma-next/migration-tools/aggregate'
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { field } from '@prisma-next/sqlite/contract-builder';
-import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
+import sqliteTargetDescriptor, { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import sqlitePack from '@prisma-next/target-sqlite/pack';
@@ -39,7 +39,11 @@ const controlAdapter = sqliteAdapterDescriptor.create(controlStack);
 
 const fw = [sqliteTargetDescriptor, sqliteAdapterDescriptor, sqliteDriverDescriptor] as const;
 
-export const pack = { family: sqlFamilyPack, target: sqlitePack } as const;
+export const pack = {
+  family: sqlFamilyPack,
+  target: sqlitePack,
+  createNamespace: sqliteCreateNamespace,
+} as const;
 export const int = field.column(integerColumn);
 export const text = field.column(textColumn);
 export { integerColumn, textColumn };

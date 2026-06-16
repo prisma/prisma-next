@@ -1,4 +1,5 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { describe, expect, it } from 'vitest';
 import { createComposedAuthoringHelpers } from '../src/composed-authoring-helpers';
 import { field, rel } from '../src/contract-builder';
@@ -33,11 +34,15 @@ const { model } = createComposedAuthoringHelpers({
 });
 
 function buildDefinition(
-  definition: Omit<Parameters<typeof buildContractDefinition>[0], 'target' | 'family'>,
+  definition: Omit<
+    Parameters<typeof buildContractDefinition>[0],
+    'target' | 'family' | 'createNamespace'
+  >,
 ) {
   return buildContractDefinition({
     family: bareFamilyPack,
     target: postgresTargetPack,
+    createNamespace: createTestSqlNamespace,
     ...definition,
   });
 }

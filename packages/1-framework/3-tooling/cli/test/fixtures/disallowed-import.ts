@@ -1,3 +1,4 @@
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
 // @ts-expect-error - This import is intentionally disallowed for testing
@@ -13,6 +14,7 @@ void something;
 export const contract = defineContract({
   family: sqlFamilyPack,
   target: postgresPack,
+  createNamespace: createTestSqlNamespace,
   models: {
     User: model('User', {
       fields: {

@@ -72,6 +72,7 @@ export type SqlNamespaceEntries = Readonly<Record<string, Readonly<Record<string
  * required. Hydrated `SqlNamespace` instances always have it.
  */
 export interface SqlNamespaceShape {
+  readonly kind: string;
   readonly id: string;
   readonly entries: SqlNamespaceEntries;
   qualifyTable?(tableName: string): string;

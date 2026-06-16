@@ -33,9 +33,9 @@ const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
 const timestamptzColumn = columnDescriptor('pg/timestamptz@1');
 
-function defineTestContract<const Definition extends Omit<ContractInput, 'target' | 'family'>>(
-  definition: Definition,
-) {
+function defineTestContract<
+  const Definition extends Omit<ContractInput, 'target' | 'family' | 'createNamespace'>,
+>(definition: Definition) {
   return defineContract({
     family: bareFamilyPack,
     target: postgresTargetPack,

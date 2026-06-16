@@ -59,6 +59,7 @@ describe('defineContract runtime guards', () => {
         defineContract({
           family: documentFamilyPack,
           target: postgresTargetPack,
+          createNamespace: createTestSqlNamespace,
           models: {},
         }),
       error: 'defineContract only accepts SQL family packs. Received family "document".',
@@ -69,6 +70,7 @@ describe('defineContract runtime guards', () => {
         defineContract({
           family: sqlFamilyPack,
           target: postgresTargetPack,
+          createNamespace: createTestSqlNamespace,
           extensionPacks: {
             invalid: unsafeExtensionPackRefForRuntimeTest(postgresTargetPack),
           },
@@ -83,6 +85,7 @@ describe('defineContract runtime guards', () => {
         defineContract({
           family: sqlFamilyPack,
           target: postgresTargetPack,
+          createNamespace: createTestSqlNamespace,
           extensionPacks: {
             invalid: unsafeExtensionPackRefForRuntimeTest({
               ...pgvectorExtensionPack,
@@ -100,6 +103,7 @@ describe('defineContract runtime guards', () => {
         defineContract({
           family: sqlFamilyPack,
           target: postgresTargetPack,
+          createNamespace: createTestSqlNamespace,
           extensionPacks: {
             invalid: mysqlExtensionPack,
           },
@@ -162,6 +166,7 @@ describe('defineContract namespace declaration runtime guards', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         namespaces: ['__unbound__'],
+        createNamespace: createTestSqlNamespace,
         models: {},
       }),
     ).toThrow(/__unbound__.*reserved/i);
@@ -173,6 +178,7 @@ describe('defineContract namespace declaration runtime guards', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         namespaces: ['__unspecified__'],
+        createNamespace: createTestSqlNamespace,
         models: {},
       }),
     ).toThrow(/__unspecified__.*reserved/i);
@@ -184,6 +190,7 @@ describe('defineContract namespace declaration runtime guards', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         namespaces: ['unbound'],
+        createNamespace: createTestSqlNamespace,
         models: {},
       }),
     ).toThrow(/unbound.*reserved.*Postgres|Postgres.*unbound.*reserved/i);
@@ -195,6 +202,7 @@ describe('defineContract namespace declaration runtime guards', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         namespaces: ['auth', 'public', 'auth'],
+        createNamespace: createTestSqlNamespace,
         models: {},
       }),
     ).toThrow(/duplicate.*auth/i);
@@ -206,6 +214,7 @@ describe('defineContract namespace declaration runtime guards', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         namespaces: [''],
+        createNamespace: createTestSqlNamespace,
         models: {},
       }),
     ).toThrow(/empty/i);
@@ -215,6 +224,7 @@ describe('defineContract namespace declaration runtime guards', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         namespaces: ['   '],
+        createNamespace: createTestSqlNamespace,
         models: {},
       }),
     ).toThrow(/whitespace|empty/i);
@@ -226,6 +236,7 @@ describe('defineContract namespace declaration runtime guards', () => {
         family: sqlFamilyPack,
         target: sqliteTargetPack,
         namespaces: ['auth'],
+        createNamespace: createTestSqlNamespace,
         models: {},
       }),
     ).toThrow(/SQLite/);

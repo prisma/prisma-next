@@ -32,7 +32,7 @@ function defineTestContract<
 >(
   definition: Omit<
     ContractInput<typeof bareFamilyPack, typeof postgresTargetPack, Types, Models, ExtensionPacks>,
-    'family' | 'target'
+    'family' | 'target' | 'createNamespace'
   >,
 ) {
   return defineContract({

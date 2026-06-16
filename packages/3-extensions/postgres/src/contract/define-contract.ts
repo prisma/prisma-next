@@ -1,6 +1,7 @@
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import type { ExtensionPackRef } from '@prisma-next/framework-components/components';
-import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { Namespace } from '@prisma-next/framework-components/ir';
+import type { SqlNamespaceTablesInput, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type {
   ComposedAuthoringHelpers,
   ContractInput,
@@ -28,11 +29,8 @@ type PostgresResult<
   typeof buildBoundContract<
     SqlFamily,
     PostgresPack,
-    {
-      readonly types?: Types;
-      readonly models?: Models;
-      readonly extensionPacks?: ExtensionPacks;
-      readonly enums?: Enums;
+    PostgresDefinition<Types, Models, ExtensionPacks, Enums> & {
+      readonly createNamespace: (input: SqlNamespaceTablesInput) => Namespace;
     }
   >
 >;
@@ -47,7 +45,7 @@ type PostgresBaseScaffold<
     Record<never, never>,
     ExtensionPacks
   >,
-  'family' | 'target' | 'types' | 'models' | 'enums'
+  'family' | 'target' | 'types' | 'models' | 'enums' | 'createNamespace'
 >;
 
 type PostgresDefinition<

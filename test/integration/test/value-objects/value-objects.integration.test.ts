@@ -11,6 +11,7 @@ import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
 import { describeWithMongoDB } from '../mongo/setup';
 
@@ -84,6 +85,7 @@ function interpretSqlPsl(schema: string) {
     target: postgresTarget,
     scalarTypeDescriptors: postgresScalarTypeDescriptors,
     composedExtensionContracts: new Map(),
+    createNamespace: postgresCreateNamespace,
   });
 }
 
