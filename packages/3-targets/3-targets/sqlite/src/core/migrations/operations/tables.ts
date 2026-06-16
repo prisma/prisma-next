@@ -1,5 +1,7 @@
 import type { MigrationOperationClass } from '@prisma-next/family-sql/control';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import { tableExistsAst } from '../../../contract-free/checks';
 import { stripOuterParens } from '../../default-normalizer';
 import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
 import { buildCreateIndexSql } from '../planner-ddl-builders';
@@ -12,6 +14,18 @@ import {
   type SqliteTableSpec,
   step,
 } from './shared';
+
+type CheckStep = { sql: string; params?: readonly unknown[] };
+
+async function tableExistsSteps(
+  lowerer: ExecuteRequestLowerer,
+  tableName: string,
+): Promise<{ present: CheckStep; absent: CheckStep }> {
+  const checks = tableExistsAst(tableName);
+  const present = await lowerer.lowerToExecuteRequest(checks.tablePresent());
+  const absent = await lowerer.lowerToExecuteRequest(checks.tableAbsent());
+  return { present, absent };
+}
 
 /**
  * Renders the body of a `CREATE TABLE <name> ( … )` statement from a flat
@@ -42,49 +56,35 @@ function renderCreateTableSql(tableName: string, spec: SqliteTableSpec): string 
   return `CREATE TABLE ${quoteIdentifier(tableName)} (\n  ${allDefs.join(',\n  ')}\n)`;
 }
 
-export function createTable(tableName: string, spec: SqliteTableSpec): Op {
+export async function createTable(
+  tableName: string,
+  spec: SqliteTableSpec,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
+  const { present, absent } = await tableExistsSteps(lowerer, tableName);
   return {
     id: `table.${tableName}`,
     label: `Create table ${tableName}`,
     summary: `Creates table ${tableName} with required columns`,
     operationClass: 'additive',
     target: { id: 'sqlite', details: buildTargetDetails('table', tableName) },
-    precheck: [
-      step(
-        `ensure table "${tableName}" does not exist`,
-        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tableName)}'`,
-      ),
-    ],
+    precheck: [step(`ensure table "${tableName}" does not exist`, absent.sql, absent.params)],
     execute: [step(`create table "${tableName}"`, renderCreateTableSql(tableName, spec))],
-    postcheck: [
-      step(
-        `verify table "${tableName}" exists`,
-        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tableName)}'`,
-      ),
-    ],
+    postcheck: [step(`verify table "${tableName}" exists`, present.sql, present.params)],
   };
 }
 
-export function dropTable(tableName: string): Op {
+export async function dropTable(tableName: string, lowerer: ExecuteRequestLowerer): Promise<Op> {
+  const { present, absent } = await tableExistsSteps(lowerer, tableName);
   return {
     id: `dropTable.${tableName}`,
     label: `Drop table ${tableName}`,
     summary: `Drops table ${tableName} which is not in the contract`,
     operationClass: 'destructive',
     target: { id: 'sqlite', details: buildTargetDetails('table', tableName) },
-    precheck: [
-      step(
-        `ensure table "${tableName}" exists`,
-        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tableName)}'`,
-      ),
-    ],
+    precheck: [step(`ensure table "${tableName}" exists`, present.sql, present.params)],
     execute: [step(`drop table "${tableName}"`, `DROP TABLE ${quoteIdentifier(tableName)}`)],
-    postcheck: [
-      step(
-        `verify table "${tableName}" is gone`,
-        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tableName)}'`,
-      ),
-    ],
+    postcheck: [step(`verify table "${tableName}" is gone`, absent.sql, absent.params)],
   };
 }
 
@@ -115,7 +115,10 @@ export interface RecreateTableArgs {
   readonly operationClass: MigrationOperationClass;
 }
 
-export function recreateTable(args: RecreateTableArgs): Op {
+export async function recreateTable(
+  args: RecreateTableArgs,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
   const {
     tableName,
     contractTable,
@@ -149,6 +152,9 @@ export function recreateTable(args: RecreateTableArgs): Op {
         ]
       : [];
 
+  const tableSteps = await tableExistsSteps(lowerer, tableName);
+  const tempSteps = await tableExistsSteps(lowerer, tempName);
+
   return {
     id: `recreateTable.${tableName}`,
     label: `Recreate table ${tableName}`,
@@ -156,13 +162,11 @@ export function recreateTable(args: RecreateTableArgs): Op {
     operationClass,
     target: { id: 'sqlite', details: buildTargetDetails('table', tableName) },
     precheck: [
-      step(
-        `ensure table "${tableName}" exists`,
-        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tableName)}'`,
-      ),
+      step(`ensure table "${tableName}" exists`, tableSteps.present.sql, tableSteps.present.params),
       step(
         `ensure temp table "${tempName}" does not exist`,
-        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tempName)}'`,
+        tempSteps.absent.sql,
+        tempSteps.absent.params,
       ),
     ],
     execute: [
@@ -179,13 +183,11 @@ export function recreateTable(args: RecreateTableArgs): Op {
       ...indexStatements,
     ],
     postcheck: [
-      step(
-        `verify table "${tableName}" exists`,
-        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tableName)}'`,
-      ),
+      step(`verify table "${tableName}" exists`, tableSteps.present.sql, tableSteps.present.params),
       step(
         `verify temp table "${tempName}" is gone`,
-        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tempName)}'`,
+        tempSteps.absent.sql,
+        tempSteps.absent.params,
       ),
       ...postchecks,
     ],

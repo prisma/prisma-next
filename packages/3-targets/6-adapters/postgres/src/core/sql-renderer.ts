@@ -32,7 +32,6 @@ import {
   type UpdateAst,
   type WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import { PostgresTableSource } from '@prisma-next/target-postgres/contract-free';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresContract } from './types';
@@ -182,7 +181,7 @@ function renderSelect(ast: SelectAst, contract: PostgresContract, pim: ParamInde
     contract,
     pim,
   )}`;
-  const fromClause = `FROM ${renderSource(ast.from, contract, pim)}`;
+  const fromClause = ast.from !== undefined ? `FROM ${renderSource(ast.from, contract, pim)}` : '';
 
   const joinsClause = ast.joins?.length
     ? ast.joins.map((join) => renderJoin(join, contract, pim)).join(' ')
@@ -240,7 +239,7 @@ function collectTableSources(ast: SelectAst): ReadonlyMap<string, TableSourceCoo
     const ref = source.alias ?? source.name;
     sources.set(ref, { name: source.name, namespaceId: source.namespaceId });
   };
-  add(ast.from);
+  if (ast.from !== undefined) add(ast.from);
   for (const join of ast.joins ?? []) {
     add(join.source);
   }
@@ -399,11 +398,17 @@ function renderDistinctPrefix(
   return '';
 }
 
+function hasExplicitSchema(
+  table: Pick<TableSource, 'name' | 'namespaceId'>,
+): table is Pick<TableSource, 'name' | 'namespaceId'> & { readonly schema: string } {
+  return 'schema' in table && typeof table.schema === 'string';
+}
+
 function qualifyTableFromNamespaceCoordinate(
   table: Pick<TableSource, 'name' | 'namespaceId'>,
   contract: PostgresContract,
 ): string {
-  if (table instanceof PostgresTableSource && table.schema !== undefined) {
+  if (hasExplicitSchema(table)) {
     return `${quoteIdentifier(table.schema)}.${quoteIdentifier(table.name)}`;
   }
   if (table.namespaceId === undefined) {
@@ -443,6 +448,11 @@ function renderSource(
       return renderTableSource(node, contract);
     case 'derived-table-source':
       return `(${renderSelect(node.query, contract, pim)}) AS ${quoteIdentifier(node.alias)}`;
+    case 'function-source': {
+      const args = node.args.map((arg) => renderExpr(arg, contract, pim)).join(', ');
+      const call = `${node.fn}(${args})`;
+      return node.alias !== undefined ? `${call} AS ${quoteIdentifier(node.alias)}` : call;
+    }
     // v8 ignore next 4
     default:
       throw new Error(

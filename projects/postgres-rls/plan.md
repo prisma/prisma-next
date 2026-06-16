@@ -15,7 +15,11 @@ RLS rides the generic schema-diff architecture (unchanged — see § Architectur
 
 This project can run in parallel with [cross-contract-refs](../cross-contract-refs/spec.md) and [runtime-target-layer](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md). The TS `ref()` helper consumes cross-contract model handles transparently — no integration work between the two projects beyond the brand contract already established by cross-contract-refs.
 
+## Slices
+
 ### Slice 1 — `select-policies-dependable` · [TML-2868](https://linear.app/prisma-company/issue/TML-2868) · PR [#771](https://github.com/prisma/prisma-next/pull/771) (continues)
+
+**Status: 🚧 in progress (PR #771).**
 
 A developer can declare a SELECT policy and **rely on it**: it gets created, edits replace it, removals drop it, drift errors out, and the Supabase example app proves the whole thing.
 
@@ -29,11 +33,9 @@ Already landed on the branch: the architecture (generic differ, content-addresse
 
 - **DoD (operator-observable):** declare a SELECT policy in the example app → migrate → only permitted rows visible under the role; edit the predicate → migrate → **exactly one policy active**, with the new predicate (the old version dropped via same-prefix replace); remove it from the contract → `db verify` reports the now-orphaned DB policy as drift (exits non-zero naming it) — auto-drop-on-removal is slice 2; drop/alter it out-of-band → `prisma db verify` exits non-zero naming the policy. Workspace typecheck green; all suites green.
 
-## Slices
-
-The five PRs below correspond to the five slices (M1–M5). Each slice is one PR.
-
 ### Slice 2 — `drift-handled-correctly` · [TML-2869](https://linear.app/prisma-company/issue/TML-2869)
+
+**Status: ⬜ not started.**
 
 Every drift variation for a SELECT policy is handled **correctly** (not just "error"), and the schema graph gains its first edge.
 
@@ -44,12 +46,16 @@ Every drift variation for a SELECT policy is handled **correctly** (not just "er
 
 ### Slice 3 — `all-policy-types` · [TML-2870](https://linear.app/prisma-company/issue/TML-2870)
 
+**Status: ⬜ not started.**
+
 Everything slices 1–2 made dependable for SELECT works for **INSERT / UPDATE / DELETE / ALL** policies.
 
 - PSL `policy_insert | policy_update | policy_delete | policy_all` block descriptors lowering through the same generic interpreter pass; `withCheck` handling (INSERT/UPDATE) end-to-end; the lifecycle + drift behaviors from slices 1–2 verified per type (the content-hash already covers operation + withCheck, so this is descriptors + DDL rendering + per-type e2e, not new architecture).
 - **DoD (operator-observable):** the slice-1 example-app scenario repeated with an UPDATE-own policy (`using` + `withCheck`): a user can update only their own row; editing/removing/drifting behaves exactly as for SELECT.
 
 ### Slice 4 — `typescript-authoring` · _(Linear: see § Linear sync)_
+
+**Status: ⬜ not started.**
 
 **Goal:** make the IR reachable through TS authoring. After this slice, an app contract can declare RLS policies and produce valid `PostgresRlsPolicy` IR.
 

@@ -100,7 +100,17 @@ Concrete scope to be ported in Phase 2 (sized at pickup):
 - the other `operations/*.ts` builders (`enums.ts`, `indexes.ts`, `columns.ts`, `constraints.ts`, `raw.ts`) — deleted as their ops adopt `toOp()`.
 No free string-gluing Op-builder should survive the planner-adoption phase.
 
-#### Carved-out slice — `typed-migration-verification-queries` (deferred, explicit)
+#### Carved-out slice — `typed-migration-verification-queries` (picked up 2026-06-11, in flight)
+
+**Status:** in flight as **one slice/PR** (operator decision, 2026-06-11). Spec: `slices/typed-migration-verification-queries/spec.md`. Runs in parallel with slice 6 (disjoint substrate — slice 6 is Mongo-only; this slice is SQL-only).
+
+**Grounding corrections to the text below (2026-06-11):**
+- **SQL-only, not three targets.** Mongo's checks are already typed (`MongoMigrationCheck`: inspection command + filter + expect, `packages/2-mongo-family/4-query/query-ast/src/migration-operation-types.ts`). Nothing to convert on Mongo.
+- **Builder substrate is wider than aggregate + comparison.** Also needed: EXISTS/IS-NULL/typed-function projection, a table-valued-function FROM source (SQLite `pragma_*`), and a minimal contract-free join surface (PG catalog EXISTS bodies). The AST itself already carries everything except the function FROM-source.
+- **Two deferred residuals, recorded with rationale:** SQLite `buildRecreatePostchecks` (needs `CASE WHEN` + row-tuple `IN` AST kinds — own substrate decision, Phase 2 follow-up) and the PG data-transform `EXISTS(<user sql>)` wrapper (inner SQL is user-supplied; no AST to build from).
+- **No byte-parity bar for checks** — inline escaped literals deliberately become bound params; the bar is semantic parity via runner integration tests.
+
+#### (Original carve-out record, for provenance)
 
 The precheck/postcheck idempotency probes in every op's `*Call.toOp()` are still **hand-built raw SQL** — SQLite uses `SELECT COUNT(*) … FROM sqlite_master WHERE type='table' AND name='…'`; Postgres uses `SELECT to_regclass(…) IS NULL` / `IS NOT NULL`. These are `SELECT`s and are the same "express, don't concatenate" violation the project exists to eliminate; they should be query-AST nodes lowered through the adapter like the `execute` step.
 

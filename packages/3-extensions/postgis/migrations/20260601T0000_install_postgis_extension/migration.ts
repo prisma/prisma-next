@@ -22,7 +22,7 @@
  * seed `migration.json` were authored by hand; `node migration.ts`
  * then re-emits `ops.json` + `migration.json` deterministically.
  */
-import { installExtension, Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
+import { Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
 import { POSTGIS_INVARIANTS } from '../../src/core/contract-space-constants';
 
 export default class M extends Migration {
@@ -35,7 +35,7 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      installExtension({
+      this.installExtension({
         id: 'postgis.install-postgis-extension',
         extensionName: 'postgis',
         invariantId: POSTGIS_INVARIANTS.installPostgis,

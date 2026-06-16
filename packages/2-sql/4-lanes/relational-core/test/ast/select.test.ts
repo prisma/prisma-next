@@ -4,6 +4,7 @@ import {
   DerivedTableSource,
   EqColJoinOn,
   ExistsExpr,
+  FunctionSource,
   JoinAst,
   OrderByItem,
   ProjectionItem,
@@ -154,5 +155,38 @@ describe('ast/select', () => {
       ]);
 
     expect(ast.collectParamRefs()).toEqual([fromParam, whereParam, havingParam, joinParam]);
+  });
+
+  it('collectParamRefs traverses FunctionSource args in top-level from and in joins', () => {
+    const fromArg = param('tbl', 'from_fn_p');
+    const joinArg = param('col', 'join_fn_p');
+
+    const ast = SelectAst.from(FunctionSource.of('pragma_table_info', [fromArg], 'pti'))
+      .addProjection('name', col('pti', 'name'))
+      .withJoins([
+        JoinAst.inner(
+          FunctionSource.of('some_fn', [joinArg], 'fn'),
+          EqColJoinOn.of(col('pti', 'name'), col('fn', 'col')),
+        ),
+      ]);
+
+    expect(ast.collectParamRefs()).toEqual([fromArg, joinArg]);
+  });
+
+  it('collectColumnRefs traverses FunctionSource args in top-level from and in joins', () => {
+    const fromCol = col('outer', 'tbl');
+    const joinCol = col('outer', 'col');
+
+    const ast = SelectAst.from(FunctionSource.of('pragma_table_info', [fromCol], 'pti'))
+      .addProjection('name', col('pti', 'name'))
+      .withJoins([
+        JoinAst.inner(
+          FunctionSource.of('some_fn', [joinCol], 'fn'),
+          EqColJoinOn.of(col('pti', 'name'), col('fn', 'col')),
+        ),
+      ]);
+
+    expect(ast.collectColumnRefs()).toContainEqual(fromCol);
+    expect(ast.collectColumnRefs()).toContainEqual(joinCol);
   });
 });

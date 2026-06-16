@@ -64,6 +64,32 @@ changes:
       glob: "**/*.{ts,tsx}"
       contains:
         - "createRuntime"
+  - id: migration-op-factories-to-methods
+    summary: |
+      The bare migration op factory functions are removed from
+      `@prisma-next/postgres/migration`. Replace each import and call-site with
+      the corresponding method on `this` inside your `Migration` subclass. The
+      option shapes changed from positional arguments to a single options object.
+    detection:
+      glob: "**/migration.ts"
+      contains:
+        - "from '@prisma-next/postgres/migration'"
+        - "from '@prisma-next/target-postgres/migration'"
+      anyMatch: true
+    script: migration-op-factories-to-methods.ts
+  - id: postgres-contract-serializer
+    summary: |
+      `SqlContractSerializer` (from `@prisma-next/family-sql/ir`) can no longer
+      deserialize Postgres contracts. The family serializer has an empty entries
+      registry and now rejects the `type` key that every Postgres namespace carries.
+      Any migration file or app code that calls
+      `new SqlContractSerializer().deserializeContract(postgresContractJson)` must
+      switch to `new PostgresContractSerializer()` imported from
+      `@prisma-next/target-postgres/runtime`.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "SqlContractSerializer"
   - id: enum-becomes-domain-concept
     summary: |
       The PSL `enum` keyword now authors the domain enum (a text-class column whose
@@ -245,6 +271,87 @@ const runtime = new PostgresRuntimeImpl({ adapter: stackInstance.adapter, contex
 ```
 
 The constructor options are identical to what `createRuntime` accepted, except `stackInstance` is not taken: pass `adapter` from `stackInstance.adapter` directly.
+
+## `migration-op-factories-to-methods`
+
+The bare op factory functions previously exported from `@prisma-next/postgres/migration` (and the deprecated `@prisma-next/target-postgres/migration` alias) are removed. Each function is now a protected method on the `PostgresMigration` base class — call it as `this.<method>(...)` inside your `Migration` subclass body.
+
+The option shapes also changed: positional arguments are replaced by a single options object.
+
+Remove the bare names from your import and replace each call-site:
+
+| Before (bare function) | After (method) |
+| --- | --- |
+| `dropColumn(schema, table, column)` | `this.dropColumn({ schema, table, column })` |
+| `setNotNull(schema, table, column)` | `this.setNotNull({ schema, table, column })` |
+| `setDefault(schema, table, column, defaultSql)` | `this.setDefault({ schema, table, column, defaultSql })` |
+| `addPrimaryKey(schema, table, name, columns)` | `this.addPrimaryKey({ schema, table, constraint: name, columns })` |
+| `addForeignKey(schema, table, { name, columns, references, onDelete })` | `this.addForeignKey({ schema, table, foreignKey: { name, columns, references, onDelete } })` |
+| `addCheckConstraint(schema, table, name, column, values)` | `this.addCheckConstraint({ schema, table, constraint: name, column, values })` |
+| `createIndex(schema, table, indexName, columns)` | `this.createIndex({ schema, table, index: indexName, columns })` |
+| `installExtension({ id, extensionName, invariantId })` | `this.installExtension({ id, extensionName, invariantId })` |
+
+Example:
+
+```ts
+// Before
+import { addForeignKey, createIndex, dropColumn } from '@prisma-next/postgres/migration';
+
+override get operations() {
+  return [
+    dropColumn('public', 'user', 'legacyName'),
+    addForeignKey('public', 'post', {
+      name: 'post_userId_fkey',
+      columns: ['userId'],
+      references: { schema: 'public', table: 'user', columns: ['id'] },
+    }),
+    createIndex('public', 'post', 'post_userId_idx', ['userId']),
+  ];
+}
+
+// After
+import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';
+
+override get operations() {
+  return [
+    this.dropColumn({ schema: 'public', table: 'user', column: 'legacyName' }),
+    this.addForeignKey({
+      schema: 'public',
+      table: 'post',
+      foreignKey: {
+        name: 'post_userId_fkey',
+        columns: ['userId'],
+        references: { schema: 'public', table: 'user', columns: ['id'] },
+      },
+    }),
+    this.createIndex({ schema: 'public', table: 'post', index: 'post_userId_idx', columns: ['userId'] }),
+  ];
+}
+```
+
+The colocated script applies this transformation automatically. Run it from your project root:
+
+```bash
+pnpm exec tsx node_modules/.skills/prisma-next-upgrade/upgrades/0.13-to-0.14/migration-op-factories-to-methods.ts
+```
+
+## `postgres-contract-serializer`
+
+`SqlContractSerializer` (from `@prisma-next/family-sql/ir`) now rejects Postgres contracts. The family serializer validates entries against a registry of known entity kinds; it only knows the SQL-family built-ins (`table`, `valueSet`) and has no knowledge of the Postgres-specific `type` key (Postgres enum types). Every Postgres namespace carries `"type": {}` in its `entries`, so the family serializer throws a `ContractValidationError` naming `type` as an unregistered kind.
+
+Replace `SqlContractSerializer` with `PostgresContractSerializer` in any migration file or app code that deserializes a Postgres-emitted contract:
+
+```ts
+// Before
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+
+// After
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
+```
+
+SQLite and family-only (non-Postgres) contracts are unaffected — their namespaces carry only `table` entries, which the family serializer knows about.
 
 ## `enum-becomes-domain-concept`
 

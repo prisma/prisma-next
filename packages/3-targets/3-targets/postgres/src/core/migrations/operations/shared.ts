@@ -42,8 +42,8 @@ export interface ForeignKeySpec {
   readonly onUpdate?: ReferentialAction;
 }
 
-export function step(description: string, sql: string) {
-  return { description, sql };
+export function step(description: string, sql: string, params?: readonly unknown[]) {
+  return { description, sql, ...ifDefined('params', params) };
 }
 
 export function targetDetails(

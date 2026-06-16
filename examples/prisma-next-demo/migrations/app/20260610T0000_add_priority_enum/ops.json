@@ -15,7 +15,8 @@
     "precheck": [
       {
         "description": "ensure column \"priority\" is missing",
-        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'post'\n    AND column_name = 'priority'\n)"
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": ["public", "post", "priority"]
       }
     ],
     "execute": [
@@ -27,7 +28,8 @@
     "postcheck": [
       {
         "description": "verify column \"priority\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'post'\n    AND column_name = 'priority'\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": ["public", "post", "priority"]
       }
     ]
   },
@@ -47,11 +49,13 @@
     "precheck": [
       {
         "description": "ensure column \"priority\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'post'\n    AND column_name = 'priority'\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": ["public", "post", "priority"]
       },
       {
         "description": "ensure no NULL values in \"priority\"",
-        "sql": "SELECT NOT EXISTS (SELECT 1 FROM \"public\".\"post\" WHERE \"priority\" IS NULL)"
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"public\".\"post\" WHERE \"priority\" IS NULL) AS \"result\"",
+        "params": []
       }
     ],
     "execute": [
@@ -63,7 +67,8 @@
     "postcheck": [
       {
         "description": "verify column \"priority\" is NOT NULL",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'post'\n    AND column_name = 'priority'\n    AND is_nullable = 'NO'\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": ["public", "post", "priority", "NO"]
       }
     ]
   },
@@ -83,7 +88,8 @@
     "precheck": [
       {
         "description": "ensure constraint \"post_priority_check\" does not exist",
-        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'post_priority_check'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"post\"')\n)"
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["post_priority_check", "public", "\"public\".\"post\""]
       }
     ],
     "execute": [
@@ -95,7 +101,8 @@
     "postcheck": [
       {
         "description": "verify constraint \"post_priority_check\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'post_priority_check'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"post\"')\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["post_priority_check", "public", "\"public\".\"post\""]
       }
     ]
   }

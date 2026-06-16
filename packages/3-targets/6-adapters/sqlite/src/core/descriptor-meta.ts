@@ -1,3 +1,14 @@
+import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
+
+// Exclude codecs that carry a renderOutputType: those emit named TypeScript types (e.g.
+// Char<N>, Varchar<N>) that are not listed in this adapter's typeImports and would
+// produce unresolvable references in contract.d.ts.  All other codecs — including the
+// sql/ identity encoders (sql/int@1, sql/float@1) — are kept so execution codec
+// lookup works and DDL lowering has access to the full codec set.
+const executionCodecDescriptors = Array.from(sqliteCodecRegistry.values()).filter(
+  (d) => d.renderOutputType === undefined,
+);
+
 export const sqliteAdapterDescriptorMeta = {
   kind: 'adapter',
   familyId: 'sql',
@@ -17,6 +28,7 @@ export const sqliteAdapterDescriptorMeta = {
   },
   types: {
     codecTypes: {
+      codecDescriptors: executionCodecDescriptors,
       import: {
         package: '@prisma-next/adapter-sqlite/codec-types',
         named: 'CodecTypes',

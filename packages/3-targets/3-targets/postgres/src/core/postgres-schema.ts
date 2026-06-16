@@ -12,7 +12,11 @@ import type {
   StorageTable,
   StorageValueSet,
 } from '@prisma-next/sql-contract/types';
+import { type CfExpr, cfExpr } from '@prisma-next/sql-relational-core/contract-free';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
+import { PostgresTableSource } from './ast/table-source';
+import { PG_TEXT_CODEC_ID } from './codec-ids';
 import { policyEntityKind, roleEntityKind } from './entity-kinds';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
 import type { PostgresRole } from './postgres-role';
@@ -146,15 +150,41 @@ export class PostgresSchema extends NamespaceBase {
   }
 
   /**
+   * Typed-AST counterpart of {@link schemaSqlExpression}: the expression a
+   * builder-built catalog check compares `n.nspname` / `table_schema`
+   * against. Named schemas bind the schema name as a text parameter; the
+   * unbound singleton overrides this to the opaque `current_schema()`
+   * expression so the live connection's `search_path` decides at runtime.
+   */
+  schemaFilterExpression(): CfExpr {
+    return cfExpr.param(this.id, PG_TEXT_CODEC_ID);
+  }
+
+  /**
+   * Typed-AST counterpart of {@link qualifyTable}: the FROM source a
+   * builder-built check uses to address a user table in this namespace.
+   * Named schemas qualify (`"schema"."table"`); the unbound singleton
+   * overrides this to leave the table unqualified so `search_path`
+   * resolves it at runtime.
+   */
+  tableSource(tableName: string, alias?: string): PostgresTableSource {
+    return new PostgresTableSource({
+      name: tableName,
+      schema: this.id,
+      ...ifDefined('alias', alias),
+    });
+  }
+
+  /**
    * The bare schema name a DDL planner should target when emitting
    * statements that need to identify this namespace in the live
    * database (e.g. `CREATE TABLE "<ddlSchemaName>"."<table>" …`,
    * catalog filters, planner conflict lookups). Named schemas resolve
    * to their own id. The `PostgresUnboundSchema` singleton inherits
    * this and returns `UNBOUND_NAMESPACE_ID` — callers that dispatch
-   * through `qualifyTableName` / `toRegclassLiteral` route through the
-   * polymorphic `PostgresUnboundSchema` overrides and produce
-   * unqualified (search-path-resolved) output automatically.
+   * through `qualifyTableName` route through the polymorphic
+   * `PostgresUnboundSchema` overrides and produce unqualified
+   * (search-path-resolved) output automatically.
    */
   ddlSchemaName(_storage: SqlStorage): string {
     return this.id;
@@ -176,9 +206,9 @@ export class PostgresSchema extends NamespaceBase {
  * `search_path`).
  *
  * `ddlSchemaName` is inherited from `PostgresSchema` and returns
- * `UNBOUND_NAMESPACE_ID`. Downstream helpers (`qualifyTableName`,
- * `toRegclassLiteral`) route through the polymorphic factory and
- * produce unqualified output automatically.
+ * `UNBOUND_NAMESPACE_ID`. Downstream helpers such as `qualifyTableName`
+ * route through the polymorphic factory and produce unqualified output
+ * automatically.
  */
 export class PostgresUnboundSchema extends PostgresSchema {
   static readonly instance: PostgresUnboundSchema = new PostgresUnboundSchema();
@@ -197,6 +227,17 @@ export class PostgresUnboundSchema extends PostgresSchema {
 
   override schemaSqlExpression(): string {
     return 'current_schema()';
+  }
+
+  override schemaFilterExpression(): CfExpr {
+    return cfExpr.raw('current_schema()', { codecId: PG_TEXT_CODEC_ID, nullable: false });
+  }
+
+  override tableSource(tableName: string, alias?: string): PostgresTableSource {
+    return new PostgresTableSource({
+      name: tableName,
+      ...ifDefined('alias', alias),
+    });
   }
 }
 

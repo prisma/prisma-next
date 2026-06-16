@@ -1,7 +1,7 @@
 #!/usr/bin/env -S node
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import postgres from '@prisma-next/postgres/runtime';
-import { Migration, MigrationCLI, setNotNull } from '@prisma-next/target-postgres/migration';
+import { Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import type { Contract } from './end-contract';
 import endContractJson from './end-contract.json' with { type: 'json' };
@@ -30,7 +30,7 @@ export default class M extends Migration {
             .update({ displayName: 'Anonymous' })
             .where((f, fns) => fns.eq(f.displayName, null)),
       }),
-      setNotNull('public', 'user', 'displayName'),
+      this.setNotNull({ schema: 'public', table: 'user', column: 'displayName' }),
     ];
   }
 }

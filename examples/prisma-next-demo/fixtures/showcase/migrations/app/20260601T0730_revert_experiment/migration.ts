@@ -1,5 +1,5 @@
 #!/usr/bin/env -S node
-import { dropColumn, Migration, MigrationCLI } from '@prisma-next/postgres/migration';
+import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 
 export default class M extends Migration {
   override describe() {
@@ -10,7 +10,7 @@ export default class M extends Migration {
   }
 
   override get operations() {
-    return [dropColumn('__unbound__', 'widget', 'count')];
+    return [this.dropColumn({ schema: '__unbound__', table: 'widget', column: 'count' })];
   }
 }
 

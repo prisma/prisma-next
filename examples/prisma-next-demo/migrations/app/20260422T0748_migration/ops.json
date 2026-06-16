@@ -44,11 +44,13 @@
     "precheck": [
       {
         "description": "ensure column \"displayName\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'displayName'\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": ["public", "user", "displayName"]
       },
       {
         "description": "ensure no NULL values in \"displayName\"",
-        "sql": "SELECT NOT EXISTS (SELECT 1 FROM \"public\".\"user\" WHERE \"displayName\" IS NULL)"
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"public\".\"user\" WHERE \"displayName\" IS NULL) AS \"result\"",
+        "params": []
       }
     ],
     "execute": [
@@ -60,7 +62,8 @@
     "postcheck": [
       {
         "description": "verify column \"displayName\" is NOT NULL",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'displayName'\n    AND is_nullable = 'NO'\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": ["public", "user", "displayName", "NO"]
       }
     ]
   }

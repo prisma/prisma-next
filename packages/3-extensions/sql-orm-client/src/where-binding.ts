@@ -207,9 +207,9 @@ function bindFromSource(contract: Contract<SqlStorage>, source: AnyFromSource): 
 }
 
 function bindSelectAst(contract: Contract<SqlStorage>, ast: SelectAst): SelectAst {
-  const namespaceId = namespaceCoordinateForSource(ast.from);
+  const namespaceId = ast.from !== undefined ? namespaceCoordinateForSource(ast.from) : undefined;
   return new SelectAst({
-    from: bindFromSource(contract, ast.from),
+    ...(ast.from !== undefined ? { from: bindFromSource(contract, ast.from) } : {}),
     joins: ast.joins?.map((join) => bindJoin(contract, join)),
     projection: ast.projection.map(
       (projection) =>

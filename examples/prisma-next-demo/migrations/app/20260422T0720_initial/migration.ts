@@ -1,9 +1,6 @@
 #!/usr/bin/env -S node
 import {
-  addCheckConstraint,
-  addForeignKey,
   col,
-  createIndex,
   fn,
   lit,
   Migration,
@@ -95,19 +92,43 @@ export default class M extends Migration {
         ],
         constraints: [primaryKey(['id'])],
       }),
-      addCheckConstraint('public', 'user', 'user_kind_check', 'kind', ['admin', 'user']),
-      addForeignKey('public', 'post', {
-        name: 'post_userId_fkey',
-        columns: ['userId'],
-        references: { schema: 'public', table: 'user', columns: ['id'] },
+      this.addCheckConstraint({
+        schema: 'public',
+        table: 'user',
+        constraint: 'user_kind_check',
+        column: 'kind',
+        values: ['admin', 'user'],
       }),
-      createIndex('public', 'post', 'post_userId_idx', ['userId']),
-      addForeignKey('public', 'task', {
-        name: 'task_userId_fkey',
-        columns: ['userId'],
-        references: { schema: 'public', table: 'user', columns: ['id'] },
+      this.addForeignKey({
+        schema: 'public',
+        table: 'post',
+        foreignKey: {
+          name: 'post_userId_fkey',
+          columns: ['userId'],
+          references: { schema: 'public', table: 'user', columns: ['id'] },
+        },
       }),
-      createIndex('public', 'task', 'task_userId_idx', ['userId']),
+      this.createIndex({
+        schema: 'public',
+        table: 'post',
+        index: 'post_userId_idx',
+        columns: ['userId'],
+      }),
+      this.addForeignKey({
+        schema: 'public',
+        table: 'task',
+        foreignKey: {
+          name: 'task_userId_fkey',
+          columns: ['userId'],
+          references: { schema: 'public', table: 'user', columns: ['id'] },
+        },
+      }),
+      this.createIndex({
+        schema: 'public',
+        table: 'task',
+        index: 'task_userId_idx',
+        columns: ['userId'],
+      }),
     ];
   }
 }

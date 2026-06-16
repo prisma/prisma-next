@@ -48,6 +48,7 @@ Rules below are listed by bare filename; the canonical file is `.agents/rules/<n
 - `namespace-diagnostic-wording.mdc` — User-facing wording for unrecognized/unavailable PSL namespaces
 - `avoid-cleavage-in-prose.mdc` — Don't use "cleavage" as a metaphor in prose; prefer split/boundary/distinction
 - `git-staging.mdc` — Git commit best practices: stage files explicitly, avoid `git add -A`, sign off
+- `running-tests.mdc` — How to run tests (and other slow verification commands): save output to a file once, read the file; don't re-run to grep different lines
 
 ## Testing
 - `test-import-patterns.mdc` — Test import patterns (source files, relative paths, don't export for tests)
@@ -128,6 +129,7 @@ Rules below are listed by bare filename; the canonical file is `.agents/rules/<n
 - `tsdown-config-package-source-only.mdc` — Keep `@prisma-next/tsdown` exports source-only (no `.js` workaround files)
 
 ## Git, CI & workflow
+- `running-tests.mdc` — How to run tests (and other slow verification commands): save output to a file once, read the file; don't re-run to grep different lines
 - `no-target-branches.mdc` — Don't branch on target; use adapters
 - `no-pull-request-target.mdc` — Never add `pull_request_target` to GitHub Actions workflows
 - `no-linear-sub-issues.mdc` — Never create Linear sub-issues; use projects/milestones/relations/labels

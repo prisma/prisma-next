@@ -42,7 +42,7 @@ function rewriteUserSelects(name: string, rewrite: (ast: SelectAst) => SelectAst
     familyId: 'sql',
     async beforeCompile(draft) {
       if (draft.ast.kind !== 'select') return undefined;
-      if (draft.ast.from.kind !== 'table-source') return undefined;
+      if (draft.ast.from?.kind !== 'table-source') return undefined;
       if (draft.ast.from.name !== 'users') return undefined;
       return { ...draft, ast: rewrite(draft.ast) };
     },

@@ -1,5 +1,5 @@
 #!/usr/bin/env -S node
-import { Migration, MigrationCLI, setDefault } from '@prisma-next/postgres/migration';
+import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 
 export default class M extends Migration {
   override describe() {
@@ -10,7 +10,14 @@ export default class M extends Migration {
   }
 
   override get operations() {
-    return [setDefault('public', 'post', 'priority', "DEFAULT 'low'")];
+    return [
+      this.setDefault({
+        schema: 'public',
+        table: 'post',
+        column: 'priority',
+        defaultSql: "DEFAULT 'low'",
+      }),
+    ];
   }
 }
 

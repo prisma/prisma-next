@@ -24,8 +24,8 @@ import { SqliteControlAdapter } from '../../src/exports/control';
 
 const lowerer = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
 
-function oracleSql(tableName: string, spec: SqliteTableSpec): string {
-  const op = preSliceCreateTableOp(tableName, spec);
+async function oracleSql(tableName: string, spec: SqliteTableSpec): Promise<string> {
+  const op = await preSliceCreateTableOp(tableName, spec, lowerer);
   const sql = op.execute[0]?.sql;
   if (sql === undefined) throw new Error('createTable op produced no execute step');
   return sql;
@@ -55,7 +55,7 @@ describe('CreateTableCall lowering output', () => {
     };
     const columns = [col('id', 'INTEGER', { notNull: true }), col('name', 'TEXT')];
 
-    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(await oracleSql(tableName, spec));
   });
 
   it('composite primary key: two NOT NULL columns with table-level PK constraint', async () => {
@@ -74,7 +74,9 @@ describe('CreateTableCall lowering output', () => {
     ];
     const constraints = [primaryKey(['user_id', 'group_id'])];
 
-    expect(await newPathSql(tableName, columns, constraints)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns, constraints)).toBe(
+      await oracleSql(tableName, spec),
+    );
   });
 
   it('table-level UNIQUE constraints (named and unnamed)', async () => {
@@ -100,7 +102,9 @@ describe('CreateTableCall lowering output', () => {
       unique(['email'], { name: 'uq_profiles_email' }),
     ];
 
-    expect(await newPathSql(tableName, columns, constraints)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns, constraints)).toBe(
+      await oracleSql(tableName, spec),
+    );
   });
 
   it('foreign key with ON DELETE CASCADE referential action', async () => {
@@ -132,7 +136,9 @@ describe('CreateTableCall lowering output', () => {
       foreignKey(['author_id'], 'users', ['id'], { onDelete: 'cascade' }),
     ];
 
-    expect(await newPathSql(tableName, columns, constraints)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns, constraints)).toBe(
+      await oracleSql(tableName, spec),
+    );
   });
 
   it('autoincrement primary key: INTEGER PRIMARY KEY AUTOINCREMENT inline', async () => {
@@ -152,7 +158,7 @@ describe('CreateTableCall lowering output', () => {
     };
     const columns = [col('id', 'INTEGER PRIMARY KEY AUTOINCREMENT'), col('payload', 'TEXT')];
 
-    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(await oracleSql(tableName, spec));
   });
 
   it('string literal default', async () => {
@@ -163,7 +169,7 @@ describe('CreateTableCall lowering output', () => {
     };
     const columns = [col('theme', 'TEXT', { default: lit('light') })];
 
-    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(await oracleSql(tableName, spec));
   });
 
   it('number literal default', async () => {
@@ -176,7 +182,7 @@ describe('CreateTableCall lowering output', () => {
     };
     const columns = [col('max_items', 'INTEGER', { default: lit(10) })];
 
-    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(await oracleSql(tableName, spec));
   });
 
   it('boolean literal default emitted as 0/1', async () => {
@@ -193,7 +199,7 @@ describe('CreateTableCall lowering output', () => {
       col('deleted', 'INTEGER', { default: lit(false) }),
     ];
 
-    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(await oracleSql(tableName, spec));
   });
 
   it('null literal default', async () => {
@@ -204,7 +210,7 @@ describe('CreateTableCall lowering output', () => {
     };
     const columns = [col('notes', 'TEXT', { default: lit(null) })];
 
-    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(await oracleSql(tableName, spec));
   });
 
   it('Date literal default emitted as a single-quoted ISO string', async () => {
@@ -223,7 +229,7 @@ describe('CreateTableCall lowering output', () => {
     };
     const columns = [col('created_at', 'TEXT', { default: lit(date) })];
 
-    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(await oracleSql(tableName, spec));
   });
 
   it('JSON object literal default', async () => {
@@ -241,7 +247,7 @@ describe('CreateTableCall lowering output', () => {
     };
     const columns = [col('settings', 'TEXT', { default: lit({ retries: 3 }) })];
 
-    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(await oracleSql(tableName, spec));
   });
 
   it('function default (non-autoincrement)', async () => {
@@ -259,6 +265,6 @@ describe('CreateTableCall lowering output', () => {
     };
     const columns = [col('created_at', 'TEXT', { default: fn("datetime('now')") })];
 
-    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(await oracleSql(tableName, spec));
   });
 });

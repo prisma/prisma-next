@@ -174,7 +174,7 @@ function renderLimitOffset(
 function renderSelect(ast: SelectAst, contract: SqliteContract): string {
   const distinctPrefix = ast.distinct ? 'DISTINCT ' : '';
   const selectClause = `SELECT ${distinctPrefix}${renderProjection(ast.projection, contract)}`;
-  const fromClause = `FROM ${renderSource(ast.from, contract)}`;
+  const fromClause = ast.from !== undefined ? `FROM ${renderSource(ast.from, contract)}` : '';
 
   const joinsClause = ast.joins?.length
     ? ast.joins.map((join) => renderJoin(join, contract)).join(' ')
@@ -261,8 +261,15 @@ function renderSource(source: AnyFromSource, contract: SqliteContract): string {
       return renderTableSource(node, contract);
     case 'derived-table-source':
       return `(${renderSelect(node.query, contract)}) AS ${quoteIdentifier(node.alias)}`;
+    case 'function-source': {
+      const args = node.args.map((arg) => renderExpr(arg, contract)).join(', ');
+      const call = `${node.fn}(${args})`;
+      return node.alias !== undefined ? `${call} AS ${quoteIdentifier(node.alias)}` : call;
+    }
     default:
-      throw new Error(`Unsupported source node kind: ${(node as { kind: string }).kind}`);
+      throw new Error(
+        `Unsupported source node kind: ${(node satisfies never as { kind: string }).kind}`,
+      );
   }
 }
 

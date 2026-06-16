@@ -68,3 +68,29 @@ The Mongo marker/ledger slice (parallel group A) shipped SATISFIED in **one roun
 4. **Harness note:** this environment exposes no subagent-resume, so D2 spawned a fresh implementer + reviewer with self-contained briefs (continuity via on-disk spec/plan + D1's committed surface). Worked fine for a 2-dispatch slice; would cost more context re-derivation on a longer one.
 
 **Follow-up surfaced at review (non-blocking, optional hygiene):** the new `controlDriverDb` error string cites `createMongoControlDriver() from @prisma-next/adapter-mongo/control` while the older `extractDb` string cites `mongoControlDriver.create() from @prisma-next/driver-mongo/control` — both accurate; harmonize if the team cares.
+
+## D4 codec-registration saga (TML-2889) — three rounds in one spot; the lesson is WHICH tests to run
+
+The SQLite typed verification checks need their param codec (`sqlite/text@1`) registered in the control-stack codec lookup to ENCODE at execution time. That registration (`codecDescriptors` on the adapter's `descriptor-meta.ts`) is dual-purpose: it feeds both the execution codec lookup (`forCodecRef`) AND the emit type-renderer. This one field caused a three-round thrash:
+
+1. **bc8177851** added the full registry → fixed execution but broke emit (shared `sql/char@1`'s `renderOutputType` emitted `Char<36>` into the SQLite contract, where `Char` isn't exported/imported → unresolved type).
+2. A reviewer called it "emit-only, not needed for lowering" (WRONG); **5d0df9d8e** reverted it → fixed emit but broke execution (`No codec descriptor registered for 'sqlite/text@1'` in the migration runner).
+3. **be4ed0d80** restored a filtered registry (`startsWith('sqlite/')`); **9b4b98acb** hardened the predicate to `renderOutputType === undefined` + added the missing test.
+
+**Root cause of the repeated escape — a verification hole, not a coding mistake:** every fix verified against the *lowering unit tests*, which build the adapter from `createSqliteBuiltinCodecLookup()` (the FULL registry) and produce SQL+param-arrays WITHOUT encoding params. Production builds the adapter from the FILTERED `stack.codecLookup` and encodes. So the unit tests structurally could not catch a filtered-lookup gap. The regression only showed in the runner INTEGRATION suites (`runner.ledger`, `db-init-update.cli`), which both a reviewer and two fix agents skipped.
+
+**Lessons (durable):**
+1. When a change touches the execution/encode path, the DoD MUST run the integration suites that actually execute (encode params, hit the DB), not just lowering unit tests. A test that builds from a different codec source than production proves nothing about production.
+2. A reviewer's "this is unnecessary" is as fallible as an implementer's "correct improvement" — both were overturned here by running the right tests. Resolve necessity EMPIRICALLY (revert + run the execution path), never by armchair reasoning (the orchestrator did this wrong too, trusting the reviewer's conclusion).
+3. `test:packages` failures under load shift suite-to-suite and pass isolated (contention flakes) — but "confirm isolated at low load" is mandatory before dismissing, because that exact discipline separated the genuine PG flakes from the real SQLite runner regression in the same run.
+4. Prefer intention-revealing predicates over incidental ones (`renderOutputType === undefined`, not `startsWith('sqlite/')`): the incidental form worked only by luck (excluded codecs happened to be identity encoders) and would silently re-break when a future codec violated the unstated invariant.
+
+## Local gates omitted test:integration — a missed consumer shipped to CI (PR #825 review loop)
+
+The slice's local verification ran `test:packages` + targeted suites + fixtures + typecheck, but NOT `pnpm test:integration`. A consumer in `test/integration/test/cli-journeys/migration-round-trip.e2e.test.ts` still called the removed bare `setNotNull` factory (the file was only partially converted — `this.addColumn` updated, bare `setNotNull` left). Nothing local exercised it, so it first failed in CI's "Integration Tests" job.
+
+Compounding orchestrator error: I examined only the "Test" CI job's failures (PGlite flakes) and declared ALL the CI red "confirmed flake" without reading the "Integration Tests" job's distinct failure — which was a real `AssertionError` (emit exit 1), not the flake's `connection error`/`Hook timed out` signature. Two different jobs, two different causes; I conflated them.
+
+**Lessons:**
+1. A breaking-change sweep's verification must run EVERY test lane that exercises the changed API — `test:integration` and e2e lanes, not just `test:packages`. A repo-wide grep for the removed symbols would also have caught it (it found exactly the one missed file once run).
+2. When multiple CI jobs are red, read EACH job's failures separately. "Job A's failures are flakes" does not license "all red is flake." Classify per-job, by failure signature (assertion vs connection/timeout).

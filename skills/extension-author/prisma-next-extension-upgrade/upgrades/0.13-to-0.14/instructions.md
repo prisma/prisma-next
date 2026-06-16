@@ -47,6 +47,21 @@ changes:
       glob: "**/*.{ts,tsx}"
       contains:
         - "createRuntime"
+  - id: migration-op-factories-to-methods
+    summary: |
+      The bare migration op factory functions are removed from
+      `@prisma-next/postgres/migration` (and the deprecated
+      `@prisma-next/target-postgres/migration` alias). Replace each import and
+      call-site with the corresponding method on `this` inside your `Migration`
+      subclass. The option shapes changed from positional arguments to a single
+      options object.
+    detection:
+      glob: "**/migration.ts"
+      contains:
+        - "from '@prisma-next/postgres/migration'"
+        - "from '@prisma-next/target-postgres/migration'"
+      anyMatch: true
+    script: migration-op-factories-to-methods.ts
   - id: namespace-entries-open-dict
     summary: |
       `SqlNamespace.entries` is now an open dictionary typed
@@ -248,6 +263,61 @@ For an unbound contract (e.g. SQLite, or any target whose entities live in the l
 
 This is a type-level change — `pnpm typecheck` (or `pnpm build`) pinpoints every remaining flat access as a compile error (`Property '<table>' does not exist on type 'Db<…>'`). Fix each by inserting the namespace segment, then run your extension's standard `pnpm test`.
 
+## `migration-op-factories-to-methods`
+
+The bare op factory functions previously exported from `@prisma-next/postgres/migration` (and the deprecated `@prisma-next/target-postgres/migration` alias) are removed. Each function is now a protected method on the `PostgresMigration` base class — call it as `this.<method>(...)` inside your extension's `Migration` subclass.
+
+The option shapes also changed: positional arguments are replaced by a single options object.
+
+Remove the bare names from your import and replace each call-site:
+
+| Before (bare function) | After (method) |
+| --- | --- |
+| `dropColumn(schema, table, column)` | `this.dropColumn({ schema, table, column })` |
+| `setNotNull(schema, table, column)` | `this.setNotNull({ schema, table, column })` |
+| `setDefault(schema, table, column, defaultSql)` | `this.setDefault({ schema, table, column, defaultSql })` |
+| `addPrimaryKey(schema, table, name, columns)` | `this.addPrimaryKey({ schema, table, constraint: name, columns })` |
+| `addForeignKey(schema, table, { name, columns, references, onDelete })` | `this.addForeignKey({ schema, table, foreignKey: { name, columns, references, onDelete } })` |
+| `addCheckConstraint(schema, table, name, column, values)` | `this.addCheckConstraint({ schema, table, constraint: name, column, values })` |
+| `createIndex(schema, table, indexName, columns)` | `this.createIndex({ schema, table, index: indexName, columns })` |
+| `installExtension({ id, extensionName, invariantId })` | `this.installExtension({ id, extensionName, invariantId })` |
+
+Example (extension migration):
+
+```ts
+// Before
+import { installExtension, Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
+
+override get operations() {
+  return [
+    installExtension({
+      id: 'my-ext.install',
+      extensionName: 'my_extension',
+      invariantId: MY_INVARIANTS.install,
+    }),
+  ];
+}
+
+// After
+import { Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
+
+override get operations() {
+  return [
+    this.installExtension({
+      id: 'my-ext.install',
+      extensionName: 'my_extension',
+      invariantId: MY_INVARIANTS.install,
+    }),
+  ];
+}
+```
+
+The colocated script applies this transformation automatically. Run it from your extension root:
+
+```bash
+pnpm exec tsx node_modules/.skills/prisma-next-extension-upgrade/upgrades/0.13-to-0.14/migration-op-factories-to-methods.ts
+```
+
 ## `create-runtime-removed`
 
 `createRuntime` is removed from `@prisma-next/sql-runtime`. Construct the target runtime class directly instead.
@@ -406,4 +476,12 @@ TML-2550: per-namespace typed resolution. The extension-package contract.d.ts fi
 (supabase, paradedb, pgvector, postgis) regenerate to the namespace-nested TypeMaps shape
 above; the diff round-trips on a consumer re-emit and needs no extension-author action beyond
 the `namespaced-type-resolution` entry. Incidental substrate diff only.
+-->
+
+<!--
+TML-2918: schema-namespaced op-ids for addColumn. The pgvector test files
+(planner.behavior.test.ts, planner.contract-to-schema-ir.test.ts) were updated to
+assert the new `column.${schema}.${table}.${column}` op-id format for add-column
+operations. Test-only assertion updates — no extension-author API change. Incidental
+substrate diff only.
 -->

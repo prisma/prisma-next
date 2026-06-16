@@ -119,7 +119,7 @@ withTempDir(({ createTempDir }) => {
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
-import { Migration, MigrationCLI, col, setNotNull } from '@prisma-next/postgres/migration';
+import { Migration, MigrationCLI, col } from '@prisma-next/postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import endContractJson from './end-contract.json' with { type: 'json' };
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
@@ -145,7 +145,7 @@ export default class M extends Migration {
         check: () => db.public.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1),
         run: () => db.public.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null)),
       }),
-      setNotNull('public', 'user', 'name'),
+      this.setNotNull({ schema: 'public', table: 'user', column: 'name' }),
     ];
   }
 }
@@ -165,7 +165,7 @@ MigrationCLI.run(import.meta.url, M);
         const opsAfterEmit = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'));
         const opIds = opsAfterEmit.map((op: { id: string }) => op.id);
         // Expected shape: addColumn → dataTransform → setNotNull.
-        expect(opIds).toContain('column.user.name');
+        expect(opIds).toContain('column.public.user.name');
         expect(opIds).toContain('data_migration.backfill-user-name');
         expect(opIds.some((id: string) => id.includes('setNotNull.user.name'))).toBe(true);
 

@@ -18,33 +18,12 @@ export {
   unique,
 } from '@prisma-next/sql-relational-core/contract-free';
 export {
-  alterColumnType,
-  dropColumn,
-  dropDefault,
-  dropNotNull,
-  setDefault,
-  setNotNull,
-} from '../core/migrations/operations/columns';
-export {
-  addCheckConstraint,
-  addForeignKey,
-  addPrimaryKey,
-  addUnique,
-  dropCheckConstraint,
-  dropConstraint,
-} from '../core/migrations/operations/constraints';
-export {
   type DataTransformClosure,
   type DataTransformOptions,
   dataTransform,
 } from '../core/migrations/operations/data-transform';
-export {
-  createExtension,
-  installExtension,
-} from '../core/migrations/operations/dependencies';
-export { createIndex, dropIndex } from '../core/migrations/operations/indexes';
+export { createExtension } from '../core/migrations/operations/dependencies';
 export { rawSql } from '../core/migrations/operations/raw';
-export { dropTable } from '../core/migrations/operations/tables';
 // Target-owned base class for migrations. Aliased to `Migration` so
 // user-edited migration.ts files (and the renderer's scaffold) read as
 // `class M extends Migration { … }` without having to thread the

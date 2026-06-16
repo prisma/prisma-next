@@ -1,39 +1,51 @@
-import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
+import { columnExistsAst } from '../../../contract-free/checks';
+import { quoteIdentifier } from '../../sql-utils';
 import { buildTargetDetails } from '../planner-target-details';
 import { type Op, type SqliteColumnSpec, step } from './shared';
 
-export function addColumn(tableName: string, column: SqliteColumnSpec): Op {
+export function addColumnExecuteSql(tableName: string, column: SqliteColumnSpec): string {
   const parts = [
     `ALTER TABLE ${quoteIdentifier(tableName)}`,
     `ADD COLUMN ${quoteIdentifier(column.name)} ${column.typeSql}`,
     column.defaultSql,
     column.nullable ? '' : 'NOT NULL',
   ].filter(Boolean);
-  const addSql = parts.join(' ');
+  return parts.join(' ');
+}
 
+export function dropColumnExecuteSql(tableName: string, columnName: string): string {
+  return `ALTER TABLE ${quoteIdentifier(tableName)} DROP COLUMN ${quoteIdentifier(columnName)}`;
+}
+
+export async function addColumn(
+  tableName: string,
+  column: SqliteColumnSpec,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
+  const checks = columnExistsAst(tableName, column.name);
+  const absent = await lowerer.lowerToExecuteRequest(checks.columnAbsent());
+  const present = await lowerer.lowerToExecuteRequest(checks.columnPresent());
   return {
     id: `column.${tableName}.${column.name}`,
     label: `Add column ${column.name} on ${tableName}`,
     summary: `Adds column ${column.name} on ${tableName}`,
     operationClass: 'additive',
     target: { id: 'sqlite', details: buildTargetDetails('column', column.name, tableName) },
-    precheck: [
-      step(
-        `ensure column "${column.name}" is missing`,
-        `SELECT COUNT(*) = 0 FROM pragma_table_info('${escapeLiteral(tableName)}') WHERE name = '${escapeLiteral(column.name)}'`,
-      ),
-    ],
-    execute: [step(`add column "${column.name}"`, addSql)],
-    postcheck: [
-      step(
-        `verify column "${column.name}" exists`,
-        `SELECT COUNT(*) > 0 FROM pragma_table_info('${escapeLiteral(tableName)}') WHERE name = '${escapeLiteral(column.name)}'`,
-      ),
-    ],
+    precheck: [step(`ensure column "${column.name}" is missing`, absent.sql, absent.params)],
+    execute: [step(`add column "${column.name}"`, addColumnExecuteSql(tableName, column))],
+    postcheck: [step(`verify column "${column.name}" exists`, present.sql, present.params)],
   };
 }
 
-export function dropColumn(tableName: string, columnName: string): Op {
+export async function dropColumn(
+  tableName: string,
+  columnName: string,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
+  const checks = columnExistsAst(tableName, columnName);
+  const present = await lowerer.lowerToExecuteRequest(checks.columnPresent());
+  const absent = await lowerer.lowerToExecuteRequest(checks.columnAbsent());
   return {
     id: `dropColumn.${tableName}.${columnName}`,
     label: `Drop column ${columnName} on ${tableName}`,
@@ -41,22 +53,16 @@ export function dropColumn(tableName: string, columnName: string): Op {
     operationClass: 'destructive',
     target: { id: 'sqlite', details: buildTargetDetails('column', columnName, tableName) },
     precheck: [
-      step(
-        `ensure column "${columnName}" exists on "${tableName}"`,
-        `SELECT COUNT(*) > 0 FROM pragma_table_info('${escapeLiteral(tableName)}') WHERE name = '${escapeLiteral(columnName)}'`,
-      ),
+      step(`ensure column "${columnName}" exists on "${tableName}"`, present.sql, present.params),
     ],
     execute: [
       step(
         `drop column "${columnName}" from "${tableName}"`,
-        `ALTER TABLE ${quoteIdentifier(tableName)} DROP COLUMN ${quoteIdentifier(columnName)}`,
+        dropColumnExecuteSql(tableName, columnName),
       ),
     ],
     postcheck: [
-      step(
-        `verify column "${columnName}" is gone from "${tableName}"`,
-        `SELECT COUNT(*) = 0 FROM pragma_table_info('${escapeLiteral(tableName)}') WHERE name = '${escapeLiteral(columnName)}'`,
-      ),
+      step(`verify column "${columnName}" is gone from "${tableName}"`, absent.sql, absent.params),
     ],
   };
 }

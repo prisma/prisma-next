@@ -42,7 +42,8 @@
     "precheck": [
       {
         "description": "ensure table \"bug\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"bug\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"bug\""]
       }
     ],
     "execute": [
@@ -55,7 +56,8 @@
     "postcheck": [
       {
         "description": "verify table \"bug\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"bug\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"bug\""]
       }
     ]
   },
@@ -75,7 +77,8 @@
     "precheck": [
       {
         "description": "ensure table \"feature\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"feature\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"feature\""]
       }
     ],
     "execute": [
@@ -88,7 +91,8 @@
     "postcheck": [
       {
         "description": "verify table \"feature\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"feature\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"feature\""]
       }
     ]
   },
@@ -108,7 +112,8 @@
     "precheck": [
       {
         "description": "ensure table \"post\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"post\""]
       }
     ],
     "execute": [
@@ -121,7 +126,8 @@
     "postcheck": [
       {
         "description": "verify table \"post\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"post\""]
       }
     ]
   },
@@ -141,7 +147,8 @@
     "precheck": [
       {
         "description": "ensure table \"task\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"task\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"task\""]
       }
     ],
     "execute": [
@@ -154,7 +161,8 @@
     "postcheck": [
       {
         "description": "verify table \"task\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"task\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"task\""]
       }
     ]
   },
@@ -174,7 +182,8 @@
     "precheck": [
       {
         "description": "ensure table \"user\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"user\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"user\""]
       }
     ],
     "execute": [
@@ -187,7 +196,8 @@
     "postcheck": [
       {
         "description": "verify table \"user\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"user\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"user\""]
       }
     ]
   },
@@ -207,7 +217,8 @@
     "precheck": [
       {
         "description": "ensure constraint \"user_kind_check\" does not exist",
-        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'user_kind_check'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"user\"')\n)"
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["user_kind_check", "public", "\"public\".\"user\""]
       }
     ],
     "execute": [
@@ -219,7 +230,8 @@
     "postcheck": [
       {
         "description": "verify constraint \"user_kind_check\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'user_kind_check'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"user\"')\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["user_kind_check", "public", "\"public\".\"user\""]
       }
     ]
   },
@@ -239,7 +251,8 @@
     "precheck": [
       {
         "description": "ensure FK \"post_userId_fkey\" does not exist",
-        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'post_userId_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"post\"')\n)"
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["post_userId_fkey", "public", "\"public\".\"post\""]
       }
     ],
     "execute": [
@@ -251,7 +264,8 @@
     "postcheck": [
       {
         "description": "verify FK \"post_userId_fkey\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'post_userId_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"post\"')\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["post_userId_fkey", "public", "\"public\".\"post\""]
       }
     ]
   },
@@ -271,7 +285,8 @@
     "precheck": [
       {
         "description": "ensure index \"post_userId_idx\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"post_userId_idx\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"post_userId_idx\""]
       }
     ],
     "execute": [
@@ -283,7 +298,8 @@
     "postcheck": [
       {
         "description": "verify index \"post_userId_idx\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"post_userId_idx\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"post_userId_idx\""]
       }
     ]
   },
@@ -303,7 +319,8 @@
     "precheck": [
       {
         "description": "ensure FK \"task_userId_fkey\" does not exist",
-        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'task_userId_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"task\"')\n)"
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["task_userId_fkey", "public", "\"public\".\"task\""]
       }
     ],
     "execute": [
@@ -315,7 +332,8 @@
     "postcheck": [
       {
         "description": "verify FK \"task_userId_fkey\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'task_userId_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"task\"')\n)"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["task_userId_fkey", "public", "\"public\".\"task\""]
       }
     ]
   },
@@ -335,7 +353,8 @@
     "precheck": [
       {
         "description": "ensure index \"task_userId_idx\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"task_userId_idx\"') IS NULL"
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"task_userId_idx\""]
       }
     ],
     "execute": [
@@ -347,7 +366,8 @@
     "postcheck": [
       {
         "description": "verify index \"task_userId_idx\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"task_userId_idx\"') IS NOT NULL"
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"task_userId_idx\""]
       }
     ]
   }

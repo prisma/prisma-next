@@ -1,19 +1,28 @@
+import type { ParamSpec } from '@prisma-next/operations';
 import { blindCast } from '@prisma-next/utils/casts';
 import {
+  AggregateExpr,
   AndExpr,
   type AnyExpression,
+  type AnyFromSource,
   BinaryExpr,
   ColumnRef,
+  ExistsExpr,
+  IdentifierRef,
   InsertAst,
   InsertOnConflict,
   type InsertValue,
+  JoinAst,
+  LiteralExpr,
   NullCheckExpr,
+  OperationExpr,
   OrderByItem,
   OrExpr,
   ParamRef,
   ProjectionItem,
+  RawExpr,
   SelectAst,
-  type TableSource,
+  TableSource,
   UpdateAst,
 } from '../ast/types';
 
@@ -43,6 +52,187 @@ export class CfExpr {
   not(): CfExpr {
     return new CfExpr(this.ast.not());
   }
+
+  isNull(): CfExpr {
+    return new CfExpr(NullCheckExpr.isNull(this.ast));
+  }
+
+  isNotNull(): CfExpr {
+    return new CfExpr(NullCheckExpr.isNotNull(this.ast));
+  }
+
+  eqLit(value: number | string | boolean): CfExpr {
+    return new CfExpr(BinaryExpr.eq(this.ast, LiteralExpr.of(value)));
+  }
+
+  gtLit(value: number | string | boolean): CfExpr {
+    return new CfExpr(BinaryExpr.gt(this.ast, LiteralExpr.of(value)));
+  }
+
+  eqParam(value: unknown, codecId: string): CfExpr {
+    return new CfExpr(BinaryExpr.eq(this.ast, ParamRef.of(value, { codec: { codecId } })));
+  }
+
+  eqExpr(other: CfExpr): CfExpr {
+    return new CfExpr(BinaryExpr.eq(this.ast, other.ast));
+  }
+}
+
+export interface CfFnOptions {
+  readonly method: string;
+  readonly template: string;
+  readonly self: CfExpr;
+  readonly args?: ReadonlyArray<CfExpr>;
+  readonly returns: ParamSpec;
+}
+
+export const cfExpr = {
+  countStar(): CfExpr {
+    return new CfExpr(AggregateExpr.count());
+  },
+  lit(value: number | string | boolean): CfExpr {
+    return new CfExpr(LiteralExpr.of(value));
+  },
+  identifierRef(name: string): CfExpr {
+    return new CfExpr(IdentifierRef.of(name));
+  },
+  param(value: unknown, codecId: string): CfExpr {
+    return new CfExpr(ParamRef.of(value, { codec: { codecId } }));
+  },
+  /**
+   * Catalog function call lowered via a `'function'`-strategy template
+   * (e.g. `to_regclass({{self}})`). Owns the `OperationExpr` assembly so
+   * target packages only supply vocabulary: template, codec'd operands,
+   * and return spec.
+   */
+  fn(options: CfFnOptions): CfExpr {
+    return new CfExpr(
+      new OperationExpr({
+        method: options.method,
+        self: options.self.ast,
+        args: options.args?.map((arg) => arg.ast),
+        returns: options.returns,
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          template: options.template,
+        },
+      }),
+    );
+  },
+  columnRef(qualifier: string, name: string): CfExpr {
+    return new CfExpr(ColumnRef.of(qualifier, name));
+  },
+  allOf(exprs: ReadonlyArray<CfExpr>): CfExpr {
+    return new CfExpr(AndExpr.of(exprs.map((expr) => expr.ast)));
+  },
+  /**
+   * Opaque DB-side SQL expression (e.g. `current_schema()`) carried as a
+   * `RawExpr`. For zero-operand catalog functions where a `'function'`
+   * lowering template has nothing to substitute.
+   */
+  raw(sql: string, returns: ParamSpec): CfExpr {
+    return new CfExpr(new RawExpr({ parts: [sql], returns }));
+  },
+  exists(query: CfExprSelectQuery): CfExpr {
+    return new CfExpr(ExistsExpr.exists(query.build()));
+  },
+  notExists(query: CfExprSelectQuery): CfExpr {
+    return new CfExpr(ExistsExpr.notExists(query.build()));
+  },
+};
+
+/** Aliased table source for catalog queries (no namespace coordinate). */
+export function cfTable(name: string, alias?: string): TableSource {
+  return TableSource.named(name, alias);
+}
+
+export class CfExprSelectQuery {
+  constructor(
+    private readonly src: AnyFromSource | undefined,
+    private readonly projectionItems: ReadonlyArray<ProjectionItem>,
+    private readonly whereExpr: CfExpr | undefined,
+    private readonly joinItems: ReadonlyArray<JoinAst> = [],
+    private readonly limitValue: number | undefined = undefined,
+  ) {}
+
+  from(source: AnyFromSource): CfExprSelectQuery {
+    return new CfExprSelectQuery(
+      source,
+      this.projectionItems,
+      this.whereExpr,
+      this.joinItems,
+      this.limitValue,
+    );
+  }
+
+  join(source: AnyFromSource, on: CfExpr): CfExprSelectQuery {
+    return new CfExprSelectQuery(
+      this.src,
+      this.projectionItems,
+      this.whereExpr,
+      [...this.joinItems, JoinAst.inner(source, on.ast)],
+      this.limitValue,
+    );
+  }
+
+  leftJoin(source: AnyFromSource, on: CfExpr): CfExprSelectQuery {
+    return new CfExprSelectQuery(
+      this.src,
+      this.projectionItems,
+      this.whereExpr,
+      [...this.joinItems, JoinAst.left(source, on.ast)],
+      this.limitValue,
+    );
+  }
+
+  project(alias: string, expr: CfExpr): CfExprSelectQuery {
+    return new CfExprSelectQuery(
+      this.src,
+      [...this.projectionItems, ProjectionItem.of(alias, expr.ast)],
+      this.whereExpr,
+      this.joinItems,
+      this.limitValue,
+    );
+  }
+
+  where(expr: CfExpr): CfExprSelectQuery {
+    return new CfExprSelectQuery(
+      this.src,
+      this.projectionItems,
+      expr,
+      this.joinItems,
+      this.limitValue,
+    );
+  }
+
+  limit(value: number): CfExprSelectQuery {
+    return new CfExprSelectQuery(
+      this.src,
+      this.projectionItems,
+      this.whereExpr,
+      this.joinItems,
+      value,
+    );
+  }
+
+  build(): SelectAst {
+    if (this.joinItems.length > 0 && this.src === undefined) {
+      throw new Error('CfExprSelectQuery: cannot add a JOIN without a FROM clause');
+    }
+    const base =
+      this.src !== undefined
+        ? SelectAst.from(this.src).withProjection(this.projectionItems)
+        : SelectAst.noFrom().withProjection(this.projectionItems);
+    const withJoins = this.joinItems.length > 0 ? base.withJoins(this.joinItems) : base;
+    const withWhere =
+      this.whereExpr !== undefined ? withJoins.withWhere(this.whereExpr.ast) : withJoins;
+    return this.limitValue !== undefined ? withWhere.withLimit(this.limitValue) : withWhere;
+  }
+}
+
+export function exprSelect(): CfExprSelectQuery {
+  return new CfExprSelectQuery(undefined, [], undefined);
 }
 
 /**

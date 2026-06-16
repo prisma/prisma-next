@@ -17,14 +17,11 @@ export {
   primaryKey,
   unique,
 } from '@prisma-next/sql-relational-core/contract-free';
-export { addColumn, dropColumn } from '../core/migrations/operations/columns';
 export {
   type DataTransformOptions,
   dataTransform,
 } from '../core/migrations/operations/data-transform';
-export { createIndex, dropIndex } from '../core/migrations/operations/indexes';
 export { rawSql } from '../core/migrations/operations/raw';
-export { dropTable, recreateTable } from '../core/migrations/operations/tables';
 // Target-owned base class for migrations. Aliased to `Migration` so
 // user-edited migration.ts files (and the renderer's scaffold) read as
 // `class M extends Migration { … }` without having to thread the

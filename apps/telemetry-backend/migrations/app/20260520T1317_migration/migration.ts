@@ -1,9 +1,10 @@
 #!/usr/bin/env -S node
 import {
-  createIndex,
-  createTable,
+  col,
+  fn,
   Migration,
   MigrationCLI,
+  primaryKey,
 } from '@prisma-next/target-postgres/migration';
 
 export default class M extends Migration {
@@ -16,36 +17,32 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      createTable(
-        '__unbound__',
-        'telemetry_event',
-        [
-          { name: 'agent', typeSql: 'text', defaultSql: '', nullable: true },
-          { name: 'arch', typeSql: 'text', defaultSql: '', nullable: false },
-          { name: 'command', typeSql: 'text', defaultSql: '', nullable: false },
-          { name: 'databaseTarget', typeSql: 'text', defaultSql: '', nullable: true },
-          { name: 'extensions', typeSql: 'jsonb', defaultSql: '', nullable: false },
-          { name: 'flags', typeSql: 'jsonb', defaultSql: '', nullable: false },
-          { name: 'id', typeSql: 'BIGSERIAL', defaultSql: '', nullable: false },
-          {
-            name: 'ingestedAt',
-            typeSql: 'timestamptz',
-            defaultSql: 'DEFAULT (now())',
-            nullable: false,
-          },
-          { name: 'installationId', typeSql: 'text', defaultSql: '', nullable: false },
-          { name: 'os', typeSql: 'text', defaultSql: '', nullable: false },
-          { name: 'packageManager', typeSql: 'text', defaultSql: '', nullable: true },
-          { name: 'runtimeName', typeSql: 'text', defaultSql: '', nullable: false },
-          { name: 'runtimeVersion', typeSql: 'text', defaultSql: '', nullable: false },
-          { name: 'tsVersion', typeSql: 'text', defaultSql: '', nullable: true },
-          { name: 'version', typeSql: 'text', defaultSql: '', nullable: false },
+      this.createTable({
+        table: 'telemetry_event',
+        columns: [
+          col('agent', 'text'),
+          col('arch', 'text', { notNull: true }),
+          col('command', 'text', { notNull: true }),
+          col('databaseTarget', 'text'),
+          col('extensions', 'jsonb', { notNull: true }),
+          col('flags', 'jsonb', { notNull: true }),
+          col('id', 'BIGSERIAL', { notNull: true }),
+          col('ingestedAt', 'timestamptz', { notNull: true, default: fn('now()') }),
+          col('installationId', 'text', { notNull: true }),
+          col('os', 'text', { notNull: true }),
+          col('packageManager', 'text'),
+          col('runtimeName', 'text', { notNull: true }),
+          col('runtimeVersion', 'text', { notNull: true }),
+          col('tsVersion', 'text'),
+          col('version', 'text', { notNull: true }),
         ],
-        { columns: ['id'] },
-      ),
-      createIndex('__unbound__', 'telemetry_event', 'telemetry_event_ingestedAt_idx', [
-        'ingestedAt',
-      ]),
+        constraints: [primaryKey(['id'])],
+      }),
+      this.createIndex({
+        table: 'telemetry_event',
+        index: 'telemetry_event_ingestedAt_idx',
+        columns: ['ingestedAt'],
+      }),
     ];
   }
 }
