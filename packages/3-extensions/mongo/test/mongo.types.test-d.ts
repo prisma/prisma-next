@@ -143,3 +143,16 @@ test('TS DSL defineContract: db.enums.Role.values resolves to the literal tuple'
 test('TS DSL defineContract: db.enums.Role.members.User resolves to "user" literal', () => {
   expectTypeOf<(typeof dslDb)['enums']['Role']['members']['User']>().toEqualTypeOf<'user'>();
 });
+
+// ---------------------------------------------------------------------------
+// F14: TS DSL contract carries a typed namespace enum? slot (no cast required)
+// ---------------------------------------------------------------------------
+
+test('TS DSL defineContract: namespace enum slot is typed without a cast', () => {
+  // MongoDomainNamespaceFromDefinition now includes enum?, so reading the
+  // entries from a built contract doesn't need a RuntimeNs cast.
+  type Ns = (typeof dslContract)['domain']['namespaces']['__unbound__'];
+  type RoleEntry = NonNullable<Ns['enum']>['Role'];
+  type MemberValue = RoleEntry['members'][number]['value'];
+  expectTypeOf<MemberValue>().toEqualTypeOf<'user' | 'admin'>();
+});

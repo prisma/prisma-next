@@ -93,19 +93,27 @@ export function buildNamespacedEnums(domain: {
 // ---------------------------------------------------------------------------
 // Type-level projection of the namespaced enum surface.
 //
-// These types derive the literal-preserving accessor shape from the contract,
-// hung off the `db.enums` facade map (`db.enums.<ns>.<Name>`). They are the
-// same accessors the runtime builds above, but typed from the two emission
-// paths:
-//   - Emitted contracts carry the literal enum entries under
-//     `domain.namespaces[ns].enum`; each maps to a `ContractEnumAccessor`.
-//   - The no-emit (built) contract carries them flat on `enumAccessors`
-//     (already accessor-shaped, literal-preserving), since its built domain
-//     type does not narrow `namespaces[ns].enum`. All authored enums land in
-//     the single built namespace, so exposing the flat map per namespace is
-//     correct there.
-// Only `SqlContractResult` carries `enumAccessors`; emitted contracts never
-// do, so the two carriers never overlap.
+// Dual-carrier rule: enum entries are accessible via two carriers, each
+// serving a distinct use case:
+//
+//   1. domain.namespaces[ns].enum — the primary carrier, present on both
+//      emitted contracts and TS-DSL built contracts. Typed as an entry map
+//      with member values as a union (e.g. 'user' | 'admin'). Used by
+//      `NamespaceEnumEntries` below to build `ContractEnumAccessor` types.
+//      The runtime `buildNamespacedEnums` also reads this path.
+//
+//   2. enumAccessors — an optional carrier on TS-DSL contracts (SqlContractResult,
+//      MongoContractBaseFromDefinition). Accessor-shaped with literal-tuple
+//      `.values` preserved from the `EnumTypeHandle`. Used by `BuiltEnumAccessorsOf`
+//      below to expose `db.enums.Role.values` as a typed tuple rather than an
+//      unordered array. Emitted contracts do not carry this slot.
+//
+// Why two carriers? `ContractEnum.members[].value` is typed as `JsonValue`,
+// which erases literal types. Going through the namespace slot gives
+// `('user'|'admin')[]` (union array), not `readonly ['user','admin']` (tuple).
+// The tuple is needed so `db.enums.Role.values[0]` resolves to `'user'`.
+// `NamespaceEnumAccessors` merges both carriers so the `db.enums` facade
+// surface is correct regardless of which producer made the contract.
 // ---------------------------------------------------------------------------
 
 type Present<T> = Exclude<T, undefined>;
@@ -164,9 +172,9 @@ type EnumEntriesToAccessors<Enums> = {
 };
 
 type BuiltEnumAccessorsOf<TContract> = TContract extends {
-  readonly enumAccessors: infer A;
+  readonly enumAccessors?: infer A;
 }
-  ? A
+  ? Exclude<A, undefined>
   : Record<never, never>;
 
 type NamespaceEnumEntries<TNamespace> = TNamespace extends {
@@ -180,11 +188,18 @@ type NamespaceEnumEntries<TNamespace> = TNamespace extends {
 // The per-namespace enum accessors. Each namespace exposes only its own enums
 // (the IR's `domain.namespaces[ns].enum`), so the same enum name in two
 // namespaces resolves to each namespace's own accessor.
+//
+// Carrier selection: when `enumAccessors` is present on the contract (TS-DSL
+// path), it is the sole source — it carries literal-tuple `.values` via
+// `EnumTypeHandle` generics. When absent (emitted-contract path), the
+// namespace `enum` entries drive the accessor projection. Merging both would
+// create conflicting `values` types for the same enum key.
 export type NamespaceEnumAccessors<
   TContract extends Contract,
   NsId extends keyof TContract['domain']['namespaces'],
-> = EnumEntriesToAccessors<NamespaceEnumEntries<TContract['domain']['namespaces'][NsId]>> &
-  BuiltEnumAccessorsOf<TContract>;
+> = keyof BuiltEnumAccessorsOf<TContract> extends never
+  ? EnumEntriesToAccessors<NamespaceEnumEntries<TContract['domain']['namespaces'][NsId]>>
+  : BuiltEnumAccessorsOf<TContract>;
 
 // The lane-agnostic enum surface exposed on the `db.enums` facade member: a
 // namespace-keyed map projected per target exactly like `db.sql` / `db.orm`.
