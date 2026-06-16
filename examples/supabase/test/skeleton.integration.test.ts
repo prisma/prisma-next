@@ -160,7 +160,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
           hasEnableRls,
           `Expected ENABLE RLS op for public.profile; got: ${JSON.stringify(opIds)}`,
         ).toBe(true);
-        const hasCreatePolicy = opIds.some((id) => id.startsWith('rlsPolicy.profile.'));
+        const hasCreatePolicy = opIds.some((id) => id.startsWith('rlsPolicy.public.profile.'));
         expect(
           hasCreatePolicy,
           `Expected CREATE POLICY op for profile; got: ${JSON.stringify(opIds)}`,

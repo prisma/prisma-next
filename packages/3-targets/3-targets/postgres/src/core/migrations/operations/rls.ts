@@ -73,7 +73,7 @@ export function createRlsPolicy(
   policy: PostgresRlsPolicy,
 ): Op {
   return {
-    id: `rlsPolicy.${tableName}.${policy.name}`,
+    id: `rlsPolicy.${schemaName}.${tableName}.${policy.name}`,
     label: `Create RLS policy "${policy.name}" on "${tableName}"`,
     operationClass: 'additive',
     target: targetDetails('rlsPolicy', policy.name, schemaName, tableName),
@@ -100,7 +100,7 @@ export function createRlsPolicy(
 
 export function dropRlsPolicy(schemaName: string, tableName: string, policyName: string): Op {
   return {
-    id: `rlsPolicy.${tableName}.${policyName}.drop`,
+    id: `rlsPolicy.${schemaName}.${tableName}.${policyName}.drop`,
     label: `Drop RLS policy "${policyName}" on "${tableName}"`,
     operationClass: 'destructive',
     target: targetDetails('rlsPolicy', policyName, schemaName, tableName),
