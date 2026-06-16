@@ -48,6 +48,7 @@ import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+import type { PostgresSchema } from '@prisma-next/target-postgres/types';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from '../src/contract';
@@ -55,7 +56,18 @@ import contractJson from '../src/contract.json' with { type: 'json' };
 import { createDb } from '../src/prisma/db';
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
 
-const POLICY_WIRE_NAME = 'profile_owner_read_3486711c';
+// Derive the policy wire name from the deserialized contract rather than pinning a literal.
+// The public namespace holds exactly one policy; its `.name` is the content-addressed wire name.
+const _deserializedForConsts = new PostgresContractSerializer().deserializeContract<Contract>(
+  contractJson,
+);
+const _publicNsDeserialized = _deserializedForConsts.storage.namespaces['public'];
+// _publicNs is a PostgresSchema at runtime after deserialization. isPostgresSchema narrows
+// to PostgresSchema, but the intersection with the contract's structural literal type
+// reduces to `never` in TypeScript because both define `kind` with incompatible literals
+// ('schema' vs 'postgres-schema'). We cast through unknown to break the intersection.
+const _publicNsAsSchema = _publicNsDeserialized as unknown as PostgresSchema;
+const POLICY_WIRE_NAME: string = Object.values(_publicNsAsSchema.policy)[0]?.name ?? '';
 
 // Active in CI (test:examples). This asserts the M1 walking-skeleton behaviour only —
 // external-contract migrate/verify + the public.profile round-trip — which is green and
@@ -364,7 +376,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
   );
 });
 
-describe.sequential('supabase RLS behavioral e2e — filtering + drift-fails-verify', () => {
+describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
   let migrationsDir: string;
   let client: ReturnType<typeof createControlClient>;
