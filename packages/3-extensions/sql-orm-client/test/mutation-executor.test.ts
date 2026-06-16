@@ -969,7 +969,7 @@ describe('mutation-executor', () => {
         } as never,
       }),
     ).rejects.toThrow(
-      /Cannot `create` on relation `roles`: its junction `user_roles` has required column\(s\) `level`/,
+      /Cannot `create` on relation `roles`: its junction `user_roles` has required column\(s\) `level`.*Write the `user_roles` junction directly or use the SQL builder\./,
     );
   });
 
@@ -993,7 +993,7 @@ describe('mutation-executor', () => {
         } as never,
       }),
     ).rejects.toThrow(
-      /Cannot `connect` on relation `roles`: its junction `user_roles` has required column\(s\) `level`/,
+      /Cannot `connect` on relation `roles`: its junction `user_roles` has required column\(s\) `level`.*Write the `user_roles` junction directly or use the SQL builder\./,
     );
   });
 

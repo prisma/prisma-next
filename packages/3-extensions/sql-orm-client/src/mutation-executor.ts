@@ -818,7 +818,7 @@ function assertJunctionPayloadWritable(
 
   const cols = through.requiredPayloadColumns.map((c) => `\`${c}\``).join(', ');
   throw new Error(
-    `Cannot \`${mutationKind}\` on relation \`${relation.relationName}\`: its junction \`${through.table}\` has required column(s) ${cols} the relation API can't populate. Use the \`${relation.relatedModelName}\` model directly or the SQL builder.`,
+    `Cannot \`${mutationKind}\` on relation \`${relation.relationName}\`: its junction \`${through.table}\` has required column(s) ${cols} the relation API can't populate. Write the \`${through.table}\` junction directly or use the SQL builder.`,
   );
 }
 
