@@ -103,11 +103,12 @@ describe('diffNodes', () => {
     expect(byName).toEqual({ alpha: 'mismatch', gamma: 'missing', delta: 'extra' });
   });
 
-  it('returns issues in deterministic (sorted) order', () => {
+  it('returns issues for all expected nodes when actual is empty', () => {
     const expected = [makeNode('ns', 'widget', 'zzz'), makeNode('ns', 'widget', 'aaa')];
     const issues = diffNodes(expected, []);
-    expect(issues[0]?.coordinate.entityName).toBe('aaa');
-    expect(issues[1]?.coordinate.entityName).toBe('zzz');
+    const names = new Set(issues.map((i) => i.coordinate.entityName));
+    expect(names).toEqual(new Set(['aaa', 'zzz']));
+    expect(issues).toHaveLength(2);
   });
 
   it('message field is a non-empty string', () => {

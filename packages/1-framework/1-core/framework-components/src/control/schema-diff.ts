@@ -22,7 +22,7 @@ function outcomeMessage(outcome: SchemaDiffOutcome, c: EntityCoordinate): string
   return `${outcome}: ${c.entityKind} '${c.entityName}' in namespace '${c.namespaceId}'`;
 }
 
-/** Align two node collections by identity; emit missing/extra/mismatch issues sorted by key. */
+/** Align two node collections by identity; emit missing/extra/mismatch issues in input order. */
 export function diffNodes(
   expected: readonly DiffableNode[],
   actual: readonly DiffableNode[],
@@ -63,12 +63,6 @@ export function diffNodes(
       issues.push({ coordinate, outcome: 'extra', message: outcomeMessage('extra', coordinate) });
     }
   }
-
-  issues.sort((a, b) => {
-    const ka = stableKey(a.coordinate);
-    const kb = stableKey(b.coordinate);
-    return ka < kb ? -1 : ka > kb ? 1 : 0;
-  });
 
   return issues;
 }
