@@ -1,9 +1,8 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
-import type { StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import {
   buildColumnDefaultSql,
   buildColumnTypeSql,
-  buildCreateTableSql,
   renderDefaultLiteral,
 } from '@prisma-next/target-postgres/planner-ddl-builders';
 import { describe, expect, it } from 'vitest';
@@ -150,42 +149,5 @@ describe('renderDefaultLiteral', () => {
   it('renders JSON object without cast for non-json column', () => {
     const result = renderDefaultLiteral({ key: 'val' });
     expect(result).toBe(`'{"key":"val"}'`);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// buildCreateTableSql
-// ---------------------------------------------------------------------------
-
-describe('buildCreateTableSql', () => {
-  it('builds CREATE TABLE with columns and primary key', () => {
-    const table: StorageTable = {
-      columns: {
-        id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-        name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-      },
-      primaryKey: { columns: ['id'] },
-      uniques: [],
-      foreignKeys: [],
-      indexes: [],
-    };
-    const sql = buildCreateTableSql('"public"."user"', table, noHooks);
-    expect(sql).toContain('CREATE TABLE "public"."user"');
-    expect(sql).toContain('"id" int4 NOT NULL');
-    expect(sql).toContain('"name" text');
-    expect(sql).toContain('PRIMARY KEY ("id")');
-  });
-
-  it('omits PRIMARY KEY when not defined', () => {
-    const table: StorageTable = {
-      columns: {
-        value: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-      },
-      uniques: [],
-      foreignKeys: [],
-      indexes: [],
-    };
-    const sql = buildCreateTableSql('"public"."kv"', table, noHooks);
-    expect(sql).not.toContain('PRIMARY KEY');
   });
 });
