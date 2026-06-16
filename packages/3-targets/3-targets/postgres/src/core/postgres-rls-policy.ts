@@ -73,6 +73,14 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
     };
   }
 
+  /**
+   * Equality by wire name only. The wire name is `<prefix>_<sha256(body)[0..8]>`,
+   * so name-equality IS body-equality — two policies with different bodies
+   * have different hashes and therefore different names. We deliberately
+   * skip comparing bodies directly because Postgres reprints predicate
+   * expressions (e.g. strips outer parentheses), so a byte-compare against
+   * the authored body would produce false mismatches on a clean re-verify.
+   */
   isEqualTo(other: DiffableNode): boolean {
     if (!(other instanceof PostgresRlsPolicy)) {
       throw new Error(

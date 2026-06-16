@@ -55,6 +55,44 @@ describe('PostgresRlsPolicy DiffableNode', () => {
     expect(typeof policy.identity).toBe('function');
     expect(typeof policy.isEqualTo).toBe('function');
   });
+
+  describe('content-addressed equality invariant', () => {
+    // Wire name == prefix + '_' + hash(body). Same prefix + different body
+    // produces different hashes, so the wire names differ and isEqualTo is
+    // false. Same body produces the same hash, so isEqualTo is true.
+    // We deliberately do NOT compare bodies directly — Postgres reprints
+    // predicate expressions, so a byte-compare would produce false mismatches
+    // on a clean re-verify.
+    it('same prefix + different body → different wire names → isEqualTo false (no collision)', () => {
+      const bodyV1 = new PostgresRlsPolicy({
+        ...baseInput,
+        name: 'read_own_profiles_a1b2c3d4',
+        using: "(owner_id = current_setting('app.uid')::int)",
+      });
+      const bodyV2 = new PostgresRlsPolicy({
+        ...baseInput,
+        name: 'read_own_profiles_deadbeef',
+        using: '(owner_id = auth.uid())',
+      });
+      expect(bodyV1.isEqualTo(bodyV2)).toBe(false);
+      expect(bodyV2.isEqualTo(bodyV1)).toBe(false);
+      expect(bodyV1.name).not.toBe(bodyV2.name);
+    });
+
+    it('same body → same wire name → isEqualTo true', () => {
+      const authored = new PostgresRlsPolicy({
+        ...baseInput,
+        name: 'read_own_profiles_a1b2c3d4',
+        using: "(owner_id = current_setting('app.uid')::int)",
+      });
+      const introspected = new PostgresRlsPolicy({
+        ...baseInput,
+        name: 'read_own_profiles_a1b2c3d4',
+        using: "(owner_id = current_setting('app.uid')::int)",
+      });
+      expect(authored.isEqualTo(introspected)).toBe(true);
+    });
+  });
 });
 
 describe('PostgresRole DiffableNode', () => {
