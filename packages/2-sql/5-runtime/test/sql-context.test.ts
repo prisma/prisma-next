@@ -496,6 +496,7 @@ describe('applyMutationDefaults', () => {
     const applied = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
+      namespace: '__unbound__',
       values: {},
     });
 
@@ -517,6 +518,7 @@ describe('applyMutationDefaults', () => {
     const applied = context.applyMutationDefaults({
       op: 'update',
       table: 'user',
+      namespace: '__unbound__',
       values: { email: 'alice@example.com' },
     });
 
@@ -538,6 +540,7 @@ describe('applyMutationDefaults', () => {
     const applied = context.applyMutationDefaults({
       op: 'update',
       table: 'user',
+      namespace: '__unbound__',
       values: {},
     });
 
@@ -610,18 +613,21 @@ describe('applyMutationDefaults', () => {
     const row1 = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
+      namespace: '__unbound__',
       values: { id: 'a' },
       defaultValueCache,
     });
     const row2 = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
+      namespace: '__unbound__',
       values: { id: 'b' },
       defaultValueCache,
     });
     const row3 = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
+      namespace: '__unbound__',
       values: { id: 'c' },
       defaultValueCache,
     });
@@ -635,6 +641,7 @@ describe('applyMutationDefaults', () => {
     const row4 = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
+      namespace: '__unbound__',
       values: { id: 'd' },
     });
     expect(counterMarker.invocations).toBe(2);
@@ -711,11 +718,13 @@ describe('applyMutationDefaults', () => {
     const row1 = context.applyMutationDefaults({
       op: 'create',
       table: 'event',
+      namespace: '__unbound__',
       values: { id: 1 },
     });
     const row2 = context.applyMutationDefaults({
       op: 'create',
       table: 'event',
+      namespace: '__unbound__',
       values: { id: 2 },
     });
 
@@ -795,12 +804,14 @@ describe('applyMutationDefaults', () => {
     const row1 = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
+      namespace: '__unbound__',
       values: {},
       defaultValueCache,
     });
     const row2 = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
+      namespace: '__unbound__',
       values: {},
       defaultValueCache,
     });

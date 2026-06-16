@@ -53,11 +53,12 @@ export type MutationDefaultsOptions = {
   readonly table: string;
   /**
    * Namespace of the target table. Execution-default refs are namespace-scoped,
-   * so when supplied only defaults declared for `(namespace, table)` are applied,
-   * disambiguating same-named tables across namespaces. Omit to match by table
-   * name alone.
+   * so only defaults declared for `(namespace, table)` are applied — this is what
+   * disambiguates same-named tables across namespaces. Required so the coordinate
+   * is always part of the match; a missing namespace is a caller bug, not a
+   * silent degrade to table-name-only matching.
    */
-  readonly namespace?: string;
+  readonly namespace: string;
   readonly values: Record<string, unknown>;
   /**
    * Per-ORM-operation cache for generators that declare `stability: 'query'`. The caller passes the same `Map` across every `applyMutationDefaults` invocation in one bulk operation; the framework keys by `generatorId` so the same value is reused across all rows and columns. Generators with `stability: 'row'` use a fresh per-call cache the framework manages internally; generators with `stability: 'field'` skip caching

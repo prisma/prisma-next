@@ -678,7 +678,7 @@ function applyMutationDefaults(
     if (mutationDefault.ref.table !== options.table) {
       continue;
     }
-    if (options.namespace !== undefined && mutationDefault.ref.namespace !== options.namespace) {
+    if (mutationDefault.ref.namespace !== options.namespace) {
       continue;
     }
 

@@ -93,7 +93,12 @@ describe('composed runtime mutation default generators', () => {
       stack: createStack([extension]),
     });
 
-    const applied = context.applyMutationDefaults({ op: 'create', table: 'user', values: {} });
+    const applied = context.applyMutationDefaults({
+      op: 'create',
+      table: 'user',
+      namespace: '__unbound__',
+      values: {},
+    });
     expect(applied).toEqual([{ column: 'id', value: 'slug-from-pack' }]);
   });
 
@@ -138,6 +143,7 @@ describe('composed runtime mutation default generators', () => {
     const applied = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
+      namespace: '__unbound__',
       values: { id: 'user-provided-value' },
     });
     expect(applied).toEqual([]);
