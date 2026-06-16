@@ -3990,10 +3990,10 @@ importers:
         version: 2.0.3
     devDependencies:
       '@prisma-next/psl-parser':
-        specifier: workspace:0.13.0
+        specifier: workspace:0.14.0
         version: link:../../../1-framework/2-authoring/psl-parser
       '@prisma-next/sql-contract-psl':
-        specifier: workspace:0.13.0
+        specifier: workspace:0.14.0
         version: link:../../../2-sql/2-authoring/contract-psl
       '@prisma-next/test-utils':
         specifier: workspace:0.14.0
@@ -4142,7 +4142,7 @@ importers:
         specifier: workspace:0.14.0
         version: link:../../../1-framework/3-tooling/migration
       '@prisma-next/psl-parser':
-        specifier: workspace:0.13.0
+        specifier: workspace:0.14.0
         version: link:../../../1-framework/2-authoring/psl-parser
       '@prisma-next/test-utils':
         specifier: workspace:0.14.0
