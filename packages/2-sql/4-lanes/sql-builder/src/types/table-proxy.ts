@@ -1,10 +1,10 @@
 import type {
   ExtractCodecTypes,
-  ExtractFieldInputTypes,
   ExtractQueryOperationTypes,
+  ExtractStorageColumnInputTypes,
+  ExtractStorageColumnTypes,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
-import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
 import type { Expression, FieldProxy, Functions } from '../expression';
 import type {
   DefaultScope,
@@ -19,97 +19,66 @@ import type { NamespaceTable, TableProxyContract } from './db';
 import type { DeleteQuery, InsertQuery, InsertValues, UpdateQuery } from './mutation-query';
 import type { WithJoin, WithSelect } from './shared';
 
-type FindModelForTable<
-  C extends TableProxyContract,
+// The storage-column type map for a single namespace/table coordinate, read
+// with a single O(1) index into the emitted `StorageColumnTypes[ns][table]`
+// (output) or `StorageColumnInputTypes[ns][table]` (input). Each entry already
+// carries the full column type — parameterized-codec-refined codec type narrowed
+// to the value-set literal union when present, with nullability applied — so the
+// sql-builder storage surface needs no table→model / column→field walk.
+//
+// Resolves to `never` when the lookup is absent: either the empty default map a
+// non-emitted (in-memory `defineContract`) contract carries — detected by
+// `string extends keyof SCT`, the open index-signature key — or a coordinate not
+// present in an emitted map.
+type StorageColumnMapAt<
+  SCT,
   NsId extends string,
   TableName extends string,
-> = C['domain']['namespaces'][NsId]['models'] extends infer Models extends Record<string, unknown>
-  ? {
-      [M in keyof Models & string]: Models[M] extends {
-        readonly storage: { readonly table: TableName };
-      }
-        ? M
-        : never;
-    }[keyof Models & string]
-  : never;
+> = string extends keyof SCT
+  ? never
+  : NsId extends keyof SCT
+    ? string extends keyof SCT[NsId]
+      ? never
+      : TableName extends keyof SCT[NsId]
+        ? SCT[NsId][TableName]
+        : never
+    : never;
 
-type FindFieldForColumn<
-  C extends TableProxyContract,
-  NsId extends string,
-  ModelName extends string,
-  ColumnName extends string,
-> = C['domain']['namespaces'][NsId]['models'] extends infer Models extends Record<string, unknown>
-  ? ModelName extends keyof Models
-    ? Models[ModelName] extends {
-        readonly storage: { readonly fields: infer Fields extends Record<string, unknown> };
-      }
-      ? {
-          [F in keyof Fields & string]: Fields[F] extends { readonly column: ColumnName }
-            ? F
-            : never;
-        }[keyof Fields & string]
-      : never
-    : never
-  : never;
-
-// The select-result row's column types for a table at a namespace coordinate.
-// Each column resolves through `ComputeColumnJsType` with the coordinate, so
-// refined per-namespace output types (e.g. `Vector<N>`) are preserved and
-// same-named tables across namespaces resolve to each namespace's own columns.
-// `ComputeColumnJsType`'s constraint is the minimal `ColumnResolutionContract`,
-// which `TableProxyContract` satisfies, so `C` is indexed directly — no
-// `C extends Contract<SqlStorage>` guard.
+// The select-result row's column types for a table at a namespace coordinate,
+// sourced directly from `StorageColumnTypes[ns][table]`. Same-named tables
+// across namespaces resolve to each namespace's own columns because `NsId` is
+// part of the coordinate; refined per-namespace output types (e.g. `Vector<N>`)
+// are preserved because the storage map bakes them.
+// A homomorphic mapped type over the resolved storage column map's keys, so the
+// result is *always* structurally a `Record<string, unknown>` (satisfying
+// `QueryContext['resolvedColumnOutputTypes']`) even while `C` is still generic.
+// `ColumnKeys` is `string` when the coordinate is absent / the map is the empty
+// default, yielding `Record<string, never>`.
 type ResolvedColumnTypes<
   C extends TableProxyContract,
   NsId extends string,
   TableName extends string,
-> =
-  NamespaceTable<C, NsId, TableName> extends infer Table extends StorageTable
-    ? {
-        [ColName in keyof Table['columns'] & string]: ComputeColumnJsType<
-          C,
-          NsId,
-          TableName,
-          ColName,
-          ExtractCodecTypes<C>
-        >;
-      }
-    : Record<string, never>;
+  ColMap = StorageColumnMapAt<ExtractStorageColumnTypes<C>, NsId, TableName>,
+  ColumnKeys extends string = [ColMap] extends [never] ? never : keyof ColMap & string,
+> = {
+  readonly [K in ColumnKeys]: ColMap extends Record<K, unknown> ? ColMap[K] : never;
+};
 
+// The accepted insert/update shape for a table at a namespace coordinate: every
+// column optional, typed from `StorageColumnInputTypes[ns][table]` (which bakes
+// the value-set narrowing, codec input, and nullability). Falls back to the
+// generic `InsertValues<Table, CT>` when the storage input map is absent.
 type ResolvedInsertValues<
   C extends TableProxyContract,
   NsId extends string,
   Table extends StorageTable,
   TableName extends string,
   CT extends Record<string, { readonly input: unknown }>,
-  FieldInputs extends Record<string, Record<string, Record<string, unknown>>>,
-> = string extends keyof FieldInputs
-  ? InsertValues<Table, CT>
-  : NsId extends keyof FieldInputs
-    ? FieldInputs[NsId] extends infer NsInputs extends Record<string, Record<string, unknown>>
-      ? FindModelForTable<C, NsId, TableName> extends infer ModelName extends string
-        ? ModelName extends keyof NsInputs
-          ? {
-              [K in keyof Table['columns']]?: FindFieldForColumn<
-                C,
-                NsId,
-                ModelName,
-                K & string
-              > extends infer FieldName extends string
-                ? FieldName extends keyof NsInputs[ModelName]
-                  ? Table['columns'][K]['nullable'] extends true
-                    ? NonNullable<NsInputs[ModelName][FieldName]> | null
-                    : NonNullable<NsInputs[ModelName][FieldName]>
-                  : Table['columns'][K]['codecId'] extends keyof CT
-                    ? CT[Table['columns'][K]['codecId']]['input']
-                    : unknown
-                : Table['columns'][K]['codecId'] extends keyof CT
-                  ? CT[Table['columns'][K]['codecId']]['input']
-                  : unknown;
-            }
-          : InsertValues<Table, CT>
-        : InsertValues<Table, CT>
-      : InsertValues<Table, CT>
+> =
+  StorageColumnMapAt<ExtractStorageColumnInputTypes<C>, NsId, TableName> extends infer ColMap
+    ? [ColMap] extends [never]
+      ? InsertValues<Table, CT>
+      : { [K in keyof ColMap]?: ColMap[K] }
     : InsertValues<Table, CT>;
 
 type ResolvedUpdateValues<
@@ -118,8 +87,7 @@ type ResolvedUpdateValues<
   Table extends StorageTable,
   TableName extends string,
   CT extends Record<string, { readonly input: unknown }>,
-  FieldInputs extends Record<string, Record<string, Record<string, unknown>>>,
-> = ResolvedInsertValues<C, NsId, Table, TableName, CT, FieldInputs>;
+> = ResolvedInsertValues<C, NsId, Table, TableName, CT>;
 
 type ResolvedUpdateExpressions<Table extends StorageTable> = {
   [K in keyof Table['columns']]?: Expression<{
@@ -155,26 +123,12 @@ export interface TableProxy<
 
   insert(
     rows: ReadonlyArray<
-      ResolvedInsertValues<
-        C,
-        NsId,
-        NamespaceTable<C, NsId, Name>,
-        Name,
-        QC['codecTypes'],
-        ExtractFieldInputTypes<C>
-      >
+      ResolvedInsertValues<C, NsId, NamespaceTable<C, NsId, Name>, Name, QC['codecTypes']>
     >,
   ): InsertQuery<QC, AvailableScope, EmptyRow>;
 
   update(
-    set: ResolvedUpdateValues<
-      C,
-      NsId,
-      NamespaceTable<C, NsId, Name>,
-      Name,
-      QC['codecTypes'],
-      ExtractFieldInputTypes<C>
-    >,
+    set: ResolvedUpdateValues<C, NsId, NamespaceTable<C, NsId, Name>, Name, QC['codecTypes']>,
   ): UpdateQuery<QC, AvailableScope, EmptyRow>;
 
   update(
