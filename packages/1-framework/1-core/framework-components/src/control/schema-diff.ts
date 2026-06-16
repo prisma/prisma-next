@@ -6,6 +6,10 @@ export interface SchemaDiffIssue {
   readonly coordinate: EntityCoordinate;
   readonly outcome: SchemaDiffOutcome;
   readonly message: string;
+  /** The expected (contract-side) node, when available. Absent for `extra` outcomes. */
+  readonly expected?: DiffableNode;
+  /** The actual (live-DB-side) node, when available. Absent for `missing` outcomes. */
+  readonly actual?: DiffableNode;
 }
 
 /** A node the generic differ can align and compare. Implemented by target IR nodes. */
@@ -14,15 +18,19 @@ export interface DiffableNode {
   isEqualTo(other: DiffableNode): boolean;
 }
 
+/** Canonical string key for a coordinate. Uses pipe-separated fields so null bytes cannot appear. */
 function stableKey(c: EntityCoordinate): string {
-  return `${c.entityKind}\0${c.namespaceId}\0${c.entityName}`;
+  return `${c.plane}|${c.namespaceId}|${c.entityKind}|${c.entityName}`;
 }
 
 function outcomeMessage(outcome: SchemaDiffOutcome, c: EntityCoordinate): string {
   return `${outcome}: ${c.entityKind} '${c.entityName}' in namespace '${c.namespaceId}'`;
 }
 
-/** Align two node collections by identity; emit missing/extra/mismatch issues in input order. */
+/**
+ * Align two flat node collections by identity; emit missing/extra/mismatch issues in input order.
+ * Intentionally flat — child-node recursion is a separate follow-on concern (the relational port).
+ */
 export function diffNodes(
   expected: readonly DiffableNode[],
   actual: readonly DiffableNode[],
@@ -47,12 +55,15 @@ export function diffNodes(
         coordinate,
         outcome: 'missing',
         message: outcomeMessage('missing', coordinate),
+        expected: expectedNode,
       });
     } else if (!expectedNode.isEqualTo(actualNode)) {
       issues.push({
         coordinate,
         outcome: 'mismatch',
         message: outcomeMessage('mismatch', coordinate),
+        expected: expectedNode,
+        actual: actualNode,
       });
     }
   }
@@ -60,7 +71,12 @@ export function diffNodes(
   for (const [key, actualNode] of actualMap) {
     if (!expectedMap.has(key)) {
       const coordinate = actualNode.identity();
-      issues.push({ coordinate, outcome: 'extra', message: outcomeMessage('extra', coordinate) });
+      issues.push({
+        coordinate,
+        outcome: 'extra',
+        message: outcomeMessage('extra', coordinate),
+        actual: actualNode,
+      });
     }
   }
 

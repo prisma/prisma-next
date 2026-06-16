@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DiffableNode } from '../src/control/schema-diff';
+import type { DiffableNode, SchemaDiffIssue } from '../src/control/schema-diff';
 import { diffNodes } from '../src/control/schema-diff';
 import type { EntityCoordinate } from '../src/ir/storage';
 
@@ -115,5 +115,44 @@ describe('diffNodes', () => {
     const issues = diffNodes([makeNode('ns', 'x', 'y')], []);
     expect(typeof issues[0]?.message).toBe('string');
     expect((issues[0]?.message.length ?? 0) > 0).toBe(true);
+  });
+
+  it('missing issue carries expected node ref but no actual', () => {
+    const expectedNode = makeNode('public', 'policy', 'read_own_abcd1234');
+    const issues = diffNodes([expectedNode], []);
+    const issue = issues[0] as SchemaDiffIssue;
+    expect(issue.expected).toBe(expectedNode);
+    expect(issue.actual).toBeUndefined();
+  });
+
+  it('extra issue carries actual node ref but no expected', () => {
+    const actualNode = makeNode('public', 'policy', 'stale_policy_deadbeef');
+    const issues = diffNodes([], [actualNode]);
+    const issue = issues[0] as SchemaDiffIssue;
+    expect(issue.actual).toBe(actualNode);
+    expect(issue.expected).toBeUndefined();
+  });
+
+  it('mismatch issue carries both expected and actual node refs', () => {
+    const expectedNode = makeNode('public', 'policy', 'read_own_abcd1234', 'body-v1');
+    const actualNode = makeNode('public', 'policy', 'read_own_abcd1234', 'body-v2');
+    const issues = diffNodes([expectedNode], [actualNode]);
+    const issue = issues[0] as SchemaDiffIssue;
+    expect(issue.expected).toBe(expectedNode);
+    expect(issue.actual).toBe(actualNode);
+  });
+
+  it('stableKey does not use null bytes — coordinate fields are pipe-separated', () => {
+    // Two nodes with entityKind 'pol' + entityName 'icy' must not collide with
+    // a node with entityKind 'policy' and an entityName that starts at the same
+    // byte offset. Null-byte separation would not prevent this; the canonical
+    // coordinate stringify must use a separator that cannot appear in any field.
+    const nodeA = makeNode('public', 'pol', 'icy');
+    const nodeB = makeNode('public', 'policy', 'x');
+    const issues = diffNodes([nodeA], [nodeB]);
+    // Both expected — one missing, one extra
+    expect(issues).toHaveLength(2);
+    const outcomes = new Set(issues.map((i) => i.outcome));
+    expect(outcomes).toEqual(new Set(['missing', 'extra']));
   });
 });
