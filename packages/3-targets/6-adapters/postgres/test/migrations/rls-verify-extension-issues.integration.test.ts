@@ -120,7 +120,10 @@ describe.sequential('RLS verify extension issues', () => {
       frameworkComponents,
       spaceId: APP_SPACE_ID,
     });
-    if (planResult.kind !== 'success') throw new Error(`Planner failed: ${planResult.kind}`);
+    if (planResult.kind !== 'success')
+      throw new Error(
+        `Planner failed: ${planResult.kind}\n${JSON.stringify(planResult.conflicts, null, 2)}`,
+      );
     const executeResult = await runner.execute({
       driver: d,
       perSpaceOptions: [
