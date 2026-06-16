@@ -138,8 +138,8 @@ export interface VerifyDatabaseSchemaResult {
       readonly fail: number;
       readonly totalNodes: number;
     };
-    /** Generic extension issues (e.g. RLS policy drift) contributed by the target adapter. */
-    readonly extensionIssues: readonly SchemaDiffIssue[];
+    /** Schema-diff issues (e.g. RLS policy drift) contributed by the target adapter. */
+    readonly schemaDiffIssues: readonly SchemaDiffIssue[];
   };
   readonly meta?: {
     readonly configPath?: string;

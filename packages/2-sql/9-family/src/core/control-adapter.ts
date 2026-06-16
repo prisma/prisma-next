@@ -196,10 +196,10 @@ export interface SqlControlAdapter<TTarget extends string = string>
   /**
    * Optional hook for collecting target-extension drift issues during schema
    * verification. Called after the relational SQL verification pass; returns
-   * `SchemaDiffIssue[]` that are merged into `VerifyDatabaseSchemaResult.schema.extensionIssues`.
+   * `SchemaDiffIssue[]` that are merged into `VerifyDatabaseSchemaResult.schema.schemaDiffIssues`.
    * The signature is generic — the SQL family never names any target-specific concept.
    */
-  collectExtensionIssues?(
+  collectSchemaDiffIssues?(
     contract: Contract<SqlStorage>,
     schema: SqlSchemaIR,
   ): readonly SchemaDiffIssue[];

@@ -10,7 +10,7 @@ function makeResult(overrides: {
   ok: boolean;
   summary: string;
   fail?: number;
-  extensionIssues?: readonly SchemaDiffIssue[];
+  schemaDiffIssues?: readonly SchemaDiffIssue[];
 }): VerifyDatabaseSchemaResult {
   const fail = overrides.fail ?? (overrides.ok ? 0 : 1);
   const result: VerifyDatabaseSchemaResult = {
@@ -20,7 +20,7 @@ function makeResult(overrides: {
     target: { expected: 'postgres' },
     schema: {
       issues: [],
-      extensionIssues: overrides.extensionIssues ?? [],
+      schemaDiffIssues: overrides.schemaDiffIssues ?? [],
       root: {
         status: overrides.ok ? 'pass' : 'fail',
         kind: 'space',
@@ -192,7 +192,7 @@ describe('combineSchemaResults', () => {
     });
   });
 
-  it('concatenates extensionIssues from all members into the combined result', () => {
+  it('concatenates schemaDiffIssues from all members into the combined result', () => {
     const appIssue: SchemaDiffIssue = {
       coordinate: {
         plane: 'storage',
@@ -221,7 +221,7 @@ describe('combineSchemaResults', () => {
           spaceId: 'app',
           ok: true,
           summary: 'Database schema satisfies contract',
-          extensionIssues: [appIssue],
+          schemaDiffIssues: [appIssue],
         }),
       ],
       [
@@ -230,13 +230,13 @@ describe('combineSchemaResults', () => {
           spaceId: 'cipher',
           ok: true,
           summary: 'Schema matches contract',
-          extensionIssues: [extIssue],
+          schemaDiffIssues: [extIssue],
         }),
       ],
     ]);
 
     const combined = combineSchemaResults(perSpace, 'app', false);
 
-    expect(combined.schema.extensionIssues).toEqual([appIssue, extIssue]);
+    expect(combined.schema.schemaDiffIssues).toEqual([appIssue, extIssue]);
   });
 });

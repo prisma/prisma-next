@@ -539,11 +539,11 @@ export function formatSchemaVerifyOutput(
   });
   lines.push(...treeLines);
 
-  // Extension issues (e.g. RLS drift) — always render when present.
-  if (result.schema.extensionIssues.length > 0) {
+  // Schema-diff issues (e.g. RLS drift) — always render when present.
+  if (result.schema.schemaDiffIssues.length > 0) {
     lines.push('');
-    lines.push(formatRed('Extension issues:'));
-    for (const issue of result.schema.extensionIssues) {
+    lines.push(formatRed('Schema-diff issues:'));
+    for (const issue of result.schema.schemaDiffIssues) {
       lines.push(`  ${formatRed('✖')} ${issue.message}`);
     }
   }

@@ -171,7 +171,7 @@ describe.sequential('RLS walking skeleton — author → plan → apply → filt
       expect(filtered.rows).toHaveLength(1);
       expect(filtered.rows[0]).toMatchObject({ id: 1, owner_id: 101 });
 
-      // Step 6: re-verify clean — extensionIssues must be empty.
+      // Step 6: re-verify clean — schemaDiffIssues must be empty.
       const introspected = await familyInstance.introspect({ driver, contract });
       const verifyResult = familyInstance.verifySchema({
         contract,
@@ -180,7 +180,7 @@ describe.sequential('RLS walking skeleton — author → plan → apply → filt
         frameworkComponents,
       });
 
-      expect(verifyResult.schema.extensionIssues).toEqual([]);
+      expect(verifyResult.schema.schemaDiffIssues).toEqual([]);
     },
     testTimeout,
   );

@@ -684,16 +684,16 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
       });
-      const extensionIssues =
-        controlAdapter.collectExtensionIssues?.(contract, options.schema) ?? [];
-      if (extensionIssues.length === 0) return sqlResult;
-      const issueCount = extensionIssues.length;
+      const schemaDiffIssues =
+        controlAdapter.collectSchemaDiffIssues?.(contract, options.schema) ?? [];
+      if (schemaDiffIssues.length === 0) return sqlResult;
+      const issueCount = schemaDiffIssues.length;
       return {
         ...sqlResult,
         ok: false,
         code: sqlResult.code ?? 'PN-RUN-3010',
-        summary: `Database schema does not satisfy contract (${issueCount} extension issue${issueCount === 1 ? '' : 's'})`,
-        schema: { ...sqlResult.schema, extensionIssues },
+        summary: `Database schema does not satisfy contract (${issueCount} schema-diff issue${issueCount === 1 ? '' : 's'})`,
+        schema: { ...sqlResult.schema, schemaDiffIssues },
       };
     },
     async sign(options: {

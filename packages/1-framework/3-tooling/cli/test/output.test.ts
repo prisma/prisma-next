@@ -409,7 +409,7 @@ describe('formatSchemaVerifyOutput', () => {
           message: 'Table "post" is missing from database',
         },
       ],
-      extensionIssues: [],
+      schemaDiffIssues: [],
       root: createVerificationNode(),
       counts: {
         pass: 3,
@@ -601,15 +601,15 @@ describe('formatSchemaVerifyOutput', () => {
     expect(stripped).toContain('⚠');
   });
 
-  it('renders extension issues with their message, naming each drifted policy', () => {
+  it('renders schema-diff issues with their message, naming each drifted policy', () => {
     const policyWireName = 'read_own_profiles_abc12345';
     const result: VerifyDatabaseSchemaResult = {
       ...createResult(),
       ok: false,
-      summary: 'Database schema does not satisfy contract (1 extension issue)',
+      summary: 'Database schema does not satisfy contract (1 schema-diff issue)',
       schema: {
         ...createResult().schema,
-        extensionIssues: [
+        schemaDiffIssues: [
           {
             coordinate: {
               plane: 'storage',
@@ -629,8 +629,8 @@ describe('formatSchemaVerifyOutput', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain(policyWireName);
-    expect(stripped).toContain('Extension issues');
-    expect(stripped).toContain('✖ Database schema does not satisfy contract (1 extension issue)');
+    expect(stripped).toContain('Schema-diff issues');
+    expect(stripped).toContain('✖ Database schema does not satisfy contract (1 schema-diff issue)');
   });
 });
 
@@ -649,7 +649,7 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
-        extensionIssues: [],
+        schemaDiffIssues: [],
         root: {
           status: 'pass',
           kind: 'schema',
@@ -707,7 +707,7 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
-        extensionIssues: [],
+        schemaDiffIssues: [],
         root: {
           status: 'pass',
           kind: 'schema',
@@ -755,7 +755,7 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
-        extensionIssues: [],
+        schemaDiffIssues: [],
         root: {
           status: 'pass',
           kind: 'schema',
@@ -810,7 +810,7 @@ describe('formatSchemaVerifyJson', () => {
             message: 'Table "post" is missing',
           },
         ],
-        extensionIssues: [],
+        schemaDiffIssues: [],
         root: {
           status: 'fail',
           kind: 'schema',

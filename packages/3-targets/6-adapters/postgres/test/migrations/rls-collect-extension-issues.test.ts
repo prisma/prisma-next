@@ -106,9 +106,9 @@ function contractWithPolicy(): Contract<SqlStorage> {
   };
 }
 
-describe('collectExtensionIssues — orphan detection', () => {
+describe('collectSchemaDiffIssues — orphan detection', () => {
   it('no contract policy + Prisma-managed DB policy → one extra issue', () => {
-    const issues = controlAdapter.collectExtensionIssues!(
+    const issues = controlAdapter.collectSchemaDiffIssues!(
       emptyContractNoPolicies(),
       schemaWithPolicies([managedPolicy()]),
     );
@@ -119,7 +119,7 @@ describe('collectExtensionIssues — orphan detection', () => {
   });
 
   it('no contract policy + external DB policy → one extra issue', () => {
-    const issues = controlAdapter.collectExtensionIssues!(
+    const issues = controlAdapter.collectSchemaDiffIssues!(
       emptyContractNoPolicies(),
       schemaWithPolicies([externalPolicy()]),
     );
@@ -130,7 +130,7 @@ describe('collectExtensionIssues — orphan detection', () => {
   });
 
   it('matching contract + DB policy → no issues', () => {
-    const issues = controlAdapter.collectExtensionIssues!(
+    const issues = controlAdapter.collectSchemaDiffIssues!(
       contractWithPolicy(),
       schemaWithPolicies([managedPolicy()]),
     );

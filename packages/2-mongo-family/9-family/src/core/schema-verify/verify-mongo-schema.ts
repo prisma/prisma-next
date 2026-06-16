@@ -57,7 +57,7 @@ export function verifyMongoSchema(options: VerifyMongoSchemaOptions): VerifyData
       ...(profileHash ? { profileHash } : {}),
     },
     target: { expected: contract.target },
-    schema: { issues, root, counts, extensionIssues: [] },
+    schema: { issues, root, counts, schemaDiffIssues: [] },
     meta: {
       strict,
       ...ifDefined('contractPath', context?.contractPath),

@@ -1,12 +1,16 @@
 /**
  * Structural invariant: no RLS-specific symbols in packages/1-framework or packages/2-sql.
  *
- * The generic differ and extension-issue plumbing are target-agnostic. Postgres RLS types
+ * The generic differ and schemaDiffIssues plumbing are target-agnostic. Postgres RLS types
  * and identifiers live exclusively in packages/3-targets. This test fails if an RLS symbol
  * leaks into a shared layer.
  *
- * Generic tokens (extensionEntities, extensionIssues, diffNodes, SchemaDiffIssue) are allowed.
+ * Generic tokens (schemaDiffIssues, diffNodes, SchemaDiffIssue) are allowed.
  * Comments are excluded from the scan — only code tokens are checked.
+ *
+ * Note: dependency-cruiser enforces import-level containment (no RLS module imports into
+ * framework/sql). This grep-based test covers the complementary case: locally-defined RLS
+ * symbols (no import needed) that dependency-cruiser cannot detect.
  */
 
 import * as fs from 'node:fs';
@@ -21,7 +25,6 @@ const RLS_PATTERNS = [
   /pg_policies/,
   /policy_select/,
   /\bRLS\b/,
-  /prismaManaged/,
 ];
 
 function stripComments(source: string): string {

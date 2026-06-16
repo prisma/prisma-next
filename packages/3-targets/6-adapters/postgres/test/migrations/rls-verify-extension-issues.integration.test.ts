@@ -140,7 +140,7 @@ describe.sequential('RLS verify extension issues', () => {
     }
   }
 
-  it('extensionIssues is empty when declared policy exists in the database', {
+  it('schemaDiffIssues is empty when the declared policy exists in the database', {
     timeout: testTimeout,
   }, async () => {
     const contract = buildContractWithPolicy();
@@ -154,10 +154,10 @@ describe.sequential('RLS verify extension issues', () => {
       frameworkComponents,
     });
 
-    expect(result.schema.extensionIssues).toEqual([]);
+    expect(result.schema.schemaDiffIssues).toEqual([]);
   });
 
-  it('extensionIssues contains one missing issue when policy is declared but not applied', {
+  it('schemaDiffIssues has one missing issue when policy is declared but absent in the database', {
     timeout: testTimeout,
   }, async () => {
     const contract = buildContractWithPolicy();
@@ -206,8 +206,8 @@ describe.sequential('RLS verify extension issues', () => {
       frameworkComponents,
     });
 
-    expect(result.schema.extensionIssues).toHaveLength(1);
-    const issue = result.schema.extensionIssues[0];
+    expect(result.schema.schemaDiffIssues).toHaveLength(1);
+    const issue = result.schema.schemaDiffIssues[0];
     expect(issue?.outcome).toBe('missing');
     expect(issue?.coordinate.entityKind).toBe('policy');
     expect(issue?.coordinate.entityName).toBe(policy.name);
@@ -261,6 +261,6 @@ describe.sequential('RLS verify extension issues', () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.schema.extensionIssues[0]?.message).toContain(policy.name);
+    expect(result.schema.schemaDiffIssues[0]?.message).toContain(policy.name);
   });
 });

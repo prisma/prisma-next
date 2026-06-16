@@ -123,7 +123,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    */
   readonly normalizeNativeType = normalizeSchemaNativeType;
 
-  collectExtensionIssues(
+  collectSchemaDiffIssues(
     contract: Contract<SqlStorage>,
     schema: SqlSchemaIR,
   ): readonly SchemaDiffIssue[] {

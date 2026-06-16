@@ -205,7 +205,7 @@ describe.sequential('RLS walking skeleton — PSL author → plan → apply → 
       expect(filtered.rows).toHaveLength(1);
       expect(filtered.rows[0]).toMatchObject({ id: 1, owner_id: 101 });
 
-      // Re-verify clean — extensionIssues must be empty.
+      // Re-verify clean — schemaDiffIssues must be empty.
       const introspected = await familyInstance.introspect({ driver, contract });
       const verifyResult = familyInstance.verifySchema({
         contract,
@@ -214,7 +214,7 @@ describe.sequential('RLS walking skeleton — PSL author → plan → apply → 
         frameworkComponents,
       });
 
-      expect(verifyResult.schema.extensionIssues).toEqual([]);
+      expect(verifyResult.schema.schemaDiffIssues).toEqual([]);
     },
     testTimeout,
   );

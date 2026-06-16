@@ -30,7 +30,7 @@ export function combineSchemaResults(
   let okAll = true;
   let firstFailure: VerifyDatabaseSchemaResult | undefined;
   let issues: VerifyDatabaseSchemaResult['schema']['issues'] = [];
-  let extensionIssues: VerifyDatabaseSchemaResult['schema']['extensionIssues'] = [];
+  let schemaDiffIssues: VerifyDatabaseSchemaResult['schema']['schemaDiffIssues'] = [];
   const counts = { pass: 0, warn: 0, fail: 0, totalNodes: 0 };
   const childRoots: Array<VerifyDatabaseSchemaResult['schema']['root']> = [];
   for (const [, result] of perSpace) {
@@ -39,7 +39,7 @@ export function combineSchemaResults(
       if (firstFailure === undefined) firstFailure = result;
     }
     issues = [...issues, ...result.schema.issues];
-    extensionIssues = [...extensionIssues, ...result.schema.extensionIssues];
+    schemaDiffIssues = [...schemaDiffIssues, ...result.schema.schemaDiffIssues];
     counts.pass += result.schema.counts.pass;
     counts.warn += result.schema.counts.warn;
     counts.fail += result.schema.counts.fail;
@@ -67,7 +67,7 @@ export function combineSchemaResults(
     target: appResult.target,
     schema: {
       issues,
-      extensionIssues,
+      schemaDiffIssues,
       root: {
         status: okAll ? 'pass' : 'fail',
         kind: 'aggregate',
