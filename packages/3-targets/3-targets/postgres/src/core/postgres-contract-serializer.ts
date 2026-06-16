@@ -19,6 +19,7 @@ import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contr
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject, JsonValue } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
+import { postgresTargetDescriptorMeta } from './descriptor-meta';
 import { policyEntityKind, roleEntityKind } from './entity-kinds';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
@@ -70,6 +71,10 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
   constructor(extraPackEntityKinds: readonly AnyEntityKindDescriptor[] = []) {
     const storageTypesHydrators = collectStorageTypesHydrators(postgresAuthoringEntityTypes);
     super(storageTypesHydrators, [policyEntityKind, roleEntityKind, ...extraPackEntityKinds]);
+  }
+
+  protected override get defaultNamespaceId(): string {
+    return postgresTargetDescriptorMeta.defaultNamespaceId;
   }
 
   protected override hydrateSqlNamespaceEntry(

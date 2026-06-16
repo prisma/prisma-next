@@ -90,15 +90,25 @@ describe('pgvector extension descriptor (contract-space package layout)', () => 
       (op) => op.invariantId === PGVECTOR_INVARIANTS.installVector,
     ) as
       | {
-          readonly precheck?: ReadonlyArray<{ readonly sql: string }>;
+          readonly precheck?: ReadonlyArray<{
+            readonly sql: string;
+            readonly params?: ReadonlyArray<unknown>;
+          }>;
           readonly execute?: ReadonlyArray<{ readonly sql: string }>;
-          readonly postcheck?: ReadonlyArray<{ readonly sql: string }>;
+          readonly postcheck?: ReadonlyArray<{
+            readonly sql: string;
+            readonly params?: ReadonlyArray<unknown>;
+          }>;
         }
       | undefined;
     expect(installOp).toBeDefined();
     expect(installOp!.execute?.[0]?.sql).toBe('CREATE EXTENSION IF NOT EXISTS vector');
-    expect(installOp!.postcheck?.[0]?.sql).toContain("extname = 'vector'");
-    expect(installOp!.precheck?.[0]?.sql).toContain("extname = 'vector'");
+    // TML-2889 routes pre/postcheck SELECTs through the typed query AST, which
+    // parameterises the extname literal.
+    expect(installOp!.postcheck?.[0]?.sql).toContain('"extname" = $1');
+    expect(installOp!.postcheck?.[0]?.params).toEqual(['vector']);
+    expect(installOp!.precheck?.[0]?.sql).toContain('"extname" = $1');
+    expect(installOp!.precheck?.[0]?.params).toEqual(['vector']);
   });
 
   it("points the head ref at the latest migration's destination hash", () => {

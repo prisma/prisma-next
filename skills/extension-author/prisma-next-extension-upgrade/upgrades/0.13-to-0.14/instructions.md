@@ -485,3 +485,11 @@ assert the new `column.${schema}.${table}.${column}` op-id format for add-column
 operations. Test-only assertion updates — no extension-author API change. Incidental
 substrate diff only.
 -->
+
+<!--
+TML-2916: un-namespaced Postgres extension contracts (pgvector, paradedb, postgis,
+supabase) regenerate to drop the spurious empty `__unbound__` storage namespace slot
+the authoring + serializer pipeline was injecting, restoring ADR 223 compliance.
+Migration `head.json` and `migration.ts` hashes update. No extension-author action:
+re-emit picks up the new shape. Incidental substrate diff only.
+-->

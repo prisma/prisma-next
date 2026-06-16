@@ -169,6 +169,10 @@ describe('PostgresContractSerializer', () => {
         super(registry);
       }
 
+      protected override get defaultNamespaceId(): string {
+        return UNBOUND_NAMESPACE_ID;
+      }
+
       protected override parseSqlContractStructure(_json: unknown): Contract<SqlStorage> {
         const base = createSqlContract({
           storage: {
