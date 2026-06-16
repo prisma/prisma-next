@@ -15,7 +15,8 @@
     "precheck": [
       {
         "description": "verify extension \"postgis\" is not already enabled",
-        "sql": "SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis')"
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_extension\" WHERE \"extname\" = $1) AS \"result\"",
+        "params": ["postgis"]
       }
     ],
     "execute": [
@@ -27,7 +28,8 @@
     "postcheck": [
       {
         "description": "confirm extension \"postgis\" is enabled",
-        "sql": "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis')"
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_extension\" WHERE \"extname\" = $1) AS \"result\"",
+        "params": ["postgis"]
       }
     ]
   }

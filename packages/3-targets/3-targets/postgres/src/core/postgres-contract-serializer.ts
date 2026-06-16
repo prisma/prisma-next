@@ -18,6 +18,7 @@ import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contr
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
+import { postgresTargetDescriptorMeta } from './descriptor-meta';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
@@ -67,6 +68,10 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
   constructor() {
     const storageTypesHydrators = collectStorageTypesHydrators(postgresAuthoringEntityTypes);
     super(storageTypesHydrators);
+  }
+
+  protected override get defaultNamespaceId(): string {
+    return postgresTargetDescriptorMeta.defaultNamespaceId;
   }
 
   protected override hydrateSqlNamespaceEntry(

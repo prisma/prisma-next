@@ -259,13 +259,6 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "entries": {
-          "table": {}
-        },
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema"
-      },
       "auth": {
         "entries": {
           "table": {
@@ -440,7 +433,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:27dcfcb121eec1827ff7464f6262582a413af76d4d86627d93db97bb2108410a",
+    "storageHash": "sha256:61dac13aa56bcb5b7f1c5441c2bd8fc07d88f6c870c80b4c1640fd0d180fb423",
     "types": {
       "Timestamptz": {
         "codecId": "pg/timestamptz@1",
