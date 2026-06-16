@@ -1212,12 +1212,15 @@ type ModelNameForTable<
   NamespaceId extends string,
   TableName extends string,
 > = {
-  [M in keyof ModelsOf<TContract> & string]: ModelsOf<TContract>[M] extends {
+  [M in keyof NamespaceModelsOf<TContract, NamespaceId> & string]: NamespaceModelsOf<
+    TContract,
+    NamespaceId
+  >[M] extends {
     readonly storage: { readonly namespaceId: NamespaceId; readonly table: TableName };
   }
     ? M
     : never;
-}[keyof ModelsOf<TContract> & string];
+}[keyof NamespaceModelsOf<TContract, NamespaceId> & string];
 
 /**
  * A junction field is a *payload* field when its backing column is neither a
