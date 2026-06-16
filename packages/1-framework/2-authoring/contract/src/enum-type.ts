@@ -61,11 +61,12 @@ type MembersAccessorMap<Members extends readonly EnumMember<string, unknown>[]> 
 // EnumTypeHandle — the authoring handle returned by enumType()
 // ---------------------------------------------------------------------------
 
-/**
- * Internal brand that identifies an EnumTypeHandle in the lowering pipeline.
- * Not exported — callers only interact with `EnumTypeHandle`.
- */
-export const ENUM_TYPE_HANDLE_BRAND = Symbol('EnumTypeHandle');
+// String-key brand rather than unique symbol: tsdown inlines a fresh unique
+// symbol into each extension's .d.mts when the source package is transitive,
+// breaking nominal type identity across chunk boundaries. A string constant
+// survives .d.mts de-duplication because string equality is preserved by value.
+// Mirrors the FILTER_EXPR_BRAND pattern in mongo-query-ast/filter-expressions.ts.
+export const ENUM_TYPE_HANDLE_BRAND = '__prismaNextEnumTypeHandle__';
 
 /**
  * Authoring handle returned by `enumType()`. Carries:
@@ -294,7 +295,7 @@ export function bindEnumType<CodecTypes extends CodecTypeMap>(): BoundEnumType<C
 /**
  * Returns true when the value is an `EnumTypeHandle` produced by
  * `enumType()`. Used in the lowering pipeline to detect enum handles
- * in field state without importing the BRAND symbol at every call site.
+ * in field state without importing the brand key at every call site.
  */
 export function isEnumTypeHandle(value: unknown): value is EnumTypeHandle {
   return (
