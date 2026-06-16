@@ -6,6 +6,7 @@ import type {
 import { crossRef } from '@prisma-next/contract/types';
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it, vi } from 'vitest';
 import {
   type DomainEnumLookup,
@@ -16,6 +17,7 @@ import {
   generateFieldInputTypesMap,
   generateFieldOutputTypesMap,
   generateFieldResolvedType,
+  generateFieldTypesMapsByNamespace,
   generateHashTypeAliases,
   generateImportLines,
   generateModelFieldsType,
@@ -1279,5 +1281,169 @@ describe('generateBothFieldTypesMaps with resolveFieldTypeParams', () => {
     const result = generateBothFieldTypesMaps(models, lookup, resolveFieldTypeParams);
     expect(result.output).toContain('readonly embedding: Vector<768>');
     expect(result.output).not.toContain('Vector<1536>');
+  });
+});
+
+describe('resolveFieldType domain-enum narrowing edge cases', () => {
+  const priorityRef = {
+    plane: 'domain' as const,
+    namespaceId: 'public',
+    entityKind: 'enum' as const,
+    entityName: 'Priority',
+  };
+
+  it('renders numeric enum members as plain literals', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/int4@1' },
+      valueSet: priorityRef,
+    };
+    const lookup: DomainEnumLookup = () => ({
+      codecId: 'pg/int4@1',
+      members: [
+        { name: 'Low', value: 1 },
+        { name: 'High', value: 10 },
+      ],
+    });
+    const result = resolveFieldType(field, undefined, undefined, lookup);
+    expect(result.output).toBe('1 | 10');
+    expect(result.input).toBe('1 | 10');
+  });
+
+  it('renders boolean enum members as plain literals', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/bool@1' },
+      valueSet: priorityRef,
+    };
+    const lookup: DomainEnumLookup = () => ({
+      codecId: 'pg/bool@1',
+      members: [
+        { name: 'On', value: true },
+        { name: 'Off', value: false },
+      ],
+    });
+    const result = resolveFieldType(field, undefined, undefined, lookup);
+    expect(result.output).toBe('true | false');
+  });
+
+  it('applies nullability on top of the narrowed union', () => {
+    const field: ContractField = {
+      nullable: true,
+      type: { kind: 'scalar', codecId: 'pg/text@1' },
+      valueSet: priorityRef,
+    };
+    const lookup: DomainEnumLookup = () => ({
+      codecId: 'pg/text@1',
+      members: [{ name: 'Low', value: 'low' }],
+    });
+    const result = resolveFieldType(field, undefined, undefined, lookup);
+    expect(result.output).toBe("'low' | null");
+    expect(result.input).toBe("'low' | null");
+  });
+
+  it('falls through to the codec channel when the lookup returns undefined', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/text@1' },
+      valueSet: priorityRef,
+    };
+    const lookup: DomainEnumLookup = () => undefined;
+    const result = resolveFieldType(field, undefined, undefined, lookup);
+    expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
+  });
+
+  it('falls through to the codec channel when the enum has no members', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/text@1' },
+      valueSet: priorityRef,
+    };
+    const lookup: DomainEnumLookup = () => ({ codecId: 'pg/text@1', members: [] });
+    const result = resolveFieldType(field, undefined, undefined, lookup);
+    expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
+  });
+
+  it('falls through to the codec channel when a member value is non-scalar', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/jsonb@1' },
+      valueSet: priorityRef,
+    };
+    const lookup: DomainEnumLookup = () => ({
+      codecId: 'pg/jsonb@1',
+      members: [{ name: 'Obj', value: { nested: 1 } }],
+    });
+    const result = resolveFieldType(field, undefined, undefined, lookup);
+    expect(result.output).toBe("CodecTypes['pg/jsonb@1']['output']");
+  });
+
+  it('does not narrow non-scalar (union) fields even with a valueSet present', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: {
+        kind: 'union',
+        members: [
+          { kind: 'scalar', codecId: 'pg/text@1' },
+          { kind: 'valueObject', name: 'Address' },
+        ],
+      },
+    };
+    const result = resolveFieldType(field);
+    expect(result.output).toBe("CodecTypes['pg/text@1']['output'] | AddressOutput");
+    expect(result.input).toBe("CodecTypes['pg/text@1']['input'] | AddressInput");
+  });
+});
+
+describe('generateFieldTypesMapsByNamespace edge cases', () => {
+  it('returns Record<string, never> when no namespaces are supplied', () => {
+    const result = generateFieldTypesMapsByNamespace([]);
+    expect(result.output).toBe('Record<string, never>');
+    expect(result.input).toBe('Record<string, never>');
+  });
+
+  it('emits Record<string, never> for a model with no fields', () => {
+    const result = generateBothFieldTypesMaps({
+      Empty: { fields: {}, relations: {}, storage: {} },
+    });
+    expect(result.output).toContain('readonly Empty: Record<string, never>');
+    expect(result.input).toContain('readonly Empty: Record<string, never>');
+  });
+
+  it('skips falsy entries in the models map', () => {
+    // The map's value type allows `ContractModelBase`, but a contract that
+    // arrives through JSON deserialization could have a falsy value at a
+    // model slot (corruption / partial parse). The emitter silently skips
+    // those rather than throwing — the `if (!model) continue` guard.
+    const models = blindCast<
+      Record<string, ContractModel>,
+      'test fixture: deliberately constructs a falsy slot to exercise the skip branch'
+    >({
+      Skipped: undefined,
+      Real: {
+        fields: { name: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
+        relations: {},
+        storage: {},
+      },
+    });
+    const result = generateBothFieldTypesMaps(models);
+    expect(result.output).not.toContain('Skipped');
+    expect(result.output).toContain('readonly Real:');
+  });
+});
+
+describe('serializeCrossReference with space', () => {
+  it('includes the space discriminator when the ref carries one', () => {
+    const result = generateRootsType({ user: crossRef('User', 'public', 'authSpace') });
+    expect(result).toContain("readonly space: 'authSpace'");
+  });
+});
+
+describe('generateValueObjectsDescriptorType empty-field branch', () => {
+  it("renders a value object with no fields as 'Record<string, never>'", () => {
+    const result = generateValueObjectsDescriptorType({
+      EmptyVO: { fields: {} },
+    });
+    expect(result).toContain('readonly EmptyVO: { readonly fields: Record<string, never> }');
   });
 });
