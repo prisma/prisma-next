@@ -14,7 +14,7 @@ A hand-built object literal that "happens" to match the contract shape is **not*
 
 ### No cast-smuggling
 
-Constructing a contract value at runtime and forcing it through the type system with `as unknown as FrameworkContract<...>`, `as unknown as Contract`, `blindCast`/`blindAs`, or any equivalent escape is **strictly forbidden** — that cast is the tell that you are hand-authoring raw contract data. Do not refactor unrelated `as` casts to `blindAs` to slip such a value past review. There is no acceptable variant of this workaround.
+Constructing a contract value at runtime and forcing it through the type system with `as unknown as FrameworkContract<...>`, `as unknown as Contract`, `blindCast`/`castAs`, or any equivalent escape is **strictly forbidden** — that cast is the tell that you are hand-authoring raw contract data. Do not refactor unrelated `as` casts to `blindCast`/`castAs` to slip such a value past review. There is no acceptable variant of this workaround.
 
 ### If you cannot satisfy this rule
 
