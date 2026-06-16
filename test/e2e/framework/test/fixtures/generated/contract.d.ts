@@ -181,13 +181,13 @@ export type StorageColumnTypes = {
       readonly update_at: CodecTypes['pg/timestamptz@1']['output'] | null;
     };
     readonly embedding: {
-      readonly embedding: CodecTypes['pg/vector@1']['output'];
+      readonly embedding: Vector<1536>;
       readonly id: CodecTypes['pg/int4@1']['output'];
-      readonly profile: CodecTypes['arktype/json@1']['output'];
+      readonly profile: { age: number; name: string };
     };
     readonly event: {
       readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
-      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly id: Char<36>;
       readonly name: CodecTypes['pg/text@1']['output'];
       readonly scheduled_at: CodecTypes['pg/timestamptz@1']['output'];
     };
@@ -202,16 +202,16 @@ export type StorageColumnTypes = {
       readonly tags: CodecTypes['pg/jsonb@1']['output'];
     };
     readonly param_types: {
-      readonly bits: CodecTypes['pg/varbit@1']['output'] | null;
-      readonly code: CodecTypes['sql/char@1']['output'] | null;
-      readonly created_at: CodecTypes['pg/timestamptz@1']['output'] | null;
-      readonly duration: CodecTypes['pg/interval@1']['output'] | null;
-      readonly flags: CodecTypes['pg/bit@1']['output'] | null;
+      readonly bits: VarBit<12> | null;
+      readonly code: Char<16> | null;
+      readonly created_at: Timestamptz<3> | null;
+      readonly duration: Interval<6> | null;
+      readonly flags: Bit<8> | null;
       readonly id: CodecTypes['pg/int4@1']['output'];
-      readonly name: CodecTypes['sql/varchar@1']['output'] | null;
-      readonly price: CodecTypes['pg/numeric@1']['output'] | null;
-      readonly starts_at: CodecTypes['pg/time@1']['output'] | null;
-      readonly starts_at_tz: CodecTypes['pg/timetz@1']['output'] | null;
+      readonly name: Varchar<255> | null;
+      readonly price: Numeric<10, 2> | null;
+      readonly starts_at: Time<2> | null;
+      readonly starts_at_tz: Timetz<2> | null;
     };
     readonly post: {
       readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
@@ -224,10 +224,71 @@ export type StorageColumnTypes = {
     };
     readonly user: {
       readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
-      readonly email: CodecTypes['sql/varchar@1']['output'];
+      readonly email: Varchar<255>;
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly profile: CodecTypes['pg/jsonb@1']['output'] | null;
       readonly update_at: CodecTypes['pg/timestamptz@1']['output'] | null;
+    };
+  };
+};
+export type StorageColumnInputTypes = {
+  readonly __unbound__: {};
+  readonly public: {
+    readonly comment: {
+      readonly content: CodecTypes['pg/text@1']['input'];
+      readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly postId: CodecTypes['pg/int4@1']['input'];
+      readonly update_at: CodecTypes['pg/timestamptz@1']['input'] | null;
+    };
+    readonly embedding: {
+      readonly embedding: CodecTypes['pg/vector@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly profile: CodecTypes['arktype/json@1']['input'];
+    };
+    readonly event: {
+      readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly scheduled_at: CodecTypes['pg/timestamptz@1']['input'];
+    };
+    readonly literal_defaults: {
+      readonly active: CodecTypes['pg/bool@1']['input'];
+      readonly big_count: CodecTypes['pg/int8@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly label: CodecTypes['pg/text@1']['input'];
+      readonly metadata: CodecTypes['pg/jsonb@1']['input'];
+      readonly rating: CodecTypes['pg/float8@1']['input'];
+      readonly score: CodecTypes['pg/int4@1']['input'];
+      readonly tags: CodecTypes['pg/jsonb@1']['input'];
+    };
+    readonly param_types: {
+      readonly bits: CodecTypes['pg/varbit@1']['input'] | null;
+      readonly code: CodecTypes['sql/char@1']['input'] | null;
+      readonly created_at: CodecTypes['pg/timestamptz@1']['input'] | null;
+      readonly duration: CodecTypes['pg/interval@1']['input'] | null;
+      readonly flags: CodecTypes['pg/bit@1']['input'] | null;
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly name: CodecTypes['sql/varchar@1']['input'] | null;
+      readonly price: CodecTypes['pg/numeric@1']['input'] | null;
+      readonly starts_at: CodecTypes['pg/time@1']['input'] | null;
+      readonly starts_at_tz: CodecTypes['pg/timetz@1']['input'] | null;
+    };
+    readonly post: {
+      readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly meta: CodecTypes['pg/json@1']['input'] | null;
+      readonly published: CodecTypes['pg/bool@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly update_at: CodecTypes['pg/timestamptz@1']['input'] | null;
+      readonly userId: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly user: {
+      readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
+      readonly email: CodecTypes['sql/varchar@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly profile: CodecTypes['pg/jsonb@1']['input'] | null;
+      readonly update_at: CodecTypes['pg/timestamptz@1']['input'] | null;
     };
   };
 };
@@ -235,7 +296,9 @@ export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<

@@ -45,11 +45,14 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 export type FieldOutputTypes = { readonly public: Record<string, never> };
 export type FieldInputTypes = { readonly public: Record<string, never> };
 export type StorageColumnTypes = { readonly __unbound__: {}; readonly public: {} };
+export type StorageColumnInputTypes = { readonly __unbound__: {}; readonly public: {} };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<

@@ -106,11 +106,35 @@ export type StorageColumnTypes = {
     };
   };
 };
+export type StorageColumnInputTypes = {
+  readonly __unbound__: {};
+  readonly public: {
+    readonly telemetry_event: {
+      readonly agent: CodecTypes['pg/text@1']['input'] | null;
+      readonly arch: CodecTypes['pg/text@1']['input'];
+      readonly command: CodecTypes['pg/text@1']['input'];
+      readonly databaseTarget: CodecTypes['pg/text@1']['input'] | null;
+      readonly extensions: CodecTypes['pg/jsonb@1']['input'];
+      readonly flags: CodecTypes['pg/jsonb@1']['input'];
+      readonly id: CodecTypes['pg/int8@1']['input'];
+      readonly ingestedAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly installationId: CodecTypes['pg/text@1']['input'];
+      readonly os: CodecTypes['pg/text@1']['input'];
+      readonly packageManager: CodecTypes['pg/text@1']['input'] | null;
+      readonly runtimeName: CodecTypes['pg/text@1']['input'];
+      readonly runtimeVersion: CodecTypes['pg/text@1']['input'];
+      readonly tsVersion: CodecTypes['pg/text@1']['input'] | null;
+      readonly version: CodecTypes['pg/text@1']['input'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<

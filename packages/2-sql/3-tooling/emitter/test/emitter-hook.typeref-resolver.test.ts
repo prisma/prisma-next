@@ -87,10 +87,14 @@ describe('sqlEmission.resolveFieldTypeParams (integration via generateContractDt
 
     expect(dts).toContain('readonly embedding: Vector<1536> | null');
     // FieldOutputTypes must use the rendered Vector<1536> type, not the raw codec accessor.
-    // (StorageColumnTypes may still use the raw accessor since there is no valueSet on this column.)
     const fieldOutputMatch = dts.match(/export type FieldOutputTypes = ({.+?});/s);
     expect(fieldOutputMatch).not.toBeNull();
     expect(fieldOutputMatch![0]).not.toContain("CodecTypes['pg/vector@1']['output']");
+    // StorageColumnTypes is now param-refined too (it carries the full column type).
+    const storageColumnMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
+    expect(storageColumnMatch).not.toBeNull();
+    expect(storageColumnMatch![0]).toContain('Vector<1536>');
+    expect(storageColumnMatch![0]).not.toContain("CodecTypes['pg/vector@1']['output']");
   });
 
   it('inline column typeParams continue to win over the resolver', () => {
@@ -151,7 +155,17 @@ describe('sqlEmission.resolveFieldTypeParams (integration via generateContractDt
       vectorCodecLookup(),
     );
 
-    expect(dts).toContain('readonly embedding: Vector<768>');
-    expect(dts).not.toContain('Vector<1536>');
+    // Inline 768 wins in the FIELD maps; the storage column keeps its own 1536.
+    const fieldOutputMatch = dts.match(/export type FieldOutputTypes = ({.+?});/s);
+    expect(fieldOutputMatch).not.toBeNull();
+    expect(fieldOutputMatch![0]).toContain('readonly embedding: Vector<768>');
+    expect(fieldOutputMatch![0]).not.toContain('Vector<1536>');
+    const fieldInputMatch = dts.match(/export type FieldInputTypes = ({.+?});/s);
+    expect(fieldInputMatch).not.toBeNull();
+    expect(fieldInputMatch![0]).not.toContain('Vector<1536>');
+    // StorageColumnTypes reflects the column's storage type (typeRef 1536).
+    const storageColumnMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
+    expect(storageColumnMatch).not.toBeNull();
+    expect(storageColumnMatch![0]).toContain('Vector<1536>');
   });
 });

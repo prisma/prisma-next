@@ -78,14 +78,30 @@ export type StorageColumnTypes = {
   readonly public: {
     readonly post: {
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly id: Char<36>;
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly userId: CodecTypes['pg/text@1']['output'];
     };
     readonly user: {
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly email: CodecTypes['pg/text@1']['output'];
-      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly id: Char<36>;
+    };
+  };
+};
+export type StorageColumnInputTypes = {
+  readonly __unbound__: {};
+  readonly public: {
+    readonly post: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+    };
+    readonly user: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly email: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['sql/char@1']['input'];
     };
   };
 };
@@ -93,7 +109,9 @@ export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<

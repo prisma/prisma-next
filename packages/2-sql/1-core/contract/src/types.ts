@@ -83,16 +83,28 @@ export function applyFkDefaults(
 // Shared by the output and input field-type maps and their extractors.
 export type NamespacedFieldTypeMap = Record<string, Record<string, Record<string, unknown>>>;
 
+// Storage-column type maps nested by namespace coordinate:
+// `[namespaceId][table][column]`. Same three-level record shape as a field map,
+// but keyed by storage table/column rather than domain model/field.
+export type NamespacedStorageColumnTypeMap = Record<
+  string,
+  Record<string, Record<string, unknown>>
+>;
+
 export type TypeMaps<
   TCodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
   TQueryOperationTypes extends Record<string, unknown> = Record<string, never>,
   TFieldOutputTypes extends NamespacedFieldTypeMap = Record<string, never>,
   TFieldInputTypes extends NamespacedFieldTypeMap = Record<string, never>,
+  TStorageColumnTypes extends NamespacedStorageColumnTypeMap = Record<string, never>,
+  TStorageColumnInputTypes extends NamespacedStorageColumnTypeMap = Record<string, never>,
 > = {
   readonly codecTypes: TCodecTypes;
   readonly queryOperationTypes: TQueryOperationTypes;
   readonly fieldOutputTypes: TFieldOutputTypes;
   readonly fieldInputTypes: TFieldInputTypes;
+  readonly storageColumnTypes: TStorageColumnTypes;
+  readonly storageColumnInputTypes: TStorageColumnInputTypes;
 };
 
 export type CodecTypesOf<T> = [T] extends [never]
@@ -172,10 +184,30 @@ export type FieldInputTypesOf<T> = [T] extends [never]
       : Record<string, never>
     : Record<string, never>;
 
+export type StorageColumnTypesOf<T> = [T] extends [never]
+  ? Record<string, never>
+  : T extends { readonly storageColumnTypes: infer F }
+    ? F extends NamespacedStorageColumnTypeMap
+      ? F
+      : Record<string, never>
+    : Record<string, never>;
+
+export type StorageColumnInputTypesOf<T> = [T] extends [never]
+  ? Record<string, never>
+  : T extends { readonly storageColumnInputTypes: infer F }
+    ? F extends NamespacedStorageColumnTypeMap
+      ? F
+      : Record<string, never>
+    : Record<string, never>;
+
 export type ExtractCodecTypes<T> = CodecTypesOf<ExtractTypeMapsFromContract<T>>;
 export type ExtractQueryOperationTypes<T> = QueryOperationTypesOf<ExtractTypeMapsFromContract<T>>;
 export type ExtractFieldOutputTypes<T> = FieldOutputTypesOf<ExtractTypeMapsFromContract<T>>;
 export type ExtractFieldInputTypes<T> = FieldInputTypesOf<ExtractTypeMapsFromContract<T>>;
+export type ExtractStorageColumnTypes<T> = StorageColumnTypesOf<ExtractTypeMapsFromContract<T>>;
+export type ExtractStorageColumnInputTypes<T> = StorageColumnInputTypesOf<
+  ExtractTypeMapsFromContract<T>
+>;
 
 export type ResolveCodecTypes<TContract, TTypeMaps> = [TTypeMaps] extends [never]
   ? ExtractCodecTypes<TContract>

@@ -1,4 +1,5 @@
 import type { Contract, ContractField, ContractModelBase } from '@prisma-next/contract/types';
+import type { CodecLookup } from '../shared/codec-types';
 import type { TypesImportSpec } from '../shared/types-import-spec';
 
 export interface GenerateContractTypesOptions {
@@ -54,9 +55,11 @@ export interface EmissionSpi {
   /**
    * Per-family hook that fully overrides the rendered output/input type for a
    * single domain field. Called before the framework's default scalar/enum
-   * narrowing logic runs. The SQL family uses this to source the type from the
-   * storage column's value-set (baked literal union) rather than from the
-   * domain enum block, keeping value-set narrowing inside the SQL family.
+   * narrowing logic runs. The SQL family uses this to source the FULL column
+   * type from the storage column — the parameterized-codec-refined codec type
+   * (via `codecLookup`), narrowed to the value-set literal union when the
+   * column carries one — so `FieldOutputTypes`/`FieldInputTypes` are a true
+   * projection of `StorageColumnTypes`.
    *
    * Returns `undefined` to fall through to the framework's default logic.
    */
@@ -66,15 +69,18 @@ export interface EmissionSpi {
     field: ContractField,
     model: ContractModelBase,
     contract: Contract,
+    codecLookup?: CodecLookup,
   ): ResolvedFieldTypeStrings | undefined;
 
   /**
    * Optional hook for emitting a family-specific top-level type export that
-   * depends on the full contract (e.g. SQL's `StorageColumnTypes` map).
+   * depends on the full contract (e.g. SQL's `StorageColumnTypes` /
+   * `StorageColumnInputTypes` maps). `codecLookup` lets the family render the
+   * parameterized-codec-refined column types (e.g. `Char<36>`, `Vector<1536>`).
    *
    * Returns a string of one or more `export type ...` declarations to insert
    * after the standard `FieldOutputTypes`/`FieldInputTypes` exports, or
    * `undefined` if the family has nothing to add.
    */
-  getExtraTypeExports?(contract: Contract): string | undefined;
+  getExtraTypeExports?(contract: Contract, codecLookup?: CodecLookup): string | undefined;
 }

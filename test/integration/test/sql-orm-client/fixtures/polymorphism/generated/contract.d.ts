@@ -184,11 +184,65 @@ export type StorageColumnTypes = {
     };
   };
 };
+export type StorageColumnInputTypes = {
+  readonly __unbound__: {};
+  readonly public: {
+    readonly accounts: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+    };
+    readonly epics: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly scope: CodecTypes['pg/text@1']['input'];
+    };
+    readonly features: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly priority: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly people: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+    };
+    readonly projects_tbl: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+    };
+    readonly task_comments: {
+      readonly body: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly task_id: CodecTypes['pg/int4@1']['input'] | null;
+    };
+    readonly tasks: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly project_id: CodecTypes['pg/int4@1']['input'] | null;
+      readonly reporter_id: CodecTypes['pg/int4@1']['input'] | null;
+      readonly severity: CodecTypes['pg/text@1']['input'] | null;
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly type: CodecTypes['pg/text@1']['input'];
+    };
+    readonly tickets: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly owner_id: CodecTypes['pg/int4@1']['input'] | null;
+      readonly subject: CodecTypes['pg/text@1']['input'];
+    };
+    readonly users: {
+      readonly account_id: CodecTypes['pg/int4@1']['input'] | null;
+      readonly email: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly kind: CodecTypes['pg/text@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly plan: CodecTypes['pg/text@1']['input'] | null;
+      readonly role: CodecTypes['pg/text@1']['input'] | null;
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<

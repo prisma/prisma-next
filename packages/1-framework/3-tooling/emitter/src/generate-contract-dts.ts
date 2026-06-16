@@ -154,7 +154,7 @@ export function generateContractDts(
 
   const resolveFieldTypeOverride: FieldTypeResolver | undefined = emitter.resolveFieldType
     ? (modelName: string, fieldName: string, field: ContractField, model: ContractModelBase) =>
-        emitter.resolveFieldType?.(modelName, fieldName, field, model, contract)
+        emitter.resolveFieldType?.(modelName, fieldName, field, model, contract, codecLookup)
     : undefined;
 
   const namespaceModelsForFieldTypes = namespaceEntries.map(
@@ -168,7 +168,7 @@ export function generateContractDts(
     resolveFieldTypeOverride,
   );
 
-  const extraTypeExports = emitter.getExtraTypeExports?.(contract);
+  const extraTypeExports = emitter.getExtraTypeExports?.(contract, codecLookup);
 
   const contractWrapper = emitter.getContractWrapper('ContractBase', 'TypeMaps');
 

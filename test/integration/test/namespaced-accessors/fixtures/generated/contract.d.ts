@@ -97,11 +97,32 @@ export type StorageColumnTypes = {
     };
   };
 };
+export type StorageColumnInputTypes = {
+  readonly __unbound__: {};
+  readonly auth: {
+    readonly users: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly token: CodecTypes['pg/text@1']['input'];
+    };
+  };
+  readonly public: {
+    readonly profile: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly user_id: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly users: {
+      readonly email: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<

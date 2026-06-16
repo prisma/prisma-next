@@ -1,10 +1,23 @@
 import { generateContractDts } from '@prisma-next/emitter';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
 import { createEmitterTestContract as createContract } from './create-emitter-test-contract';
 
 const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-hash' };
+
+function vectorCodecLookup(): CodecLookup {
+  return {
+    get: () => undefined,
+    targetTypesFor: () => undefined,
+    metaFor: () => undefined,
+    renderOutputTypeFor: (id, params) =>
+      id === 'pg/vector@1' ? `Vector<${params['length']}>` : undefined,
+    renderInputTypeFor: (id, params) =>
+      id === 'pg/vector@1' ? `VectorInput<${params['length']}>` : undefined,
+  };
+}
 
 describe('StorageColumnTypes', () => {
   it('emits a literal union entry for an enum column (text codec)', () => {
@@ -420,5 +433,276 @@ describe('StorageColumnTypes', () => {
     expect(dts).toContain("readonly priority: 'low' | 'high' | 'urgent'");
     expect(dts).not.toContain('ContractBase[');
     expect(dts).not.toContain("['members'][number]");
+  });
+
+  it('bakes the parameterized-codec-refined type for a typeRef column (not the raw accessor)', () => {
+    const contract = createContract({
+      domain: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            models: {
+              Post: {
+                storage: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  table: 'post',
+                  fields: { embedding: { column: 'embedding' } },
+                },
+                fields: {
+                  embedding: {
+                    nullable: true,
+                    type: { kind: 'scalar', codecId: 'pg/vector@1' },
+                  },
+                },
+                relations: {},
+              },
+            },
+          },
+        },
+      },
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {
+                post: {
+                  columns: {
+                    embedding: {
+                      nativeType: 'vector',
+                      codecId: 'pg/vector@1',
+                      nullable: true,
+                      typeRef: 'Embedding1536',
+                    },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+            },
+          },
+        },
+        types: {
+          Embedding1536: {
+            codecId: 'pg/vector@1',
+            nativeType: 'vector',
+            typeParams: { length: 1536 },
+          },
+        },
+      },
+    });
+
+    const dts = generateContractDts(
+      contract,
+      sqlEmission,
+      [],
+      testHashes,
+      undefined,
+      vectorCodecLookup(),
+    );
+
+    const storageColumnMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
+    expect(storageColumnMatch).not.toBeNull();
+    // The refined codec output is baked in, NOT the raw codec accessor.
+    expect(storageColumnMatch![0]).toContain('readonly embedding: Vector<1536> | null');
+    expect(storageColumnMatch![0]).not.toContain("CodecTypes['pg/vector@1']['output']");
+  });
+
+  it('emits a StorageColumnInputTypes map (param-refined input side)', () => {
+    const contract = createContract({
+      domain: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            models: {
+              Post: {
+                storage: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  table: 'post',
+                  fields: { embedding: { column: 'embedding' }, title: { column: 'title' } },
+                },
+                fields: {
+                  embedding: { nullable: false, type: { kind: 'scalar', codecId: 'pg/vector@1' } },
+                  title: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+                },
+                relations: {},
+              },
+            },
+          },
+        },
+      },
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {
+                post: {
+                  columns: {
+                    embedding: {
+                      nativeType: 'vector',
+                      codecId: 'pg/vector@1',
+                      nullable: false,
+                      typeRef: 'Embedding1536',
+                    },
+                    title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+            },
+          },
+        },
+        types: {
+          Embedding1536: {
+            codecId: 'pg/vector@1',
+            nativeType: 'vector',
+            typeParams: { length: 1536 },
+          },
+        },
+      },
+    });
+
+    const dts = generateContractDts(
+      contract,
+      sqlEmission,
+      [],
+      testHashes,
+      undefined,
+      vectorCodecLookup(),
+    );
+
+    const inputMatch = dts.match(/export type StorageColumnInputTypes = ({.+?});/s);
+    expect(inputMatch).not.toBeNull();
+    // Refined input render for the parameterized column; codec input accessor for the plain one.
+    expect(inputMatch![0]).toContain('readonly embedding: VectorInput<1536>');
+    expect(inputMatch![0]).toContain("readonly title: CodecTypes['pg/text@1']['input']");
+  });
+
+  it('narrows StorageColumnInputTypes to the value-set union for an enum column', () => {
+    const contract = createContract({
+      domain: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            models: {
+              Post: {
+                storage: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  table: 'post',
+                  fields: { priority: { column: 'priority' } },
+                },
+                fields: {
+                  priority: {
+                    nullable: false,
+                    type: { kind: 'scalar', codecId: 'pg/text@1' },
+                    valueSet: {
+                      plane: 'domain',
+                      entityKind: 'enum',
+                      namespaceId: UNBOUND_NAMESPACE_ID,
+                      entityName: 'Priority',
+                    },
+                  },
+                },
+                relations: {},
+              },
+            },
+          },
+        },
+      },
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {
+                post: {
+                  columns: {
+                    priority: {
+                      nativeType: 'text',
+                      codecId: 'pg/text@1',
+                      nullable: false,
+                      valueSet: {
+                        plane: 'storage',
+                        entityKind: 'valueSet',
+                        namespaceId: UNBOUND_NAMESPACE_ID,
+                        entityName: 'Priority',
+                      },
+                    },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+              valueSet: {
+                Priority: { kind: 'valueSet', values: ['low', 'high', 'urgent'] },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const dts = generateContractDts(contract, sqlEmission, [], testHashes);
+
+    const inputMatch = dts.match(/export type StorageColumnInputTypes = ({.+?});/s);
+    expect(inputMatch).not.toBeNull();
+    expect(inputMatch![0]).toContain("readonly priority: 'low' | 'high' | 'urgent'");
+  });
+
+  it('FieldOutputTypes uses the field element codec for a many[] field, not the storage column codec', () => {
+    // A `many` (array) field is stored as a single container column (e.g. jsonb),
+    // but its element type comes from the domain field's own codec (pg/text@1).
+    // The storage lookup override must NOT fire for many/dict fields — the field
+    // map keeps the framework default (element codec), while StorageColumnTypes
+    // shows the container column codec.
+    const contract = createContract({
+      models: {
+        Config: {
+          storage: {
+            table: 'config',
+            fields: { tags: { column: 'tags' } },
+          },
+          fields: {
+            tags: {
+              nullable: false,
+              many: true,
+              type: { kind: 'scalar', codecId: 'pg/text@1' },
+            },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          config: {
+            columns: {
+              // The column stores the array as jsonb (container codec differs).
+              tags: { nativeType: 'jsonb', codecId: 'pg/jsonb@1', nullable: false },
+            },
+            primaryKey: { columns: ['tags'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const dts = generateContractDts(contract, sqlEmission, [], testHashes);
+
+    const fieldOutputMatch = dts.match(/export type FieldOutputTypes = ({.+?});/s);
+    expect(fieldOutputMatch).not.toBeNull();
+    // Field map: element codec (text), wrapped in ReadonlyArray.
+    expect(fieldOutputMatch![0]).toContain(
+      "readonly tags: ReadonlyArray<CodecTypes['pg/text@1']['output']>",
+    );
+    expect(fieldOutputMatch![0]).not.toContain('jsonb');
+
+    // StorageColumnTypes: the container column codec (jsonb).
+    const storageColumnMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
+    expect(storageColumnMatch).not.toBeNull();
+    expect(storageColumnMatch![0]).toContain("readonly tags: CodecTypes['pg/jsonb@1']['output']");
   });
 });

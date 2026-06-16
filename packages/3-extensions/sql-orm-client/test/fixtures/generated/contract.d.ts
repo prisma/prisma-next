@@ -196,7 +196,7 @@ export type StorageColumnTypes = {
       readonly post_id: CodecTypes['pg/int4@1']['output'];
     };
     readonly posts: {
-      readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
+      readonly embedding: Vector<3> | null;
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly user_id: CodecTypes['pg/int4@1']['output'];
@@ -218,14 +218,8 @@ export type StorageColumnTypes = {
       readonly name: CodecTypes['pg/text@1']['output'];
       readonly tenant_id: CodecTypes['pg/int4@1']['output'];
     };
-    readonly roles: {
-      readonly id: CodecTypes['sql/char@1']['output'];
-      readonly name: CodecTypes['pg/text@1']['output'];
-    };
-    readonly tags: {
-      readonly id: CodecTypes['sql/char@1']['output'];
-      readonly name: CodecTypes['pg/text@1']['output'];
-    };
+    readonly roles: { readonly id: Char<36>; readonly name: CodecTypes['pg/text@1']['output'] };
+    readonly tags: { readonly id: Char<36>; readonly name: CodecTypes['pg/text@1']['output'] };
     readonly user_roles: {
       readonly level: CodecTypes['pg/int4@1']['output'];
       readonly role_id: CodecTypes['pg/text@1']['output'];
@@ -246,11 +240,77 @@ export type StorageColumnTypes = {
     };
   };
 };
+export type StorageColumnInputTypes = {
+  readonly __unbound__: {};
+  readonly public: {
+    readonly articles: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly reviewer_id: CodecTypes['pg/int4@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+    };
+    readonly comments: {
+      readonly body: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly post_id: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly posts: {
+      readonly embedding: number[] | null;
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly user_id: CodecTypes['pg/int4@1']['input'];
+      readonly views: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly profiles: {
+      readonly bio: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly user_id: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly project_links: {
+      readonly dst_id: CodecTypes['pg/int4@1']['input'];
+      readonly dst_tenant_id: CodecTypes['pg/int4@1']['input'];
+      readonly src_id: CodecTypes['pg/int4@1']['input'];
+      readonly src_tenant_id: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly projects: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly tenant_id: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly roles: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+    };
+    readonly tags: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+    };
+    readonly user_roles: {
+      readonly level: CodecTypes['pg/int4@1']['input'];
+      readonly role_id: CodecTypes['pg/text@1']['input'];
+      readonly user_id: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly user_tags: {
+      readonly created_at: CodecTypes['pg/text@1']['input'];
+      readonly note: CodecTypes['pg/text@1']['input'] | null;
+      readonly tag_id: CodecTypes['pg/text@1']['input'];
+      readonly user_id: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly users: {
+      readonly address: CodecTypes['pg/jsonb@1']['input'] | null;
+      readonly email: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly invited_by_id: CodecTypes['pg/int4@1']['input'] | null;
+      readonly name: CodecTypes['pg/text@1']['input'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<

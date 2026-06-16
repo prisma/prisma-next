@@ -111,17 +111,14 @@ export type FieldInputTypes = {
 export type StorageColumnTypes = {
   readonly __unbound__: {};
   readonly public: {
-    readonly articles: {
-      readonly id: CodecTypes['sql/char@1']['output'];
-      readonly title: CodecTypes['pg/text@1']['output'];
-    };
+    readonly articles: { readonly id: Char<36>; readonly title: CodecTypes['pg/text@1']['output'] };
     readonly comments: {
       readonly body: CodecTypes['pg/text@1']['output'];
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly post_id: CodecTypes['pg/int4@1']['output'];
     };
     readonly posts: {
-      readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
+      readonly embedding: Vector<3> | null;
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly user_id: CodecTypes['pg/int4@1']['output'];
@@ -140,11 +137,45 @@ export type StorageColumnTypes = {
     };
   };
 };
+export type StorageColumnInputTypes = {
+  readonly __unbound__: {};
+  readonly public: {
+    readonly articles: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+    };
+    readonly comments: {
+      readonly body: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly post_id: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly posts: {
+      readonly embedding: CodecTypes['pg/vector@1']['input'] | null;
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly user_id: CodecTypes['pg/int4@1']['input'];
+      readonly views: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly profiles: {
+      readonly bio: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly user_id: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly users: {
+      readonly email: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly invited_by_id: CodecTypes['pg/int4@1']['input'] | null;
+      readonly name: CodecTypes['pg/text@1']['input'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<

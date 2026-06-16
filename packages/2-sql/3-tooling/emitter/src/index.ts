@@ -10,6 +10,8 @@ import {
   serializeObjectKey,
   serializeValue,
 } from '@prisma-next/emitter/domain-type-generation';
+import { isSafeTypeExpression } from '@prisma-next/emitter/type-expression-safety';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   GenerateContractTypesOptions,
   ResolvedFieldTypeStrings,
@@ -23,6 +25,7 @@ import {
 import type {
   SqlModelStorage,
   SqlStorage,
+  StorageColumn,
   StorageTable,
   StorageTypeInstance,
   StorageValueSet,
@@ -319,7 +322,18 @@ export const sqlEmission = {
     field: ContractField,
     model: ContractModelBase,
     contract: Contract,
+    codecLookup?: CodecLookup,
   ): ResolvedFieldTypeStrings | undefined {
+    // Only plain scalar fields are typed 1:1 by their storage column. Composite
+    // fields (valueObject/union) keep the framework's default (e.g. a jsonb-backed
+    // value-object field renders as `<Name>Output`). `many`/`dict` fields are also
+    // excluded: their element type comes from the domain field's own codec, while
+    // the storage column carries the container codec (e.g. a `string[]` field maps
+    // to a single jsonb column) — so the framework default, which reads the field
+    // codec, is correct for them.
+    if (field.type.kind !== 'scalar') return undefined;
+    if (field.many === true || field.dict === true) return undefined;
+
     const sqlModel = blindCast<
       ContractModel<SqlModelStorage>,
       'same pattern as resolveFieldTypeParams above'
@@ -345,29 +359,34 @@ export const sqlEmission = {
     if (!table) return undefined;
 
     const column = table.columns[storageField.column];
-    if (!column?.valueSet) return undefined;
+    if (!column) return undefined;
 
-    const valueSet = entityAt<StorageValueSet>(storage, {
-      namespaceId: column.valueSet.namespaceId,
-      entityKind: column.valueSet.entityKind,
-      entityName: column.valueSet.entityName,
-    });
-    if (!valueSet) return undefined;
+    const inlineTypeParams = field.type.typeParams;
 
-    const union = renderValueSetUnion(valueSet.values, field.nullable);
-    if (!union) return undefined;
-
-    return { output: union, input: union };
+    return {
+      output: applyFieldModifiers(
+        computeColumnTypeBase(storage, column, 'output', codecLookup, inlineTypeParams),
+        field,
+      ),
+      input: applyFieldModifiers(
+        computeColumnTypeBase(storage, column, 'input', codecLookup, inlineTypeParams),
+        field,
+      ),
+    };
   },
 
-  getExtraTypeExports(contract: Contract): string | undefined {
+  getExtraTypeExports(contract: Contract, codecLookup?: CodecLookup): string | undefined {
     const storage = blindCast<
       SqlStorage | undefined,
       'contract.storage is SqlStorage for sql family'
     >(contract.storage);
     if (!storage?.namespaces) return undefined;
-    const storageColumnTypes = generateStorageColumnTypesMap(storage);
-    return `export type StorageColumnTypes = ${storageColumnTypes};`;
+    const outputMap = generateStorageColumnTypesMap(storage, 'output', codecLookup);
+    const inputMap = generateStorageColumnTypesMap(storage, 'input', codecLookup);
+    return [
+      `export type StorageColumnTypes = ${outputMap};`,
+      `export type StorageColumnInputTypes = ${inputMap};`,
+    ].join('\n');
   },
 
   getFamilyImports(): string[] {
@@ -400,7 +419,7 @@ export const sqlEmission = {
   },
 
   getTypeMapsExpression(): string {
-    return 'TypeMapsType<CodecTypes, QueryOperationTypes, FieldOutputTypes, FieldInputTypes>';
+    return 'TypeMapsType<CodecTypes, QueryOperationTypes, FieldOutputTypes, FieldInputTypes, StorageColumnTypes, StorageColumnInputTypes>';
   },
 
   getContractWrapper(contractBaseName: string, typeMapsName: string): string {
@@ -418,7 +437,7 @@ function renderValueSetLiteral(value: JsonValue): string | undefined {
   return undefined;
 }
 
-function renderValueSetUnion(values: readonly JsonValue[], nullable: boolean): string | undefined {
+function renderValueSetUnionBase(values: readonly JsonValue[]): string | undefined {
   if (values.length === 0) return undefined;
   const literals: string[] = [];
   for (const v of values) {
@@ -426,11 +445,104 @@ function renderValueSetUnion(values: readonly JsonValue[], nullable: boolean): s
     if (lit === undefined) return undefined;
     literals.push(lit);
   }
-  const union = literals.join(' | ');
-  return nullable ? `${union} | null` : union;
+  return literals.join(' | ');
 }
 
-function generateStorageColumnTypesMap(storage: SqlStorage): string {
+type ColumnTypeSide = 'output' | 'input';
+
+function columnTypeParams(
+  storage: SqlStorage,
+  column: StorageColumn,
+): Record<string, unknown> | undefined {
+  if (column.typeRef) {
+    const typeInstance = storage.types?.[column.typeRef];
+    if (typeInstance === undefined) return undefined;
+    return blindCast<
+      Partial<StorageTypeInstance>,
+      'storage.types entries are codec-instance triples carrying optional typeParams'
+    >(typeInstance).typeParams;
+  }
+  return column.typeParams;
+}
+
+function renderRefinedCodecType(
+  column: StorageColumn,
+  side: ColumnTypeSide,
+  params: Record<string, unknown> | undefined,
+  codecLookup: CodecLookup | undefined,
+): string {
+  if (codecLookup && params && Object.keys(params).length > 0) {
+    const rendered =
+      side === 'output'
+        ? codecLookup.renderOutputTypeFor(column.codecId, params)
+        : codecLookup.renderInputTypeFor?.(column.codecId, params);
+    if (rendered && isSafeTypeExpression(rendered)) {
+      return rendered;
+    }
+  }
+  return `CodecTypes[${serializeValue(column.codecId)}][${serializeValue(side)}]`;
+}
+
+/**
+ * The base emitted type for a storage column on one side, WITHOUT nullability
+ * or array/dict modifiers: the parameterized-codec-refined codec type (via
+ * `codecLookup`), narrowed to the value-set literal union when the column
+ * carries one. Baked literals only — no `ContractBase[...]` traversal. Both
+ * `StorageColumnTypes`/`StorageColumnInputTypes` and the field-map override
+ * (`resolveFieldType`) read through this, so the field maps stay a true
+ * projection of the storage lookup.
+ */
+function computeColumnTypeBase(
+  storage: SqlStorage,
+  column: StorageColumn,
+  side: ColumnTypeSide,
+  codecLookup: CodecLookup | undefined,
+  inlineTypeParams?: Record<string, unknown>,
+): string {
+  if (column.valueSet) {
+    const valueSet = entityAt<StorageValueSet>(storage, {
+      namespaceId: column.valueSet.namespaceId,
+      entityKind: column.valueSet.entityKind,
+      entityName: column.valueSet.entityName,
+    });
+    const union = valueSet ? renderValueSetUnionBase(valueSet.values) : undefined;
+    if (union !== undefined) return union;
+  }
+  // Inline domain-field typeParams win over the storage column's, mirroring the
+  // framework default emit path.
+  const params =
+    inlineTypeParams && Object.keys(inlineTypeParams).length > 0
+      ? inlineTypeParams
+      : columnTypeParams(storage, column);
+  return renderRefinedCodecType(column, side, params, codecLookup);
+}
+
+function computeColumnType(
+  storage: SqlStorage,
+  column: StorageColumn,
+  side: ColumnTypeSide,
+  codecLookup: CodecLookup | undefined,
+): string {
+  const base = computeColumnTypeBase(storage, column, side, codecLookup);
+  return column.nullable ? `${base} | null` : base;
+}
+
+// Mirrors the framework's `applyModifiers` (domain-type-generation.ts) exactly
+// so a column-backed field map stays byte-identical: many → ReadonlyArray,
+// dict → Readonly<Record<string, …>>, nullable → | null, in that order.
+function applyFieldModifiers(base: string, field: ContractField): string {
+  let result = base;
+  if (field.many === true) result = `ReadonlyArray<${result}>`;
+  if (field.dict === true) result = `Readonly<Record<string, ${result}>>`;
+  if (field.nullable) result = `${result} | null`;
+  return result;
+}
+
+function generateStorageColumnTypesMap(
+  storage: SqlStorage,
+  side: ColumnTypeSide,
+  codecLookup: CodecLookup | undefined,
+): string {
   const namespaceEntries = Object.entries(storage.namespaces ?? {}).sort(([a], [b]) =>
     a.localeCompare(b),
   );
@@ -450,30 +562,7 @@ function generateStorageColumnTypesMap(storage: SqlStorage): string {
       const colParts: string[] = [];
 
       for (const [colName, col] of colEntries) {
-        let colType: string;
-
-        if (col.valueSet) {
-          const valueSet = entityAt<StorageValueSet>(storage, {
-            namespaceId: col.valueSet.namespaceId,
-            entityKind: col.valueSet.entityKind,
-            entityName: col.valueSet.entityName,
-          });
-          const union = valueSet ? renderValueSetUnion(valueSet.values, col.nullable) : undefined;
-          if (union !== undefined) {
-            colType = union;
-          } else {
-            const codecAccessor = `CodecTypes[${serializeValue(col.codecId)}]`;
-            colType = col.nullable
-              ? `${codecAccessor}['output'] | null`
-              : `${codecAccessor}['output']`;
-          }
-        } else {
-          const codecAccessor = `CodecTypes[${serializeValue(col.codecId)}]`;
-          colType = col.nullable
-            ? `${codecAccessor}['output'] | null`
-            : `${codecAccessor}['output']`;
-        }
-
+        const colType = computeColumnType(storage, col, side, codecLookup);
         colParts.push(`readonly ${serializeObjectKey(colName)}: ${colType}`);
       }
 

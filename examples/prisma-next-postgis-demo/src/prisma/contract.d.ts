@@ -91,19 +91,39 @@ export type StorageColumnTypes = {
   readonly __unbound__: {};
   readonly public: {
     readonly cafe: {
-      readonly id: CodecTypes['sql/char@1']['output'];
-      readonly location: CodecTypes['pg/geometry@1']['output'];
+      readonly id: Char<36>;
+      readonly location: Geometry<4326>;
       readonly name: CodecTypes['pg/text@1']['output'];
     };
     readonly neighborhood: {
-      readonly boundary: CodecTypes['pg/geometry@1']['output'];
-      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly boundary: Geometry<4326>;
+      readonly id: Char<36>;
       readonly name: CodecTypes['pg/text@1']['output'];
     };
     readonly route: {
-      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly id: Char<36>;
       readonly name: CodecTypes['pg/text@1']['output'];
-      readonly path: CodecTypes['pg/geometry@1']['output'];
+      readonly path: Geometry<4326>;
+    };
+  };
+};
+export type StorageColumnInputTypes = {
+  readonly __unbound__: {};
+  readonly public: {
+    readonly cafe: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly location: CodecTypes['pg/geometry@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+    };
+    readonly neighborhood: {
+      readonly boundary: CodecTypes['pg/geometry@1']['input'];
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+    };
+    readonly route: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly path: CodecTypes['pg/geometry@1']['input'];
     };
   };
 };
@@ -111,7 +131,9 @@ export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<
