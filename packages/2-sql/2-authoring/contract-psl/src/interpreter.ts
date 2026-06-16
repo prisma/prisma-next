@@ -14,6 +14,7 @@ import { crossRef } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
   AuthoringEntityContext,
+  AuthoringEntityTypeDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import {
   instantiateAuthoringEntityType,
@@ -125,10 +126,7 @@ export interface InterpretPslDocumentToSqlContractInput {
    * without the factory and falls back to the family
    * `SqlUnboundNamespace` singleton.
    */
-  readonly createNamespace?: (
-    input: SqlNamespaceTablesInput,
-    enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
-  ) => Namespace;
+  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly codecLookup?: CodecLookup;
 }
 
@@ -2234,8 +2232,7 @@ export function interpretPslDocumentToSqlContract(
   // entities into each namespace's entries before handing off to the factory.
   // The entities map keys are discriminator strings — equal to the entries key
   // by the one-string rule — so they merge directly into entries without
-  // translation. The enumTypes argument is not forwarded: the interpreter-level
-  // override doesn't take it (enum types reach the target via namespaceTypes).
+  // translation.
   //
   // Fall back to the target pack's authoring.createNamespace when the caller
   // does not supply one explicitly — the Postgres target pack contributes it so
@@ -2243,10 +2240,7 @@ export function interpretPslDocumentToSqlContract(
   // re-specify the factory.
   const targetCreateNamespace = blindCast<
     | {
-        readonly createNamespace?: (
-          input: SqlNamespaceTablesInput,
-          enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
-        ) => Namespace;
+        readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
       }
     | undefined,
     'target pack may carry createNamespace on its authoring object'
@@ -2254,19 +2248,16 @@ export function interpretPslDocumentToSqlContract(
   const innerCreateNamespace = input.createNamespace ?? targetCreateNamespace;
   const createNamespaceWithExtensions =
     innerCreateNamespace !== undefined
-      ? (
-          nsInput: SqlNamespaceTablesInput,
-          enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
-        ) => {
+      ? (nsInput: SqlNamespaceTablesInput) => {
           const entities = namespaceExtensionEntities.get(nsInput.id);
           if (entities === undefined) {
-            return innerCreateNamespace(nsInput, enumTypes);
+            return innerCreateNamespace(nsInput);
           }
           const extended: SqlNamespaceTablesInput = {
             ...nsInput,
             entries: { ...nsInput.entries, ...entities },
           };
-          return innerCreateNamespace(extended, enumTypes);
+          return innerCreateNamespace(extended);
         }
       : undefined;
 

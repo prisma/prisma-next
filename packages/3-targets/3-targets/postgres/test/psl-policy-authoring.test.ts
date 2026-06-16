@@ -256,10 +256,10 @@ namespace public {
 
     const ns = result.value.storage.namespaces['public'] as PostgresSchema;
     expect(ns).toBeInstanceOf(PostgresSchema);
-    expect(Object.keys(ns.entries.policy)).toHaveLength(1);
+    expect(Object.keys(ns.policy)).toHaveLength(1);
 
-    const [policyKey] = Object.keys(ns.entries.policy);
-    const policy = ns.entries.policy[policyKey!]!;
+    const [policyKey] = Object.keys(ns.policy);
+    const policy = ns.policy[policyKey!]!;
     expect(policy).toBeInstanceOf(PostgresRlsPolicy);
     expect(policy.operation).toBe('select');
     expect(policy.permissive).toBe(true);
@@ -348,10 +348,10 @@ describe('PostgresContractSerializer policy round-trip', () => {
 
     const ns = roundTripped.storage.namespaces['public'] as PostgresSchema;
     expect(ns).toBeInstanceOf(PostgresSchema);
-    expect(Object.keys(ns.entries.policy)).toHaveLength(1);
+    expect(Object.keys(ns.policy)).toHaveLength(1);
 
-    const [policyKey] = Object.keys(ns.entries.policy);
-    const policy = ns.entries.policy[policyKey!]!;
+    const [policyKey] = Object.keys(ns.policy);
+    const policy = ns.policy[policyKey!]!;
     expect(policy).toBeInstanceOf(PostgresRlsPolicy);
     expect(policy.operation).toBe('select');
     expect(policy.permissive).toBe(true);
@@ -371,8 +371,8 @@ describe('PostgresContractSerializer policy round-trip', () => {
     );
 
     const ns = roundTripped.storage.namespaces['public'] as PostgresSchema;
-    const [key] = Object.keys(ns.entries.policy);
-    const policy = ns.entries.policy[key!]!;
+    const [key] = Object.keys(ns.policy);
+    const policy = ns.policy[key!]!;
     expect(Object.isFrozen(policy)).toBe(true);
     expect(() => {
       (policy as { name: string }).name = 'mutated';

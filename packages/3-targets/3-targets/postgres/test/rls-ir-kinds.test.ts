@@ -139,7 +139,7 @@ describe('PostgresSchema role and policy slots', () => {
         role: { authenticated: { name: 'authenticated' } },
       },
     });
-    const role = schema.entries.role['authenticated'];
+    const role = schema.role['authenticated'];
     expect(role).toBeInstanceOf(PostgresRole);
     expect(role?.name).toBe('authenticated');
   });
@@ -173,7 +173,7 @@ describe('PostgresSchema role and policy slots', () => {
       id: 'public',
       entries: { table: {}, type: {}, role: { authenticated: role } },
     });
-    const hydrated = schema.entries.role['authenticated'];
+    const hydrated = schema.role['authenticated'];
     expect(hydrated).toBeInstanceOf(PostgresRole);
     expect(hydrated?.name).toBe(role.name);
     expect(hydrated?.namespaceId).toBe(role.namespaceId);

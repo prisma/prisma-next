@@ -211,7 +211,7 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
       const nsA = contractA.storage.namespaces['public'];
       expect(nsA).toBeDefined();
       if (!isPostgresSchema(nsA)) throw new Error('expected PostgresSchema for public');
-      const policies = Object.values(nsA.entries.policy);
+      const policies = Object.values(nsA.policy);
       expect(policies).toHaveLength(1);
       const nameA = policies[0]?.name ?? '';
       expect(nameA).toMatch(/^p_read_[0-9a-f]{8}$/);
@@ -241,8 +241,8 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
       if (!isPostgresSchema(nsB)) throw new Error('expected PostgresSchema for public (B)');
 
       // Wire names are on policy.name, not the dict key (which is the PSL prefix).
-      const nameA = Object.values(nsA.entries.policy)[0]?.name ?? '';
-      const nameB = Object.values(nsB.entries.policy)[0]?.name ?? '';
+      const nameA = Object.values(nsA.policy)[0]?.name ?? '';
+      const nameB = Object.values(nsB.policy)[0]?.name ?? '';
       expect(nameA).not.toBe(nameB);
 
       const introspected = await familyInstance.introspect({ driver, contract: contractA });
@@ -285,7 +285,7 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
 
       const nsB = contractB.storage.namespaces['public'];
       if (!isPostgresSchema(nsB)) throw new Error('expected PostgresSchema for public (B)');
-      const nameB = Object.values(nsB.entries.policy)[0]?.name ?? '';
+      const nameB = Object.values(nsB.policy)[0]?.name ?? '';
 
       // Exactly one policy for profile.
       const policyRows = await driver.query<{ policyname: string }>(
@@ -328,7 +328,7 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
 
       const nsB = contractB.storage.namespaces['public'];
       if (!isPostgresSchema(nsB)) throw new Error('expected PostgresSchema for public (B)');
-      const nameB = Object.values(nsB.entries.policy)[0]?.name ?? '';
+      const nameB = Object.values(nsB.policy)[0]?.name ?? '';
 
       // Introspect the live DB (which still has p_read_<hashB> from step 3).
       const introspected = await familyInstance.introspect({ driver, contract: contractNoPolicy });

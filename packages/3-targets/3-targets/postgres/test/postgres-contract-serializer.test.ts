@@ -366,8 +366,8 @@ describe('role + policy round-trip', () => {
     expect(ns).toBeInstanceOf(PostgresSchema);
 
     // Role slot preserved
-    expect(Object.keys(ns.entries.role)).toHaveLength(1);
-    const role = ns.entries.role['app_user'];
+    expect(Object.keys(ns.role)).toHaveLength(1);
+    const role = ns.role['app_user'];
     expect(role).toBeInstanceOf(PostgresRole);
     expect(role?.name).toBe('app_user');
     expect(role?.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
@@ -404,7 +404,7 @@ describe('role + policy round-trip', () => {
     const roundTripped = serializer.deserializeContract(JSON.parse(JSON.stringify(json)));
 
     const ns = roundTripped.storage.namespaces[UNBOUND_NAMESPACE_ID] as PostgresSchema;
-    const role = ns.entries.role['app_user']!;
+    const role = ns.role['app_user']!;
     const policy = ns.policy['posts_select_own_a1b2c3d4']!;
 
     expect(Object.isFrozen(role)).toBe(true);
