@@ -1,3 +1,4 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { type SqlStorage, StorageTable, StorageValueSet } from '@prisma-next/sql-contract/types';
 import { createSqlContract } from '@prisma-next/test-utils';
