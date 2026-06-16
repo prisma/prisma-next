@@ -2161,10 +2161,8 @@ export function interpretPslDocumentToSqlContract(
                 patchedModels[modelCoordinateKey(namespaceId, modelName)] ?? model,
               ]),
             ),
-            ...(namespaceSlice.enum !== undefined ? { enum: namespaceSlice.enum } : {}),
-            ...(namespaceSlice.valueObjects !== undefined
-              ? { valueObjects: namespaceSlice.valueObjects }
-              : {}),
+            ...ifDefined('enum', namespaceSlice.enum),
+            ...ifDefined('valueObjects', namespaceSlice.valueObjects),
             ...(namespaceId === input.target.defaultNamespaceId &&
             Object.keys(valueObjects).length > 0
               ? { valueObjects }

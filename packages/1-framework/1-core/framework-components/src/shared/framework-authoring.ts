@@ -835,7 +835,7 @@ function resolveAuthoringStorageTypeTemplate(
   return {
     codecId: template.codecId,
     nativeType,
-    ...(typeParams === undefined ? {} : { typeParams }),
+    ...ifDefined('typeParams', typeParams),
   };
 }
 
