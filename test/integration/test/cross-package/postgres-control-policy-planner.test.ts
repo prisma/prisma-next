@@ -281,7 +281,10 @@ describe('PostgresMigrationPlanner.plan tolerated vs managed add-column', async 
     const operations = await planAddColumn('managed');
     expect(operations).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 'column.users.email', operationClass: 'additive' }),
+        expect.objectContaining({
+          id: 'column.__unbound__.users.email',
+          operationClass: 'additive',
+        }),
       ]),
     );
   });

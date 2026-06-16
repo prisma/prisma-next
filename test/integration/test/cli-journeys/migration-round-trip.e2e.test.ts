@@ -165,7 +165,7 @@ MigrationCLI.run(import.meta.url, M);
         const opsAfterEmit = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'));
         const opIds = opsAfterEmit.map((op: { id: string }) => op.id);
         // Expected shape: addColumn → dataTransform → setNotNull.
-        expect(opIds).toContain('column.user.name');
+        expect(opIds).toContain('column.public.user.name');
         expect(opIds).toContain('data_migration.backfill-user-name');
         expect(opIds.some((id: string) => id.includes('setNotNull.user.name'))).toBe(true);
 
