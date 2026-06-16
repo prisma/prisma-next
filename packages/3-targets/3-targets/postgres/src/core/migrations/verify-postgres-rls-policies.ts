@@ -1,6 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import { diffNodes } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { PostgresRlsPolicy } from '../postgres-rls-policy';
@@ -18,6 +17,17 @@ function rlsPoliciesFromAnnotations(schema: SqlSchemaIR): readonly PostgresRlsPo
  * `verifyPostgresNamespacePresence` — runs at the target layer, stitched into
  * `collectSchemaIssues` so a single `SchemaIssue[]` flows through `planIssues`.
  *
+ * Policy identity is the wire name (dispatch brief: "identity uses name").
+ * Namespace coordinates are not used for matching because the contract may use
+ * UNBOUND_NAMESPACE_ID while the introspected schema carries the resolved DDL
+ * schema name (e.g. 'public'). The table-name filter already scopes results to
+ * tables present in the introspected schema IR.
+ *
+ * `strict` mirrors the family verifier's strict flag: `extra_rls_policy` issues
+ * are only emitted when strict is true (widening or destructive ops allowed).
+ * Callers using additive-only policy (e.g. `db init`) skip extra issues, matching
+ * the family verifier's behavior for extra tables and columns.
+ *
  * Scoping: only policies attached to tables present in the schema IR are
  * considered. Policies on tables outside the scope of the introspected IR
  * (e.g. another schema) are ignored.
@@ -25,8 +35,9 @@ function rlsPoliciesFromAnnotations(schema: SqlSchemaIR): readonly PostgresRlsPo
 export function verifyPostgresRlsPolicies(input: {
   readonly contract: Contract<SqlStorage>;
   readonly schema: SqlSchemaIR;
+  readonly strict?: boolean;
 }): readonly SchemaIssue[] {
-  const { contract, schema } = input;
+  const { contract, schema, strict = false } = input;
 
   const expectedPolicies: PostgresRlsPolicy[] = [];
   for (const ns of Object.values(contract.storage.namespaces)) {
@@ -41,13 +52,13 @@ export function verifyPostgresRlsPolicies(input: {
   const schemaTableNames = new Set(Object.keys(schema.tables));
   const scopedActual = actualPolicies.filter((p) => schemaTableNames.has(p.tableName));
 
-  const diffs = diffNodes(expectedPolicies, scopedActual);
+  const expectedByName = new Map(expectedPolicies.map((p) => [p.name, p]));
+  const actualByName = new Map(scopedActual.map((p) => [p.name, p]));
+
   const issues: SchemaIssue[] = [];
 
-  for (const diff of diffs) {
-    if (diff.outcome === 'missing') {
-      const policy = expectedPolicies.find((p) => p.name === diff.coordinate.entityName);
-      if (!policy) continue;
+  for (const [name, policy] of expectedByName) {
+    if (!actualByName.has(name)) {
       issues.push({
         kind: 'missing_rls_policy',
         namespaceId: policy.namespaceId,
@@ -55,16 +66,20 @@ export function verifyPostgresRlsPolicies(input: {
         indexOrConstraint: policy.name,
         message: `RLS policy "${policy.name}" on table "${policy.tableName}" is missing from the database`,
       });
-    } else if (diff.outcome === 'extra') {
-      const policy = scopedActual.find((p) => p.name === diff.coordinate.entityName);
-      if (!policy) continue;
-      issues.push({
-        kind: 'extra_rls_policy',
-        namespaceId: policy.namespaceId,
-        table: policy.tableName,
-        indexOrConstraint: policy.name,
-        message: `RLS policy "${policy.name}" on table "${policy.tableName}" is present in the database but not in the contract`,
-      });
+    }
+  }
+
+  if (strict) {
+    for (const [name, policy] of actualByName) {
+      if (!expectedByName.has(name)) {
+        issues.push({
+          kind: 'extra_rls_policy',
+          namespaceId: policy.namespaceId,
+          table: policy.tableName,
+          indexOrConstraint: policy.name,
+          message: `RLS policy "${policy.name}" on table "${policy.tableName}" is present in the database but not in the contract`,
+        });
+      }
     }
   }
 

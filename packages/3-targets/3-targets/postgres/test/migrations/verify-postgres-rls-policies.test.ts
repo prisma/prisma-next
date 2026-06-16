@@ -107,7 +107,7 @@ describe('verifyPostgresRlsPolicies', () => {
     const contract = makeContract([]);
     const schema = makeSchema([actualPolicy]);
 
-    const issues = verifyPostgresRlsPolicies({ contract, schema });
+    const issues = verifyPostgresRlsPolicies({ contract, schema, strict: true });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
@@ -145,7 +145,7 @@ describe('verifyPostgresRlsPolicies', () => {
     const contract = makeContract([newPolicy]);
     const schema = makeSchema([oldPolicy]);
 
-    const issues = verifyPostgresRlsPolicies({ contract, schema });
+    const issues = verifyPostgresRlsPolicies({ contract, schema, strict: true });
 
     expect(issues).toHaveLength(2);
     const kinds = issues.map((i) => i.kind);
@@ -159,7 +159,7 @@ describe('verifyPostgresRlsPolicies', () => {
     const contract = makeContract([contractPolicy]);
     const schema = makeSchema([actualPolicy]);
 
-    const issues = verifyPostgresRlsPolicies({ contract, schema });
+    const issues = verifyPostgresRlsPolicies({ contract, schema, strict: true });
 
     for (const issue of issues as readonly BaseSchemaIssue[]) {
       expect(issue.namespaceId).toBe(UNBOUND_NAMESPACE_ID);

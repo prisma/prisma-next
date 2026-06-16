@@ -117,7 +117,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   readonly normalizeNativeType = normalizeSchemaNativeType;
 
   collectSchemaIssues(contract: Contract<SqlStorage>, schema: SqlSchemaIR): readonly SchemaIssue[] {
-    return verifyPostgresRlsPolicies({ contract, schema });
+    return verifyPostgresRlsPolicies({ contract, schema, strict: true });
   }
 
   bootstrapControlTableQueries(): readonly DdlNode[] {

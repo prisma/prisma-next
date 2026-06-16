@@ -284,6 +284,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const rlsIssues = verifyPostgresRlsPolicies({
       contract: options.contract,
       schema: options.schema,
+      strict,
     });
     const extra = [...namespaceIssues, ...rlsIssues];
     if (extra.length === 0) {

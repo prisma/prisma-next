@@ -622,13 +622,18 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Missing RLS policy issue is incomplete'),
         );
       }
+      const wireName = issue.indexOrConstraint;
       const ns = ctx.toContract.storage.namespaces[issue.namespaceId];
-      const policy = isPostgresSchema(ns) ? ns.policy[issue.indexOrConstraint] : undefined;
+      // Policy entries are keyed by PSL prefix (not wire name) when authored via PSL.
+      // Resolve by matching on the wire name (.name property).
+      const policy = isPostgresSchema(ns)
+        ? Object.values(ns.policy).find((p) => p.name === wireName)
+        : undefined;
       if (!policy) {
         return notOk(
           issueConflict(
             'unsupportedOperation',
-            `RLS policy "${issue.indexOrConstraint}" not found in contract namespace "${issue.namespaceId}"`,
+            `RLS policy "${wireName}" not found in contract namespace "${issue.namespaceId}"`,
           ),
         );
       }
