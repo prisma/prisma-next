@@ -1,4 +1,8 @@
 export type {
+  StorageColumnMapAt,
+  StorageColumnTypeAcrossNamespaces,
+} from '../column-type-resolution';
+export type {
   CheckConstraintInput,
   CodecTypesOf,
   ContractWithTypeMaps,

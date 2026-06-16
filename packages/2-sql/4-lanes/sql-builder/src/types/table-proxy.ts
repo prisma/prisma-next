@@ -3,6 +3,7 @@ import type {
   ExtractQueryOperationTypes,
   ExtractStorageColumnInputTypes,
   ExtractStorageColumnTypes,
+  StorageColumnMapAt,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { Expression, FieldProxy, Functions } from '../expression';
@@ -19,41 +20,9 @@ import type { NamespaceTable, TableProxyContract } from './db';
 import type { DeleteQuery, InsertQuery, InsertValues, UpdateQuery } from './mutation-query';
 import type { WithJoin, WithSelect } from './shared';
 
-// The storage-column type map for a single namespace/table coordinate, read
-// with a single O(1) index into the emitted `StorageColumnTypes[ns][table]`
-// (output) or `StorageColumnInputTypes[ns][table]` (input). Each entry already
-// carries the full column type — parameterized-codec-refined codec type narrowed
-// to the value-set literal union when present, with nullability applied — so the
-// sql-builder storage surface needs no table→model / column→field walk.
-//
-// Resolves to `never` when the lookup is absent: either the empty default map a
-// non-emitted (in-memory `defineContract`) contract carries — detected by
-// `string extends keyof SCT`, the open index-signature key — or a coordinate not
-// present in an emitted map.
-type StorageColumnMapAt<
-  SCT,
-  NsId extends string,
-  TableName extends string,
-> = string extends keyof SCT
-  ? never
-  : NsId extends keyof SCT
-    ? string extends keyof SCT[NsId]
-      ? never
-      : TableName extends keyof SCT[NsId]
-        ? SCT[NsId][TableName]
-        : never
-    : never;
-
-// The select-result row's column types for a table at a namespace coordinate,
-// sourced directly from `StorageColumnTypes[ns][table]`. Same-named tables
-// across namespaces resolve to each namespace's own columns because `NsId` is
-// part of the coordinate; refined per-namespace output types (e.g. `Vector<N>`)
-// are preserved because the storage map bakes them.
-// A homomorphic mapped type over the resolved storage column map's keys, so the
-// result is *always* structurally a `Record<string, unknown>` (satisfying
-// `QueryContext['resolvedColumnOutputTypes']`) even while `C` is still generic.
-// `ColumnKeys` is `string` when the coordinate is absent / the map is the empty
-// default, yielding `Record<string, never>`.
+// Homomorphic mapped form so the result is always `Record<string, unknown>`,
+// satisfying `QueryContext['resolvedColumnOutputTypes']` even while `C` is
+// generic. Empty `ColumnKeys` yields `Record<string, never>`.
 type ResolvedColumnTypes<
   C extends TableProxyContract,
   NsId extends string,
@@ -64,10 +33,6 @@ type ResolvedColumnTypes<
   readonly [K in ColumnKeys]: ColMap extends Record<K, unknown> ? ColMap[K] : never;
 };
 
-// The accepted insert/update shape for a table at a namespace coordinate: every
-// column optional, typed from `StorageColumnInputTypes[ns][table]` (which bakes
-// the value-set narrowing, codec input, and nullability). Falls back to the
-// generic `InsertValues<Table, CT>` when the storage input map is absent.
 type ResolvedInsertValues<
   C extends TableProxyContract,
   NsId extends string,
