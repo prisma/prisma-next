@@ -2246,6 +2246,17 @@ export function interpretPslDocumentToSqlContract(
     'target pack may carry createNamespace on its authoring object'
   >(input.target.authoring)?.createNamespace;
   const innerCreateNamespace = input.createNamespace ?? targetCreateNamespace;
+
+  if (namespaceExtensionEntities.size > 0 && innerCreateNamespace === undefined) {
+    const kinds = [...namespaceExtensionEntities.values()]
+      .flatMap((entities) => Object.keys(entities))
+      .join(', ');
+    throw new Error(
+      `PSL interpreter: extension entities of kind(s) [${kinds}] were lowered but the target supplies no createNamespace factory. ` +
+        'Provide createNamespace on the target authoring object or pass it explicitly to interpretPslDocumentToSqlContract.',
+    );
+  }
+
   const createNamespaceWithExtensions =
     innerCreateNamespace !== undefined
       ? (nsInput: SqlNamespaceTablesInput) => {

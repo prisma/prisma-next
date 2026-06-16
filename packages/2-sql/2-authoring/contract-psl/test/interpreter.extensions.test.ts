@@ -531,6 +531,57 @@ model Doc {
     });
   });
 
+  it('throws when extension entities are lowered but no createNamespace factory is available', () => {
+    const targetWithoutCreateNamespace = {
+      ...postgresTarget,
+      authoring: {
+        entityTypes: {
+          test: {
+            kind: 'entity' as const,
+            discriminator: 'test-custom-block',
+            output: {
+              factory: (raw: unknown) => raw,
+            },
+          },
+        },
+        pslBlockDescriptors: {
+          test_block: {
+            kind: 'pslBlock' as const,
+            keyword: 'test_block',
+            discriminator: 'test-custom-block',
+            name: { required: true },
+            parameters: {},
+          },
+        },
+      },
+    };
+
+    const document = parsePslDocument({
+      schema: `
+namespace public {
+  model Foo {
+    id Int @id
+  }
+
+  test_block my_entry {
+  }
+}
+`,
+      sourceId: 'schema.prisma',
+      pslBlockDescriptors: targetWithoutCreateNamespace.authoring.pslBlockDescriptors,
+    });
+
+    expect(() =>
+      interpretPslDocumentToSqlContract({
+        document,
+        target: targetWithoutCreateNamespace,
+        scalarTypeDescriptors: postgresScalarTypeDescriptors,
+        composedExtensionContracts: new Map(),
+        authoringContributions: targetWithoutCreateNamespace.authoring,
+      }),
+    ).toThrow(/createNamespace/);
+  });
+
   it('routes lowered extension entities to entries[discriminator] when no explicit createNamespace is supplied', () => {
     // Under the open entries model (ADR 224/225), extension blocks are lowered
     // into entries[discriminator][name] — the discriminator is the entries key.
