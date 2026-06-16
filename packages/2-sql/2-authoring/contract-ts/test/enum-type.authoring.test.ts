@@ -183,6 +183,7 @@ describe('enumType() authoring → contract structure', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       enums: { Role },
       models: {},
     }) as Contract<SqlStorage>;
@@ -201,6 +202,7 @@ describe('enumType() authoring → contract structure', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       enums: { Role },
       models: {},
     }) as Contract<SqlStorage>;
@@ -215,6 +217,7 @@ describe('enumType() authoring → contract structure', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       enums: { Role },
       models: {
         User: model('User', {
@@ -240,6 +243,7 @@ describe('enumType() authoring → contract structure', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       enums: { Role },
       models: {
         User: model('User', {
@@ -265,6 +269,7 @@ describe('enumType() authoring → contract structure', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       enums: { Role },
       models: {
         User: model('User', {
@@ -352,6 +357,7 @@ describe('enumType() — declaration key must match enumType name', () => {
       defineContract({
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { MyAlias: Role },
         models: {},
       }),
@@ -376,6 +382,7 @@ describe('enumType() — full integration via defineContract factory', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { Status },
       },
       ({ field: f, model: m }) =>

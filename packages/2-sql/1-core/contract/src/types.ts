@@ -27,6 +27,7 @@ export { SqlNode } from './ir/sql-node';
 export {
   SqlNamespace,
   type SqlNamespaceEntries,
+  type SqlNamespaceShape,
   type SqlNamespaceTablesInput,
   SqlStorage,
   type SqlStorageInput,

@@ -128,12 +128,13 @@ describe('defineContract namespace declaration runtime guards', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         namespaces: [],
+        createNamespace: createTestSqlNamespace,
         models: {},
       }),
     ).not.toThrow();
   });
 
-  it('accepts user-declared Postgres schema names with or without a `createNamespace` factory', () => {
+  it('accepts user-declared Postgres schema names with a `createNamespace` factory', () => {
     expect(() =>
       defineContract({
         family: sqlFamilyPack,
@@ -149,6 +150,7 @@ describe('defineContract namespace declaration runtime guards', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         namespaces: ['public', 'auth'],
+        createNamespace: createTestSqlNamespace,
         models: {},
       }),
     ).not.toThrow();
@@ -235,6 +237,7 @@ describe('defineContract namespace declaration runtime guards', () => {
         family: sqlFamilyPack,
         target: sqliteTargetPack,
         namespaces: [],
+        createNamespace: createTestSqlNamespace,
         models: {},
       }),
     ).not.toThrow();

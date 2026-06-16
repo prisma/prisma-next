@@ -1,6 +1,7 @@
 import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
@@ -38,6 +39,7 @@ describe('defineContract defaultControlPolicy', () => {
     const built = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       defaultControlPolicy: 'external',
       models: {
         User: model('User', {
@@ -53,6 +55,7 @@ describe('defineContract defaultControlPolicy', () => {
     const built = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', {
           fields: { id: field.column(int4Column).id() },
@@ -77,6 +80,7 @@ describe('defineContract per-table control', () => {
       const built = defineContract({
         family: bareFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         models: {
           User: model('User', {
             fields: { id: field.column(int4Column).id() },
@@ -96,6 +100,7 @@ describe('defineContract per-table control', () => {
     const built = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', {
           fields: { id: field.column(int4Column).id() },
@@ -114,6 +119,7 @@ describe('defineContract mixed default and per-table control', () => {
     const built = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       defaultControlPolicy: 'external',
       models: {
         User: model('User', {

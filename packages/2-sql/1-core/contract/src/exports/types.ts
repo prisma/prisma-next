@@ -25,6 +25,7 @@ export type {
   SqlModelFieldStorage,
   SqlModelStorage,
   SqlNamespaceEntries,
+  SqlNamespaceShape,
   SqlNamespaceTablesInput,
   SqlQueryOperationTypes,
   SqlStorageInput,

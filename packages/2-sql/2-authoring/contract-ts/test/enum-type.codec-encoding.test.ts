@@ -5,6 +5,7 @@ import {
   emptyCodecLookup,
 } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/build-contract';
@@ -40,6 +41,7 @@ function codecLookupOf(codecs: Record<string, Codec>): CodecLookup {
 function definitionWith(enumHandle: ReturnType<typeof enumType>): ContractDefinition {
   return {
     target: postgresTargetPack,
+    createNamespace: createTestSqlNamespace,
     storageTypes: {},
     models: [],
     enums: { [enumHandle.enumName]: enumHandle },

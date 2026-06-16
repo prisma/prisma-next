@@ -4,6 +4,7 @@ import type {
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
 import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { defineContract } from '../src/contract-builder';
 
@@ -96,6 +97,7 @@ describe('entities namespace — synthetic pack exemplar', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         extensionPacks: { demo: demoEntitiesExtensionPack },
       },
       ({ demoEntity, field, model }) => {
@@ -123,6 +125,7 @@ describe('entities namespace — synthetic pack exemplar', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         extensionPacks: { demo: demoEntitiesExtensionPack },
       },
       ({ demoEntity, field, model }) => {
@@ -150,6 +153,7 @@ describe('entities namespace — synthetic pack exemplar', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
       },
       (helpers) => {
         // The `demoEntity` helper is contributed by `demoEntitiesExtensionPack`;

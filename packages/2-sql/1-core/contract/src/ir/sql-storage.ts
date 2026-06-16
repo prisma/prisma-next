@@ -63,12 +63,27 @@ export type SqlNamespaceEntries = Readonly<Record<string, Readonly<Record<string
 };
 
 /**
+ * Structural shape for SQL family namespaces. Generated `.d.ts` contract
+ * types satisfy this structurally (no prototype methods). The runtime
+ * abstract class `SqlNamespace` extends this.
+ *
+ * `qualifyTable` is optional here so that JSON-shaped contract types
+ * (which carry no methods) are accepted where `SqlNamespaceShape` is
+ * required. Hydrated `SqlNamespace` instances always have it.
+ */
+export interface SqlNamespaceShape {
+  readonly id: string;
+  readonly entries: SqlNamespaceEntries;
+  qualifyTable?(tableName: string): string;
+}
+
+/**
  * Abstract SQL family namespace. Target concretions (`PostgresSchema`,
  * `SqliteDatabase`, …) extend this class — it is never instantiated directly.
  * `entries` is the open ADR 224 dictionary: `entries[entityKind][entityName]`
  * addresses any entity.
  */
-export abstract class SqlNamespace extends NamespaceBase {
+export abstract class SqlNamespace extends NamespaceBase implements SqlNamespaceShape {
   abstract override readonly id: string;
   abstract override readonly entries: SqlNamespaceEntries;
 
@@ -77,7 +92,7 @@ export abstract class SqlNamespace extends NamespaceBase {
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
-  readonly namespaces: Readonly<Record<string, SqlNamespace>>;
+  readonly namespaces: Readonly<Record<string, SqlNamespaceShape>>;
   declare readonly types?: Readonly<Record<string, StorageTypeInstance>>;
 
   constructor(input: SqlStorageInput<THash>) {

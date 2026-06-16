@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import type {
   ExtractFieldInputTypes,
   ExtractFieldOutputTypes,
@@ -51,6 +52,7 @@ const factoryContract = defineContract(
   {
     family: sqlFamilyPack,
     target: postgresTargetPack,
+    createNamespace: createTestSqlNamespace,
   },
   () => ({
     enums: { Role, Status, Priority },
@@ -70,6 +72,7 @@ const factoryContract = defineContract(
 const definitionContract = defineContract({
   family: sqlFamilyPack,
   target: postgresTargetPack,
+  createNamespace: createTestSqlNamespace,
   enums: { Role, Status, Priority },
   models: {
     User: model('User', {
@@ -143,6 +146,7 @@ const mixedContract = defineContract(
   {
     family: sqlFamilyPack,
     target: postgresTargetPack,
+    createNamespace: createTestSqlNamespace,
     enums: { Role },
   },
   () => ({

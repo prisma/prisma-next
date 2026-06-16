@@ -8,11 +8,13 @@
  * - Missing-pack fail-fast for cross-space relations
  * - Local (same-space) relations are unchanged (no `to.space`)
  */
+
 import type {
   ExtensionPackRef,
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model, rel } from '../src/contract-builder';
 import { ContractModelBuilder } from '../src/contract-dsl';
@@ -84,6 +86,7 @@ describe('cross-space belongsTo relation lowering', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       extensionPacks: { supabase: supabasePack },
       models: { Profile },
     });
@@ -111,6 +114,7 @@ describe('cross-space belongsTo relation lowering', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       extensionPacks: { supabase: supabasePack },
       models: { Profile },
     });
@@ -137,6 +141,7 @@ describe('cross-space belongsTo relation lowering', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       extensionPacks: { supabase: supabasePack },
       models: { Profile },
     });
@@ -161,6 +166,7 @@ describe('cross-space belongsTo relation lowering', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       extensionPacks: { supabase: supabasePack },
       models: { Profile },
     });
@@ -197,6 +203,7 @@ describe('cross-space belongsTo relation — missing-pack fail-fast', () => {
       defineContract({
         family: bareFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         // intentionally no extensionPacks — 'supabase' undeclared
         models: { Profile },
       }),
@@ -219,6 +226,7 @@ describe('cross-space belongsTo relation — missing-pack fail-fast', () => {
       defineContract({
         family: bareFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         models: { Profile },
       }),
     ).toThrow(/extensionPacks/i);
@@ -246,6 +254,7 @@ describe('F-lazy: lazy cross-space belongsTo handle carries the brand', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       extensionPacks: { supabase: supabasePack },
       models: { Profile },
     });
@@ -282,6 +291,7 @@ describe('F-relfk: cross-space belongsTo().sql({ fk }) produces a cross-space FK
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       extensionPacks: { supabase: supabasePack },
       models: { Profile },
     });
@@ -326,6 +336,7 @@ describe('local belongsTo relation regression (AC9)', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: { User, Post },
     });
 

@@ -3,6 +3,7 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -64,6 +65,7 @@ describe('capability contribution at authoring time', () => {
     const contract = buildOneModelContract({
       family: sqlFamilyPack,
       target: bareTargetPack,
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(contract.capabilities).toEqual({});
@@ -73,6 +75,7 @@ describe('capability contribution at authoring time', () => {
     const contract = buildOneModelContract({
       family: sqlFamilyPack,
       target: targetWithCapabilities,
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(contract.capabilities).toEqual({
@@ -86,6 +89,7 @@ describe('capability contribution at authoring time', () => {
       family: sqlFamilyPack,
       target: targetWithCapabilities,
       extensionPacks: { pgvector: extensionWithCapabilities },
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(contract.capabilities).toEqual({
@@ -102,6 +106,7 @@ describe('capability contribution at authoring time', () => {
     buildOneModelContract({
       family: sqlFamilyPack,
       target: bareTargetPack,
+      createNamespace: createTestSqlNamespace,
       // @ts-expect-error — `capabilities` was removed from the `defineContract` input.
       capabilities: { postgres: { lateral: true } },
     });
@@ -114,11 +119,13 @@ describe('capability contribution at authoring time', () => {
     const bare = buildOneModelContract({
       family: sqlFamilyPack,
       target: bareTargetPack,
+      createNamespace: createTestSqlNamespace,
     });
     const decorated = buildOneModelContract({
       family: sqlFamilyPack,
       target: targetWithCapabilities,
       extensionPacks: { pgvector: extensionWithCapabilities },
+      createNamespace: createTestSqlNamespace,
     });
     expect(bare.profileHash).toEqual(decorated.profileHash);
     expect(bare.profileHash).toEqual(

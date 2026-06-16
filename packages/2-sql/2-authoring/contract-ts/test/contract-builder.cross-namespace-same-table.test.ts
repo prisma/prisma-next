@@ -1,4 +1,5 @@
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
@@ -75,6 +76,7 @@ describe('same bare table name across namespaces with a cross-namespace FK', () 
   const contract = buildSqlContractFromDefinition({
     target: postgresTargetPack,
     namespaces: ['public', 'auth'],
+    createNamespace: createTestSqlNamespace,
     models: [publicUser, profile, authUser],
   });
   const storage = contract.storage as SqlStorage;

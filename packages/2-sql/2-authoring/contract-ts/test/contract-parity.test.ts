@@ -1,4 +1,5 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -27,6 +28,7 @@ describe('defineContract build output', () => {
     const built = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', {
           fields: {

@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import {
   CheckConstraint,
   type SqlStorage,
@@ -48,6 +49,7 @@ describe('check-constraint lowering', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { Role },
       },
       ({ field: f, model: m }) =>
@@ -92,6 +94,7 @@ describe('check-constraint lowering', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { Role, Status },
       },
       ({ field: f, model: m }) =>
@@ -121,6 +124,7 @@ describe('check-constraint lowering', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
       },
       ({ field: f, model: m }) =>
         ({
@@ -148,6 +152,7 @@ describe('check-constraint lowering', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { Role },
       },
       ({ field: f, model: m }) =>
@@ -182,6 +187,7 @@ describe('check-constraint serialize→hydrate round-trip', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { Role },
       },
       ({ field: f, model: m }) =>

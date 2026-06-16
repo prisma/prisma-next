@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, expectTypeOf, it } from 'vitest';
@@ -38,6 +39,7 @@ function defineTestContract<const Definition extends Omit<ContractInput, 'target
   return defineContract({
     family: bareFamilyPack,
     target: postgresTargetPack,
+    createNamespace: createTestSqlNamespace,
     ...definition,
   });
 }
