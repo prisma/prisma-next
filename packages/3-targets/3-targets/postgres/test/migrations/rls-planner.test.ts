@@ -263,8 +263,8 @@ describe('RLS planner same-prefix replace', () => {
 
     const ops = await Promise.all(result.plan.operations);
     const opIds = ops.map((op) => op.id);
-    expect(opIds).toContain(`rlsPolicy.${SCHEMA_NAME}.${TABLE_NAME}.p_read_11111111`);
-    expect(opIds).toContain(`rlsPolicy.${SCHEMA_NAME}.${TABLE_NAME}.p_read_00000000.drop`);
+    expect(opIds).toContain(`rlsPolicy.public.${TABLE_NAME}.p_read_11111111`);
+    expect(opIds).toContain(`rlsPolicy.public.${TABLE_NAME}.p_read_00000000.drop`);
   });
 
   it('does not drop a different-prefix actual policy when creating a new one', async () => {
@@ -312,8 +312,8 @@ describe('RLS planner same-prefix replace', () => {
 
     const ops = await Promise.all(result.plan.operations);
     const opIds = ops.map((op) => op.id);
-    expect(opIds).toContain(`rlsPolicy.${SCHEMA_NAME}.${TABLE_NAME}.p_read_11111111`);
-    expect(opIds).not.toContain(`rlsPolicy.${SCHEMA_NAME}.${TABLE_NAME}.other_aaaabbbb.drop`);
+    expect(opIds).toContain(`rlsPolicy.public.${TABLE_NAME}.p_read_11111111`);
+    expect(opIds).not.toContain(`rlsPolicy.public.${TABLE_NAME}.other_aaaabbbb.drop`);
   });
 
   it('does not drop a same-prefix sibling that is still in the contract', async () => {
@@ -367,9 +367,9 @@ describe('RLS planner same-prefix replace', () => {
     const ops = await Promise.all(result.plan.operations);
     const opIds = ops.map((op) => op.id);
     // policyB is missing — a CREATE must be emitted
-    expect(opIds).toContain(`rlsPolicy.${SCHEMA_NAME}.${TABLE_NAME}.p_read_bbbbbbbb`);
+    expect(opIds).toContain(`rlsPolicy.public.${TABLE_NAME}.p_read_bbbbbbbb`);
     // policyA shares the same prefix but is still in the contract — must not be dropped
-    expect(opIds).not.toContain(`rlsPolicy.${SCHEMA_NAME}.${TABLE_NAME}.p_read_aaaaaaaa.drop`);
+    expect(opIds).not.toContain(`rlsPolicy.public.${TABLE_NAME}.p_read_aaaaaaaa.drop`);
   });
 
   it('F06: additive-only policy passes create/enable but filters the replace-drop', async () => {
@@ -416,9 +416,9 @@ describe('RLS planner same-prefix replace', () => {
     const ops = await Promise.all(result.plan.operations);
     const opIds = ops.map((op) => op.id);
     // CREATE new: additive — allowed
-    expect(opIds).toContain(`rlsPolicy.${SCHEMA_NAME}.${TABLE_NAME}.p_read_11111111`);
+    expect(opIds).toContain(`rlsPolicy.public.${TABLE_NAME}.p_read_11111111`);
     // DROP old: destructive — filtered
-    expect(opIds).not.toContain(`rlsPolicy.${SCHEMA_NAME}.${TABLE_NAME}.p_read_00000000.drop`);
+    expect(opIds).not.toContain(`rlsPolicy.public.${TABLE_NAME}.p_read_00000000.drop`);
   });
 });
 
