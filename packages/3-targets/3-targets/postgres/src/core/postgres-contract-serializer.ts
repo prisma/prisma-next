@@ -10,6 +10,7 @@ import {
   isAuthoringEntityTypeDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import {
+  type AnyEntityKindDescriptor,
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
@@ -66,9 +67,9 @@ function collectStorageTypesHydrators(
 }
 
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
-  constructor() {
+  constructor(extraPackEntityKinds: readonly AnyEntityKindDescriptor[] = []) {
     const storageTypesHydrators = collectStorageTypesHydrators(postgresAuthoringEntityTypes);
-    super(storageTypesHydrators, [policyEntityKind, roleEntityKind]);
+    super(storageTypesHydrators, [policyEntityKind, roleEntityKind, ...extraPackEntityKinds]);
   }
 
   protected override hydrateSqlNamespaceEntry(
@@ -84,15 +85,14 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
 
-    const valueSetSlot = entries['valueSet'];
-    const hasValueSets = valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0;
-    const hasPolicies =
-      entries['policy'] !== undefined && Object.keys(entries['policy']).length > 0;
-    const hasRoles = entries['role'] !== undefined && Object.keys(entries['role']).length > 0;
-    const emptyTables = Object.keys(entries['table'] ?? {}).length === 0;
-    if (id === UNBOUND_NAMESPACE_ID && emptyTables && !hasValueSets && !hasPolicies && !hasRoles) {
+    const allSlotsEmpty = Object.values(entries).every(
+      (slot) => slot === undefined || Object.keys(slot).length === 0,
+    );
+    if (id === UNBOUND_NAMESPACE_ID && allSlotsEmpty) {
       return PostgresSchema.unbound;
     }
+    const valueSetSlot = entries['valueSet'];
+    const hasValueSets = valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0;
     return new PostgresSchema({
       id,
       entries: {

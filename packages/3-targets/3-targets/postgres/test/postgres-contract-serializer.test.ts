@@ -4,7 +4,10 @@ import {
   SqlContractSerializerBase,
   type SqlEntityHydrationFactory,
 } from '@prisma-next/family-sql/ir';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  type AnyEntityKindDescriptor,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import {
   ForeignKey,
   PrimaryKey,
@@ -15,6 +18,7 @@ import {
   toStorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { createSqlContract } from '@prisma-next/test-utils';
+import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
 import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
@@ -424,6 +428,34 @@ describe('role + policy round-trip', () => {
     const contract = serializer.deserializeContract(input);
     const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
     expect(ns).toBe(PostgresSchema.unbound);
+  });
+
+  it('does NOT collapse to PostgresSchema.unbound when a pack-contributed kind has entries', () => {
+    const customKind: AnyEntityKindDescriptor = {
+      kind: 'customKind',
+      schema: type({ name: 'string' }),
+      construct: (input) => input,
+    };
+    const serializer = new PostgresContractSerializer([customKind]);
+
+    const input = createSqlContract({
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {},
+              customKind: { someEntry: { name: 'someEntry' } },
+            },
+          },
+        },
+      },
+    });
+
+    const contract = serializer.deserializeContract(input);
+    const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(ns).not.toBe(PostgresSchema.unbound);
+    expect(ns).toBeInstanceOf(PostgresSchema);
   });
 
   it('rejects a malformed policy entry (bad operation literal)', () => {
