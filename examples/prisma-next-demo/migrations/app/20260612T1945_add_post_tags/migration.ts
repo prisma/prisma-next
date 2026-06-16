@@ -1,18 +1,11 @@
 #!/usr/bin/env -S node
-import {
-  addForeignKey,
-  col,
-  createIndex,
-  Migration,
-  MigrationCLI,
-  primaryKey,
-} from '@prisma-next/postgres/migration';
+import { col, Migration, MigrationCLI, primaryKey } from '@prisma-next/postgres/migration';
 
 export default class M extends Migration {
   override describe() {
     return {
-      from: 'sha256:372f890816e6e404f2365d11fca59175fa4e79ba84125ab08ca71c4561cf4581',
-      to: 'sha256:d1a720d7254dfa4cd2dc39353b21de48198fc5aa75dc9a471c95f0e9f1be889f',
+      from: 'sha256:1a02eed4ad52f589641c1e16b929427e1060acc6bc1e9cc4e3b6e663523f88b4',
+      to: 'sha256:09bb3eff595f260fde93e5b8272ba63487cb2bb64b9893e57ecef3f8a51b0630',
     };
   }
 
@@ -36,17 +29,35 @@ export default class M extends Migration {
         ],
         constraints: [primaryKey(['id'])],
       }),
-      createIndex('public', 'post_tag', 'post_tag_postId_idx', ['postId']),
-      createIndex('public', 'post_tag', 'post_tag_tagId_idx', ['tagId']),
-      addForeignKey('public', 'post_tag', {
-        name: 'post_tag_postId_fkey',
+      this.createIndex({
+        schema: 'public',
+        table: 'post_tag',
+        index: 'post_tag_postId_idx',
         columns: ['postId'],
-        references: { schema: 'public', table: 'post', columns: ['id'] },
       }),
-      addForeignKey('public', 'post_tag', {
-        name: 'post_tag_tagId_fkey',
+      this.createIndex({
+        schema: 'public',
+        table: 'post_tag',
+        index: 'post_tag_tagId_idx',
         columns: ['tagId'],
-        references: { schema: 'public', table: 'tag', columns: ['id'] },
+      }),
+      this.addForeignKey({
+        schema: 'public',
+        table: 'post_tag',
+        foreignKey: {
+          name: 'post_tag_postId_fkey',
+          columns: ['postId'],
+          references: { schema: 'public', table: 'post', columns: ['id'] },
+        },
+      }),
+      this.addForeignKey({
+        schema: 'public',
+        table: 'post_tag',
+        foreignKey: {
+          name: 'post_tag_tagId_fkey',
+          columns: ['tagId'],
+          references: { schema: 'public', table: 'tag', columns: ['id'] },
+        },
       }),
     ];
   }
