@@ -1,4 +1,4 @@
-// `string extends keyof X` detects the open `Record<string, never>` default that non-emitted contracts carry.
+// `string extends keyof SCT` detects the open `Record<string, never>` default that non-emitted contracts carry.
 export type StorageColumnMapAt<
   SCT,
   NsId extends string,
