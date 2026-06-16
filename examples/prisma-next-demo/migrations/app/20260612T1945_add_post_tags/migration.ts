@@ -4,8 +4,8 @@ import { col, Migration, MigrationCLI, primaryKey } from '@prisma-next/postgres/
 export default class M extends Migration {
   override describe() {
     return {
-      from: 'sha256:1a02eed4ad52f589641c1e16b929427e1060acc6bc1e9cc4e3b6e663523f88b4',
-      to: 'sha256:09bb3eff595f260fde93e5b8272ba63487cb2bb64b9893e57ecef3f8a51b0630',
+      from: 'sha256:9f07ac18eb5ab5c21cff6b8414fb2a29bfae8d8b21009fbdd29616b4718e1d99',
+      to: 'sha256:0c2f8a63a778d1dc173c397d79b93d1dff153aa498510d05d0f2b27b6f72f5c4',
     };
   }
 

@@ -642,13 +642,6 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "entries": {
-          "table": {}
-        },
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema"
-      },
       "public": {
         "entries": {
           "table": {
@@ -1095,7 +1088,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:09bb3eff595f260fde93e5b8272ba63487cb2bb64b9893e57ecef3f8a51b0630",
+    "storageHash": "sha256:0c2f8a63a778d1dc173c397d79b93d1dff153aa498510d05d0f2b27b6f72f5c4",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

@@ -750,9 +750,6 @@ importers:
       '@prisma-next/sql-contract-psl':
         specifier: workspace:0.14.0
         version: link:../../packages/2-sql/2-authoring/contract-psl
-      '@prisma-next/sql-contract-ts':
-        specifier: workspace:0.14.0
-        version: link:../../packages/2-sql/2-authoring/contract-ts
       '@prisma-next/sql-orm-client':
         specifier: workspace:0.14.0
         version: link:../../packages/3-extensions/sql-orm-client
