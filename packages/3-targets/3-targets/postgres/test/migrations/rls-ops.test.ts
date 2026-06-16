@@ -25,6 +25,12 @@ describe('renderCreatePolicySql role-name validation', () => {
     });
   }
 
+  it('renders TO PUBLIC when roles is empty', () => {
+    const op = createRlsPolicy('public', 'profiles', policyWithRoles([]));
+    expect(op.execute[0]?.sql).toContain('TO PUBLIC');
+    expect(op.execute[0]?.sql).not.toContain('TO ,');
+  });
+
   it('renders a plain SQL identifier role without error', () => {
     const op = createRlsPolicy('public', 'profiles', policyWithRoles(['app_user']));
     expect(op.execute[0]?.sql).toContain('TO app_user');

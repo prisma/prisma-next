@@ -55,7 +55,8 @@ function renderCreatePolicySql(
 ): string {
   const permissiveness = policy.permissive ? 'PERMISSIVE' : 'RESTRICTIVE';
   const command = OPERATION_SQL[policy.operation];
-  const roles = policy.roles.map(validateRoleName).join(', ');
+  const roles =
+    policy.roles.length === 0 ? 'PUBLIC' : policy.roles.map(validateRoleName).join(', ');
   let sql = `CREATE POLICY ${quoteIdentifier(policy.name)} ON ${qualifyTableName(schemaName, tableName)} AS ${permissiveness} FOR ${command} TO ${roles}`;
   if (policy.using !== undefined) {
     sql += ` USING (${policy.using})`;
