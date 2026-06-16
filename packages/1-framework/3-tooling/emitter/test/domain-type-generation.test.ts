@@ -8,6 +8,7 @@ import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  type DomainEnumLookup,
   deduplicateImports,
   generateBothFieldTypesMaps,
   generateCodecTypeIntersection,
@@ -1159,19 +1160,20 @@ describe('resolveFieldType', () => {
   });
 });
 
-describe('generateBothFieldTypesMaps with resolveFieldTypeOverride', () => {
-  // The family SPI fully owns per-field type resolution via `resolveFieldType`. The framework
-  // emit path passes a `resolveFieldTypeOverride` callback; when it returns a type, that type
-  // wins over the framework's default scalar/codec narrowing. This is the seam the SQL family
-  // uses to source an enum field's literal union from its storage value-set.
-
-  it('lets the override win over the codec channel for the matching field', () => {
+describe('generateBothFieldTypesMaps with domainEnumLookup', () => {
+  it('narrows a scalar enum field to its domain-enum members on both sides', () => {
     const models: Record<string, ContractModel> = {
       Post: {
         fields: {
           priority: {
             nullable: false,
             type: { kind: 'scalar', codecId: 'pg/text@1' },
+            valueSet: {
+              plane: 'domain',
+              entityKind: 'enum',
+              namespaceId: 'public',
+              entityName: 'Priority',
+            },
           },
           title: {
             nullable: false,
@@ -1182,17 +1184,24 @@ describe('generateBothFieldTypesMaps with resolveFieldTypeOverride', () => {
         storage: {},
       },
     };
-    const override = (_modelName: string, fieldName: string) =>
-      fieldName === 'priority'
-        ? { output: "'low' | 'high' | 'urgent'", input: "'low' | 'high' | 'urgent'" }
+    const domainEnumLookup: DomainEnumLookup = (ref) =>
+      ref.entityName === 'Priority'
+        ? {
+            codecId: 'pg/text@1',
+            members: [
+              { name: 'Low', value: 'low' },
+              { name: 'High', value: 'high' },
+              { name: 'Urgent', value: 'urgent' },
+            ],
+          }
         : undefined;
-    const result = generateBothFieldTypesMaps(models, undefined, undefined, override);
+    const result = generateBothFieldTypesMaps(models, undefined, undefined, domainEnumLookup);
     expect(result.output).toContain("readonly priority: 'low' | 'high' | 'urgent'");
     expect(result.input).toContain("readonly priority: 'low' | 'high' | 'urgent'");
     expect(result.output).toContain("readonly title: CodecTypes['pg/text@1']['output']");
   });
 
-  it('falls through to the framework default when the override returns undefined', () => {
+  it('falls through to the codec channel for non-enum scalar fields', () => {
     const models: Record<string, ContractModel> = {
       Post: {
         fields: {
@@ -1205,8 +1214,7 @@ describe('generateBothFieldTypesMaps with resolveFieldTypeOverride', () => {
         storage: {},
       },
     };
-    const override = () => undefined;
-    const result = generateBothFieldTypesMaps(models, undefined, undefined, override);
+    const result = generateBothFieldTypesMaps(models, undefined, undefined, () => undefined);
     expect(result.output).toContain("readonly title: CodecTypes['pg/text@1']['output']");
   });
 });

@@ -56,18 +56,24 @@ Observable types are identical; `contract.json` and its hashes stay byte-identic
   the honest model. (The "single source so it can't drift" framing from the first
   attempt was confabulated — a generated file regenerates atomically and can't drift.)
 
-## Boundaries — keep SQL out of the framework
+## Boundaries — framework holds no STORAGE knowledge
 
-- The **storage column lookup and all value-set / column narrowing live in the SQL
-  family emitter** (`packages/2-sql/3-tooling/emitter`), alongside the existing
-  storage-type generation. The framework emitter
-  (`packages/1-framework/3-tooling/emitter`) must **not** gain knowledge of columns or
-  value-sets.
-- The framework emitter assembles the field-type-map skeleton and **delegates each
-  field's rendered type to a family hook** (it already delegates parameterized types via
-  `resolveFieldTypeParams`). The SQL family answers from its storage column lookup. The
-  domain enum block stays framework-level (target-agnostic); columns/value-sets do not
-  cross up.
+- The **storage column lookup** (`StorageColumnTypes`/`StorageColumnInputTypes` —
+  keyed by table/column, narrowed by the storage column's `valueSet`) lives in
+  the SQL family emitter (`packages/2-sql/3-tooling/emitter`), alongside the
+  existing storage-type generation. The framework emitter must **not** gain
+  knowledge of columns, storage value-sets, or storage tables.
+- **Domain enum narrowing is framework-level.** A `field.valueSet` of
+  `entityKind: 'enum'` is a domain-plane reference (`contract.domain.enum`); the
+  framework emitter reads its members directly and bakes the literal union into
+  `FieldOutputTypes`/`FieldInputTypes`. Same algorithm Mongo and SQL both need;
+  same algorithm `contract-ts` already uses for the no-emit (`typeof contract`)
+  path. The framework already delegates parameterized-codec rendering via
+  `resolveFieldTypeParams` (kept) because parameterized types ARE family-
+  specific. It does NOT delegate enum narrowing — that's family-agnostic.
+- `FieldOutputTypes` and `StorageColumnTypes` compute the value-union
+  *independently* (same algorithm, no derivation hook between them). They were
+  byte-identical before; they stay byte-identical after.
 
 ## Cross-family (SQL-only realization)
 
@@ -97,8 +103,9 @@ adopt reference-following.
 - SQL family emitter: derive `FieldOutputTypes`/`FieldInputTypes` from the storage
   column lookup at emit time (baked literals); the ORM's read (`ComputeColumnJsType`)
   reverts to a plain `FieldOutputTypes` index — no ref-following, no fallback chain.
-- Framework emitter: delegate per-field type rendering to a family hook; no value-set /
-  column knowledge in framework code.
+- Framework emitter: bake domain enum narrowing directly (read
+  `contract.domain.namespaces[ns].enum[name].members[*].value`); no knowledge of
+  storage columns, storage value-sets, or storage tables in framework code.
 - Tests per acceptance criteria below.
 
 **Out:**
@@ -120,9 +127,10 @@ adopt reference-following.
 - **A4 — No type-level traversal in the emitted output.** The emitted
   `FieldOutputTypes`/`FieldInputTypes` and storage column lookup are plain literal types
   — no `ContractBase[...]` / ref-following expressions. A test/grep guard asserts this.
-- **A5 — Framework stays target-agnostic.** No column / value-set knowledge in
-  `packages/1-framework/3-tooling/emitter`; the SQL realization lives in the SQL family
-  emitter. (`lint:deps` + inspection.)
+- **A5 — Framework holds no STORAGE knowledge.** No knowledge of storage
+  columns, storage tables, or storage value-sets in
+  `packages/1-framework/3-tooling/emitter`. (Domain enum narrowing IS framework-
+  level — same algorithm Mongo and SQL share.) `lint:deps` + grep guard.
 - **A6 — No-emit path functional.** `enum-surface.*` and `contract-ts` enum tests stay
   green; an enum field read on `typeof contract` resolves to the union.
 - **A7 — Contract bytes stable.** `contract.json` / `storageHash` / `profileHash`
@@ -135,3 +143,6 @@ adopt reference-following.
 
 - **`spaceId` / TML-2500.** Cross-space value-set references remain unhandled;
   unreachable today.
+- **TML-2926 — SQL emitter god-file extraction.** `packages/2-sql/3-tooling/emitter/src/index.ts`
+  is multi-hundred-line. Out of scope for this slice; tracked separately. Every line
+  added to it now is future extraction tax — prefer extracting helpers when touching it.

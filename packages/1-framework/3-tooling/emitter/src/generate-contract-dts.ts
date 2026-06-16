@@ -1,9 +1,9 @@
 import type {
   Contract,
   ContractEnum,
-  ContractField,
   ContractModelBase,
   ContractValueObject,
+  ValueSetRef,
 } from '@prisma-next/contract/types';
 import { DomainNamespaceResolutionError } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
@@ -14,8 +14,8 @@ import type {
 } from '@prisma-next/framework-components/emission';
 import { blindCast } from '@prisma-next/utils/casts';
 import {
+  type DomainEnumLookup,
   deduplicateImports,
-  type FieldTypeResolver,
   generateCodecTypeIntersection,
   generateFieldTypesMapsByNamespace,
   generateHashTypeAliases,
@@ -152,10 +152,16 @@ export function generateContractDts(
         emitter.resolveFieldTypeParams?.(modelName, fieldName, model, contract)
     : undefined;
 
-  const resolveFieldTypeOverride: FieldTypeResolver | undefined = emitter.resolveFieldType
-    ? (modelName: string, fieldName: string, field: ContractField, model: ContractModelBase) =>
-        emitter.resolveFieldType?.(modelName, fieldName, field, model, contract, codecLookup)
-    : undefined;
+  const domainEnumLookup: DomainEnumLookup = (ref: ValueSetRef) => {
+    if (ref.entityKind !== 'enum') return undefined;
+    const ns = contract.domain.namespaces[ref.namespaceId];
+    if (!ns) return undefined;
+    const enumBlock = blindCast<
+      Record<string, ContractEnum> | undefined,
+      'ns.enum is an optional ContractEnum record in the emitted IR'
+    >(ns.enum);
+    return enumBlock?.[ref.entityName];
+  };
 
   const namespaceModelsForFieldTypes = namespaceEntries.map(
     ([nsId, ns]) => [nsId, ns.models] as const,
@@ -165,10 +171,10 @@ export function generateContractDts(
     namespaceModelsForFieldTypes,
     codecLookup,
     resolveFieldTypeParams,
-    resolveFieldTypeOverride,
+    domainEnumLookup,
   );
 
-  const extraTypeExports = emitter.getExtraTypeExports?.(contract, codecLookup);
+  const extraTypeExports = emitter.getStorageTypeExports?.(contract, codecLookup);
 
   const contractWrapper = emitter.getContractWrapper('ContractBase', 'TypeMaps');
 
