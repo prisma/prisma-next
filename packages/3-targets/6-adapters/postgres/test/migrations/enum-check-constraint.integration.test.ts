@@ -12,6 +12,7 @@ import {
   member,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   controlAdapter,
@@ -54,7 +55,7 @@ function makeRoleContract(members: { name: string; value: string }[]): Contract<
   return buildBoundContract(
     sqlFamilyPack,
     postgresPack,
-    { enums: { Role } },
+    { enums: { Role }, createNamespace: postgresCreateNamespace },
     ({ field: f, model: m }) => ({
       models: {
         User: m('User', {

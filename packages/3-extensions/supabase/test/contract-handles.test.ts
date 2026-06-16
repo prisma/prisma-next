@@ -24,6 +24,7 @@
  *    same brand/coordinate as one built by hand.
  */
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import type { TargetFieldRef } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
   defineContract,
@@ -126,6 +127,7 @@ describe('lowering smoke test — FK + relation to AuthUser via real supabasePac
       target: postgresTargetPack,
       extensionPacks: { supabase: supabasePack },
       models: { Profile },
+      createNamespace: createTestSqlNamespace,
     });
   }
 
