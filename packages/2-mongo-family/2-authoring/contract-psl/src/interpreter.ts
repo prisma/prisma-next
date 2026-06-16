@@ -11,9 +11,9 @@ import {
   type ContractValueObject,
   type CrossReference,
   crossRef,
-  type JsonValue,
   type ValueSetRef,
 } from '@prisma-next/contract/types';
+import type { EnumTypeHandle } from '@prisma-next/contract-authoring';
 import type {
   AuthoringContributions,
   AuthoringEntityContext,
@@ -68,13 +68,6 @@ export interface InterpretPslDocumentToMongoContractInput {
   readonly codecLookup?: CodecLookup;
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
   readonly authoringContributions?: AuthoringContributions;
-}
-
-interface EnumHandleShape {
-  readonly enumName: string;
-  readonly codecId: string;
-  readonly nativeType: string;
-  readonly enumMembers: readonly { readonly name: string; readonly value: JsonValue }[];
 }
 
 /**
@@ -911,7 +904,7 @@ function processEnumDeclarations(input: {
   }
 
   for (const decl of input.enumBlocks) {
-    const handle = instantiateAuthoringEntityType(
+    const handle = instantiateAuthoringEntityType<EnumTypeHandle | undefined>(
       'enum',
       enumDescriptor,
       [decl],
@@ -920,10 +913,9 @@ function processEnumDeclarations(input: {
 
     if (handle === undefined || handle === null) continue;
 
-    const typedHandle = blindCast<EnumHandleShape, 'enum factory returns EnumHandleShape'>(handle);
     builtEnums[decl.name] = {
-      codecId: typedHandle.codecId,
-      members: typedHandle.enumMembers.map((m) => ({
+      codecId: handle.codecId,
+      members: handle.enumMembers.map((m) => ({
         name: m.name,
         value: m.value,
       })),
