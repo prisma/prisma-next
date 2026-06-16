@@ -165,7 +165,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     );
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "name" text DEFAULT '' NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "name" text DEFAULT ('') NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "name" DROP DEFAULT`,
     ]);
 
@@ -183,7 +183,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     });
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "age" int4 DEFAULT 0 NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "age" int4 DEFAULT (0) NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "age" DROP DEFAULT`,
     ]);
   });
@@ -208,7 +208,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     );
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "flags" bit(4) DEFAULT B'0000' NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "flags" bit(4) DEFAULT (B'0000') NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "flags" DROP DEFAULT`,
     ]);
   });
@@ -221,7 +221,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     });
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "tags" text[] DEFAULT '{}' NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "tags" text[] DEFAULT ('{}') NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "tags" DROP DEFAULT`,
     ]);
   });
@@ -234,7 +234,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     });
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "searchDocument" tsvector DEFAULT ''::tsvector NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "searchDocument" tsvector DEFAULT (''::tsvector) NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "searchDocument" DROP DEFAULT`,
     ]);
   });
@@ -247,7 +247,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     });
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "metadata" json DEFAULT '{}'::json NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "metadata" json DEFAULT ('{}'::json) NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "metadata" DROP DEFAULT`,
     ]);
   });
@@ -260,7 +260,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     });
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "opensAt" timetz DEFAULT '00:00:00+00' NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "opensAt" timetz DEFAULT ('00:00:00+00') NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "opensAt" DROP DEFAULT`,
     ]);
   });
@@ -281,7 +281,7 @@ describe('NOT NULL column without default uses temporary default', () => {
       `SELECT NOT EXISTS (SELECT 1 AS "one" FROM ${qualifiedUserTable} LIMIT 1) AS "result"`,
     );
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "embedding" vector(3) DEFAULT '[0,0,0]'::vector NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "embedding" vector(3) DEFAULT ('[0,0,0]'::vector) NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "embedding" DROP DEFAULT`,
     ]);
   });
@@ -312,7 +312,7 @@ describe('NOT NULL column without default uses temporary default', () => {
       `SELECT NOT EXISTS (SELECT 1 AS "one" FROM ${qualifiedUserTable} LIMIT 1) AS "result"`,
     );
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "embedding" vector(3) DEFAULT '[0,0,0]'::vector NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "embedding" vector(3) DEFAULT ('[0,0,0]'::vector) NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "embedding" DROP DEFAULT`,
     ]);
   });

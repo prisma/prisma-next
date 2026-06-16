@@ -42,6 +42,7 @@ import { columnExistsAst, tableExistsAst } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
+import { boundSchema } from './bound-schema';
 import {
   addNotNullColumnDirect,
   alterColumnType,
@@ -82,10 +83,6 @@ type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 // ESM resolution at runtime in user migrations even though pnpm has the
 // transitive package on disk.
 const POSTGRES_MIGRATION_FACADE = '@prisma-next/postgres/migration';
-
-function boundSchema(schemaName: string): string | undefined {
-  return schemaName === UNBOUND_NAMESPACE_ID ? undefined : schemaName;
-}
 
 abstract class PostgresOpFactoryCallNode extends TsExpression implements FrameworkOpFactoryCall {
   abstract readonly factoryName: string;
@@ -684,10 +681,8 @@ export class DropDefaultCall extends PostgresOpFactoryCallNode {
 
 /**
  * Planner-internal call for adding a NOT NULL column (no contract default) to
- * a table that must be empty at migration time. Carries the raw ADD COLUMN SQL
- * (produced by `buildAddColumnSql` at plan time — deferred from slice-7 typed
- * DDL) plus the parameters needed to lower the typed pre/postchecks at render
- * time.
+ * a table that must be empty at migration time. Carries the typed `DdlColumn`
+ * and lowers it to an ADD COLUMN execute step via the adapter at `toOp` time.
  *
  * No authored `PostgresMigration` method: this call is only emitted by the
  * planner, never hand-written by migration authors.
@@ -698,15 +693,15 @@ export class AddNotNullColumnDirectCall extends PostgresOpFactoryCallNode {
   readonly schemaName: string;
   readonly tableName: string;
   readonly columnName: string;
-  readonly executeStepSql: string;
+  readonly column: DdlColumn;
   readonly label: string;
 
-  constructor(schemaName: string, tableName: string, columnName: string, executeStepSql: string) {
+  constructor(schemaName: string, tableName: string, columnName: string, column: DdlColumn) {
     super();
     this.schemaName = schemaName;
     this.tableName = tableName;
     this.columnName = columnName;
-    this.executeStepSql = executeStepSql;
+    this.column = column;
     this.label = `Add column ${columnName} to ${tableName}`;
     this.freeze();
   }
@@ -717,13 +712,7 @@ export class AddNotNullColumnDirectCall extends PostgresOpFactoryCallNode {
         `AddNotNullColumnDirectCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return addNotNullColumnDirect(
-      this.schemaName,
-      this.tableName,
-      this.columnName,
-      this.executeStepSql,
-      lowerer,
-    );
+    return addNotNullColumnDirect(this.schemaName, this.tableName, this.column, lowerer);
   }
 
   renderTypeScript(): string {
@@ -738,9 +727,9 @@ export class AddNotNullColumnDirectCall extends PostgresOpFactoryCallNode {
 /**
  * Planner-internal call for adding a NOT NULL column (no contract default)
  * using a temporary default value for non-empty tables. Carries all parameters
- * needed for `buildAddNotNullColumnWithTemporaryDefaultOperation`; the typed
- * pre/postchecks are lowered at render time via `toOp(lowerer)`. The execute
- * SQL (`buildAddColumnSql`) is still raw per slice-7 deferral.
+ * needed for `buildAddNotNullColumnWithTemporaryDefaultOperation`; both the
+ * typed ADD COLUMN execute step and the pre/postchecks are lowered via the
+ * adapter at `toOp` time.
  *
  * No authored `PostgresMigration` method: this call is only emitted by the
  * planner, never hand-written by migration authors.
