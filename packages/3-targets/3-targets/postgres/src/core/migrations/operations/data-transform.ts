@@ -113,10 +113,12 @@ export async function dataTransform<TContract extends Contract<SqlStorage>>(
     runClosures.map((closure) => invokeAndLower(closure, contract, adapter, name)),
   );
 
-  // The wrapper stays as raw SQL: by this point `checkPlan.sql` is already a
-  // lowered SQL string, and the typed `EXISTS` builder only accepts a
-  // pre-lowering query node. Typing the wrapper would need new AST substrate
-  // (raw-subquery-as-EXISTS-source); tracked separately.
+  // Raw remnant: the factory lowered the user's `check` plan above before
+  // we get a chance to wrap it, so the EXISTS lifting only has text by the
+  // time it runs. The fix is to rewrite the factory to defer lowering until
+  // after wrapping — so `cfExpr.exists(checkPlan.ast)` can produce the
+  // EXISTS query, then lower once at the boundary — not to grow new AST
+  // substrate. Out of scope for the slice that introduced this comment.
   const precheck: readonly SqlMigrationPlanOperationStep[] = checkPlan
     ? [
         {
