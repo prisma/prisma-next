@@ -23,7 +23,6 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   Contract as ContractType,
-  ContractModelDefinitions,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -44,33 +43,37 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   : _Encoded;
 
 export type FieldOutputTypes = {
-  readonly Tag: {
-    readonly id: CodecTypes['pg/text@1']['output'];
-    readonly name: CodecTypes['pg/text@1']['output'];
-  };
-  readonly User: {
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly name: CodecTypes['pg/text@1']['output'];
-    readonly email: CodecTypes['pg/text@1']['output'];
-  };
-  readonly UserTag: {
-    readonly userId: CodecTypes['pg/int4@1']['output'];
-    readonly tagId: CodecTypes['pg/text@1']['output'];
+  readonly public: {
+    readonly Tag: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+    };
+    readonly User: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly email: CodecTypes['pg/text@1']['output'];
+    };
+    readonly UserTag: {
+      readonly userId: CodecTypes['pg/int4@1']['output'];
+      readonly tagId: CodecTypes['pg/text@1']['output'];
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly Tag: {
-    readonly id: CodecTypes['pg/text@1']['input'];
-    readonly name: CodecTypes['pg/text@1']['input'];
-  };
-  readonly User: {
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly name: CodecTypes['pg/text@1']['input'];
-    readonly email: CodecTypes['pg/text@1']['input'];
-  };
-  readonly UserTag: {
-    readonly userId: CodecTypes['pg/int4@1']['input'];
-    readonly tagId: CodecTypes['pg/text@1']['input'];
+  readonly public: {
+    readonly Tag: {
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+    };
+    readonly User: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly email: CodecTypes['pg/text@1']['input'];
+    };
+    readonly UserTag: {
+      readonly userId: CodecTypes['pg/int4@1']['input'];
+      readonly tagId: CodecTypes['pg/text@1']['input'];
+    };
   };
 };
 export type TypeMaps = TypeMapsType<
@@ -81,234 +84,112 @@ export type TypeMaps = TypeMapsType<
 >;
 
 type ContractBase = Omit<
-  ContractType<
-    {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'postgres-unbound-schema';
-          readonly entries: { readonly table: {}; readonly type: Record<string, never> };
-        };
-        readonly public: {
-          readonly id: 'public';
-          readonly kind: 'postgres-schema';
-          readonly entries: {
-            readonly table: {
-              readonly tags: {
-                columns: {
-                  readonly id: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
-                  readonly name: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
+  ContractType<{
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'postgres-unbound-schema';
+        readonly entries: { readonly table: {} };
+      };
+      readonly public: {
+        readonly id: 'public';
+        readonly kind: 'postgres-schema';
+        readonly entries: {
+          readonly table: {
+            readonly tags: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
                 };
-                primaryKey: { readonly columns: readonly ['id'] };
-                uniques: readonly [{ readonly columns: readonly ['name'] }];
-                indexes: readonly [];
-                foreignKeys: readonly [];
-              };
-              readonly user_tags: {
-                columns: {
-                  readonly user_id: {
-                    readonly nativeType: 'int4';
-                    readonly codecId: 'pg/int4@1';
-                    readonly nullable: false;
-                  };
-                  readonly tag_id: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
+                readonly name: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
                 };
-                primaryKey: { readonly columns: readonly ['user_id', 'tag_id'] };
-                uniques: readonly [];
-                indexes: readonly [];
-                foreignKeys: readonly [
-                  {
-                    readonly source: {
-                      readonly namespaceId: 'public' & NamespaceId;
-                      readonly tableName: 'user_tags';
-                      readonly columns: readonly ['user_id'];
-                    };
-                    readonly target: {
-                      readonly namespaceId: 'public' & NamespaceId;
-                      readonly tableName: 'users';
-                      readonly columns: readonly ['id'];
-                    };
-                    readonly constraint: true;
-                    readonly index: true;
-                  },
-                  {
-                    readonly source: {
-                      readonly namespaceId: 'public' & NamespaceId;
-                      readonly tableName: 'user_tags';
-                      readonly columns: readonly ['tag_id'];
-                    };
-                    readonly target: {
-                      readonly namespaceId: 'public' & NamespaceId;
-                      readonly tableName: 'tags';
-                      readonly columns: readonly ['id'];
-                    };
-                    readonly constraint: true;
-                    readonly index: true;
-                  },
-                ];
               };
-              readonly users: {
-                columns: {
-                  readonly id: {
-                    readonly nativeType: 'int4';
-                    readonly codecId: 'pg/int4@1';
-                    readonly nullable: false;
-                  };
-                  readonly name: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
-                  readonly email: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['name'] }];
+              indexes: readonly [];
+              foreignKeys: readonly [];
+            };
+            readonly user_tags: {
+              columns: {
+                readonly user_id: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
                 };
-                primaryKey: { readonly columns: readonly ['id'] };
-                uniques: readonly [{ readonly columns: readonly ['email'] }];
-                indexes: readonly [];
-                foreignKeys: readonly [];
+                readonly tag_id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
               };
+              primaryKey: { readonly columns: readonly ['user_id', 'tag_id'] };
+              uniques: readonly [];
+              indexes: readonly [];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'user_tags';
+                    readonly columns: readonly ['user_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'users';
+                    readonly columns: readonly ['id'];
+                  };
+                  readonly constraint: true;
+                  readonly index: true;
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'user_tags';
+                    readonly columns: readonly ['tag_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'tags';
+                    readonly columns: readonly ['id'];
+                  };
+                  readonly constraint: true;
+                  readonly index: true;
+                },
+              ];
             };
-            readonly type: Record<string, never>;
+            readonly users: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly name: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly email: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['email'] }];
+              indexes: readonly [];
+              foreignKeys: readonly [];
+            };
           };
         };
       };
-      readonly storageHash: StorageHash;
-    },
-    {
-      readonly Tag: {
-        readonly fields: {
-          readonly id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-          readonly name: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-        };
-        readonly relations: {
-          readonly users: {
-            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
-            readonly cardinality: 'N:M';
-            readonly on: {
-              readonly localFields: readonly ['id'];
-              readonly targetFields: readonly ['tag_id'];
-            };
-            readonly through: {
-              readonly table: 'user_tags';
-              readonly namespaceId: 'public';
-              readonly parentColumns: readonly ['tag_id'];
-              readonly childColumns: readonly ['user_id'];
-              readonly targetColumns: readonly ['id'];
-            };
-          };
-        };
-        readonly storage: {
-          readonly table: 'tags';
-          readonly namespaceId: 'public';
-          readonly fields: {
-            readonly id: { readonly column: 'id' };
-            readonly name: { readonly column: 'name' };
-          };
-        };
-      };
-      readonly User: {
-        readonly fields: {
-          readonly id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          };
-          readonly name: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-          readonly email: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-        };
-        readonly relations: {
-          readonly tags: {
-            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Tag' };
-            readonly cardinality: 'N:M';
-            readonly on: {
-              readonly localFields: readonly ['id'];
-              readonly targetFields: readonly ['user_id'];
-            };
-            readonly through: {
-              readonly table: 'user_tags';
-              readonly namespaceId: 'public';
-              readonly parentColumns: readonly ['user_id'];
-              readonly childColumns: readonly ['tag_id'];
-              readonly targetColumns: readonly ['id'];
-            };
-          };
-        };
-        readonly storage: {
-          readonly table: 'users';
-          readonly namespaceId: 'public';
-          readonly fields: {
-            readonly id: { readonly column: 'id' };
-            readonly name: { readonly column: 'name' };
-            readonly email: { readonly column: 'email' };
-          };
-        };
-      };
-      readonly UserTag: {
-        readonly fields: {
-          readonly userId: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-          };
-          readonly tagId: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
-        };
-        readonly relations: {
-          readonly tag: {
-            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Tag' };
-            readonly cardinality: 'N:1';
-            readonly on: {
-              readonly localFields: readonly ['tagId'];
-              readonly targetFields: readonly ['id'];
-            };
-          };
-          readonly user: {
-            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
-            readonly cardinality: 'N:1';
-            readonly on: {
-              readonly localFields: readonly ['userId'];
-              readonly targetFields: readonly ['id'];
-            };
-          };
-        };
-        readonly storage: {
-          readonly table: 'user_tags';
-          readonly namespaceId: 'public';
-          readonly fields: {
-            readonly userId: { readonly column: 'user_id' };
-            readonly tagId: { readonly column: 'tag_id' };
-          };
-        };
-      };
-    }
-  >,
+    };
+    readonly storageHash: StorageHash;
+  }>,
   'roots' | 'domain'
 > & {
   readonly target: 'postgres';
@@ -464,8 +345,6 @@ type ContractBase = Omit<
 
   readonly profileHash: ProfileHash;
 };
-
-export type Models = ContractModelDefinitions<Contract>;
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
