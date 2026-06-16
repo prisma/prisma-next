@@ -484,6 +484,17 @@ Incidental substrate diff only.
 -->
 
 <!--
+TML-2886 (redo, PR #841): type SQL enum columns via a baked storage column lookup.
+The SQL emitter now generates a top-level `StorageColumnTypes` map keyed
+`[namespace][table][column]`; `FieldOutputTypes`/`FieldInputTypes` are derived from
+it at emit time. The query builder (sql-builder) reads `StorageColumnTypes` directly;
+the ORM still reads `FieldOutputTypes`. `contract.json` and both hashes are
+byte-identical; `FieldOutputTypes` is byte-identical to main. The examples/ diff is
+purely `.d.ts` regeneration (the new `StorageColumnTypes` block added; observable
+types unchanged). No consumer action required. Incidental substrate diff only.
+-->
+
+<!--
 #788: enum input types widened to their member union in emitted contract.d.ts (PR
 #797). The emitter now renders an enum-restricted field's input type as the literal
 member union on the write side, matching the existing output side: a `pg/enum@1`

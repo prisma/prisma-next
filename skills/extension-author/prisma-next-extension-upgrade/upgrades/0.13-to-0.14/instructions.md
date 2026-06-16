@@ -485,3 +485,13 @@ assert the new `column.${schema}.${table}.${column}` op-id format for add-column
 operations. Test-only assertion updates — no extension-author API change. Incidental
 substrate diff only.
 -->
+
+<!--
+TML-2886 (redo, PR #841): type SQL enum columns via a baked storage column lookup.
+The SQL emitter generates a new `StorageColumnTypes` map in `contract.d.ts`, keyed
+`[namespace][table][column]`; `FieldOutputTypes`/`FieldInputTypes` are derived from it
+at emit time. The extension-package `contract.d.ts` fixtures (paradedb, pgvector,
+postgis, supabase, sql-orm-client test fixture) regenerate to add the `StorageColumnTypes`
+block. `contract.json` and hashes are byte-identical; `FieldOutputTypes` is unchanged.
+No extension-author API or surface change. Incidental substrate diff only.
+-->
