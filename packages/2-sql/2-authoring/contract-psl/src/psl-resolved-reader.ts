@@ -10,14 +10,13 @@ import type {
   ResolvedField,
   ResolvedNamespace,
   SourceFile,
-  SyntaxNode,
 } from '@prisma-next/psl-parser/syntax';
 import {
   GenericBlockDeclarationAst,
   KeyValuePairAst,
   printSyntax,
   StringLiteralExprAst,
-  SyntaxNode as SyntaxNodeClass,
+  SyntaxNode,
 } from '@prisma-next/psl-parser/syntax';
 
 /**
@@ -117,7 +116,7 @@ function readBlockAttributes(
  */
 function extensionBlockKeyword(blockSyntax: SyntaxNode): string | undefined {
   for (const child of blockSyntax.children()) {
-    if (child instanceof SyntaxNodeClass) continue;
+    if (child instanceof SyntaxNode) continue;
     if (child.kind === 'Ident') return child.text;
   }
   return undefined;
@@ -158,7 +157,7 @@ function extensionBlockFromResolved(
 ): PslExtensionBlock {
   const parameters: Record<string, PslExtensionBlockParamValue> = {};
   for (const child of block.syntax.children()) {
-    if (!(child instanceof SyntaxNodeClass)) continue;
+    if (!(child instanceof SyntaxNode)) continue;
     const entry = KeyValuePairAst.cast(child);
     if (!entry) continue;
     const key = entry.key()?.token()?.text;

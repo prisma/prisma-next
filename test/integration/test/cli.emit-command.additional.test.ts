@@ -179,10 +179,12 @@ describe('emit command: additional fixtures', () => {
       expect(sourceResult.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+            code: 'PSL_UNRESOLVED_TYPE_REFERENCE',
             sourceId: './schema.prisma',
             span: expect.objectContaining({
-              start: expect.objectContaining({ line: 3 }),
+              // Resolver diagnostics use the 0-based parser line convention; the
+              // `data Unsupported` field is the third source line.
+              start: expect.objectContaining({ line: 2 }),
             }),
           }),
         ]),
@@ -200,7 +202,7 @@ describe('emit command: additional fixtures', () => {
 
       const errorOutput = consoleErrors.join('\n');
       expect(errorOutput).toContain('PSL to SQL contract interpretation failed');
-      expect(errorOutput).toContain('PSL_UNSUPPORTED_FIELD_TYPE');
+      expect(errorOutput).toContain('PSL_UNRESOLVED_TYPE_REFERENCE');
       expect(errorOutput).toContain('schema.prisma');
     } finally {
       testSetup.cleanup();
