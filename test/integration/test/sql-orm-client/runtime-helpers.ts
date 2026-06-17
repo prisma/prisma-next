@@ -199,20 +199,24 @@ export async function createPgIntegrationRuntime(
     // otherwise the per-test execution-count assertions would miss them.
     async connection() {
       const conn = await realRuntime.connection();
-      const recordingConnection = {
+      type PgConnection = Awaited<ReturnType<typeof realRuntime.connection>>;
+      type PgTransaction = Awaited<ReturnType<PgConnection['transaction']>>;
+
+      const recordingConnection: PgConnection = {
         ...conn,
         execute: <Row>(plan: (SqlExecutionPlan | SqlQueryPlan) & { readonly _row?: Row }) =>
           recordAndDelegate((p) => conn.execute(p), plan),
-        transaction: async () => {
+        transaction: async (): Promise<PgTransaction> => {
           const tx = await conn.transaction();
-          return {
+          const recordingTransaction: PgTransaction = {
             ...tx,
             execute: <Row>(plan: (SqlExecutionPlan | SqlQueryPlan) & { readonly _row?: Row }) =>
               recordAndDelegate((p) => tx.execute(p), plan),
           };
+          return recordingTransaction;
         },
       };
-      return recordingConnection as unknown as Awaited<ReturnType<typeof realRuntime.connection>>;
+      return recordingConnection;
     },
   };
 
