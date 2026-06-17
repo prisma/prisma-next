@@ -234,8 +234,10 @@ describe('TypeAnnotationAst', () => {
   it('detects list type', () => {
     const b = new GreenNodeBuilder();
     b.startNode('TypeAnnotation');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'String');
+    b.finishNode();
     b.finishNode();
     b.token('LBracket', '[');
     b.token('RBracket', ']');
@@ -243,7 +245,7 @@ describe('TypeAnnotationAst', () => {
     const ta = TypeAnnotationAst.cast(root)!;
     expect(ta.isList()).toBe(true);
     expect(ta.isOptional()).toBe(false);
-    expect(ta.name()?.token()?.text).toBe('String');
+    expect(ta.name()?.name()?.token()?.text).toBe('String');
   });
 
   it('detects optional type', () => {
@@ -777,8 +779,10 @@ describe('NamedTypeDeclarationAst', () => {
     b.token('Equals', '=');
     b.token('Whitespace', ' ');
     b.startNode('TypeAnnotation');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'Int');
+    b.finishNode();
     b.finishNode();
     b.finishNode();
     b.token('Whitespace', ' ');
@@ -798,7 +802,7 @@ describe('NamedTypeDeclarationAst', () => {
     const decl = NamedTypeDeclarationAst.cast(root)!;
     expect(decl.name()?.token()?.text).toBe('UserId');
     expect(decl.equals()?.text).toBe('=');
-    expect(decl.typeAnnotation()?.name()?.token()?.text).toBe('Int');
+    expect(decl.typeAnnotation()?.name()?.name()?.token()?.text).toBe('Int');
     const attrs = Array.from(decl.attributes());
     expect(attrs).toHaveLength(1);
     expect(attrs[0]!.name()?.name()?.token()?.text).toBe('db');
@@ -1135,10 +1139,10 @@ describe('TypeAnnotationAst qualified references', () => {
     b.finishNode();
     const root = createSyntaxTree(b.finishNode());
     const ta = TypeAnnotationAst.cast(root)!;
-    expect(ta.dot()?.text).toBe('.');
-    expect(ta.namespaceName()?.token()?.text).toBe('auth');
-    expect(ta.name()?.token()?.text).toBe('User');
-    expect(ta.spaceName()).toBeUndefined();
+    expect(ta.name()?.dot()?.text).toBe('.');
+    expect(ta.name()?.namespace()?.token()?.text).toBe('auth');
+    expect(ta.name()?.name()?.token()?.text).toBe('User');
+    expect(ta.name()?.space()).toBeUndefined();
     expect(ta.argList()).toBeUndefined();
     expect(ta.isConstructor()).toBe(false);
     expect(ta.isList()).toBe(false);
@@ -1149,6 +1153,7 @@ describe('TypeAnnotationAst qualified references', () => {
     // supabase:auth.User?
     const b = new GreenNodeBuilder();
     b.startNode('TypeAnnotation');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'supabase');
     b.finishNode();
@@ -1160,13 +1165,14 @@ describe('TypeAnnotationAst qualified references', () => {
     b.startNode('Identifier');
     b.token('Ident', 'User');
     b.finishNode();
+    b.finishNode();
     b.token('Question', '?');
     const root = createSyntaxTree(b.finishNode());
     const ta = TypeAnnotationAst.cast(root)!;
-    expect(ta.colon()?.text).toBe(':');
-    expect(ta.spaceName()?.token()?.text).toBe('supabase');
-    expect(ta.namespaceName()?.token()?.text).toBe('auth');
-    expect(ta.name()?.token()?.text).toBe('User');
+    expect(ta.name()?.colon()?.text).toBe(':');
+    expect(ta.name()?.space()?.token()?.text).toBe('supabase');
+    expect(ta.name()?.namespace()?.token()?.text).toBe('auth');
+    expect(ta.name()?.name()?.token()?.text).toBe('User');
     expect(ta.isOptional()).toBe(true);
   });
 
@@ -1174,6 +1180,7 @@ describe('TypeAnnotationAst qualified references', () => {
     // supabase:User
     const b = new GreenNodeBuilder();
     b.startNode('TypeAnnotation');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'supabase');
     b.finishNode();
@@ -1181,11 +1188,12 @@ describe('TypeAnnotationAst qualified references', () => {
     b.startNode('Identifier');
     b.token('Ident', 'User');
     b.finishNode();
+    b.finishNode();
     const root = createSyntaxTree(b.finishNode());
     const ta = TypeAnnotationAst.cast(root)!;
-    expect(ta.spaceName()?.token()?.text).toBe('supabase');
-    expect(ta.namespaceName()).toBeUndefined();
-    expect(ta.name()?.token()?.text).toBe('User');
+    expect(ta.name()?.space()?.token()?.text).toBe('supabase');
+    expect(ta.name()?.namespace()).toBeUndefined();
+    expect(ta.name()?.name()?.token()?.text).toBe('User');
   });
 
   it('exposes inline constructor call', () => {
@@ -1209,13 +1217,13 @@ describe('TypeAnnotationAst qualified references', () => {
     const root = createSyntaxTree(b.finishNode());
     const ta = TypeAnnotationAst.cast(root)!;
     expect(ta.isConstructor()).toBe(true);
-    expect(ta.qualifiedName()?.path()).toEqual(['Vector']);
-    expect(ta.name()?.token()?.text).toBe('Vector');
+    expect(ta.name()?.path()).toEqual(['Vector']);
+    expect(ta.name()?.name()?.token()?.text).toBe('Vector');
     const argList = ta.argList();
     expect(argList).toBeInstanceOf(AttributeArgListAst);
     expect(Array.from(argList!.args())).toHaveLength(1);
-    expect(ta.namespaceName()).toBeUndefined();
-    expect(ta.spaceName()).toBeUndefined();
+    expect(ta.name()?.namespace()).toBeUndefined();
+    expect(ta.name()?.space()).toBeUndefined();
   });
 
   it('returns base name for bare reference', () => {
@@ -1228,9 +1236,9 @@ describe('TypeAnnotationAst qualified references', () => {
     b.finishNode();
     const root = createSyntaxTree(b.finishNode());
     const ta = TypeAnnotationAst.cast(root)!;
-    expect(ta.name()?.token()?.text).toBe('String');
-    expect(ta.namespaceName()).toBeUndefined();
-    expect(ta.spaceName()).toBeUndefined();
+    expect(ta.name()?.name()?.token()?.text).toBe('String');
+    expect(ta.name()?.namespace()).toBeUndefined();
+    expect(ta.name()?.space()).toBeUndefined();
     expect(ta.argList()).toBeUndefined();
     expect(ta.isConstructor()).toBe(false);
   });

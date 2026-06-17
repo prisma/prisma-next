@@ -149,6 +149,25 @@ types {
       expect(target.args[0]?.syntax.kind).toBe('NumberLiteralExpr');
     });
 
+    it('keeps a malformed constructor arg as a hole so later arg indexes do not shift', () => {
+      const target = fieldTarget(
+        resolveSource(`
+model M {
+  id  String @id
+  vec Vector(, 1536)
+}
+`),
+        UNSPECIFIED_PSL_NAMESPACE_ID,
+        'M',
+        'vec',
+      );
+      expect(target.kind).toBe('constructor');
+      if (target.kind !== 'constructor') throw new Error('expected constructor');
+      expect(target.args).toHaveLength(2);
+      expect(target.args[0]).toBeUndefined();
+      expect(target.args[1]?.syntax.kind).toBe('NumberLiteralExpr');
+    });
+
     it('resolves a dangling reference to an unresolved target plus a diagnostic', () => {
       const doc = resolveSource(source);
       expect(fieldTarget(doc, 'blog', 'Post', 'ghost')).toEqual({
@@ -336,6 +355,24 @@ model User {
 
     it('reads a positional string-literal argument as its unquoted value', () => {
       expect(attr('map').stringArg(0)).toBe('user_name');
+    });
+
+    it('keeps a missing-value arg in its slot so positional indexes do not shift', () => {
+      const doc = resolveSource(`
+model User {
+  id   String @id
+  name String @map(label: , "user_name")
+}
+`);
+      const map = namespace(doc, UNSPECIFIED_PSL_NAMESPACE_ID)
+        .models.get('User')!
+        .fields.get('name')!
+        .attributes.find((a) => a.name === 'map')!;
+      expect(map.args).toHaveLength(2);
+      expect(map.args[0]?.name).toBe('label');
+      expect(map.args[0]?.value).toBeUndefined();
+      expect(map.positionalArg(0)?.syntax.kind).toBe('StringLiteralExpr');
+      expect(map.stringArg(0)).toBe('user_name');
     });
 
     it('exposes dotted attribute names structurally', () => {

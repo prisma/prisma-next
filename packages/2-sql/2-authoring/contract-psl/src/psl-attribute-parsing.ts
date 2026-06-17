@@ -2,7 +2,7 @@ import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types'
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { PslSpan } from '@prisma-next/psl-parser';
 import type { ExpressionAst, ResolvedAttribute } from '@prisma-next/psl-parser/syntax';
-import { ArrayLiteralAst, argText, StringLiteralExprAst } from '@prisma-next/psl-parser/syntax';
+import { ArrayLiteralAst, printSyntax, StringLiteralExprAst } from '@prisma-next/psl-parser/syntax';
 
 /**
  * Finds an attribute by name from a resolved attribute list. Returns
@@ -21,8 +21,8 @@ export function lowerFirst(value: string): string {
 }
 
 export function getNamedArgument(attribute: ResolvedAttribute, name: string): string | undefined {
-  const arg = attribute.args.find((a) => a.name === name);
-  return arg === undefined ? undefined : argText(arg.value.syntax);
+  const value = attribute.args.find((a) => a.name === name)?.value;
+  return value === undefined ? undefined : printSyntax(value.syntax);
 }
 
 export function getNamedArgumentExpr(
@@ -35,7 +35,7 @@ export function getNamedArgumentExpr(
 /**
  * The first positional argument's expression node, or `undefined` when absent.
  * Replaces the legacy `getPositionalArgumentEntry` `{ value, span }` accessor:
- * callers read the raw text via {@link argText} and derive spans from the CST.
+ * callers read the raw text via {@link printSyntax} and derive spans from the CST.
  */
 export function getPositionalArgumentExpr(
   attribute: ResolvedAttribute,
@@ -57,7 +57,7 @@ export function unquoteStringLiteral(value: string): string {
  * The bare names listed in an array-literal argument expression (e.g. the
  * `[id, name]` of `@@id([id, name])`), or `undefined` when the expression is
  * not an array literal. Element names are read from the CST element nodes via
- * {@link argText} (preserving the raw source text the legacy comma-split
+ * {@link printSyntax} (preserving the raw source text the legacy comma-split
  * produced).
  */
 export function parseFieldList(value: ExpressionAst): readonly string[] | undefined {
@@ -67,7 +67,7 @@ export function parseFieldList(value: ExpressionAst): readonly string[] | undefi
   }
   const parts: string[] = [];
   for (const element of array.elements()) {
-    const text = argText(element.syntax).trim();
+    const text = printSyntax(element.syntax).trim();
     if (text.length > 0) parts.push(text);
   }
   return parts;
@@ -140,9 +140,9 @@ export function parseConstraintMapArgument(input: {
 }
 
 export function getPositionalArguments(attribute: ResolvedAttribute): readonly string[] {
-  return attribute.args
-    .filter((arg) => arg.name === undefined)
-    .map((arg) => argText(arg.value.syntax));
+  return attribute.args.flatMap((arg) =>
+    arg.name === undefined && arg.value !== undefined ? [printSyntax(arg.value.syntax)] : [],
+  );
 }
 
 /**

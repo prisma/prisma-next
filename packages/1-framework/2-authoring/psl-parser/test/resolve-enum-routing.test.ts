@@ -56,14 +56,13 @@ enum Priority {
 }
 `;
 
-  it('lands the enum block in extensionBlocks keyed by its name, not in the enums map', () => {
+  it('lands the enum block in extensionBlocks keyed by its name', () => {
     const doc = resolveDoc(source, {
       pslBlockDescriptors: { enum: enumDescriptor },
       codecLookup: textCodecLookup,
     });
     const ns = doc.namespaces.get(UNSPECIFIED_PSL_NAMESPACE_ID);
     expect(ns?.extensionBlocks.has('Priority')).toBe(true);
-    expect(ns?.enums.size).toBe(0);
   });
 
   it('resolves a well-formed domain enum with no diagnostics', () => {

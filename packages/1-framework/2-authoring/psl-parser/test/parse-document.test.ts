@@ -35,7 +35,7 @@ import {
   ObjectLiteralExprAst,
   StringLiteralExprAst,
 } from '../src/syntax/ast/expressions';
-import { argText } from '../src/syntax/ast-helpers';
+import { printSyntax } from '../src/syntax/ast-helpers';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
 import type { SyntaxNode } from '../src/syntax/red';
 import { frameworkScalarTypes, highlight, printTree } from './support';
@@ -1010,7 +1010,7 @@ describe('parse() accepts single-quoted string literals', () => {
     expect(value).toBeInstanceOf(StringLiteralExprAst);
     expect((value as StringLiteralExprAst).value()).toBe('short');
     // The raw arg text round-trips the single quotes, matching the legacy reader.
-    expect(argText((object as ExpressionAst).syntax)).toBe("{ label: 'short' }");
+    expect(printSyntax((object as ExpressionAst).syntax)).toBe("{ label: 'short' }");
   });
 
   it('unquotes both quote styles and decodes escaped single quotes', () => {
@@ -1034,7 +1034,7 @@ describe('parse() accepts double-quoted object-literal keys', () => {
     const field = Array.from(object.fields())[0];
     expect(field?.keyName()).toBe('length');
     expect((field?.value() as NumberLiteralExprAst | undefined)?.value()).toBe(35);
-    expect(argText(object.syntax)).toBe('{ "length": 35 }');
+    expect(printSyntax(object.syntax)).toBe('{ "length": 35 }');
   });
 
   it('accepts a mix of identifier and string-literal keys', () => {
@@ -1066,7 +1066,7 @@ describe('parse() accepts qualified default-function calls', () => {
     expect(calls[0]?.path()).toEqual(['temporal', 'updatedAt']);
     // The raw text the downstream resolver reads is the full qualified call —
     // never split into a bare `temporal` plus a trailing parse error.
-    expect(argText((calls[0] as ExpressionAst).syntax)).toBe('temporal.updatedAt()');
+    expect(printSyntax((calls[0] as ExpressionAst).syntax)).toBe('temporal.updatedAt()');
   });
 });
 

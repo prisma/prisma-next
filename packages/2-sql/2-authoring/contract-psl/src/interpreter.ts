@@ -37,7 +37,7 @@ import type {
   ResolvedNamespace,
   SourceFile,
 } from '@prisma-next/psl-parser/syntax';
-import { argText, StringLiteralExprAst } from '@prisma-next/psl-parser/syntax';
+import { printSyntax, StringLiteralExprAst } from '@prisma-next/psl-parser/syntax';
 import type {
   SqlModelStorage,
   SqlNamespaceTablesInput,
@@ -679,7 +679,7 @@ function relationTargetCoordinates(field: ResolvedField): {
     };
   }
   const annotation = field.syntax.typeAnnotation();
-  const writtenNamespace = annotation?.namespaceName()?.token()?.text;
+  const writtenNamespace = annotation?.name()?.namespace()?.token()?.text;
   return {
     typeName: fieldTypeName(field),
     typeNamespaceId: writtenNamespace,
@@ -1567,7 +1567,8 @@ function collectPolymorphismDeclarations(
       const attrSpan = spanOf(attr.syntax.syntax, sourceFile);
       if (attr.name === 'discriminator') {
         const fieldNameExpr = getPositionalArgumentExpr(attr);
-        const fieldName = fieldNameExpr === undefined ? undefined : argText(fieldNameExpr.syntax);
+        const fieldName =
+          fieldNameExpr === undefined ? undefined : printSyntax(fieldNameExpr.syntax);
         if (!fieldName) {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
@@ -1592,7 +1593,7 @@ function collectPolymorphismDeclarations(
 
       if (attr.name === 'base') {
         const baseNameExpr = getPositionalArgumentExpr(attr, 0);
-        const baseName = baseNameExpr === undefined ? undefined : argText(baseNameExpr.syntax);
+        const baseName = baseNameExpr === undefined ? undefined : printSyntax(baseNameExpr.syntax);
         const valueExpr = getPositionalArgumentExpr(attr, 1);
         if (!baseName || !valueExpr) {
           diagnostics.push({

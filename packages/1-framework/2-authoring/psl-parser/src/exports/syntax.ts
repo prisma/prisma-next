@@ -7,8 +7,6 @@ export type {
   ResolvedBlockType,
   ResolvedCompositeType,
   ResolvedDocument,
-  ResolvedEnum,
-  ResolvedEnumValue,
   ResolvedExtensionBlock,
   ResolvedField,
   ResolvedFieldType,
@@ -57,7 +55,7 @@ export { IdentifierAst } from '../syntax/ast/identifier';
 export { QualifiedNameAst } from '../syntax/ast/qualified-name';
 export { TypeAnnotationAst } from '../syntax/ast/type-annotation';
 export type { AstNode } from '../syntax/ast-helpers';
-export { argText, filterChildren, findChildToken, findFirstChild } from '../syntax/ast-helpers';
+export { filterChildren, findChildToken, findFirstChild, printSyntax } from '../syntax/ast-helpers';
 export type { GreenElement, GreenNode, GreenToken } from '../syntax/green';
 export { greenNode, greenToken } from '../syntax/green';
 export { GreenNodeBuilder } from '../syntax/green-builder';

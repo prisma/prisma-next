@@ -30,7 +30,7 @@ import type {
   SourceFile,
   TypeTarget,
 } from '@prisma-next/psl-parser/syntax';
-import { argText } from '@prisma-next/psl-parser/syntax';
+import { printSyntax } from '@prisma-next/psl-parser/syntax';
 import { blindCast } from '@prisma-next/utils/casts';
 import {
   lowerDefaultFunctionWithRegistry,
@@ -406,18 +406,24 @@ export type ResolveFieldTypeResult =
  * shape that the authoring argument machinery (`mapPslHelperArgs`,
  * `instantiatePslTypeConstructor`, `instantiatePslFieldPreset`) consumes.
  * Constructor args from the CST are all positional; their spans are recovered
- * through `sourceFile`.
+ * through `sourceFile`. An argument whose `value` is malformed keeps its
+ * positional slot — it maps to an empty-text positional arg whose span falls
+ * back to the surrounding annotation `span`, so downstream indexes never shift.
  */
 export function buildConstructorCall(
   target: TypeTarget & { kind: 'constructor' },
   span: PslSpan,
   sourceFile: SourceFile,
 ): PslTypeConstructorCall {
-  const args: PslAttributeArgument[] = target.args.map((expr) => ({
-    kind: 'positional' as const,
-    value: argText(expr.syntax),
-    span: spanOf(expr.syntax, sourceFile),
-  }));
+  const args: PslAttributeArgument[] = target.args.map((expr) =>
+    expr === undefined
+      ? { kind: 'positional' as const, value: '', span }
+      : {
+          kind: 'positional' as const,
+          value: printSyntax(expr.syntax),
+          span: spanOf(expr.syntax, sourceFile),
+        },
+  );
   return { kind: 'typeConstructor', path: target.path, args, span };
 }
 
@@ -780,7 +786,7 @@ export function lowerDefaultForField(input: {
     return {};
   }
 
-  const expressionText = argText(expressionAst.syntax);
+  const expressionText = printSyntax(expressionAst.syntax);
   const expressionSpan = spanOf(expressionAst.syntax, input.sourceFile);
 
   const literalDefault = parseDefaultLiteralValue(expressionText);

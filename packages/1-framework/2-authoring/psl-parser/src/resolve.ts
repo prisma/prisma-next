@@ -8,6 +8,7 @@ import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { PslBlockParam, PslDiagnosticCode } from '@prisma-next/framework-components/psl-ast';
 import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { ParseDiagnostic } from './parse';
 import type { Range, SourceFile } from './source-file';
 import type { FieldAttributeAst, ModelAttributeAst } from './syntax/ast/attributes';
@@ -15,7 +16,6 @@ import {
   CompositeTypeDeclarationAst,
   type DocumentAst,
   EnumDeclarationAst,
-  type EnumValueDeclarationAst,
   type FieldDeclarationAst,
   GenericBlockDeclarationAst,
   type KeyValuePairAst,
@@ -76,7 +76,7 @@ export type TypeTarget =
   | {
       readonly kind: 'constructor';
       readonly path: readonly string[];
-      readonly args: readonly ExpressionAst[];
+      readonly args: readonly (ExpressionAst | undefined)[];
     }
   | { readonly kind: 'unresolved'; readonly typeName: string };
 
@@ -88,7 +88,7 @@ export interface ResolvedFieldType {
 
 export interface ResolvedArg {
   readonly name?: string;
-  readonly value: ExpressionAst;
+  readonly value?: ExpressionAst;
 }
 
 /**
@@ -153,20 +153,6 @@ export interface ResolvedCompositeType {
   readonly syntax: CompositeTypeDeclarationAst;
 }
 
-export interface ResolvedEnumValue {
-  readonly name: string;
-  readonly attributes: readonly ResolvedAttribute[];
-  readonly syntax: EnumValueDeclarationAst;
-}
-
-export interface ResolvedEnum {
-  readonly name: string;
-  readonly namespaceId: string;
-  readonly values: ReadonlyMap<string, ResolvedEnumValue>;
-  readonly attributes: readonly ResolvedAttribute[];
-  readonly syntax: EnumDeclarationAst;
-}
-
 export interface ResolvedExtensionBlock {
   readonly name: string;
   readonly namespaceId: string;
@@ -202,7 +188,6 @@ export interface ResolvedNamedType {
 export interface ResolvedNamespace {
   readonly id: string;
   readonly models: ReadonlyMap<string, ResolvedModel>;
-  readonly enums: ReadonlyMap<string, ResolvedEnum>;
   readonly compositeTypes: ReadonlyMap<string, ResolvedCompositeType>;
   readonly extensionBlocks: ReadonlyMap<string, ResolvedExtensionBlock>;
   readonly blockTypes: ReadonlyMap<string, ResolvedBlockType>;
@@ -274,24 +259,23 @@ class Resolver {
   ): TypeTarget {
     if (!annotation) return { kind: 'unresolved', typeName: '' };
 
+    const qn = annotation.name();
+
     const argList = annotation.argList();
     if (argList) {
       return {
         kind: 'constructor',
-        path: annotation.qualifiedName()?.path() ?? [],
-        args: [...argList.args()].flatMap((arg) => {
-          const value = arg.value();
-          return value === undefined ? [] : [value];
-        }),
+        path: qn?.path() ?? [],
+        args: [...argList.args()].map((arg) => arg.value()),
       };
     }
 
-    const typeName = annotation.name()?.name();
+    const typeName = qn?.name()?.name();
     if (typeName === undefined) return { kind: 'unresolved', typeName: '' };
 
-    const spaceName = annotation.spaceName()?.name();
+    const spaceName = qn?.space()?.name();
     if (spaceName !== undefined) {
-      const namespaceName = annotation.namespaceName()?.name();
+      const namespaceName = qn?.namespace()?.name();
       return namespaceName === undefined
         ? { kind: 'crossSpace', spaceId: spaceName, typeName }
         : { kind: 'crossSpace', spaceId: spaceName, namespaceId: namespaceName, typeName };
@@ -301,7 +285,7 @@ class Resolver {
     // when `Type` matches a built-in scalar name. The bare-name scalar shortcut
     // below runs only after the qualifier branch, so `ns.String` does not bind to
     // the scalar `String` and skip the namespace lookup.
-    const qualifier = annotation.namespaceName()?.name();
+    const qualifier = qn?.namespace()?.name();
     if (qualifier !== undefined) {
       const kind = nameTable.byNamespace.get(qualifier)?.get(typeName);
       if (kind !== undefined) {
@@ -313,7 +297,7 @@ class Resolver {
       // An over-qualified annotation (e.g. `a.b.Bar`) was already flagged by
       // `parse` with `PSL_INVALID_QUALIFIED_TYPE`; re-reporting it here as an
       // unresolved reference would double-diagnose a single malformed type.
-      if (!annotation.isOverQualified()) {
+      if (!(qn?.isOverQualified() ?? false)) {
         this.diagnostic(
           'PSL_UNRESOLVED_TYPE_REFERENCE',
           `Type "${qualifier}.${typeName}" does not resolve to a known declaration`,
@@ -439,9 +423,8 @@ function collectArgs(argList: { args(): Iterable<ArgLike> } | undefined): Resolv
   const args: ResolvedArg[] = [];
   for (const arg of argList?.args() ?? []) {
     const value = arg.value();
-    if (value === undefined) continue;
     const name = arg.name()?.name();
-    args.push(name === undefined ? { value } : { name, value });
+    args.push({ ...ifDefined('name', name), ...ifDefined('value', value) });
   }
   return args;
 }
@@ -473,7 +456,6 @@ interface NamespaceBucket {
   readonly syntax?: NamespaceDeclarationAst;
   readonly declarations: OrderedDeclaration[];
   readonly models: ModelDeclarationAst[];
-  readonly enums: EnumDeclarationAst[];
   readonly compositeTypes: CompositeTypeDeclarationAst[];
   readonly genericBlocks: GenericBlockDeclarationAst[];
 }
@@ -503,7 +485,6 @@ export function resolve(
       ...(syntax ? { syntax } : {}),
       declarations: [],
       models: [],
-      enums: [],
       compositeTypes: [],
       genericBlocks: [],
     };
@@ -523,7 +504,6 @@ export function resolve(
     }
     const enumDecl = EnumDeclarationAst.cast(member);
     if (enumDecl) {
-      bucket.enums.push(enumDecl);
       bucket.declarations.push({ kind: 'enum', declaration: enumDecl });
       return;
     }
@@ -686,29 +666,6 @@ function buildNamespace(
     });
   }
 
-  const enums = new Map<string, ResolvedEnum>();
-  for (const declaration of bucket.enums) {
-    const name = declaration.name()?.name();
-    if (name === undefined || enums.has(name)) continue;
-    const values = new Map<string, ResolvedEnumValue>();
-    for (const value of declaration.values()) {
-      const valueName = value.name()?.name();
-      if (valueName === undefined || values.has(valueName)) continue;
-      values.set(valueName, {
-        name: valueName,
-        attributes: resolveFieldAttributes(value.attributes()),
-        syntax: value,
-      });
-    }
-    enums.set(name, {
-      name,
-      namespaceId: bucket.id,
-      values,
-      attributes: resolveModelAttributes(declaration.attributes()),
-      syntax: declaration,
-    });
-  }
-
   const compositeTypes = new Map<string, ResolvedCompositeType>();
   for (const declaration of bucket.compositeTypes) {
     const name = declaration.name()?.name();
@@ -762,7 +719,6 @@ function buildNamespace(
   return {
     id: bucket.id,
     models,
-    enums,
     compositeTypes,
     extensionBlocks,
     blockTypes,

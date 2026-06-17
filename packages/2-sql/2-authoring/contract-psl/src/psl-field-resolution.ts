@@ -16,7 +16,7 @@ import type {
   ResolvedModel,
   SourceFile,
 } from '@prisma-next/psl-parser/syntax';
-import { argText } from '@prisma-next/psl-parser/syntax';
+import { printSyntax } from '@prisma-next/psl-parser/syntax';
 import type { EnumTypeHandle } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -73,7 +73,7 @@ function lowerEnumDefaultForField(input: {
     return {};
   }
 
-  const raw = argText(expressionAst.syntax).trim();
+  const raw = printSyntax(expressionAst.syntax).trim();
   const isQuotedString = /^(['"]).*\1$/.test(raw);
   const isFunctionCall = raw.includes('(') && raw.endsWith(')');
 

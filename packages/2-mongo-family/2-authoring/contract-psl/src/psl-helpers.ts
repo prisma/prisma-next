@@ -1,18 +1,18 @@
 import type { ExpressionAst, ResolvedAttribute } from '@prisma-next/psl-parser/syntax';
-import { argText, StringLiteralExprAst } from '@prisma-next/psl-parser/syntax';
+import { printSyntax, StringLiteralExprAst } from '@prisma-next/psl-parser/syntax';
 
 /**
  * Unquoted value of a string-literal argument, or `undefined` when the
  * expression is not a string literal. Handles both `'`- and `"`-quoting and
- * decodes escapes, unlike the raw {@link argText} slice.
+ * decodes escapes, unlike the raw {@link printSyntax} slice.
  */
-function stringLiteralValue(value: ExpressionAst): string | undefined {
-  return StringLiteralExprAst.cast(value.syntax)?.value();
+function stringLiteralValue(value: ExpressionAst | undefined): string | undefined {
+  return value === undefined ? undefined : StringLiteralExprAst.cast(value.syntax)?.value();
 }
 
 export function getNamedArgument(attr: ResolvedAttribute, name: string): string | undefined {
-  const arg = attr.args.find((a) => a.name === name);
-  return arg === undefined ? undefined : argText(arg.value.syntax);
+  const value = attr.args.find((a) => a.name === name)?.value;
+  return value === undefined ? undefined : printSyntax(value.syntax);
 }
 
 export function parseFieldList(value: string): readonly string[] {
@@ -121,8 +121,8 @@ export function parseRelationAttribute(
     }
   }
 
-  const fields = fieldsArg ? parseFieldList(argText(fieldsArg.syntax)) : undefined;
-  const references = referencesArg ? parseFieldList(argText(referencesArg.syntax)) : undefined;
+  const fields = fieldsArg ? parseFieldList(printSyntax(fieldsArg.syntax)) : undefined;
+  const references = referencesArg ? parseFieldList(printSyntax(referencesArg.syntax)) : undefined;
 
   return {
     ...(relationName !== undefined ? { relationName } : {}),
@@ -140,7 +140,7 @@ export function parseRelationAttribute(
 export function quotedStringArg(attr: ResolvedAttribute, index: number): string | undefined {
   const value = attr.positionalArg(index);
   if (value === undefined) return undefined;
-  const trimmed = argText(value.syntax).trim();
+  const trimmed = printSyntax(value.syntax).trim();
   const match = trimmed.match(/^(['"])(.*)\1$/);
   if (!match) return undefined;
   return match[2] ?? '';

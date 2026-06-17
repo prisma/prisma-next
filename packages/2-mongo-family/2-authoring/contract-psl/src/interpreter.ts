@@ -34,7 +34,7 @@ import type {
   SourceFile,
   SyntaxNode,
 } from '@prisma-next/psl-parser/syntax';
-import { argText } from '@prisma-next/psl-parser/syntax';
+import { printSyntax } from '@prisma-next/psl-parser/syntax';
 import { blindCast } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { deriveJsonSchema, derivePolymorphicJsonSchema } from './derive-json-schema';
@@ -204,7 +204,7 @@ function collectPolymorphismDeclarations(
       const span = spanOf(attr.syntax.syntax, sourceFile);
       if (attr.name === 'discriminator') {
         const positional = attr.positionalArg(0);
-        const fieldName = positional === undefined ? undefined : argText(positional.syntax);
+        const fieldName = positional === undefined ? undefined : printSyntax(positional.syntax);
         if (!fieldName) {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
@@ -228,7 +228,8 @@ function collectPolymorphismDeclarations(
       }
       if (attr.name === 'base') {
         const basePositional = attr.positionalArg(0);
-        const baseName = basePositional === undefined ? undefined : argText(basePositional.syntax);
+        const baseName =
+          basePositional === undefined ? undefined : printSyntax(basePositional.syntax);
         const value = quotedStringArg(attr, 1);
         if (!baseName || attr.positionalArg(1) === undefined) {
           diagnostics.push({
@@ -640,7 +641,7 @@ function collectIndexes(
     const span = spanOf(attr.syntax.syntax, sourceFile);
     const fieldsArgExpr = attr.positionalArg(0);
     if (!fieldsArgExpr) continue;
-    const parsedFields = parseIndexFieldList(argText(fieldsArgExpr.syntax));
+    const parsedFields = parseIndexFieldList(printSyntax(fieldsArgExpr.syntax));
     if (parsedFields.length === 0) continue;
 
     const hasWildcard = parsedFields.some((f) => f.isWildcard);

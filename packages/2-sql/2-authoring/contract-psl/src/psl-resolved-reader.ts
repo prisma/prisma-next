@@ -13,9 +13,9 @@ import type {
   SyntaxNode,
 } from '@prisma-next/psl-parser/syntax';
 import {
-  argText,
   GenericBlockDeclarationAst,
   KeyValuePairAst,
+  printSyntax,
   StringLiteralExprAst,
   SyntaxNode as SyntaxNodeClass,
 } from '@prisma-next/psl-parser/syntax';
@@ -95,7 +95,7 @@ function readBlockAttributes(
       if (literal === undefined) continue;
       args.push({
         kind: 'positional',
-        value: argText(value.syntax),
+        value: printSyntax(value.syntax),
         span: spanOf(value.syntax, sourceFile),
       });
     }
@@ -167,7 +167,7 @@ function extensionBlockFromResolved(
     parameters[key] =
       value === undefined
         ? { kind: 'bare', span: spanOf(entry.syntax, sourceFile) }
-        : { kind: 'value', raw: argText(value.syntax), span: spanOf(value.syntax, sourceFile) };
+        : { kind: 'value', raw: printSyntax(value.syntax), span: spanOf(value.syntax, sourceFile) };
   }
   return {
     kind: discriminator,
