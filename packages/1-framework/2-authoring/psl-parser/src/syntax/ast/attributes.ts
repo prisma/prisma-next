@@ -40,11 +40,6 @@ export class FieldAttributeAst implements AstNode {
     return findChildToken(this.syntax, 'At');
   }
 
-  /**
-   * The attribute's qualified name (`map`, or the `db.VarChar` of `@db.VarChar`),
-   * the single source for its namespace and bare-name segments. Read the parts
-   * via {@link QualifiedNameAst.namespace} / {@link QualifiedNameAst.name}.
-   */
   name(): QualifiedNameAst | undefined {
     return findFirstChild(this.syntax, QualifiedNameAst.cast);
   }
@@ -69,11 +64,6 @@ export class ModelAttributeAst implements AstNode {
     return findChildToken(this.syntax, 'DoubleAt');
   }
 
-  /**
-   * The attribute's qualified name, the single source for its namespace and
-   * bare-name segments. Read the parts via {@link QualifiedNameAst.namespace} /
-   * {@link QualifiedNameAst.name}.
-   */
   name(): QualifiedNameAst | undefined {
     return findFirstChild(this.syntax, QualifiedNameAst.cast);
   }

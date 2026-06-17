@@ -4,9 +4,8 @@ export type SyntaxKind =
   | 'CompositeTypeDeclaration'
   | 'Namespace'
   | 'TypesBlock'
-  // The generic/extension block node — the `kw [name] { key = value }` form
-  // produced by `parseGenericBlock`. Deliberately distinct from the reserved
-  // `model`/`enum`/`namespace`/`type`/`types` declarations above.
+  // The generic/extension block node: the `kw [name] { key = value }` form,
+  // distinct from the reserved `model`/`namespace`/`type`/`types` declarations.
   | 'GenericBlockDeclaration'
   | 'FieldDeclaration'
   | 'NamedTypeDeclaration'
@@ -17,10 +16,7 @@ export type SyntaxKind =
   | 'AttributeArg'
   | 'TypeAnnotation'
   | 'Identifier'
-  // A namespace-qualified name `[space ':']? Ident ('.' Ident)*`, parsed as a
-  // single unit and reused in every position a qualified name appears: type
-  // annotations, qualified constructor/function calls, qualified default-function
-  // calls, and qualified `@@`-block attribute names.
+  // A namespace-qualified name `[space ':']? Ident ('.' Ident)*`.
   | 'QualifiedName'
   | 'FunctionCall'
   | 'ArrayLiteral'

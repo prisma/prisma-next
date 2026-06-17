@@ -27,10 +27,8 @@ const TRIVIA_KINDS: ReadonlySet<TokenKind> = new Set<TokenKind>([
 ]);
 
 /**
- * The absolute source span of a single token, captured for a diagnostic: the
- * token's start offset (total source text consumed before it) and its text
- * length. Captured eagerly so a marker stays valid after the cursor advances
- * past the token it points at.
+ * The source span of a token, captured eagerly so it stays valid after the
+ * cursor advances past the token it points at.
  */
 export interface DiagnosticMark {
   readonly offset: number;
@@ -38,11 +36,9 @@ export interface DiagnosticMark {
 }
 
 /**
- * The fault-tolerant parser substrate the leaf and (later) declaration grammars
- * drive. It owns the token cursor, the green-tree builder with its
- * trivia-attachment discipline, the diagnostic sink, and the recovery
- * primitive. Trivia is flushed into the enclosing open node, so every child
- * node spans exactly its first through last significant token.
+ * The fault-tolerant parser substrate the grammars drive. Trivia is flushed
+ * into the enclosing open node, so every child node spans exactly its first
+ * through last significant token.
  */
 export class Cursor {
   readonly #tokenizer: Tokenizer;
@@ -85,10 +81,7 @@ export class Cursor {
     }
   }
 
-  /**
-   * Span of the significant token `lookahead` positions ahead (`mark(0)` = the next,
-   * `mark(1)` = the one after), captured eagerly so it stays valid after the cursor advances.
-   */
+  /** Span of the significant token `lookahead` positions ahead (`mark(0)` = the next). */
   mark(lookahead = 0): DiagnosticMark {
     let rawIndex = 0;
     let offset = this.#offset;
@@ -110,9 +103,8 @@ export class Cursor {
   }
 
   /**
-   * Zero-width mark just past the last consumed significant token (before any trailing
-   * trivia) — anchors an "expected here" diagnostic at the spot, e.g. the `{` missing
-   * after a declaration's name.
+   * Zero-width mark just past the last consumed significant token — anchors an
+   * "expected here" diagnostic, e.g. the `{` missing after a declaration's name.
    */
   markAfterLastToken(): DiagnosticMark {
     return { offset: this.#offset, length: 0 };
@@ -185,9 +177,8 @@ function parseIdentifier(cursor: Cursor): void {
 }
 
 /**
- * Parses a single expression in argument or element position. Returns the
- * produced node, or `undefined` when the next significant token does not start a
- * recognised expression (the caller decides how to recover).
+ * Returns `undefined` when the next significant token does not start a
+ * recognised expression, leaving recovery to the caller.
  */
 export function parseExpression(cursor: Cursor): GreenNode | undefined {
   return (
@@ -221,16 +212,10 @@ export function parseNumberLiteralExpr(cursor: Cursor): GreenNode | undefined {
 }
 
 /**
- * Parses a namespace-qualified name `[space ':']? Ident ('.' Ident)*` into a
- * single {@link QualifiedName} node, consuming the whole chain greedily. This is
- * the one qualified-name parser for every position — type annotation, call
- * callee, attribute name — and it owns its diagnostics: a malformed chain reports
- * `PSL_INVALID_QUALIFIED_NAME` identically regardless of where the name appears.
- * The parse always completes — the subtree round-trips losslessly. The leading
- * `Ident` is the caller's precondition (`parseQualifiedName` is only entered once
- * `peekKind() === 'Ident'`).
+ * Parses a namespace-qualified name `[space ':']? Ident ('.' Ident)*`. The
+ * caller guarantees a leading `Ident`.
  *
- * Parsing the chain up front is the point: a position then decides
+ * Parsing the whole chain up front lets a position decide
  * constructor-vs-reference by peeking exactly one token for `(`, with no scan of
  * the dotted chain's length.
  */
@@ -243,19 +228,16 @@ export function parseQualifiedName(cursor: Cursor): void {
 }
 
 /**
- * Consumes a run of `<separator> Ident` segments inside an open `QualifiedName`,
- * reporting `PSL_INVALID_QUALIFIED_NAME` for each separator past the first of its
- * kind (over-qualification — a well-formed name carries at most one colon space
- * and one dot namespace) and for a separator no identifier follows (a trailing
- * separator). The separator is consumed regardless, so the subtree — and the
- * lossless round-trip — stays intact.
+ * A well-formed name carries at most one colon space and one dot namespace, so
+ * each separator past the first of its kind reports `PSL_INVALID_QUALIFIED_NAME`.
+ * The separator is consumed regardless, keeping the lossless round-trip intact.
  */
 function parseQualifiedSegments(cursor: Cursor, separator: 'Colon' | 'Dot'): void {
   let seen = 0;
   while (cursor.peekKind() === separator) {
     seen++;
     const separatorMark = cursor.mark();
-    cursor.bump(); // separator
+    cursor.bump();
     if (seen > 1) {
       cursor.diagnostic(
         'PSL_INVALID_QUALIFIED_NAME',
@@ -297,7 +279,7 @@ export function parseIdentifierExpr(cursor: Cursor): GreenNode | undefined {
 export function parseArrayLiteral(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'LBracket') return undefined;
   cursor.startNode('ArrayLiteral');
-  cursor.bump(); // LBracket
+  cursor.bump();
   while (cursor.peekKind() !== 'RBracket' && cursor.peekKind() !== 'Eof') {
     const element = parseExpression(cursor);
     if (!element) break;
@@ -317,22 +299,20 @@ export function parseObjectLiteralExpr(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'LBrace') return undefined;
   const braceMark = cursor.mark();
   cursor.startNode('ObjectLiteralExpr');
-  cursor.bump(); // LBrace
+  cursor.bump();
   while (cursor.peekKind() !== 'RBrace' && cursor.peekKind() !== 'Eof') {
     parseObjectField(cursor);
     if (cursor.peekKind() === 'Comma') {
       cursor.bump();
     } else if (cursor.peekKind() === 'Ident') {
-      // A following identifier key with no separating comma re-enters the loop
-      // (the next parseObjectField consumes the key, ≥1 token, guaranteeing
-      // progress). Flag the missing comma at the gap after the previous field.
+      // A following identifier key with no comma re-enters the loop; the next
+      // parseObjectField consumes ≥1 token, so progress is guaranteed.
       cursor.diagnostic(
         'PSL_INVALID_OBJECT_LITERAL',
         'Expected "," between object-literal fields',
         cursor.markAfterLastToken(),
       );
     } else {
-      // Anything else terminates the field list.
       break;
     }
   }
@@ -349,11 +329,10 @@ export function parseObjectField(cursor: Cursor): GreenNode {
   const keyMark = cursor.mark();
   const keyText = cursor.peekToken().text;
   if (cursor.peekKind() === 'Ident') {
-    parseIdentifier(cursor); // identifier key
+    parseIdentifier(cursor);
   } else if (cursor.peekKind() === 'StringLiteral') {
     // A string-literal key (e.g. `{ "length": 35 }`) is accepted; its logical
-    // name is the unquoted string. Consuming it as a `StringLiteralExpr` keeps
-    // the key node structured so the field and enclosing block stay in sync.
+    // name is the unquoted string.
     parseStringLiteralExpr(cursor);
   }
   if (cursor.peekKind() === 'Colon') {
@@ -374,10 +353,9 @@ export function parseObjectField(cursor: Cursor): GreenNode {
 
 /**
  * Whether the next tokens open a call: a bare `Ident(` or a namespace-qualified
- * `Ident.Ident(`. The lookahead is bounded — at most the four tokens of a
- * well-formed call callee — so a bare dotted reference like `a.b` (no following
- * `(`) is *not* mistaken for a call and falls through to the bare-identifier form,
- * rather than scanning an unbounded dotted chain ahead to find the paren.
+ * `Ident.Ident(`. The lookahead is deliberately bounded so a bare dotted
+ * reference like `a.b` is not mistaken for a call, rather than scanning an
+ * unbounded dotted chain ahead to find the paren.
  */
 function isCallAhead(cursor: Cursor): boolean {
   if (cursor.peekKind() !== 'Ident') return false;
@@ -390,13 +368,10 @@ function isCallAhead(cursor: Cursor): boolean {
 }
 
 /**
- * Parses a function/constructor call in expression position — bare
- * `autoincrement()` or namespace-qualified `temporal.updatedAt()` — into a
- * {@link FunctionCall} whose callee is a single {@link QualifiedName}, so
- * `FunctionCallAst.path()` reads the full `['temporal', 'updatedAt']` chain. A
- * no-op (returns `undefined`) unless {@link isCallAhead} confirms a trailing `(`,
- * leaving the `parseExpression` `??` chain to fall through to the boolean and
- * bare-identifier forms.
+ * Parses a function/constructor call — bare `autoincrement()` or qualified
+ * `temporal.updatedAt()`. Returns `undefined` unless {@link isCallAhead}
+ * confirms a trailing `(`, so the `parseExpression` chain falls through to the
+ * boolean and bare-identifier forms.
  */
 export function parseFunctionCall(cursor: Cursor): GreenNode | undefined {
   if (!isCallAhead(cursor)) return undefined;
@@ -408,13 +383,9 @@ export function parseFunctionCall(cursor: Cursor): GreenNode | undefined {
   return cursor.finishNode();
 }
 
-/**
- * Parses a parenthesised, comma-separated `AttributeArg` list into the
- * currently open node (a `FunctionCall` or an `AttributeArgList`), consuming the
- * surrounding parentheses.
- */
+/** Parses a parenthesised, comma-separated `AttributeArg` list into the currently open node. */
 function parseParenArgs(cursor: Cursor): void {
-  cursor.bump(); // LParen
+  cursor.bump();
   while (cursor.peekKind() !== 'RParen' && cursor.peekKind() !== 'Eof') {
     parseAttributeArg(cursor);
     if (cursor.peekKind() === 'Comma') {
@@ -431,8 +402,8 @@ function parseParenArgs(cursor: Cursor): void {
 export function parseAttributeArg(cursor: Cursor): GreenNode {
   cursor.startNode('AttributeArg');
   if (cursor.peekKind() === 'Ident' && cursor.peekKind(1) === 'Colon') {
-    parseIdentifier(cursor); // argument name
-    cursor.bump(); // Colon
+    parseIdentifier(cursor);
+    cursor.bump();
   }
   parseArgValue(cursor);
   return cursor.finishNode();
@@ -452,7 +423,7 @@ export function parseAttribute(cursor: Cursor): GreenNode {
   const isBlockAttribute = cursor.peekKind() === 'DoubleAt';
   const attributeMark = cursor.mark();
   cursor.startNode(isBlockAttribute ? 'ModelAttribute' : 'FieldAttribute');
-  cursor.bump(); // At or DoubleAt
+  cursor.bump();
   if (cursor.peekKind() === 'Ident') {
     parseQualifiedName(cursor);
   } else {
@@ -464,20 +435,13 @@ export function parseAttribute(cursor: Cursor): GreenNode {
   return cursor.finishNode();
 }
 
-/**
- * A type annotation recomposes as `QualifiedName (argList)? ([])? (?)?`: the one
- * qualified-name unit, then — decided by peeking a single token for `(` — an
- * optional constructor argument list (`pgvector.Vector(1536)`), then the list and
- * optional suffixes. A malformed qualified name (over-qualification, a trailing
- * separator) is diagnosed by {@link parseQualifiedName} itself, uniformly with
- * every other qualified-name position; the subtree still round-trips losslessly.
- */
+/** A type annotation: `QualifiedName (argList)? ([])? (?)?`, e.g. `pgvector.Vector(1536)[]?`. */
 export function parseTypeAnnotation(cursor: Cursor): GreenNode {
   cursor.startNode('TypeAnnotation');
   if (cursor.peekKind() === 'Ident') {
     parseQualifiedName(cursor);
     if (cursor.peekKind() === 'LParen') {
-      parseAttributeArgList(cursor); // constructor args, e.g. Vector(1536)
+      parseAttributeArgList(cursor);
     }
   }
   if (cursor.peekKind() === 'LBracket') {
@@ -495,11 +459,8 @@ export function parseTypeAnnotation(cursor: Cursor): GreenNode {
 type MemberParser = (cursor: Cursor) => void;
 
 /**
- * Drives the recursive descent over a full PSL document. Tokenizes via the
- * substrate cursor, builds a complete green/red tree wrapped as a
- * {@link DocumentAst}, collects every syntactic {@link ParseDiagnostic}, and
- * never throws — malformed input yields diagnostics and a recovered tree, not
- * an exception.
+ * Parses a full PSL document. Never throws — malformed input yields diagnostics
+ * and a recovered tree, not an exception.
  */
 export function parse(source: string): ParseResult {
   const cursor = new Cursor(source);
@@ -530,15 +491,10 @@ function keywordIs(cursor: Cursor, keyword: string): boolean {
 }
 
 /**
- * Recognises one top-level (or namespace-body) declaration as an ordered list of
- * alternatives composed with `??`. Each alternative owns its discriminating
- * `peekKind`/`peekToken` lookahead and is a no-op on non-match: it returns
- * `undefined` having consumed and mutated nothing, so the forward-only cursor is
- * never left half-consumed by a rejected alternative. The first alternative to
- * commit wins; when none match, the input is recovered as an unsupported
- * declaration. Recovery runs via the `if (!node)` tail rather than as a `??`
- * arm, because it appends raw tokens to the open parent instead of returning a
- * child node.
+ * Each alternative is a no-op on non-match, consuming nothing, so the
+ * forward-only cursor is never left half-consumed by a rejected alternative.
+ * Recovery runs via the `if (!node)` tail rather than as a `??` arm, because it
+ * appends raw tokens to the open parent instead of returning a child node.
  */
 function parseDeclaration(cursor: Cursor, insideNamespace: boolean): void {
   const name = cursor.peekKind(1) === 'Ident' ? cursor.peekToken(1).text : '';
@@ -574,8 +530,8 @@ function parseDeclaration(cursor: Cursor, insideNamespace: boolean): void {
 }
 
 /**
- * Reports only the first missing piece — a missing name suppresses the missing-brace
- * diagnostic. `nameRequired` is false only for the `types` block, which never has a name.
+ * Reports only the first missing piece — a missing name suppresses the
+ * missing-brace diagnostic. `nameRequired` is false only for the `types` block.
  */
 function parseBlock(
   cursor: Cursor,
@@ -614,12 +570,10 @@ export function parseModel(cursor: Cursor): GreenNode | undefined {
 }
 
 /**
- * Excluding the reserved keywords keeps a malformed reserved block (e.g. `model {` with
- * no name) routed to its dedicated parser. The generic keyword set is open
- * (extension-contributed), so a bare identifier with no brace (e.g. `oops`) is read as an
- * unfinished custom declaration — a committed `GenericBlockDeclaration` + missing-brace diagnostic
- * — not unsupported content. A non-identifier lead can't be a declaration name, so it falls
- * through to `parseUnsupportedTopLevel`.
+ * Excluding the reserved keywords keeps a malformed reserved block (e.g. `model
+ * {` with no name) routed to its dedicated parser. The generic keyword set is
+ * open, so a bare identifier with no brace (e.g. `oops`) is read as an unfinished
+ * custom declaration rather than unsupported content.
  */
 export function parseGenericBlock(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
@@ -660,15 +614,10 @@ export function parseTypesBlock(cursor: Cursor): GreenNode | undefined {
   return parseBlock(cursor, 'TypesBlock', false, parseNamedTypeMember);
 }
 
-/**
- * Parses a `{ … }` block body: consumes the braces, dispatches each member to
- * `parseMember` until the closing brace or EOF, and flags an unclosed block.
- * Every `parseMember` consumes at least one significant token, so the loop
- * always terminates.
- */
+/** Every `parseMember` consumes at least one significant token, so the loop always terminates. */
 function parseBlockBody(cursor: Cursor, parseMember: MemberParser): void {
   const braceMark = cursor.mark();
-  cursor.bump(); // LBrace
+  cursor.bump();
   for (;;) {
     const kind = cursor.peekKind();
     if (kind === 'RBrace' || kind === 'Eof') break;
@@ -693,9 +642,7 @@ function parseUnsupportedTopLevel(cursor: Cursor): void {
 }
 
 /**
- * Block-attribute alternative shared by model, composite-type, and generic-block
- * members: matches a leading `@@` (yielding a `ModelAttribute`) and is a no-op on
- * anything else. The `@@`-vs-`@` distinction is preserved exactly — single-`@`
+ * Matches a leading `@@` block attribute, a no-op otherwise. Single-`@`
  * attributes belong to fields and are parsed inside `parseField`.
  */
 export function parseBlockAttribute(cursor: Cursor): GreenNode | undefined {
@@ -726,11 +673,9 @@ function parseNamedTypeMember(cursor: Cursor): void {
 }
 
 /**
- * A generic-block member is either a `@@`-block attribute (e.g. `@@type("…")`,
- * yielding a `ModelAttribute` — the same node model/enum/composite blocks use) or
- * a `key = value` entry. The block-attribute alternative is purely syntactic: it
- * parses the `@@attr(args)` shape and does not judge whether the attribute is
- * valid for the block's kind — that stays a `resolve` semantic concern.
+ * A generic-block member is either a `@@`-block attribute or a `key = value`
+ * entry. The block-attribute alternative is purely syntactic — it does not judge
+ * whether the attribute is valid for the block's kind.
  */
 function parseKeyValueMember(cursor: Cursor): void {
   const node = parseBlockAttribute(cursor) ?? parseKeyValue(cursor);
@@ -748,7 +693,7 @@ function invalidMember(cursor: Cursor, code: PslDiagnosticCode, message: string)
 export function parseField(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
   cursor.startNode('FieldDeclaration');
-  parseIdentifier(cursor); // name
+  parseIdentifier(cursor);
   parseTypeAnnotation(cursor);
   while (cursor.peekKind() === 'At') {
     parseAttribute(cursor);
@@ -761,7 +706,7 @@ export function parseNamedType(cursor: Cursor): GreenNode | undefined {
   cursor.startNode('NamedTypeDeclaration');
   const nameMark = cursor.mark();
   const nameText = cursor.peekToken().text;
-  parseIdentifier(cursor); // name
+  parseIdentifier(cursor);
   if (cursor.peekKind() === 'Equals') {
     cursor.bump();
   } else {
@@ -775,17 +720,14 @@ export function parseNamedType(cursor: Cursor): GreenNode | undefined {
 }
 
 /**
- * A generic-block entry is either `key = value` or a bare `key`. The bare form
- * (a key with no `=`) is the member shape a domain-enum block uses for a value
- * that the codec derives from the member name itself (`enum Status { Active }`);
- * it commits a `KeyValuePair` carrying only the key, which downstream readers
- * treat as a bare-kind parameter. A `key =` with no following expression is a
- * malformed value and is flagged.
+ * A generic-block entry is either `key = value` or a bare `key` (committing a
+ * `KeyValuePair` carrying only the key). A `key =` with no following expression
+ * is flagged.
  */
 export function parseKeyValue(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
   cursor.startNode('KeyValuePair');
-  parseIdentifier(cursor); // key
+  parseIdentifier(cursor);
   if (cursor.peekKind() === 'Equals') {
     cursor.bump();
     if (!parseExpression(cursor)) {

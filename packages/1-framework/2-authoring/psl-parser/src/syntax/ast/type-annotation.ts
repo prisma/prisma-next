@@ -12,21 +12,12 @@ export class TypeAnnotationAst implements AstNode {
     this.syntax = syntax;
   }
 
-  /**
-   * The qualified-name unit `[space ':']? Ident ('.' Ident)*` — the annotation's
-   * reference, or the callee of a constructor when an {@link argList} follows.
-   * Reach through it for the name segments (`space()`/`namespace()`/`name()`/
-   * `path()`) and the over-qualification check.
-   */
+  /** The annotation's reference, doubling as the constructor callee when an {@link argList} follows. */
   name(): QualifiedNameAst | undefined {
     return findFirstChild(this.syntax, QualifiedNameAst.cast);
   }
 
-  /**
-   * The constructor argument list, present when the annotation is a constructor
-   * (`Vector(1536)`, `pgvector.Vector(1536)`) rather than a plain reference — i.e.
-   * a `(` followed the {@link name}.
-   */
+  /** Present when the annotation is a constructor (`Vector(1536)`) rather than a plain reference. */
   argList(): AttributeArgListAst | undefined {
     return findFirstChild(this.syntax, AttributeArgListAst.cast);
   }

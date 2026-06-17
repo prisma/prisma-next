@@ -844,7 +844,7 @@ describe('FunctionCallAst', () => {
     b.token('RParen', ')');
     const root = createSyntaxTree(b.finishNode());
     const fn = FunctionCallAst.cast(root)!;
-    expect(fn.qualifiedName()?.identifier()?.token()?.text).toBe('autoincrement');
+    expect(fn.name()?.identifier()?.token()?.text).toBe('autoincrement');
     expect(fn.lparen()?.text).toBe('(');
     expect(fn.rparen()?.text).toBe(')');
     expect(Array.from(fn.args())).toHaveLength(0);

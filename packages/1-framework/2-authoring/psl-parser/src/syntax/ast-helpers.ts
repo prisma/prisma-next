@@ -36,12 +36,8 @@ export function* filterChildren<T>(
 }
 
 /**
- * Raw source text of a CST node — the concatenated token text it spans, which
- * reproduces the source slice. Leaf nodes carry no leading/trailing trivia, so
- * the result is already trimmed; quotes, brackets, and qualifiers are preserved
- * verbatim. Callers that want the decoded string value of a string literal
- * should decode it instead; `printSyntax` is for the cases that need the
- * unmodified source slice.
+ * Raw source text of a CST node, verbatim (quotes and brackets preserved). For
+ * the decoded value of a string literal, decode it instead.
  */
 export function printSyntax(node: SyntaxNode): string {
   let text = '';

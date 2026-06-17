@@ -4,20 +4,7 @@ import { filterChildren, findChildToken, findFirstChild } from '../ast-helpers';
 import { SyntaxNode } from '../red';
 import { IdentifierAst } from './identifier';
 
-/**
- * A namespace-qualified name `[space ':']? Ident ('.' Ident)*`, parsed as a single
- * unit by `parseQualifiedName`. It is the one shape every qualified position
- * shares: a type annotation's reference or constructor callee, a qualified
- * function/constructor call's callee, and a qualified `@@`-attribute name.
- *
- * The colon-introduced first segment is the cross-space `space`; the dot-joined
- * tail is `namespace.name` (or just `name` when undotted). Reading the segments
- * back out:
- *
- * - `space()` — the segment before a `:`, when one is present.
- * - `identifier()` — the last segment (the bare type / call / attribute name).
- * - `namespace()` — the segment immediately before the last `.`, when dotted.
- */
+/** A namespace-qualified name, e.g. `pgvector.Vector` or `supabase:auth.User`. */
 export class QualifiedNameAst implements AstNode {
   readonly syntax: SyntaxNode;
 
@@ -59,19 +46,16 @@ export class QualifiedNameAst implements AstNode {
     return findChildToken(this.syntax, 'Dot');
   }
 
-  /** The cross-space `space` segment (the identifier before a `:`), if any. */
   space(): IdentifierAst | undefined {
     if (!this.colon()) return undefined;
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  /** The namespace segment (the identifier before the last `.`), if dotted. */
   namespace(): IdentifierAst | undefined {
     if (!this.dot()) return undefined;
     return this.#penultimateSegment();
   }
 
-  /** The bare name — the last identifier segment. */
   identifier(): IdentifierAst | undefined {
     return this.#lastSegment();
   }
@@ -90,10 +74,8 @@ export class QualifiedNameAst implements AstNode {
   }
 
   /**
-   * Whether this name carries more qualifier segments than a well-formed name
-   * allows (a second `:`-space or a second `.`-namespace). `parseQualifiedName`
-   * emits `PSL_INVALID_QUALIFIED_NAME` for it; the resolver reads it to avoid
-   * double-reporting an already-flagged annotation as unresolved.
+   * Flags a malformed name with more qualifier segments than allowed (a second
+   * `:`-space or a second `.`-namespace).
    */
   isOverQualified(): boolean {
     return this.#separatorCount('Dot') > 1 || this.#separatorCount('Colon') > 1;

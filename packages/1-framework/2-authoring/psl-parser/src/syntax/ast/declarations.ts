@@ -9,8 +9,8 @@ import { IdentifierAst } from './identifier';
 import { TypeAnnotationAst } from './type-annotation';
 
 /**
- * What may appear inside a `namespace` block: models, enums, composite types,
- * and extension (block) declarations. `types {}` blocks and nested `namespace`
+ * What may appear inside a `namespace` block: models, composite types, and
+ * extension (block) declarations. `types {}` blocks and nested `namespace`
  * blocks are document-only, so they are not namespace members.
  */
 export type NamespaceMemberAst =

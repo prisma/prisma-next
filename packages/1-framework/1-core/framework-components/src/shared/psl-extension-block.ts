@@ -36,9 +36,8 @@ export type PslDiagnosticCode =
   | 'PSL_INVALID_TYPES_MEMBER'
   | 'PSL_INVALID_QUALIFIED_TYPE'
   /**
-   * The fault-tolerant CST parser saw a qualified name (e.g. a dotted type or
-   * attribute reference) in a position where the written name is structurally
-   * invalid. Emitted by the CST `parse` surface, anchored on the name's span.
+   * A qualified name (e.g. a dotted type or attribute reference) is structurally
+   * invalid, such as an over-qualified or trailing-separator name.
    */
   | 'PSL_INVALID_QUALIFIED_NAME'
   /**

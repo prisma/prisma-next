@@ -12,12 +12,8 @@ export class FunctionCallAst implements AstNode {
     this.syntax = syntax;
   }
 
-  /**
-   * The qualified-name callee — present for parser-produced calls, whose callee
-   * is a single {@link QualifiedName}. `undefined` for a call whose identifier
-   * segments sit directly under the node.
-   */
-  qualifiedName(): QualifiedNameAst | undefined {
+  /** The qualified-name callee, or `undefined` when identifier segments sit directly under the node. */
+  name(): QualifiedNameAst | undefined {
     return findFirstChild(this.syntax, QualifiedNameAst.cast);
   }
 
@@ -27,7 +23,7 @@ export class FunctionCallAst implements AstNode {
    * `['pgvector', 'Vector']`. Empty when the call carries no identifier.
    */
   path(): readonly string[] {
-    const qualified = this.qualifiedName();
+    const qualified = this.name();
     const segments: string[] = [];
     for (const segment of filterChildren(qualified?.syntax ?? this.syntax, IdentifierAst.cast)) {
       const text = segment.token()?.text;
