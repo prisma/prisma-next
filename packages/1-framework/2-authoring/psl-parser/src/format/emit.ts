@@ -523,8 +523,9 @@ function emitQualifiedName(qualified: QualifiedNameAst | undefined): string {
   const space = identifierText(qualified.space());
   const namespace = identifierText(qualified.namespace());
   const name = identifierText(qualified.identifier());
-  const prefix = space ? `${space}:` : namespace ? `${namespace}.` : '';
-  return `${prefix}${name}`;
+  const spacePrefix = space ? `${space}:` : '';
+  const namespacePrefix = namespace ? `${namespace}.` : '';
+  return `${spacePrefix}${namespacePrefix}${name}`;
 }
 
 function emitTypeAnnotation(annotation: TypeAnnotationAst | undefined): string {

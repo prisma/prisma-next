@@ -34,6 +34,10 @@ describe('format type-annotation round-trip', () => {
     expect(field('ns.Type')).toContain(fieldLine('ns.Type'));
   });
 
+  it('round-trips a space-and-namespace-qualified type', () => {
+    expect(field('supabase:auth.AuthUser')).toContain(fieldLine('supabase:auth.AuthUser'));
+  });
+
   it('round-trips a constructor-call type', () => {
     expect(field('Vector(1536)')).toContain(fieldLine('Vector(1536)'));
   });
