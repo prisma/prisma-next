@@ -104,7 +104,7 @@ const baseInput = {
 
 describe('un-namespaced PG model defaults to public namespace (TML-2916)', () => {
   it('places a bare model in domain.namespaces.public and storage.namespaces.public, with no __unbound__ slot', () => {
-    const document = parsePslDocument({
+    const document = parseAndResolve({
       schema: `model user {
   id String @id @default(uuid())
 }
@@ -112,7 +112,7 @@ describe('un-namespaced PG model defaults to public namespace (TML-2916)', () =>
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
