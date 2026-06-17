@@ -37,6 +37,7 @@ function writeCompositePkContract(ctx: JourneyContext): void {
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 
 const User = model('User', {
   fields: {
@@ -52,6 +53,7 @@ const User = model('User', {
 export const contract = defineContract({
   family: sqlFamily,
   target: postgresPack,
+  createNamespace: postgresCreateNamespace,
   models: { User },
 });
 `,
