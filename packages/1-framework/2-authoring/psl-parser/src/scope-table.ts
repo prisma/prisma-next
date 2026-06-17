@@ -84,10 +84,35 @@ export interface NameTableBuild {
  * winning symbols.
  */
 export function buildNameTable(document: DocumentAst, resolver: Resolver): NameTableBuild {
-  const scopeOrder: string[] = [];
-  const scopes = new Map<string, MutableScope>();
-  const getScope = (id: string, syntax?: NamespaceDeclarationAst): MutableScope => {
-    const existing = scopes.get(id);
+  const collector = new ScopeCollector(resolver);
+  const namedTypeDecls = collectDeclarations(document, collector);
+  const namedTypeNames = collectNamedTypeNames(namedTypeDecls, resolver);
+  const nameTable: NameTable = {
+    scopes: projectScopeSymbols(collector.scopes),
+    namedTypes: namedTypeNames,
+  };
+
+  return { nameTable, scopes: collector.scopes, scopeOrder: collector.scopeOrder, namedTypeDecls };
+}
+
+function reportDuplicateDeclaration(resolver: Resolver, name: string, syntax: SyntaxNode): void {
+  resolver.diagnostic(
+    'PSL_DUPLICATE_DECLARATION',
+    `Duplicate declaration "${name}" in this scope; the first declaration is used`,
+    syntax,
+  );
+}
+
+/** Owns the per-namespace {@link MutableScope}s and their source order, and
+ * inserts declarations first-declaration-wins. */
+class ScopeCollector {
+  readonly scopes = new Map<string, MutableScope>();
+  readonly scopeOrder: string[] = [];
+
+  constructor(private readonly resolver: Resolver) {}
+
+  getScope(id: string, syntax?: NamespaceDeclarationAst): MutableScope {
+    const existing = this.scopes.get(id);
     if (existing) return existing;
     const scope: MutableScope = {
       id,
@@ -95,36 +120,32 @@ export function buildNameTable(document: DocumentAst, resolver: Resolver): NameT
       symbols: new Map(),
       genericBlocks: [],
     };
-    scopes.set(id, scope);
-    scopeOrder.push(id);
+    this.scopes.set(id, scope);
+    this.scopeOrder.push(id);
     return scope;
-  };
+  }
 
   // Insert a declaration into a scope, first-declaration-wins: a name already
   // taken (by any kind, in source order) yields a duplicate-declaration
   // diagnostic on the later occurrence and is otherwise ignored.
-  const declare = (scope: MutableScope, name: string | undefined, symbol: ScopeSymbol): void => {
+  declare(scope: MutableScope, name: string | undefined, symbol: ScopeSymbol): void {
     if (name === undefined) return;
     if (scope.symbols.has(name)) {
-      resolver.diagnostic(
-        'PSL_DUPLICATE_DECLARATION',
-        `Duplicate declaration "${name}" in this scope; the first declaration is used`,
-        symbol.node.syntax,
-      );
+      reportDuplicateDeclaration(this.resolver, name, symbol.node.syntax);
       return;
     }
     scope.symbols.set(name, symbol);
-  };
+  }
 
-  const collectMember = (scope: MutableScope, member: SyntaxNode): void => {
+  collectMember(scope: MutableScope, member: SyntaxNode): void {
     const model = ModelDeclarationAst.cast(member);
     if (model) {
-      declare(scope, model.name()?.name(), { kind: 'model', node: model });
+      this.declare(scope, model.name()?.name(), { kind: 'model', node: model });
       return;
     }
     const composite = CompositeTypeDeclarationAst.cast(member);
     if (composite) {
-      declare(scope, composite.name()?.name(), { kind: 'compositeType', node: composite });
+      this.declare(scope, composite.name()?.name(), { kind: 'compositeType', node: composite });
       return;
     }
     const block = GenericBlockDeclarationAst.cast(member);
@@ -132,21 +153,27 @@ export function buildNameTable(document: DocumentAst, resolver: Resolver): NameT
       scope.genericBlocks.push(block);
       const keyword = block.keyword()?.text;
       if (keyword !== undefined) {
-        declare(scope, block.name()?.name(), { kind: 'block', keyword, node: block });
+        this.declare(scope, block.name()?.name(), { kind: 'block', keyword, node: block });
       }
     }
-  };
+  }
+}
 
+/** Walks the document once, routing namespace declarations and top-level members
+ * into the collector's scopes and accumulating types-block named declarations. */
+function collectDeclarations(
+  document: DocumentAst,
+  collector: ScopeCollector,
+): NamedTypeDeclarationAst[] {
   const namedTypeDecls: NamedTypeDeclarationAst[] = [];
-
   for (const declaration of document.declarations()) {
     const namespaceDecl = NamespaceDeclarationAst.cast(declaration.syntax);
     if (namespaceDecl) {
       const id = namespaceDecl.name()?.name();
       if (id === undefined) continue;
-      const scope = getScope(id, namespaceDecl);
+      const scope = collector.getScope(id, namespaceDecl);
       for (const member of namespaceDecl.declarations()) {
-        collectMember(scope, member.syntax);
+        collector.collectMember(scope, member.syntax);
       }
       continue;
     }
@@ -157,29 +184,38 @@ export function buildNameTable(document: DocumentAst, resolver: Resolver): NameT
       }
       continue;
     }
-    collectMember(getScope(UNSPECIFIED_PSL_NAMESPACE_ID), declaration.syntax);
+    collector.collectMember(collector.getScope(UNSPECIFIED_PSL_NAMESPACE_ID), declaration.syntax);
   }
+  return namedTypeDecls;
+}
 
+/** Document-level named-type names, first-declaration-wins: a duplicate name
+ * yields a diagnostic on the later occurrence and is otherwise dropped. */
+function collectNamedTypeNames(
+  namedTypeDecls: NamedTypeDeclarationAst[],
+  resolver: Resolver,
+): Set<string> {
   const namedTypeNames = new Set<string>();
   for (const declaration of namedTypeDecls) {
     const name = declaration.name()?.name();
     if (name === undefined) continue;
     if (namedTypeNames.has(name)) {
-      resolver.diagnostic(
-        'PSL_DUPLICATE_DECLARATION',
-        `Duplicate declaration "${name}" in this scope; the first declaration is used`,
-        declaration.syntax,
-      );
+      reportDuplicateDeclaration(resolver, name, declaration.syntax);
       continue;
     }
     namedTypeNames.add(name);
   }
+  return namedTypeNames;
+}
 
+/** The read-only scope-symbols view of the collected scopes the {@link NameTable}
+ * exposes. */
+function projectScopeSymbols(
+  scopes: Map<string, MutableScope>,
+): Map<string, ReadonlyMap<string, ScopeSymbol>> {
   const scopeSymbols = new Map<string, ReadonlyMap<string, ScopeSymbol>>();
   for (const [id, scope] of scopes) scopeSymbols.set(id, scope.symbols);
-  const nameTable: NameTable = { scopes: scopeSymbols, namedTypes: namedTypeNames };
-
-  return { nameTable, scopes, scopeOrder, namedTypeDecls };
+  return scopeSymbols;
 }
 
 /** A scope symbol as a resolved {@link TypeTarget}: a block becomes a `block`
