@@ -2,12 +2,16 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { BaseSchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import {
   computeContentHash,
   normalizePredicate,
 } from '@prisma-next/target-postgres/rls-canonicalize';
-import { PostgresRlsPolicy, PostgresSchema } from '@prisma-next/target-postgres/types';
+import {
+  PostgresRlsPolicy,
+  PostgresSchema,
+  PostgresSchemaIR,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { controlAdapter } from './fixtures/runner-fixtures';
@@ -49,8 +53,8 @@ function externalPolicy(): PostgresRlsPolicy {
   });
 }
 
-function schemaWithPolicies(policies: PostgresRlsPolicy[]): SqlSchemaIR {
-  return {
+function schemaWithPolicies(policies: PostgresRlsPolicy[]): PostgresSchemaIR {
+  return new PostgresSchemaIR({
     tables: {
       [TABLE_NAME]: {
         name: TABLE_NAME,
@@ -60,8 +64,13 @@ function schemaWithPolicies(policies: PostgresRlsPolicy[]): SqlSchemaIR {
         indexes: [],
       } as unknown as SqlTableIR,
     },
-    annotations: { pg: { rlsPolicies: policies } },
-  };
+    pgSchemaName: 'public',
+    pgVersion: 'unknown',
+    rlsPolicies: policies,
+    roles: [],
+    existingSchemas: ['public'],
+    nativeEnumTypeNames: [],
+  });
 }
 
 function emptyContractNoPolicies(): Contract<SqlStorage> {

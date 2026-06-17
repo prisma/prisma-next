@@ -10,4 +10,9 @@ export {
   PostgresUnboundSchema,
   postgresCreateNamespace,
 } from '../core/postgres-schema';
+export {
+  isPostgresSchemaIR,
+  PostgresSchemaIR,
+  type PostgresSchemaIRInput,
+} from '../core/postgres-schema-ir';
 export type { PostgresColumnDefault } from '../core/types';

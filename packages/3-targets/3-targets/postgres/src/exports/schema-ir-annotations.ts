@@ -1,5 +1,1 @@
-export {
-  type PostgresSchemaIrAnnotations,
-  readPostgresSchemaIrAnnotations,
-  resolveDdlSchemaForNamespaceStorage,
-} from '../core/postgres-schema-ir-annotations';
+export { resolveDdlSchemaForNamespaceStorage } from '../core/postgres-schema-ir-annotations';

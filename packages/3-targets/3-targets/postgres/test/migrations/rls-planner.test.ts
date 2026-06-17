@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
+import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
 import { PostgresCreatePolicy } from '../../src/exports/ddl';
 
 const stubLowerer: ExecuteRequestLowerer = {
@@ -100,8 +101,8 @@ function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<Sql
   };
 }
 
-function schemaWith(policies: readonly PostgresRlsPolicy[]) {
-  return {
+function schemaWith(policies: readonly PostgresRlsPolicy[]): PostgresSchemaIR {
+  return new PostgresSchemaIR({
     tables: {
       [TABLE_NAME]: {
         name: TABLE_NAME,
@@ -114,15 +115,24 @@ function schemaWith(policies: readonly PostgresRlsPolicy[]) {
         indexes: [],
       },
     },
-    annotations: {
-      pg: {
-        rlsPolicies: policies,
-      },
-    },
-  };
+    pgSchemaName: 'public',
+    pgVersion: 'unknown',
+    rlsPolicies: policies,
+    roles: [],
+    existingSchemas: ['public'],
+    nativeEnumTypeNames: [],
+  });
 }
 
-const emptySchema = { tables: {} };
+const emptySchema = new PostgresSchemaIR({
+  tables: {},
+  pgSchemaName: 'public',
+  pgVersion: 'unknown',
+  rlsPolicies: [],
+  roles: [],
+  existingSchemas: ['public'],
+  nativeEnumTypeNames: [],
+});
 const DB_UPDATE_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 };

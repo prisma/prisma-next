@@ -2,7 +2,7 @@ import {
   computeContentHash,
   normalizePredicate,
 } from '@prisma-next/target-postgres/rls-canonicalize';
-import { PostgresRlsPolicy } from '@prisma-next/target-postgres/types';
+import { isPostgresSchemaIR, PostgresRlsPolicy } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createDriver,
@@ -58,14 +58,16 @@ describe.sequential('RLS introspection', () => {
 
     const schema = await familyInstance.introspect({ driver: driver! });
 
-    const pg = schema.annotations?.['pg'] as Record<string, unknown> | undefined;
-    const rlsPolicies = pg?.['rlsPolicies'] as PostgresRlsPolicy[] | undefined;
+    expect(isPostgresSchemaIR(schema)).toBe(true);
+    if (!isPostgresSchemaIR(schema)) return;
+
+    const { rlsPolicies } = schema;
 
     expect(rlsPolicies).toBeDefined();
     expect(Array.isArray(rlsPolicies)).toBe(true);
-    expect(rlsPolicies!.length).toBeGreaterThanOrEqual(1);
+    expect(rlsPolicies.length).toBeGreaterThanOrEqual(1);
 
-    const policy = rlsPolicies!.find((p) => p.tableName === 'posts');
+    const policy = rlsPolicies.find((p) => p.tableName === 'posts');
     expect(policy).toBeDefined();
     expect(policy).toBeInstanceOf(PostgresRlsPolicy);
 
@@ -84,8 +86,10 @@ describe.sequential('RLS introspection', () => {
   }, async () => {
     const schema = await familyInstance.introspect({ driver: driver! });
 
-    const pg = schema.annotations?.['pg'] as Record<string, unknown> | undefined;
-    const roles = (pg?.['roles'] ?? []) as Array<{ name: string }>;
+    expect(isPostgresSchemaIR(schema)).toBe(true);
+    if (!isPostgresSchemaIR(schema)) return;
+
+    const { roles } = schema;
 
     // roles may be empty if the only non-system role is 'postgres' (filtered out).
     expect(Array.isArray(roles)).toBe(true);

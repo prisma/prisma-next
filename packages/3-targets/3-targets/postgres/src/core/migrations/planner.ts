@@ -25,6 +25,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
+import { isPostgresSchemaIR } from '../postgres-schema-ir';
 import {
   formatPostgresControlPolicySubjectLabel,
   resolvePostgresCallControlPolicySubject,
@@ -281,11 +282,9 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       contract: options.contract,
       schema: options.schema,
     });
-    const rlsIssues = verifyPostgresRlsPolicies({
-      contract: options.contract,
-      schema: options.schema,
-      strict,
-    });
+    const rlsIssues = isPostgresSchemaIR(options.schema)
+      ? verifyPostgresRlsPolicies({ contract: options.contract, schema: options.schema, strict })
+      : [];
     const extra = [...namespaceIssues, ...rlsIssues];
     if (extra.length === 0) {
       return verifyResult.schema.issues;

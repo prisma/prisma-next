@@ -1,15 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { isPostgresSchema } from '../postgres-schema';
-import { readPostgresSchemaIrAnnotations } from '../postgres-schema-ir-annotations';
-
-function rlsPoliciesFromAnnotations(schema: SqlSchemaIR): readonly PostgresRlsPolicy[] {
-  const { rlsPolicies } = readPostgresSchemaIrAnnotations(schema);
-  return rlsPolicies ?? [];
-}
+import type { PostgresSchemaIR } from '../postgres-schema-ir';
 
 /**
  * Emits `missing_rls_policy` / `extra_rls_policy` issues for every contract
@@ -37,12 +30,12 @@ function rlsPoliciesFromAnnotations(schema: SqlSchemaIR): readonly PostgresRlsPo
  */
 export function verifyPostgresRlsPolicies(input: {
   readonly contract: Contract<SqlStorage>;
-  readonly schema: SqlSchemaIR;
+  readonly schema: PostgresSchemaIR;
   readonly strict?: boolean;
 }): readonly SchemaIssue[] {
   const { contract, schema, strict = false } = input;
 
-  const actualPolicies = rlsPoliciesFromAnnotations(schema);
+  const actualPolicies = schema.rlsPolicies;
   const schemaTableNames = new Set(Object.keys(schema.tables));
   const scopedActual = actualPolicies.filter((p) => schemaTableNames.has(p.tableName));
   const actualByName = new Map(scopedActual.map((p) => [p.name, p]));

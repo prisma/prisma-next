@@ -2,12 +2,12 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { BaseSchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { verifyPostgresRlsPolicies } from '../../src/core/migrations/verify-postgres-rls-policies';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
+import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
 
 const TABLE_NAME = 'profiles';
 
@@ -63,8 +63,8 @@ function makeContract(policies: readonly PostgresRlsPolicy[]): Contract<SqlStora
   };
 }
 
-function makeSchema(actualPolicies: readonly PostgresRlsPolicy[]): SqlSchemaIR {
-  return {
+function makeSchema(actualPolicies: readonly PostgresRlsPolicy[]): PostgresSchemaIR {
+  return new PostgresSchemaIR({
     tables: {
       [TABLE_NAME]: {
         name: TABLE_NAME,
@@ -77,12 +77,13 @@ function makeSchema(actualPolicies: readonly PostgresRlsPolicy[]): SqlSchemaIR {
         indexes: [],
       },
     },
-    annotations: {
-      pg: {
-        rlsPolicies: actualPolicies,
-      },
-    },
-  };
+    pgSchemaName: 'public',
+    pgVersion: 'unknown',
+    rlsPolicies: actualPolicies,
+    roles: [],
+    existingSchemas: ['public'],
+    nativeEnumTypeNames: [],
+  });
 }
 
 describe('verifyPostgresRlsPolicies', () => {

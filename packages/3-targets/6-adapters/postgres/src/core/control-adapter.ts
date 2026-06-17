@@ -60,9 +60,13 @@ import type {
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { verifyPostgresRlsPolicies } from '@prisma-next/target-postgres/planner';
-import { readPostgresSchemaIrAnnotations } from '@prisma-next/target-postgres/schema-ir-annotations';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
-import { PostgresRlsPolicy, PostgresRole } from '@prisma-next/target-postgres/types';
+import {
+  isPostgresSchemaIR,
+  PostgresRlsPolicy,
+  PostgresRole,
+  PostgresSchemaIR,
+} from '@prisma-next/target-postgres/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { encodeControlQueryParams } from './control-codecs';
@@ -119,6 +123,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   readonly normalizeNativeType = normalizeSchemaNativeType;
 
   collectSchemaIssues(contract: Contract<SqlStorage>, schema: SqlSchemaIR): readonly SchemaIssue[] {
+    if (!isPostgresSchemaIR(schema)) return [];
     return verifyPostgresRlsPolicies({ contract, schema, strict: true });
   }
 
@@ -562,26 +567,22 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     driver: SqlControlDriverInstance<'postgres'>,
     contract?: unknown,
     schema = 'public',
-  ): Promise<SqlSchemaIR> {
+  ): Promise<PostgresSchemaIR> {
     const declaredNamespaces = extractContractNamespaceIds(contract);
     const ir =
       declaredNamespaces.length > 0
         ? await this.introspectNamespaces(driver, declaredNamespaces)
         : await this.introspectSchema(driver, schema);
-    // Capture the list of non-system schemas so downstream planners
-    // (e.g. `verifyPostgresNamespacePresence`) can determine which
-    // contract-declared namespaces need a `CREATE SCHEMA` before the
-    // table DDL.
     const existingSchemas = await this.listExistingSchemas(driver);
-    const annotations = ir.annotations ?? {};
-    const pg = (annotations as { pg?: Record<string, unknown> }).pg ?? {};
-    return {
-      ...ir,
-      annotations: {
-        ...annotations,
-        pg: { ...pg, existingSchemas },
-      },
-    };
+    return new PostgresSchemaIR({
+      tables: ir.tables,
+      pgSchemaName: ir.pgSchemaName,
+      pgVersion: ir.pgVersion,
+      rlsPolicies: ir.rlsPolicies,
+      roles: ir.roles,
+      existingSchemas,
+      nativeEnumTypeNames: ir.nativeEnumTypeNames,
+    });
   }
 
   /**
@@ -616,7 +617,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   private async introspectNamespaces(
     driver: SqlControlDriverInstance<'postgres'>,
     namespaceIds: readonly string[],
-  ): Promise<SqlSchemaIR> {
+  ): Promise<PostgresSchemaIR> {
     const resolvedSchemas: string[] = [];
     for (const id of namespaceIds) {
       if (id === UNBOUND_NAMESPACE_ID) {
@@ -633,7 +634,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     // Walk schemas sequentially: every introspectSchema call shares the one
     // control connection, so a parallel walk only serialises behind the wire
     // protocol and trips pg's "already executing a query" deprecation.
-    const perSchema: SqlSchemaIR[] = [];
+    const perSchema: PostgresSchemaIR[] = [];
     for (const schema of uniqueSchemas) {
       perSchema.push(await this.introspectSchema(driver, schema));
     }
@@ -646,28 +647,22 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     }
 
     const mergedRlsPolicies: PostgresRlsPolicy[] = [];
+    const mergedRoles: PostgresRole[] = [];
     for (const ir of perSchema) {
-      const pgAnnotations = readPostgresSchemaIrAnnotations(ir);
-      if (pgAnnotations.rlsPolicies) {
-        mergedRlsPolicies.push(...pgAnnotations.rlsPolicies);
-      }
+      mergedRlsPolicies.push(...ir.rlsPolicies);
+      mergedRoles.push(...ir.roles);
     }
 
-    const firstAnnotations = perSchema[0]?.annotations;
-    const firstPg =
-      blindCast<Record<string, unknown> | undefined, 'pg annotation envelope index slot'>(
-        firstAnnotations?.['pg'],
-      ) ?? {};
-    return {
+    const first = perSchema[0];
+    return new PostgresSchemaIR({
       tables: mergedTables,
-      ...ifDefined('annotations', {
-        ...firstAnnotations,
-        pg: {
-          ...firstPg,
-          ...ifDefined('rlsPolicies', mergedRlsPolicies.length > 0 ? mergedRlsPolicies : undefined),
-        },
-      }),
-    };
+      pgSchemaName: first?.pgSchemaName ?? 'public',
+      pgVersion: first?.pgVersion ?? 'unknown',
+      rlsPolicies: mergedRlsPolicies,
+      roles: mergedRoles,
+      existingSchemas: first?.existingSchemas ?? ['public'],
+      nativeEnumTypeNames: first?.nativeEnumTypeNames ?? [],
+    });
   }
 
   /**
@@ -678,7 +673,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   private async introspectSchema(
     driver: SqlControlDriverInstance<'postgres'>,
     schema: string,
-  ): Promise<SqlSchemaIR> {
+  ): Promise<PostgresSchemaIR> {
     // Issue the schema-wide queries one at a time. A single control connection
     // serialises queries anyway, so Promise.all buys no parallelism here and
     // makes pg emit a "client is already executing a query" deprecation. One
@@ -1161,20 +1156,15 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       (row) => new PostgresRole({ name: row.rolname }),
     );
 
-    const annotations = {
-      pg: {
-        schema,
-        version: await this.getPostgresVersion(driver),
-        ...(nativeEnumTypeNames.length > 0 && { nativeEnumTypeNames }),
-        ...ifDefined('rlsPolicies', rlsPolicies.length > 0 ? rlsPolicies : undefined),
-        ...ifDefined('roles', roles.length > 0 ? roles : undefined),
-      },
-    };
-
-    return {
+    return new PostgresSchemaIR({
       tables,
-      annotations,
-    };
+      pgSchemaName: schema,
+      pgVersion: await this.getPostgresVersion(driver),
+      rlsPolicies,
+      roles,
+      existingSchemas: [],
+      nativeEnumTypeNames,
+    });
   }
 
   /**
