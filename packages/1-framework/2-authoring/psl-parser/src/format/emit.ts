@@ -584,7 +584,7 @@ function emitExpression(expression: ExpressionAst | undefined): string {
 
 function emitFunctionCall(call: FunctionCallAst): string {
   const args = Array.from(call.args(), emitAttributeArg).join(', ');
-  return `${emitQualifiedName(call.qualifiedName())}(${args})`;
+  return `${emitQualifiedName(call.name())}(${args})`;
 }
 
 function identifierText(identifier: IdentifierAst | undefined): string {
