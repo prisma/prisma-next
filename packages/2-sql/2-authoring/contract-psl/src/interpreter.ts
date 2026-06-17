@@ -99,9 +99,15 @@ import {
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
 
+export interface SqlAuthoringContributions extends AuthoringContributions {
+  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+}
+
 export interface InterpretPslDocumentToSqlContractInput {
   readonly document: ParsePslDocumentResult;
-  readonly target: TargetPackRef<'sql', string>;
+  readonly target: Omit<TargetPackRef<'sql', string>, 'authoring'> & {
+    readonly authoring?: SqlAuthoringContributions;
+  };
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly composedExtensionPacks?: readonly string[];
   readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
@@ -2228,14 +2234,7 @@ export function interpretPslDocumentToSqlContract(
   // does not supply one explicitly — the Postgres target pack contributes it so
   // the generic PSL provider path works without requiring every call site to
   // re-specify the factory.
-  const targetCreateNamespace = blindCast<
-    | {
-        readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
-      }
-    | undefined,
-    'target pack may carry createNamespace on its authoring object'
-  >(input.target.authoring)?.createNamespace;
-  const innerCreateNamespace = input.createNamespace ?? targetCreateNamespace;
+  const innerCreateNamespace = input.createNamespace ?? input.target.authoring?.createNamespace;
 
   if (namespaceExtensionEntities.size > 0 && innerCreateNamespace === undefined) {
     const kinds = [...namespaceExtensionEntities.values()]

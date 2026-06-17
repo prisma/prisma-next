@@ -24,6 +24,8 @@ const RLS_PATTERNS = [
   /pg_policies/,
   /policy_select/,
   /\bRLS\b/,
+  /_rls_/,
+  /rls_policy/,
 ];
 
 function stripComments(source: string): string {

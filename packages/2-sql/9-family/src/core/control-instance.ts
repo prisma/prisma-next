@@ -684,9 +684,10 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
       });
-      const extraIssues = controlAdapter.collectSchemaIssues?.(contract, options.schema) ?? [];
-      if (extraIssues.length === 0) return sqlResult;
-      const totalFails = sqlResult.schema.counts.fail + extraIssues.length;
+      const schemaDiffIssues =
+        controlAdapter.collectSchemaDiffIssues?.(contract, options.schema) ?? [];
+      if (schemaDiffIssues.length === 0) return sqlResult;
+      const totalFails = sqlResult.schema.counts.fail + schemaDiffIssues.length;
       return {
         ...sqlResult,
         ok: false,
@@ -694,7 +695,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         summary: `Database schema does not satisfy contract (${totalFails} failure${totalFails === 1 ? '' : 's'})`,
         schema: {
           ...sqlResult.schema,
-          issues: [...sqlResult.schema.issues, ...extraIssues],
+          schemaDiffIssues,
           counts: { ...sqlResult.schema.counts, fail: totalFails },
         },
       };

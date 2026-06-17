@@ -11,7 +11,7 @@ import {
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
-import { APP_SPACE_ID, type SchemaIssue } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, type SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
@@ -59,7 +59,7 @@ import type {
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
-import { verifyPostgresRlsPolicies } from '@prisma-next/target-postgres/planner';
+import { diffPostgresRlsPolicies } from '@prisma-next/target-postgres/planner';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
   isPostgresSchemaIR,
@@ -122,9 +122,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    */
   readonly normalizeNativeType = normalizeSchemaNativeType;
 
-  collectSchemaIssues(contract: Contract<SqlStorage>, schema: SqlSchemaIR): readonly SchemaIssue[] {
-    if (!isPostgresSchemaIR(schema)) return [];
-    return verifyPostgresRlsPolicies({ contract, schema, strict: true });
+  collectSchemaDiffIssues(
+    contract: Contract<SqlStorage>,
+    schema: SqlSchemaIR,
+  ): readonly SchemaDiffIssue[] {
+    if (!isPostgresSchemaIR(schema)) {
+      throw new Error(
+        `RLS verification requires a PostgresSchemaIR; got ${(schema as { constructor?: { name?: string } }).constructor?.name ?? typeof schema}`,
+      );
+    }
+    return diffPostgresRlsPolicies({ contract, schema });
   }
 
   bootstrapControlTableQueries(): readonly DdlNode[] {

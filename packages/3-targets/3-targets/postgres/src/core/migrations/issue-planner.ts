@@ -31,8 +31,6 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
-import { isPostgresSchema } from '../postgres-schema';
-import { resolveDdlSchemaForNamespaceStorage } from '../postgres-schema-ir-annotations';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -40,7 +38,6 @@ import {
   AddUniqueCall,
   AlterColumnTypeCall,
   CreateIndexCall,
-  CreatePostgresRlsPolicyCall,
   CreateSchemaCall,
   CreateTableCall,
   DropCheckConstraintCall,
@@ -49,9 +46,7 @@ import {
   DropDefaultCall,
   DropIndexCall,
   DropNotNullCall,
-  DropPostgresRlsPolicyCall,
   DropTableCall,
-  EnableRowLevelSecurityCall,
   type PostgresOpFactoryCall,
   postgresDefaultToDdlColumnDefault,
   SetDefaultCall,
@@ -118,10 +113,6 @@ const ISSUE_KIND_ORDER: Record<string, number> = {
   check_missing: 53,
   check_mismatch: 54,
   check_removed: 55,
-
-  // RLS policies (after tables so ENABLE/CREATE fire once the table exists)
-  missing_rls_policy: 61,
-  extra_rls_policy: 62,
 };
 
 function issueOrder(issue: SchemaIssue): number {
@@ -616,52 +607,6 @@ function mapIssueToCall(
       ]);
     }
 
-    case 'missing_rls_policy': {
-      if (!issue.table || !issue.indexOrConstraint || !issue.namespaceId) {
-        return notOk(
-          issueConflict('unsupportedOperation', 'Missing RLS policy issue is incomplete'),
-        );
-      }
-      const wireName = issue.indexOrConstraint;
-      const ns = ctx.toContract.storage.namespaces[issue.namespaceId];
-      // Policy entries are keyed by PSL prefix (not wire name) when authored via PSL.
-      // Resolve by matching on the wire name (.name property).
-      const policy = isPostgresSchema(ns)
-        ? Object.values(ns.policy).find((p) => p.name === wireName)
-        : undefined;
-      if (!policy) {
-        return notOk(
-          issueConflict(
-            'unsupportedOperation',
-            `RLS policy "${wireName}" not found in contract namespace "${issue.namespaceId}"`,
-          ),
-        );
-      }
-      const schemaForTable = resolveDdlSchemaForNamespaceStorage(
-        ctx.toContract.storage,
-        issue.namespaceId,
-        ctx.schema,
-      );
-      return ok([
-        new EnableRowLevelSecurityCall(schemaForTable, issue.table),
-        new CreatePostgresRlsPolicyCall(schemaForTable, issue.table, policy),
-      ]);
-    }
-
-    case 'extra_rls_policy': {
-      if (!issue.table || !issue.indexOrConstraint || !issue.namespaceId) {
-        return notOk(issueConflict('unsupportedOperation', 'Extra RLS policy issue is incomplete'));
-      }
-      const schemaForTable = resolveDdlSchemaForNamespaceStorage(
-        ctx.toContract.storage,
-        issue.namespaceId,
-        ctx.schema,
-      );
-      return ok([
-        new DropPostgresRlsPolicyCall(schemaForTable, issue.table, issue.indexOrConstraint),
-      ]);
-    }
-
     case 'foreign_key_mismatch':
       if (!issue.table)
         return notOk(issueConflict('foreignKeyConflict', 'Foreign key issue has no table name'));
@@ -1009,20 +954,6 @@ export function planIssues(
   const byCategory = (cat: CallCategory) =>
     combinedBucketable.filter((c) => classifyCall(c) === cat);
 
-  // Deduplicate EnableRowLevelSecurityCall by (schemaName, tableName): when
-  // multiple missing_rls_policy issues for the same table each emit one, keep only
-  // the first.
-  const seenRlsEnableTables = new Set<string>();
-  const deduplicatedRlsEnable = byCategory('rlsEnable').filter((c) => {
-    const key = `${(c as EnableRowLevelSecurityCall).schemaName}.${(c as EnableRowLevelSecurityCall).tableName}`;
-    if (seenRlsEnableTables.has(key)) return false;
-    seenRlsEnableTables.add(key);
-    return true;
-  });
-
-  // RLS enable + policy creation run after column/alter steps: a policy
-  // predicate may reference a column added in the same migration, so the
-  // column must exist before CREATE POLICY runs.
   const calls: PostgresOpFactoryCall[] = [
     ...byCategory('dep'),
     ...byCategory('drop'),
@@ -1034,8 +965,6 @@ export function planIssues(
     ...byCategory('unique'),
     ...byCategory('index'),
     ...byCategory('foreignKey'),
-    ...deduplicatedRlsEnable,
-    ...byCategory('rlsPolicy'),
   ];
 
   return ok({ calls });

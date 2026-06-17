@@ -25,7 +25,9 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
+import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { isPostgresSchemaIR } from '../postgres-schema-ir';
+import { resolveDdlSchemaForNamespaceStorage } from '../postgres-schema-ir-annotations';
 import {
   formatPostgresControlPolicySubjectLabel,
   resolvePostgresCallControlPolicySubject,
@@ -34,10 +36,15 @@ import {
 } from './control-policy';
 import { planIssues } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
+import {
+  CreatePostgresRlsPolicyCall,
+  DropPostgresRlsPolicyCall,
+  EnableRowLevelSecurityCall,
+} from './op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
 import { verifyPostgresNamespacePresence } from './verify-postgres-namespaces';
-import { verifyPostgresRlsPolicies } from './verify-postgres-rls-policies';
+import { diffPostgresRlsPolicies } from './verify-postgres-rls-policies';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -196,6 +203,20 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       return plannerFailure(result.failure);
     }
 
+    // Translate RLS diff issues to DDL calls and run through control-policy
+    // partition. This runs AFTER the structural planIssues pass so the RLS
+    // calls can refer to tables that may have been created in this plan.
+    const rlsCalls = this.planRlsDiff(options);
+    const rlsPartition = partitionCallsByControlPolicy({
+      calls: rlsCalls,
+      contract: options.contract,
+      resolveControlPolicySubject: (call) =>
+        resolvePostgresCallControlPolicySubject(call, options.contract),
+      resolveFactoryName: (call) => call.factoryName,
+      formatSubjectLabel: (factoryName, subject) =>
+        formatPostgresControlPolicySubjectLabel(factoryName, subject, options.contract),
+    });
+
     // Inline `onFieldEvent`-emitted ops after structural DDL. The fixed
     // ordering is `structural → added → dropped → altered`, with
     // within-group sorting by `(tableName, fieldName)` so re-emits are
@@ -221,9 +242,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       formatSubjectLabel: (factoryName, subject) =>
         formatPostgresControlPolicySubjectLabel(factoryName, subject, options.contract),
     });
-    const calls = [...result.value.calls, ...fieldEventPartition.kept];
+    const calls = [...result.value.calls, ...rlsPartition.kept, ...fieldEventPartition.kept];
     const warnings: SqlPlannerConflict[] = [
       ...issuePartition.warnings,
+      ...rlsPartition.warnings,
       ...fieldEventPartition.warnings,
     ];
 
@@ -240,6 +262,50 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       ),
       ...(warnings.length > 0 ? { warnings: Object.freeze(warnings) } : {}),
     });
+  }
+
+  private planRlsDiff(options: PlannerOptionsWithComponents): readonly PostgresOpFactoryCall[] {
+    if (!isPostgresSchemaIR(options.schema)) {
+      throw new Error(
+        `RLS verification requires a PostgresSchemaIR; got ${(options.schema as { constructor?: { name?: string } }).constructor?.name ?? typeof options.schema}`,
+      );
+    }
+    const diffIssues = diffPostgresRlsPolicies({
+      contract: options.contract,
+      schema: options.schema,
+    });
+
+    const calls: PostgresOpFactoryCall[] = [];
+    const seenEnableTables = new Set<string>();
+
+    for (const issue of diffIssues) {
+      const { namespaceId, entityName: policyName } = issue.coordinate;
+      const schemaForTable = resolveDdlSchemaForNamespaceStorage(
+        options.contract.storage,
+        namespaceId,
+        options.schema,
+      );
+
+      if (issue.outcome === 'missing' || issue.outcome === 'mismatch') {
+        const policy = issue.expected as PostgresRlsPolicy;
+        const tableName = policy.tableName;
+        const tableKey = `${schemaForTable}.${tableName}`;
+        if (!seenEnableTables.has(tableKey)) {
+          seenEnableTables.add(tableKey);
+          calls.push(new EnableRowLevelSecurityCall(schemaForTable, tableName));
+        }
+        if (issue.outcome === 'mismatch') {
+          const actualPolicy = issue.actual as PostgresRlsPolicy;
+          calls.push(new DropPostgresRlsPolicyCall(schemaForTable, tableName, actualPolicy.name));
+        }
+        calls.push(new CreatePostgresRlsPolicyCall(schemaForTable, tableName, policy));
+      } else {
+        const policy = issue.actual as PostgresRlsPolicy;
+        calls.push(new DropPostgresRlsPolicyCall(schemaForTable, policy.tableName, policyName));
+      }
+    }
+
+    return calls;
   }
 
   private ensureAdditivePolicy(policy: MigrationOperationPolicy) {
@@ -276,19 +342,14 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // rather than in the family verifier. Stitch it in here so a single
     // `SchemaIssue[]` flows through `planIssues` and the planner emits
     // CREATE SCHEMA in the dep bucket before any CreateTableCall.
-    // Schema presence and RLS policy drift are Postgres-specific concerns.
-    // Both are stitched in here so a single SchemaIssue[] flows through planIssues.
+    // RLS policy drift is handled separately via diffPostgresRlsPolicies → planRlsDiff.
     const namespaceIssues = verifyPostgresNamespacePresence({
       contract: options.contract,
       schema: options.schema,
     });
-    const rlsIssues = isPostgresSchemaIR(options.schema)
-      ? verifyPostgresRlsPolicies({ contract: options.contract, schema: options.schema, strict })
-      : [];
-    const extra = [...namespaceIssues, ...rlsIssues];
-    if (extra.length === 0) {
+    if (namespaceIssues.length === 0) {
       return verifyResult.schema.issues;
     }
-    return [...extra, ...verifyResult.schema.issues];
+    return [...namespaceIssues, ...verifyResult.schema.issues];
   }
 }

@@ -6,7 +6,7 @@ import type {
 import type {
   ControlAdapterInstance,
   ControlStack,
-  SchemaIssue,
+  SchemaDiffIssue,
 } from '@prisma-next/framework-components/control';
 import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
@@ -194,13 +194,16 @@ export interface SqlControlAdapter<TTarget extends string = string>
   readonly normalizeNativeType?: NativeTypeNormalizer;
 
   /**
-   * Optional hook for collecting target-specific drift issues during schema
+   * Optional hook for collecting target-specific diff issues during schema
    * verification. Called after the relational SQL verification pass; returns
-   * `SchemaIssue[]` that are merged into `VerifyDatabaseSchemaResult.schema.issues`.
-   * The SQL family never names any target-specific concept — this hook is the
-   * target's only opportunity to contribute issues before the verify verdict.
+   * generic `SchemaDiffIssue[]` (coordinate + outcome + message — no target
+   * naming) that are folded into `VerifyDatabaseSchemaResult.schema.schemaDiffIssues`
+   * and counted as failures when non-empty.
    */
-  collectSchemaIssues?(contract: Contract<SqlStorage>, schema: SqlSchemaIR): readonly SchemaIssue[];
+  collectSchemaDiffIssues?(
+    contract: Contract<SqlStorage>,
+    schema: SqlSchemaIR,
+  ): readonly SchemaDiffIssue[];
 
   /**
    * Ordered DDL queries that bootstrap marker/ledger control tables for migration

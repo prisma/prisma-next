@@ -539,15 +539,10 @@ export function formatSchemaVerifyOutput(
   });
   lines.push(...treeLines);
 
-  // Render schema issues that don't appear in the verification tree (e.g. RLS
-  // policy drift contributed by the target adapter after the SQL verify pass).
-  const extraIssues = result.schema.issues.filter(
-    (i) => i.kind === 'missing_rls_policy' || i.kind === 'extra_rls_policy',
-  );
-  if (extraIssues.length > 0) {
+  if (result.schema.schemaDiffIssues.length > 0) {
     lines.push('');
     lines.push(formatRed('Schema drift:'));
-    for (const issue of extraIssues) {
+    for (const issue of result.schema.schemaDiffIssues) {
       lines.push(`  ${formatRed('✖')} ${issue.message}`);
     }
   }

@@ -1,3 +1,5 @@
+import type { SchemaDiffIssue } from './schema-diff';
+
 export const VERIFY_CODE_MARKER_MISSING = 'PN-RUN-3001';
 export const VERIFY_CODE_HASH_MISMATCH = 'PN-RUN-3002';
 export const VERIFY_CODE_TARGET_MISMATCH = 'PN-RUN-3003';
@@ -61,9 +63,7 @@ export interface BaseSchemaIssue {
     | 'extra_default'
     | 'check_missing'
     | 'check_removed'
-    | 'check_mismatch'
-    | 'missing_rls_policy'
-    | 'extra_rls_policy';
+    | 'check_mismatch';
   readonly table?: string;
   /**
    * Namespace coordinate of the issue's subject (e.g. the schema a SQL
@@ -131,6 +131,7 @@ export interface VerifyDatabaseSchemaResult {
   };
   readonly schema: {
     readonly issues: readonly SchemaIssue[];
+    readonly schemaDiffIssues: readonly SchemaDiffIssue[];
     readonly root: SchemaVerificationNode;
     readonly counts: {
       readonly pass: number;

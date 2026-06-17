@@ -47,10 +47,6 @@ export function classifySqlVerifierIssueKind(kind: SchemaIssue['kind']): Verifie
       return 'declaredMissing';
     case 'check_removed':
       return 'extraAuxiliary';
-    case 'missing_rls_policy':
-      return 'declaredMissing';
-    case 'extra_rls_policy':
-      return 'extraAuxiliary';
   }
 }
 
