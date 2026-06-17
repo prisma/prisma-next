@@ -1,17 +1,14 @@
-import type { FieldAttributeAst, ModelAttributeAst } from '../syntax/ast/attributes';
-import type {
-  DocumentAst,
-  EnumValueDeclarationAst,
-  FieldDeclarationAst,
-  KeyValuePairAst,
-  NamedTypeDeclarationAst,
-  NamespaceMemberAst,
-} from '../syntax/ast/declarations';
+import { type FieldAttributeAst, ModelAttributeAst } from '../syntax/ast/attributes';
 import {
   CompositeTypeDeclarationAst,
+  type DocumentAst,
   EnumDeclarationAst,
+  EnumValueDeclarationAst,
+  FieldDeclarationAst,
   GenericBlockDeclarationAst,
+  KeyValuePairAst,
   ModelDeclarationAst,
+  NamedTypeDeclarationAst,
   NamespaceDeclarationAst,
   TypesBlockAst,
 } from '../syntax/ast/declarations';
@@ -26,22 +23,29 @@ import {
 } from '../syntax/ast/expressions';
 import { IdentifierAst } from '../syntax/ast/identifier';
 import type { TypeAnnotationAst } from '../syntax/ast/type-annotation';
+import { type SyntaxElement, SyntaxNode } from '../syntax/red';
 
 /**
  * Accumulates emitted lines paired with their nesting depth. The depth is
  * materialised into leading indentation only when the lines are joined, so the
- * resolved indent unit and newline live entirely at the join step.
+ * resolved indent unit and newline live entirely at the join step. A line
+ * tagged `blank` carries no indentation regardless of depth.
  */
 class LineWriter {
-  readonly #lines: { readonly depth: number; readonly text: string }[] = [];
+  readonly #lines: { readonly depth: number; readonly text: string; readonly blank: boolean }[] =
+    [];
 
   push(depth: number, text: string): void {
-    this.#lines.push({ depth, text });
+    this.#lines.push({ depth, text, blank: false });
+  }
+
+  blank(): void {
+    this.#lines.push({ depth: 0, text: '', blank: true });
   }
 
   join(indentUnit: string, newline: string): string {
     const body = this.#lines
-      .map((line) => `${indentUnit.repeat(line.depth)}${line.text}`)
+      .map((line) => (line.blank ? '' : `${indentUnit.repeat(line.depth)}${line.text}`))
       .join(newline);
     return body.length > 0 ? `${body}${newline}` : '';
   }
@@ -49,85 +53,267 @@ class LineWriter {
 
 export function emitDocument(document: DocumentAst, indentUnit: string, newline: string): string {
   const writer = new LineWriter();
-  for (const declaration of document.declarations()) {
-    emitDeclaration(writer, declaration, 0);
-  }
+  emitRegion(writer, Array.from(document.syntax.children()), 0);
   return writer.join(indentUnit, newline);
 }
 
-type TopLevelDeclarationAst = NamespaceMemberAst | TypesBlockAst | NamespaceDeclarationAst;
+/**
+ * A member of a block or document, paired with the inter-construct trivia the
+ * emitter reattaches to it: own-line comment lines that immediately precede it
+ * (`leading`) and a comment that trails it on the same source line
+ * (`trailing`).
+ */
+interface MemberItem {
+  readonly kind: 'member';
+  readonly node: SyntaxNode;
+  readonly leading: readonly string[];
+  trailing: string | undefined;
+}
 
-function emitDeclaration(
-  writer: LineWriter,
-  declaration: TopLevelDeclarationAst,
-  depth: number,
-): void {
-  const model = ModelDeclarationAst.cast(declaration.syntax);
-  if (model) {
-    emitBlock(writer, depth, blockHeader('model', model.name()), () => {
-      emitFieldRows(writer, Array.from(model.fields()), depth + 1);
-      for (const attribute of model.attributes()) emitModelAttribute(writer, attribute, depth + 1);
-    });
+interface BlankItem {
+  readonly kind: 'blank';
+}
+
+type Item = MemberItem | BlankItem;
+
+/**
+ * Walks a region's elements (a block body between its braces, or the whole
+ * document) in source order and reduces the interleaved significant nodes and
+ * trivia tokens into a member/blank sequence. Own-line comments attach as a
+ * member's `leading`; a same-line comment attaches as the preceding member's
+ * `trailing`; a run of one or more blank lines between members collapses to a
+ * single `blank`, never directly after the opening boundary nor before the
+ * closing one.
+ */
+function sequenceRegion(elements: readonly SyntaxElement[]): Item[] {
+  const items: Item[] = [];
+  let leading: string[] = [];
+  let blankPending = false;
+  let sawContent = false;
+  let newlines = 0;
+
+  for (const element of elements) {
+    if (element instanceof SyntaxNode) {
+      if (newlines >= 2 && sawContent && leading.length === 0) blankPending = true;
+      if (blankPending) {
+        items.push({ kind: 'blank' });
+        blankPending = false;
+      }
+      items.push({ kind: 'member', node: element, leading, trailing: undefined });
+      leading = [];
+      sawContent = true;
+      newlines = 0;
+      continue;
+    }
+    if (element.kind === 'Whitespace') continue;
+    if (element.kind === 'Newline') {
+      newlines += 1;
+      continue;
+    }
+    if (element.kind === 'Comment') {
+      const last = items.at(-1);
+      if (newlines === 0 && last?.kind === 'member' && last.trailing === undefined) {
+        last.trailing = element.text;
+      } else {
+        if (newlines >= 2 && sawContent && leading.length === 0) blankPending = true;
+        leading.push(element.text);
+        sawContent = true;
+      }
+      newlines = 0;
+    }
+  }
+  return items;
+}
+
+function emitRegion(writer: LineWriter, elements: readonly SyntaxElement[], depth: number): void {
+  const items = sequenceRegion(elements);
+  let pendingRows: MemberItem[] = [];
+
+  const flushRows = (): void => {
+    if (pendingRows.length === 0) return;
+    emitAlignedRows(writer, pendingRows, depth);
+    pendingRows = [];
+  };
+
+  for (const item of items) {
+    if (item.kind === 'blank') {
+      flushRows();
+      writer.blank();
+      continue;
+    }
+    const row = toAlignmentRow(item.node);
+    if (row && item.leading.length === 0) {
+      pendingRows.push(item);
+      continue;
+    }
+    flushRows();
+    for (const comment of item.leading) writer.push(depth, comment);
+    emitMember(writer, item, depth);
+  }
+  flushRows();
+}
+
+/**
+ * Renders a single non-row member (block attribute, named type, key/value, or a
+ * nested block) with its trailing comment appended. Row-kind members (fields,
+ * enum values) flow through {@link emitAlignedRows} instead.
+ */
+function emitMember(writer: LineWriter, item: MemberItem, depth: number): void {
+  const node = item.node;
+  const block = emitBlockMember(writer, node, depth);
+  if (block) return;
+
+  const modelAttribute = ModelAttributeAst.cast(node);
+  if (modelAttribute) {
+    writer.push(depth, withTrailing(emitModelAttribute(modelAttribute), item.trailing));
     return;
   }
-
-  const composite = CompositeTypeDeclarationAst.cast(declaration.syntax);
-  if (composite) {
-    emitBlock(writer, depth, blockHeader('type', composite.name()), () => {
-      emitFieldRows(writer, Array.from(composite.fields()), depth + 1);
-      for (const attribute of composite.attributes())
-        emitModelAttribute(writer, attribute, depth + 1);
-    });
+  const named = NamedTypeDeclarationAst.cast(node);
+  if (named) {
+    writer.push(depth, withTrailing(emitNamedType(named), item.trailing));
     return;
   }
-
-  const enumDecl = EnumDeclarationAst.cast(declaration.syntax);
-  if (enumDecl) {
-    emitBlock(writer, depth, blockHeader('enum', enumDecl.name()), () => {
-      emitEnumValueRows(writer, Array.from(enumDecl.values()), depth + 1);
-      for (const attribute of enumDecl.attributes())
-        emitModelAttribute(writer, attribute, depth + 1);
-    });
+  const keyValue = KeyValuePairAst.cast(node);
+  if (keyValue) {
+    writer.push(depth, withTrailing(emitKeyValue(keyValue), item.trailing));
     return;
   }
-
-  const namespace = NamespaceDeclarationAst.cast(declaration.syntax);
-  if (namespace) {
-    emitBlock(writer, depth, blockHeader('namespace', namespace.name()), () => {
-      for (const member of namespace.declarations()) emitDeclaration(writer, member, depth + 1);
-    });
-    return;
-  }
-
-  const typesBlock = TypesBlockAst.cast(declaration.syntax);
-  if (typesBlock) {
-    emitBlock(writer, depth, 'types {', () => {
-      for (const named of typesBlock.declarations()) emitNamedType(writer, named, depth + 1);
-    });
-    return;
-  }
-
-  const generic = GenericBlockDeclarationAst.cast(declaration.syntax);
-  if (generic) {
-    emitBlock(writer, depth, blockHeader(genericKeyword(generic), generic.name()), () => {
-      for (const entry of generic.entries()) emitKeyValue(writer, entry, depth + 1);
-    });
+  const row = toAlignmentRow(node);
+  if (row) {
+    writer.push(depth, withTrailing(renderAlignedRow(row, row.name.length, 0), item.trailing));
   }
 }
 
-function emitBlock(writer: LineWriter, depth: number, header: string, emitBody: () => void): void {
-  writer.push(depth, header);
-  emitBody();
+/**
+ * Renders a member that is itself a block (model / composite type / enum /
+ * namespace / `types` / generic). Returns `true` when handled. The header line
+ * carries the member's trailing same-line comment; the body recurses through
+ * {@link emitRegion} so nested trivia is preserved at the deeper indent.
+ */
+function emitBlockMember(writer: LineWriter, node: SyntaxNode, depth: number): boolean {
+  const model = ModelDeclarationAst.cast(node);
+  if (model) {
+    emitNamedBlock(writer, depth, 'model', model.name(), node);
+    return true;
+  }
+  const composite = CompositeTypeDeclarationAst.cast(node);
+  if (composite) {
+    emitNamedBlock(writer, depth, 'type', composite.name(), node);
+    return true;
+  }
+  const enumDecl = EnumDeclarationAst.cast(node);
+  if (enumDecl) {
+    emitNamedBlock(writer, depth, 'enum', enumDecl.name(), node);
+    return true;
+  }
+  const namespace = NamespaceDeclarationAst.cast(node);
+  if (namespace) {
+    emitNamedBlock(writer, depth, 'namespace', namespace.name(), node);
+    return true;
+  }
+  const typesBlock = TypesBlockAst.cast(node);
+  if (typesBlock) {
+    emitBlock(writer, depth, 'types {', node);
+    return true;
+  }
+  const generic = GenericBlockDeclarationAst.cast(node);
+  if (generic) {
+    emitNamedBlock(writer, depth, generic.keyword()?.text ?? '', generic.name(), node);
+    return true;
+  }
+  return false;
+}
+
+function emitNamedBlock(
+  writer: LineWriter,
+  depth: number,
+  keyword: string,
+  name: IdentifierAst | undefined,
+  node: SyntaxNode,
+): void {
+  emitBlock(writer, depth, blockHeader(keyword, name), node);
+}
+
+function emitBlock(writer: LineWriter, depth: number, header: string, node: SyntaxNode): void {
+  writer.push(depth, withTrailing(header, headerTrailingComment(node)));
+  emitRegion(writer, blockBodyElements(node), depth + 1);
   writer.push(depth, '}');
+}
+
+/**
+ * The elements of a block's body: everything strictly between the opening
+ * `LBrace` and the closing `RBrace`. Trivia outside the braces (the header's
+ * own leading comment, the blank line after the block) belongs to the enclosing
+ * region, not the body.
+ */
+function blockBodyElements(node: SyntaxNode): SyntaxElement[] {
+  const elements = Array.from(node.children());
+  const open = elements.findIndex((el) => !(el instanceof SyntaxNode) && el.kind === 'LBrace');
+  let close = -1;
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i];
+    if (el && !(el instanceof SyntaxNode) && el.kind === 'RBrace') {
+      close = i;
+      break;
+    }
+  }
+  if (open === -1) return [];
+  const end = close === -1 ? elements.length : close;
+  return elements.slice(bodyStart(elements, open), end);
+}
+
+/**
+ * The index where a block body's emittable elements begin: just past the
+ * opening `LBrace`, skipping a same-line header comment (whitespace then a
+ * comment with no intervening newline). That comment is rendered on the header
+ * line by {@link headerTrailingComment}, so it must not also surface as the
+ * first member's leading comment.
+ */
+function bodyStart(elements: readonly SyntaxElement[], open: number): number {
+  let index = open + 1;
+  while (index < elements.length) {
+    const el = elements[index];
+    if (el && !(el instanceof SyntaxNode) && el.kind === 'Whitespace') {
+      index += 1;
+      continue;
+    }
+    if (el && !(el instanceof SyntaxNode) && el.kind === 'Comment') {
+      return index + 1;
+    }
+    break;
+  }
+  return open + 1;
+}
+
+/**
+ * A same-line comment that trails a block header is attached (per the parser's
+ * trivia discipline) inside the block node, between the `LBrace` and the first
+ * body member, with no intervening newline. Surfaced here so the header line
+ * can carry it.
+ */
+function headerTrailingComment(node: SyntaxNode): string | undefined {
+  let pastBrace = false;
+  for (const el of node.children()) {
+    if (el instanceof SyntaxNode) {
+      if (pastBrace) return undefined;
+      continue;
+    }
+    if (el.kind === 'LBrace') {
+      pastBrace = true;
+      continue;
+    }
+    if (!pastBrace) continue;
+    if (el.kind === 'Whitespace') continue;
+    if (el.kind === 'Newline') return undefined;
+    if (el.kind === 'Comment') return el.text;
+    return undefined;
+  }
+  return undefined;
 }
 
 function blockHeader(keyword: string, name: IdentifierAst | undefined): string {
   const named = identifierText(name);
   return named ? `${keyword} ${named} {` : `${keyword} {`;
-}
-
-function genericKeyword(generic: GenericBlockDeclarationAst): string {
-  return generic.keyword()?.text ?? '';
 }
 
 /**
@@ -141,39 +327,48 @@ interface AlignmentRow {
   readonly name: string;
   readonly type: string;
   readonly attributes: string;
+  readonly trailing: string | undefined;
 }
 
-function emitFieldRows(writer: LineWriter, fields: FieldDeclarationAst[], depth: number): void {
-  const rows = fields.map<AlignmentRow>((field) => ({
-    name: identifierText(field.name()),
-    type: emitTypeAnnotation(field.typeAnnotation()),
-    attributes: Array.from(field.attributes(), emitFieldAttribute).join(' '),
-  }));
-  emitAlignedRows(writer, rows, depth);
+function toAlignmentRow(node: SyntaxNode): AlignmentRow | undefined {
+  const field = FieldDeclarationAst.cast(node);
+  if (field) {
+    return {
+      name: identifierText(field.name()),
+      type: emitTypeAnnotation(field.typeAnnotation()),
+      attributes: Array.from(field.attributes(), emitFieldAttribute).join(' '),
+      trailing: undefined,
+    };
+  }
+  const value = EnumValueDeclarationAst.cast(node);
+  if (value) {
+    return {
+      name: identifierText(value.name()),
+      type: '',
+      attributes: Array.from(value.attributes(), emitFieldAttribute).join(' '),
+      trailing: undefined,
+    };
+  }
+  return undefined;
 }
 
-function emitEnumValueRows(
-  writer: LineWriter,
-  values: EnumValueDeclarationAst[],
-  depth: number,
-): void {
-  const rows = values.map<AlignmentRow>((value) => ({
-    name: identifierText(value.name()),
-    type: '',
-    attributes: Array.from(value.attributes(), emitFieldAttribute).join(' '),
-  }));
-  emitAlignedRows(writer, rows, depth);
-}
-
-function emitAlignedRows(writer: LineWriter, rows: readonly AlignmentRow[], depth: number): void {
+function emitAlignedRows(writer: LineWriter, items: readonly MemberItem[], depth: number): void {
+  const rows = items.map<AlignmentRow>((item) => {
+    const base = toAlignmentRow(item.node);
+    return base ? { ...base, trailing: item.trailing } : emptyRow();
+  });
   const nameWidth = Math.max(0, ...rows.map((row) => row.name.length));
   const typeColumnEnd = Math.max(
     0,
     ...rows.map((row) => (row.type.length > 0 ? nameWidth + 1 + row.type.length : row.name.length)),
   );
   for (const row of rows) {
-    writer.push(depth, renderAlignedRow(row, nameWidth, typeColumnEnd));
+    writer.push(depth, withTrailing(renderAlignedRow(row, nameWidth, typeColumnEnd), row.trailing));
   }
+}
+
+function emptyRow(): AlignmentRow {
+  return { name: '', type: '', attributes: '', trailing: undefined };
 }
 
 function renderAlignedRow(row: AlignmentRow, nameWidth: number, typeColumnEnd: number): string {
@@ -187,14 +382,18 @@ function renderAlignedRow(row: AlignmentRow, nameWidth: number, typeColumnEnd: n
   return line;
 }
 
-function emitNamedType(writer: LineWriter, named: NamedTypeDeclarationAst, depth: number): void {
-  const parts = [identifierText(named.name()), '=', emitTypeAnnotation(named.typeAnnotation())];
-  for (const attribute of named.attributes()) parts.push(emitFieldAttribute(attribute));
-  writer.push(depth, joinTokens(parts));
+function withTrailing(line: string, trailing: string | undefined): string {
+  return trailing === undefined ? line : `${line} ${trailing}`;
 }
 
-function emitKeyValue(writer: LineWriter, entry: KeyValuePairAst, depth: number): void {
-  writer.push(depth, joinTokens([identifierText(entry.key()), '=', emitExpression(entry.value())]));
+function emitNamedType(named: NamedTypeDeclarationAst): string {
+  const parts = [identifierText(named.name()), '=', emitTypeAnnotation(named.typeAnnotation())];
+  for (const attribute of named.attributes()) parts.push(emitFieldAttribute(attribute));
+  return joinTokens(parts);
+}
+
+function emitKeyValue(entry: KeyValuePairAst): string {
+  return joinTokens([identifierText(entry.key()), '=', emitExpression(entry.value())]);
 }
 
 function emitTypeAnnotation(annotation: TypeAnnotationAst | undefined): string {
@@ -222,8 +421,8 @@ function emitFieldAttribute(attribute: FieldAttributeAst): string {
   return `@${qualified}${emitArgList(attribute)}`;
 }
 
-function emitModelAttribute(writer: LineWriter, attribute: ModelAttributeAst, depth: number): void {
-  writer.push(depth, `@@${identifierText(attribute.name())}${emitArgList(attribute)}`);
+function emitModelAttribute(attribute: ModelAttributeAst): string {
+  return `@@${identifierText(attribute.name())}${emitArgList(attribute)}`;
 }
 
 function emitArgList(attribute: FieldAttributeAst | ModelAttributeAst): string {
