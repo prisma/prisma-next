@@ -2,7 +2,7 @@ import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types'
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { PslSpan } from '@prisma-next/psl-parser';
 import type { ExpressionAst, ResolvedAttribute } from '@prisma-next/psl-parser/syntax';
-import { ArrayLiteralAst, argText } from '@prisma-next/psl-parser/syntax';
+import { ArrayLiteralAst, argText, StringLiteralExprAst } from '@prisma-next/psl-parser/syntax';
 
 /**
  * Finds an attribute by name from a resolved attribute list. Returns
@@ -20,22 +20,16 @@ export function lowerFirst(value: string): string {
   return value[0]?.toLowerCase() + value.slice(1);
 }
 
-/**
- * Strips matching outer quotes from a raw argument's source text, returning the
- * inner text, or `undefined` when the text is not a quoted string literal. No
- * escape decoding — the inner bytes are returned verbatim (matching the legacy
- * `parseQuotedStringLiteral`). Callers pass {@link argText} of a CST expression.
- */
-export function parseQuotedStringLiteral(value: string): string | undefined {
-  const trimmed = value.trim();
-  const match = trimmed.match(/^(['"])(.*)\1$/);
-  if (!match) return undefined;
-  return match[2] ?? '';
-}
-
 export function getNamedArgument(attribute: ResolvedAttribute, name: string): string | undefined {
   const arg = attribute.args.find((a) => a.name === name);
   return arg === undefined ? undefined : argText(arg.value.syntax);
+}
+
+export function getNamedArgumentExpr(
+  attribute: ResolvedAttribute,
+  name: string,
+): ExpressionAst | undefined {
+  return attribute.args.find((a) => a.name === name)?.value;
 }
 
 /**
@@ -101,7 +95,7 @@ export function parseMapName(input: {
     });
     return input.defaultValue;
   }
-  const parsed = parseQuotedStringLiteral(argText(value.syntax));
+  const parsed = StringLiteralExprAst.cast(value.syntax)?.value();
   if (parsed === undefined) {
     input.diagnostics.push({
       code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
@@ -126,12 +120,12 @@ export function parseConstraintMapArgument(input: {
     return undefined;
   }
 
-  const raw = getNamedArgument(input.attribute, 'map');
-  if (!raw) {
+  const mapExpr = getNamedArgumentExpr(input.attribute, 'map');
+  if (!mapExpr) {
     return undefined;
   }
 
-  const parsed = parseQuotedStringLiteral(raw);
+  const parsed = StringLiteralExprAst.cast(mapExpr.syntax)?.value();
   if (parsed !== undefined) {
     return parsed;
   }
@@ -202,7 +196,7 @@ export function parseObjectLiteralStringMap(input: {
         message: `${input.entityLabel} object-literal key "${key}" must be a bare identifier`,
       });
     }
-    const parsedString = parseQuotedStringLiteral(rawValue);
+    const parsedString = decodeRawStringLiteral(rawValue);
     if (parsedString === undefined) {
       return pushInvalidAttributeArgument({
         diagnostics: input.diagnostics,
@@ -222,6 +216,56 @@ export function parseObjectLiteralStringMap(input: {
     result[key] = parsedString;
   }
   return result;
+}
+
+function decodeRawStringLiteral(raw: string): string | undefined {
+  const trimmed = raw.trim();
+  const quote = trimmed[0];
+  if ((quote !== '"' && quote !== "'") || trimmed[trimmed.length - 1] !== quote) {
+    return undefined;
+  }
+  const inner = trimmed.slice(1, -1);
+  let out = '';
+  let i = 0;
+  while (i < inner.length) {
+    const ch = inner.charAt(i);
+    if (ch !== '\\' || i + 1 >= inner.length) {
+      out += ch;
+      i++;
+      continue;
+    }
+    const next = inner.charAt(i + 1);
+    switch (next) {
+      case 'n':
+        out += '\n';
+        i += 2;
+        continue;
+      case 'r':
+        out += '\r';
+        i += 2;
+        continue;
+      case 't':
+        out += '\t';
+        i += 2;
+        continue;
+      case '"':
+        out += '"';
+        i += 2;
+        continue;
+      case "'":
+        out += "'";
+        i += 2;
+        continue;
+      case '\\':
+        out += '\\';
+        i += 2;
+        continue;
+      default:
+        out += ch;
+        i++;
+    }
+  }
+  return out;
 }
 
 function splitObjectLiteralEntries(body: string): readonly string[] {

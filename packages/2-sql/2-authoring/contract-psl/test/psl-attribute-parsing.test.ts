@@ -114,7 +114,7 @@ describe('parseObjectLiteralStringMap', () => {
 
   it('handles escaped quotes inside string values', () => {
     const { result, diagnostics } = callParse('{ s: "hello \\"world\\"" }');
-    expect(result).toEqual({ s: 'hello \\"world\\"' });
+    expect(result).toEqual({ s: 'hello "world"' });
     expect(diagnostics).toHaveLength(0);
   });
 

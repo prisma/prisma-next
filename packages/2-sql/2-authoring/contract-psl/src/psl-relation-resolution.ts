@@ -2,16 +2,16 @@ import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types'
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type { PslSpan } from '@prisma-next/psl-parser';
 import type { ResolvedAttribute, ResolvedField, SourceFile } from '@prisma-next/psl-parser/syntax';
-import { argText } from '@prisma-next/psl-parser/syntax';
+import { StringLiteralExprAst } from '@prisma-next/psl-parser/syntax';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   getNamedArgument,
+  getNamedArgumentExpr,
   getPositionalArgumentExpr,
   parseFieldList,
-  parseQuotedStringLiteral,
   unquoteStringLiteral,
 } from './psl-attribute-parsing';
 import { checkUncomposedNamespace, reportUncomposedNamespace } from './psl-column-resolution';
@@ -112,8 +112,7 @@ export function parseRelationAttribute(input: {
   let relationNameFromPositional: string | undefined;
   const positionalNameExpr = getPositionalArgumentExpr(input.attribute);
   if (positionalNameExpr) {
-    const rawName = argText(positionalNameExpr.syntax);
-    const parsedName = parseQuotedStringLiteral(rawName);
+    const parsedName = StringLiteralExprAst.cast(positionalNameExpr.syntax)?.value();
     if (!parsedName) {
       input.diagnostics.push({
         code: 'PSL_INVALID_RELATION_ATTRIBUTE',
@@ -148,11 +147,11 @@ export function parseRelationAttribute(input: {
     }
   }
 
-  const namedRelationNameRaw = getNamedArgument(input.attribute, 'name');
-  const namedRelationName = namedRelationNameRaw
-    ? parseQuotedStringLiteral(namedRelationNameRaw)
+  const namedRelationNameExpr = getNamedArgumentExpr(input.attribute, 'name');
+  const namedRelationName = namedRelationNameExpr
+    ? StringLiteralExprAst.cast(namedRelationNameExpr.syntax)?.value()
     : undefined;
-  if (namedRelationNameRaw && !namedRelationName) {
+  if (namedRelationNameExpr && !namedRelationName) {
     input.diagnostics.push({
       code: 'PSL_INVALID_RELATION_ATTRIBUTE',
       message: `Relation field "${input.modelName}.${input.fieldName}" named relation name must be a quoted string literal`,
@@ -177,11 +176,11 @@ export function parseRelationAttribute(input: {
   }
   const relationName = namedRelationName ?? relationNameFromPositional;
 
-  const constraintNameRaw = getNamedArgument(input.attribute, 'map');
-  const constraintName = constraintNameRaw
-    ? parseQuotedStringLiteral(constraintNameRaw)
+  const constraintNameExpr = getNamedArgumentExpr(input.attribute, 'map');
+  const constraintName = constraintNameExpr
+    ? StringLiteralExprAst.cast(constraintNameExpr.syntax)?.value()
     : undefined;
-  if (constraintNameRaw && !constraintName) {
+  if (constraintNameExpr && !constraintName) {
     input.diagnostics.push({
       code: 'PSL_INVALID_RELATION_ATTRIBUTE',
       message: `Relation field "${input.modelName}.${input.fieldName}" map argument must be a quoted string literal`,

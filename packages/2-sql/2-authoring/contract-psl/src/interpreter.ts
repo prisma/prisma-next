@@ -39,7 +39,7 @@ import type {
   SourceFile,
   SyntaxNode,
 } from '@prisma-next/psl-parser/syntax';
-import { argText } from '@prisma-next/psl-parser/syntax';
+import { argText, StringLiteralExprAst } from '@prisma-next/psl-parser/syntax';
 import type {
   SqlModelStorage,
   SqlNamespaceTablesInput,
@@ -63,13 +63,13 @@ import {
   findDuplicateFieldName,
   getAttribute,
   getNamedArgument,
+  getNamedArgumentExpr,
   getPositionalArgumentExpr,
   mapFieldNamesToColumns,
   parseAttributeFieldList,
   parseConstraintMapArgument,
   parseControlPolicyAttribute,
   parseObjectLiteralStringMap,
-  parseQuotedStringLiteral,
 } from './psl-attribute-parsing';
 import type { ColumnDescriptor } from './psl-column-resolution';
 import {
@@ -1029,10 +1029,10 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         });
       } else {
         const indexEntityLabel = `Model "${model.name}" @@index`;
-        const rawTypeArg = getNamedArgument(modelAttribute, 'type');
+        const typeArgExpr = getNamedArgumentExpr(modelAttribute, 'type');
         let indexType: string | undefined;
-        if (rawTypeArg !== undefined) {
-          const parsed = parseQuotedStringLiteral(rawTypeArg);
+        if (typeArgExpr !== undefined) {
+          const parsed = StringLiteralExprAst.cast(typeArgExpr.syntax)?.value();
           if (parsed === undefined) {
             diagnostics.push({
               code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
@@ -1646,9 +1646,8 @@ function collectPolymorphismDeclarations(
       if (attr.name === 'base') {
         const baseNameExpr = getPositionalArgumentExpr(attr, 0);
         const baseName = baseNameExpr === undefined ? undefined : argText(baseNameExpr.syntax);
-        const rawValueExpr = getPositionalArgumentExpr(attr, 1);
-        const rawValue = rawValueExpr === undefined ? undefined : argText(rawValueExpr.syntax);
-        if (!baseName || !rawValue) {
+        const valueExpr = getPositionalArgumentExpr(attr, 1);
+        if (!baseName || !valueExpr) {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
             message: `Model "${model.name}" @@base requires two arguments: base model name and discriminator value`,
@@ -1657,7 +1656,7 @@ function collectPolymorphismDeclarations(
           });
           continue;
         }
-        const value = parseQuotedStringLiteral(rawValue);
+        const value = StringLiteralExprAst.cast(valueExpr.syntax)?.value();
         if (value === undefined) {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
