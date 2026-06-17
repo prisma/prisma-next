@@ -794,11 +794,9 @@ function collectRuntimeModelSpecs(definition: ContractInput): RuntimeCollection 
     const attributesSpec = modelDefinition.buildAttributesSpec();
     const sqlSpec = modelDefinition.buildSqlSpec();
     const tableName = sqlSpec?.table ?? applyNaming(modelName, definition.naming?.tables);
-    // Table names are unique per namespace, not globally: `public.users` and
-    // `shadow.users` are distinct tables. Key the collision check by a tuple so
-    // namespace/table boundaries remain unambiguous.
-    const namespaceId =
-      modelDefinition.stageOne.namespace ?? definition.target.defaultNamespaceId ?? 'public';
+    // Table names are unique per namespace, not globally. Key the collision
+    // check by a tuple so namespace/table boundaries remain unambiguous.
+    const namespaceId = modelDefinition.stageOne.namespace ?? definition.target.defaultNamespaceId;
     const tableKey = JSON.stringify([namespaceId, tableName]);
     const existingModel = tableOwners.get(tableKey);
     if (existingModel) {
