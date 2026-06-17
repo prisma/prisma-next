@@ -22,8 +22,8 @@ const span: PslSpan = {
 };
 
 function modelAttribute(schema: string, model: string, attribute: string): ResolvedAttribute {
-  const { document } = parse(schema);
-  const resolved = resolve(document);
+  const { document, sourceFile } = parse(schema);
+  const resolved = resolve(document, sourceFile);
   const ns = [...resolved.namespaces.values()][0];
   const target = ns?.models.get(model);
   const found = target?.attributes.find((attr) => attr.name === attribute);
@@ -37,8 +37,8 @@ function fieldAttribute(
   field: string,
   attribute: string,
 ): ResolvedAttribute {
-  const { document } = parse(schema);
-  const resolved = resolve(document);
+  const { document, sourceFile } = parse(schema);
+  const resolved = resolve(document, sourceFile);
   const ns = [...resolved.namespaces.values()][0];
   const target = ns?.models.get(model)?.fields.get(field);
   const found = target?.attributes.find((attr) => attr.name === attribute);

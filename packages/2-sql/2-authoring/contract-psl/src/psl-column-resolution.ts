@@ -856,9 +856,9 @@ export function resolveColumnDescriptor(
     if (target.coord.kind === 'namedType') {
       return namedTypeDescriptors.get(target.coord.name);
     }
-    if (target.coord.kind === 'enum') {
-      return enumTypeDescriptors.get(target.coord.name);
-    }
+    // Enum field types are no longer `ref`/`enum` coordinates: the parser routes
+    // `enum {…}` through a generic block, so a field typed by an enum name binds
+    // as `unresolved` and is matched against `enumTypeDescriptors` below.
     return undefined;
   }
   if (target.kind === 'scalar') {

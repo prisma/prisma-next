@@ -34,11 +34,11 @@ import type {
   SourceFile,
   SyntaxNode,
 } from '@prisma-next/psl-parser/syntax';
+import { argText } from '@prisma-next/psl-parser/syntax';
 import { blindCast } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { deriveJsonSchema, derivePolymorphicJsonSchema } from './derive-json-schema';
 import {
-  argText,
   getAttribute,
   getMapName,
   getNamedArgument,

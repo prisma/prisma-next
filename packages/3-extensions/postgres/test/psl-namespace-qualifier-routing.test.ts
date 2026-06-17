@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 function parseAndResolve(schema: string) {
   const { document, diagnostics: parseDiagnostics, sourceFile } = parse(schema);
-  const resolved = resolve(document);
+  const resolved = resolve(document, sourceFile);
   return {
     document: { ...resolved, diagnostics: [...parseDiagnostics, ...resolved.diagnostics] },
     sourceId: 'schema.prisma',

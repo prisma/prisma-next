@@ -1,19 +1,13 @@
 import type { ExpressionAst, ResolvedAttribute } from '@prisma-next/psl-parser/syntax';
+import { argText, StringLiteralExprAst } from '@prisma-next/psl-parser/syntax';
 
 /**
- * Raw source text of an argument expression — the concatenated token text of the
- * CST node, which reproduces the source slice the node spans (leaf expression
- * nodes carry no leading/trailing trivia, so this is already trimmed). This is
- * the value the downstream string parsers expect: it matches the raw, trimmed
- * argument text the legacy parser exposed as its positional/named arg value
- * (quotes and brackets preserved; the parsers strip them as needed).
+ * Unquoted value of a string-literal argument, or `undefined` when the
+ * expression is not a string literal. Handles both `'`- and `"`-quoting and
+ * decodes escapes, unlike the raw {@link argText} slice.
  */
-export function argText(value: ExpressionAst): string {
-  let text = '';
-  for (const token of value.syntax.tokens()) {
-    text += token.text;
-  }
-  return text;
+function stringLiteralValue(value: ExpressionAst): string | undefined {
+  return StringLiteralExprAst.cast(value.syntax)?.value();
 }
 
 export function getNamedArgument(attr: ResolvedAttribute, name: string): string | undefined {
@@ -96,7 +90,7 @@ export function getMapName(attributes: readonly ResolvedAttribute[]): string | u
   if (!mapAttr) return undefined;
   const arg = mapAttr.positionalArg(0);
   if (!arg) return undefined;
-  return stripQuotes(argText(arg));
+  return stringLiteralValue(arg);
 }
 
 export interface ParsedRelationAttribute {
@@ -117,9 +111,9 @@ export function parseRelationAttribute(
 
   for (const arg of relationAttr.args) {
     if (arg.name === undefined) {
-      relationName = stripQuotes(argText(arg.value));
+      relationName = stringLiteralValue(arg.value);
     } else if (arg.name === 'name') {
-      relationName = stripQuotes(argText(arg.value));
+      relationName = stringLiteralValue(arg.value);
     } else if (arg.name === 'fields') {
       fieldsArg = arg.value;
     } else if (arg.name === 'references') {
@@ -135,13 +129,6 @@ export function parseRelationAttribute(
     ...(fields !== undefined ? { fields } : {}),
     ...(references !== undefined ? { references } : {}),
   };
-}
-
-function stripQuotes(value: string): string {
-  if (value.startsWith('"') && value.endsWith('"')) {
-    return value.slice(1, -1);
-  }
-  return value;
 }
 
 /**

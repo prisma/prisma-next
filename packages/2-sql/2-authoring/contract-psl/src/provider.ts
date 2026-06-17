@@ -85,7 +85,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         }
 
         const { document, diagnostics: parseDiagnostics, sourceFile } = parse(schema);
-        const resolved = resolve(document, {
+        const resolved = resolve(document, sourceFile, {
           ...ifDefined('pslBlockDescriptors', context.authoringContributions.pslBlockDescriptors),
           codecLookup: context.codecLookup,
         });

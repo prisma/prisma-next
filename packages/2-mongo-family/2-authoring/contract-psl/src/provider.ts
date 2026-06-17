@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
-import { parse, resolve } from '@prisma-next/psl-parser/syntax';
+import { DEFAULT_SCALAR_TYPES, parse, resolve } from '@prisma-next/psl-parser/syntax';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { interpretPslDocumentToMongoContract } from './interpreter';
@@ -71,14 +71,21 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
         }
 
         const { document, diagnostics: parseDiagnostics, sourceFile } = parse(schema);
-        const resolved = resolve(document, { codecLookup: context.codecLookup });
+        const resolved = resolve(document, sourceFile, {
+          codecLookup: context.codecLookup,
+          scalarTypes: new Set([...DEFAULT_SCALAR_TYPES, ...context.scalarTypeDescriptors.keys()]),
+        });
 
-        // `ObjectId` and custom scalars legitimately resolve to an `unresolved`
-        // target in Mongo, so `resolve` emits `PSL_UNRESOLVED_TYPE_REFERENCE` for
-        // them. Forwarding it would surface a spurious error the interpreter would
-        // never raise: `PSL_UNSUPPORTED_FIELD_TYPE` (a `scalarTypeDescriptors` miss)
-        // is the authoritative unknown-type signal. All other resolve diagnostics
-        // (name-collision, extension-block) and parse diagnostics pass through.
+        // Mongo's own scalars (`ObjectId`, …) now resolve as `scalar` targets
+        // because they are in the per-target `scalarTypes` set above, so a valid
+        // scalar no longer produces a spurious `PSL_UNRESOLVED_TYPE_REFERENCE`.
+        // A *genuinely* unknown type still resolves to `unresolved` and would
+        // surface that new resolver code, which the interpreter never raised: its
+        // own `PSL_UNSUPPORTED_FIELD_TYPE` (a `scalarTypeDescriptors` miss) is the
+        // authoritative unknown-type signal. The filter keeps byte-identity by
+        // dropping the resolver code for those genuine unknowns; all other resolve
+        // diagnostics (name-collision, extension-block) and parse diagnostics pass
+        // through.
         const semanticDiagnostics = resolved.diagnostics.filter(
           (diagnostic) => diagnostic.code !== 'PSL_UNRESOLVED_TYPE_REFERENCE',
         );

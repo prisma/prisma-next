@@ -26,7 +26,7 @@ export function parseAndResolve(input: ParseAndResolveInput): {
 } {
   const sourceId = input.sourceId ?? 'schema.prisma';
   const { document, diagnostics: parseDiagnostics, sourceFile } = parse(input.schema);
-  const resolved = resolve(document, {
+  const resolved = resolve(document, sourceFile, {
     ...ifDefined('pslBlockDescriptors', input.pslBlockDescriptors),
     ...ifDefined('codecLookup', input.codecLookup),
   });

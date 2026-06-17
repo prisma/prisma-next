@@ -7,7 +7,7 @@ function modelsOf(ir: Contract): Record<string, unknown> {
   return ir.domain.namespaces[UNBOUND_NAMESPACE_ID]!.models;
 }
 
-import { parse, resolve } from '@prisma-next/psl-parser/syntax';
+import { DEFAULT_SCALAR_TYPES, parse, resolve } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToMongoContract } from '../src/interpreter';
 
@@ -18,6 +18,11 @@ const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
   ['DateTime', 'mongo/date@1'],
   ['ObjectId', 'mongo/objectId@1'],
   ['Float', 'mongo/double@1'],
+]);
+
+const mongoScalarTypes: ReadonlySet<string> = new Set([
+  ...DEFAULT_SCALAR_TYPES,
+  ...mongoScalarTypeDescriptors.keys(),
 ]);
 
 const mongoTargetTypes: Record<string, readonly string[]> = {
@@ -55,7 +60,10 @@ function mongoCollectionsOf(ir: { readonly storage: unknown }): Record<string, u
 
 function interpret(schema: string) {
   const { document, sourceFile } = parse(schema);
-  const resolved = resolve(document, { codecLookup: mongoCodecLookup });
+  const resolved = resolve(document, sourceFile, {
+    codecLookup: mongoCodecLookup,
+    scalarTypes: mongoScalarTypes,
+  });
   return interpretPslDocumentToMongoContract({
     document: resolved,
     sourceId: 'test.prisma',

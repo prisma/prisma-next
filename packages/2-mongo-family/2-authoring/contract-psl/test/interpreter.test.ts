@@ -14,7 +14,7 @@ import {
   MongoStorage,
   MongoValidator,
 } from '@prisma-next/mongo-contract';
-import { parse, resolve } from '@prisma-next/psl-parser/syntax';
+import { DEFAULT_SCALAR_TYPES, parse, resolve } from '@prisma-next/psl-parser/syntax';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { describe, expect, it } from 'vitest';
 import {
@@ -29,6 +29,11 @@ const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
   ['DateTime', 'mongo/date@1'],
   ['ObjectId', 'mongo/objectId@1'],
   ['Float', 'mongo/double@1'],
+]);
+
+const mongoScalarTypes: ReadonlySet<string> = new Set([
+  ...DEFAULT_SCALAR_TYPES,
+  ...mongoScalarTypeDescriptors.keys(),
 ]);
 
 const mongoTargetTypes: Record<string, readonly string[]> = {
@@ -92,7 +97,10 @@ function interpret(
   overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'document' | 'sourceFile'>>,
 ) {
   const { document, sourceFile } = parse(schema);
-  const resolved = resolve(document, { codecLookup: mongoCodecLookup });
+  const resolved = resolve(document, sourceFile, {
+    codecLookup: mongoCodecLookup,
+    scalarTypes: mongoScalarTypes,
+  });
   return interpretPslDocumentToMongoContract({
     document: resolved,
     sourceId: 'test.prisma',

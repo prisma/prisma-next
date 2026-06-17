@@ -7,7 +7,7 @@ PSL-first SQL contract interpretation for Prisma Next.
 `@prisma-next/sql-contract-psl` provides two entrypoints:
 
 - **Pure interpreter** (`@prisma-next/sql-contract-psl`): parsed PSL document -> SQL `Contract`
-- **Provider helper** (`@prisma-next/sql-contract-psl/provider`): read file -> parse -> interpret -> `ContractConfig`
+- **Provider helper** (`@prisma-next/sql-contract-psl/provider`): read file -> parse -> resolve -> interpret -> `ContractConfig`
 
 This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line config helper.
 
@@ -24,7 +24,7 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 - Enforce extension composition for namespaced constructor expressions and emit strict diagnostics for unsupported namespaced attributes
 - Validate generator applicability by declared `codecId` support on composed generator descriptors
 - Consume target-bound scalar descriptors, shared authoring contributions, and mutation-default registries assembled by composition layers
-- Compose provider flow for SQL PSL-first config (`read -> parse -> interpret`) without local registry assembly
+- Compose provider flow for SQL PSL-first config (`read -> parse -> resolve -> interpret`) without local registry assembly
 - Preserve parser diagnostics and add interpreter diagnostics with stable codes
 - Return `notOk` with structured diagnostics for unsupported constructs
 - Keep interpretation deterministic for equivalent AST inputs

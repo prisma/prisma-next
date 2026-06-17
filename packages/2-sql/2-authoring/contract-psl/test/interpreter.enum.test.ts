@@ -705,6 +705,50 @@ model Post {
     );
   });
 
+  it('named @default(value: Low) on an enum field emits an arg-shape diagnostic', () => {
+    const result = interpret(`
+enum Priority {
+  @@type("pg/text@1")
+  Low  = "low"
+  High = "high"
+}
+
+model Post {
+  id       Int      @id
+  priority Priority @default(value: Low)
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT' }),
+      ]),
+    );
+  });
+
+  it('extra positional @default(Low, High) on an enum field emits an arg-shape diagnostic', () => {
+    const result = interpret(`
+enum Priority {
+  @@type("pg/text@1")
+  Low  = "low"
+  High = "high"
+}
+
+model Post {
+  id       Int      @id
+  priority Priority @default(Low, High)
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT' }),
+      ]),
+    );
+  });
+
   it('non-enum field with @default is unchanged (a plain text field still lowers correctly)', () => {
     const result = interpret(`
 model Post {

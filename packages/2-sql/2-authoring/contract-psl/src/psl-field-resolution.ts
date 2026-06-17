@@ -49,8 +49,26 @@ function lowerEnumDefaultForField(input: {
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): LoweredFieldDefault {
+  const positionalEntries = input.defaultAttribute.args.filter((arg) => arg.name === undefined);
+  const namedEntries = input.defaultAttribute.args.filter((arg) => arg.name !== undefined);
+  if (namedEntries.length > 0 || positionalEntries.length !== 1) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
+      message: `Field "${input.modelName}.${input.fieldName}" requires exactly one positional @default(...) expression.`,
+      sourceId: input.sourceId,
+      span: input.span,
+    });
+    return {};
+  }
+
   const expressionAst = getPositionalArgumentExpr(input.defaultAttribute);
   if (!expressionAst) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
+      message: `Field "${input.modelName}.${input.fieldName}" requires a positional @default(...) expression.`,
+      sourceId: input.sourceId,
+      span: input.span,
+    });
     return {};
   }
 

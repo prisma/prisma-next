@@ -6,7 +6,6 @@ import type {
   PslSpan,
 } from '@prisma-next/psl-parser';
 import type {
-  ExpressionAst,
   ResolvedAttribute,
   ResolvedDocument,
   ResolvedExtensionBlock,
@@ -18,11 +17,19 @@ import type {
   TypeTarget,
 } from '@prisma-next/psl-parser/syntax';
 import {
+  argText,
   GenericBlockDeclarationAst,
   KeyValuePairAst,
   StringLiteralExprAst,
   SyntaxNode as SyntaxNodeClass,
 } from '@prisma-next/psl-parser/syntax';
+
+/**
+ * Re-exported from `@prisma-next/psl-parser/syntax` so the package's read-path
+ * modules import `argText` from this one internal surface rather than reaching
+ * into the parser package directly (matching the other read helpers here).
+ */
+export { argText };
 
 /**
  * Internal read surface over {@link ResolvedDocument} for the SQL authoring
@@ -100,22 +107,6 @@ export function getAttribute(
   name: string,
 ): ResolvedAttribute | undefined {
   return attributes.find((attr) => attr.name === name);
-}
-
-/**
- * Raw source text of an argument expression — the concatenated token text of
- * the CST node, which reproduces the source slice the node spans (leaf
- * expression nodes carry no leading/trailing trivia, so this is already
- * trimmed). This matches the raw, trimmed argument text the legacy parser
- * exposed as its positional/named arg value: quotes and brackets are
- * preserved; downstream parsers strip them as needed.
- */
-export function argText(value: ExpressionAst): string {
-  let text = '';
-  for (const token of value.syntax.tokens()) {
-    text += token.text;
-  }
-  return text;
 }
 
 /**

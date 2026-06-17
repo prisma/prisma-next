@@ -12,8 +12,8 @@ import {
 } from '../src/resolved-read-shims';
 
 function parseAndResolve(schema: string) {
-  const { document } = parse(schema);
-  return resolve(document);
+  const { document, sourceFile } = parse(schema);
+  return resolve(document, sourceFile);
 }
 
 describe('namespacesOf', () => {
@@ -40,15 +40,11 @@ describe('namespacesOf', () => {
     expect(ns.has('auth')).toBe(true);
   });
 
-  it('includes models, enums, and compositeTypes maps within a namespace', () => {
+  it('includes models and compositeTypes maps within a namespace', () => {
     const resolved = parseAndResolve(`
       model Post {
         id Int @id
         title String
-      }
-      enum Role {
-        ADMIN
-        USER
       }
       type Address {
         street String
@@ -58,8 +54,20 @@ describe('namespacesOf', () => {
     const unspecified = ns.get(UNSPECIFIED_PSL_NAMESPACE_ID);
     expect(unspecified).toBeDefined();
     expect(unspecified?.models.has('Post')).toBe(true);
-    expect(unspecified?.enums.has('Role')).toBe(true);
     expect(unspecified?.compositeTypes.has('Address')).toBe(true);
+  });
+
+  it('routes an enum block with no registered descriptor to an unsupported-block diagnostic', () => {
+    const resolved = parseAndResolve(`
+      enum Role {
+        ADMIN
+        USER
+      }
+    `);
+    const unspecified = namespacesOf(resolved).get(UNSPECIFIED_PSL_NAMESPACE_ID);
+    expect(unspecified?.enums.has('Role')).toBe(false);
+    expect(unspecified?.extensionBlocks.has('Role')).toBe(false);
+    expect(resolved.diagnostics.map((d) => d.code)).toContain('PSL_UNSUPPORTED_TOP_LEVEL_BLOCK');
   });
 });
 
