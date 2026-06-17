@@ -28,7 +28,6 @@ import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/
 import type { PslExtensionBlock } from '@prisma-next/psl-parser';
 import type {
   ParseDiagnostic,
-  Position,
   ResolvedAttribute,
   ResolvedCompositeType,
   ResolvedDocument,
@@ -37,7 +36,6 @@ import type {
   ResolvedNamedType,
   ResolvedNamespace,
   SourceFile,
-  SyntaxNode,
 } from '@prisma-next/psl-parser/syntax';
 import { argText, StringLiteralExprAst } from '@prisma-next/psl-parser/syntax';
 import type {
@@ -203,33 +201,21 @@ function compareStrings(left: string, right: string): -1 | 0 | 1 {
  * reports `{ line, character }` ranges; the `ContractSourceDiagnostic` span also
  * carries an `offset`, recovered through the same `SourceFile`.
  *
- * `PSL_UNRESOLVED_TYPE_REFERENCE` is forwarded for genuine unknown-type
- * references — the resolver owns that signal. The exception is a field typed by
- * a declared extension block (an `enum {…}`): the parser routes enum blocks
- * through generic blocks, so the resolver cannot bind the enum name and marks it
- * `unresolved`, yet the interpreter resolves it against the enum descriptors.
- * Those by-design false positives are suppressed via `suppressedRanges` (keyed
- * by the type annotation's range). `PSL_UNSUPPORTED_FIELD_TYPE` stays reserved
- * for names that resolve but SQL cannot store.
+ * `PSL_UNRESOLVED_TYPE_REFERENCE` is forwarded as-is: the resolver owns that
+ * signal and emits it only for genuine unknown-type references. An enum-typed
+ * field now binds to a `block` target (the parser routes `enum {…}` through a
+ * named generic block), so it resolves cleanly and the resolver no longer emits
+ * `PSL_UNRESOLVED_TYPE_REFERENCE` for it. `PSL_UNSUPPORTED_FIELD_TYPE` stays
+ * reserved for names that resolve but SQL cannot store — including a `block`
+ * target whose keyword is not a storable field type.
  */
-function rangeKey(range: { start: Position; end: Position }): string {
-  return `${range.start.line}:${range.start.character}-${range.end.line}:${range.end.character}`;
-}
-
 function mapResolverDiagnostics(
   diagnostics: readonly ParseDiagnostic[],
   sourceId: string,
   sourceFile: SourceFile,
-  suppressedRanges: ReadonlySet<string>,
 ): ContractSourceDiagnostic[] {
   const result: ContractSourceDiagnostic[] = [];
   for (const diagnostic of diagnostics) {
-    if (
-      diagnostic.code === 'PSL_UNRESOLVED_TYPE_REFERENCE' &&
-      suppressedRanges.has(rangeKey(diagnostic.range))
-    ) {
-      continue;
-    }
     const { start, end } = diagnostic.range;
     result.push({
       code: diagnostic.code,
@@ -242,46 +228,6 @@ function mapResolverDiagnostics(
     });
   }
   return result;
-}
-
-/**
- * The annotation-range keys of every model field whose type is an `unresolved`
- * reference to a declared extension block (an `enum {…}`). The resolver emits
- * `PSL_UNRESOLVED_TYPE_REFERENCE` against the field's type annotation for these,
- * since enum blocks do not register a bindable declaration name — but the
- * interpreter resolves them against the enum descriptors, so the resolver
- * diagnostic is a by-design false positive and {@link mapResolverDiagnostics}
- * drops it.
- */
-function enumTypedFieldRanges(
-  namespaces: readonly ResolvedNamespace[],
-  sourceFile: SourceFile,
-): ReadonlySet<string> {
-  const blockNames = new Set<string>();
-  for (const namespace of namespaces) {
-    for (const name of namespace.extensionBlocks.keys()) blockNames.add(name);
-  }
-  const ranges = new Set<string>();
-  if (blockNames.size === 0) return ranges;
-  for (const namespace of namespaces) {
-    for (const model of namespace.models.values()) {
-      for (const field of model.fields.values()) {
-        const target = field.type.target;
-        if (target.kind !== 'unresolved' || !blockNames.has(target.typeName)) continue;
-        const annotation = field.syntax.typeAnnotation();
-        if (annotation === undefined) continue;
-        ranges.add(rangeKey(spanToRange(annotation.syntax, sourceFile)));
-      }
-    }
-  }
-  return ranges;
-}
-
-function spanToRange(node: SyntaxNode, sourceFile: SourceFile): { start: Position; end: Position } {
-  return {
-    start: sourceFile.positionAt(node.offset),
-    end: sourceFile.positionAt(node.offset + node.textLength),
-  };
 }
 
 /**
@@ -461,6 +407,7 @@ function namedTypeBaseName(target: ResolvedNamedType['target']): string {
   if (target.kind === 'ref') return target.coord.name;
   if (target.kind === 'crossSpace') return target.typeName;
   if (target.kind === 'constructor') return target.path.join('.');
+  if (target.kind === 'block') return target.name;
   return target.typeName;
 }
 
@@ -2039,7 +1986,6 @@ export function interpretPslDocumentToSqlContract(
     input.document.diagnostics,
     sourceId,
     sourceFile,
-    enumTypedFieldRanges(resolvedNamespaces, sourceFile),
   );
   validateNamespaceBlocksForSqlTarget({
     namespaces: resolvedNamespaces,

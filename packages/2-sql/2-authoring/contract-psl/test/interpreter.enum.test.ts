@@ -388,7 +388,7 @@ model Post {
     );
   });
 
-  it('duplicate enum block names: second block silently wins (last-writer wins in entries map)', () => {
+  it('duplicate enum block names emit PSL_DUPLICATE_DECLARATION', () => {
     const result = interpret(`
 enum Priority {
   @@type("pg/text@1")
@@ -402,11 +402,14 @@ model Post {
   id Int @id
 }
 `);
-    // The extension-block grammar stores blocks by kind+name in entries; a
-    // second block with the same name overwrites the first without a
-    // diagnostic. The second Priority block (High = "high") wins.
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
+    // Block names join the namespace declaration name-space (first-wins
+    // collision handling), so a second block with the same name is a duplicate
+    // declaration rather than a silent overwrite.
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_DUPLICATE_DECLARATION' })]),
+    );
   });
 
   it('namespaced enum emits not-supported diagnostic', () => {

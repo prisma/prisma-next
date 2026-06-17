@@ -37,6 +37,7 @@ import {
  * - `ref` → declaration name from the coordinate (e.g. `"User"`)
  * - `crossSpace` → the written type name (e.g. `"User"`)
  * - `constructor` → dot-joined path (e.g. `"temporal.cuid2"`)
+ * - `block` → the block name (e.g. `"Priority"` for a field typed by an `enum`)
  * - `unresolved` → the written type name (e.g. `"UnknownType"`)
  */
 export function fieldTypeName(field: ResolvedField): string {
@@ -45,6 +46,7 @@ export function fieldTypeName(field: ResolvedField): string {
   if (target.kind === 'ref') return target.coord.name;
   if (target.kind === 'crossSpace') return target.typeName;
   if (target.kind === 'constructor') return target.path.join('.');
+  if (target.kind === 'block') return target.name;
   return target.typeName;
 }
 

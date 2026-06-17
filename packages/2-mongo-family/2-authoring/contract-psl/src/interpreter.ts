@@ -87,6 +87,13 @@ function spanOf(node: SyntaxNode, sourceFile: SourceFile): ContractSourceDiagnos
  * name — expected here, not an error (the `PSL_UNRESOLVED_TYPE_REFERENCE` that
  * resolution emits for them is deliberately not forwarded; Mongo's own
  * `PSL_UNSUPPORTED_FIELD_TYPE` remains the authoritative unknown-type signal).
+ *
+ * A `block` target is a field typed by a named generic block (e.g. an `enum`):
+ * resolution binds the name without judging whether the block's keyword is a
+ * valid field type. Mongo has no block-typed field support (no enum lowering),
+ * so such a field finds no scalar codec and falls through to
+ * `PSL_UNSUPPORTED_FIELD_TYPE` — the same unknown-type signal as before, now via
+ * the block name rather than an unresolved name.
  */
 function fieldTypeName(field: ResolvedField): string {
   const target = field.type.target;
@@ -94,6 +101,7 @@ function fieldTypeName(field: ResolvedField): string {
   if (target.kind === 'ref') return target.coord.name;
   if (target.kind === 'crossSpace') return target.typeName;
   if (target.kind === 'constructor') return target.path.join('.');
+  if (target.kind === 'block') return target.name;
   return target.typeName;
 }
 

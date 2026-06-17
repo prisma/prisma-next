@@ -531,8 +531,9 @@ export function resolveFieldTypeDescriptor(input: {
     // emitted `PSL_UNRESOLVED_TYPE_REFERENCE` (or `parse` flagged the malformed
     // qualifier), so the interpreter must not duplicate it with a
     // `PSL_UNSUPPORTED_FIELD_TYPE`. `PSL_UNSUPPORTED_FIELD_TYPE` is reserved for
-    // names that *do* resolve (a `scalar`/`ref`/`namedType` target) but SQL
-    // cannot store.
+    // names that *do* resolve (a `scalar`/`ref`/`namedType` target, or a `block`
+    // target whose keyword cannot be a field type — e.g. a non-enum block) but
+    // SQL cannot store.
     return { ok: false, alreadyReported: target.kind === 'unresolved' };
   }
   return { ok: true, descriptor };
@@ -863,13 +864,18 @@ export function resolveColumnDescriptor(
     if (target.coord.kind === 'namedType') {
       return namedTypeDescriptors.get(target.coord.name);
     }
-    // Enum field types are no longer `ref`/`enum` coordinates: the parser routes
-    // `enum {…}` through a generic block, so a field typed by an enum name binds
-    // as `unresolved` and is matched against `enumTypeDescriptors` below.
     return undefined;
   }
   if (target.kind === 'scalar') {
     return namedTypeDescriptors.get(target.name) ?? scalarTypeDescriptors.get(target.name);
+  }
+  if (target.kind === 'block') {
+    // A field typed by a named generic block binds to a `block` target. The
+    // parser routes `enum {…}` through a generic block, so an enum-typed field
+    // arrives here and matches the enum descriptors keyed by the block name. A
+    // block whose keyword is not a storable field type (any non-enum block)
+    // matches nothing and falls through to `PSL_UNSUPPORTED_FIELD_TYPE`.
+    return enumTypeDescriptors.get(target.name);
   }
   if (target.kind === 'unresolved') {
     return (
