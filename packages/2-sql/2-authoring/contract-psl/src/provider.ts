@@ -5,7 +5,7 @@ import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import { parse, resolve } from '@prisma-next/psl-parser/syntax';
+import { DEFAULT_SCALAR_TYPES, parse, resolve } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -88,6 +88,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         const resolved = resolve(document, sourceFile, {
           ...ifDefined('pslBlockDescriptors', context.authoringContributions.pslBlockDescriptors),
           codecLookup: context.codecLookup,
+          scalarTypes: new Set([...DEFAULT_SCALAR_TYPES, ...context.scalarTypeDescriptors.keys()]),
         });
         // `parse` does not itself fail on syntax errors — it recovers and
         // collects diagnostics on the result. The interpreter merges the

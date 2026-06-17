@@ -667,6 +667,45 @@ model Document {
     });
   });
 
+  describe('given a scalar registered in scalarTypeDescriptors beyond the 9 built-ins', () => {
+    it('resolves the extension scalar as a field type without emitting PSL_UNSUPPORTED_FIELD_TYPE', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-custom-scalar-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model Item {
+  id Int @id
+  uid SqlUuid
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma', baseOptions);
+      const result = await contract.source.load(
+        createPostgresTestContext({
+          resolvedInputs: [schemaPath],
+          scalarTypeDescriptors: new Map([
+            ...createPostgresTestContext().scalarTypeDescriptors,
+            ['SqlUuid', 'pg/uuid@1'],
+          ]),
+          codecLookup: {
+            ...createPostgresTestContext().codecLookup,
+            targetTypesFor: (id: string) => {
+              if (id === 'pg/uuid@1') return ['uuid'];
+              return createPostgresTestContext().codecLookup.targetTypesFor(id);
+            },
+          },
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+    });
+  });
+
   describe('given a missing schema file', () => {
     it('returns PSL_SCHEMA_READ_FAILED diagnostics when schema file is missing', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
