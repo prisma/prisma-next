@@ -321,7 +321,7 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
   // --------------------------------------------------------------------------
 
   it(
-    'scenario 2: contract with policy removed → verify ok:false, extra_rls_policy issue names orphaned p_read_<hashB>',
+    'scenario 2: contract with policy removed → verify ok:false, extra schemaDiffIssue names orphaned p_read_<hashB>',
     async () => {
       const contractB = buildContractFromPsl(PSL_B);
       const contractNoPolicy = buildContractFromPsl(PSL_NO_POLICY);
@@ -341,7 +341,7 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
       });
 
       expect(verifyResult.ok).toBe(false);
-      const extraIssues = verifyResult.schema.issues.filter((i) => i.kind === 'extra_rls_policy');
+      const extraIssues = verifyResult.schema.schemaDiffIssues.filter((i) => i.outcome === 'extra');
       expect(extraIssues.length).toBeGreaterThan(0);
 
       const issueMessages = extraIssues.map((i) => i.message);

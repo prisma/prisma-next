@@ -1,5 +1,4 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { BaseSchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
@@ -116,33 +115,31 @@ function contractWithPolicy(): Contract<SqlStorage> {
   };
 }
 
-describe('collectSchemaIssues — RLS drift detection', () => {
-  it('no contract policy + Prisma-managed DB policy → one extra_rls_policy issue', () => {
-    const issues = controlAdapter.collectSchemaIssues!(
+describe('collectSchemaDiffIssues — RLS drift detection', () => {
+  it('no contract policy + Prisma-managed DB policy → one extra diff issue', () => {
+    const issues = controlAdapter.collectSchemaDiffIssues!(
       emptyContractNoPolicies(),
       schemaWithPolicies([managedPolicy()]),
     );
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.kind).toBe('extra_rls_policy');
-    expect((issues[0] as BaseSchemaIssue | undefined)?.indexOrConstraint).toBe(WIRE_NAME);
+    expect(issues[0]?.outcome).toBe('extra');
+    expect(issues[0]?.coordinate.entityName).toBe(WIRE_NAME);
   });
 
-  it('no contract policy + external DB policy → one extra_rls_policy issue', () => {
-    const issues = controlAdapter.collectSchemaIssues!(
+  it('no contract policy + external DB policy → one extra diff issue', () => {
+    const issues = controlAdapter.collectSchemaDiffIssues!(
       emptyContractNoPolicies(),
       schemaWithPolicies([externalPolicy()]),
     );
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.kind).toBe('extra_rls_policy');
-    expect((issues[0] as BaseSchemaIssue | undefined)?.indexOrConstraint).toBe(
-      'legacy_admin_policy',
-    );
+    expect(issues[0]?.outcome).toBe('extra');
+    expect(issues[0]?.coordinate.entityName).toBe('legacy_admin_policy');
   });
 
   it('matching contract + DB policy → no issues', () => {
-    const issues = controlAdapter.collectSchemaIssues!(
+    const issues = controlAdapter.collectSchemaDiffIssues!(
       contractWithPolicy(),
       schemaWithPolicies([managedPolicy()]),
     );

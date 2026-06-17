@@ -1,10 +1,9 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { BaseSchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { verifyPostgresRlsPolicies } from '../../src/core/migrations/verify-postgres-rls-policies';
+import { diffPostgresRlsPolicies } from '../../src/core/migrations/verify-postgres-rls-policies';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
@@ -86,36 +85,32 @@ function makeSchema(actualPolicies: readonly PostgresRlsPolicy[]): PostgresSchem
   });
 }
 
-describe('verifyPostgresRlsPolicies', () => {
-  it('emits missing_rls_policy when a contract policy is absent from the DB', () => {
+describe('diffPostgresRlsPolicies', () => {
+  it('emits missing outcome when a contract policy is absent from the DB', () => {
     const policy = makePolicy('read_own_profiles_a1b2c3d4');
     const contract = makeContract([policy]);
     const schema = makeSchema([]);
 
-    const issues = verifyPostgresRlsPolicies({ contract, schema });
+    const issues = diffPostgresRlsPolicies({ contract, schema });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
-      kind: 'missing_rls_policy',
-      namespaceId: UNBOUND_NAMESPACE_ID,
-      table: TABLE_NAME,
-      message: expect.stringContaining('read_own_profiles_a1b2c3d4'),
+      outcome: 'missing',
+      coordinate: expect.objectContaining({ entityName: 'read_own_profiles_a1b2c3d4' }),
     });
   });
 
-  it('emits extra_rls_policy when a DB policy is absent from the contract', () => {
+  it('emits extra outcome when a DB policy is absent from the contract', () => {
     const actualPolicy = makePolicy('read_own_profiles_deadbeef');
     const contract = makeContract([]);
     const schema = makeSchema([actualPolicy]);
 
-    const issues = verifyPostgresRlsPolicies({ contract, schema, strict: true });
+    const issues = diffPostgresRlsPolicies({ contract, schema });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
-      kind: 'extra_rls_policy',
-      namespaceId: UNBOUND_NAMESPACE_ID,
-      table: TABLE_NAME,
-      message: expect.stringContaining('read_own_profiles_deadbeef'),
+      outcome: 'extra',
+      coordinate: expect.objectContaining({ entityName: 'read_own_profiles_deadbeef' }),
     });
   });
 
@@ -135,36 +130,35 @@ describe('verifyPostgresRlsPolicies', () => {
       }),
     ]);
 
-    const issues = verifyPostgresRlsPolicies({ contract, schema });
+    const issues = diffPostgresRlsPolicies({ contract, schema });
 
     expect(issues).toHaveLength(0);
   });
 
-  it('emits missing + extra for an edit (same prefix, different hash)', () => {
+  it('emits missing + extra for a name change (same prefix, different hash)', () => {
     const newPolicy = makePolicy('read_own_profiles_11111111');
     const oldPolicy = makePolicy('read_own_profiles_00000000');
     const contract = makeContract([newPolicy]);
     const schema = makeSchema([oldPolicy]);
 
-    const issues = verifyPostgresRlsPolicies({ contract, schema, strict: true });
+    const issues = diffPostgresRlsPolicies({ contract, schema });
 
     expect(issues).toHaveLength(2);
-    const kinds = issues.map((i) => i.kind);
-    expect(kinds).toContain('missing_rls_policy');
-    expect(kinds).toContain('extra_rls_policy');
+    const outcomes = issues.map((i) => i.outcome);
+    expect(outcomes).toContain('missing');
+    expect(outcomes).toContain('extra');
   });
 
-  it('carries namespaceId and table on both missing and extra issues', () => {
+  it('carries namespaceId on both missing and extra issues via coordinate', () => {
     const contractPolicy = makePolicy('rp_a1b2c3d4');
     const actualPolicy = makePolicy('rp_deadbeef');
     const contract = makeContract([contractPolicy]);
     const schema = makeSchema([actualPolicy]);
 
-    const issues = verifyPostgresRlsPolicies({ contract, schema, strict: true });
+    const issues = diffPostgresRlsPolicies({ contract, schema });
 
-    for (const issue of issues as readonly BaseSchemaIssue[]) {
-      expect(issue.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
-      expect(issue.table).toBe(TABLE_NAME);
+    for (const issue of issues) {
+      expect(issue.coordinate.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
     }
   });
 
@@ -172,18 +166,19 @@ describe('verifyPostgresRlsPolicies', () => {
     const contract = makeContract([]);
     const schema = makeSchema([]);
 
-    const issues = verifyPostgresRlsPolicies({ contract, schema });
+    const issues = diffPostgresRlsPolicies({ contract, schema });
 
     expect(issues).toHaveLength(0);
   });
 
-  it('ignores DB policies on tables not in the schema IR (out-of-scope)', () => {
+  it('emits extra for a DB policy on a table not in the contract (strict drop)', () => {
     const outsidePolicy = makePolicy('some_policy_aaaabbbb', 'other_table');
     const contract = makeContract([]);
     const schema = makeSchema([outsidePolicy]);
 
-    const issues = verifyPostgresRlsPolicies({ contract, schema });
+    const issues = diffPostgresRlsPolicies({ contract, schema });
 
-    expect(issues).toHaveLength(0);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ outcome: 'extra' });
   });
 });

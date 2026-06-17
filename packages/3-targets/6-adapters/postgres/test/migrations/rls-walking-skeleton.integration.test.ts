@@ -180,10 +180,7 @@ describe.sequential('RLS walking skeleton — author → plan → apply → filt
         frameworkComponents,
       });
 
-      const rlsIssues = verifyResult.schema.issues.filter(
-        (i) => i.kind === 'missing_rls_policy' || i.kind === 'extra_rls_policy',
-      );
-      expect(rlsIssues).toEqual([]);
+      expect(verifyResult.schema.schemaDiffIssues).toEqual([]);
     },
     testTimeout,
   );

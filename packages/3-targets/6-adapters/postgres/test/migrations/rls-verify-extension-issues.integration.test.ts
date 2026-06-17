@@ -1,6 +1,6 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import { APP_SPACE_ID, type BaseSchemaIssue } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import {
@@ -157,13 +157,10 @@ describe.sequential('RLS verify extension issues', () => {
       frameworkComponents,
     });
 
-    const rlsIssues = result.schema.issues.filter(
-      (i) => i.kind === 'missing_rls_policy' || i.kind === 'extra_rls_policy',
-    );
-    expect(rlsIssues).toEqual([]);
+    expect(result.schema.schemaDiffIssues).toEqual([]);
   });
 
-  it('emits a missing_rls_policy SchemaIssue when policy is declared but absent in the database', {
+  it('emits a missing SchemaDiffIssue when policy is declared but absent in the database', {
     timeout: testTimeout,
   }, async () => {
     const contract = buildContractWithPolicy();
@@ -212,11 +209,9 @@ describe.sequential('RLS verify extension issues', () => {
       frameworkComponents,
     });
 
-    const rlsIssues = result.schema.issues.filter((i) => i.kind === 'missing_rls_policy');
+    const rlsIssues = result.schema.schemaDiffIssues.filter((i) => i.outcome === 'missing');
     expect(rlsIssues).toHaveLength(1);
-    const issue = rlsIssues[0] as BaseSchemaIssue | undefined;
-    expect(issue?.kind).toBe('missing_rls_policy');
-    expect(issue?.indexOrConstraint).toBe(policy.name);
+    expect(rlsIssues[0]?.coordinate.entityName).toBe(policy.name);
   });
 
   it('verify result is ok:false when a declared policy is absent from the database', {
@@ -267,7 +262,7 @@ describe.sequential('RLS verify extension issues', () => {
     });
 
     expect(result.ok).toBe(false);
-    const rlsIssues = result.schema.issues.filter((i) => i.kind === 'missing_rls_policy');
+    const rlsIssues = result.schema.schemaDiffIssues.filter((i) => i.outcome === 'missing');
     expect(rlsIssues[0]?.message).toContain(policy.name);
   });
 });

@@ -409,6 +409,7 @@ describe('formatSchemaVerifyOutput', () => {
           message: 'Table "post" is missing from database',
         },
       ],
+      schemaDiffIssues: [],
       root: createVerificationNode(),
       counts: {
         pass: 3,
@@ -600,7 +601,7 @@ describe('formatSchemaVerifyOutput', () => {
     expect(stripped).toContain('⚠');
   });
 
-  it('renders RLS policy drift issues with their message, naming each drifted policy', () => {
+  it('renders RLS policy drift issues via schemaDiffIssues, naming each drifted policy', () => {
     const policyWireName = 'read_own_profiles_abc12345';
     const result: VerifyDatabaseSchemaResult = {
       ...createResult(),
@@ -608,12 +609,15 @@ describe('formatSchemaVerifyOutput', () => {
       summary: 'Database schema does not satisfy contract (1 failure)',
       schema: {
         ...createResult().schema,
-        issues: [
+        schemaDiffIssues: [
           {
-            kind: 'missing_rls_policy' as const,
-            namespaceId: 'public',
-            table: 'profiles',
-            indexOrConstraint: policyWireName,
+            coordinate: {
+              plane: 'storage',
+              namespaceId: 'public',
+              entityKind: 'policy',
+              entityName: policyWireName,
+            },
+            outcome: 'missing',
             message: `RLS policy "${policyWireName}" on table "profiles" is missing from the database`,
           },
         ],
@@ -645,6 +649,7 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
+        schemaDiffIssues: [],
         root: {
           status: 'pass',
           kind: 'schema',
@@ -702,6 +707,7 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
+        schemaDiffIssues: [],
         root: {
           status: 'pass',
           kind: 'schema',
@@ -749,6 +755,7 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
+        schemaDiffIssues: [],
         root: {
           status: 'pass',
           kind: 'schema',
@@ -803,6 +810,7 @@ describe('formatSchemaVerifyJson', () => {
             message: 'Table "post" is missing',
           },
         ],
+        schemaDiffIssues: [],
         root: {
           status: 'fail',
           kind: 'schema',
