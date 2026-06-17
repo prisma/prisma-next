@@ -12,7 +12,8 @@
  *   1. `db.asServiceRole().sql.auth.users.select(…)` returns a seeded row and
  *      the emitted SQL targets `"auth"."users"`; the bound connection runs as
  *      `service_role` (read via `current_setting('role')`), proving it is the
- *      role grants — not the pool owner — that authorise the read.
+ *      role grants — not the pool owner — that authorise the read. The ORM path
+ *      (`asServiceRole().orm.auth.AuthUser.first(…)`) reads back the same row.
  *   2. `asServiceRole().sql` still exposes the app's own namespaces alongside
  *      `auth` / `storage` (non-regression).
  *
@@ -162,6 +163,12 @@ describe('Slice D — service_role queries auth/storage namespaces via the facad
           )
           .toArray();
         expect(boundRole).toEqual({ role: 'service_role' });
+
+        // ORM path reaches auth through service_role: orm.auth.AuthUser maps to
+        // "auth"."users" via the merged service-role contract's domain namespaces.
+        // Reads back the same seeded row as the .sql assertion above.
+        const authUser = await sr.orm.auth.AuthUser.select('id', 'email').first({ id: userId });
+        expect(authUser).toEqual({ id: userId, email: 'admin@example.com' });
       } finally {
         await db.close();
       }

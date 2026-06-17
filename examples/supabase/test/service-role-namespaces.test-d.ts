@@ -6,11 +6,11 @@
  * That is the whole point: the negative assertions below would be vacuous
  * against a contract that already carried `auth` / `storage`.
  *
- * Proven here:
- *   1. `asServiceRole().sql` GAINS `auth` and `storage` (via
+ * Proven here, for both the `.sql` and `.orm` surfaces:
+ *   1. `asServiceRole()` GAINS the `auth` and `storage` namespace accessors (via
  *      `WithExtensionNamespaces`) on top of the app's own `public`.
- *   2. `asAnon().sql` and `asUser(jwt).sql` do NOT expose `auth` / `storage` —
- *      those namespaces are reachable only over the service_role connection.
+ *   2. `asAnon()` and `asUser(jwt)` do NOT expose `auth` / `storage` — those
+ *      namespaces are reachable only over the service_role connection.
  */
 
 import type { RoleBoundDb, SupabaseDb } from '@prisma-next/extension-supabase/runtime';
@@ -47,4 +47,24 @@ test('asUser(jwt).sql does not expose auth or storage', async () => {
 test('asAnon() and asUser() return the unchanged app contract', async () => {
   expectTypeOf(db.asAnon()).toEqualTypeOf<RoleBoundDb<Contract>>();
   expectTypeOf(await db.asUser('jwt')).toEqualTypeOf<RoleBoundDb<Contract>>();
+});
+
+test('asServiceRole().orm gains auth and storage alongside public', () => {
+  const sr = db.asServiceRole();
+  expectTypeOf(sr.orm).toHaveProperty('public');
+  expectTypeOf(sr.orm).toHaveProperty('auth');
+  expectTypeOf(sr.orm).toHaveProperty('storage');
+});
+
+test('asAnon().orm does not expose auth or storage', () => {
+  const anon = db.asAnon();
+  expectTypeOf(anon.orm).toHaveProperty('public');
+  expectTypeOf(anon.orm).not.toHaveProperty('auth');
+  expectTypeOf(anon.orm).not.toHaveProperty('storage');
+});
+
+test('asUser(jwt).orm does not expose auth or storage', async () => {
+  const user = await db.asUser('jwt');
+  expectTypeOf(user.orm).not.toHaveProperty('auth');
+  expectTypeOf(user.orm).not.toHaveProperty('storage');
 });
