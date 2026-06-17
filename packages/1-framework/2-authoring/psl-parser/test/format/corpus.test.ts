@@ -57,7 +57,7 @@ const goldenNameFor = (file: string): string =>
   relative(repoRoot, file)
     .split(sep)
     .join('__')
-    .replace(/\.prisma$|\.psl$/, '.psl');
+    .replace(/\.prisma$|\.psl$/, '.prisma');
 
 describe('formatter golden corpus', () => {
   it('discovers at least the known set of corpus files', () => {
