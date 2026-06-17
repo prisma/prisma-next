@@ -15,7 +15,7 @@ import { IdentifierAst } from './identifier';
  * back out:
  *
  * - `space()` — the segment before a `:`, when one is present.
- * - `name()` — the last segment (the bare type / call / attribute name).
+ * - `identifier()` — the last segment (the bare type / call / attribute name).
  * - `namespace()` — the segment immediately before the last `.`, when dotted.
  */
 export class QualifiedNameAst implements AstNode {
@@ -72,7 +72,7 @@ export class QualifiedNameAst implements AstNode {
   }
 
   /** The bare name — the last identifier segment. */
-  name(): IdentifierAst | undefined {
+  identifier(): IdentifierAst | undefined {
     return this.#lastSegment();
   }
 
@@ -90,10 +90,10 @@ export class QualifiedNameAst implements AstNode {
   }
 
   /**
-   * Whether this name carries more qualifier segments than a well-formed type
-   * allows (a second `:`-space or a second `.`-namespace). The type-annotation
-   * position emits `PSL_INVALID_QUALIFIED_TYPE` for it; the resolver reads it to
-   * avoid double-reporting an already-flagged annotation as unresolved.
+   * Whether this name carries more qualifier segments than a well-formed name
+   * allows (a second `:`-space or a second `.`-namespace). `parseQualifiedName`
+   * emits `PSL_INVALID_QUALIFIED_NAME` for it; the resolver reads it to avoid
+   * double-reporting an already-flagged annotation as unresolved.
    */
   isOverQualified(): boolean {
     return this.#separatorCount('Dot') > 1 || this.#separatorCount('Colon') > 1;

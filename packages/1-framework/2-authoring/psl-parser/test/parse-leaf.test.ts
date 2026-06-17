@@ -40,7 +40,7 @@ describe('offset tracking', () => {
     const { diagnostics, cursor } = parse(source, parseTypeAnnotation);
 
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       a.b
@@ -474,8 +474,8 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
-    expect(diagnostics[0]!.message).toBe('Qualified type reference has too many segments');
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
+    expect(diagnostics[0]!.message).toBe('Qualified name has too many segments');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       a.b.c
@@ -491,8 +491,8 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
-    expect(diagnostics[0]!.message).toBe('Qualified type reference has too many segments');
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
+    expect(diagnostics[0]!.message).toBe('Qualified name has too many segments');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       a:b:c
@@ -508,10 +508,8 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
-    expect(diagnostics[0]!.message).toBe(
-      'Qualified type reference is missing a segment after the separator',
-    );
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
+    expect(diagnostics[0]!.message).toBe('Qualified name is missing a name after the separator');
   });
 
   it('flags a trailing colon with no following segment', () => {
@@ -521,7 +519,7 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
   });
 });
 
@@ -554,9 +552,11 @@ describe('parseQualifiedName', () => {
     expect(cursor.diagnostics).toEqual([]);
   });
 
-  it('emits no diagnostic of its own for over-qualification; the position decides', () => {
+  it('emits PSL_INVALID_QUALIFIED_NAME for over-qualification, uniformly in every position', () => {
     const { diagnostics } = parse('a.b.c', run);
-    expect(diagnostics).toEqual([]);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
+    expect(diagnostics[0]!.message).toBe('Qualified name has too many segments');
   });
 });
 
@@ -585,8 +585,8 @@ describe('parseAttribute fault tolerance', () => {
     expect(node.kind).toBe('FieldAttribute');
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
-    expect(diagnostics[0]!.message).toBe('Attribute name expected after "."');
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
+    expect(diagnostics[0]!.message).toBe('Qualified name is missing a name after the separator');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       @ns.

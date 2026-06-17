@@ -511,7 +511,7 @@ model Foo {
         scalarTypes: frameworkScalarTypes,
       });
       const all = [...result.diagnostics, ...resolved.diagnostics];
-      expect(all.map((d) => d.code)).toEqual(['PSL_INVALID_QUALIFIED_TYPE']);
+      expect(all.map((d) => d.code)).toEqual(['PSL_INVALID_QUALIFIED_NAME']);
       expect(resolved.diagnostics).toEqual([]);
     });
 

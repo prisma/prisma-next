@@ -221,68 +221,58 @@ export function parseNumberLiteralExpr(cursor: Cursor): GreenNode | undefined {
 }
 
 /**
- * What {@link parseQualifiedName} found while consuming the chain, so the calling
- * position can diagnose with its own wording without supplying a callback. `extra`
- * marks each separator beyond the first of its kind (over-qualification);
- * `trailingSeparator` is true when a separator was consumed that no identifier
- * followed. The parse always completes (the subtree round-trips losslessly); these
- * are advisory findings, not parse failures.
- */
-export interface QualifiedNameFindings {
-  readonly extraSeparators: readonly DiagnosticMark[];
-  readonly trailingSeparator: boolean;
-}
-
-/**
  * Parses a namespace-qualified name `[space ':']? Ident ('.' Ident)*` into a
- * single {@link QualifiedName} node, consuming the whole chain greedily — uniform
- * across every position (type annotation, call callee, attribute name). It emits
- * no diagnostics of its own; it reports what it found as {@link QualifiedNameFindings}
- * so each position keeps its own wording. The leading `Ident` is the caller's
- * precondition — `parseQualifiedName` is only entered once `peekKind() === 'Ident'`.
+ * single {@link QualifiedName} node, consuming the whole chain greedily. This is
+ * the one qualified-name parser for every position — type annotation, call
+ * callee, attribute name — and it owns its diagnostics: a malformed chain reports
+ * `PSL_INVALID_QUALIFIED_NAME` identically regardless of where the name appears.
+ * The parse always completes — the subtree round-trips losslessly. The leading
+ * `Ident` is the caller's precondition (`parseQualifiedName` is only entered once
+ * `peekKind() === 'Ident'`).
  *
  * Parsing the chain up front is the point: a position then decides
  * constructor-vs-reference by peeking exactly one token for `(`, with no scan of
  * the dotted chain's length.
  */
-export function parseQualifiedName(cursor: Cursor): QualifiedNameFindings {
+export function parseQualifiedName(cursor: Cursor): void {
   cursor.startNode('QualifiedName');
   parseIdentifier(cursor); // first segment: the space, namespace, or bare name
-  const extraSeparators: DiagnosticMark[] = [];
-  const colon = parseQualifiedSegments(cursor, 'Colon', extraSeparators);
-  const dot = parseQualifiedSegments(cursor, 'Dot', extraSeparators);
+  parseQualifiedSegments(cursor, 'Colon');
+  parseQualifiedSegments(cursor, 'Dot');
   cursor.finishNode();
-  return { extraSeparators, trailingSeparator: colon || dot };
 }
 
 /**
- * Consumes a run of `<separator> Ident` segments inside an open `QualifiedName`.
- * A well-formed name carries at most one colon-introduced space and one
- * dot-introduced namespace; each separator past the first of its kind is appended
- * to `extraSeparators`. Returns whether the run ended on a separator no identifier
- * followed. The separator is consumed regardless, so the subtree — and the
+ * Consumes a run of `<separator> Ident` segments inside an open `QualifiedName`,
+ * reporting `PSL_INVALID_QUALIFIED_NAME` for each separator past the first of its
+ * kind (over-qualification — a well-formed name carries at most one colon space
+ * and one dot namespace) and for a separator no identifier follows (a trailing
+ * separator). The separator is consumed regardless, so the subtree — and the
  * lossless round-trip — stays intact.
  */
-function parseQualifiedSegments(
-  cursor: Cursor,
-  separator: 'Colon' | 'Dot',
-  extraSeparators: DiagnosticMark[],
-): boolean {
+function parseQualifiedSegments(cursor: Cursor, separator: 'Colon' | 'Dot'): void {
   let seen = 0;
-  let trailing = false;
   while (cursor.peekKind() === separator) {
     seen++;
     const separatorMark = cursor.mark();
     cursor.bump(); // separator
-    if (seen > 1) extraSeparators.push(separatorMark);
+    if (seen > 1) {
+      cursor.diagnostic(
+        'PSL_INVALID_QUALIFIED_NAME',
+        'Qualified name has too many segments',
+        separatorMark,
+      );
+    }
     if (cursor.peekKind() === 'Ident') {
       parseIdentifier(cursor);
-      trailing = false;
     } else {
-      trailing = true;
+      cursor.diagnostic(
+        'PSL_INVALID_QUALIFIED_NAME',
+        'Qualified name is missing a name after the separator',
+        cursor.mark(),
+      );
     }
   }
-  return trailing;
 }
 
 // Ordering among the `Ident`-leading alternatives is load-bearing: the
@@ -464,14 +454,7 @@ export function parseAttribute(cursor: Cursor): GreenNode {
   cursor.startNode(isBlockAttribute ? 'ModelAttribute' : 'FieldAttribute');
   cursor.bump(); // At or DoubleAt
   if (cursor.peekKind() === 'Ident') {
-    const findings = parseQualifiedName(cursor);
-    if (findings.trailingSeparator) {
-      cursor.diagnostic(
-        'PSL_INVALID_ATTRIBUTE_SYNTAX',
-        'Attribute name expected after "."',
-        cursor.mark(),
-      );
-    }
+    parseQualifiedName(cursor);
   } else {
     cursor.diagnostic('PSL_INVALID_ATTRIBUTE_SYNTAX', 'Attribute name expected', attributeMark);
   }
@@ -485,28 +468,14 @@ export function parseAttribute(cursor: Cursor): GreenNode {
  * A type annotation recomposes as `QualifiedName (argList)? ([])? (?)?`: the one
  * qualified-name unit, then — decided by peeking a single token for `(` — an
  * optional constructor argument list (`pgvector.Vector(1536)`), then the list and
- * optional suffixes. Over-qualification (a second `:`-space or `.`-namespace) and
- * a trailing separator (`Int.`, `supabase:`) are both flagged with
- * `PSL_INVALID_QUALIFIED_TYPE`; the subtree still round-trips losslessly.
+ * optional suffixes. A malformed qualified name (over-qualification, a trailing
+ * separator) is diagnosed by {@link parseQualifiedName} itself, uniformly with
+ * every other qualified-name position; the subtree still round-trips losslessly.
  */
 export function parseTypeAnnotation(cursor: Cursor): GreenNode {
   cursor.startNode('TypeAnnotation');
   if (cursor.peekKind() === 'Ident') {
-    const findings = parseQualifiedName(cursor);
-    for (const separator of findings.extraSeparators) {
-      cursor.diagnostic(
-        'PSL_INVALID_QUALIFIED_TYPE',
-        'Qualified type reference has too many segments',
-        separator,
-      );
-    }
-    if (findings.trailingSeparator) {
-      cursor.diagnostic(
-        'PSL_INVALID_QUALIFIED_TYPE',
-        'Qualified type reference is missing a segment after the separator',
-        cursor.mark(),
-      );
-    }
+    parseQualifiedName(cursor);
     if (cursor.peekKind() === 'LParen') {
       parseAttributeArgList(cursor); // constructor args, e.g. Vector(1536)
     }

@@ -339,7 +339,7 @@ describe('parse() well-formed document conformance', () => {
     const attributes = Array.from(block.attributes());
     expect(attributes).toHaveLength(1);
     expect(attributes[0]).toBeInstanceOf(ModelAttributeAst);
-    expect(attributes[0]!.name()?.name()?.token()?.text).toBe('type');
+    expect(attributes[0]!.name()?.identifier()?.token()?.text).toBe('type');
     const args = Array.from(attributes[0]!.argList()?.args() ?? []);
     expect(args).toHaveLength(1);
     const argValue = args[0]!.value();

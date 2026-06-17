@@ -85,7 +85,7 @@ function readBlockAttributes(
   if (block === undefined) return [];
   const attributes: PslExtensionBlockAttribute[] = [];
   for (const attribute of block.attributes()) {
-    const name = attribute.name()?.name()?.token()?.text;
+    const name = attribute.name()?.identifier()?.token()?.text;
     if (name === undefined) continue;
     const args: PslExtensionBlockAttributeArg[] = [];
     for (const arg of attribute.argList()?.args() ?? []) {

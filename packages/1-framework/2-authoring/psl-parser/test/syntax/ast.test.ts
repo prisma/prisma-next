@@ -226,7 +226,7 @@ describe('ModelDeclarationAst', () => {
     const attrs = Array.from(model.attributes());
     expect(attrs).toHaveLength(1);
     expect(attrs[0]!.doubleAt()?.text).toBe('@@');
-    expect(attrs[0]!.name()?.name()?.token()?.text).toBe('map');
+    expect(attrs[0]!.name()?.identifier()?.token()?.text).toBe('map');
   });
 });
 
@@ -245,7 +245,7 @@ describe('TypeAnnotationAst', () => {
     const ta = TypeAnnotationAst.cast(root)!;
     expect(ta.isList()).toBe(true);
     expect(ta.isOptional()).toBe(false);
-    expect(ta.name()?.name()?.token()?.text).toBe('String');
+    expect(ta.name()?.identifier()?.token()?.text).toBe('String');
   });
 
   it('detects optional type', () => {
@@ -298,7 +298,7 @@ describe('FieldAttributeAst', () => {
     const attr = FieldAttributeAst.cast(root)!;
     const name = attr.name()!;
     expect(attr.at()?.text).toBe('@');
-    expect(name.name()?.token()?.text).toBe('id');
+    expect(name.identifier()?.token()?.text).toBe('id');
     expect(name.dot()).toBeUndefined();
     expect(name.namespace()).toBeUndefined();
     expect(attr.argList()).toBeUndefined();
@@ -323,7 +323,7 @@ describe('FieldAttributeAst', () => {
     const name = attr.name()!;
     expect(name.dot()?.text).toBe('.');
     expect(name.namespace()?.token()?.text).toBe('db');
-    expect(name.name()?.token()?.text).toBe('VarChar');
+    expect(name.identifier()?.token()?.text).toBe('VarChar');
   });
 
   it('exposes argList', () => {
@@ -802,10 +802,10 @@ describe('NamedTypeDeclarationAst', () => {
     const decl = NamedTypeDeclarationAst.cast(root)!;
     expect(decl.name()?.token()?.text).toBe('UserId');
     expect(decl.equals()?.text).toBe('=');
-    expect(decl.typeAnnotation()?.name()?.name()?.token()?.text).toBe('Int');
+    expect(decl.typeAnnotation()?.name()?.identifier()?.token()?.text).toBe('Int');
     const attrs = Array.from(decl.attributes());
     expect(attrs).toHaveLength(1);
-    expect(attrs[0]!.name()?.name()?.token()?.text).toBe('db');
+    expect(attrs[0]!.name()?.identifier()?.token()?.text).toBe('db');
   });
 });
 
@@ -880,7 +880,7 @@ describe('FieldDeclarationAst.attributes', () => {
     const field = FieldDeclarationAst.cast(root)!;
     const attrs = Array.from(field.attributes());
     expect(attrs).toHaveLength(1);
-    expect(attrs[0]!.name()?.name()?.token()?.text).toBe('id');
+    expect(attrs[0]!.name()?.identifier()?.token()?.text).toBe('id');
   });
 });
 
@@ -897,7 +897,7 @@ describe('FunctionCallAst', () => {
     b.token('RParen', ')');
     const root = createSyntaxTree(b.finishNode());
     const fn = FunctionCallAst.cast(root)!;
-    expect(fn.qualifiedName()?.name()?.token()?.text).toBe('autoincrement');
+    expect(fn.qualifiedName()?.identifier()?.token()?.text).toBe('autoincrement');
     expect(fn.lparen()?.text).toBe('(');
     expect(fn.rparen()?.text).toBe(')');
     expect(Array.from(fn.args())).toHaveLength(0);
@@ -980,7 +980,7 @@ describe('EnumDeclarationAst.attributes', () => {
     const attrs = Array.from(decl.attributes());
     expect(attrs).toHaveLength(1);
     expect(attrs[0]!.doubleAt()?.text).toBe('@@');
-    expect(attrs[0]!.name()?.name()?.token()?.text).toBe('map');
+    expect(attrs[0]!.name()?.identifier()?.token()?.text).toBe('map');
   });
 
   it('iterates enum-value attributes', () => {
@@ -990,7 +990,7 @@ describe('EnumDeclarationAst.attributes', () => {
     const attrs = Array.from(value.attributes());
     expect(attrs).toHaveLength(1);
     expect(attrs[0]!.at()?.text).toBe('@');
-    expect(attrs[0]!.name()?.name()?.token()?.text).toBe('map');
+    expect(attrs[0]!.name()?.identifier()?.token()?.text).toBe('map');
   });
 });
 
@@ -1051,7 +1051,7 @@ describe('CompositeTypeDeclarationAst', () => {
     expect(fields[0]!.name()?.token()?.text).toBe('street');
     const attrs = Array.from(ct.attributes());
     expect(attrs).toHaveLength(1);
-    expect(attrs[0]!.name()?.name()?.token()?.text).toBe('map');
+    expect(attrs[0]!.name()?.identifier()?.token()?.text).toBe('map');
   });
 });
 
@@ -1141,7 +1141,7 @@ describe('TypeAnnotationAst qualified references', () => {
     const ta = TypeAnnotationAst.cast(root)!;
     expect(ta.name()?.dot()?.text).toBe('.');
     expect(ta.name()?.namespace()?.token()?.text).toBe('auth');
-    expect(ta.name()?.name()?.token()?.text).toBe('User');
+    expect(ta.name()?.identifier()?.token()?.text).toBe('User');
     expect(ta.name()?.space()).toBeUndefined();
     expect(ta.argList()).toBeUndefined();
     expect(ta.isConstructor()).toBe(false);
@@ -1172,7 +1172,7 @@ describe('TypeAnnotationAst qualified references', () => {
     expect(ta.name()?.colon()?.text).toBe(':');
     expect(ta.name()?.space()?.token()?.text).toBe('supabase');
     expect(ta.name()?.namespace()?.token()?.text).toBe('auth');
-    expect(ta.name()?.name()?.token()?.text).toBe('User');
+    expect(ta.name()?.identifier()?.token()?.text).toBe('User');
     expect(ta.isOptional()).toBe(true);
   });
 
@@ -1193,7 +1193,7 @@ describe('TypeAnnotationAst qualified references', () => {
     const ta = TypeAnnotationAst.cast(root)!;
     expect(ta.name()?.space()?.token()?.text).toBe('supabase');
     expect(ta.name()?.namespace()).toBeUndefined();
-    expect(ta.name()?.name()?.token()?.text).toBe('User');
+    expect(ta.name()?.identifier()?.token()?.text).toBe('User');
   });
 
   it('exposes inline constructor call', () => {
@@ -1218,7 +1218,7 @@ describe('TypeAnnotationAst qualified references', () => {
     const ta = TypeAnnotationAst.cast(root)!;
     expect(ta.isConstructor()).toBe(true);
     expect(ta.name()?.path()).toEqual(['Vector']);
-    expect(ta.name()?.name()?.token()?.text).toBe('Vector');
+    expect(ta.name()?.identifier()?.token()?.text).toBe('Vector');
     const argList = ta.argList();
     expect(argList).toBeInstanceOf(AttributeArgListAst);
     expect(Array.from(argList!.args())).toHaveLength(1);
@@ -1236,7 +1236,7 @@ describe('TypeAnnotationAst qualified references', () => {
     b.finishNode();
     const root = createSyntaxTree(b.finishNode());
     const ta = TypeAnnotationAst.cast(root)!;
-    expect(ta.name()?.name()?.token()?.text).toBe('String');
+    expect(ta.name()?.identifier()?.token()?.text).toBe('String');
     expect(ta.name()?.namespace()).toBeUndefined();
     expect(ta.name()?.space()).toBeUndefined();
     expect(ta.argList()).toBeUndefined();
@@ -1257,7 +1257,7 @@ describe('QualifiedNameAst', () => {
     ident(b, 'Vector');
     const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
     expect(qn.path()).toEqual(['Vector']);
-    expect(qn.name()?.token()?.text).toBe('Vector');
+    expect(qn.identifier()?.token()?.text).toBe('Vector');
     expect(qn.namespace()).toBeUndefined();
     expect(qn.space()).toBeUndefined();
     expect(qn.isOverQualified()).toBe(false);
@@ -1272,7 +1272,7 @@ describe('QualifiedNameAst', () => {
     const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
     expect(qn.path()).toEqual(['pgvector', 'Vector']);
     expect(qn.namespace()?.token()?.text).toBe('pgvector');
-    expect(qn.name()?.token()?.text).toBe('Vector');
+    expect(qn.identifier()?.token()?.text).toBe('Vector');
     expect(qn.space()).toBeUndefined();
   });
 
@@ -1287,7 +1287,7 @@ describe('QualifiedNameAst', () => {
     const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
     expect(qn.space()?.token()?.text).toBe('supabase');
     expect(qn.namespace()?.token()?.text).toBe('auth');
-    expect(qn.name()?.token()?.text).toBe('User');
+    expect(qn.identifier()?.token()?.text).toBe('User');
     expect(qn.path()).toEqual(['supabase', 'auth', 'User']);
   });
 

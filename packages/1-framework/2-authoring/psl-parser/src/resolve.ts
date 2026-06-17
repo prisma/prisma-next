@@ -270,7 +270,7 @@ class Resolver {
       };
     }
 
-    const typeName = qn?.name()?.name();
+    const typeName = qn?.identifier()?.name();
     if (typeName === undefined) return { kind: 'unresolved', typeName: '' };
 
     const spaceName = qn?.space()?.name();
@@ -295,7 +295,7 @@ class Resolver {
         return { kind: 'block', namespaceId: qualifier, name: typeName };
       }
       // An over-qualified annotation (e.g. `a.b.Bar`) was already flagged by
-      // `parse` with `PSL_INVALID_QUALIFIED_TYPE`; re-reporting it here as an
+      // `parse` with `PSL_INVALID_QUALIFIED_NAME`; re-reporting it here as an
       // unresolved reference would double-diagnose a single malformed type.
       if (!(qn?.isOverQualified() ?? false)) {
         this.diagnostic(
@@ -393,7 +393,7 @@ function unresolvedBareNameMessage(
 }
 
 function attributeName(qualified: QualifiedNameAst | undefined): string | undefined {
-  const baseName = qualified?.name()?.name();
+  const baseName = qualified?.identifier()?.name();
   if (baseName === undefined) return undefined;
   const namespaceName = qualified?.namespace()?.name();
   return namespaceName === undefined ? baseName : `${namespaceName}.${baseName}`;
