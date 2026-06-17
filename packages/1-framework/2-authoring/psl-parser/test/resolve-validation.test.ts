@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { ParseDiagnostic } from '../src/parse';
 import { parse } from '../src/parse';
 import { type ResolveOptions, resolve } from '../src/resolve';
+import { frameworkScalarTypes } from './support';
 
 // A stub codec that accepts any JSON string and rejects every non-string JSON
 // value, mirroring the StubStringCodec the legacy validator suite used to
@@ -47,9 +48,13 @@ const policySelectDescriptor: AuthoringPslBlockDescriptor = {
 
 const policyDescriptors = { policy_select: policySelectDescriptor };
 
-function resolveSource(source: string, options?: ResolveOptions): readonly ParseDiagnostic[] {
+function resolveSource(
+  source: string,
+  options?: Omit<ResolveOptions, 'scalarTypes'>,
+): readonly ParseDiagnostic[] {
   const { document, sourceFile } = parse(source);
-  return resolve(document, sourceFile, options).diagnostics;
+  return resolve(document, sourceFile, { scalarTypes: frameworkScalarTypes, ...options })
+    .diagnostics;
 }
 
 function diagnosticsFor(source: string): readonly ParseDiagnostic[] {
@@ -202,6 +207,47 @@ policy_select ReadPosts {
       expect(diagnosticsFor(source).some((d) => d.code === 'PSL_EXTENSION_OPTION_OUT_OF_SET')).toBe(
         false,
       );
+    });
+  });
+
+  describe('list parameter', () => {
+    it('rejects a non-array value with PSL_EXTENSION_INVALID_VALUE', () => {
+      const source = `
+model Post {
+  id Int @id
+}
+
+policy_select ReadPosts {
+  target = Post
+  roles = "admin"
+  using = "true"
+}
+`;
+      const diagnostic = diagnosticsFor(source).find(
+        (d) => d.code === 'PSL_EXTENSION_INVALID_VALUE' && d.message.includes('roles'),
+      );
+      expect(diagnostic?.message).toBe(
+        'Parameter "roles" in "policy_select" block "ReadPosts" must be a list.',
+      );
+    });
+
+    it('accepts an array value without a list diagnostic', () => {
+      const source = `
+model Post {
+  id Int @id
+}
+
+policy_select ReadPosts {
+  target = Post
+  roles = []
+  using = "true"
+}
+`;
+      expect(
+        diagnosticsFor(source).filter(
+          (d) => d.code === 'PSL_EXTENSION_INVALID_VALUE' && d.message.includes('roles'),
+        ),
+      ).toEqual([]);
     });
   });
 
@@ -574,5 +620,30 @@ model User {
 }
 `;
     expect(resolveSource(source).some((d) => d.code === 'PSL_INVALID_TYPES_MEMBER')).toBe(false);
+  });
+
+  it('finds a colliding model across namespaces even when an earlier namespace declares another kind of the same name', () => {
+    // `Order` is a composite type in namespace `a` and a model in namespace `b`.
+    // The collision check must find the model across all namespaces, not stop at
+    // the first (composite) hit and miss it.
+    const source = `
+types {
+  Order = String
+}
+
+namespace a {
+  type Order {
+    item String
+  }
+}
+
+namespace b {
+  model Order {
+    id Int @id
+  }
+}
+`;
+    const diagnostic = resolveSource(source).find((d) => d.code === 'PSL_INVALID_TYPES_MEMBER');
+    expect(diagnostic?.message).toBe('Named type "Order" conflicts with model name "Order"');
   });
 });

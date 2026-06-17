@@ -3,12 +3,8 @@ import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec
 import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
 import { describe, expect, it } from 'vitest';
 import { parse } from '../src/parse';
-import {
-  DEFAULT_SCALAR_TYPES,
-  type ResolvedDocument,
-  type ResolveOptions,
-  resolve,
-} from '../src/resolve';
+import { type ResolvedDocument, type ResolveOptions, resolve } from '../src/resolve';
+import { frameworkScalarTypes } from './support';
 
 const textCodec: Codec = {
   id: 'pg/text@1',
@@ -41,9 +37,12 @@ const enumDescriptor: AuthoringPslBlockDescriptor = {
   variadicParameters: true,
 };
 
-function resolveDoc(source: string, options?: ResolveOptions): ResolvedDocument {
+function resolveDoc(
+  source: string,
+  options?: Omit<ResolveOptions, 'scalarTypes'> & { scalarTypes?: ReadonlySet<string> },
+): ResolvedDocument {
   const { document, sourceFile } = parse(source);
-  return resolve(document, sourceFile, options);
+  return resolve(document, sourceFile, { scalarTypes: frameworkScalarTypes, ...options });
 }
 
 describe('enum routes through the generic-block / extension-block path', () => {
@@ -102,7 +101,7 @@ model Account {
 }
 `;
 
-  it('leaves a target-specific scalar unresolved under the default scalar set', () => {
+  it('leaves a target-specific scalar unresolved under the framework scalar set', () => {
     const doc = resolveDoc(source);
     const owner = doc.namespaces
       .get(UNSPECIFIED_PSL_NAMESPACE_ID)
@@ -114,7 +113,7 @@ model Account {
 
   it('resolves a target-specific scalar to a scalar target when the target supplies it', () => {
     const doc = resolveDoc(source, {
-      scalarTypes: new Set([...DEFAULT_SCALAR_TYPES, 'ObjectId']),
+      scalarTypes: new Set([...frameworkScalarTypes, 'ObjectId']),
     });
     const owner = doc.namespaces
       .get(UNSPECIFIED_PSL_NAMESPACE_ID)
@@ -129,7 +128,7 @@ describe('resolve derives diagnostic ranges from the passed SourceFile', () => {
   it('anchors an unresolved-reference diagnostic at the offending token', () => {
     const source = 'model M {\n  ghost Mystery\n}';
     const { document, sourceFile } = parse(source);
-    const doc = resolve(document, sourceFile);
+    const doc = resolve(document, sourceFile, { scalarTypes: frameworkScalarTypes });
     const diagnostic = doc.diagnostics.find((d) => d.code === 'PSL_UNRESOLVED_TYPE_REFERENCE');
     expect(diagnostic).toBeDefined();
     // `Mystery` starts at column 8 of line 1 (zero-based line index).

@@ -34,3 +34,19 @@ export function* filterChildren<T>(
     if (result !== undefined) yield result;
   }
 }
+
+/**
+ * Raw source text of a CST node — the concatenated token text it spans, which
+ * reproduces the source slice. Leaf nodes carry no leading/trailing trivia, so
+ * the result is already trimmed; quotes, brackets, and qualifiers are preserved
+ * verbatim. Callers that want the decoded string value of a string literal
+ * should decode it instead; `argText` is for the cases that need the unmodified
+ * source slice.
+ */
+export function argText(node: SyntaxNode): string {
+  let text = '';
+  for (const token of node.tokens()) {
+    text += token.text;
+  }
+  return text;
+}

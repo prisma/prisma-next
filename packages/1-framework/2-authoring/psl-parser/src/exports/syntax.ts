@@ -17,7 +17,7 @@ export type {
   ResolveOptions,
   TypeTarget,
 } from '../resolve';
-export { DEFAULT_SCALAR_TYPES, ResolvedAttribute, resolve } from '../resolve';
+export { ResolvedAttribute, resolve } from '../resolve';
 export type { Position, Range } from '../source-file';
 export { SourceFile } from '../source-file';
 export {
@@ -43,7 +43,6 @@ export type { ExpressionAst } from '../syntax/ast/expressions';
 export {
   ArrayLiteralAst,
   AttributeArgAst,
-  argText,
   BooleanLiteralExprAst,
   castExpression,
   FunctionCallAst,
@@ -57,7 +56,7 @@ export { IdentifierAst } from '../syntax/ast/identifier';
 export { QualifiedNameAst } from '../syntax/ast/qualified-name';
 export { TypeAnnotationAst } from '../syntax/ast/type-annotation';
 export type { AstNode } from '../syntax/ast-helpers';
-export { filterChildren, findChildToken, findFirstChild } from '../syntax/ast-helpers';
+export { argText, filterChildren, findChildToken, findFirstChild } from '../syntax/ast-helpers';
 export type { GreenElement, GreenNode, GreenToken } from '../syntax/green';
 export { greenNode, greenToken } from '../syntax/green';
 export { GreenNodeBuilder } from '../syntax/green-builder';

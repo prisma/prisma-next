@@ -14,10 +14,11 @@ import {
   ModelDeclarationAst,
   NamedTypeDeclarationAst,
 } from '../src/syntax/ast/declarations';
+import { frameworkScalarTypes } from './support';
 
 function resolveSource(source: string): ResolvedDocument {
   const { document, sourceFile } = parse(source);
-  return resolve(document, sourceFile);
+  return resolve(document, sourceFile, { scalarTypes: frameworkScalarTypes });
 }
 
 function namespace(doc: ResolvedDocument, id: string): ResolvedNamespace {
@@ -396,6 +397,40 @@ model Account {
     });
   });
 
+  describe('cross-kind collision honours source order', () => {
+    // `type Foo` (composite) precedes `model Foo`; the source-first composite
+    // survives and the collision diagnostic attaches to the source-second model —
+    // registration walks declarations in source order, not all-models-then-the-rest.
+    const source = `
+type Foo {
+  bar String
+}
+
+model Foo {
+  id String @id
+}
+`;
+
+    it('keeps the source-first declaration kind, not the later same-named one', () => {
+      const target = fieldTarget(
+        resolveSource(`${source}\nmodel Use {\n  foo Foo\n}\n`),
+        UNSPECIFIED_PSL_NAMESPACE_ID,
+        'Use',
+        'foo',
+      );
+      expect(target).toEqual({
+        kind: 'ref',
+        coord: { kind: 'compositeType', namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID, name: 'Foo' },
+      });
+    });
+
+    it('emits exactly one collision diagnostic', () => {
+      expect(
+        resolveSource(source).diagnostics.filter((d) => d.code === 'PSL_DUPLICATE_DECLARATION'),
+      ).toHaveLength(1);
+    });
+  });
+
   describe('namespace-qualified constructor types', () => {
     it('resolves a qualified constructor in a types-block RHS to a multi-segment path', () => {
       const doc = resolveSource('types {\n  Embedding = pgvector.Vector(1536)\n}');
@@ -435,7 +470,9 @@ model Account {
   describe('over-qualified type references are not double-diagnosed', () => {
     it('emits exactly one diagnostic for a triple-segment dotted type', () => {
       const result = parse('model M {\n  x a.b.Bar\n}');
-      const resolved = resolve(result.document, result.sourceFile);
+      const resolved = resolve(result.document, result.sourceFile, {
+        scalarTypes: frameworkScalarTypes,
+      });
       const all = [...result.diagnostics, ...resolved.diagnostics];
       expect(all.map((d) => d.code)).toEqual(['PSL_INVALID_QUALIFIED_TYPE']);
       expect(resolved.diagnostics).toEqual([]);
@@ -444,6 +481,26 @@ model Account {
     it('still flags a well-formed but unknown two-segment reference', () => {
       const doc = resolveSource('model M {\n  x a.Bar\n}');
       expect(doc.diagnostics.map((d) => d.code)).toEqual(['PSL_UNRESOLVED_TYPE_REFERENCE']);
+    });
+  });
+
+  describe('a qualified name resolves against its namespace, not the bare scalar', () => {
+    it('does not bind a qualified scalar-named reference to the scalar', () => {
+      // `ns.String` must look up `String` in namespace `ns` — not short-circuit
+      // to the built-in scalar `String` and skip the namespace.
+      const doc = resolveSource('namespace ns {\n  model M {\n    x ns.String\n  }\n}');
+      expect(fieldTarget(doc, 'ns', 'M', 'x')).toEqual({ kind: 'unresolved', typeName: 'String' });
+      expect(doc.diagnostics.map((d) => d.code)).toContain('PSL_UNRESOLVED_TYPE_REFERENCE');
+    });
+
+    it('binds a qualified scalar-named reference to a same-named declaration in that namespace', () => {
+      const doc = resolveSource(
+        'namespace ns {\n  model String {\n    id Int @id\n  }\n  model M {\n    x ns.String\n  }\n}',
+      );
+      expect(fieldTarget(doc, 'ns', 'M', 'x')).toEqual({
+        kind: 'ref',
+        coord: { kind: 'model', namespaceId: 'ns', name: 'String' },
+      });
     });
   });
 

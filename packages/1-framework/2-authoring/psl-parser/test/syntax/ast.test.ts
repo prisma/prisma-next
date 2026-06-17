@@ -188,8 +188,10 @@ describe('ModelDeclarationAst', () => {
     b.token('Newline', '\n');
     b.startNode('ModelAttribute');
     b.token('DoubleAt', '@@');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'map');
+    b.finishNode();
     b.finishNode();
     b.finishNode();
     b.token('Newline', '\n');
@@ -224,7 +226,7 @@ describe('ModelDeclarationAst', () => {
     const attrs = Array.from(model.attributes());
     expect(attrs).toHaveLength(1);
     expect(attrs[0]!.doubleAt()?.text).toBe('@@');
-    expect(attrs[0]!.name()?.token()?.text).toBe('map');
+    expect(attrs[0]!.name()?.name()?.token()?.text).toBe('map');
   });
 });
 
@@ -285,15 +287,18 @@ describe('FieldAttributeAst', () => {
     const b = new GreenNodeBuilder();
     b.startNode('FieldAttribute');
     b.token('At', '@');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'id');
     b.finishNode();
+    b.finishNode();
     const root = createSyntaxTree(b.finishNode());
     const attr = FieldAttributeAst.cast(root)!;
+    const name = attr.name()!;
     expect(attr.at()?.text).toBe('@');
-    expect(attr.name()?.token()?.text).toBe('id');
-    expect(attr.dot()).toBeUndefined();
-    expect(attr.namespaceName()).toBeUndefined();
+    expect(name.name()?.token()?.text).toBe('id');
+    expect(name.dot()).toBeUndefined();
+    expect(name.namespace()).toBeUndefined();
     expect(attr.argList()).toBeUndefined();
   });
 
@@ -302,6 +307,7 @@ describe('FieldAttributeAst', () => {
     const b = new GreenNodeBuilder();
     b.startNode('FieldAttribute');
     b.token('At', '@');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'db');
     b.finishNode();
@@ -309,11 +315,13 @@ describe('FieldAttributeAst', () => {
     b.startNode('Identifier');
     b.token('Ident', 'VarChar');
     b.finishNode();
+    b.finishNode();
     const root = createSyntaxTree(b.finishNode());
     const attr = FieldAttributeAst.cast(root)!;
-    expect(attr.dot()?.text).toBe('.');
-    expect(attr.namespaceName()?.token()?.text).toBe('db');
-    expect(attr.name()?.token()?.text).toBe('VarChar');
+    const name = attr.name()!;
+    expect(name.dot()?.text).toBe('.');
+    expect(name.namespace()?.token()?.text).toBe('db');
+    expect(name.name()?.token()?.text).toBe('VarChar');
   });
 
   it('exposes argList', () => {
@@ -776,8 +784,10 @@ describe('NamedTypeDeclarationAst', () => {
     b.token('Whitespace', ' ');
     b.startNode('FieldAttribute');
     b.token('At', '@');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'db');
+    b.finishNode();
     b.finishNode();
     b.finishNode();
     return b.finishNode();
@@ -791,7 +801,7 @@ describe('NamedTypeDeclarationAst', () => {
     expect(decl.typeAnnotation()?.name()?.token()?.text).toBe('Int');
     const attrs = Array.from(decl.attributes());
     expect(attrs).toHaveLength(1);
-    expect(attrs[0]!.name()?.token()?.text).toBe('db');
+    expect(attrs[0]!.name()?.name()?.token()?.text).toBe('db');
   });
 });
 
@@ -856,15 +866,17 @@ describe('FieldDeclarationAst.attributes', () => {
     b.token('Whitespace', ' ');
     b.startNode('FieldAttribute');
     b.token('At', '@');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'id');
+    b.finishNode();
     b.finishNode();
     b.finishNode();
     const root = createSyntaxTree(b.finishNode());
     const field = FieldDeclarationAst.cast(root)!;
     const attrs = Array.from(field.attributes());
     expect(attrs).toHaveLength(1);
-    expect(attrs[0]!.name()?.token()?.text).toBe('id');
+    expect(attrs[0]!.name()?.name()?.token()?.text).toBe('id');
   });
 });
 
@@ -872,14 +884,16 @@ describe('FunctionCallAst', () => {
   it('exposes name, parens, and args', () => {
     const b = new GreenNodeBuilder();
     b.startNode('FunctionCall');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'autoincrement');
+    b.finishNode();
     b.finishNode();
     b.token('LParen', '(');
     b.token('RParen', ')');
     const root = createSyntaxTree(b.finishNode());
     const fn = FunctionCallAst.cast(root)!;
-    expect(fn.name()?.token()?.text).toBe('autoincrement');
+    expect(fn.qualifiedName()?.name()?.token()?.text).toBe('autoincrement');
     expect(fn.lparen()?.text).toBe('(');
     expect(fn.rparen()?.text).toBe(')');
     expect(Array.from(fn.args())).toHaveLength(0);
@@ -937,15 +951,19 @@ describe('EnumDeclarationAst.attributes', () => {
     b.token('Whitespace', ' ');
     b.startNode('FieldAttribute');
     b.token('At', '@');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'map');
+    b.finishNode();
     b.finishNode();
     b.finishNode();
     b.finishNode();
     b.startNode('ModelAttribute');
     b.token('DoubleAt', '@@');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'map');
+    b.finishNode();
     b.finishNode();
     b.finishNode();
     b.token('RBrace', '}');
@@ -958,7 +976,7 @@ describe('EnumDeclarationAst.attributes', () => {
     const attrs = Array.from(decl.attributes());
     expect(attrs).toHaveLength(1);
     expect(attrs[0]!.doubleAt()?.text).toBe('@@');
-    expect(attrs[0]!.name()?.token()?.text).toBe('map');
+    expect(attrs[0]!.name()?.name()?.token()?.text).toBe('map');
   });
 
   it('iterates enum-value attributes', () => {
@@ -968,7 +986,7 @@ describe('EnumDeclarationAst.attributes', () => {
     const attrs = Array.from(value.attributes());
     expect(attrs).toHaveLength(1);
     expect(attrs[0]!.at()?.text).toBe('@');
-    expect(attrs[0]!.name()?.token()?.text).toBe('map');
+    expect(attrs[0]!.name()?.name()?.token()?.text).toBe('map');
   });
 });
 
@@ -998,8 +1016,10 @@ describe('CompositeTypeDeclarationAst', () => {
     b.finishNode();
     b.startNode('ModelAttribute');
     b.token('DoubleAt', '@@');
+    b.startNode('QualifiedName');
     b.startNode('Identifier');
     b.token('Ident', 'map');
+    b.finishNode();
     b.finishNode();
     b.finishNode();
     b.token('RBrace', '}');
@@ -1027,7 +1047,7 @@ describe('CompositeTypeDeclarationAst', () => {
     expect(fields[0]!.name()?.token()?.text).toBe('street');
     const attrs = Array.from(ct.attributes());
     expect(attrs).toHaveLength(1);
-    expect(attrs[0]!.name()?.token()?.text).toBe('map');
+    expect(attrs[0]!.name()?.name()?.token()?.text).toBe('map');
   });
 });
 

@@ -21,11 +21,6 @@ export class FunctionCallAst implements AstNode {
     return findFirstChild(this.syntax, QualifiedNameAst.cast);
   }
 
-  name(): IdentifierAst | undefined {
-    const qualified = this.qualifiedName();
-    return findFirstChild(qualified?.syntax ?? this.syntax, IdentifierAst.cast);
-  }
-
   /**
    * The dotted call path, in source order. A bare `Vector(…)` yields
    * `['Vector']`; a namespace-qualified `pgvector.Vector(…)` yields
@@ -323,22 +318,6 @@ export type ExpressionAst =
   | BooleanLiteralExprAst
   | ObjectLiteralExprAst
   | IdentifierAst;
-
-/**
- * Raw source text of an expression — the concatenated token text of its CST
- * node, which reproduces the source slice the node spans. Leaf expression nodes
- * carry no leading/trailing trivia, so the result is already trimmed; quotes,
- * brackets, and qualifiers are preserved verbatim. Callers that want the decoded
- * string value of a string literal should use {@link StringLiteralExprAst.value}
- * instead; `argText` is for the cases that need the unmodified source slice.
- */
-export function argText(value: ExpressionAst): string {
-  let text = '';
-  for (const token of value.syntax.tokens()) {
-    text += token.text;
-  }
-  return text;
-}
 
 export function castExpression(node: SyntaxNode): ExpressionAst | undefined {
   return (

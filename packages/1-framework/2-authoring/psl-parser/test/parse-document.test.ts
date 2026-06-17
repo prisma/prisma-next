@@ -29,16 +29,16 @@ import {
   TypesBlockAst,
 } from '../src/syntax/ast/declarations';
 import {
-  argText,
   type ExpressionAst,
   FunctionCallAst,
   NumberLiteralExprAst,
   ObjectLiteralExprAst,
   StringLiteralExprAst,
 } from '../src/syntax/ast/expressions';
+import { argText } from '../src/syntax/ast-helpers';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
 import type { SyntaxNode } from '../src/syntax/red';
-import { highlight, printTree } from './support';
+import { frameworkScalarTypes, highlight, printTree } from './support';
 
 function greenText(element: GreenElement): string {
   if (element.type === 'token') return element.text;
@@ -339,7 +339,7 @@ describe('parse() well-formed document conformance', () => {
     const attributes = Array.from(block.attributes());
     expect(attributes).toHaveLength(1);
     expect(attributes[0]).toBeInstanceOf(ModelAttributeAst);
-    expect(attributes[0]!.name()?.token()?.text).toBe('type');
+    expect(attributes[0]!.name()?.name()?.token()?.text).toBe('type');
     const args = Array.from(attributes[0]!.argList()?.args() ?? []);
     expect(args).toHaveLength(1);
     const argValue = args[0]!.value();
@@ -1010,7 +1010,7 @@ describe('parse() accepts single-quoted string literals', () => {
     expect(value).toBeInstanceOf(StringLiteralExprAst);
     expect((value as StringLiteralExprAst).value()).toBe('short');
     // The raw arg text round-trips the single quotes, matching the legacy reader.
-    expect(argText(object as ExpressionAst)).toBe("{ label: 'short' }");
+    expect(argText((object as ExpressionAst).syntax)).toBe("{ label: 'short' }");
   });
 
   it('unquotes both quote styles and decodes escaped single quotes', () => {
@@ -1034,7 +1034,7 @@ describe('parse() accepts double-quoted object-literal keys', () => {
     const field = Array.from(object.fields())[0];
     expect(field?.keyName()).toBe('length');
     expect((field?.value() as NumberLiteralExprAst | undefined)?.value()).toBe(35);
-    expect(argText(object)).toBe('{ "length": 35 }');
+    expect(argText(object.syntax)).toBe('{ "length": 35 }');
   });
 
   it('accepts a mix of identifier and string-literal keys', () => {
@@ -1066,7 +1066,7 @@ describe('parse() accepts qualified default-function calls', () => {
     expect(calls[0]?.path()).toEqual(['temporal', 'updatedAt']);
     // The raw text the downstream resolver reads is the full qualified call —
     // never split into a bare `temporal` plus a trailing parse error.
-    expect(argText(calls[0] as ExpressionAst)).toBe('temporal.updatedAt()');
+    expect(argText((calls[0] as ExpressionAst).syntax)).toBe('temporal.updatedAt()');
   });
 });
 
@@ -1077,7 +1077,9 @@ describe('resolve() reads qualified @@-block attributes', () => {
     expect(result.diagnostics).toHaveLength(0);
     expect(greenText(result.document.syntax.green)).toBe(source);
 
-    const resolved = resolve(result.document, result.sourceFile);
+    const resolved = resolve(result.document, result.sourceFile, {
+      scalarTypes: frameworkScalarTypes,
+    });
     const models = Array.from(resolved.namespaces.values()).flatMap((ns) =>
       Array.from(ns.models.values()),
     );

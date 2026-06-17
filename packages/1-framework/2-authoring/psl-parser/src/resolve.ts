@@ -30,43 +30,30 @@ import {
   StringLiteralExprAst,
 } from './syntax/ast/expressions';
 import { IdentifierAst } from './syntax/ast/identifier';
+import type { QualifiedNameAst } from './syntax/ast/qualified-name';
 import type { TypeAnnotationAst } from './syntax/ast/type-annotation';
 import type { SyntaxNode } from './syntax/red';
 
 /**
- * Inputs the resolve pass needs to run the descriptor-driven extension-block
- * validators. All are optional: with no descriptors registered, generic blocks
- * in the document are recorded structurally but no parameter-level diagnostic
- * runs (the keyword is unrecognised by the resolver). `codecLookup` defaults to
+ * Inputs the resolve pass needs. `pslBlockDescriptors` and `codecLookup` are
+ * optional: with no descriptors registered, generic blocks in the document are
+ * recorded structurally but no parameter-level diagnostic runs (the keyword is
+ * unrecognised by the resolver); `codecLookup` defaults to
  * {@link emptyCodecLookup}, which rejects every `value`-kind parameter as an
  * unknown codec — callers with `value` parameters must supply a real lookup.
- * `scalarTypes` is the set of bare type names the target treats as built-in
- * scalars; it defaults to {@link DEFAULT_SCALAR_TYPES} (the framework PSL
- * built-ins). A target that adds its own scalar (e.g. Mongo's `ObjectId`) passes
- * its own set so the name resolves to a `scalar` target rather than an
- * `unresolved` reference.
+ *
+ * `scalarTypes` is required: it is the set of bare type names the target treats
+ * as built-in scalars (its `scalarTypeDescriptors` keys). A name in this set
+ * resolves to a `scalar` target rather than an `unresolved` reference. The
+ * resolver has no built-in fallback — every caller has a target, and the target's
+ * concrete scalar list is the single source of truth, so a scalar the target does
+ * not declare is (correctly) unresolved.
  */
 export interface ResolveOptions {
+  readonly scalarTypes: ReadonlySet<string>;
   readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
   readonly codecLookup?: CodecLookup;
-  readonly scalarTypes?: ReadonlySet<string>;
 }
-
-/**
- * The framework's default PSL built-in scalar names. A target that does not
- * supply its own `scalarTypes` set resolves bare references against this set.
- */
-export const DEFAULT_SCALAR_TYPES: ReadonlySet<string> = new Set([
-  'String',
-  'Boolean',
-  'Int',
-  'BigInt',
-  'Float',
-  'Decimal',
-  'DateTime',
-  'Json',
-  'Bytes',
-]);
 
 export type DeclKind = 'model' | 'enum' | 'compositeType' | 'namedType';
 
@@ -289,10 +276,10 @@ class Resolver {
         : { kind: 'crossSpace', spaceId: spaceName, namespaceId: namespaceName, typeName };
     }
 
-    if (this.#scalarTypes.has(typeName)) {
-      return { kind: 'scalar', name: typeName };
-    }
-
+    // A qualified `ns.Type` must resolve against the named namespace `ns` — even
+    // when `Type` matches a built-in scalar name. The bare-name scalar shortcut
+    // below runs only after the qualifier branch, so `ns.String` does not bind to
+    // the scalar `String` and skip the namespace lookup.
     const qualifier = annotation.namespaceName()?.name();
     if (qualifier !== undefined) {
       const kind = nameTable.byNamespace.get(qualifier)?.get(typeName);
@@ -310,6 +297,10 @@ class Resolver {
         );
       }
       return { kind: 'unresolved', typeName };
+    }
+
+    if (this.#scalarTypes.has(typeName)) {
+      return { kind: 'scalar', name: typeName };
     }
 
     if (nameTable.namedTypes.has(typeName)) {
@@ -381,13 +372,18 @@ function unresolvedBareNameMessage(
     : base;
 }
 
+function attributeName(qualified: QualifiedNameAst | undefined): string | undefined {
+  const baseName = qualified?.name()?.name();
+  if (baseName === undefined) return undefined;
+  const namespaceName = qualified?.namespace()?.name();
+  return namespaceName === undefined ? baseName : `${namespaceName}.${baseName}`;
+}
+
 function resolveFieldAttributes(attributes: Iterable<FieldAttributeAst>): ResolvedAttribute[] {
   const result: ResolvedAttribute[] = [];
   for (const attribute of attributes) {
-    const baseName = attribute.name()?.name();
-    if (baseName === undefined) continue;
-    const namespaceName = attribute.namespaceName()?.name();
-    const name = namespaceName === undefined ? baseName : `${namespaceName}.${baseName}`;
+    const name = attributeName(attribute.name());
+    if (name === undefined) continue;
     result.push(new ResolvedAttribute(name, collectArgs(attribute.argList()), attribute));
   }
   return result;
@@ -396,10 +392,8 @@ function resolveFieldAttributes(attributes: Iterable<FieldAttributeAst>): Resolv
 function resolveModelAttributes(attributes: Iterable<ModelAttributeAst>): ResolvedAttribute[] {
   const result: ResolvedAttribute[] = [];
   for (const attribute of attributes) {
-    const baseName = attribute.name()?.name();
-    if (baseName === undefined) continue;
-    const namespaceName = attribute.namespaceName()?.name();
-    const name = namespaceName === undefined ? baseName : `${namespaceName}.${baseName}`;
+    const name = attributeName(attribute.name());
+    if (name === undefined) continue;
     result.push(new ResolvedAttribute(name, collectArgs(attribute.argList()), attribute));
   }
   return result;
@@ -421,9 +415,25 @@ interface ArgLike {
   value(): ExpressionAst | undefined;
 }
 
+interface NamedDeclaration {
+  name(): IdentifierAst | undefined;
+  readonly syntax: SyntaxNode;
+}
+
+/**
+ * One named declaration tagged with its kind, kept in source order so name
+ * registration sees declarations in the order they appear — the first wins, and
+ * its diagnostic attaches to the source-first decl regardless of kind.
+ */
+interface OrderedDeclaration {
+  readonly kind: DeclKind;
+  readonly declaration: NamedDeclaration;
+}
+
 interface NamespaceBucket {
   readonly id: string;
   readonly syntax?: NamespaceDeclarationAst;
+  readonly declarations: OrderedDeclaration[];
   readonly models: ModelDeclarationAst[];
   readonly enums: EnumDeclarationAst[];
   readonly compositeTypes: CompositeTypeDeclarationAst[];
@@ -439,9 +449,9 @@ interface NamespaceBucket {
 export function resolve(
   document: DocumentAst,
   sourceFile: SourceFile,
-  options: ResolveOptions = {},
+  options: ResolveOptions,
 ): ResolvedDocument {
-  const resolver = new Resolver(sourceFile, options.scalarTypes ?? DEFAULT_SCALAR_TYPES);
+  const resolver = new Resolver(sourceFile, options.scalarTypes);
   const descriptorsByKeyword = collectBlockDescriptors(options.pslBlockDescriptors);
   const codecLookup = options.codecLookup ?? emptyCodecLookup;
 
@@ -453,6 +463,7 @@ export function resolve(
     const bucket: NamespaceBucket = {
       id,
       ...(syntax ? { syntax } : {}),
+      declarations: [],
       models: [],
       enums: [],
       compositeTypes: [],
@@ -469,16 +480,19 @@ export function resolve(
     const model = ModelDeclarationAst.cast(member);
     if (model) {
       bucket.models.push(model);
+      bucket.declarations.push({ kind: 'model', declaration: model });
       return;
     }
     const enumDecl = EnumDeclarationAst.cast(member);
     if (enumDecl) {
       bucket.enums.push(enumDecl);
+      bucket.declarations.push({ kind: 'enum', declaration: enumDecl });
       return;
     }
     const composite = CompositeTypeDeclarationAst.cast(member);
     if (composite) {
       bucket.compositeTypes.push(composite);
+      bucket.declarations.push({ kind: 'compositeType', declaration: composite });
       return;
     }
     const genericBlock = GenericBlockDeclarationAst.cast(member);
@@ -513,9 +527,9 @@ export function resolve(
     const bucket = buckets.get(id);
     if (!bucket) continue;
     const decls = new Map<string, DeclKind>();
-    registerNames(decls, bucket.models, 'model', resolver);
-    registerNames(decls, bucket.enums, 'enum', resolver);
-    registerNames(decls, bucket.compositeTypes, 'compositeType', resolver);
+    for (const { kind, declaration } of bucket.declarations) {
+      registerName(decls, declaration, kind, resolver);
+    }
     byNamespace.set(id, decls);
   }
 
@@ -561,23 +575,32 @@ export function resolve(
 
 function registerNames(
   store: Map<string, DeclKind>,
-  declarations: ReadonlyArray<{ name(): IdentifierAst | undefined; syntax: SyntaxNode }>,
+  declarations: ReadonlyArray<NamedDeclaration>,
   kind: DeclKind,
   resolver: Resolver,
 ): void {
   for (const declaration of declarations) {
-    const name = declaration.name()?.name();
-    if (name === undefined) continue;
-    if (store.has(name)) {
-      resolver.diagnostic(
-        'PSL_DUPLICATE_DECLARATION',
-        `Duplicate declaration "${name}" in this scope; the first declaration is used`,
-        declaration.syntax,
-      );
-      continue;
-    }
-    store.set(name, kind);
+    registerName(store, declaration, kind, resolver);
   }
+}
+
+function registerName(
+  store: Map<string, DeclKind>,
+  declaration: NamedDeclaration,
+  kind: DeclKind,
+  resolver: Resolver,
+): void {
+  const name = declaration.name()?.name();
+  if (name === undefined) return;
+  if (store.has(name)) {
+    resolver.diagnostic(
+      'PSL_DUPLICATE_DECLARATION',
+      `Duplicate declaration "${name}" in this scope; the first declaration is used`,
+      declaration.syntax,
+    );
+    return;
+  }
+  store.set(name, kind);
 }
 
 function buildNamespace(
@@ -713,7 +736,7 @@ function validateNamedTypeCollisions(
       );
       continue;
     }
-    if (declaredKindAcrossNamespaces(nameTable, name) === 'model') {
+    if (hasDeclaredKindAcrossNamespaces(nameTable, name, 'model')) {
       resolver.diagnostic(
         'PSL_INVALID_TYPES_MEMBER',
         `Named type "${name}" conflicts with model name "${name}"`,
@@ -723,12 +746,21 @@ function validateNamedTypeCollisions(
   }
 }
 
-function declaredKindAcrossNamespaces(nameTable: NameTable, name: string): DeclKind | undefined {
+/**
+ * Whether any namespace declares `name` with the given kind. Checks every
+ * namespace rather than returning the first name hit, so a model in one namespace
+ * is still found when an earlier namespace declares an enum of the same name (and
+ * vice versa).
+ */
+function hasDeclaredKindAcrossNamespaces(
+  nameTable: NameTable,
+  name: string,
+  expectedKind: string,
+): boolean {
   for (const decls of nameTable.byNamespace.values()) {
-    const kind = decls.get(name);
-    if (kind !== undefined) return kind;
+    if (decls.get(name) === expectedKind) return true;
   }
-  return undefined;
+  return false;
 }
 
 interface ExtensionValidationContext {
@@ -903,7 +935,14 @@ function validateExtensionParam(
     }
     case 'list': {
       const array = ArrayLiteralAst.cast(value.syntax);
-      if (!array) return;
+      if (!array) {
+        resolver.diagnostic(
+          'PSL_EXTENSION_INVALID_VALUE',
+          `Parameter "${key}" in "${descriptor.keyword}" block "${blockName}" must be a list.`,
+          value.syntax,
+        );
+        return;
+      }
       for (const item of array.elements()) {
         validateExtensionParam(
           blockName,
@@ -937,7 +976,7 @@ function validateExtensionRef(
   const found =
     param.scope === 'same-namespace'
       ? declaredKindInNamespace(context.nameTable, namespaceId, identifier, param.refKind)
-      : declaredKindAcrossNamespaces(context.nameTable, identifier) === param.refKind;
+      : hasDeclaredKindAcrossNamespaces(context.nameTable, identifier, param.refKind);
 
   if (!found) {
     const scopeLabel =

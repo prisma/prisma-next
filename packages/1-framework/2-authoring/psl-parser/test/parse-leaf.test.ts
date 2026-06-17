@@ -500,6 +500,29 @@ describe('parseTypeAnnotation fault tolerance', () => {
       "
     `);
   });
+
+  it('flags a trailing dot with no following segment', () => {
+    const source = 'Int.';
+    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+
+    expect(node.kind).toBe('TypeAnnotation');
+    expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+    expect(diagnostics[0]!.message).toBe(
+      'Qualified type reference is missing a segment after the separator',
+    );
+  });
+
+  it('flags a trailing colon with no following segment', () => {
+    const source = 'supabase:';
+    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+
+    expect(node.kind).toBe('TypeAnnotation');
+    expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+  });
 });
 
 describe('parseQualifiedName', () => {
@@ -718,6 +741,12 @@ describe('expression alternatives are no-ops on non-match', () => {
 
   it('parseFunctionCall rejects an identifier with no following paren without consuming', () => {
     expectNoOpReject('foo', parseFunctionCall);
+  });
+
+  it('parseFunctionCall rejects a dotted reference with no following paren without consuming', () => {
+    // `a.b` (no parens) must not be committed as a paren-less FunctionCall — the
+    // lookahead requires the trailing `(` before the node is started.
+    expectNoOpReject('a.b', parseFunctionCall);
   });
 
   it('parseBooleanLiteralExpr rejects a non-boolean identifier without consuming', () => {
