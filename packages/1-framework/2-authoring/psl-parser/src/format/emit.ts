@@ -64,7 +64,7 @@ class LineWriter {
 
 export function emitDocument(document: DocumentAst, indentUnit: string, newline: string): string {
   const writer = new LineWriter();
-  emitRegion(writer, Array.from(document.syntax.children()), 0);
+  emitItems(writer, sequenceRegion(Array.from(document.syntax.children())).items, 0);
   return writer.join(indentUnit, newline);
 }
 
@@ -99,21 +99,40 @@ interface DanglingCommentItem {
 type Item = MemberItem | BlankItem | DanglingCommentItem;
 
 /**
- * Walks a region's elements (a block body between its braces, or the whole
- * document) in source order and reduces the interleaved significant nodes and
- * trivia tokens into a member/blank sequence. Own-line comments attach as a
- * member's `leading`; a same-line comment attaches as the preceding member's
- * `trailing`; a run of one or more blank lines between members collapses to a
- * single `blank`, never directly after the opening boundary nor before the
+ * The result of the single source-order pass over a region: the comment that
+ * trailed the region's opening boundary on the same source line (a block
+ * header's `{ // ...` comment, `undefined` for the document or a braceless
+ * header) plus the member/blank/dangling-comment sequence that follows.
+ */
+interface Region {
+  readonly headerComment: string | undefined;
+  readonly items: Item[];
+}
+
+/**
+ * Walks a region's elements in source order exactly once and reduces the
+ * interleaved significant nodes and trivia tokens into a member/blank sequence,
+ * plus the region's optional header same-line comment. The region is either the
+ * whole document (no braces) or a block interior delimited by its `{`/`}` — for
+ * the latter the brace tokens are passed in so the one pass can recognise the
+ * boundaries without a separate walk.
+ *
+ * Own-line comments attach as a member's `leading`; a same-line comment
+ * attaches as the preceding member's `trailing`; a same-line comment trailing
+ * the opening `{` (the `{ // ...` case, before any member) attaches as
+ * `headerComment`; a run of one or more blank lines between members collapses
+ * to a single `blank`, never directly after the opening boundary nor before the
  * closing one. Own-line comments left over after the last member (with no
  * construct to attach to) surface as trailing `comment` items, preserving a
  * single collapsed blank line that preceded them.
  */
-function sequenceRegion(elements: readonly SyntaxElement[]): Item[] {
+function sequenceRegion(elements: readonly SyntaxElement[]): Region {
   const items: Item[] = [];
+  let headerComment: string | undefined;
   let leading: string[] = [];
   let blankPending = false;
   let sawContent = false;
+  let sawOpenBrace = false;
   let newlines = 0;
 
   for (const element of elements) {
@@ -129,6 +148,11 @@ function sequenceRegion(elements: readonly SyntaxElement[]): Item[] {
       newlines = 0;
       continue;
     }
+    if (element.kind === 'LBrace' && !sawOpenBrace) {
+      sawOpenBrace = true;
+      continue;
+    }
+    if (element.kind === 'RBrace') break;
     if (element.kind === 'Whitespace') continue;
     if (element.kind === 'Newline') {
       newlines += 1;
@@ -136,7 +160,9 @@ function sequenceRegion(elements: readonly SyntaxElement[]): Item[] {
     }
     if (element.kind === 'Comment') {
       const last = items.at(-1);
-      if (newlines === 0 && last?.kind === 'member' && last.trailing === undefined) {
+      if (sawOpenBrace && newlines === 0 && !sawContent && headerComment === undefined) {
+        headerComment = element.text;
+      } else if (newlines === 0 && last?.kind === 'member' && last.trailing === undefined) {
         last.trailing = element.text;
       } else {
         if (newlines >= 2 && sawContent && leading.length === 0) blankPending = true;
@@ -150,11 +176,19 @@ function sequenceRegion(elements: readonly SyntaxElement[]): Item[] {
     if (blankPending) items.push({ kind: 'blank' });
     for (const comment of leading) items.push({ kind: 'comment', text: comment });
   }
-  return items;
+  return { headerComment, items };
 }
 
-function emitRegion(writer: LineWriter, elements: readonly SyntaxElement[], depth: number): void {
-  const items = sequenceRegion(elements);
+/**
+ * Renders the sequenced items of one region. All inter-member trivia is already
+ * resolved into the items by {@link sequenceRegion} (the single source-order
+ * pass); this step only decides line layout: aligned-row runs, the house-style
+ * blank before a block attribute, and the one trivia case that is *not*
+ * inter-member — the {@link inlineBreakComment} barrier, which is interior to a
+ * single declaration and so splits that member across lines rather than
+ * attaching to a position between members.
+ */
+function emitItems(writer: LineWriter, items: readonly Item[], depth: number): void {
   let pendingRows: MemberItem[] = [];
   let lastMemberWasRegular = false;
 
@@ -222,6 +256,13 @@ interface InlineBreak {
  * relocate the comment off the token it documents — an idempotence hazard).
  * Returns `undefined` when no such barrier is present (the common case), so the
  * member renders through its normal single-line path.
+ *
+ * This is the one comment the source-order region pass deliberately does not
+ * own: it is *intra-declaration* trivia (a child of the member node, between
+ * the type and its attributes), not inter-member trivia positioned between
+ * sibling members. The region pass's `leading`/`trailing`/`headerComment`
+ * attachment model cannot express "a comment that splits one member across
+ * lines," so this stays a separate look inside the member node.
  */
 function inlineBreakComment(node: SyntaxNode): InlineBreak | undefined {
   const field = FieldDeclarationAst.cast(node);
@@ -314,8 +355,9 @@ function emitMember(writer: LineWriter, item: MemberItem, depth: number): void {
  * namespace / `types` / generic). Returns `true` when handled. The header line
  * carries the block's own header same-line comment; `closingTrailing` is the
  * comment that trailed the member's closing `}` on the same source line, which
- * the closing line carries. The body recurses through {@link emitRegion} so
- * nested trivia is preserved at the deeper indent.
+ * the closing line carries. The body recurses through {@link emitBlock} — and
+ * thence the single {@link sequenceRegion} pass — so nested trivia is preserved
+ * at the deeper indent.
  */
 function emitBlockMember(
   writer: LineWriter,
@@ -376,80 +418,34 @@ function emitBlock(
   node: SyntaxNode,
   closingTrailing: string | undefined,
 ): void {
-  writer.push(depth, withTrailing(header, headerTrailingComment(node)));
-  emitRegion(writer, blockBodyElements(node), depth + 1);
+  const { headerComment, items } = sequenceRegion(blockInterior(node));
+  writer.push(depth, withTrailing(header, headerComment));
+  emitItems(writer, items, depth + 1);
   writer.push(depth, withTrailing('}', closingTrailing));
 }
 
 /**
- * The elements of a block's body: everything strictly between the opening
- * `LBrace` and the closing `RBrace`. Trivia outside the braces (the header's
- * own leading comment, the blank line after the block) belongs to the enclosing
- * region, not the body.
+ * A block node's interior, brace-delimited: the elements from the opening
+ * `LBrace` through the closing `RBrace` (inclusive). The braces are kept so the
+ * single {@link sequenceRegion} pass can recognise the boundaries itself — it
+ * surfaces a same-line comment trailing the `{` as the region's `headerComment`
+ * and stops at the `}`, with no separate header-comment or body-start walk.
+ * Trivia outside the braces (the header's own leading comment, the blank line
+ * after the block) belongs to the enclosing region, not the interior.
  */
-function blockBodyElements(node: SyntaxNode): SyntaxElement[] {
+function blockInterior(node: SyntaxNode): SyntaxElement[] {
   const elements = Array.from(node.children());
   const open = elements.findIndex((el) => !(el instanceof SyntaxNode) && el.kind === 'LBrace');
-  let close = -1;
-  for (let i = elements.length - 1; i >= 0; i--) {
+  if (open === -1) return [];
+  let close = elements.length;
+  for (let i = elements.length - 1; i > open; i--) {
     const el = elements[i];
     if (el && !(el instanceof SyntaxNode) && el.kind === 'RBrace') {
-      close = i;
+      close = i + 1;
       break;
     }
   }
-  if (open === -1) return [];
-  const end = close === -1 ? elements.length : close;
-  return elements.slice(bodyStart(elements, open), end);
-}
-
-/**
- * The index where a block body's emittable elements begin: just past the
- * opening `LBrace`, skipping a same-line header comment (whitespace then a
- * comment with no intervening newline). That comment is rendered on the header
- * line by {@link headerTrailingComment}, so it must not also surface as the
- * first member's leading comment.
- */
-function bodyStart(elements: readonly SyntaxElement[], open: number): number {
-  let index = open + 1;
-  while (index < elements.length) {
-    const el = elements[index];
-    if (el && !(el instanceof SyntaxNode) && el.kind === 'Whitespace') {
-      index += 1;
-      continue;
-    }
-    if (el && !(el instanceof SyntaxNode) && el.kind === 'Comment') {
-      return index + 1;
-    }
-    break;
-  }
-  return open + 1;
-}
-
-/**
- * A same-line comment that trails a block header is attached (per the parser's
- * trivia discipline) inside the block node, between the `LBrace` and the first
- * body member, with no intervening newline. Surfaced here so the header line
- * can carry it.
- */
-function headerTrailingComment(node: SyntaxNode): string | undefined {
-  let pastBrace = false;
-  for (const el of node.children()) {
-    if (el instanceof SyntaxNode) {
-      if (pastBrace) return undefined;
-      continue;
-    }
-    if (el.kind === 'LBrace') {
-      pastBrace = true;
-      continue;
-    }
-    if (!pastBrace) continue;
-    if (el.kind === 'Whitespace') continue;
-    if (el.kind === 'Newline') return undefined;
-    if (el.kind === 'Comment') return el.text;
-    return undefined;
-  }
-  return undefined;
+  return elements.slice(open, close);
 }
 
 function blockHeader(keyword: string, name: IdentifierAst | undefined): string {
