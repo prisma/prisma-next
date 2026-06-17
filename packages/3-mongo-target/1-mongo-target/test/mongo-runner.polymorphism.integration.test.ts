@@ -12,7 +12,7 @@ import type { MongoContract } from '@prisma-next/mongo-contract';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import { DEFAULT_SCALAR_TYPES, parse, resolve } from '@prisma-next/psl-parser/syntax';
+import { parse, resolve } from '@prisma-next/psl-parser/syntax';
 import { type Db, MongoClient, MongoServerError } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -55,10 +55,7 @@ const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
   ['Float', 'mongo/double@1'],
 ]);
 
-const mongoScalarTypes: ReadonlySet<string> = new Set([
-  ...DEFAULT_SCALAR_TYPES,
-  ...mongoScalarTypeDescriptors.keys(),
-]);
+const mongoScalarTypes: ReadonlySet<string> = new Set(mongoScalarTypeDescriptors.keys());
 
 const mongoTargetTypes: Record<string, readonly string[]> = {
   'mongo/string@1': ['string'],

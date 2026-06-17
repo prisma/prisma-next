@@ -16,6 +16,7 @@ import type {
   ResolvedModel,
   SourceFile,
 } from '@prisma-next/psl-parser/syntax';
+import { argText } from '@prisma-next/psl-parser/syntax';
 import type { EnumTypeHandle } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -33,7 +34,7 @@ import {
   reportUncomposedNamespace,
   resolveFieldTypeDescriptor,
 } from './psl-column-resolution';
-import { argText, classifyTypeTarget, fieldTypeName, spanOf } from './resolved-read-shims';
+import { fieldTypeName, spanOf } from './psl-resolved-reader';
 
 type LoweredFieldDefault = {
   readonly defaultValue?: ColumnDefault;
@@ -72,7 +73,7 @@ function lowerEnumDefaultForField(input: {
     return {};
   }
 
-  const raw = argText(expressionAst).trim();
+  const raw = argText(expressionAst.syntax).trim();
   const isQuotedString = /^(['"]).*\1$/.test(raw);
   const isFunctionCall = raw.includes('(') && raw.endsWith(')');
 
@@ -326,7 +327,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Lowere
   const resolvedFields: LoweredSqlField[] = [];
 
   for (const field of model.fields.values()) {
-    const target = classifyTypeTarget(field.type.target);
+    const target = field.type.target;
     const isModelField =
       target.kind === 'ref'
         ? target.coord.kind === 'model' && modelNames.has(target.coord.name)

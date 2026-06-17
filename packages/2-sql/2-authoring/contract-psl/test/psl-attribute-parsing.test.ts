@@ -3,6 +3,7 @@ import type { PslSpan } from '@prisma-next/psl-parser';
 import { parse, type ResolvedAttribute, resolve } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
 import {
+  getAttribute,
   getNamedArgument,
   getPositionalArgumentExpr,
   getPositionalArguments,
@@ -15,6 +16,7 @@ import {
   parseOptionalNumericArguments,
   parseOptionalSingleIntegerArgument,
 } from '../src/psl-attribute-parsing';
+import { sqlScalarTypes } from './fixtures';
 
 const span: PslSpan = {
   start: { offset: 0, line: 1, column: 1 },
@@ -23,7 +25,7 @@ const span: PslSpan = {
 
 function modelAttribute(schema: string, model: string, attribute: string): ResolvedAttribute {
   const { document, sourceFile } = parse(schema);
-  const resolved = resolve(document, sourceFile);
+  const resolved = resolve(document, sourceFile, { scalarTypes: sqlScalarTypes });
   const ns = [...resolved.namespaces.values()][0];
   const target = ns?.models.get(model);
   const found = target?.attributes.find((attr) => attr.name === attribute);
@@ -38,7 +40,7 @@ function fieldAttribute(
   attribute: string,
 ): ResolvedAttribute {
   const { document, sourceFile } = parse(schema);
-  const resolved = resolve(document, sourceFile);
+  const resolved = resolve(document, sourceFile, { scalarTypes: sqlScalarTypes });
   const ns = [...resolved.namespaces.values()][0];
   const target = ns?.models.get(model)?.fields.get(field);
   const found = target?.attributes.find((attr) => attr.name === attribute);
@@ -191,6 +193,18 @@ describe('parseObjectLiteralStringMap', () => {
     const { result, diagnostics } = callParse('{ 1bad: "x", 2bad: "y" }');
     expect(result).toBeUndefined();
     expect(diagnostics).toHaveLength(1);
+  });
+});
+
+describe('getAttribute', () => {
+  const mapAttr = fieldAttribute(`model User { id Int @id @map("user_id") }`, 'User', 'id', 'map');
+
+  it('finds an attribute by name', () => {
+    expect(getAttribute([mapAttr], 'map')?.name).toBe('map');
+  });
+
+  it('returns undefined when the attribute is absent', () => {
+    expect(getAttribute([mapAttr], 'unique')).toBeUndefined();
   });
 });
 

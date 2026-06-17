@@ -10,9 +10,21 @@ import {
 } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
 
+const postgresScalarTypes: ReadonlySet<string> = new Set([
+  'String',
+  'Boolean',
+  'Int',
+  'BigInt',
+  'Float',
+  'Decimal',
+  'DateTime',
+  'Json',
+  'Bytes',
+]);
+
 function parseAndResolve(schema: string) {
   const { document, diagnostics: parseDiagnostics, sourceFile } = parse(schema);
-  const resolved = resolve(document, sourceFile);
+  const resolved = resolve(document, sourceFile, { scalarTypes: postgresScalarTypes });
   return {
     document: { ...resolved, diagnostics: [...parseDiagnostics, ...resolved.diagnostics] },
     sourceId: 'schema.prisma',

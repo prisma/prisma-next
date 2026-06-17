@@ -27,6 +27,24 @@ import { type EnumTypeHandle, enumType } from '@prisma-next/sql-contract-ts/cont
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 
+/**
+ * The built-in scalar names a SQL target declares. `resolve` requires the
+ * caller to supply its target's scalar set (no framework default); tests pass
+ * this set, matching the keys a real SQL target's `scalarTypeDescriptors`
+ * contributes.
+ */
+export const sqlScalarTypes: ReadonlySet<string> = new Set([
+  'String',
+  'Boolean',
+  'Int',
+  'BigInt',
+  'Float',
+  'Decimal',
+  'DateTime',
+  'Json',
+  'Bytes',
+]);
+
 function testEnumFactory(
   block: PslExtensionBlock,
   ctx: AuthoringEntityContext,
@@ -667,6 +685,7 @@ export function parseAndResolve(input: ParseAndResolveInput): {
   const sourceId = input.sourceId ?? 'schema.prisma';
   const { document, diagnostics: parseDiagnostics, sourceFile } = parse(input.schema);
   const resolved = resolve(document, sourceFile, {
+    scalarTypes: sqlScalarTypes,
     ...ifDefined('pslBlockDescriptors', input.pslBlockDescriptors),
     ...ifDefined('codecLookup', input.codecLookup),
   });

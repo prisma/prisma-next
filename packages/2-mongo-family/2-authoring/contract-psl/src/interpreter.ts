@@ -196,7 +196,7 @@ function collectPolymorphismDeclarations(
       const span = spanOf(attr.syntax.syntax, sourceFile);
       if (attr.name === 'discriminator') {
         const positional = attr.positionalArg(0);
-        const fieldName = positional === undefined ? undefined : argText(positional);
+        const fieldName = positional === undefined ? undefined : argText(positional.syntax);
         if (!fieldName) {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
@@ -220,7 +220,7 @@ function collectPolymorphismDeclarations(
       }
       if (attr.name === 'base') {
         const basePositional = attr.positionalArg(0);
-        const baseName = basePositional === undefined ? undefined : argText(basePositional);
+        const baseName = basePositional === undefined ? undefined : argText(basePositional.syntax);
         const value = quotedStringArg(attr, 1);
         if (!baseName || attr.positionalArg(1) === undefined) {
           diagnostics.push({
@@ -632,7 +632,7 @@ function collectIndexes(
     const span = spanOf(attr.syntax.syntax, sourceFile);
     const fieldsArgExpr = attr.positionalArg(0);
     if (!fieldsArgExpr) continue;
-    const parsedFields = parseIndexFieldList(argText(fieldsArgExpr));
+    const parsedFields = parseIndexFieldList(argText(fieldsArgExpr.syntax));
     if (parsedFields.length === 0) continue;
 
     const hasWildcard = parsedFields.some((f) => f.isWildcard);

@@ -7,7 +7,7 @@ function modelsOf(ir: Contract): Record<string, unknown> {
   return ir.domain.namespaces[UNBOUND_NAMESPACE_ID]!.models;
 }
 
-import { DEFAULT_SCALAR_TYPES, parse, resolve } from '@prisma-next/psl-parser/syntax';
+import { parse, resolve } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToMongoContract } from '../src/interpreter';
 
@@ -20,10 +20,7 @@ const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
   ['Float', 'mongo/double@1'],
 ]);
 
-const mongoScalarTypes: ReadonlySet<string> = new Set([
-  ...DEFAULT_SCALAR_TYPES,
-  ...mongoScalarTypeDescriptors.keys(),
-]);
+const mongoScalarTypes: ReadonlySet<string> = new Set(mongoScalarTypeDescriptors.keys());
 
 const mongoTargetTypes: Record<string, readonly string[]> = {
   'mongo/string@1': ['string'],

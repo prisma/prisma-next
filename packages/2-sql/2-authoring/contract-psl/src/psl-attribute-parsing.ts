@@ -2,10 +2,18 @@ import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types'
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { PslSpan } from '@prisma-next/psl-parser';
 import type { ExpressionAst, ResolvedAttribute } from '@prisma-next/psl-parser/syntax';
-import { ArrayLiteralAst } from '@prisma-next/psl-parser/syntax';
-import { argText, getAttribute, getNamedArgText } from './resolved-read-shims';
+import { ArrayLiteralAst, argText } from '@prisma-next/psl-parser/syntax';
 
-export { getAttribute };
+/**
+ * Finds an attribute by name from a resolved attribute list. Returns
+ * `undefined` when the attribute is absent.
+ */
+export function getAttribute(
+  attributes: readonly ResolvedAttribute[],
+  name: string,
+): ResolvedAttribute | undefined {
+  return attributes.find((attr) => attr.name === name);
+}
 
 export function lowerFirst(value: string): string {
   if (value.length === 0) return value;
@@ -26,7 +34,8 @@ export function parseQuotedStringLiteral(value: string): string | undefined {
 }
 
 export function getNamedArgument(attribute: ResolvedAttribute, name: string): string | undefined {
-  return getNamedArgText(attribute, name);
+  const arg = attribute.args.find((a) => a.name === name);
+  return arg === undefined ? undefined : argText(arg.value.syntax);
 }
 
 /**
@@ -64,7 +73,7 @@ export function parseFieldList(value: ExpressionAst): readonly string[] | undefi
   }
   const parts: string[] = [];
   for (const element of array.elements()) {
-    const text = argText(element).trim();
+    const text = argText(element.syntax).trim();
     if (text.length > 0) parts.push(text);
   }
   return parts;
@@ -92,7 +101,7 @@ export function parseMapName(input: {
     });
     return input.defaultValue;
   }
-  const parsed = parseQuotedStringLiteral(argText(value));
+  const parsed = parseQuotedStringLiteral(argText(value.syntax));
   if (parsed === undefined) {
     input.diagnostics.push({
       code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
@@ -137,7 +146,9 @@ export function parseConstraintMapArgument(input: {
 }
 
 export function getPositionalArguments(attribute: ResolvedAttribute): readonly string[] {
-  return attribute.args.filter((arg) => arg.name === undefined).map((arg) => argText(arg.value));
+  return attribute.args
+    .filter((arg) => arg.name === undefined)
+    .map((arg) => argText(arg.value.syntax));
 }
 
 /**

@@ -63,17 +63,24 @@ const mongoCodecLookup: CodecLookup = {
   renderOutputTypeFor: () => undefined,
 };
 
+const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
+  ['String', 'mongo/string@1'],
+  ['Int', 'mongo/int32@1'],
+  ['Boolean', 'mongo/bool@1'],
+  ['DateTime', 'mongo/date@1'],
+  ['ObjectId', 'mongo/objectId@1'],
+  ['Float', 'mongo/double@1'],
+]);
+
 function pslToContract(schema: string): MongoContract {
   const result = interpretPslDocumentToMongoContract({
-    ...parseAndResolve({ schema, sourceId: 'test.prisma', codecLookup: mongoCodecLookup }),
-    scalarTypeDescriptors: new Map([
-      ['String', 'mongo/string@1'],
-      ['Int', 'mongo/int32@1'],
-      ['Boolean', 'mongo/bool@1'],
-      ['DateTime', 'mongo/date@1'],
-      ['ObjectId', 'mongo/objectId@1'],
-      ['Float', 'mongo/double@1'],
-    ]),
+    ...parseAndResolve({
+      schema,
+      sourceId: 'test.prisma',
+      codecLookup: mongoCodecLookup,
+      scalarTypes: new Set(mongoScalarTypeDescriptors.keys()),
+    }),
+    scalarTypeDescriptors: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
   });
   if (!result.ok) {

@@ -28,6 +28,7 @@ import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/
 import type { PslExtensionBlock } from '@prisma-next/psl-parser';
 import type {
   ParseDiagnostic,
+  Position,
   ResolvedAttribute,
   ResolvedCompositeType,
   ResolvedDocument,
@@ -36,7 +37,9 @@ import type {
   ResolvedNamedType,
   ResolvedNamespace,
   SourceFile,
+  SyntaxNode,
 } from '@prisma-next/psl-parser/syntax';
+import { argText } from '@prisma-next/psl-parser/syntax';
 import type {
   SqlModelStorage,
   SqlNamespaceTablesInput,
@@ -97,7 +100,7 @@ import {
   parseRelationAttribute,
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
-import { argText, extensionBlocksByKeyword, fieldTypeName, spanOf } from './resolved-read-shims';
+import { extensionBlocksByKeyword, fieldTypeName, spanOf } from './psl-resolved-reader';
 
 export interface InterpretPslDocumentToSqlContractInput {
   readonly document: ResolvedDocument;
@@ -200,23 +203,31 @@ function compareStrings(left: string, right: string): -1 | 0 | 1 {
  * reports `{ line, character }` ranges; the `ContractSourceDiagnostic` span also
  * carries an `offset`, recovered through the same `SourceFile`.
  *
- * `PSL_UNRESOLVED_TYPE_REFERENCE` is deliberately **dropped**: it is a new
- * `semantic-layer` code the legacy SQL interpreter never emitted. An unknown
- * field type, named-type base, or relation target legitimately resolves to an
- * `unresolved` target in this package; the interpreter's own
- * `PSL_UNSUPPORTED_FIELD_TYPE` / `PSL_UNSUPPORTED_NAMED_TYPE_BASE` /
- * `PSL_INVALID_RELATION_TARGET` remain the authoritative unknown-reference
- * signals (mirroring the Mongo provider filter for `ObjectId`). Forwarding it
- * would surface a spurious, duplicate diagnostic the corpus never carried.
+ * `PSL_UNRESOLVED_TYPE_REFERENCE` is forwarded for genuine unknown-type
+ * references — the resolver owns that signal. The exception is a field typed by
+ * a declared extension block (an `enum {…}`): the parser routes enum blocks
+ * through generic blocks, so the resolver cannot bind the enum name and marks it
+ * `unresolved`, yet the interpreter resolves it against the enum descriptors.
+ * Those by-design false positives are suppressed via `suppressedRanges` (keyed
+ * by the type annotation's range). `PSL_UNSUPPORTED_FIELD_TYPE` stays reserved
+ * for names that resolve but SQL cannot store.
  */
+function rangeKey(range: { start: Position; end: Position }): string {
+  return `${range.start.line}:${range.start.character}-${range.end.line}:${range.end.character}`;
+}
+
 function mapResolverDiagnostics(
   diagnostics: readonly ParseDiagnostic[],
   sourceId: string,
   sourceFile: SourceFile,
+  suppressedRanges: ReadonlySet<string>,
 ): ContractSourceDiagnostic[] {
   const result: ContractSourceDiagnostic[] = [];
   for (const diagnostic of diagnostics) {
-    if (diagnostic.code === 'PSL_UNRESOLVED_TYPE_REFERENCE') {
+    if (
+      diagnostic.code === 'PSL_UNRESOLVED_TYPE_REFERENCE' &&
+      suppressedRanges.has(rangeKey(diagnostic.range))
+    ) {
       continue;
     }
     const { start, end } = diagnostic.range;
@@ -231,6 +242,46 @@ function mapResolverDiagnostics(
     });
   }
   return result;
+}
+
+/**
+ * The annotation-range keys of every model field whose type is an `unresolved`
+ * reference to a declared extension block (an `enum {…}`). The resolver emits
+ * `PSL_UNRESOLVED_TYPE_REFERENCE` against the field's type annotation for these,
+ * since enum blocks do not register a bindable declaration name — but the
+ * interpreter resolves them against the enum descriptors, so the resolver
+ * diagnostic is a by-design false positive and {@link mapResolverDiagnostics}
+ * drops it.
+ */
+function enumTypedFieldRanges(
+  namespaces: readonly ResolvedNamespace[],
+  sourceFile: SourceFile,
+): ReadonlySet<string> {
+  const blockNames = new Set<string>();
+  for (const namespace of namespaces) {
+    for (const name of namespace.extensionBlocks.keys()) blockNames.add(name);
+  }
+  const ranges = new Set<string>();
+  if (blockNames.size === 0) return ranges;
+  for (const namespace of namespaces) {
+    for (const model of namespace.models.values()) {
+      for (const field of model.fields.values()) {
+        const target = field.type.target;
+        if (target.kind !== 'unresolved' || !blockNames.has(target.typeName)) continue;
+        const annotation = field.syntax.typeAnnotation();
+        if (annotation === undefined) continue;
+        ranges.add(rangeKey(spanToRange(annotation.syntax, sourceFile)));
+      }
+    }
+  }
+  return ranges;
+}
+
+function spanToRange(node: SyntaxNode, sourceFile: SourceFile): { start: Position; end: Position } {
+  return {
+    start: sourceFile.positionAt(node.offset),
+    end: sourceFile.positionAt(node.offset + node.textLength),
+  };
 }
 
 /**
@@ -1569,7 +1620,7 @@ function collectPolymorphismDeclarations(
       const attrSpan = spanOf(attr.syntax.syntax, sourceFile);
       if (attr.name === 'discriminator') {
         const fieldNameExpr = getPositionalArgumentExpr(attr);
-        const fieldName = fieldNameExpr === undefined ? undefined : argText(fieldNameExpr);
+        const fieldName = fieldNameExpr === undefined ? undefined : argText(fieldNameExpr.syntax);
         if (!fieldName) {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
@@ -1594,9 +1645,9 @@ function collectPolymorphismDeclarations(
 
       if (attr.name === 'base') {
         const baseNameExpr = getPositionalArgumentExpr(attr, 0);
-        const baseName = baseNameExpr === undefined ? undefined : argText(baseNameExpr);
+        const baseName = baseNameExpr === undefined ? undefined : argText(baseNameExpr.syntax);
         const rawValueExpr = getPositionalArgumentExpr(attr, 1);
-        const rawValue = rawValueExpr === undefined ? undefined : argText(rawValueExpr);
+        const rawValue = rawValueExpr === undefined ? undefined : argText(rawValueExpr.syntax);
         if (!baseName || !rawValue) {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
@@ -1989,6 +2040,7 @@ export function interpretPslDocumentToSqlContract(
     input.document.diagnostics,
     sourceId,
     sourceFile,
+    enumTypedFieldRanges(resolvedNamespaces, sourceFile),
   );
   validateNamespaceBlocksForSqlTarget({
     namespaces: resolvedNamespaces,

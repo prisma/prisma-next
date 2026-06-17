@@ -113,7 +113,7 @@ describe('mongoContract provider helper', () => {
     });
   });
 
-  it('still reports a genuinely unknown field type as PSL_UNSUPPORTED_FIELD_TYPE', async () => {
+  it('reports a genuinely unknown field type as PSL_UNRESOLVED_TYPE_REFERENCE', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'mongo-psl-provider-unknown-'));
     tempDirs.push(tempDir);
     const schemaPath = join(tempDir, 'schema.prisma');
@@ -137,13 +137,10 @@ describe('mongoContract provider helper', () => {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+          code: 'PSL_UNRESOLVED_TYPE_REFERENCE',
           message: expect.stringContaining('Mystery'),
         }),
       ]),
-    );
-    expect(result.failure.diagnostics.some((d) => d.code === 'PSL_UNRESOLVED_TYPE_REFERENCE')).toBe(
-      false,
     );
   });
 

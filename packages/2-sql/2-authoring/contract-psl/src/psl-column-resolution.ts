@@ -30,6 +30,7 @@ import type {
   SourceFile,
   TypeTarget,
 } from '@prisma-next/psl-parser/syntax';
+import { argText } from '@prisma-next/psl-parser/syntax';
 import { blindCast } from '@prisma-next/utils/casts';
 import {
   lowerDefaultFunctionWithRegistry,
@@ -44,7 +45,7 @@ import {
   unquoteStringLiteral,
 } from './psl-attribute-parsing';
 import { mapPslHelperArgs } from './psl-authoring-arguments';
-import { argText, spanOf } from './resolved-read-shims';
+import { spanOf } from './psl-resolved-reader';
 
 export type ColumnDescriptor = {
   readonly codecId: string;
@@ -414,7 +415,7 @@ export function buildConstructorCall(
 ): PslTypeConstructorCall {
   const args: PslAttributeArgument[] = target.args.map((expr) => ({
     kind: 'positional' as const,
-    value: argText(expr),
+    value: argText(expr.syntax),
     span: spanOf(expr.syntax, sourceFile),
   }));
   return { kind: 'typeConstructor', path: target.path, args, span };
@@ -526,7 +527,13 @@ export function resolveFieldTypeDescriptor(input: {
     input.scalarTypeDescriptors,
   );
   if (!descriptor) {
-    return { ok: false, alreadyReported: false };
+    // An `unresolved` target is a name the resolver could not bind: it already
+    // emitted `PSL_UNRESOLVED_TYPE_REFERENCE` (or `parse` flagged the malformed
+    // qualifier), so the interpreter must not duplicate it with a
+    // `PSL_UNSUPPORTED_FIELD_TYPE`. `PSL_UNSUPPORTED_FIELD_TYPE` is reserved for
+    // names that *do* resolve (a `scalar`/`ref`/`namedType` target) but SQL
+    // cannot store.
+    return { ok: false, alreadyReported: target.kind === 'unresolved' };
   }
   return { ok: true, descriptor };
 }
@@ -772,7 +779,7 @@ export function lowerDefaultForField(input: {
     return {};
   }
 
-  const expressionText = argText(expressionAst);
+  const expressionText = argText(expressionAst.syntax);
   const expressionSpan = spanOf(expressionAst.syntax, input.sourceFile);
 
   const literalDefault = parseDefaultLiteralValue(expressionText);

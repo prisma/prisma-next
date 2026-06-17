@@ -125,7 +125,7 @@ model User {
     expect(result.failure.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
       expect.arrayContaining([
         'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
-        'PSL_UNSUPPORTED_FIELD_TYPE',
+        'PSL_UNRESOLVED_TYPE_REFERENCE',
         'PSL_INVALID_RELATION_TARGET',
       ]),
     );
@@ -324,7 +324,7 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+          code: 'PSL_UNRESOLVED_TYPE_REFERENCE',
           message: expect.stringContaining('Unknown'),
         }),
       ]),
@@ -688,7 +688,7 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+          code: 'PSL_UNRESOLVED_TYPE_REFERENCE',
           sourceId: 'schema.prisma',
         }),
       ]),

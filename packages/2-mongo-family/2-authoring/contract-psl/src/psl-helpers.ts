@@ -12,7 +12,7 @@ function stringLiteralValue(value: ExpressionAst): string | undefined {
 
 export function getNamedArgument(attr: ResolvedAttribute, name: string): string | undefined {
   const arg = attr.args.find((a) => a.name === name);
-  return arg === undefined ? undefined : argText(arg.value);
+  return arg === undefined ? undefined : argText(arg.value.syntax);
 }
 
 export function parseFieldList(value: string): readonly string[] {
@@ -121,8 +121,8 @@ export function parseRelationAttribute(
     }
   }
 
-  const fields = fieldsArg ? parseFieldList(argText(fieldsArg)) : undefined;
-  const references = referencesArg ? parseFieldList(argText(referencesArg)) : undefined;
+  const fields = fieldsArg ? parseFieldList(argText(fieldsArg.syntax)) : undefined;
+  const references = referencesArg ? parseFieldList(argText(referencesArg.syntax)) : undefined;
 
   return {
     ...(relationName !== undefined ? { relationName } : {}),
@@ -140,7 +140,7 @@ export function parseRelationAttribute(
 export function quotedStringArg(attr: ResolvedAttribute, index: number): string | undefined {
   const value = attr.positionalArg(index);
   if (value === undefined) return undefined;
-  const trimmed = argText(value).trim();
+  const trimmed = argText(value.syntax).trim();
   const match = trimmed.match(/^(['"])(.*)\1$/);
   if (!match) return undefined;
   return match[2] ?? '';

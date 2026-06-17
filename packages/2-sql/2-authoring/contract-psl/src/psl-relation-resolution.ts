@@ -2,6 +2,7 @@ import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types'
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type { PslSpan } from '@prisma-next/psl-parser';
 import type { ResolvedAttribute, ResolvedField, SourceFile } from '@prisma-next/psl-parser/syntax';
+import { argText } from '@prisma-next/psl-parser/syntax';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
@@ -14,7 +15,7 @@ import {
   unquoteStringLiteral,
 } from './psl-attribute-parsing';
 import { checkUncomposedNamespace, reportUncomposedNamespace } from './psl-column-resolution';
-import { argText, spanOf } from './resolved-read-shims';
+import { spanOf } from './psl-resolved-reader';
 
 export const REFERENTIAL_ACTION_MAP: Record<string, ReferentialAction | undefined> = {
   NoAction: 'noAction',
@@ -111,7 +112,7 @@ export function parseRelationAttribute(input: {
   let relationNameFromPositional: string | undefined;
   const positionalNameExpr = getPositionalArgumentExpr(input.attribute);
   if (positionalNameExpr) {
-    const rawName = argText(positionalNameExpr);
+    const rawName = argText(positionalNameExpr.syntax);
     const parsedName = parseQuotedStringLiteral(rawName);
     if (!parsedName) {
       input.diagnostics.push({

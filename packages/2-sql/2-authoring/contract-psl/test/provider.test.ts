@@ -284,7 +284,7 @@ model Post {
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+            code: 'PSL_UNRESOLVED_TYPE_REFERENCE',
             sourceId: './schema.prisma',
             message: expect.stringContaining('Unknown'),
             span: expect.objectContaining({
