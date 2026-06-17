@@ -15,7 +15,6 @@ import type { FieldAttributeAst, ModelAttributeAst } from './syntax/ast/attribut
 import {
   CompositeTypeDeclarationAst,
   type DocumentAst,
-  EnumDeclarationAst,
   type FieldDeclarationAst,
   GenericBlockDeclarationAst,
   type KeyValuePairAst,
@@ -55,7 +54,7 @@ export interface ResolveOptions {
   readonly codecLookup?: CodecLookup;
 }
 
-export type DeclKind = 'model' | 'enum' | 'compositeType' | 'namedType';
+export type DeclKind = 'model' | 'compositeType' | 'namedType';
 
 export interface DeclCoord {
   readonly kind: DeclKind;
@@ -201,25 +200,40 @@ export interface ResolvedDocument {
 }
 
 /**
- * The set of declaration names visible while binding a written type reference to
- * a kind-ful coordinate. A bare (unqualified) name resolves in, and only in:
- * scalars ∪ document-level named types ∪ the current namespace ∪ the top-level /
- * unspecified namespace ({@link UNSPECIFIED_PSL_NAMESPACE_ID}, which is ambient —
- * it has no prefix to qualify with). A declaration that lives only in some other
- * *named* namespace must be referenced fully-qualified (`ns.Name`); a bare name
- * found in none of the allowed scopes is `unresolved`. A qualified `ns.Type`
- * reference resolves against the named namespace exactly.
+ * One declared name in a namespace's scope: a kind-ful declaration (a model or
+ * composite type) or a named generic block (carrying the keyword that defined
+ * it). Named types live in the document-level {@link NameTable.namedTypes} set,
+ * not in a scope. A block and a same-named model collide like two models would —
+ * a name maps to exactly one symbol, first-declaration-wins.
+ */
+type ScopeSymbol =
+  | { readonly kind: 'model'; readonly node: ModelDeclarationAst }
+  | { readonly kind: 'compositeType'; readonly node: CompositeTypeDeclarationAst }
+  | { readonly kind: 'block'; readonly keyword: string; readonly node: GenericBlockDeclarationAst };
+
+/**
+ * The names visible while binding a written type reference to a target. A bare
+ * (unqualified) name resolves in, and only in: scalars ∪ document-level named
+ * types ∪ the current namespace's scope ∪ the top-level / unspecified namespace
+ * ({@link UNSPECIFIED_PSL_NAMESPACE_ID}, which is ambient — it has no prefix to
+ * qualify with). A declaration that lives only in some other *named* namespace
+ * must be referenced fully-qualified (`ns.Name`); a bare name found in none of
+ * the allowed scopes is `unresolved`. A qualified `ns.Type` reference resolves
+ * against the named namespace's scope exactly.
+ *
+ * Each scope is one source-ordered, first-wins {@link ScopeSymbol} map — the same
+ * map the resolver reads to classify a reference (model/composite → `ref`, block →
+ * `block`) and {@link buildNamespace} reads to emit the resolved entities, so the
+ * name table and the resolved document can never disagree on what a name is.
  *
  * The live SQL interpreter's bare-name path is instead flat document-wide
- * last-wins (`modelMappings.set(name, …)` over the coordinate-keyed map), so a
- * bare name shared across namespaces resolves differently there. That divergence
- * is deliberate: cross-namespace bare references the legacy path accepted now
- * require qualification under this resolver, to be reconciled when the
- * interpreter migrates onto it.
+ * last-wins, so a bare name shared across namespaces resolves differently there.
+ * That divergence is deliberate: cross-namespace bare references the legacy path
+ * accepted now require qualification under this resolver, to be reconciled when
+ * the interpreter migrates onto it.
  */
 interface NameTable {
-  readonly byNamespace: ReadonlyMap<string, ReadonlyMap<string, DeclKind>>;
-  readonly blockTypesByNamespace: ReadonlyMap<string, ReadonlySet<string>>;
+  readonly scopes: ReadonlyMap<string, ReadonlyMap<string, ScopeSymbol>>;
   readonly namedTypes: ReadonlySet<string>;
 }
 
@@ -287,12 +301,9 @@ class Resolver {
     // the scalar `String` and skip the namespace lookup.
     const qualifier = qn?.namespace()?.name();
     if (qualifier !== undefined) {
-      const kind = nameTable.byNamespace.get(qualifier)?.get(typeName);
-      if (kind !== undefined) {
-        return { kind: 'ref', coord: { kind, namespaceId: qualifier, name: typeName } };
-      }
-      if (nameTable.blockTypesByNamespace.get(qualifier)?.has(typeName)) {
-        return { kind: 'block', namespaceId: qualifier, name: typeName };
+      const symbol = nameTable.scopes.get(qualifier)?.get(typeName);
+      if (symbol !== undefined) {
+        return symbolTarget(symbol, qualifier, typeName);
       }
       // An over-qualified annotation (e.g. `a.b.Bar`) was already flagged by
       // `parse` with `PSL_INVALID_QUALIFIED_NAME`; re-reporting it here as an
@@ -318,32 +329,26 @@ class Resolver {
       };
     }
 
-    const currentKind = nameTable.byNamespace.get(currentNamespaceId)?.get(typeName);
-    if (currentKind !== undefined) {
-      return {
-        kind: 'ref',
-        coord: { kind: currentKind, namespaceId: currentNamespaceId, name: typeName },
-      };
-    }
+    // Bare name: the current namespace, then the ambient (top-level) one. A
+    // kind-ful declaration outranks a same-named block across both scopes (a model
+    // in the ambient scope binds before a block in the current one), preserving the
+    // legacy decl-before-block precedence.
+    const currentSymbol = nameTable.scopes.get(currentNamespaceId)?.get(typeName);
+    const ambientSymbol =
+      currentNamespaceId === UNSPECIFIED_PSL_NAMESPACE_ID
+        ? undefined
+        : nameTable.scopes.get(UNSPECIFIED_PSL_NAMESPACE_ID)?.get(typeName);
 
-    if (currentNamespaceId !== UNSPECIFIED_PSL_NAMESPACE_ID) {
-      const ambientKind = nameTable.byNamespace.get(UNSPECIFIED_PSL_NAMESPACE_ID)?.get(typeName);
-      if (ambientKind !== undefined) {
-        return {
-          kind: 'ref',
-          coord: { kind: ambientKind, namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID, name: typeName },
-        };
-      }
+    if (currentSymbol !== undefined && currentSymbol.kind !== 'block') {
+      return symbolTarget(currentSymbol, currentNamespaceId, typeName);
     }
-
-    if (nameTable.blockTypesByNamespace.get(currentNamespaceId)?.has(typeName)) {
+    if (ambientSymbol !== undefined && ambientSymbol.kind !== 'block') {
+      return symbolTarget(ambientSymbol, UNSPECIFIED_PSL_NAMESPACE_ID, typeName);
+    }
+    if (currentSymbol?.kind === 'block') {
       return { kind: 'block', namespaceId: currentNamespaceId, name: typeName };
     }
-
-    if (
-      currentNamespaceId !== UNSPECIFIED_PSL_NAMESPACE_ID &&
-      nameTable.blockTypesByNamespace.get(UNSPECIFIED_PSL_NAMESPACE_ID)?.has(typeName)
-    ) {
+    if (ambientSymbol?.kind === 'block') {
       return { kind: 'block', namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID, name: typeName };
     }
 
@@ -368,6 +373,14 @@ class Resolver {
   }
 }
 
+/** A scope symbol as a resolved {@link TypeTarget}: a block becomes a `block`
+ * target, any kind-ful declaration a `ref` carrying its {@link DeclKind}. */
+function symbolTarget(symbol: ScopeSymbol, namespaceId: string, name: string): TypeTarget {
+  return symbol.kind === 'block'
+    ? { kind: 'block', namespaceId, name }
+    : { kind: 'ref', coord: { kind: symbol.kind, namespaceId, name } };
+}
+
 /**
  * Message for a bare name that resolves in none of the allowed scopes. When the
  * name is declared in exactly one *other named* namespace, the message carries a
@@ -380,11 +393,10 @@ function unresolvedBareNameMessage(
   nameTable: NameTable,
 ): string {
   const otherNamespaces: string[] = [];
-  for (const [namespaceId, decls] of nameTable.byNamespace) {
+  for (const [namespaceId, scope] of nameTable.scopes) {
     if (namespaceId === currentNamespaceId || namespaceId === UNSPECIFIED_PSL_NAMESPACE_ID)
       continue;
-    const inBlockTypes = nameTable.blockTypesByNamespace.get(namespaceId)?.has(typeName) ?? false;
-    if (decls.has(typeName) || inBlockTypes) otherNamespaces.push(namespaceId);
+    if (scope.has(typeName)) otherNamespaces.push(namespaceId);
   }
   const base = `Type "${typeName}" does not resolve to a known declaration`;
   return otherNamespaces.length === 1
@@ -434,29 +446,18 @@ interface ArgLike {
   value(): ExpressionAst | undefined;
 }
 
-interface NamedDeclaration {
-  name(): IdentifierAst | undefined;
-  readonly syntax: SyntaxNode;
-}
-
 /**
- * One named declaration kept in source order so name registration sees
- * declarations in the order they appear — the first wins, and its diagnostic
- * attaches to the source-first decl regardless of kind. A `block` entry is a
- * named generic block: it occupies the namespace's declaration name-space (so it
- * collides with a same-named model/enum/composite) but carries no {@link DeclKind}
- * — its keyword is recorded on the {@link ResolvedBlockType}, not as a decl kind.
+ * A namespace's scope under construction: a source-ordered, first-wins
+ * {@link ScopeSymbol} table plus every generic block in declaration order. The
+ * symbols back both type resolution and {@link buildNamespace}, so the two can
+ * never disagree on what a name is. `genericBlocks` keeps *every* block — named
+ * or anonymous, collision winner or loser — because extension-block validation
+ * runs over all of them, independent of the declaration name-space.
  */
-type OrderedDeclaration =
-  | { readonly kind: DeclKind; readonly declaration: NamedDeclaration }
-  | { readonly kind: 'block'; readonly declaration: NamedDeclaration };
-
-interface NamespaceBucket {
+interface MutableScope {
   readonly id: string;
   readonly syntax?: NamespaceDeclarationAst;
-  readonly declarations: OrderedDeclaration[];
-  readonly models: ModelDeclarationAst[];
-  readonly compositeTypes: CompositeTypeDeclarationAst[];
+  readonly symbols: Map<string, ScopeSymbol>;
   readonly genericBlocks: GenericBlockDeclarationAst[];
 }
 
@@ -475,61 +476,69 @@ export function resolve(
   const descriptorsByKeyword = collectBlockDescriptors(options.pslBlockDescriptors);
   const codecLookup = options.codecLookup ?? emptyCodecLookup;
 
-  const bucketOrder: string[] = [];
-  const buckets = new Map<string, NamespaceBucket>();
-  const getBucket = (id: string, syntax?: NamespaceDeclarationAst): NamespaceBucket => {
-    const existing = buckets.get(id);
+  const scopeOrder: string[] = [];
+  const scopes = new Map<string, MutableScope>();
+  const getScope = (id: string, syntax?: NamespaceDeclarationAst): MutableScope => {
+    const existing = scopes.get(id);
     if (existing) return existing;
-    const bucket: NamespaceBucket = {
+    const scope: MutableScope = {
       id,
       ...(syntax ? { syntax } : {}),
-      declarations: [],
-      models: [],
-      compositeTypes: [],
+      symbols: new Map(),
       genericBlocks: [],
     };
-    buckets.set(id, bucket);
-    bucketOrder.push(id);
-    return bucket;
+    scopes.set(id, scope);
+    scopeOrder.push(id);
+    return scope;
   };
 
-  const namedTypeDecls: NamedTypeDeclarationAst[] = [];
-
-  const bucketMember = (bucket: NamespaceBucket, member: SyntaxNode): void => {
-    const model = ModelDeclarationAst.cast(member);
-    if (model) {
-      bucket.models.push(model);
-      bucket.declarations.push({ kind: 'model', declaration: model });
+  // Insert a declaration into a scope, first-declaration-wins: a name already
+  // taken (by any kind, in source order) yields a duplicate-declaration
+  // diagnostic on the later occurrence and is otherwise ignored.
+  const declare = (scope: MutableScope, name: string | undefined, symbol: ScopeSymbol): void => {
+    if (name === undefined) return;
+    if (scope.symbols.has(name)) {
+      resolver.diagnostic(
+        'PSL_DUPLICATE_DECLARATION',
+        `Duplicate declaration "${name}" in this scope; the first declaration is used`,
+        symbol.node.syntax,
+      );
       return;
     }
-    const enumDecl = EnumDeclarationAst.cast(member);
-    if (enumDecl) {
-      bucket.declarations.push({ kind: 'enum', declaration: enumDecl });
+    scope.symbols.set(name, symbol);
+  };
+
+  const collectMember = (scope: MutableScope, member: SyntaxNode): void => {
+    const model = ModelDeclarationAst.cast(member);
+    if (model) {
+      declare(scope, model.name()?.name(), { kind: 'model', node: model });
       return;
     }
     const composite = CompositeTypeDeclarationAst.cast(member);
     if (composite) {
-      bucket.compositeTypes.push(composite);
-      bucket.declarations.push({ kind: 'compositeType', declaration: composite });
+      declare(scope, composite.name()?.name(), { kind: 'compositeType', node: composite });
       return;
     }
-    const genericBlock = GenericBlockDeclarationAst.cast(member);
-    if (genericBlock) {
-      bucket.genericBlocks.push(genericBlock);
-      if (genericBlock.name() !== undefined) {
-        bucket.declarations.push({ kind: 'block', declaration: genericBlock });
+    const block = GenericBlockDeclarationAst.cast(member);
+    if (block) {
+      scope.genericBlocks.push(block);
+      const keyword = block.keyword()?.text;
+      if (keyword !== undefined) {
+        declare(scope, block.name()?.name(), { kind: 'block', keyword, node: block });
       }
     }
   };
+
+  const namedTypeDecls: NamedTypeDeclarationAst[] = [];
 
   for (const declaration of document.declarations()) {
     const namespaceDecl = NamespaceDeclarationAst.cast(declaration.syntax);
     if (namespaceDecl) {
       const id = namespaceDecl.name()?.name();
       if (id === undefined) continue;
-      const bucket = getBucket(id, namespaceDecl);
+      const scope = getScope(id, namespaceDecl);
       for (const member of namespaceDecl.declarations()) {
-        bucketMember(bucket, member.syntax);
+        collectMember(scope, member.syntax);
       }
       continue;
     }
@@ -540,46 +549,27 @@ export function resolve(
       }
       continue;
     }
-    bucketMember(getBucket(UNSPECIFIED_PSL_NAMESPACE_ID), declaration.syntax);
+    collectMember(getScope(UNSPECIFIED_PSL_NAMESPACE_ID), declaration.syntax);
   }
 
-  const byNamespace = new Map<string, ReadonlyMap<string, DeclKind>>();
-  const blockTypesByNamespace = new Map<string, ReadonlySet<string>>();
-  for (const id of bucketOrder) {
-    const bucket = buckets.get(id);
-    if (!bucket) continue;
-    // `decls` holds the kind-ful declarations; `blockNames` holds named generic
-    // blocks. `seen` is shared so a block and a model of the same name collide
-    // (first-wins, source-ordered) the same way two models would.
-    const decls = new Map<string, DeclKind>();
-    const blockNames = new Set<string>();
-    const seen = new Set<string>();
-    for (const entry of bucket.declarations) {
-      const name = entry.declaration.name()?.name();
-      if (name === undefined) continue;
-      if (seen.has(name)) {
-        resolver.diagnostic(
-          'PSL_DUPLICATE_DECLARATION',
-          `Duplicate declaration "${name}" in this scope; the first declaration is used`,
-          entry.declaration.syntax,
-        );
-        continue;
-      }
-      seen.add(name);
-      if (entry.kind === 'block') blockNames.add(name);
-      else decls.set(name, entry.kind);
+  const namedTypeNames = new Set<string>();
+  for (const declaration of namedTypeDecls) {
+    const name = declaration.name()?.name();
+    if (name === undefined) continue;
+    if (namedTypeNames.has(name)) {
+      resolver.diagnostic(
+        'PSL_DUPLICATE_DECLARATION',
+        `Duplicate declaration "${name}" in this scope; the first declaration is used`,
+        declaration.syntax,
+      );
+      continue;
     }
-    byNamespace.set(id, decls);
-    blockTypesByNamespace.set(id, blockNames);
+    namedTypeNames.add(name);
   }
 
-  const namedTypeStore = new Map<string, DeclKind>();
-  registerNames(namedTypeStore, namedTypeDecls, 'namedType', resolver);
-  const nameTable: NameTable = {
-    byNamespace,
-    blockTypesByNamespace,
-    namedTypes: new Set(namedTypeStore.keys()),
-  };
+  const scopeSymbols = new Map<string, ReadonlyMap<string, ScopeSymbol>>();
+  for (const [id, scope] of scopes) scopeSymbols.set(id, scope.symbols);
+  const nameTable: NameTable = { scopes: scopeSymbols, namedTypes: namedTypeNames };
 
   const extensionContext: ExtensionValidationContext = {
     descriptorsByKeyword,
@@ -588,10 +578,10 @@ export function resolve(
   };
 
   const namespaces = new Map<string, ResolvedNamespace>();
-  for (const id of bucketOrder) {
-    const bucket = buckets.get(id);
-    if (!bucket) continue;
-    namespaces.set(id, buildNamespace(bucket, nameTable, resolver, extensionContext));
+  for (const id of scopeOrder) {
+    const scope = scopes.get(id);
+    if (!scope) continue;
+    namespaces.set(id, buildNamespace(scope, nameTable, resolver, extensionContext));
   }
 
   const namedTypes = new Map<string, ResolvedNamedType>();
@@ -617,84 +607,49 @@ export function resolve(
   return { namespaces, namedTypes, diagnostics: resolver.diagnostics };
 }
 
-function registerNames(
-  store: Map<string, DeclKind>,
-  declarations: ReadonlyArray<NamedDeclaration>,
-  kind: DeclKind,
-  resolver: Resolver,
-): void {
-  for (const declaration of declarations) {
-    registerName(store, declaration, kind, resolver);
-  }
-}
-
-function registerName(
-  store: Map<string, DeclKind>,
-  declaration: NamedDeclaration,
-  kind: DeclKind,
-  resolver: Resolver,
-): void {
-  const name = declaration.name()?.name();
-  if (name === undefined) return;
-  if (store.has(name)) {
-    resolver.diagnostic(
-      'PSL_DUPLICATE_DECLARATION',
-      `Duplicate declaration "${name}" in this scope; the first declaration is used`,
-      declaration.syntax,
-    );
-    return;
-  }
-  store.set(name, kind);
-}
-
 function buildNamespace(
-  bucket: NamespaceBucket,
+  scope: MutableScope,
   nameTable: NameTable,
   resolver: Resolver,
   extensionContext: ExtensionValidationContext,
 ): ResolvedNamespace {
+  // Models, composites, and block types all come straight from the scope's
+  // symbols — already deduped and source-ordered — so the resolved namespace
+  // agrees with the name table by construction; no second pass re-derives them.
   const models = new Map<string, ResolvedModel>();
-  for (const declaration of bucket.models) {
-    const name = declaration.name()?.name();
-    if (name === undefined || models.has(name)) continue;
-    models.set(name, {
-      name,
-      namespaceId: bucket.id,
-      fields: buildFields(declaration.fields(), bucket.id, nameTable, resolver),
-      attributes: resolveModelAttributes(declaration.attributes()),
-      syntax: declaration,
-    });
-  }
-
   const compositeTypes = new Map<string, ResolvedCompositeType>();
-  for (const declaration of bucket.compositeTypes) {
-    const name = declaration.name()?.name();
-    if (name === undefined || compositeTypes.has(name)) continue;
-    compositeTypes.set(name, {
-      name,
-      namespaceId: bucket.id,
-      fields: buildFields(declaration.fields(), bucket.id, nameTable, resolver),
-      attributes: resolveModelAttributes(declaration.attributes()),
-      syntax: declaration,
-    });
-  }
-
-  // Every named generic block is recorded as a block type, keyed by name. The
-  // membership mirrors the resolver's name-table (`blockTypesByNamespace`): a
-  // block whose name lost a first-wins collision to an earlier declaration is not
-  // here, so the map and the resolution path agree on which names are block types.
-  const blockTypeNames = nameTable.blockTypesByNamespace.get(bucket.id);
   const blockTypes = new Map<string, ResolvedBlockType>();
-  for (const block of bucket.genericBlocks) {
-    const name = block.name()?.name();
-    const keyword = block.keyword()?.text;
-    if (name === undefined || keyword === undefined) continue;
-    if (!blockTypeNames?.has(name) || blockTypes.has(name)) continue;
-    blockTypes.set(name, { name, keyword, namespaceId: bucket.id, syntax: block });
+  for (const [name, symbol] of scope.symbols) {
+    if (symbol.kind === 'model') {
+      models.set(name, {
+        name,
+        namespaceId: scope.id,
+        fields: buildFields(symbol.node.fields(), scope.id, nameTable, resolver),
+        attributes: resolveModelAttributes(symbol.node.attributes()),
+        syntax: symbol.node,
+      });
+    } else if (symbol.kind === 'compositeType') {
+      compositeTypes.set(name, {
+        name,
+        namespaceId: scope.id,
+        fields: buildFields(symbol.node.fields(), scope.id, nameTable, resolver),
+        attributes: resolveModelAttributes(symbol.node.attributes()),
+        syntax: symbol.node,
+      });
+    } else {
+      blockTypes.set(name, {
+        name,
+        keyword: symbol.keyword,
+        namespaceId: scope.id,
+        syntax: symbol.node,
+      });
+    }
   }
 
+  // Extension-block validation runs over every generic block, independent of the
+  // declaration name-space: a block that lost a name collision is still validated.
   const extensionBlocks = new Map<string, ResolvedExtensionBlock>();
-  for (const block of bucket.genericBlocks) {
+  for (const block of scope.genericBlocks) {
     const keyword = block.keyword()?.text;
     if (keyword === undefined) continue;
     const descriptor = extensionContext.descriptorsByKeyword.get(keyword);
@@ -711,18 +666,18 @@ function buildNamespace(
     }
     const name = block.name()?.name();
     if (name === undefined) continue;
-    validateExtensionBlockParams(block, name, descriptor, bucket.id, resolver, extensionContext);
+    validateExtensionBlockParams(block, name, descriptor, scope.id, resolver, extensionContext);
     if (extensionBlocks.has(name)) continue;
-    extensionBlocks.set(name, { name, namespaceId: bucket.id, syntax: block.syntax });
+    extensionBlocks.set(name, { name, namespaceId: scope.id, syntax: block.syntax });
   }
 
   return {
-    id: bucket.id,
+    id: scope.id,
     models,
     compositeTypes,
     extensionBlocks,
     blockTypes,
-    ...(bucket.syntax ? { syntax: bucket.syntax } : {}),
+    ...(scope.syntax ? { syntax: scope.syntax } : {}),
   };
 }
 
@@ -750,8 +705,8 @@ function buildFields(
  * Cross-kind named-type collision: a named type whose name matches a scalar or a
  * model declared anywhere in the document. Matches the old parser's verbatim
  * messages and its scalar → model precedence (first match wins, one diagnostic
- * per colliding named type). Distinct from the same-kind duplicate-declaration
- * collision handled in {@link registerNames}.
+ * per colliding named type). Distinct from the same-name duplicate-declaration
+ * collision detected while collecting the named-type declarations.
  */
 function validateNamedTypeCollisions(
   namedTypeDecls: readonly NamedTypeDeclarationAst[],
@@ -784,16 +739,17 @@ function validateNamedTypeCollisions(
 /**
  * Whether any namespace declares `name` with the given kind. Checks every
  * namespace rather than returning the first name hit, so a model in one namespace
- * is still found when an earlier namespace declares an enum of the same name (and
- * vice versa).
+ * is still found when an earlier namespace declares a different-kind symbol of the
+ * same name (and vice versa). Block symbols never match (their kind is `block`,
+ * never a {@link DeclKind} a ref param expects).
  */
 function hasDeclaredKindAcrossNamespaces(
   nameTable: NameTable,
   name: string,
   expectedKind: string,
 ): boolean {
-  for (const decls of nameTable.byNamespace.values()) {
-    if (decls.get(name) === expectedKind) return true;
+  for (const scope of nameTable.scopes.values()) {
+    if (scope.get(name)?.kind === expectedKind) return true;
   }
   return false;
 }
@@ -1030,7 +986,7 @@ function declaredKindInNamespace(
   name: string,
   refKind: string,
 ): boolean {
-  return nameTable.byNamespace.get(namespaceId)?.get(name) === refKind;
+  return nameTable.scopes.get(namespaceId)?.get(name)?.kind === refKind;
 }
 
 function nodeText(node: SyntaxNode): string {
