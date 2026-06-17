@@ -84,5 +84,14 @@ export class PostgresSchemaIR extends SqlSchemaIRNode {
 }
 
 export function isPostgresSchemaIR(value: unknown): value is PostgresSchemaIR {
-  return value instanceof PostgresSchemaIR;
+  if (value instanceof PostgresSchemaIR) return true;
+  // projectSchemaToSpace spreads the IR into a plain object ({...schema, tables: pruned}).
+  // The resulting object is not an instance but retains all own properties including
+  // rlsPolicies. Duck-type on that to handle the multi-space verification path.
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'rlsPolicies' in value &&
+    Array.isArray((value as { rlsPolicies: unknown }).rlsPolicies)
+  );
 }

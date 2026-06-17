@@ -275,6 +275,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       schema: options.schema,
     });
 
+    const allowsDestructive = options.policy.allowedOperationClasses.includes('destructive');
     const calls: PostgresOpFactoryCall[] = [];
     const seenEnableTables = new Set<string>();
 
@@ -294,12 +295,12 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
           seenEnableTables.add(tableKey);
           calls.push(new EnableRowLevelSecurityCall(schemaForTable, tableName));
         }
-        if (issue.outcome === 'mismatch') {
+        if (issue.outcome === 'mismatch' && allowsDestructive) {
           const actualPolicy = issue.actual as PostgresRlsPolicy;
           calls.push(new DropPostgresRlsPolicyCall(schemaForTable, tableName, actualPolicy.name));
         }
         calls.push(new CreatePostgresRlsPolicyCall(schemaForTable, tableName, policy));
-      } else {
+      } else if (allowsDestructive) {
         const policy = issue.actual as PostgresRlsPolicy;
         calls.push(new DropPostgresRlsPolicyCall(schemaForTable, policy.tableName, policyName));
       }
