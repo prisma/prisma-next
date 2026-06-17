@@ -43,6 +43,10 @@ import { afterAll, beforeAll } from 'vitest';
 const execFileAsync = promisify(execFile);
 const TSX_BIN = resolve(import.meta.dirname, '../../../../node_modules/.bin/tsx');
 
+// The `format` command factory is not exported from the CLI package's `./commands/*`
+// subpath map, so it is imported directly from source — matching how `executeCommand`
+// and the other non-exported test helpers are pulled in above.
+import { createFormatCommand } from '../../../../packages/1-framework/3-tooling/cli/src/commands/format';
 import {
   appendImplicitMigrationPlanFrom,
   executeCommand,
@@ -561,6 +565,18 @@ export async function runContractEmitWithConfig(
     configPath,
     ...extraArgs,
   ]);
+}
+
+/**
+ * Runs `prisma format` with an explicit config path in the given test directory.
+ * `format` takes no further arguments — it formats the config's PSL contract source
+ * in place when `contract.source.sourceFormat === 'psl'`.
+ */
+export async function runFormatWithConfig(
+  testDir: string,
+  configPath: string,
+): Promise<CommandResult> {
+  return runCommandRaw(createFormatCommand(), testDir, ['--config', configPath]);
 }
 
 /**
