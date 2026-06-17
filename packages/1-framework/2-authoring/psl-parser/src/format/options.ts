@@ -1,5 +1,3 @@
-import { type } from 'arktype';
-
 export interface FormatOptions {
   readonly indent?: number | 'tab';
   readonly newline?: 'LF' | 'CRLF';
@@ -10,21 +8,21 @@ export interface ResolvedFormatOptions {
   readonly newline: string;
 }
 
-const FormatOptionsSchema = type({
-  'indent?': type('number.integer >= 1').or("'tab'"),
-  'newline?': type("'LF'").or("'CRLF'"),
-});
-
-const DEFAULT_INDENT_WIDTH = 2;
-
 export function resolveFormatOptions(options: FormatOptions | undefined): ResolvedFormatOptions {
-  const validated = FormatOptionsSchema(options ?? {});
-  if (validated instanceof type.errors) {
-    throw new Error(`Invalid format options: ${validated.summary}`);
+  const indent = options?.indent ?? 2;
+  if (indent !== 'tab' && (typeof indent !== 'number' || !Number.isInteger(indent) || indent < 1)) {
+    throw new TypeError(
+      `Invalid format options: indent must be a positive integer or 'tab', got ${String(indent)}`,
+    );
   }
-  const indent = validated.indent ?? DEFAULT_INDENT_WIDTH;
+  const newline = options?.newline ?? 'LF';
+  if (newline !== 'LF' && newline !== 'CRLF') {
+    throw new TypeError(
+      `Invalid format options: newline must be 'LF' or 'CRLF', got ${String(newline)}`,
+    );
+  }
   return {
     indentUnit: indent === 'tab' ? '\t' : ' '.repeat(indent),
-    newline: validated.newline === 'CRLF' ? '\r\n' : '\n',
+    newline: newline === 'CRLF' ? '\r\n' : '\n',
   };
 }

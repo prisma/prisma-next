@@ -17,8 +17,7 @@
   },
   "dependencies": {
     "@prisma-next/framework-components": "workspace:0.14.0",
-    "@prisma-next/utils": "workspace:0.14.0",
-    "arktype": "catalog:"
+    "@prisma-next/utils": "workspace:0.14.0"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:0.14.0",

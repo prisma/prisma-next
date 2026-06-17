@@ -1519,9 +1519,6 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:0.14.0
         version: link:../../0-foundation/utils
-      arktype:
-        specifier: 'catalog:'
-        version: 2.2.0
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:0.14.0
