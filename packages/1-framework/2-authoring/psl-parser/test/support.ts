@@ -1,6 +1,23 @@
 import type { Range, SourceFile } from '../src/source-file';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
 
+/**
+ * The framework PSL built-in scalar names a typical target declares. `resolve`
+ * requires the caller to supply its target's scalar set; tests that don't care
+ * about a specific target pass this standard set.
+ */
+export const frameworkScalarTypes: ReadonlySet<string> = new Set([
+  'String',
+  'Boolean',
+  'Int',
+  'BigInt',
+  'Float',
+  'Decimal',
+  'DateTime',
+  'Json',
+  'Bytes',
+]);
+
 function escapeForDebug(text: string): string {
   return text
     .replaceAll('\\', '\\\\')

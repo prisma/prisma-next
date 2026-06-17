@@ -3,6 +3,7 @@ import type { AstNode } from '../ast-helpers';
 import { filterChildren, findChildToken, findFirstChild } from '../ast-helpers';
 import { SyntaxNode } from '../red';
 import { IdentifierAst } from './identifier';
+import { QualifiedNameAst } from './qualified-name';
 
 export class FunctionCallAst implements AstNode {
   readonly syntax: SyntaxNode;
@@ -11,8 +12,28 @@ export class FunctionCallAst implements AstNode {
     this.syntax = syntax;
   }
 
-  name(): IdentifierAst | undefined {
-    return findFirstChild(this.syntax, IdentifierAst.cast);
+  /**
+   * The qualified-name callee — present for parser-produced calls, whose callee
+   * is a single {@link QualifiedName}. `undefined` for a call whose identifier
+   * segments sit directly under the node.
+   */
+  qualifiedName(): QualifiedNameAst | undefined {
+    return findFirstChild(this.syntax, QualifiedNameAst.cast);
+  }
+
+  /**
+   * The dotted call path, in source order. A bare `Vector(…)` yields
+   * `['Vector']`; a namespace-qualified `pgvector.Vector(…)` yields
+   * `['pgvector', 'Vector']`. Empty when the call carries no identifier.
+   */
+  path(): readonly string[] {
+    const qualified = this.qualifiedName();
+    const segments: string[] = [];
+    for (const segment of filterChildren(qualified?.syntax ?? this.syntax, IdentifierAst.cast)) {
+      const text = segment.token()?.text;
+      if (text !== undefined) segments.push(text);
+    }
+    return segments;
   }
 
   lparen(): Token | undefined {
@@ -91,6 +112,10 @@ function decodeStringLiteral(raw: string): string {
         continue;
       case '"':
         out += '"';
+        i += 2;
+        continue;
+      case "'":
+        out += "'";
         i += 2;
         continue;
       case '\\':
@@ -234,6 +259,26 @@ export class ObjectFieldAst implements AstNode {
         continue;
       }
       return IdentifierAst.cast(child);
+    }
+    return undefined;
+  }
+
+  /**
+   * The field's logical key name, unquoted. An identifier key (`length:`) yields
+   * its text; a string-literal key (`"length":`) yields the decoded string.
+   * `undefined` when the field carries no key node.
+   */
+  keyName(): string | undefined {
+    for (const child of this.syntax.children()) {
+      if (!(child instanceof SyntaxNode)) {
+        if (child.kind === 'Colon') break;
+        continue;
+      }
+      const identifier = IdentifierAst.cast(child);
+      if (identifier) return identifier.token()?.text;
+      const stringKey = StringLiteralExprAst.cast(child);
+      if (stringKey) return stringKey.value();
+      return undefined;
     }
     return undefined;
   }

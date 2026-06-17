@@ -36,6 +36,12 @@ export type PslDiagnosticCode =
   | 'PSL_INVALID_TYPES_MEMBER'
   | 'PSL_INVALID_QUALIFIED_TYPE'
   /**
+   * The fault-tolerant CST parser saw a qualified name (e.g. a dotted type or
+   * attribute reference) in a position where the written name is structurally
+   * invalid. Emitted by the CST `parse` surface, anchored on the name's span.
+   */
+  | 'PSL_INVALID_QUALIFIED_NAME'
+  /**
    * A reserved declaration keyword (`model`/`enum`/`namespace`/`type`) that
    * committed the declaration kind on the keyword alone but is missing its name
    * and/or opening brace. The recursive-descent parser produces a best-effort

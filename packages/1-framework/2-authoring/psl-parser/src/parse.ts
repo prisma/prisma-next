@@ -220,9 +220,64 @@ export function parseNumberLiteralExpr(cursor: Cursor): GreenNode | undefined {
   return cursor.finishNode();
 }
 
+/**
+ * Parses a namespace-qualified name `[space ':']? Ident ('.' Ident)*` into a
+ * single {@link QualifiedName} node, consuming the whole chain greedily. This is
+ * the one qualified-name parser for every position — type annotation, call
+ * callee, attribute name — and it owns its diagnostics: a malformed chain reports
+ * `PSL_INVALID_QUALIFIED_NAME` identically regardless of where the name appears.
+ * The parse always completes — the subtree round-trips losslessly. The leading
+ * `Ident` is the caller's precondition (`parseQualifiedName` is only entered once
+ * `peekKind() === 'Ident'`).
+ *
+ * Parsing the chain up front is the point: a position then decides
+ * constructor-vs-reference by peeking exactly one token for `(`, with no scan of
+ * the dotted chain's length.
+ */
+export function parseQualifiedName(cursor: Cursor): void {
+  cursor.startNode('QualifiedName');
+  parseIdentifier(cursor); // first segment: the space, namespace, or bare name
+  parseQualifiedSegments(cursor, 'Colon');
+  parseQualifiedSegments(cursor, 'Dot');
+  cursor.finishNode();
+}
+
+/**
+ * Consumes a run of `<separator> Ident` segments inside an open `QualifiedName`,
+ * reporting `PSL_INVALID_QUALIFIED_NAME` for each separator past the first of its
+ * kind (over-qualification — a well-formed name carries at most one colon space
+ * and one dot namespace) and for a separator no identifier follows (a trailing
+ * separator). The separator is consumed regardless, so the subtree — and the
+ * lossless round-trip — stays intact.
+ */
+function parseQualifiedSegments(cursor: Cursor, separator: 'Colon' | 'Dot'): void {
+  let seen = 0;
+  while (cursor.peekKind() === separator) {
+    seen++;
+    const separatorMark = cursor.mark();
+    cursor.bump(); // separator
+    if (seen > 1) {
+      cursor.diagnostic(
+        'PSL_INVALID_QUALIFIED_NAME',
+        'Qualified name has too many segments',
+        separatorMark,
+      );
+    }
+    if (cursor.peekKind() === 'Ident') {
+      parseIdentifier(cursor);
+    } else {
+      cursor.diagnostic(
+        'PSL_INVALID_QUALIFIED_NAME',
+        'Qualified name is missing a name after the separator',
+        cursor.mark(),
+      );
+    }
+  }
+}
+
 // Ordering among the `Ident`-leading alternatives is load-bearing: the
-// `LParen` lookahead of `parseFunctionCall` must win before the boolean check,
-// so `true(` stays a function call named `true` rather than a boolean literal.
+// `LParen`/`Dot` lookahead of `parseCall` must win before the boolean check, so
+// `true(` stays a function call named `true` rather than a boolean literal.
 export function parseBooleanLiteralExpr(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
   const text = cursor.peekToken().text;
@@ -294,15 +349,11 @@ export function parseObjectField(cursor: Cursor): GreenNode {
   const keyMark = cursor.mark();
   const keyText = cursor.peekToken().text;
   if (cursor.peekKind() === 'Ident') {
-    parseIdentifier(cursor); // identifier key — the only valid key
+    parseIdentifier(cursor); // identifier key
   } else if (cursor.peekKind() === 'StringLiteral') {
-    // String keys are not valid PSL. Flag the key, then still consume it so the
-    // field stays structured and the object/enclosing block don't desync (F04).
-    cursor.diagnostic(
-      'PSL_INVALID_OBJECT_LITERAL',
-      'Object literal keys must be identifiers',
-      keyMark,
-    );
+    // A string-literal key (e.g. `{ "length": 35 }`) is accepted; its logical
+    // name is the unquoted string. Consuming it as a `StringLiteralExpr` keeps
+    // the key node structured so the field and enclosing block stay in sync.
     parseStringLiteralExpr(cursor);
   }
   if (cursor.peekKind() === 'Colon') {
@@ -321,11 +372,39 @@ export function parseObjectField(cursor: Cursor): GreenNode {
   return cursor.finishNode();
 }
 
+/**
+ * Whether the next tokens open a call: a bare `Ident(` or a namespace-qualified
+ * `Ident.Ident(`. The lookahead is bounded — at most the four tokens of a
+ * well-formed call callee — so a bare dotted reference like `a.b` (no following
+ * `(`) is *not* mistaken for a call and falls through to the bare-identifier form,
+ * rather than scanning an unbounded dotted chain ahead to find the paren.
+ */
+function isCallAhead(cursor: Cursor): boolean {
+  if (cursor.peekKind() !== 'Ident') return false;
+  if (cursor.peekKind(1) === 'LParen') return true;
+  return (
+    cursor.peekKind(1) === 'Dot' &&
+    cursor.peekKind(2) === 'Ident' &&
+    cursor.peekKind(3) === 'LParen'
+  );
+}
+
+/**
+ * Parses a function/constructor call in expression position — bare
+ * `autoincrement()` or namespace-qualified `temporal.updatedAt()` — into a
+ * {@link FunctionCall} whose callee is a single {@link QualifiedName}, so
+ * `FunctionCallAst.path()` reads the full `['temporal', 'updatedAt']` chain. A
+ * no-op (returns `undefined`) unless {@link isCallAhead} confirms a trailing `(`,
+ * leaving the `parseExpression` `??` chain to fall through to the boolean and
+ * bare-identifier forms.
+ */
 export function parseFunctionCall(cursor: Cursor): GreenNode | undefined {
-  if (cursor.peekKind() !== 'Ident' || cursor.peekKind(1) !== 'LParen') return undefined;
+  if (!isCallAhead(cursor)) return undefined;
   cursor.startNode('FunctionCall');
-  parseIdentifier(cursor);
-  parseParenArgs(cursor);
+  parseQualifiedName(cursor);
+  if (cursor.peekKind() === 'LParen') {
+    parseParenArgs(cursor);
+  }
   return cursor.finishNode();
 }
 
@@ -375,19 +454,7 @@ export function parseAttribute(cursor: Cursor): GreenNode {
   cursor.startNode(isBlockAttribute ? 'ModelAttribute' : 'FieldAttribute');
   cursor.bump(); // At or DoubleAt
   if (cursor.peekKind() === 'Ident') {
-    parseIdentifier(cursor);
-    if (cursor.peekKind() === 'Dot') {
-      cursor.bump(); // Dot
-      if (cursor.peekKind() === 'Ident') {
-        parseIdentifier(cursor);
-      } else {
-        cursor.diagnostic(
-          'PSL_INVALID_ATTRIBUTE_SYNTAX',
-          'Attribute name expected after "."',
-          cursor.mark(),
-        );
-      }
-    }
+    parseQualifiedName(cursor);
   } else {
     cursor.diagnostic('PSL_INVALID_ATTRIBUTE_SYNTAX', 'Attribute name expected', attributeMark);
   }
@@ -397,14 +464,21 @@ export function parseAttribute(cursor: Cursor): GreenNode {
   return cursor.finishNode();
 }
 
+/**
+ * A type annotation recomposes as `QualifiedName (argList)? ([])? (?)?`: the one
+ * qualified-name unit, then — decided by peeking a single token for `(` — an
+ * optional constructor argument list (`pgvector.Vector(1536)`), then the list and
+ * optional suffixes. A malformed qualified name (over-qualification, a trailing
+ * separator) is diagnosed by {@link parseQualifiedName} itself, uniformly with
+ * every other qualified-name position; the subtree still round-trips losslessly.
+ */
 export function parseTypeAnnotation(cursor: Cursor): GreenNode {
   cursor.startNode('TypeAnnotation');
-  if (cursor.peekKind() === 'Ident' && cursor.peekKind(1) === 'LParen') {
-    parseFunctionCall(cursor); // inline constructor, e.g. Vector(1536)
-  } else if (cursor.peekKind() === 'Ident') {
-    parseIdentifier(cursor); // base name or space/namespace segment
-    parseQualifierSegments(cursor, 'Colon');
-    parseQualifierSegments(cursor, 'Dot');
+  if (cursor.peekKind() === 'Ident') {
+    parseQualifiedName(cursor);
+    if (cursor.peekKind() === 'LParen') {
+      parseAttributeArgList(cursor); // constructor args, e.g. Vector(1536)
+    }
   }
   if (cursor.peekKind() === 'LBracket') {
     cursor.bump();
@@ -416,32 +490,6 @@ export function parseTypeAnnotation(cursor: Cursor): GreenNode {
     cursor.bump();
   }
   return cursor.finishNode();
-}
-
-/**
- * Consumes a run of `<separator> Ident` qualifier segments. A well-formed type
- * carries at most one colon-introduced space and one dot-introduced namespace;
- * any second separator of the same kind is over-qualification and emits
- * `PSL_INVALID_QUALIFIED_TYPE` pointed at the offending separator, while still
- * consuming the segment so the subtree (and the round-trip) stays intact.
- */
-function parseQualifierSegments(cursor: Cursor, separator: 'Colon' | 'Dot'): void {
-  let seen = 0;
-  while (cursor.peekKind() === separator) {
-    seen++;
-    const separatorMark = cursor.mark();
-    cursor.bump(); // separator
-    if (seen > 1) {
-      cursor.diagnostic(
-        'PSL_INVALID_QUALIFIED_TYPE',
-        'Qualified type reference has too many segments',
-        separatorMark,
-      );
-    }
-    if (cursor.peekKind() === 'Ident') {
-      parseIdentifier(cursor);
-    }
-  }
 }
 
 type MemberParser = (cursor: Cursor) => void;
@@ -472,7 +520,6 @@ function parseDocument(cursor: Cursor): GreenNode {
 
 const RESERVED_BLOCK_KEYWORDS: ReadonlySet<string> = new Set([
   'model',
-  'enum',
   'namespace',
   'type',
   'types',
@@ -517,7 +564,6 @@ function parseDeclaration(cursor: Cursor, insideNamespace: boolean): void {
 
   const node =
     parseModel(cursor) ??
-    parseEnum(cursor) ??
     parseNamespace(cursor) ??
     parseCompositeType(cursor) ??
     parseTypesBlock(cursor) ??
@@ -565,11 +611,6 @@ function parseBlock(
 export function parseModel(cursor: Cursor): GreenNode | undefined {
   if (!keywordIs(cursor, 'model')) return undefined;
   return parseBlock(cursor, 'ModelDeclaration', true, parseModelMember);
-}
-
-export function parseEnum(cursor: Cursor): GreenNode | undefined {
-  if (!keywordIs(cursor, 'enum')) return undefined;
-  return parseBlock(cursor, 'EnumDeclaration', true, parseEnumMember);
 }
 
 /**
@@ -652,10 +693,10 @@ function parseUnsupportedTopLevel(cursor: Cursor): void {
 }
 
 /**
- * Block-attribute alternative shared by model and enum members: matches a
- * leading `@@` (yielding a `ModelAttribute`) and is a no-op on anything else. The
- * `@@`-vs-`@` distinction is preserved exactly — single-`@` attributes belong to
- * fields and enum values and are parsed inside `parseField`/`parseEnumValue`.
+ * Block-attribute alternative shared by model, composite-type, and generic-block
+ * members: matches a leading `@@` (yielding a `ModelAttribute`) and is a no-op on
+ * anything else. The `@@`-vs-`@` distinction is preserved exactly — single-`@`
+ * attributes belong to fields and are parsed inside `parseField`.
  */
 export function parseBlockAttribute(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'DoubleAt') return undefined;
@@ -673,17 +714,6 @@ function parseModelMember(cursor: Cursor): void {
   }
 }
 
-function parseEnumMember(cursor: Cursor): void {
-  const node = parseBlockAttribute(cursor) ?? parseEnumValue(cursor);
-  if (!node) {
-    invalidMember(
-      cursor,
-      'PSL_INVALID_ENUM_MEMBER',
-      `Invalid enum value declaration "${cursor.peekToken().text}"`,
-    );
-  }
-}
-
 function parseNamedTypeMember(cursor: Cursor): void {
   const node = parseNamedType(cursor);
   if (!node) {
@@ -695,8 +725,15 @@ function parseNamedTypeMember(cursor: Cursor): void {
   }
 }
 
+/**
+ * A generic-block member is either a `@@`-block attribute (e.g. `@@type("…")`,
+ * yielding a `ModelAttribute` — the same node model/enum/composite blocks use) or
+ * a `key = value` entry. The block-attribute alternative is purely syntactic: it
+ * parses the `@@attr(args)` shape and does not judge whether the attribute is
+ * valid for the block's kind — that stays a `resolve` semantic concern.
+ */
 function parseKeyValueMember(cursor: Cursor): void {
-  const node = parseKeyValue(cursor);
+  const node = parseBlockAttribute(cursor) ?? parseKeyValue(cursor);
   if (!node) {
     invalidMember(cursor, 'PSL_INVALID_EXTENSION_BLOCK_MEMBER', 'Invalid block entry');
   }
@@ -713,16 +750,6 @@ export function parseField(cursor: Cursor): GreenNode | undefined {
   cursor.startNode('FieldDeclaration');
   parseIdentifier(cursor); // name
   parseTypeAnnotation(cursor);
-  while (cursor.peekKind() === 'At') {
-    parseAttribute(cursor);
-  }
-  return cursor.finishNode();
-}
-
-export function parseEnumValue(cursor: Cursor): GreenNode | undefined {
-  if (cursor.peekKind() !== 'Ident') return undefined;
-  cursor.startNode('EnumValueDeclaration');
-  parseIdentifier(cursor); // name
   while (cursor.peekKind() === 'At') {
     parseAttribute(cursor);
   }
@@ -747,21 +774,27 @@ export function parseNamedType(cursor: Cursor): GreenNode | undefined {
   return cursor.finishNode();
 }
 
+/**
+ * A generic-block entry is either `key = value` or a bare `key`. The bare form
+ * (a key with no `=`) is the member shape a domain-enum block uses for a value
+ * that the codec derives from the member name itself (`enum Status { Active }`);
+ * it commits a `KeyValuePair` carrying only the key, which downstream readers
+ * treat as a bare-kind parameter. A `key =` with no following expression is a
+ * malformed value and is flagged.
+ */
 export function parseKeyValue(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
   cursor.startNode('KeyValuePair');
-  const keyMark = cursor.mark();
-  const keyText = cursor.peekToken().text;
   parseIdentifier(cursor); // key
   if (cursor.peekKind() === 'Equals') {
     cursor.bump();
-  } else {
-    cursor.diagnostic(
-      'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
-      `Expected "=" after "${keyText}"`,
-      keyMark,
-    );
+    if (!parseExpression(cursor)) {
+      cursor.diagnostic(
+        'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
+        'Expected a value after "="',
+        cursor.mark(),
+      );
+    }
   }
-  parseExpression(cursor);
   return cursor.finishNode();
 }

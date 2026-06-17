@@ -10,20 +10,17 @@ import { TypeAnnotationAst } from './type-annotation';
 
 /**
  * What may appear inside a `namespace` block: models, enums, composite types,
- * and extension (block) declarations. Mirrors what `parsePslDocument` accepts
- * in a namespace body. `types {}` blocks and nested `namespace` blocks are
- * document-only, so they are not namespace members.
+ * and extension (block) declarations. `types {}` blocks and nested `namespace`
+ * blocks are document-only, so they are not namespace members.
  */
 export type NamespaceMemberAst =
   | ModelDeclarationAst
-  | EnumDeclarationAst
   | CompositeTypeDeclarationAst
   | GenericBlockDeclarationAst;
 
 function castNamespaceMember(node: SyntaxNode): NamespaceMemberAst | undefined {
   return (
     ModelDeclarationAst.cast(node) ??
-    EnumDeclarationAst.cast(node) ??
     CompositeTypeDeclarationAst.cast(node) ??
     GenericBlockDeclarationAst.cast(node)
   );
@@ -82,42 +79,6 @@ export class ModelDeclarationAst implements AstNode {
 
   static cast(node: SyntaxNode): ModelDeclarationAst | undefined {
     return node.kind === 'ModelDeclaration' ? new ModelDeclarationAst(node) : undefined;
-  }
-}
-
-export class EnumDeclarationAst implements AstNode {
-  readonly syntax: SyntaxNode;
-
-  constructor(syntax: SyntaxNode) {
-    this.syntax = syntax;
-  }
-
-  keyword(): Token | undefined {
-    return findChildToken(this.syntax, 'Ident');
-  }
-
-  name(): IdentifierAst | undefined {
-    return findFirstChild(this.syntax, IdentifierAst.cast);
-  }
-
-  lbrace(): Token | undefined {
-    return findChildToken(this.syntax, 'LBrace');
-  }
-
-  rbrace(): Token | undefined {
-    return findChildToken(this.syntax, 'RBrace');
-  }
-
-  *values(): Iterable<EnumValueDeclarationAst> {
-    yield* filterChildren(this.syntax, EnumValueDeclarationAst.cast);
-  }
-
-  *attributes(): Iterable<ModelAttributeAst> {
-    yield* filterChildren(this.syntax, ModelAttributeAst.cast);
-  }
-
-  static cast(node: SyntaxNode): EnumDeclarationAst | undefined {
-    return node.kind === 'EnumDeclaration' ? new EnumDeclarationAst(node) : undefined;
   }
 }
 
@@ -246,6 +207,10 @@ export class GenericBlockDeclarationAst implements AstNode {
     yield* filterChildren(this.syntax, KeyValuePairAst.cast);
   }
 
+  *attributes(): Iterable<ModelAttributeAst> {
+    yield* filterChildren(this.syntax, ModelAttributeAst.cast);
+  }
+
   static cast(node: SyntaxNode): GenericBlockDeclarationAst | undefined {
     return node.kind === 'GenericBlockDeclaration'
       ? new GenericBlockDeclarationAst(node)
@@ -309,26 +274,6 @@ export class FieldDeclarationAst implements AstNode {
 
   static cast(node: SyntaxNode): FieldDeclarationAst | undefined {
     return node.kind === 'FieldDeclaration' ? new FieldDeclarationAst(node) : undefined;
-  }
-}
-
-export class EnumValueDeclarationAst implements AstNode {
-  readonly syntax: SyntaxNode;
-
-  constructor(syntax: SyntaxNode) {
-    this.syntax = syntax;
-  }
-
-  name(): IdentifierAst | undefined {
-    return findFirstChild(this.syntax, IdentifierAst.cast);
-  }
-
-  *attributes(): Iterable<FieldAttributeAst> {
-    yield* filterChildren(this.syntax, FieldAttributeAst.cast);
-  }
-
-  static cast(node: SyntaxNode): EnumValueDeclarationAst | undefined {
-    return node.kind === 'EnumValueDeclaration' ? new EnumValueDeclarationAst(node) : undefined;
   }
 }
 
