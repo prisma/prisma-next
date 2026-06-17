@@ -7,8 +7,6 @@ import {
 import {
   CompositeTypeDeclarationAst,
   DocumentAst,
-  EnumDeclarationAst,
-  EnumValueDeclarationAst,
   FieldDeclarationAst,
   GenericBlockDeclarationAst,
   KeyValuePairAst,
@@ -80,14 +78,12 @@ describe('static cast', () => {
   });
 
   const castTests: Array<[string, (node: SyntaxNode) => unknown, SyntaxKind]> = [
-    ['EnumDeclarationAst', EnumDeclarationAst.cast, 'EnumDeclaration'],
     ['CompositeTypeDeclarationAst', CompositeTypeDeclarationAst.cast, 'CompositeTypeDeclaration'],
     ['NamespaceDeclarationAst', NamespaceDeclarationAst.cast, 'Namespace'],
     ['TypesBlockAst', TypesBlockAst.cast, 'TypesBlock'],
     ['GenericBlockDeclarationAst', GenericBlockDeclarationAst.cast, 'GenericBlockDeclaration'],
     ['KeyValuePairAst', KeyValuePairAst.cast, 'KeyValuePair'],
     ['FieldDeclarationAst', FieldDeclarationAst.cast, 'FieldDeclaration'],
-    ['EnumValueDeclarationAst', EnumValueDeclarationAst.cast, 'EnumValueDeclaration'],
     ['NamedTypeDeclarationAst', NamedTypeDeclarationAst.cast, 'NamedTypeDeclaration'],
     ['TypeAnnotationAst', TypeAnnotationAst.cast, 'TypeAnnotation'],
     ['QualifiedNameAst', QualifiedNameAst.cast, 'QualifiedName'],
@@ -658,11 +654,11 @@ describe('DocumentAst', () => {
     b.token('RBrace', '}');
     b.finishNode();
     b.token('Newline', '\n');
-    b.startNode('EnumDeclaration');
-    b.token('Ident', 'enum');
+    b.startNode('GenericBlockDeclaration');
+    b.token('Ident', 'datasource');
     b.token('Whitespace', ' ');
     b.startNode('Identifier');
-    b.token('Ident', 'Role');
+    b.token('Ident', 'db');
     b.finishNode();
     b.token('Whitespace', ' ');
     b.token('LBrace', '{');
@@ -673,56 +669,7 @@ describe('DocumentAst', () => {
     const decls = Array.from(doc.declarations());
     expect(decls).toHaveLength(2);
     expect(decls[0]).toBeInstanceOf(ModelDeclarationAst);
-    expect(decls[1]).toBeInstanceOf(EnumDeclarationAst);
-  });
-});
-
-describe('EnumDeclarationAst', () => {
-  function buildEnum() {
-    const b = new GreenNodeBuilder();
-    b.startNode('EnumDeclaration');
-    b.token('Ident', 'enum');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'Role');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('LBrace', '{');
-    b.token('Newline', '\n');
-    b.token('Whitespace', '  ');
-    b.startNode('EnumValueDeclaration');
-    b.startNode('Identifier');
-    b.token('Ident', 'ADMIN');
-    b.finishNode();
-    b.finishNode();
-    b.token('Newline', '\n');
-    b.token('Whitespace', '  ');
-    b.startNode('EnumValueDeclaration');
-    b.startNode('Identifier');
-    b.token('Ident', 'USER');
-    b.finishNode();
-    b.finishNode();
-    b.token('Newline', '\n');
-    b.token('RBrace', '}');
-    return b.finishNode();
-  }
-
-  it('exposes keyword, name, braces', () => {
-    const root = createSyntaxTree(buildEnum());
-    const decl = EnumDeclarationAst.cast(root)!;
-    expect(decl.keyword()?.text).toBe('enum');
-    expect(decl.name()?.token()?.text).toBe('Role');
-    expect(decl.lbrace()?.text).toBe('{');
-    expect(decl.rbrace()?.text).toBe('}');
-  });
-
-  it('iterates values', () => {
-    const root = createSyntaxTree(buildEnum());
-    const decl = EnumDeclarationAst.cast(root)!;
-    const values = Array.from(decl.values());
-    expect(values).toHaveLength(2);
-    expect(values[0]!.name()?.token()?.text).toBe('ADMIN');
-    expect(values[1]!.name()?.token()?.text).toBe('USER');
+    expect(decls[1]).toBeInstanceOf(GenericBlockDeclarationAst);
   });
 });
 
@@ -936,64 +883,6 @@ describe('ModelAttributeAst.argList', () => {
   });
 });
 
-describe('EnumDeclarationAst.attributes', () => {
-  function buildEnumWithAttributes() {
-    // enum Role { ADMIN @map("admin")\n @@map("roles") }
-    const b = new GreenNodeBuilder();
-    b.startNode('EnumDeclaration');
-    b.token('Ident', 'enum');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'Role');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('LBrace', '{');
-    b.startNode('EnumValueDeclaration');
-    b.startNode('Identifier');
-    b.token('Ident', 'ADMIN');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.startNode('FieldAttribute');
-    b.token('At', '@');
-    b.startNode('QualifiedName');
-    b.startNode('Identifier');
-    b.token('Ident', 'map');
-    b.finishNode();
-    b.finishNode();
-    b.finishNode();
-    b.finishNode();
-    b.startNode('ModelAttribute');
-    b.token('DoubleAt', '@@');
-    b.startNode('QualifiedName');
-    b.startNode('Identifier');
-    b.token('Ident', 'map');
-    b.finishNode();
-    b.finishNode();
-    b.finishNode();
-    b.token('RBrace', '}');
-    return b.finishNode();
-  }
-
-  it('iterates enum-level attributes', () => {
-    const root = createSyntaxTree(buildEnumWithAttributes());
-    const decl = EnumDeclarationAst.cast(root)!;
-    const attrs = Array.from(decl.attributes());
-    expect(attrs).toHaveLength(1);
-    expect(attrs[0]!.doubleAt()?.text).toBe('@@');
-    expect(attrs[0]!.name()?.identifier()?.token()?.text).toBe('map');
-  });
-
-  it('iterates enum-value attributes', () => {
-    const root = createSyntaxTree(buildEnumWithAttributes());
-    const decl = EnumDeclarationAst.cast(root)!;
-    const value = Array.from(decl.values())[0]!;
-    const attrs = Array.from(value.attributes());
-    expect(attrs).toHaveLength(1);
-    expect(attrs[0]!.at()?.text).toBe('@');
-    expect(attrs[0]!.name()?.identifier()?.token()?.text).toBe('map');
-  });
-});
-
 describe('CompositeTypeDeclarationAst', () => {
   function buildCompositeType() {
     // type Address { street String\n @@map("addresses") }
@@ -1057,7 +946,7 @@ describe('CompositeTypeDeclarationAst', () => {
 
 describe('NamespaceDeclarationAst', () => {
   function buildNamespace() {
-    // namespace auth { model User {} enum Role {} extend Something {} }
+    // namespace auth { model User {} datasource db {} extend Something {} }
     const b = new GreenNodeBuilder();
     b.startNode('Document');
     b.startNode('Namespace');
@@ -1077,11 +966,11 @@ describe('NamespaceDeclarationAst', () => {
     b.token('LBrace', '{');
     b.token('RBrace', '}');
     b.finishNode();
-    b.startNode('EnumDeclaration');
-    b.token('Ident', 'enum');
+    b.startNode('GenericBlockDeclaration');
+    b.token('Ident', 'datasource');
     b.token('Whitespace', ' ');
     b.startNode('Identifier');
-    b.token('Ident', 'Role');
+    b.token('Ident', 'db');
     b.finishNode();
     b.token('LBrace', '{');
     b.token('RBrace', '}');
@@ -1118,7 +1007,7 @@ describe('NamespaceDeclarationAst', () => {
     const decls = Array.from(ns.declarations());
     expect(decls).toHaveLength(3);
     expect(decls[0]).toBeInstanceOf(ModelDeclarationAst);
-    expect(decls[1]).toBeInstanceOf(EnumDeclarationAst);
+    expect(decls[1]).toBeInstanceOf(GenericBlockDeclarationAst);
     expect(decls[2]).toBeInstanceOf(GenericBlockDeclarationAst);
   });
 });

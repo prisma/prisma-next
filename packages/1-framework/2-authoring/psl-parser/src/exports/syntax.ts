@@ -28,8 +28,6 @@ export type { NamespaceMemberAst } from '../syntax/ast/declarations';
 export {
   CompositeTypeDeclarationAst,
   DocumentAst,
-  EnumDeclarationAst,
-  EnumValueDeclarationAst,
   FieldDeclarationAst,
   GenericBlockDeclarationAst,
   KeyValuePairAst,

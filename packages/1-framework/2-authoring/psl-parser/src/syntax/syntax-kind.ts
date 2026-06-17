@@ -1,7 +1,6 @@
 export type SyntaxKind =
   | 'Document'
   | 'ModelDeclaration'
-  | 'EnumDeclaration'
   | 'CompositeTypeDeclaration'
   | 'Namespace'
   | 'TypesBlock'
@@ -10,7 +9,6 @@ export type SyntaxKind =
   // `model`/`enum`/`namespace`/`type`/`types` declarations above.
   | 'GenericBlockDeclaration'
   | 'FieldDeclaration'
-  | 'EnumValueDeclaration'
   | 'NamedTypeDeclaration'
   | 'KeyValuePair'
   | 'FieldAttribute'
