@@ -310,6 +310,7 @@ const sqliteDefaultFunctionRegistryEntries = [
 
 const sqliteScalarTypeDescriptors = new Map<string, string>([
   ['String', SQLITE_TEXT_CODEC_ID],
+  ['Boolean', SQLITE_INTEGER_CODEC_ID],
   ['Int', SQLITE_INTEGER_CODEC_ID],
   ['BigInt', SQLITE_BIGINT_CODEC_ID],
   ['Float', SQLITE_REAL_CODEC_ID],
