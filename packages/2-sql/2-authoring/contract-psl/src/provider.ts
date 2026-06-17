@@ -58,6 +58,7 @@ function buildColumnDescriptorMap(
 export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
   return {
     source: {
+      sourceFormat: 'psl',
       inputs: [schemaPath],
       load: async (context) => {
         const [absoluteSchemaPath] = context.resolvedInputs;

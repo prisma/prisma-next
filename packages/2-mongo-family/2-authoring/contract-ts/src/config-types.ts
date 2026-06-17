@@ -18,6 +18,7 @@ export function typescriptContract(
 ): ContractConfig {
   return {
     source: {
+      sourceFormat: 'typescript',
       load: async () =>
         ok(applySpecifierDefaultControlPolicy(contract, options?.defaultControlPolicy)),
     },
@@ -32,6 +33,7 @@ export function typescriptContractFromPath(
 ): ContractConfig {
   return {
     source: {
+      sourceFormat: 'typescript',
       inputs: [contractPath],
       load: async (context) => {
         const [absolutePath] = context.resolvedInputs;

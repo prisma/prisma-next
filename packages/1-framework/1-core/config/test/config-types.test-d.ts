@@ -10,7 +10,7 @@ import type {
 import { ok } from '@prisma-next/utils/result';
 import { expectTypeOf, test } from 'vitest';
 import { defineConfig, type PrismaNextConfig } from '../src/config-types';
-import type { ContractSourceProvider } from '../src/contract-source-types';
+import type { ContractSourceFormat, ContractSourceProvider } from '../src/contract-source-types';
 
 const mockHook = {
   id: 'sql',
@@ -110,6 +110,7 @@ test('accepts contract source providers with declared inputs', () => {
     adapter: postgresAdapterDescriptor,
     contract: {
       source: {
+        sourceFormat: 'psl',
         inputs: ['./schema.prisma'],
         load: async (_context) => ok({} as never),
       },
@@ -117,6 +118,9 @@ test('accepts contract source providers with declared inputs', () => {
   };
 
   const result = defineConfig(config);
+  expectTypeOf(result.contract!.source.sourceFormat).toEqualTypeOf<
+    ContractSourceFormat | undefined
+  >();
   expectTypeOf(result.contract!.source.inputs).toEqualTypeOf<readonly string[] | undefined>();
   expectTypeOf(result.contract!.source.load).toEqualTypeOf<ContractSourceProvider['load']>();
 });

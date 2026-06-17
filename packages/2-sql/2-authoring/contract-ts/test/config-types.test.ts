@@ -36,6 +36,23 @@ const stubContext: ContractSourceContext = {
   resolvedInputs: [],
 };
 
+describe('source format discriminator', () => {
+  it('typescriptContract tags the source as TypeScript', () => {
+    const config = typescriptContract({ targetFamily: 'sql', target: 'postgres' } as Contract);
+    expect(config.source.sourceFormat).toBe('typescript');
+  });
+
+  it('typescriptContractFromPath tags the source as TypeScript', () => {
+    const config = typescriptContractFromPath('./contract.ts');
+    expect(config.source.sourceFormat).toBe('typescript');
+  });
+
+  it('emptyContract tags the source as TypeScript', () => {
+    const config = emptyContract({ target: postgresTargetPack });
+    expect(config.source.sourceFormat).toBe('typescript');
+  });
+});
+
 describe('typescriptContract', () => {
   it('returns provider result with contract', async () => {
     const contract = { targetFamily: 'sql', target: 'postgres' } as Contract;

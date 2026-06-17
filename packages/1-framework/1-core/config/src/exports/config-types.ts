@@ -10,5 +10,6 @@ export type {
   ContractSourceDiagnosticPosition,
   ContractSourceDiagnosticSpan,
   ContractSourceDiagnostics,
+  ContractSourceFormat,
   ContractSourceProvider,
 } from '../contract-source-types';

@@ -111,6 +111,7 @@ export interface PrismaNextConfig<
 const ContractSourceInputSchema = type('string');
 
 export const ContractSourceProviderSchema = type({
+  'sourceFormat?': "'psl' | 'typescript'",
   'inputs?': ContractSourceInputSchema.array(),
   load: 'Function',
 });
