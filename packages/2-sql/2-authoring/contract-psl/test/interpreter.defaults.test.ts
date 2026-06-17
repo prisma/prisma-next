@@ -57,27 +57,27 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       mutations: {
         defaults: [
           {
-            ref: { table: 'defaults', column: 'idCuid2' },
+            ref: { namespace: 'public', table: 'defaults', column: 'idCuid2' },
             onCreate: { kind: 'generator', id: 'cuid2' },
           },
           {
-            ref: { table: 'defaults', column: 'idNanoidDefault' },
+            ref: { namespace: 'public', table: 'defaults', column: 'idNanoidDefault' },
             onCreate: { kind: 'generator', id: 'nanoid' },
           },
           {
-            ref: { table: 'defaults', column: 'idNanoidSized' },
+            ref: { namespace: 'public', table: 'defaults', column: 'idNanoidSized' },
             onCreate: { kind: 'generator', id: 'nanoid', params: { size: 16 } },
           },
           {
-            ref: { table: 'defaults', column: 'idUlid' },
+            ref: { namespace: 'public', table: 'defaults', column: 'idUlid' },
             onCreate: { kind: 'generator', id: 'ulid' },
           },
           {
-            ref: { table: 'defaults', column: 'idUuidV4' },
+            ref: { namespace: 'public', table: 'defaults', column: 'idUuidV4' },
             onCreate: { kind: 'generator', id: 'uuidv4' },
           },
           {
-            ref: { table: 'defaults', column: 'idUuidV7' },
+            ref: { namespace: 'public', table: 'defaults', column: 'idUuidV7' },
             onCreate: { kind: 'generator', id: 'uuidv7' },
           },
         ],
@@ -146,11 +146,11 @@ model UuidNative {
       mutations: {
         defaults: expect.arrayContaining([
           {
-            ref: { table: 'uuidNative', column: 'idV4' },
+            ref: { namespace: 'public', table: 'uuidNative', column: 'idV4' },
             onCreate: { kind: 'generator', id: 'uuidv4' },
           },
           {
-            ref: { table: 'uuidNative', column: 'idV7' },
+            ref: { namespace: 'public', table: 'uuidNative', column: 'idV7' },
             onCreate: { kind: 'generator', id: 'uuidv7' },
           },
         ]),
@@ -194,7 +194,7 @@ model Profile {
       mutations: {
         defaults: [
           {
-            ref: { table: 'profile', column: 'id' },
+            ref: { namespace: 'public', table: 'profile', column: 'id' },
             onCreate: { kind: 'generator', id: 'uuidv4' },
           },
         ],
@@ -471,7 +471,7 @@ model UuidNativeBad {
     });
     expect(result.value.execution?.mutations.defaults).toEqual([
       {
-        ref: { table: 'timestamped', column: 'updatedAt' },
+        ref: { namespace: 'public', table: 'timestamped', column: 'updatedAt' },
         onCreate: { kind: 'generator', id: 'timestampNow' },
         onUpdate: { kind: 'generator', id: 'timestampNow' },
       },
@@ -508,7 +508,7 @@ model UuidNativeBad {
     });
     expect(result.value.execution?.mutations.defaults).toEqual([
       {
-        ref: { table: 'timestamped', column: 'updatedAt' },
+        ref: { namespace: '__unbound__', table: 'timestamped', column: 'updatedAt' },
         onCreate: { kind: 'generator', id: 'timestampNow' },
         onUpdate: { kind: 'generator', id: 'timestampNow' },
       },

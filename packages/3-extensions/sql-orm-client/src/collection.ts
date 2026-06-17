@@ -124,6 +124,7 @@ import { normalizeWhereArg } from './where-interop';
 
 function applyCreateDefaults(
   ctx: CollectionContext<Contract<SqlStorage>>,
+  namespaceId: string,
   tableName: string,
   rows: Record<string, unknown>[],
 ): void {
@@ -136,6 +137,7 @@ function applyCreateDefaults(
     const applied = ctx.context.applyMutationDefaults({
       op: 'create',
       table: tableName,
+      namespace: namespaceId,
       values: row,
       ...(defaultValueCache ? { defaultValueCache } : {}),
     });
@@ -147,12 +149,14 @@ function applyCreateDefaults(
 
 function applyUpdateDefaults(
   ctx: CollectionContext<Contract<SqlStorage>>,
+  namespaceId: string,
   tableName: string,
   values: Record<string, unknown>,
 ): void {
   const applied = ctx.context.applyMutationDefaults({
     op: 'update',
     table: tableName,
+    namespace: namespaceId,
     values,
   });
   for (const def of applied) {
@@ -1310,7 +1314,7 @@ export class Collection<
     }
 
     const mappedRows = this.#mapCreateRows(rows);
-    applyCreateDefaults(this.ctx, this.tableName, mappedRows);
+    applyCreateDefaults(this.ctx, this.namespaceId, this.tableName, mappedRows);
     const { selectedForQuery: selectedForInsert, hiddenColumns } = this.#augmentMutationSelection();
     if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
       const plans = compileInsertReturningSplit(
@@ -1432,7 +1436,7 @@ export class Collection<
         }
 
         const merged = await withMutationScope(runtime, async (scope) => {
-          applyCreateDefaults(collectionCtx, tableName, [baseRow]);
+          applyCreateDefaults(collectionCtx, namespaceId, tableName, [baseRow]);
           const baseCompiled = compileInsertReturning(
             contract,
             namespaceId,
@@ -1451,7 +1455,7 @@ export class Collection<
 
           const pkValue = baseCreated[pkColumn];
           variantRow[pkColumn] = pkValue;
-          applyCreateDefaults(collectionCtx, variant.table, [variantRow]);
+          applyCreateDefaults(collectionCtx, namespaceId, variant.table, [variantRow]);
           const variantCompiled = compileInsertReturning(
             contract,
             namespaceId,
@@ -1566,7 +1570,7 @@ export class Collection<
 
     const rows = data as readonly Record<string, unknown>[];
     const mappedRows = this.#mapCreateRows(rows);
-    applyCreateDefaults(this.ctx, this.tableName, mappedRows);
+    applyCreateDefaults(this.ctx, this.namespaceId, this.tableName, mappedRows);
 
     if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
       const plans = compileInsertCountSplit(
@@ -1635,7 +1639,7 @@ export class Collection<
 
     const mappedCreateRows = this.#mapCreateRows([input.create as Record<string, unknown>]);
     const createValues = mappedCreateRows[0] ?? {};
-    applyCreateDefaults(this.ctx, this.tableName, [createValues]);
+    applyCreateDefaults(this.ctx, this.namespaceId, this.tableName, [createValues]);
     const updateValues = mapModelDataToStorageRow(
       this.contract,
       this.namespaceId,
@@ -1644,7 +1648,7 @@ export class Collection<
     );
     const hasUpdateValues = Object.keys(updateValues).length > 0;
     if (hasUpdateValues) {
-      applyUpdateDefaults(this.ctx, this.tableName, updateValues);
+      applyUpdateDefaults(this.ctx, this.namespaceId, this.tableName, updateValues);
     }
     const conflictColumns = resolveUpsertConflictColumns(
       this.contract,
@@ -1847,7 +1851,7 @@ export class Collection<
       return new AsyncIterableResult(generator());
     }
 
-    applyUpdateDefaults(this.ctx, this.tableName, mappedData);
+    applyUpdateDefaults(this.ctx, this.namespaceId, this.tableName, mappedData);
 
     const { selectedForQuery: selectedForUpdate, hiddenColumns } = this.#augmentMutationSelection();
     const compiled = mergeAnnotations(
@@ -1905,7 +1909,7 @@ export class Collection<
       return 0;
     }
 
-    applyUpdateDefaults(this.ctx, this.tableName, mappedData);
+    applyUpdateDefaults(this.ctx, this.namespaceId, this.tableName, mappedData);
 
     // Annotations attach to the write, not the matching read.
     const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'updateCount');

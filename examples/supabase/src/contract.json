@@ -152,7 +152,7 @@
     }
   },
   "execution": {
-    "executionHash": "sha256:09bd7caf0ad111e77df2565dce0c4c5b0b784f9d3dfe5c97f969f1016a6b66bb",
+    "executionHash": "sha256:ed14abd667c95e810498cf90d4adaa694b5130bc29593f0d88c31837a278d704",
     "mutations": {
       "defaults": [
         {
@@ -162,6 +162,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "profile"
           }
         }
@@ -190,7 +191,7 @@
       "id": "supabase",
       "kind": "extension",
       "targetId": "postgres",
-      "version": "0.13.0"
+      "version": "0.14.0"
     }
   },
   "meta": {},

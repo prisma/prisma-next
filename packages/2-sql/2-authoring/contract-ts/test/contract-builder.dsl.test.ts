@@ -189,7 +189,7 @@ describe('contract DSL authoring surface', () => {
     ]);
     expect(contract.execution?.mutations.defaults).toEqual([
       {
-        ref: { table: 'app_user', column: 'id' },
+        ref: { namespace: 'public', table: 'app_user', column: 'id' },
         onCreate: { kind: 'generator', id: 'uuidv4' },
       },
     ]);
@@ -639,6 +639,118 @@ describe('contract DSL authoring surface', () => {
     },
   ])('rejects duplicate %s after applying naming defaults', ({ run, error }) => {
     expect(run).toThrow(error);
+  });
+
+  it('allows the same table name in different namespaces', () => {
+    const PublicThing = model('PublicThing', {
+      fields: {
+        id: field.column(int4Column).id(),
+      },
+    }).sql({ table: 'thing' });
+
+    const ShadowThing = model('ShadowThing', {
+      namespace: 'shadow',
+      fields: {
+        id: field.column(int4Column).id(),
+      },
+    }).sql({ table: 'thing' });
+
+    const contract = defineTestContract({
+      namespaces: ['shadow'],
+      models: { PublicThing, ShadowThing },
+    });
+
+    expect(contract.storage.namespaces).toHaveProperty(['public', 'entries', 'table', 'thing']);
+    expect(contract.storage.namespaces).toHaveProperty(['shadow', 'entries', 'table', 'thing']);
+    expect(contract.domain.namespaces).toHaveProperty(['shadow', 'models', 'ShadowThing']);
+  });
+
+  it('resolves an M:N junction to its own namespace when the junction table name collides', () => {
+    const PublicRole = model('Role', {
+      fields: { id: field.column(textColumn).id() },
+    }).sql({ table: 'roles' });
+    const PublicUserRole = model('UserRole', {
+      fields: {
+        userId: field.column(int4Column).column('user_id'),
+        roleId: field.column(textColumn).column('role_id'),
+      },
+    })
+      .attributes(({ fields, constraints }) => ({
+        id: constraints.id([fields.userId, fields.roleId]),
+      }))
+      .sql({ table: 'user_roles' });
+    const PublicUser = model('User', {
+      fields: { id: field.column(int4Column).id() },
+    })
+      .relations({
+        roles: rel.manyToMany(() => PublicRole, {
+          through: () => PublicUserRole,
+          from: 'userId',
+          to: 'roleId',
+        }),
+      })
+      .sql({ table: 'users' });
+
+    const ShadowRole = model('ShadowRole', {
+      namespace: 'shadow',
+      fields: { id: field.column(textColumn).id() },
+    }).sql({ table: 'roles' });
+    const ShadowUserRole = model('ShadowUserRole', {
+      namespace: 'shadow',
+      fields: {
+        userId: field.column(int4Column).column('user_id'),
+        roleId: field.column(textColumn).column('role_id'),
+      },
+    })
+      .attributes(({ fields, constraints }) => ({
+        id: constraints.id([fields.userId, fields.roleId]),
+      }))
+      .sql({ table: 'user_roles' });
+    const ShadowUser = model('ShadowUser', {
+      namespace: 'shadow',
+      fields: { id: field.column(int4Column).id() },
+    })
+      .relations({
+        roles: rel.manyToMany(() => ShadowRole, {
+          through: () => ShadowUserRole,
+          from: 'userId',
+          to: 'roleId',
+        }),
+      })
+      .sql({ table: 'users' });
+
+    const contract = defineTestContract({
+      namespaces: ['shadow'],
+      models: {
+        User: PublicUser,
+        Role: PublicRole,
+        UserRole: PublicUserRole,
+        ShadowUser,
+        ShadowRole,
+        ShadowUserRole,
+      },
+    });
+
+    expect(contract.domain.namespaces).toMatchObject({
+      public: {
+        models: {
+          User: {
+            relations: {
+              roles: { through: { table: 'user_roles', namespaceId: 'public' } },
+            },
+          },
+        },
+      },
+      shadow: {
+        models: {
+          ShadowUser: {
+            relations: {
+              roles: { through: { table: 'user_roles', namespaceId: 'shadow' } },
+            },
+          },
+        },
+      },
+    });
   });
 
   it('rejects duplicate relation names when mixing model relations with .relations()', () => {

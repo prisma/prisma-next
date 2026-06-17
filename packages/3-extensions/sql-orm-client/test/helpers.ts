@@ -1,11 +1,14 @@
+import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import {
+  type ColumnDefaultLiteralInputValue,
   domainModelsAtDefaultNamespace,
   type Contract as FrameworkContract,
 } from '@prisma-next/contract/types';
 import type {
   CodecDescriptor,
   CodecInstanceContext,
+  ColumnTypeDescriptor,
 } from '@prisma-next/framework-components/codec';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -15,11 +18,13 @@ import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-la
 import {
   createExecutionContext,
   createSqlExecutionStack,
+  type RuntimeMutationDefaultGenerator,
   type RuntimeParameterizedCodecDescriptor,
   type SqlRuntimeExtensionDescriptor,
 } from '@prisma-next/sql-runtime';
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import type { RuntimeQueryable } from '../src/types';
+import { defineContract, field, model, rel, type ScalarFieldBuilder } from './contract-builder';
 import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
 import { defineTestCodec } from './test-codec';
@@ -142,14 +147,48 @@ const pgVectorCodecStubExtension: SqlRuntimeExtensionDescriptor<'postgres'> = ((
   };
 })();
 
-const testContext: ExecutionContext<TestContract> = createExecutionContext({
-  contract: baseTestContract,
-  stack: createSqlExecutionStack({
-    target: postgresTarget,
-    adapter: postgresAdapter,
-    extensionPacks: [pgVectorCodecStubExtension],
-  }),
-});
+/**
+ * Builds an {@link ExecutionContext} from the given contract — unlike
+ * spreading `{ ...getTestContext(), contract }`, this makes
+ * `applyMutationDefaults` observe the patched contract's execution defaults
+ * (the context's defaults applier is a closure over the contract it was
+ * created from). Extra mutation default generators referenced by the
+ * contract can be registered via `options.mutationDefaultGenerators`.
+ */
+export function buildTestContextFromContract<TContract extends FrameworkContract<SqlStorage>>(
+  contract: TContract,
+  options?: {
+    readonly mutationDefaultGenerators?: ReadonlyArray<RuntimeMutationDefaultGenerator>;
+  },
+): ExecutionContext<TContract> {
+  const generators = options?.mutationDefaultGenerators ?? [];
+  const extensionPacks: SqlRuntimeExtensionDescriptor<'postgres'>[] = [pgVectorCodecStubExtension];
+  if (generators.length > 0) {
+    extensionPacks.push({
+      kind: 'extension',
+      id: 'test-mutation-default-generators',
+      version: '0.0.0',
+      familyId: 'sql',
+      targetId: 'postgres',
+      codecs: () => [],
+      mutationDefaultGenerators: () => generators,
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    });
+  }
+
+  return createExecutionContext({
+    contract,
+    stack: createSqlExecutionStack({
+      target: postgresTarget,
+      adapter: postgresAdapter,
+      extensionPacks,
+    }),
+  });
+}
+
+const testContext: ExecutionContext<TestContract> = buildTestContextFromContract(baseTestContract);
 
 export function getTestContext(): ExecutionContext<TestContract> {
   return testContext;
@@ -401,6 +440,224 @@ export function buildStiPolyContract(): TestContract {
   };
 
   return deserializeTestContract(raw);
+}
+
+type RawColumn = {
+  nativeType: string;
+  codecId: string;
+  nullable: boolean;
+  // A string default is treated as a SQL expression (`defaultSql`); any other
+  // literal is a value default (`default`).
+  default?: string | ColumnDefaultLiteralInputValue;
+};
+
+// extraColumns carry a raw codecId/nativeType pair; a ColumnTypeDescriptor is
+// exactly that pair, so the DSL accepts it directly without any contract-shaped
+// literal.
+function extraColumnDescriptor(col: RawColumn): ColumnTypeDescriptor {
+  return { codecId: col.codecId, nativeType: col.nativeType };
+}
+
+/**
+ * Builds a minimal M:N contract with Parent <-> Child via a junction table,
+ * authored through the contract-builder DSL. Used by unit tests that assert
+ * M:N include and nested-write behavior.
+ */
+export function buildManyToManyContract(opts: {
+  junctionTable: string;
+  parentColumns: string[];
+  childColumns: string[];
+  targetColumns: string[];
+  localFields?: string[];
+  extraColumns?: Record<string, RawColumn>;
+}) {
+  const {
+    junctionTable,
+    parentColumns,
+    childColumns,
+    targetColumns,
+    localFields = ['id'],
+    extraColumns = {},
+  } = opts;
+
+  // Field names match the storage column names throughout (the relation
+  // criteria and mutation payloads in the suite address columns by these
+  // names), so each `field.column(...)` keeps the default column = field name.
+  const parentFields: Record<string, ScalarFieldBuilder> = {};
+  for (const col of localFields) {
+    parentFields[col] = field.column(int4Column);
+  }
+  const Parent = model('Parent', { fields: parentFields }).attributes(
+    ({ fields, constraints }) => ({
+      id: constraints.id(localFields.map((col) => fields[col]!)),
+    }),
+  );
+
+  const childFields: Record<string, ScalarFieldBuilder> = {};
+  for (const col of targetColumns) {
+    childFields[col] = field.column(int4Column);
+  }
+  const Child = model('Child', { fields: childFields })
+    .attributes(({ fields, constraints }) => ({
+      id: constraints.id(targetColumns.map((col) => fields[col]!)),
+    }))
+    .sql({ table: 'children' });
+
+  // A column shared by parentColumns and childColumns (e.g. a `tenant_id`
+  // discriminator) is a single physical junction column, so dedupe before
+  // declaring the fields and the composite primary key.
+  const junctionPkColumns = [...new Set([...parentColumns, ...childColumns])];
+  const junctionFields: Record<string, ScalarFieldBuilder> = {};
+  for (const col of junctionPkColumns) {
+    junctionFields[col] = field.column(int4Column);
+  }
+  for (const [name, col] of Object.entries(extraColumns)) {
+    let builder: ScalarFieldBuilder = field.column(extraColumnDescriptor(col));
+    if (col.nullable) {
+      builder = builder.optional();
+    }
+    if (col.default !== undefined) {
+      builder =
+        typeof col.default === 'string'
+          ? builder.defaultSql(col.default)
+          : builder.default(col.default);
+    }
+    junctionFields[name] = builder;
+  }
+  const Junction = model('Junction', { fields: junctionFields })
+    .attributes(({ fields, constraints }) => ({
+      id: constraints.id(junctionPkColumns.map((col) => fields[col]!)),
+    }))
+    .sql({ table: junctionTable });
+
+  const ParentWithRelation = Parent.relations({
+    children: rel.manyToMany(() => Child, {
+      through: () => Junction,
+      from: parentColumns,
+      to: childColumns,
+    }),
+  }).sql({ table: 'parents' });
+
+  return defineContract({
+    models: { Parent: ParentWithRelation, Child, Junction },
+  });
+}
+
+/**
+ * Extends {@link buildManyToManyContract} with an `Owner` model and an N:1
+ * `owner` relation on `Child` (children.owner_id → owners.id), so tests can
+ * exercise junction-created targets that carry their own relation mutations.
+ */
+export function buildManyToManyContractWithTargetRelation() {
+  const Parent = model('Parent', {
+    fields: { id: field.column(int4Column).id() },
+  });
+
+  const Owner = model('Owner', {
+    fields: { id: field.column(int4Column).id() },
+  }).sql({ table: 'owners' });
+
+  const Child = model('Child', {
+    fields: {
+      id: field.column(int4Column).id(),
+      ownerId: field.column(int4Column).column('owner_id'),
+    },
+    relations: {
+      owner: rel.belongsTo(Owner, { from: 'ownerId', to: 'id' }),
+    },
+  }).sql({ table: 'children' });
+
+  const Junction = model('Junction', {
+    fields: {
+      parentId: field.column(int4Column).column('parent_id'),
+      childId: field.column(int4Column).column('child_id'),
+    },
+  })
+    .attributes(({ fields, constraints }) => ({
+      id: constraints.id([fields.parentId, fields.childId]),
+    }))
+    .sql({ table: 'parent_child' });
+
+  const ParentWithRelation = Parent.relations({
+    children: rel.manyToMany(() => Child, {
+      through: () => Junction,
+      from: 'parentId',
+      to: 'childId',
+    }),
+  }).sql({ table: 'parents' });
+
+  return defineContract({
+    models: { Parent: ParentWithRelation, Owner, Child, Junction },
+  });
+}
+
+/**
+ * Builds a User <-> Role M:N contract whose `user_roles` junction carries a
+ * NOT NULL `level` payload column whose only default is an execution-time
+ * onCreate generator (`test-level`) — no storage default. Authored through the
+ * DSL: `field.generated` stamps the execution onCreate default and leaves the
+ * column NOT NULL with no storage default, so the connect/create gate stays
+ * open and `insertJunctionLink` must populate `level` before the INSERT.
+ */
+export function buildExecutionDefaultJunctionContract() {
+  const User = model('User', {
+    fields: {
+      id: field.column(int4Column).id(),
+      name: field.column(textColumn),
+      email: field.column(textColumn).unique(),
+    },
+  });
+
+  const Role = model('Role', {
+    fields: {
+      id: field.column(textColumn).id(),
+      name: field.column(textColumn).unique(),
+    },
+  }).sql({ table: 'roles' });
+
+  const UserRole = model('UserRole', {
+    fields: {
+      userId: field.column(int4Column).column('user_id'),
+      roleId: field.column(textColumn).column('role_id'),
+      level: field.generated({
+        type: int4Column,
+        generated: { kind: 'generator', id: 'test-level' },
+      }),
+    },
+  })
+    .attributes(({ fields, constraints }) => ({
+      id: constraints.id([fields.userId, fields.roleId]),
+    }))
+    .sql({ table: 'user_roles' });
+
+  const UserWithRelation = User.relations({
+    roles: rel.manyToMany(() => Role, {
+      through: () => UserRole,
+      from: 'userId',
+      to: 'roleId',
+    }),
+  }).sql({ table: 'users' });
+
+  return defineContract({
+    models: { User: UserWithRelation, Role, UserRole },
+  });
+}
+
+/**
+ * Builds a contract whose `User` model (table `users`) keys on a custom
+ * primary-key column `pk_id` instead of the conventional `id`. Authored
+ * through the contract-builder DSL so `buildPrimaryKeyFilterFromRow` reads a
+ * real emitted primary key rather than a hand-patched storage table.
+ */
+export function buildCustomPrimaryKeyContract() {
+  const User = model('User', {
+    fields: {
+      pk_id: field.column(int4Column).id(),
+      name: field.column(textColumn),
+    },
+  }).sql({ table: 'users' });
+
+  return defineContract({ models: { User } });
 }
 
 export function createMockRuntime(): MockRuntime {

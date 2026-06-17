@@ -16,6 +16,10 @@ import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
+import type { Contract as ExecutionDefaultedTagsContract } from './fixtures/execution-defaulted-tags/generated/contract';
+import executionDefaultedTagsContractJson from './fixtures/execution-defaulted-tags/generated/contract.json' with {
+  type: 'json',
+};
 import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
 import type { Contract as PolyContract } from './fixtures/polymorphism/generated/contract';
@@ -118,6 +122,17 @@ export type { PolyContract };
 
 export function deserializePolyContract(json: unknown = polyContractJson): PolyContract {
   return postgresContractSerializer.deserializeContract(json) as PolyContract;
+}
+
+export type { ExecutionDefaultedTagsContract };
+
+// The emitted contract whose `user_tags.created_at` junction payload column
+// carries an execution-time onCreate default (no storage default). Re-deserialize
+// per call so storage namespaces keep their methods (structuredClone strips them).
+export function getExecutionDefaultedTagsContract(): ExecutionDefaultedTagsContract {
+  return postgresContractSerializer.deserializeContract(
+    JSON.parse(JSON.stringify(executionDefaultedTagsContractJson)),
+  ) as ExecutionDefaultedTagsContract;
 }
 
 const polyTestContract = deserializePolyContract();

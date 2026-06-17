@@ -8,7 +8,20 @@ alwaysApply: false
 
 ## Rule
 
-**Never, under any circumstances, patch raw contract data structures in tests.** Use real emitted fixtures. If a test really has to generate a contract at runtime, it may only generate it from a high-level representation made with a user-facing authoring surface (contract builder DSL, PSL) — never by writing, or worse, patching, the raw contract data structure.
+**Never, under any circumstances, patch or hand-author raw contract data structures in tests.** This is a HARD rule — hard as obsidian — not a guideline, suggestion, or default you may trade away under time pressure. Use real emitted fixtures. If a test really has to generate a contract at runtime, it may only generate it from a high-level representation made with a user-facing authoring surface (contract builder DSL, PSL) — never by writing, or worse, patching, the raw contract data structure.
+
+A hand-built object literal that "happens" to match the contract shape is **not** a contract — it is a bag of random data that incidentally coincides with a real contract today and will diverge tomorrow given the velocity of this repo. Tests built on it are vacuous.
+
+### No cast-smuggling
+
+Constructing a contract value at runtime and forcing it through the type system with `as unknown as FrameworkContract<...>`, `as unknown as Contract`, `blindCast`/`castAs`, or any equivalent escape is **strictly forbidden** — that cast is the tell that you are hand-authoring raw contract data. Do not refactor unrelated `as` casts to `blindCast`/`castAs` to slip such a value past review. There is no acceptable variant of this workaround.
+
+### If you cannot satisfy this rule
+
+Stop. A workaround is never acceptable — it invalidates the rest of the work and is treated as a total failure of the task, not a partial success.
+
+- **Working unattended:** stop and fix whatever prevents you from satisfying the rule (e.g. add the missing emitted fixture, or extend the authoring surface) before continuing.
+- **Working interactively:** stop and flag it to the operator.
 
 ## Why
 
