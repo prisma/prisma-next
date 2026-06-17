@@ -1,6 +1,6 @@
 import {
   type AttributeArgListAst,
-  type FieldAttributeAst,
+  FieldAttributeAst,
   ModelAttributeAst,
 } from '../syntax/ast/attributes';
 import {
@@ -166,6 +166,13 @@ function emitRegion(writer: LineWriter, elements: readonly SyntaxElement[], dept
       writer.push(depth, item.text);
       continue;
     }
+    const broken = inlineBreakComment(item.node);
+    if (broken) {
+      flushRows();
+      for (const comment of item.leading) writer.push(depth, comment);
+      emitBrokenMember(writer, broken, depth, item.trailing);
+      continue;
+    }
     const row = toAlignmentRow(item.node);
     if (row && item.leading.length === 0) {
       pendingRows.push(item);
@@ -176,6 +183,82 @@ function emitRegion(writer: LineWriter, elements: readonly SyntaxElement[], dept
     emitMember(writer, item, depth);
   }
   flushRows();
+}
+
+/**
+ * A member whose declaration broke at a same-line `//` comment, split into the
+ * head line text (its name+type, with the comment appended) and the continuation
+ * attributes that followed on later source lines.
+ */
+interface InlineBreak {
+  readonly head: string;
+  readonly comment: string;
+  readonly attributes: readonly string[];
+}
+
+/**
+ * Detects a same-line `//` comment acting as a hard break barrier inside a
+ * field or named-type declaration: the head ran to a `//` comment and the
+ * `@attribute`s continued on later lines. A `//` comment runs to end-of-line,
+ * so the emitter must preserve the break rather than hoist the attributes up
+ * onto the comment line (which would both swallow them into the comment and
+ * relocate the comment off the token it documents — an idempotence hazard).
+ * Returns `undefined` when no such barrier is present (the common case), so the
+ * member renders through its normal single-line path.
+ */
+function inlineBreakComment(node: SyntaxNode): InlineBreak | undefined {
+  const field = FieldDeclarationAst.cast(node);
+  const named = NamedTypeDeclarationAst.cast(node);
+  if (!field && !named) return undefined;
+
+  let comment: string | undefined;
+  let sawNewline = false;
+  let sawAttribute = false;
+  for (const child of node.children()) {
+    if (child instanceof SyntaxNode) {
+      if (FieldAttributeAst.cast(child)) sawAttribute = true;
+      continue;
+    }
+    if (sawAttribute) continue;
+    if (child.kind === 'Comment') comment = child.text;
+    else if (child.kind === 'Newline' && comment !== undefined) sawNewline = true;
+  }
+  if (comment === undefined || !sawNewline || !sawAttribute) return undefined;
+
+  if (field) {
+    return {
+      head: joinTokens([identifierText(field.name()), emitTypeAnnotation(field.typeAnnotation())]),
+      comment,
+      attributes: Array.from(field.attributes(), emitFieldAttribute),
+    };
+  }
+  if (named) {
+    return {
+      head: joinTokens([
+        identifierText(named.name()),
+        '=',
+        emitTypeAnnotation(named.typeAnnotation()),
+      ]),
+      comment,
+      attributes: Array.from(named.attributes(), emitFieldAttribute),
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Renders a member whose declaration broke at a same-line comment: the head
+ * (with the comment) on its own line at `depth`, then each continuation
+ * attribute on its own line at the field-continuation indent (`depth + 1`).
+ */
+function emitBrokenMember(
+  writer: LineWriter,
+  broken: InlineBreak,
+  depth: number,
+  trailing: string | undefined,
+): void {
+  writer.push(depth, withTrailing(`${broken.head} ${broken.comment}`, trailing));
+  for (const attribute of broken.attributes) writer.push(depth + 1, attribute);
 }
 
 /**

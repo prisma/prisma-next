@@ -170,3 +170,34 @@ describe('format alignment grouping with trivia', () => {
     );
   });
 });
+
+describe('format inline comment break barrier', () => {
+  it('keeps an attribute on its own line when a same-line comment precedes it', () => {
+    const out = format('model M {\nid Int //comment\n@id\n}');
+    expect(out).toEqual(lines('model M {', '  id Int //comment', '    @id', '}', ''));
+  });
+
+  it('does not hoist the attribute up past the same-line comment', () => {
+    const out = format('model M {\nid Int //comment\n@id\n}');
+    expect(out).not.toContain('@id //comment');
+  });
+
+  it('keeps every continuation attribute below the comment on its own line', () => {
+    const out = format('model M {\nid Int //pk\n@id\n@default(autoincrement())\n}');
+    expect(out).toEqual(
+      lines('model M {', '  id Int //pk', '    @id', '    @default(autoincrement())', '}', ''),
+    );
+  });
+
+  it('keeps a named-type continuation attribute on its own line past a same-line comment', () => {
+    const out = format('types {\nEmail = String //the address\n@db.Text\n}');
+    expect(out).toEqual(
+      lines('types {', '  Email = String //the address', '    @db.Text', '}', ''),
+    );
+  });
+
+  it('formats the inline-comment break idempotently', () => {
+    const once = format('model M {\nid Int //comment\n@id\n}');
+    expect(format(once)).toEqual(once);
+  });
+});
