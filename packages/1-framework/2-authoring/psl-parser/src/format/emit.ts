@@ -1,9 +1,11 @@
-import { type FieldAttributeAst, ModelAttributeAst } from '../syntax/ast/attributes';
+import {
+  type AttributeArgListAst,
+  type FieldAttributeAst,
+  ModelAttributeAst,
+} from '../syntax/ast/attributes';
 import {
   CompositeTypeDeclarationAst,
   type DocumentAst,
-  EnumDeclarationAst,
-  EnumValueDeclarationAst,
   FieldDeclarationAst,
   GenericBlockDeclarationAst,
   KeyValuePairAst,
@@ -22,6 +24,7 @@ import {
   StringLiteralExprAst,
 } from '../syntax/ast/expressions';
 import { IdentifierAst } from '../syntax/ast/identifier';
+import type { QualifiedNameAst } from '../syntax/ast/qualified-name';
 import type { TypeAnnotationAst } from '../syntax/ast/type-annotation';
 import { type SyntaxElement, SyntaxNode } from '../syntax/red';
 
@@ -230,11 +233,6 @@ function emitBlockMember(
     emitNamedBlock(writer, depth, 'type', composite.name(), node, closingTrailing);
     return true;
   }
-  const enumDecl = EnumDeclarationAst.cast(node);
-  if (enumDecl) {
-    emitNamedBlock(writer, depth, 'enum', enumDecl.name(), node, closingTrailing);
-    return true;
-  }
   const namespace = NamespaceDeclarationAst.cast(node);
   if (namespace) {
     emitNamedBlock(writer, depth, 'namespace', namespace.name(), node, closingTrailing);
@@ -383,15 +381,6 @@ function toAlignmentRow(node: SyntaxNode): AlignmentRow | undefined {
       trailing: undefined,
     };
   }
-  const value = EnumValueDeclarationAst.cast(node);
-  if (value) {
-    return {
-      name: identifierText(value.name()),
-      type: '',
-      attributes: Array.from(value.attributes(), emitFieldAttribute).join(' '),
-      trailing: undefined,
-    };
-  }
   return undefined;
 }
 
@@ -436,40 +425,43 @@ function emitNamedType(named: NamedTypeDeclarationAst): string {
 }
 
 function emitKeyValue(entry: KeyValuePairAst): string {
-  return joinTokens([identifierText(entry.key()), '=', emitExpression(entry.value())]);
+  const key = identifierText(entry.key());
+  if (!entry.equals()) return key;
+  return joinTokens([key, '=', emitExpression(entry.value())]);
+}
+
+/**
+ * Reassembles a `[space ':']? [namespace '.']? name` qualified name from its
+ * segments. The one place every qualified position (type reference, constructor
+ * callee, attribute name) is rendered back to text.
+ */
+function emitQualifiedName(qualified: QualifiedNameAst | undefined): string {
+  if (!qualified) return '';
+  const space = identifierText(qualified.space());
+  const namespace = identifierText(qualified.namespace());
+  const name = identifierText(qualified.identifier());
+  const prefix = space ? `${space}:` : namespace ? `${namespace}.` : '';
+  return `${prefix}${name}`;
 }
 
 function emitTypeAnnotation(annotation: TypeAnnotationAst | undefined): string {
   if (!annotation) return '';
-  let base = '';
-  const constructorCall = annotation.constructorCall();
-  if (constructorCall) {
-    base = emitFunctionCall(constructorCall);
-  } else {
-    const space = identifierText(annotation.spaceName());
-    const namespace = identifierText(annotation.namespaceName());
-    const name = identifierText(annotation.name());
-    const prefix = space ? `${space}:` : namespace ? `${namespace}.` : '';
-    base = `${prefix}${name}`;
-  }
+  let base = emitQualifiedName(annotation.name());
+  if (annotation.isConstructor()) base += emitArgList(annotation.argList());
   if (annotation.isList()) base += '[]';
   if (annotation.isOptional()) base += '?';
   return base;
 }
 
 function emitFieldAttribute(attribute: FieldAttributeAst): string {
-  const namespace = identifierText(attribute.namespaceName());
-  const name = identifierText(attribute.name());
-  const qualified = namespace ? `${namespace}.${name}` : name;
-  return `@${qualified}${emitArgList(attribute)}`;
+  return `@${emitQualifiedName(attribute.name())}${emitArgList(attribute.argList())}`;
 }
 
 function emitModelAttribute(attribute: ModelAttributeAst): string {
-  return `@@${identifierText(attribute.name())}${emitArgList(attribute)}`;
+  return `@@${emitQualifiedName(attribute.name())}${emitArgList(attribute.argList())}`;
 }
 
-function emitArgList(attribute: FieldAttributeAst | ModelAttributeAst): string {
-  const argList = attribute.argList();
+function emitArgList(argList: AttributeArgListAst | undefined): string {
   if (!argList) return '';
   const args = Array.from(argList.args(), emitAttributeArg).join(', ');
   return `(${args})`;
@@ -508,7 +500,7 @@ function emitExpression(expression: ExpressionAst | undefined): string {
 
 function emitFunctionCall(call: FunctionCallAst): string {
   const args = Array.from(call.args(), emitAttributeArg).join(', ');
-  return `${identifierText(call.name())}(${args})`;
+  return `${emitQualifiedName(call.qualifiedName())}(${args})`;
 }
 
 function identifierText(identifier: IdentifierAst | undefined): string {

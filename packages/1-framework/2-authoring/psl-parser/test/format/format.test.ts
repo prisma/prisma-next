@@ -38,9 +38,16 @@ describe('format', () => {
     expect(out).toEqual(['model User {', '  id Int @db.Uuid', '}', ''].join('\n'));
   });
 
-  it('formats an enum declaration', () => {
-    const out = format('enum Role {\nUSER\nADMIN @map("admin")\n}');
-    expect(out).toEqual(['enum Role {', '  USER', '  ADMIN @map("admin")', '}', ''].join('\n'));
+  it('formats an enum declaration through the generic-block path', () => {
+    const out = format('enum Role {\nUSER\nADMIN\n@@map("roles")\n}');
+    expect(out).toEqual(
+      ['enum Role {', '  USER', '  ADMIN', '  @@map("roles")', '}', ''].join('\n'),
+    );
+  });
+
+  it('renders a bare enum member as the key alone, not key followed by =', () => {
+    const out = format('enum Status {\nActive\nInactive\n}');
+    expect(out).toEqual(['enum Status {', '  Active', '  Inactive', '}', ''].join('\n'));
   });
 
   it('formats a composite type declaration', () => {

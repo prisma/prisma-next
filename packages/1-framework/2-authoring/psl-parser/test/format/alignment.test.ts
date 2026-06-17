@@ -39,17 +39,10 @@ describe('format per-block field alignment', () => {
     );
   });
 
-  it('aligns enum value attributes to a common column within the enum block', () => {
-    const out = format('enum Role {\nUSER\nADMINISTRATOR @map("admin")\nGUEST @map("guest")\n}');
+  it('renders enum members as bare keys with no alignment padding', () => {
+    const out = format('enum Role {\nUSER\nADMINISTRATOR\nGUEST\n}');
     expect(out).toEqual(
-      [
-        'enum Role {',
-        '  USER',
-        '  ADMINISTRATOR @map("admin")',
-        '  GUEST         @map("guest")',
-        '}',
-        '',
-      ].join('\n'),
+      ['enum Role {', '  USER', '  ADMINISTRATOR', '  GUEST', '}', ''].join('\n'),
     );
   });
 
@@ -109,7 +102,7 @@ describe('format per-block field alignment', () => {
       '}',
       'enum Role {',
       '  USER',
-      '  ADMINISTRATOR @map("admin")',
+      '  ADMINISTRATOR',
       '}',
       '',
     ].join('\n');
