@@ -9,7 +9,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { ok } from '@prisma-next/utils/result';
 import { expectTypeOf, test } from 'vitest';
-import { defineConfig, type PrismaNextConfig } from '../src/config-types';
+import { defineConfig, type FormatterConfig, type PrismaNextConfig } from '../src/config-types';
 import type { ContractSourceFormat, ContractSourceProvider } from '../src/contract-source-types';
 
 const mockHook = {
@@ -123,6 +123,42 @@ test('accepts contract source providers with declared inputs', () => {
   >();
   expectTypeOf(result.contract!.source.inputs).toEqualTypeOf<readonly string[] | undefined>();
   expectTypeOf(result.contract!.source.load).toEqualTypeOf<ContractSourceProvider['load']>();
+});
+
+test('carries an optional formatter section', () => {
+  const config: PrismaNextConfig<'sql', 'postgres'> = {
+    family: sqlFamilyDescriptor,
+    target: postgresTargetDescriptor,
+    adapter: postgresAdapterDescriptor,
+    formatter: { indent: 'tab', newline: 'CRLF' },
+  };
+
+  const result = defineConfig(config);
+  expectTypeOf(result.formatter).toEqualTypeOf<FormatterConfig | undefined>();
+  expectTypeOf<FormatterConfig['indent']>().toEqualTypeOf<number | 'tab' | undefined>();
+  expectTypeOf<FormatterConfig['newline']>().toEqualTypeOf<'LF' | 'CRLF' | undefined>();
+});
+
+test('omits the formatter section when absent', () => {
+  const config: PrismaNextConfig<'sql', 'postgres'> = {
+    family: sqlFamilyDescriptor,
+    target: postgresTargetDescriptor,
+    adapter: postgresAdapterDescriptor,
+  };
+
+  expectTypeOf(config.formatter).toEqualTypeOf<FormatterConfig | undefined>();
+});
+
+test('rejects an invalid newline literal in the formatter section', () => {
+  const config: PrismaNextConfig<'sql', 'postgres'> = {
+    family: sqlFamilyDescriptor,
+    target: postgresTargetDescriptor,
+    adapter: postgresAdapterDescriptor,
+    // @ts-expect-error newline must be 'LF' | 'CRLF', not a lowercase variant
+    formatter: { newline: 'crlf' },
+  };
+
+  void config;
 });
 
 test('rejects mismatched target in target descriptor', () => {

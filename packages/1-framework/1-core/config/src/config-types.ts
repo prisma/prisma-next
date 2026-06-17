@@ -34,6 +34,18 @@ export interface ContractConfig {
 }
 
 /**
+ * Formatting options for the `prisma format` command. Mirrors the PSL
+ * formatter engine's `FormatOptions`: `indent` is a positive space count or
+ * the literal `'tab'`; `newline` is `'LF'` or `'CRLF'`. Both are optional —
+ * an absent value falls back to the engine defaults (indent 2; newline
+ * resolved from `os.EOL` at the CLI).
+ */
+export interface FormatterConfig {
+  readonly indent?: number | 'tab';
+  readonly newline?: 'LF' | 'CRLF';
+}
+
+/**
  * Default *source* directory for the contract file the user authors at `init`
  * time. Output artefacts colocate with source per the same rule path-bearing
  * providers apply.
@@ -106,6 +118,11 @@ export interface PrismaNextConfig<
     /** Directory for migration packages, relative to config file. Defaults to 'migrations'. */
     readonly dir?: string;
   };
+  /**
+   * Formatting options for the `prisma format` command. Optional; absent
+   * sections fall back to the engine defaults.
+   */
+  readonly formatter?: FormatterConfig;
 }
 
 const ContractSourceInputSchema = type('string');
@@ -129,6 +146,11 @@ const MigrationsConfigSchema = type({
   'dir?': 'string',
 });
 
+export const FormatterConfigSchema = type({
+  'indent?': "number | 'tab'",
+  'newline?': "'LF' | 'CRLF'",
+});
+
 const PrismaNextConfigSchema = type({
   family: 'unknown', // ControlFamilyDescriptor - validated separately
   target: 'unknown', // ControlTargetDescriptor - validated separately
@@ -138,6 +160,7 @@ const PrismaNextConfigSchema = type({
   'db?': 'unknown',
   'contract?': ContractConfigSchema,
   'migrations?': MigrationsConfigSchema,
+  'formatter?': FormatterConfigSchema,
 });
 
 /**

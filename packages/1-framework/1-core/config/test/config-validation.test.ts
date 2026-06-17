@@ -566,3 +566,45 @@ describe('defineConfig', () => {
     expect(() => validateConfig(config)).not.toThrow();
   });
 });
+
+describe('formatter section', () => {
+  it('is optional', () => {
+    const config = createValidConfig();
+    expect(() => defineConfig(config)).not.toThrow();
+  });
+
+  it('accepts a numeric indent and an explicit newline', () => {
+    const config = createValidConfig({
+      formatter: { indent: 4, newline: 'CRLF' },
+    });
+    expect(() => defineConfig(config)).not.toThrow();
+  });
+
+  it('accepts a tab indent', () => {
+    const config = createValidConfig({
+      formatter: { indent: 'tab' },
+    });
+    expect(() => defineConfig(config)).not.toThrow();
+  });
+
+  it('accepts an empty formatter object', () => {
+    const config = createValidConfig({
+      formatter: {},
+    });
+    expect(() => defineConfig(config)).not.toThrow();
+  });
+
+  it('rejects a lowercase newline', () => {
+    const config = createValidConfig({
+      formatter: { newline: 'crlf' },
+    }) as unknown as PrismaNextConfig;
+    expect(() => defineConfig(config)).toThrow('Config validation failed');
+  });
+
+  it('rejects an unsupported indent literal', () => {
+    const config = createValidConfig({
+      formatter: { indent: 'spaces' },
+    }) as unknown as PrismaNextConfig;
+    expect(() => defineConfig(config)).toThrow('Config validation failed');
+  });
+});
