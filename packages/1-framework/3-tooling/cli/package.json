@@ -20,7 +20,7 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@clack/prompts": "^1.4.0",
+    "@clack/prompts": "^1.5.1",
     "@prisma-next/config": "workspace:0.14.0",
     "@prisma-next/contract": "workspace:0.14.0",
     "@prisma-next/emitter": "workspace:0.14.0",
