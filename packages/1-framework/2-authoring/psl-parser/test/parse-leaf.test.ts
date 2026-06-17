@@ -11,6 +11,7 @@ import {
   parseIdentifierExpr,
   parseNumberLiteralExpr,
   parseObjectLiteralExpr,
+  parseQualifiedName,
   parseStringLiteralExpr,
   parseTypeAnnotation,
 } from '../src/parse';
@@ -39,7 +40,7 @@ describe('offset tracking', () => {
     const { diagnostics, cursor } = parse(source, parseTypeAnnotation);
 
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       a.b
@@ -111,8 +112,9 @@ describe('parseAttribute well-formed', () => {
     expect(printTree(node)).toMatchInlineSnapshot(`
       "FieldAttribute
         At "@"
-        Identifier
-          Ident "id""
+        QualifiedName
+          Identifier
+            Ident "id""
     `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
@@ -125,11 +127,12 @@ describe('parseAttribute well-formed', () => {
     expect(printTree(node)).toMatchInlineSnapshot(`
       "FieldAttribute
         At "@"
-        Identifier
-          Ident "db"
-        Dot "."
-        Identifier
-          Ident "VarChar""
+        QualifiedName
+          Identifier
+            Ident "db"
+          Dot "."
+          Identifier
+            Ident "VarChar""
     `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
@@ -142,14 +145,16 @@ describe('parseAttribute well-formed', () => {
     expect(printTree(node)).toMatchInlineSnapshot(`
       "FieldAttribute
         At "@"
-        Identifier
-          Ident "default"
+        QualifiedName
+          Identifier
+            Ident "default"
         AttributeArgList
           LParen "("
           AttributeArg
             FunctionCall
-              Identifier
-                Ident "autoincrement"
+              QualifiedName
+                Identifier
+                  Ident "autoincrement"
               LParen "("
               RParen ")"
           RParen ")""
@@ -165,8 +170,9 @@ describe('parseAttribute well-formed', () => {
     expect(printTree(node)).toMatchInlineSnapshot(`
       "ModelAttribute
         DoubleAt "@@"
-        Identifier
-          Ident "map""
+        QualifiedName
+          Identifier
+            Ident "map""
     `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
@@ -270,8 +276,9 @@ describe('parseExpression well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "FunctionCall
-        Identifier
-          Ident "autoincrement"
+        QualifiedName
+          Identifier
+            Ident "autoincrement"
         LParen "("
         RParen ")""
     `);
@@ -308,8 +315,9 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        Identifier
-          Ident "String""
+        QualifiedName
+          Identifier
+            Ident "String""
     `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
@@ -321,11 +329,12 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        Identifier
-          Ident "auth"
-        Dot "."
-        Identifier
-          Ident "User""
+        QualifiedName
+          Identifier
+            Ident "auth"
+          Dot "."
+          Identifier
+            Ident "User""
     `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
@@ -337,14 +346,15 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        Identifier
-          Ident "supabase"
-        Colon ":"
-        Identifier
-          Ident "auth"
-        Dot "."
-        Identifier
-          Ident "User"
+        QualifiedName
+          Identifier
+            Ident "supabase"
+          Colon ":"
+          Identifier
+            Ident "auth"
+          Dot "."
+          Identifier
+            Ident "User"
         Question "?""
     `);
     expect(greenText(node)).toBe(source);
@@ -357,11 +367,12 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        Identifier
-          Ident "supabase"
-        Colon ":"
-        Identifier
-          Ident "User""
+        QualifiedName
+          Identifier
+            Ident "supabase"
+          Colon ":"
+          Identifier
+            Ident "User""
     `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
@@ -373,14 +384,66 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        FunctionCall
+        QualifiedName
           Identifier
             Ident "Vector"
+        AttributeArgList
           LParen "("
           AttributeArg
             NumberLiteralExpr
               NumberLiteral "1536"
           RParen ")""
+    `);
+    expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it('parses a namespace-qualified constructor call into a single FunctionCall chain', () => {
+    const source = 'pgvector.Vector(1536)';
+    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "TypeAnnotation
+        QualifiedName
+          Identifier
+            Ident "pgvector"
+          Dot "."
+          Identifier
+            Ident "Vector"
+        AttributeArgList
+          LParen "("
+          AttributeArg
+            NumberLiteralExpr
+              NumberLiteral "1536"
+          RParen ")""
+    `);
+    expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it('parses a qualified constructor with a named argument and an optional suffix', () => {
+    const source = 'pgvector.Vector(length: 1536)?';
+    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "TypeAnnotation
+        QualifiedName
+          Identifier
+            Ident "pgvector"
+          Dot "."
+          Identifier
+            Ident "Vector"
+        AttributeArgList
+          LParen "("
+          AttributeArg
+            Identifier
+              Ident "length"
+            Colon ":"
+            Whitespace " "
+            NumberLiteralExpr
+              NumberLiteral "1536"
+          RParen ")"
+        Question "?""
     `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
@@ -392,8 +455,9 @@ describe('parseTypeAnnotation well-formed', () => {
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
-        Identifier
-          Ident "String"
+        QualifiedName
+          Identifier
+            Ident "String"
         LBracket "["
         RBracket "]""
     `);
@@ -410,8 +474,8 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
-    expect(diagnostics[0]!.message).toBe('Qualified type reference has too many segments');
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
+    expect(diagnostics[0]!.message).toBe('Qualified name has too many segments');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       a.b.c
@@ -427,14 +491,72 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
-    expect(diagnostics[0]!.message).toBe('Qualified type reference has too many segments');
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
+    expect(diagnostics[0]!.message).toBe('Qualified name has too many segments');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       a:b:c
          ~
       "
     `);
+  });
+
+  it('flags a trailing dot with no following segment', () => {
+    const source = 'Int.';
+    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+
+    expect(node.kind).toBe('TypeAnnotation');
+    expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
+    expect(diagnostics[0]!.message).toBe('Qualified name is missing a name after the separator');
+  });
+
+  it('flags a trailing colon with no following segment', () => {
+    const source = 'supabase:';
+    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+
+    expect(node.kind).toBe('TypeAnnotation');
+    expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
+  });
+});
+
+describe('parseQualifiedName', () => {
+  const run = (cursor: Cursor): GreenNode => {
+    parseQualifiedName(cursor);
+    cursor.startNode('Document');
+    while (cursor.peekKind() !== 'Eof') cursor.bump();
+    cursor.flushTrivia();
+    return cursor.finishNode();
+  };
+
+  it('consumes a space:namespace.name chain into one QualifiedName, round-tripping', () => {
+    const source = 'supabase:auth.User';
+    const cursor = new Cursor(source);
+    parseQualifiedName(cursor);
+    cursor.startNode('Document');
+    cursor.flushTrivia();
+    const trailing = cursor.finishNode();
+    expect(cursor.diagnostics).toEqual([]);
+    expect(cursor.peekKind()).toBe('Eof');
+    expect(greenText(trailing)).toBe('');
+  });
+
+  it('stops at the first non-segment token, leaving it for the caller to peek', () => {
+    // The `(` is left unconsumed: the caller decides constructor-vs-reference.
+    const cursor = new Cursor('pgvector.Vector(1536)');
+    parseQualifiedName(cursor);
+    expect(cursor.peekKind()).toBe('LParen');
+    expect(cursor.diagnostics).toEqual([]);
+  });
+
+  it('emits PSL_INVALID_QUALIFIED_NAME for over-qualification, uniformly in every position', () => {
+    const { diagnostics } = parse('a.b.c', run);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
+    expect(diagnostics[0]!.message).toBe('Qualified name has too many segments');
   });
 });
 
@@ -463,8 +585,8 @@ describe('parseAttribute fault tolerance', () => {
     expect(node.kind).toBe('FieldAttribute');
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
-    expect(diagnostics[0]!.message).toBe('Attribute name expected after "."');
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
+    expect(diagnostics[0]!.message).toBe('Qualified name is missing a name after the separator');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       @ns.
@@ -558,41 +680,34 @@ describe('argument-position object literal', () => {
     `);
   });
 
-  it('flags a string-literal key as invalid but recovers a terminated, round-tripping object', () => {
+  it('accepts a string-literal key, exposing the unquoted name', () => {
     const source = '{ "k": 1 }';
-    const { node, diagnostics, cursor } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parse(source, parseAttributeArg);
     expect(greenText(node)).toBe(source); // round-trip holds, object terminated
-    expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
-    expect(diagnostics[0]!.message).toBe('Object literal keys must be identifiers');
-    expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
-      "
-      { "k": 1 }
-        ~~~
-      "
-    `);
+    expect(diagnostics).toEqual([]);
+
+    const obj = AttributeArgAst.cast(createSyntaxTree(node))!.value();
+    expect(obj).toBeInstanceOf(ObjectLiteralExprAst);
+    if (obj instanceof ObjectLiteralExprAst) {
+      const field = Array.from(obj.fields())[0];
+      expect(field!.keyName()).toBe('k');
+      expect(field!.value()).toBeInstanceOf(NumberLiteralExprAst);
+    }
   });
 
-  it('flags only the string-literal key in a mixed object and parses the rest', () => {
+  it('accepts a mix of identifier and string-literal keys with no diagnostics', () => {
     const source = '{ a: 1, "k": 2 }';
-    const { node, diagnostics, cursor } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parse(source, parseAttributeArg);
     expect(greenText(node)).toBe(source); // round-trip holds
-    expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
-    expect(diagnostics[0]!.message).toBe('Object literal keys must be identifiers');
-    expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
-      "
-      { a: 1, "k": 2 }
-              ~~~
-      "
-    `);
+    expect(diagnostics).toEqual([]);
 
     const obj = AttributeArgAst.cast(createSyntaxTree(node))!.value();
     expect(obj).toBeInstanceOf(ObjectLiteralExprAst);
     if (obj instanceof ObjectLiteralExprAst) {
       const fields = Array.from(obj.fields());
       expect(fields).toHaveLength(2);
-      expect(fields[0]!.key()?.token()?.text).toBe('a');
+      expect(fields[0]!.keyName()).toBe('a');
+      expect(fields[1]!.keyName()).toBe('k');
       expect(fields[0]!.value()).toBeInstanceOf(NumberLiteralExprAst);
       expect(fields[1]!.value()).toBeInstanceOf(NumberLiteralExprAst);
     }
@@ -626,6 +741,12 @@ describe('expression alternatives are no-ops on non-match', () => {
 
   it('parseFunctionCall rejects an identifier with no following paren without consuming', () => {
     expectNoOpReject('foo', parseFunctionCall);
+  });
+
+  it('parseFunctionCall rejects a dotted reference with no following paren without consuming', () => {
+    // `a.b` (no parens) must not be committed as a paren-less FunctionCall — the
+    // lookahead requires the trailing `(` before the node is started.
+    expectNoOpReject('a.b', parseFunctionCall);
   });
 
   it('parseBooleanLiteralExpr rejects a non-boolean identifier without consuming', () => {

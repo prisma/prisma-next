@@ -36,6 +36,11 @@ export type PslDiagnosticCode =
   | 'PSL_INVALID_TYPES_MEMBER'
   | 'PSL_INVALID_QUALIFIED_TYPE'
   /**
+   * A qualified name (e.g. a dotted type or attribute reference) is structurally
+   * invalid, such as an over-qualified or trailing-separator name.
+   */
+  | 'PSL_INVALID_QUALIFIED_NAME'
+  /**
    * A reserved declaration keyword (`model`/`enum`/`namespace`/`type`) that
    * committed the declaration kind on the keyword alone but is missing its name
    * and/or opening brace. The recursive-descent parser produces a best-effort

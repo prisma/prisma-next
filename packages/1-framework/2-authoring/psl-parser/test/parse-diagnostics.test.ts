@@ -3,7 +3,6 @@ import { parse } from '../src/parse';
 import {
   CompositeTypeDeclarationAst,
   DocumentAst,
-  EnumDeclarationAst,
   GenericBlockDeclarationAst,
   ModelDeclarationAst,
   NamespaceDeclarationAst,
@@ -30,7 +29,7 @@ function diagnosticFor(source: string, code: string) {
   return { result, message: diagnostic.message, diagnostic };
 }
 
-describe('parse() syntactic diagnostics carry parsePslDocument-parity messages', () => {
+describe('parse() syntactic diagnostics', () => {
   it('reports an unterminated block, anchored on the opening brace', () => {
     const source = 'model User {\n  id Int';
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_UNTERMINATED_BLOCK');
@@ -161,21 +160,6 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
 
-  it('reports a malformed enum member with the offending token', () => {
-    const source = 'enum E {\n  123\n  OK\n}';
-    const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_ENUM_MEMBER');
-    expect(message).toBe('Invalid enum value declaration "123"');
-    expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "
-      enum E {
-        123
-        ~~~
-        OK
-      }
-      "
-    `);
-  });
-
   it('reports a malformed types-block member with the offending token', () => {
     const source = 'types {\n  123\n  Ok = Int\n}';
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_TYPES_MEMBER');
@@ -209,52 +193,36 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     `);
   });
 
-  it('reports a generic-block entry missing its "=", anchored on the key, keeping the pair', () => {
+  it('treats a bare key followed by a stray value as a bare entry plus an invalid member', () => {
     const source = 'datasource db {\n  provider "x"\n}';
-    const { result, message, diagnostic } = diagnosticFor(
-      source,
-      'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
-    );
-    expect(message).toBe('Expected "=" after "provider"');
-    expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "
-      datasource db {
-        provider "x"
-        ~~~~~~~~
-      }
-      "
-    `);
+    const { result, message } = diagnosticFor(source, 'PSL_INVALID_EXTENSION_BLOCK_MEMBER');
+    // `provider` (no `=`) is a valid bare entry; the trailing `"x"` is the
+    // invalid member the diagnostic points at.
+    expect(message).toBe('Invalid block entry');
     const decl = Array.from(result.document.declarations())[0];
     expect(decl).toBeInstanceOf(GenericBlockDeclarationAst);
     if (decl instanceof GenericBlockDeclarationAst) {
       const entries = Array.from(decl.entries());
       expect(entries).toHaveLength(1);
       expect(entries[0]!.key()?.token()?.text).toBe('provider');
+      expect(entries[0]!.value()).toBeUndefined();
     }
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
 
-  it('reports a bare generic-block key with no value as a missing "="', () => {
+  it('accepts a bare generic-block key with no value as a bare-member entry', () => {
     const source = 'datasource db {\n  provider\n}';
-    const { result, message, diagnostic } = diagnosticFor(
-      source,
-      'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
-    );
-    expect(message).toBe('Expected "=" after "provider"');
-    expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "
-      datasource db {
-        provider
-        ~~~~~~~~
-      }
-      "
-    `);
+    const result = parse(source);
+    // A bare key carries no value and is not a diagnostic: the domain-enum
+    // member shape `enum Status { Active }` relies on this entry.
+    expect(result.diagnostics).toEqual([]);
     const decl = Array.from(result.document.declarations())[0];
     expect(decl).toBeInstanceOf(GenericBlockDeclarationAst);
     if (decl instanceof GenericBlockDeclarationAst) {
       const entries = Array.from(decl.entries());
       expect(entries).toHaveLength(1);
       expect(entries[0]!.key()?.token()?.text).toBe('provider');
+      expect(entries[0]!.value()).toBeUndefined();
     }
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
@@ -326,46 +294,27 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
 
-  it('enum with a missing name yields a typed node', () => {
+  it('a nameless enum block parses as a nameless generic block with no parse diagnostic', () => {
+    // `enum` is no longer a reserved native keyword: it routes through the
+    // generic-block grammar, so a nameless `enum {}` is a structurally valid
+    // generic block. Whether a name is required is a resolve-time descriptor
+    // concern, not a parse-time one.
     const source = 'enum {\n}';
-    const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
-    expect(message).toBe('Expected a name after "enum"');
-    expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "
-      enum {
-      ~~~~
-      }
-      "
-    `);
-    expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(EnumDeclarationAst);
+    const result = parse(source);
+    expect(result.diagnostics).toEqual([]);
+    expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(
+      GenericBlockDeclarationAst,
+    );
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
 
-  it('enum with a missing brace yields a typed node and reports the brace', () => {
-    const source = 'enum Color';
-    const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
-    expect(message).toBe('Expected "{" to open the "enum" block');
-    expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "
-      enum Color
-                ~
-      "
-    `);
-    expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(EnumDeclarationAst);
-    expect(greenText(result.document.syntax.green)).toBe(source);
-  });
-
-  it('a bare enum keyword yields a typed node and reports the missing name', () => {
+  it('enum with a name but no brace reports the missing brace as a generic block', () => {
     const source = 'enum';
-    const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
-    expect(message).toBe('Expected a name after "enum"');
-    expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "
-      enum
-      ~~~~
-      "
-    `);
-    expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(EnumDeclarationAst);
+    const { result, message } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
+    expect(message).toBe('Expected "{" to open the "enum" block');
+    expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(
+      GenericBlockDeclarationAst,
+    );
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
 
@@ -570,10 +519,8 @@ describe('parse() diagnoses unterminated string literals', () => {
 
 describe('parse() attribute attachment is newline-insensitive', () => {
   // F06: a standalone attribute on the line after a field attaches to that
-  // field, because newlines are trivia in this grammar. This is a known,
-  // intentional divergence from `parsePslDocument`'s line semantics, to be
-  // revisited at consumer-repoint (see the spec/plan open item). This test pins
-  // the current behaviour so the follow-up has a signal; no code change.
+  // field, because newlines are trivia in this grammar. This test pins the
+  // current behaviour so any future change has a signal; no code change.
   it('attaches a standalone attribute on the next line to the preceding field', () => {
     const source = 'model M {\n  id Int\n  @id\n}';
     const result = parse(source);
@@ -594,14 +541,16 @@ describe('parse() attribute attachment is newline-insensitive', () => {
               Ident "id"
             Whitespace " "
             TypeAnnotation
-              Identifier
-                Ident "Int"
+              QualifiedName
+                Identifier
+                  Ident "Int"
             Newline "\\n"
             Whitespace "  "
             FieldAttribute
               At "@"
-              Identifier
-                Ident "id"
+              QualifiedName
+                Identifier
+                  Ident "id"
           Newline "\\n"
           RBrace "}""
     `);
