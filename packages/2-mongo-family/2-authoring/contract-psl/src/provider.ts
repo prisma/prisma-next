@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse, resolve } from '@prisma-next/psl-parser/syntax';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -74,6 +75,11 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
         const resolved = resolve(document, sourceFile, {
           codecLookup: context.codecLookup,
           scalarTypes: new Set(context.scalarTypeDescriptors.keys()),
+          // Mongo's target default namespace. The Mongo interpreter discards the
+          // resolved coordinate namespace (it stamps its own `UNBOUND_NAMESPACE_ID`
+          // at every relation/root emit), so this is inert for Mongo output; it is
+          // supplied because `defaultNamespaceId` is a required resolve option.
+          defaultNamespaceId: UNBOUND_NAMESPACE_ID,
         });
 
         const syntacticAndSemantic = [...parseDiagnostics, ...resolved.diagnostics];

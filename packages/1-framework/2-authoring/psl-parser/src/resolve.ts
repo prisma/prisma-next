@@ -51,6 +51,16 @@ import type { SyntaxNode } from './syntax/red';
  */
 export interface ResolveOptions {
   readonly scalarTypes: ReadonlySet<string>;
+  /**
+   * The namespace a bare name resolves *into* for this target. The resolver
+   * stamps it onto bare-name coordinates ({@link DeclCoord.namespaceId}) in place
+   * of the parser-synthesised {@link UNSPECIFIED_PSL_NAMESPACE_ID} bucket id, so a
+   * resolved `ref`/`block` coordinate carries the target's real default namespace
+   * (e.g. `'public'` for postgres). Required: every target threads its own
+   * `TargetPackRef.defaultNamespaceId`. The bucket/lookup keys themselves stay
+   * {@link UNSPECIFIED_PSL_NAMESPACE_ID}; only the stamped coordinate value moves.
+   */
+  readonly defaultNamespaceId: string;
   readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
   readonly codecLookup?: CodecLookup;
 }
@@ -204,10 +214,25 @@ export class Resolver {
   readonly #diagnostics: ParseDiagnostic[] = [];
   readonly #sourceFile: SourceFile;
   readonly #scalarTypes: ReadonlySet<string>;
+  readonly #defaultNamespaceId: string;
 
-  constructor(sourceFile: SourceFile, scalarTypes: ReadonlySet<string>) {
+  constructor(
+    sourceFile: SourceFile,
+    scalarTypes: ReadonlySet<string>,
+    defaultNamespaceId: string,
+  ) {
     this.#sourceFile = sourceFile;
     this.#scalarTypes = scalarTypes;
+    this.#defaultNamespaceId = defaultNamespaceId;
+  }
+
+  // The namespace stamped onto a bare-name coordinate. The bucket/lookup keys
+  // stay {@link UNSPECIFIED_PSL_NAMESPACE_ID} (the parser's synthesised id for
+  // top-level declarations); only the *resolved* coordinate carries the target's
+  // real default namespace, so a downstream interpreter reads where the name
+  // actually binds. A name found in a genuine named namespace keeps that id.
+  #stamp(namespaceId: string): string {
+    return namespaceId === UNSPECIFIED_PSL_NAMESPACE_ID ? this.#defaultNamespaceId : namespaceId;
   }
 
   get scalarTypes(): ReadonlySet<string> {
@@ -288,7 +313,7 @@ export class Resolver {
     if (nameTable.namedTypes.has(typeName)) {
       return {
         kind: 'ref',
-        coord: { kind: 'namedType', namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID, name: typeName },
+        coord: { kind: 'namedType', namespaceId: this.#defaultNamespaceId, name: typeName },
       };
     }
 
@@ -313,16 +338,16 @@ export class Resolver {
         : nameTable.scopes.get(UNSPECIFIED_PSL_NAMESPACE_ID)?.get(typeName);
 
     if (currentSymbol !== undefined && currentSymbol.kind !== 'block') {
-      return symbolTarget(currentSymbol, currentNamespaceId, typeName);
+      return symbolTarget(currentSymbol, this.#stamp(currentNamespaceId), typeName);
     }
     if (ambientSymbol !== undefined && ambientSymbol.kind !== 'block') {
-      return symbolTarget(ambientSymbol, UNSPECIFIED_PSL_NAMESPACE_ID, typeName);
+      return symbolTarget(ambientSymbol, this.#defaultNamespaceId, typeName);
     }
     if (currentSymbol?.kind === 'block') {
-      return { kind: 'block', namespaceId: currentNamespaceId, name: typeName };
+      return { kind: 'block', namespaceId: this.#stamp(currentNamespaceId), name: typeName };
     }
     if (ambientSymbol?.kind === 'block') {
-      return { kind: 'block', namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID, name: typeName };
+      return { kind: 'block', namespaceId: this.#defaultNamespaceId, name: typeName };
     }
 
     this.diagnostic(
@@ -399,7 +424,7 @@ export function resolve(
   sourceFile: SourceFile,
   options: ResolveOptions,
 ): ResolvedDocument {
-  const resolver = new Resolver(sourceFile, options.scalarTypes);
+  const resolver = new Resolver(sourceFile, options.scalarTypes, options.defaultNamespaceId);
   const descriptorsByKeyword = collectBlockDescriptors(options.pslBlockDescriptors);
   const codecLookup = options.codecLookup ?? emptyCodecLookup;
 

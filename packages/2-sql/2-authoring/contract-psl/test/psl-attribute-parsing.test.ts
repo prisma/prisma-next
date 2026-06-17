@@ -25,7 +25,10 @@ const span: PslSpan = {
 
 function modelAttribute(schema: string, model: string, attribute: string): ResolvedAttribute {
   const { document, sourceFile } = parse(schema);
-  const resolved = resolve(document, sourceFile, { scalarTypes: sqlScalarTypes });
+  const resolved = resolve(document, sourceFile, {
+    scalarTypes: sqlScalarTypes,
+    defaultNamespaceId: 'public',
+  });
   const ns = [...resolved.namespaces.values()][0];
   const target = ns?.models.get(model);
   const found = target?.attributes.find((attr) => attr.name === attribute);
@@ -40,7 +43,10 @@ function fieldAttribute(
   attribute: string,
 ): ResolvedAttribute {
   const { document, sourceFile } = parse(schema);
-  const resolved = resolve(document, sourceFile, { scalarTypes: sqlScalarTypes });
+  const resolved = resolve(document, sourceFile, {
+    scalarTypes: sqlScalarTypes,
+    defaultNamespaceId: 'public',
+  });
   const ns = [...resolved.namespaces.values()][0];
   const target = ns?.models.get(model)?.fields.get(field);
   const found = target?.attributes.find((attr) => attr.name === attribute);

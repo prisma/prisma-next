@@ -1079,6 +1079,7 @@ describe('resolve() reads qualified @@-block attributes', () => {
 
     const resolved = resolve(result.document, result.sourceFile, {
       scalarTypes: frameworkScalarTypes,
+      defaultNamespaceId: 'public',
     });
     const models = Array.from(resolved.namespaces.values()).flatMap((ns) =>
       Array.from(ns.models.values()),

@@ -53,8 +53,11 @@ function resolveSource(
   options?: Omit<ResolveOptions, 'scalarTypes'>,
 ): readonly ParseDiagnostic[] {
   const { document, sourceFile } = parse(source);
-  return resolve(document, sourceFile, { scalarTypes: frameworkScalarTypes, ...options })
-    .diagnostics;
+  return resolve(document, sourceFile, {
+    scalarTypes: frameworkScalarTypes,
+    defaultNamespaceId: 'public',
+    ...options,
+  }).diagnostics;
 }
 
 function diagnosticsFor(source: string): readonly ParseDiagnostic[] {

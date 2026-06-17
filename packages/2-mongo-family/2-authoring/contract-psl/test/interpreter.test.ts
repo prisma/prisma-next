@@ -97,6 +97,7 @@ function interpret(
   const resolved = resolve(document, sourceFile, {
     codecLookup: mongoCodecLookup,
     scalarTypes: mongoScalarTypes,
+    defaultNamespaceId: '__unbound__',
   });
   return interpretPslDocumentToMongoContract({
     document: resolved,

@@ -18,7 +18,10 @@ import { frameworkScalarTypes } from './support';
 
 function resolveSource(source: string): ResolvedDocument {
   const { document, sourceFile } = parse(source);
-  return resolve(document, sourceFile, { scalarTypes: frameworkScalarTypes });
+  return resolve(document, sourceFile, {
+    scalarTypes: frameworkScalarTypes,
+    defaultNamespaceId: 'public',
+  });
 }
 
 function namespace(doc: ResolvedDocument, id: string): ResolvedNamespace {
@@ -113,7 +116,7 @@ types {
     it('resolves a named-type alias reference to a namedType ref coordinate', () => {
       expect(fieldTarget(resolveSource(source), 'auth', 'User', 'email')).toEqual({
         kind: 'ref',
-        coord: { kind: 'namedType', namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID, name: 'Email' },
+        coord: { kind: 'namedType', namespaceId: 'public', name: 'Email' },
       });
     });
 
@@ -286,7 +289,7 @@ namespace billing {
     it('resolves a namespaced bare reference to a top-level un-namespaced declaration', () => {
       expect(fieldTarget(resolveSource(source), 'billing', 'Invoice', 'audit')).toEqual({
         kind: 'ref',
-        coord: { kind: 'model', namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID, name: 'AuditLog' },
+        coord: { kind: 'model', namespaceId: 'public', name: 'AuditLog' },
       });
     });
   });
@@ -425,7 +428,7 @@ model Account {
         fieldTarget(resolveSource(source), UNSPECIFIED_PSL_NAMESPACE_ID, 'Account', 'owner'),
       ).toEqual({
         kind: 'ref',
-        coord: { kind: 'model', namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID, name: 'User' },
+        coord: { kind: 'model', namespaceId: 'public', name: 'User' },
       });
     });
 
@@ -457,7 +460,7 @@ model Foo {
       );
       expect(target).toEqual({
         kind: 'ref',
-        coord: { kind: 'compositeType', namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID, name: 'Foo' },
+        coord: { kind: 'compositeType', namespaceId: 'public', name: 'Foo' },
       });
     });
 
@@ -509,6 +512,7 @@ model Foo {
       const result = parse('model M {\n  x a.b.Bar\n}');
       const resolved = resolve(result.document, result.sourceFile, {
         scalarTypes: frameworkScalarTypes,
+        defaultNamespaceId: 'public',
       });
       const all = [...result.diagnostics, ...resolved.diagnostics];
       expect(all.map((d) => d.code)).toEqual(['PSL_INVALID_QUALIFIED_NAME']);

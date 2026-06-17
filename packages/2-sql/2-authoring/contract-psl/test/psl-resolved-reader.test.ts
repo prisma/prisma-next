@@ -6,7 +6,10 @@ import { sqlScalarTypes } from './fixtures';
 
 function parseAndResolve(schema: string) {
   const { document, sourceFile } = parse(schema);
-  return resolve(document, sourceFile, { scalarTypes: sqlScalarTypes });
+  return resolve(document, sourceFile, {
+    scalarTypes: sqlScalarTypes,
+    defaultNamespaceId: 'public',
+  });
 }
 
 function field(schema: string, model: string, fieldName: string) {

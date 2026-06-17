@@ -43,7 +43,11 @@ function resolveDoc(
   options?: Omit<ResolveOptions, 'scalarTypes'> & { scalarTypes?: ReadonlySet<string> },
 ): ResolvedDocument {
   const { document, sourceFile } = parse(source);
-  return resolve(document, sourceFile, { scalarTypes: frameworkScalarTypes, ...options });
+  return resolve(document, sourceFile, {
+    scalarTypes: frameworkScalarTypes,
+    defaultNamespaceId: 'public',
+    ...options,
+  });
 }
 
 describe('enum routes through the generic-block / extension-block path', () => {
@@ -114,7 +118,7 @@ model Ticket {
     const status = ns?.models.get('Ticket')?.fields.get('status');
     expect(status?.type.target).toEqual({
       kind: 'block',
-      namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID,
+      namespaceId: 'public',
       name: 'Priority',
     });
     expect(ns?.blockTypes.get('Priority')).toEqual({
@@ -143,7 +147,7 @@ model Ticket {
     expect(ns?.blockTypes.get('Priority')?.keyword).toBe('enum');
     expect(ns?.models.get('Ticket')?.fields.get('status')?.type.target).toEqual({
       kind: 'block',
-      namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID,
+      namespaceId: 'public',
       name: 'Priority',
     });
   });
@@ -165,7 +169,7 @@ model Document {
     expect(ns?.blockTypes.get('Restricted')?.keyword).toBe('policy_select');
     expect(ns?.models.get('Document')?.fields.get('access')?.type.target).toEqual({
       kind: 'block',
-      namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID,
+      namespaceId: 'public',
       name: 'Restricted',
     });
   });
@@ -262,7 +266,10 @@ describe('resolve derives diagnostic ranges from the passed SourceFile', () => {
   it('anchors an unresolved-reference diagnostic at the offending token', () => {
     const source = 'model M {\n  ghost Mystery\n}';
     const { document, sourceFile } = parse(source);
-    const doc = resolve(document, sourceFile, { scalarTypes: frameworkScalarTypes });
+    const doc = resolve(document, sourceFile, {
+      scalarTypes: frameworkScalarTypes,
+      defaultNamespaceId: 'public',
+    });
     const diagnostic = doc.diagnostics.find((d) => d.code === 'PSL_UNRESOLVED_TYPE_REFERENCE');
     expect(diagnostic).toBeDefined();
     // `Mystery` starts at column 8 of line 1 (zero-based line index).

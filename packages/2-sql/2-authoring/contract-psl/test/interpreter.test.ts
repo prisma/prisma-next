@@ -12,6 +12,8 @@ import {
   parseAndResolve,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  sqliteScalarTypeDescriptors,
+  sqliteTarget,
   testEnumEntityContributions,
 } from './fixtures';
 import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
@@ -229,6 +231,52 @@ model Comment {
       post: crossRef('Post', 'public'),
       comment: crossRef('Comment', 'public'),
     });
+  });
+
+  it('omits a bare-relation FK target namespace beyond the SQLite unbound sentinel', () => {
+    // SQLite reconciliation (Option 1): the resolver stamps sqlite's concrete
+    // `defaultNamespaceId` (`__unbound__`) onto the bare relation coordinate, but
+    // the FK-emit must NOT surface a namespace per-model — the bare FK keeps
+    // omitting `references.namespaceId`, so the build fills the single unbound
+    // sentinel. The FK target therefore carries exactly `__unbound__` (and nothing
+    // target-specific), byte-identical to the pre-resolver-stamp shape.
+    const document = parseAndResolve({
+      schema: `model User {
+  id Int @id
+}
+
+model Post {
+  id Int @id
+  userId Int
+  author User @relation(fields: [userId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+      defaultNamespaceId: '__unbound__',
+    });
+
+    const result = interpretPslDocumentToSqlContractInternal({
+      ...document,
+      target: sqliteTarget,
+      scalarTypeDescriptors: sqliteScalarTypeDescriptors,
+      composedExtensionContracts: new Map(),
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    const postTable = unboundTables(storage)['post'];
+    expect(postTable?.foreignKeys).toHaveLength(1);
+    expect(postTable?.foreignKeys[0]).toMatchObject({
+      source: { namespaceId: '__unbound__', tableName: 'post', columns: ['userId'] },
+      target: { namespaceId: '__unbound__', tableName: 'user', columns: ['id'] },
+    });
+    // The reconciliation's binding assertion: the bare FK target namespace is
+    // exactly the single unbound sentinel — the resolver's stamped `__unbound__`
+    // default did not surface a per-model namespace on the FK.
+    expect(postTable?.foreignKeys[0]?.target.namespaceId).toBe('__unbound__');
   });
 
   it('builds sql contract ir from simple psl schema', () => {

@@ -667,6 +667,13 @@ export interface ParseAndResolveInput {
   readonly sourceId?: string;
   readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
   readonly codecLookup?: CodecLookup;
+  /**
+   * The namespace the resolver stamps onto bare-name coordinates. Mirrors the
+   * target's `defaultNamespaceId`; defaults to postgres's `'public'`, which is
+   * what most fixtures interpret against. SQLite interpretation collapses the FK
+   * namespace away regardless, so the default is safe for both targets.
+   */
+  readonly defaultNamespaceId?: string;
 }
 
 /**
@@ -686,6 +693,7 @@ export function parseAndResolve(input: ParseAndResolveInput): {
   const { document, diagnostics: parseDiagnostics, sourceFile } = parse(input.schema);
   const resolved = resolve(document, sourceFile, {
     scalarTypes: sqlScalarTypes,
+    defaultNamespaceId: input.defaultNamespaceId ?? 'public',
     ...ifDefined('pslBlockDescriptors', input.pslBlockDescriptors),
     ...ifDefined('codecLookup', input.codecLookup),
   });

@@ -89,6 +89,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           ...ifDefined('pslBlockDescriptors', context.authoringContributions.pslBlockDescriptors),
           codecLookup: context.codecLookup,
           scalarTypes: new Set(context.scalarTypeDescriptors.keys()),
+          defaultNamespaceId: options.target.defaultNamespaceId,
         });
         // `parse` does not itself fail on syntax errors — it recovers and
         // collects diagnostics on the result. The interpreter merges the

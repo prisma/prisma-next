@@ -641,8 +641,6 @@ interface BuildModelNodeInput {
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
-  /** Resolved namespace id keyed by model name — used to stamp the target namespace on FKs. */
-  readonly modelNamespaceIds: ReadonlyMap<string, string>;
   readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
 }
 
@@ -669,6 +667,15 @@ function relationTargetCoordinates(field: ResolvedField): {
   readonly typeName: string;
   readonly typeNamespaceId: string | undefined;
   readonly typeContractSpaceId: string | undefined;
+  /**
+   * The namespace the resolver stamped on the target coordinate — the namespace
+   * the bare name actually binds into for this target (the resolver's
+   * `defaultNamespaceId` for a top-level model, or a named namespace otherwise).
+   * Unlike `typeNamespaceId` (set only when the author wrote a qualifier), this
+   * is the resolved binding namespace and is read for the bare-relation FK
+   * target namespace. Absent for non-`ref` targets.
+   */
+  readonly resolvedTargetNamespaceId: string | undefined;
 } {
   const target = field.type.target;
   if (target.kind === 'crossSpace') {
@@ -676,6 +683,7 @@ function relationTargetCoordinates(field: ResolvedField): {
       typeName: target.typeName,
       typeNamespaceId: target.namespaceId,
       typeContractSpaceId: target.spaceId,
+      resolvedTargetNamespaceId: undefined,
     };
   }
   const annotation = field.syntax.typeAnnotation();
@@ -684,6 +692,7 @@ function relationTargetCoordinates(field: ResolvedField): {
     typeName: fieldTypeName(field),
     typeNamespaceId: writtenNamespace,
     typeContractSpaceId: undefined,
+    resolvedTargetNamespaceId: target.kind === 'ref' ? target.coord.namespaceId : undefined,
   };
 }
 
@@ -1058,6 +1067,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       typeName: fieldTypeName,
       typeNamespaceId: fieldTypeNamespaceId,
       typeContractSpaceId: fieldTypeContractSpaceId,
+      resolvedTargetNamespaceId,
     } = relationTargetCoordinates(relationAttribute.field);
     const relationFieldSpan = spanOf(relationAttribute.field.syntax.syntax, sourceFile);
     const relationAttrSpan = spanOf(relationAttribute.relation.syntax.syntax, sourceFile);
@@ -1359,10 +1369,27 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         })
       : undefined;
 
+    // The FK target namespace. A written qualifier wins (`auth.User`). For a bare
+    // relation the resolver already stamped the binding namespace onto the target
+    // coordinate (`resolvedTargetNamespaceId`), so the interpreter reads it rather
+    // than re-deriving from `modelNamespaceIds`. The stamped value is the target's
+    // bucket id (e.g. `'public'` for a top-level postgres model, `'unbound'` for a
+    // late-binding block), so it is routed through `resolveNamespaceIdForSqlTarget`
+    // — the same lowering `modelNamespaceIds` used — which (a) maps the `'unbound'`
+    // bucket to its `'__unbound__'` namespace id on postgres and (b) is the
+    // SQLite reconciliation (Option 1): every non-postgres target returns
+    // `undefined`, so the FK `references` keeps omitting `namespaceId` and stays
+    // byte-identical (sqlite's coord carries a concrete `'__unbound__'` default
+    // that must not surface on the FK).
     const targetNamespaceId =
       normalizedQualifier !== undefined
         ? normalizedQualifier
-        : input.modelNamespaceIds.get(targetMapping.model.name);
+        : resolvedTargetNamespaceId === undefined
+          ? undefined
+          : resolveNamespaceIdForSqlTarget({
+              bucketName: resolvedTargetNamespaceId,
+              targetId: input.targetId,
+            });
     foreignKeyNodes.push({
       columns: localColumns,
       references: {
@@ -2140,7 +2167,6 @@ export function interpretPslDocumentToSqlContract(
       scalarTypeDescriptors: input.scalarTypeDescriptors,
       sourceId,
       diagnostics,
-      modelNamespaceIds,
       ...(enumHandlesByName.size > 0 ? { enumHandles: enumHandlesByName } : {}),
     });
     modelNodes.push(
