@@ -266,9 +266,9 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 
   private planRlsDiff(options: PlannerOptionsWithComponents): readonly PostgresOpFactoryCall[] {
     if (!isPostgresSchemaIR(options.schema)) {
-      throw new Error(
-        `RLS verification requires a PostgresSchemaIR; got ${(options.schema as { constructor?: { name?: string } }).constructor?.name ?? typeof options.schema}`,
-      );
+      // The schema came from contractToSchemaIR (migration plan path), not from
+      // live DB introspection. There are no live DB policies to reconcile against.
+      return [];
     }
     const diffIssues = diffPostgresRlsPolicies({
       contract: options.contract,
