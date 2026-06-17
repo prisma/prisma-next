@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { format, PslFormatError } from '../../src/exports/format';
 
 describe('format', () => {
-  it('emits one declaration per line with single-space token separation', () => {
+  it('emits one declaration per line with the field cells aligned per block', () => {
     const out = format('model User {\nid Int @id\nemail String @unique\n}');
     expect(out).toEqual(
-      ['model User {', '  id Int @id', '  email String @unique', '}', ''].join('\n'),
+      ['model User {', '  id    Int    @id', '  email String @unique', '}', ''].join('\n'),
     );
   });
 
@@ -45,7 +45,9 @@ describe('format', () => {
 
   it('formats a composite type declaration', () => {
     const out = format('type Address {\nstreet String\ncity String\n}');
-    expect(out).toEqual(['type Address {', '  street String', '  city String', '}', ''].join('\n'));
+    expect(out).toEqual(
+      ['type Address {', '  street String', '  city   String', '}', ''].join('\n'),
+    );
   });
 
   it('formats a types block with named type declarations', () => {

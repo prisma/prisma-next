@@ -65,7 +65,7 @@ function emitDeclaration(
   const model = ModelDeclarationAst.cast(declaration.syntax);
   if (model) {
     emitBlock(writer, depth, blockHeader('model', model.name()), () => {
-      for (const field of model.fields()) emitField(writer, field, depth + 1);
+      emitFieldRows(writer, Array.from(model.fields()), depth + 1);
       for (const attribute of model.attributes()) emitModelAttribute(writer, attribute, depth + 1);
     });
     return;
@@ -74,7 +74,7 @@ function emitDeclaration(
   const composite = CompositeTypeDeclarationAst.cast(declaration.syntax);
   if (composite) {
     emitBlock(writer, depth, blockHeader('type', composite.name()), () => {
-      for (const field of composite.fields()) emitField(writer, field, depth + 1);
+      emitFieldRows(writer, Array.from(composite.fields()), depth + 1);
       for (const attribute of composite.attributes())
         emitModelAttribute(writer, attribute, depth + 1);
     });
@@ -84,7 +84,7 @@ function emitDeclaration(
   const enumDecl = EnumDeclarationAst.cast(declaration.syntax);
   if (enumDecl) {
     emitBlock(writer, depth, blockHeader('enum', enumDecl.name()), () => {
-      for (const value of enumDecl.values()) emitEnumValue(writer, value, depth + 1);
+      emitEnumValueRows(writer, Array.from(enumDecl.values()), depth + 1);
       for (const attribute of enumDecl.attributes())
         emitModelAttribute(writer, attribute, depth + 1);
     });
@@ -130,16 +130,61 @@ function genericKeyword(generic: GenericBlockDeclarationAst): string {
   return generic.keyword()?.text ?? '';
 }
 
-function emitField(writer: LineWriter, field: FieldDeclarationAst, depth: number): void {
-  const parts = [identifierText(field.name()), emitTypeAnnotation(field.typeAnnotation())];
-  for (const attribute of field.attributes()) parts.push(emitFieldAttribute(attribute));
-  writer.push(depth, joinTokens(parts));
+/**
+ * One field's contribution to a block's alignment table: the left-hand
+ * `name` / `type` cells plus the single right-hand `attributes` cell. Both
+ * the type column and the attribute column are aligned per block: the type
+ * starts one space past the widest name, and the attributes start one space
+ * past the widest name+type cell.
+ */
+interface AlignmentRow {
+  readonly name: string;
+  readonly type: string;
+  readonly attributes: string;
 }
 
-function emitEnumValue(writer: LineWriter, value: EnumValueDeclarationAst, depth: number): void {
-  const parts = [identifierText(value.name())];
-  for (const attribute of value.attributes()) parts.push(emitFieldAttribute(attribute));
-  writer.push(depth, joinTokens(parts));
+function emitFieldRows(writer: LineWriter, fields: FieldDeclarationAst[], depth: number): void {
+  const rows = fields.map<AlignmentRow>((field) => ({
+    name: identifierText(field.name()),
+    type: emitTypeAnnotation(field.typeAnnotation()),
+    attributes: Array.from(field.attributes(), emitFieldAttribute).join(' '),
+  }));
+  emitAlignedRows(writer, rows, depth);
+}
+
+function emitEnumValueRows(
+  writer: LineWriter,
+  values: EnumValueDeclarationAst[],
+  depth: number,
+): void {
+  const rows = values.map<AlignmentRow>((value) => ({
+    name: identifierText(value.name()),
+    type: '',
+    attributes: Array.from(value.attributes(), emitFieldAttribute).join(' '),
+  }));
+  emitAlignedRows(writer, rows, depth);
+}
+
+function emitAlignedRows(writer: LineWriter, rows: readonly AlignmentRow[], depth: number): void {
+  const nameWidth = Math.max(0, ...rows.map((row) => row.name.length));
+  const typeColumnEnd = Math.max(
+    0,
+    ...rows.map((row) => (row.type.length > 0 ? nameWidth + 1 + row.type.length : row.name.length)),
+  );
+  for (const row of rows) {
+    writer.push(depth, renderAlignedRow(row, nameWidth, typeColumnEnd));
+  }
+}
+
+function renderAlignedRow(row: AlignmentRow, nameWidth: number, typeColumnEnd: number): string {
+  let line = row.name;
+  if (row.type.length > 0) {
+    line = `${row.name.padEnd(nameWidth)} ${row.type}`;
+  }
+  if (row.attributes.length > 0) {
+    line = `${line.padEnd(typeColumnEnd)} ${row.attributes}`;
+  }
+  return line;
 }
 
 function emitNamedType(writer: LineWriter, named: NamedTypeDeclarationAst, depth: number): void {
