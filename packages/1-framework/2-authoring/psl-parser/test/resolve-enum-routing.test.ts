@@ -4,6 +4,7 @@ import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/
 import { describe, expect, it } from 'vitest';
 import { parse } from '../src/parse';
 import { type ResolvedDocument, type ResolveOptions, resolve } from '../src/resolve';
+import { GenericBlockDeclarationAst } from '../src/syntax/ast/declarations';
 import { frameworkScalarTypes } from './support';
 
 const textCodec: Codec = {
@@ -90,6 +91,140 @@ enum Priority {
   it('reports an enum block as unsupported when no descriptor claims the keyword', () => {
     const doc = resolveDoc(source, { codecLookup: textCodecLookup });
     expect(doc.diagnostics.map((d) => d.code)).toContain('PSL_UNSUPPORTED_TOP_LEVEL_BLOCK');
+  });
+});
+
+describe('field references to named generic blocks resolve to block-type targets', () => {
+  it('resolves an enum-typed field to a block target and records the keyword on blockTypes', () => {
+    const doc = resolveDoc(
+      `
+enum Priority {
+  @@type("pg/text@1")
+  Low  = "low"
+  High = "high"
+}
+
+model Ticket {
+  id     String @id
+  status Priority
+}
+`,
+      { pslBlockDescriptors: { enum: enumDescriptor }, codecLookup: textCodecLookup },
+    );
+    const ns = doc.namespaces.get(UNSPECIFIED_PSL_NAMESPACE_ID);
+    const status = ns?.models.get('Ticket')?.fields.get('status');
+    expect(status?.type.target).toEqual({
+      kind: 'block',
+      namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID,
+      name: 'Priority',
+    });
+    expect(ns?.blockTypes.get('Priority')).toEqual({
+      name: 'Priority',
+      keyword: 'enum',
+      namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID,
+      syntax: expect.any(GenericBlockDeclarationAst),
+    });
+    expect(doc.diagnostics).toEqual([]);
+  });
+
+  it('records a named generic block as a block type even with no registered descriptor', () => {
+    const doc = resolveDoc(
+      `
+enum Priority {
+  Low = "low"
+}
+
+model Ticket {
+  id     String @id
+  status Priority
+}
+`,
+    );
+    const ns = doc.namespaces.get(UNSPECIFIED_PSL_NAMESPACE_ID);
+    expect(ns?.blockTypes.get('Priority')?.keyword).toBe('enum');
+    expect(ns?.models.get('Ticket')?.fields.get('status')?.type.target).toEqual({
+      kind: 'block',
+      namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID,
+      name: 'Priority',
+    });
+  });
+
+  it('resolves a field typed by a non-enum named block to a block target carrying that keyword', () => {
+    const doc = resolveDoc(
+      `
+policy_select Restricted {
+  rule = "owner"
+}
+
+model Document {
+  id     String @id
+  access Restricted
+}
+`,
+    );
+    const ns = doc.namespaces.get(UNSPECIFIED_PSL_NAMESPACE_ID);
+    expect(ns?.blockTypes.get('Restricted')?.keyword).toBe('policy_select');
+    expect(ns?.models.get('Document')?.fields.get('access')?.type.target).toEqual({
+      kind: 'block',
+      namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID,
+      name: 'Restricted',
+    });
+  });
+
+  it('resolves a qualified cross-namespace reference to a namespaced block type', () => {
+    const doc = resolveDoc(
+      `
+namespace catalog {
+  enum Priority {
+    Low = "low"
+  }
+}
+
+namespace tickets {
+  model Ticket {
+    id     String @id
+    status catalog.Priority
+  }
+}
+`,
+    );
+    expect(
+      doc.namespaces.get('tickets')?.models.get('Ticket')?.fields.get('status')?.type.target,
+    ).toEqual({ kind: 'block', namespaceId: 'catalog', name: 'Priority' });
+  });
+
+  it('leaves a genuinely unknown field type unresolved', () => {
+    const doc = resolveDoc(
+      `
+model Ticket {
+  id     String @id
+  status Mystery
+}
+`,
+    );
+    expect(
+      doc.namespaces.get(UNSPECIFIED_PSL_NAMESPACE_ID)?.models.get('Ticket')?.fields.get('status')
+        ?.type.target,
+    ).toEqual({ kind: 'unresolved', typeName: 'Mystery' });
+    expect(doc.diagnostics.map((d) => d.code)).toContain('PSL_UNRESOLVED_TYPE_REFERENCE');
+  });
+
+  it('treats a block name colliding with a model as a duplicate declaration, first wins', () => {
+    const doc = resolveDoc(
+      `
+model Priority {
+  id String @id
+}
+
+enum Priority {
+  Low = "low"
+}
+`,
+    );
+    const ns = doc.namespaces.get(UNSPECIFIED_PSL_NAMESPACE_ID);
+    expect(ns?.models.has('Priority')).toBe(true);
+    expect(ns?.blockTypes.has('Priority')).toBe(false);
+    expect(doc.diagnostics.map((d) => d.code)).toContain('PSL_DUPLICATE_DECLARATION');
   });
 });
 

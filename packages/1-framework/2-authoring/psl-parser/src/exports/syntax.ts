@@ -4,6 +4,7 @@ export type {
   DeclCoord,
   DeclKind,
   ResolvedArg,
+  ResolvedBlockType,
   ResolvedCompositeType,
   ResolvedDocument,
   ResolvedEnum,

@@ -66,6 +66,7 @@ export interface DeclCoord {
 export type TypeTarget =
   | { readonly kind: 'scalar'; readonly name: string }
   | { readonly kind: 'ref'; readonly coord: DeclCoord }
+  | { readonly kind: 'block'; readonly namespaceId: string; readonly name: string }
   | {
       readonly kind: 'crossSpace';
       readonly spaceId: string;
@@ -172,6 +173,24 @@ export interface ResolvedExtensionBlock {
   readonly syntax: SyntaxNode;
 }
 
+/**
+ * A named generic block recorded as a type-defining declaration: a field or
+ * named-type reference whose name binds here resolves to a `block` {@link TypeTarget}
+ * carrying the block's `namespaceId`/`name`, and the consumer reads {@link ResolvedBlockType.keyword}
+ * to learn which keyword (`enum`, …) defined the type.
+ *
+ * The resolver records *every* named generic block here regardless of keyword —
+ * it does not gatekeep whether the keyword is valid in field position. That
+ * judgement (e.g. `enum` is a field type, but a non-type block is not) belongs to
+ * the interpreter, which reads `keyword` off the resolved block-type target.
+ */
+export interface ResolvedBlockType {
+  readonly name: string;
+  readonly keyword: string;
+  readonly namespaceId: string;
+  readonly syntax: GenericBlockDeclarationAst;
+}
+
 export interface ResolvedNamedType {
   readonly name: string;
   readonly type: ResolvedFieldType;
@@ -186,6 +205,7 @@ export interface ResolvedNamespace {
   readonly enums: ReadonlyMap<string, ResolvedEnum>;
   readonly compositeTypes: ReadonlyMap<string, ResolvedCompositeType>;
   readonly extensionBlocks: ReadonlyMap<string, ResolvedExtensionBlock>;
+  readonly blockTypes: ReadonlyMap<string, ResolvedBlockType>;
   readonly syntax?: NamespaceDeclarationAst;
 }
 
@@ -214,6 +234,7 @@ export interface ResolvedDocument {
  */
 interface NameTable {
   readonly byNamespace: ReadonlyMap<string, ReadonlyMap<string, DeclKind>>;
+  readonly blockTypesByNamespace: ReadonlyMap<string, ReadonlySet<string>>;
   readonly namedTypes: ReadonlySet<string>;
 }
 
@@ -286,6 +307,9 @@ class Resolver {
       if (kind !== undefined) {
         return { kind: 'ref', coord: { kind, namespaceId: qualifier, name: typeName } };
       }
+      if (nameTable.blockTypesByNamespace.get(qualifier)?.has(typeName)) {
+        return { kind: 'block', namespaceId: qualifier, name: typeName };
+      }
       // An over-qualified annotation (e.g. `a.b.Bar`) was already flagged by
       // `parse` with `PSL_INVALID_QUALIFIED_TYPE`; re-reporting it here as an
       // unresolved reference would double-diagnose a single malformed type.
@@ -328,6 +352,17 @@ class Resolver {
       }
     }
 
+    if (nameTable.blockTypesByNamespace.get(currentNamespaceId)?.has(typeName)) {
+      return { kind: 'block', namespaceId: currentNamespaceId, name: typeName };
+    }
+
+    if (
+      currentNamespaceId !== UNSPECIFIED_PSL_NAMESPACE_ID &&
+      nameTable.blockTypesByNamespace.get(UNSPECIFIED_PSL_NAMESPACE_ID)?.has(typeName)
+    ) {
+      return { kind: 'block', namespaceId: UNSPECIFIED_PSL_NAMESPACE_ID, name: typeName };
+    }
+
     this.diagnostic(
       'PSL_UNRESOLVED_TYPE_REFERENCE',
       unresolvedBareNameMessage(typeName, currentNamespaceId, nameTable),
@@ -364,7 +399,8 @@ function unresolvedBareNameMessage(
   for (const [namespaceId, decls] of nameTable.byNamespace) {
     if (namespaceId === currentNamespaceId || namespaceId === UNSPECIFIED_PSL_NAMESPACE_ID)
       continue;
-    if (decls.has(typeName)) otherNamespaces.push(namespaceId);
+    const inBlockTypes = nameTable.blockTypesByNamespace.get(namespaceId)?.has(typeName) ?? false;
+    if (decls.has(typeName) || inBlockTypes) otherNamespaces.push(namespaceId);
   }
   const base = `Type "${typeName}" does not resolve to a known declaration`;
   return otherNamespaces.length === 1
@@ -421,14 +457,16 @@ interface NamedDeclaration {
 }
 
 /**
- * One named declaration tagged with its kind, kept in source order so name
- * registration sees declarations in the order they appear — the first wins, and
- * its diagnostic attaches to the source-first decl regardless of kind.
+ * One named declaration kept in source order so name registration sees
+ * declarations in the order they appear — the first wins, and its diagnostic
+ * attaches to the source-first decl regardless of kind. A `block` entry is a
+ * named generic block: it occupies the namespace's declaration name-space (so it
+ * collides with a same-named model/enum/composite) but carries no {@link DeclKind}
+ * — its keyword is recorded on the {@link ResolvedBlockType}, not as a decl kind.
  */
-interface OrderedDeclaration {
-  readonly kind: DeclKind;
-  readonly declaration: NamedDeclaration;
-}
+type OrderedDeclaration =
+  | { readonly kind: DeclKind; readonly declaration: NamedDeclaration }
+  | { readonly kind: 'block'; readonly declaration: NamedDeclaration };
 
 interface NamespaceBucket {
   readonly id: string;
@@ -498,6 +536,9 @@ export function resolve(
     const genericBlock = GenericBlockDeclarationAst.cast(member);
     if (genericBlock) {
       bucket.genericBlocks.push(genericBlock);
+      if (genericBlock.name() !== undefined) {
+        bucket.declarations.push({ kind: 'block', declaration: genericBlock });
+      }
     }
   };
 
@@ -523,19 +564,42 @@ export function resolve(
   }
 
   const byNamespace = new Map<string, ReadonlyMap<string, DeclKind>>();
+  const blockTypesByNamespace = new Map<string, ReadonlySet<string>>();
   for (const id of bucketOrder) {
     const bucket = buckets.get(id);
     if (!bucket) continue;
+    // `decls` holds the kind-ful declarations; `blockNames` holds named generic
+    // blocks. `seen` is shared so a block and a model of the same name collide
+    // (first-wins, source-ordered) the same way two models would.
     const decls = new Map<string, DeclKind>();
-    for (const { kind, declaration } of bucket.declarations) {
-      registerName(decls, declaration, kind, resolver);
+    const blockNames = new Set<string>();
+    const seen = new Set<string>();
+    for (const entry of bucket.declarations) {
+      const name = entry.declaration.name()?.name();
+      if (name === undefined) continue;
+      if (seen.has(name)) {
+        resolver.diagnostic(
+          'PSL_DUPLICATE_DECLARATION',
+          `Duplicate declaration "${name}" in this scope; the first declaration is used`,
+          entry.declaration.syntax,
+        );
+        continue;
+      }
+      seen.add(name);
+      if (entry.kind === 'block') blockNames.add(name);
+      else decls.set(name, entry.kind);
     }
     byNamespace.set(id, decls);
+    blockTypesByNamespace.set(id, blockNames);
   }
 
   const namedTypeStore = new Map<string, DeclKind>();
   registerNames(namedTypeStore, namedTypeDecls, 'namedType', resolver);
-  const nameTable: NameTable = { byNamespace, namedTypes: new Set(namedTypeStore.keys()) };
+  const nameTable: NameTable = {
+    byNamespace,
+    blockTypesByNamespace,
+    namedTypes: new Set(namedTypeStore.keys()),
+  };
 
   const extensionContext: ExtensionValidationContext = {
     descriptorsByKeyword,
@@ -658,6 +722,20 @@ function buildNamespace(
     });
   }
 
+  // Every named generic block is recorded as a block type, keyed by name. The
+  // membership mirrors the resolver's name-table (`blockTypesByNamespace`): a
+  // block whose name lost a first-wins collision to an earlier declaration is not
+  // here, so the map and the resolution path agree on which names are block types.
+  const blockTypeNames = nameTable.blockTypesByNamespace.get(bucket.id);
+  const blockTypes = new Map<string, ResolvedBlockType>();
+  for (const block of bucket.genericBlocks) {
+    const name = block.name()?.name();
+    const keyword = block.keyword()?.text;
+    if (name === undefined || keyword === undefined) continue;
+    if (!blockTypeNames?.has(name) || blockTypes.has(name)) continue;
+    blockTypes.set(name, { name, keyword, namespaceId: bucket.id, syntax: block });
+  }
+
   const extensionBlocks = new Map<string, ResolvedExtensionBlock>();
   for (const block of bucket.genericBlocks) {
     const keyword = block.keyword()?.text;
@@ -687,6 +765,7 @@ function buildNamespace(
     enums,
     compositeTypes,
     extensionBlocks,
+    blockTypes,
     ...(bucket.syntax ? { syntax: bucket.syntax } : {}),
   };
 }
