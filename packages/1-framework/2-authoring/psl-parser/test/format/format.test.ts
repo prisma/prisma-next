@@ -23,7 +23,7 @@ describe('format', () => {
 
   it('renders block attributes with the @@ prefix preserved', () => {
     const out = format('model User {\nid Int\n@@id([id])\n}');
-    expect(out).toEqual(['model User {', '  id Int', '  @@id([id])', '}', ''].join('\n'));
+    expect(out).toEqual(['model User {', '  id Int', '', '  @@id([id])', '}', ''].join('\n'));
   });
 
   it('renders attribute argument lists as key: value with comma-space separators', () => {
@@ -41,7 +41,7 @@ describe('format', () => {
   it('formats an enum declaration through the generic-block path', () => {
     const out = format('enum Role {\nUSER\nADMIN\n@@map("roles")\n}');
     expect(out).toEqual(
-      ['enum Role {', '  USER', '  ADMIN', '  @@map("roles")', '}', ''].join('\n'),
+      ['enum Role {', '  USER', '  ADMIN', '', '  @@map("roles")', '}', ''].join('\n'),
     );
   });
 

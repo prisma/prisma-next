@@ -58,6 +58,7 @@ model Product {
   image           Image
   embedding       Float[]?
   status          String   @default("active")
+
   @@map("products")
   @@textIndex([name, description], weights: "{\"name\": 10, \"description\": 1}")
   @@index([brand, subCategory])
@@ -72,6 +73,7 @@ model User {
   address Address?
   carts   Cart[]
   orders  Order[]
+
   @@map("users")
 }
 
@@ -80,6 +82,7 @@ model Cart {
   userId ObjectId
   items  CartItem[]
   user   User       @relation(fields: [userId], references: [id])
+
   @@map("carts")
   @@unique([userId])
 }
@@ -93,6 +96,7 @@ model Order {
   statusHistory   StatusEntry[]
   user            User            @relation(fields: [userId], references: [id])
   invoices        Invoice[]
+
   @@map("orders")
   @@index([userId])
 }
@@ -104,6 +108,7 @@ model Location {
   city            String
   postalCode      String
   country         String
+
   @@map("locations")
   @@index([city, country], collationLocale: "en", collationStrength: 2)
 }
@@ -117,6 +122,7 @@ model Invoice {
   total    Float
   issuedAt DateTime
   order    Order             @relation(fields: [orderId], references: [id])
+
   @@map("invoices")
   @@index([orderId])
   @@index([issuedAt(sort: Desc)], sparse: true)
@@ -128,6 +134,7 @@ model Event {
   sessionId String
   type      String
   timestamp DateTime
+
   @@map("events")
   @@discriminator(type)
   @@index([userId, timestamp(sort: Desc)])
@@ -139,16 +146,19 @@ model ViewProductEvent {
   subCategory String
   brand       String
   exitMethod  String?
+
   @@base(Event, "view-product")
 }
 
 model SearchEvent {
   query String
+
   @@base(Event, "search")
 }
 
 model AddToCartEvent {
   productId String
   brand     String
+
   @@base(Event, "add-to-cart")
 }

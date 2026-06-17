@@ -45,10 +45,10 @@ const repoRelative = (file: string): string => relative(repoRoot, file).split(se
 // Kept explicit and sorted so the no-op set is reviewable. Every other corpus file
 // must reformat (format(source) !== source); a file flipping direction either way
 // fails the classification guard below and forces a conscious reclassification.
-const knownNoOpFiles = [
-  'examples/mongo-blog-leaderboard/src/contract.prisma',
-  'examples/prisma-next-cloudflare-worker/src/prisma/contract.prisma',
-] as const;
+// The set is currently empty: the blank-line-before-@@ house-style rule reformats
+// every corpus file, including the two examples that were previously canonical
+// (both placed a field directly before a @@ attribute with no blank line).
+const knownNoOpFiles = [] as const;
 
 const isKnownNoOp = (file: string): boolean =>
   (knownNoOpFiles as readonly string[]).includes(repoRelative(file));

@@ -29,7 +29,7 @@ describe('format leading own-line comments', () => {
   it('reattaches a leading comment before a block attribute', () => {
     const out = format('model User {\nid Int @id\n// the table name\n@@map("user")\n}');
     expect(out).toEqual(
-      lines('model User {', '  id Int @id', '  // the table name', '  @@map("user")', '}', ''),
+      lines('model User {', '  id Int @id', '', '  // the table name', '  @@map("user")', '}', ''),
     );
   });
 
@@ -65,7 +65,7 @@ describe('format trailing same-line comments', () => {
   it('reattaches a trailing comment on a block attribute', () => {
     const out = format('model User {\nid Int @id\n@@map("user") // table name\n}');
     expect(out).toEqual(
-      lines('model User {', '  id Int @id', '  @@map("user") // table name', '}', ''),
+      lines('model User {', '  id Int @id', '', '  @@map("user") // table name', '}', ''),
     );
   });
 

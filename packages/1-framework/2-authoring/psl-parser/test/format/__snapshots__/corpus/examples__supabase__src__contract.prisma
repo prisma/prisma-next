@@ -8,6 +8,7 @@ namespace public {
     username String
     userId   Uuid                   @unique
     user     supabase:auth.AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
     @@map("profile")
   }
 }

@@ -5,7 +5,7 @@ import { format } from '../../src/exports/format';
 
 const examplesDir = join(__dirname, '..', '..', '..', '..', '..', '..', 'examples');
 
-const noOpOracles = [
+const corpusOracles = [
   join(examplesDir, 'prisma-next-cloudflare-worker', 'src', 'prisma', 'contract.prisma'),
   join(examplesDir, 'mongo-blog-leaderboard', 'src', 'contract.prisma'),
 ];
@@ -29,14 +29,9 @@ describe('format dangling-comment idempotence', () => {
   });
 });
 
-describe('format no-op oracles', () => {
-  for (const path of noOpOracles) {
-    it(`formats ${path} as a byte-for-byte no-op`, () => {
-      const source = readFileSync(path, 'utf8');
-      expect(format(source)).toEqual(source);
-    });
-
-    it(`formats ${path} idempotently`, () => {
+describe('format real-corpus idempotence oracles', () => {
+  for (const path of corpusOracles) {
+    it(`reaches a fixed point on ${path}`, () => {
       const source = readFileSync(path, 'utf8');
       const once = format(source);
       expect(format(once)).toEqual(once);

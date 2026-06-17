@@ -5,6 +5,7 @@ model User {
   bio     String?
   address Address?
   posts   Post[]
+
   @@map("users")
 }
 
@@ -32,11 +33,13 @@ model Post {
 
 model Article {
   summary String
+
   @@base(Post, "article")
 }
 
 model Tutorial {
   difficulty String
   duration   Int
+
   @@base(Post, "tutorial")
 }

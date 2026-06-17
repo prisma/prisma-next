@@ -46,6 +46,14 @@ class LineWriter {
     this.#lines.push({ depth: 0, text: '', blank: true });
   }
 
+  lastIsBlank(): boolean {
+    return this.#lines.at(-1)?.blank ?? false;
+  }
+
+  hasContent(): boolean {
+    return this.#lines.length > 0;
+  }
+
   join(indentUnit: string, newline: string): string {
     const body = this.#lines
       .map((line) => (line.blank ? '' : `${indentUnit.repeat(line.depth)}${line.text}`))
@@ -148,6 +156,7 @@ function sequenceRegion(elements: readonly SyntaxElement[]): Item[] {
 function emitRegion(writer: LineWriter, elements: readonly SyntaxElement[], depth: number): void {
   const items = sequenceRegion(elements);
   let pendingRows: MemberItem[] = [];
+  let lastMemberWasRegular = false;
 
   const flushRows = (): void => {
     if (pendingRows.length === 0) return;
@@ -166,21 +175,29 @@ function emitRegion(writer: LineWriter, elements: readonly SyntaxElement[], dept
       writer.push(depth, item.text);
       continue;
     }
+    const isBlockAttribute = ModelAttributeAst.cast(item.node) !== undefined;
+    if (isBlockAttribute && lastMemberWasRegular && writer.hasContent() && !writer.lastIsBlank()) {
+      flushRows();
+      writer.blank();
+    }
     const broken = inlineBreakComment(item.node);
     if (broken) {
       flushRows();
       for (const comment of item.leading) writer.push(depth, comment);
       emitBrokenMember(writer, broken, depth, item.trailing);
+      lastMemberWasRegular = !isBlockAttribute;
       continue;
     }
     const row = toAlignmentRow(item.node);
     if (row && item.leading.length === 0) {
       pendingRows.push(item);
+      lastMemberWasRegular = true;
       continue;
     }
     flushRows();
     for (const comment of item.leading) writer.push(depth, comment);
     emitMember(writer, item, depth);
+    lastMemberWasRegular = !isBlockAttribute;
   }
   flushRows();
 }

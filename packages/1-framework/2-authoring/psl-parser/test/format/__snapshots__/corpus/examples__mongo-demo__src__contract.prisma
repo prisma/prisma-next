@@ -13,6 +13,7 @@ model User {
   bio     String?
   address Address?
   posts   Post[]
+
   @@map("users")
 }
 
@@ -24,12 +25,14 @@ model Post {
   authorId  ObjectId
   createdAt DateTime
   author    User     @relation(fields: [authorId], references: [id])
+
   @@discriminator(kind)
   @@map("posts")
 }
 
 model Article {
   summary String
+
   @@base(Post, "article")
   @@unique([summary])
 }
@@ -37,5 +40,6 @@ model Article {
 model Tutorial {
   difficulty String
   duration   Int
+
   @@base(Post, "tutorial")
 }

@@ -59,6 +59,7 @@ model Task {
 model Bug {
   severity     String
   stepsToRepro String?
+
   @@base(Task, "bug")
   @@map("bug")
 }
@@ -66,6 +67,7 @@ model Bug {
 model Feature {
   priority      String
   targetRelease String?
+
   @@base(Task, "feature")
   @@map("feature")
 }
