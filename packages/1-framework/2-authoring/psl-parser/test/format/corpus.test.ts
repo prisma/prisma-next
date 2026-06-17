@@ -39,6 +39,20 @@ const corpus = [...collectContractFiles(examplesDir).sort(), fixtureFile];
 
 const knownCorpusSize = 31;
 
+const repoRelative = (file: string): string => relative(repoRoot, file).split(sep).join('/');
+
+// Corpus files whose source is already in canonical form: format(source) === source.
+// Kept explicit and sorted so the no-op set is reviewable. Every other corpus file
+// must reformat (format(source) !== source); a file flipping direction either way
+// fails the classification guard below and forces a conscious reclassification.
+const knownNoOpFiles = [
+  'examples/mongo-blog-leaderboard/src/contract.prisma',
+  'examples/prisma-next-cloudflare-worker/src/prisma/contract.prisma',
+] as const;
+
+const isKnownNoOp = (file: string): boolean =>
+  (knownNoOpFiles as readonly string[]).includes(repoRelative(file));
+
 const goldenNameFor = (file: string): string =>
   relative(repoRoot, file)
     .split(sep)
@@ -48,6 +62,14 @@ const goldenNameFor = (file: string): string =>
 describe('formatter golden corpus', () => {
   it('discovers at least the known set of corpus files', () => {
     expect(corpus.length).toBeGreaterThanOrEqual(knownCorpusSize);
+  });
+
+  it('reformats every corpus file except exactly the known no-op set', () => {
+    const noOp = corpus
+      .filter((file) => format(readFileSync(file, 'utf8')) === readFileSync(file, 'utf8'))
+      .map(repoRelative)
+      .sort();
+    expect(noOp).toEqual([...knownNoOpFiles].sort());
   });
 
   for (const file of corpus) {
@@ -72,6 +94,12 @@ describe('formatter golden corpus', () => {
       }
 
       expect(format(once), `${name} is not idempotent under format()`).toEqual(once);
+
+      if (isKnownNoOp(file)) {
+        expect(once, `${name} is a known no-op but format() changed it`).toEqual(source);
+      } else {
+        expect(once, `${name} should reformat but format() left it unchanged`).not.toEqual(source);
+      }
 
       await expect(once).toMatchFileSnapshot(golden);
     });
