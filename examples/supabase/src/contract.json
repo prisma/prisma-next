@@ -157,7 +157,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:025d858e1e7bee8adfb17931ec24f15fe9e7b2cf4f92cc882c2b00c5cfe1f097",
+    "storageHash": "sha256:dd64f4203eb2e83868556b4e35fa836f629f8a2ec0e854a078148a83b50dc880",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",
@@ -205,7 +205,7 @@
       "id": "supabase",
       "kind": "extension",
       "targetId": "postgres",
-      "version": "0.13.0"
+      "version": "0.14.0"
     }
   },
   "meta": {},
