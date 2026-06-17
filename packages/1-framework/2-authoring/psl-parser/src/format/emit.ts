@@ -74,7 +74,18 @@ interface BlankItem {
   readonly kind: 'blank';
 }
 
-type Item = MemberItem | BlankItem;
+/**
+ * An own-line comment line that trails the last member of a region with no
+ * construct after it, sitting between that member and the region's closing
+ * token (`}` for a block, EOF for the document). It carries no member to attach
+ * to, so it surfaces as its own item rendered at the region's member indent.
+ */
+interface DanglingCommentItem {
+  readonly kind: 'comment';
+  readonly text: string;
+}
+
+type Item = MemberItem | BlankItem | DanglingCommentItem;
 
 /**
  * Walks a region's elements (a block body between its braces, or the whole
@@ -83,7 +94,9 @@ type Item = MemberItem | BlankItem;
  * member's `leading`; a same-line comment attaches as the preceding member's
  * `trailing`; a run of one or more blank lines between members collapses to a
  * single `blank`, never directly after the opening boundary nor before the
- * closing one.
+ * closing one. Own-line comments left over after the last member (with no
+ * construct to attach to) surface as trailing `comment` items, preserving a
+ * single collapsed blank line that preceded them.
  */
 function sequenceRegion(elements: readonly SyntaxElement[]): Item[] {
   const items: Item[] = [];
@@ -122,6 +135,10 @@ function sequenceRegion(elements: readonly SyntaxElement[]): Item[] {
       newlines = 0;
     }
   }
+  if (leading.length > 0) {
+    if (blankPending) items.push({ kind: 'blank' });
+    for (const comment of leading) items.push({ kind: 'comment', text: comment });
+  }
   return items;
 }
 
@@ -139,6 +156,11 @@ function emitRegion(writer: LineWriter, elements: readonly SyntaxElement[], dept
     if (item.kind === 'blank') {
       flushRows();
       writer.blank();
+      continue;
+    }
+    if (item.kind === 'comment') {
+      flushRows();
+      writer.push(depth, item.text);
       continue;
     }
     const row = toAlignmentRow(item.node);
@@ -160,7 +182,7 @@ function emitRegion(writer: LineWriter, elements: readonly SyntaxElement[], dept
  */
 function emitMember(writer: LineWriter, item: MemberItem, depth: number): void {
   const node = item.node;
-  const block = emitBlockMember(writer, node, depth);
+  const block = emitBlockMember(writer, node, depth, item.trailing);
   if (block) return;
 
   const modelAttribute = ModelAttributeAst.cast(node);
@@ -187,38 +209,52 @@ function emitMember(writer: LineWriter, item: MemberItem, depth: number): void {
 /**
  * Renders a member that is itself a block (model / composite type / enum /
  * namespace / `types` / generic). Returns `true` when handled. The header line
- * carries the member's trailing same-line comment; the body recurses through
- * {@link emitRegion} so nested trivia is preserved at the deeper indent.
+ * carries the block's own header same-line comment; `closingTrailing` is the
+ * comment that trailed the member's closing `}` on the same source line, which
+ * the closing line carries. The body recurses through {@link emitRegion} so
+ * nested trivia is preserved at the deeper indent.
  */
-function emitBlockMember(writer: LineWriter, node: SyntaxNode, depth: number): boolean {
+function emitBlockMember(
+  writer: LineWriter,
+  node: SyntaxNode,
+  depth: number,
+  closingTrailing: string | undefined,
+): boolean {
   const model = ModelDeclarationAst.cast(node);
   if (model) {
-    emitNamedBlock(writer, depth, 'model', model.name(), node);
+    emitNamedBlock(writer, depth, 'model', model.name(), node, closingTrailing);
     return true;
   }
   const composite = CompositeTypeDeclarationAst.cast(node);
   if (composite) {
-    emitNamedBlock(writer, depth, 'type', composite.name(), node);
+    emitNamedBlock(writer, depth, 'type', composite.name(), node, closingTrailing);
     return true;
   }
   const enumDecl = EnumDeclarationAst.cast(node);
   if (enumDecl) {
-    emitNamedBlock(writer, depth, 'enum', enumDecl.name(), node);
+    emitNamedBlock(writer, depth, 'enum', enumDecl.name(), node, closingTrailing);
     return true;
   }
   const namespace = NamespaceDeclarationAst.cast(node);
   if (namespace) {
-    emitNamedBlock(writer, depth, 'namespace', namespace.name(), node);
+    emitNamedBlock(writer, depth, 'namespace', namespace.name(), node, closingTrailing);
     return true;
   }
   const typesBlock = TypesBlockAst.cast(node);
   if (typesBlock) {
-    emitBlock(writer, depth, 'types {', node);
+    emitBlock(writer, depth, 'types {', node, closingTrailing);
     return true;
   }
   const generic = GenericBlockDeclarationAst.cast(node);
   if (generic) {
-    emitNamedBlock(writer, depth, generic.keyword()?.text ?? '', generic.name(), node);
+    emitNamedBlock(
+      writer,
+      depth,
+      generic.keyword()?.text ?? '',
+      generic.name(),
+      node,
+      closingTrailing,
+    );
     return true;
   }
   return false;
@@ -230,14 +266,21 @@ function emitNamedBlock(
   keyword: string,
   name: IdentifierAst | undefined,
   node: SyntaxNode,
+  closingTrailing: string | undefined,
 ): void {
-  emitBlock(writer, depth, blockHeader(keyword, name), node);
+  emitBlock(writer, depth, blockHeader(keyword, name), node, closingTrailing);
 }
 
-function emitBlock(writer: LineWriter, depth: number, header: string, node: SyntaxNode): void {
+function emitBlock(
+  writer: LineWriter,
+  depth: number,
+  header: string,
+  node: SyntaxNode,
+  closingTrailing: string | undefined,
+): void {
   writer.push(depth, withTrailing(header, headerTrailingComment(node)));
   emitRegion(writer, blockBodyElements(node), depth + 1);
-  writer.push(depth, '}');
+  writer.push(depth, withTrailing('}', closingTrailing));
 }
 
 /**

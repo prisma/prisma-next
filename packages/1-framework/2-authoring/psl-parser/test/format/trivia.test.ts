@@ -73,6 +73,18 @@ describe('format trailing same-line comments', () => {
     const out = format('model User { // a user\nid Int @id\n}');
     expect(out).toEqual(lines('model User { // a user', '  id Int @id', '}', ''));
   });
+
+  it('reattaches a trailing comment on a block closing brace line', () => {
+    const out = format('model User {\nid Int @id\n} // end of model');
+    expect(out).toEqual(lines('model User {', '  id Int @id', '} // end of model', ''));
+  });
+
+  it('reattaches a trailing comment on a nested block closing brace line', () => {
+    const out = format('namespace App {\nmodel User {\nid Int @id\n} // end User\n}');
+    expect(out).toEqual(
+      lines('namespace App {', '  model User {', '    id Int @id', '  } // end User', '}', ''),
+    );
+  });
 });
 
 describe('format blank-line preservation', () => {
@@ -101,6 +113,40 @@ describe('format blank-line preservation', () => {
   it('collapses blank lines between top-level declarations to one', () => {
     const out = format('model A {\nid Int\n}\n\n\nmodel B {\nid Int\n}');
     expect(out).toEqual(lines('model A {', '  id Int', '}', '', 'model B {', '  id Int', '}', ''));
+  });
+});
+
+describe('format dangling trailing comments', () => {
+  it('keeps an own-line comment after the last field at member indent before the brace', () => {
+    const out = format('model User {\nid Int @id\n// trailing note\n}');
+    expect(out).toEqual(lines('model User {', '  id Int @id', '  // trailing note', '}', ''));
+  });
+
+  it('keeps multiple own-line comments after the last field before the brace', () => {
+    const out = format('model User {\nid Int @id\n// first\n// second\n}');
+    expect(out).toEqual(
+      lines('model User {', '  id Int @id', '  // first', '  // second', '}', ''),
+    );
+  });
+
+  it('keeps a dangling comment in an otherwise empty block at member indent', () => {
+    const out = format('model User {\n// only a comment\n}');
+    expect(out).toEqual(lines('model User {', '  // only a comment', '}', ''));
+  });
+
+  it('collapses a blank-line run before a dangling comment to one and drops the trailing blank', () => {
+    const out = format('model User {\nid Int @id\n\n\n// trailing note\n}');
+    expect(out).toEqual(lines('model User {', '  id Int @id', '', '  // trailing note', '}', ''));
+  });
+
+  it('keeps a dangling comment at the end of the document at column zero', () => {
+    const out = format('model User {\nid Int @id\n}\n// end of file');
+    expect(out).toEqual(lines('model User {', '  id Int @id', '}', '// end of file', ''));
+  });
+
+  it('keeps a /// doc comment dangling before the closing brace', () => {
+    const out = format('model User {\nid Int @id\n/// dangling doc\n}');
+    expect(out).toEqual(lines('model User {', '  id Int @id', '  /// dangling doc', '}', ''));
   });
 });
 
