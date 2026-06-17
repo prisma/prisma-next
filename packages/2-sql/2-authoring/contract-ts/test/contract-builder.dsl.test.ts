@@ -660,17 +660,9 @@ describe('contract DSL authoring surface', () => {
       models: { PublicThing, ShadowThing },
     });
 
-    const storageNamespaces = contract.storage.namespaces as unknown as Record<
-      string,
-      { readonly entries: { readonly table?: Record<string, unknown> } }
-    >;
-    const domainNamespaces = contract.domain.namespaces as unknown as Record<
-      string,
-      { readonly models: Record<string, unknown> }
-    >;
-    expect(storageNamespaces['public']?.entries.table?.['thing']).toBeDefined();
-    expect(storageNamespaces['shadow']?.entries.table?.['thing']).toBeDefined();
-    expect(domainNamespaces['shadow']?.models['ShadowThing']).toBeDefined();
+    expect(contract.storage.namespaces).toHaveProperty(['public', 'entries', 'table', 'thing']);
+    expect(contract.storage.namespaces).toHaveProperty(['shadow', 'entries', 'table', 'thing']);
+    expect(contract.domain.namespaces).toHaveProperty(['shadow', 'models', 'ShadowThing']);
   });
 
   it('resolves an M:N junction to its own namespace when the junction table name collides', () => {
@@ -739,20 +731,26 @@ describe('contract DSL authoring surface', () => {
       },
     });
 
-    const domainNamespaces = contract.domain.namespaces as unknown as Record<
-      string,
-      {
-        readonly models: Record<
-          string,
-          { readonly relations?: Record<string, { readonly through?: unknown }> }
-        >;
-      }
-    >;
-    const publicThrough = domainNamespaces['public']?.models['User']?.relations?.['roles']?.through;
-    const shadowThrough =
-      domainNamespaces['shadow']?.models['ShadowUser']?.relations?.['roles']?.through;
-    expect(publicThrough).toMatchObject({ table: 'user_roles', namespaceId: 'public' });
-    expect(shadowThrough).toMatchObject({ table: 'user_roles', namespaceId: 'shadow' });
+    expect(contract.domain.namespaces).toMatchObject({
+      public: {
+        models: {
+          User: {
+            relations: {
+              roles: { through: { table: 'user_roles', namespaceId: 'public' } },
+            },
+          },
+        },
+      },
+      shadow: {
+        models: {
+          ShadowUser: {
+            relations: {
+              roles: { through: { table: 'user_roles', namespaceId: 'shadow' } },
+            },
+          },
+        },
+      },
+    });
   });
 
   it('rejects duplicate relation names when mixing model relations with .relations()', () => {

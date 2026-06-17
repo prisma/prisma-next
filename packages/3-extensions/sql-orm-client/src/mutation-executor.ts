@@ -9,7 +9,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
-import { blindCast } from '@prisma-next/utils/casts';
+import { castAs } from '@prisma-next/utils/casts';
 import {
   getColumnToFieldMap,
   resolveFieldToColumn,
@@ -291,12 +291,7 @@ async function updateFirstGraph(
     return null;
   }
 
-  const parsed = parseMutationInput(
-    contract,
-    namespaceId,
-    modelName,
-    blindCast<Record<string, unknown>, 'mutation update input is a plain object payload'>(input),
-  );
+  const parsed = parseMutationInput(contract, namespaceId, modelName, input);
   const { parentOwned, childOwned, junctionOwned } = partitionByOwnership(parsed.relationMutations);
 
   const scalarData = { ...parsed.scalarData };
@@ -336,10 +331,7 @@ async function updateFirstGraph(
       context,
       namespaceId,
       modelName,
-      blindCast<
-        MutationUpdateInput<Contract<SqlStorage>, string>,
-        'primary key filter is a mutation update criterion'
-      >(pkFilter),
+      castAs<MutationUpdateInput<Contract<SqlStorage>, string>>(pkFilter),
     );
     if (!pkWhere) {
       throw new Error(`Failed to build primary key filter for model "${modelName}"`);
@@ -395,7 +387,9 @@ function parseMutationInput(
   contract: Contract<SqlStorage>,
   namespaceId: string,
   modelName: string,
-  input: Record<string, unknown>,
+  input:
+    | MutationCreateInput<Contract<SqlStorage>, string>
+    | MutationUpdateInput<Contract<SqlStorage>, string>,
 ): ParsedMutationInput {
   const scalarData: Record<string, unknown> = {};
   const relationDefinitions = new Map(
@@ -513,10 +507,7 @@ async function applyParentOwnedMutation(
       context,
       relation.relatedNamespaceId,
       relation.relatedModelName,
-      blindCast<
-        MutationCreateInput<Contract<SqlStorage>, string>,
-        'relation create row is a nested mutation create input'
-      >(row),
+      castAs<MutationCreateInput<Contract<SqlStorage>, string>>(row),
     );
     copyRelatedValuesToParent(
       contract,
@@ -541,7 +532,7 @@ async function applyParentOwnedMutation(
     context,
     relation.relatedNamespaceId,
     relation.relatedModelName,
-    blindCast<Record<string, unknown>, 'relation connect criterion is a plain object'>(criterion),
+    castAs<Record<string, unknown>>(criterion),
   );
   if (!relatedRow) {
     throw new Error(
@@ -605,11 +596,7 @@ async function applyChildOwnedMutation(
 
   if (mutation.kind === 'create') {
     for (const childInput of mutation.data) {
-      const payload = {
-        ...blindCast<Record<string, unknown>, 'child create input is a plain object payload'>(
-          childInput,
-        ),
-      };
+      const payload: Record<string, unknown> = { ...castAs<Record<string, unknown>>(childInput) };
 
       for (const [childColumn, parentValue] of parentValues.entries()) {
         const childFieldName = toFieldName(
@@ -626,10 +613,7 @@ async function applyChildOwnedMutation(
         context,
         relation.relatedNamespaceId,
         relation.relatedModelName,
-        blindCast<
-          MutationCreateInput<Contract<SqlStorage>, string>,
-          'child-owned payload is a nested mutation create input'
-        >(payload),
+        castAs<MutationCreateInput<Contract<SqlStorage>, string>>(payload),
       );
     }
     return;
@@ -641,10 +625,7 @@ async function applyChildOwnedMutation(
         context,
         relation.relatedNamespaceId,
         relation.relatedModelName,
-        blindCast<
-          MutationUpdateInput<Contract<SqlStorage>, string>,
-          'child-owned connect criterion is a mutation update filter'
-        >(criterion),
+        castAs<MutationUpdateInput<Contract<SqlStorage>, string>>(criterion),
       );
       if (!criterionWhere) {
         throw new Error(
@@ -692,10 +673,7 @@ async function applyChildOwnedMutation(
       context,
       relation.relatedNamespaceId,
       relation.relatedModelName,
-      blindCast<
-        MutationUpdateInput<Contract<SqlStorage>, string>,
-        'child-owned disconnect criterion is a mutation update filter'
-      >(criterion),
+      castAs<MutationUpdateInput<Contract<SqlStorage>, string>>(criterion),
     );
     if (!criterionWhere) {
       throw new Error(
@@ -743,10 +721,7 @@ async function applyJunctionOwnedMutation(
         context,
         relation.relatedNamespaceId,
         relation.relatedModelName,
-        blindCast<
-          MutationCreateInput<Contract<SqlStorage>, string>,
-          'junction-created target is a nested mutation create input'
-        >(childInput),
+        castAs<MutationCreateInput<Contract<SqlStorage>, string>>(childInput),
       );
       const targetPkValues = readJunctionTargetValues(contract, relation, relatedRow);
       await insertJunctionLink(scope, context, relation, parentPkValues, targetPkValues, 'create');
@@ -841,14 +816,14 @@ async function resolveJunctionTargetValues(
   context: ExecutionContext,
   relation: JunctionRelationDefinition,
   kind: 'connect' | 'disconnect',
-  criterion: unknown,
+  criterion: Record<string, unknown>,
 ): Promise<Map<string, unknown>> {
   const relatedRow = await findRowByCriterion(
     scope,
     context,
     relation.relatedNamespaceId,
     relation.relatedModelName,
-    blindCast<Record<string, unknown>, 'connect/disconnect criterion is a plain object'>(criterion),
+    criterion,
   );
   if (!relatedRow) {
     throw new Error(
@@ -1169,10 +1144,7 @@ async function findRowByCriterion(
     context,
     namespaceId,
     modelName,
-    blindCast<
-      MutationUpdateInput<Contract<SqlStorage>, string>,
-      'criterion object is a mutation update filter'
-    >(criterion),
+    castAs<MutationUpdateInput<Contract<SqlStorage>, string>>(criterion),
   );
   if (!whereExpr) {
     throw new Error(`Nested connect for model "${modelName}" requires non-empty criterion`);
