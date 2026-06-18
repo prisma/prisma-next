@@ -55,6 +55,35 @@ export interface InterpretPslDocumentToMongoContractInput {
   readonly sourceId: string;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly codecLookup?: CodecLookup;
+  /**
+   * Diagnostics produced before interpretation (the provider's combined
+   * `parse` + `buildSymbolTable` set), seeded into the interpreter's collection
+   * so the post-walk dedupe gate emits the parse + symbol-table + interpreter
+   * union in one run — matching the legacy combined-set parser behaviour rather
+   * than failing before interpreting.
+   */
+  readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
+}
+
+function diagnosticDedupKey(diagnostic: ContractSourceDiagnostic): string {
+  const span = diagnostic.span;
+  const spanKey = span
+    ? `${span.start.offset}:${span.end.offset}:${span.start.line}:${span.end.line}`
+    : '';
+  return `${diagnostic.code}\u0000${diagnostic.sourceId}\u0000${spanKey}\u0000${diagnostic.message}`;
+}
+
+function dedupeDiagnostics(
+  diagnostics: readonly ContractSourceDiagnostic[],
+): ContractSourceDiagnostic[] {
+  const seen = new Map<string, ContractSourceDiagnostic>();
+  for (const diagnostic of diagnostics) {
+    const key = diagnosticDedupKey(diagnostic);
+    if (!seen.has(key)) {
+      seen.set(key, diagnostic);
+    }
+  }
+  return [...seen.values()];
 }
 
 /**
@@ -855,7 +884,7 @@ export function interpretPslDocumentToMongoContract(
 ): Result<Contract, ContractSourceDiagnostics> {
   const { symbolTable, sourceFile, scalarTypeDescriptors, codecLookup } = input;
   const sourceId = input.sourceId;
-  const diagnostics: ContractSourceDiagnostic[] = [];
+  const diagnostics: ContractSourceDiagnostic[] = [...(input.seedDiagnostics ?? [])];
   const topLevel = symbolTable.topLevel;
   validateNamespaceBlocksForMongoTarget({
     namespaces: Object.values(topLevel.namespaces),
@@ -1107,7 +1136,7 @@ export function interpretPslDocumentToMongoContract(
   if (diagnostics.length > 0 || polyResult.diagnostics.length > 0) {
     return notOk({
       summary: 'PSL to Mongo contract interpretation failed',
-      diagnostics: [...diagnostics, ...polyResult.diagnostics],
+      diagnostics: dedupeDiagnostics([...diagnostics, ...polyResult.diagnostics]),
     });
   }
 

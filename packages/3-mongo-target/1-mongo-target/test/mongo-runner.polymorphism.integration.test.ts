@@ -12,7 +12,8 @@ import type { MongoContract } from '@prisma-next/mongo-contract';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import { type Db, MongoClient, MongoServerError } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -114,9 +115,16 @@ const polymorphicSchema = `
 `;
 
 function makeContractFromPsl(): MongoContract {
-  const document = parsePslDocument({ schema: polymorphicSchema, sourceId: 'tasks.prisma' });
-  const result = interpretPslDocumentToMongoContract({
+  const { document, sourceFile } = parse(polymorphicSchema);
+  const { table: symbolTable } = buildSymbolTable({
     document,
+    sourceFile,
+    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
+  });
+  const result = interpretPslDocumentToMongoContract({
+    symbolTable,
+    sourceFile,
+    sourceId: 'tasks.prisma',
     scalarTypeDescriptors: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
   });

@@ -11,7 +11,8 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import {
   MongoMigrationPlanner,
   MongoMigrationRunner,
@@ -64,17 +65,25 @@ const mongoCodecLookup: CodecLookup = {
 };
 
 function pslToContract(schema: string): MongoContract {
-  const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
-  const result = interpretPslDocumentToMongoContract({
+  const scalarTypeDescriptors = new Map([
+    ['String', 'mongo/string@1'],
+    ['Int', 'mongo/int32@1'],
+    ['Boolean', 'mongo/bool@1'],
+    ['DateTime', 'mongo/date@1'],
+    ['ObjectId', 'mongo/objectId@1'],
+    ['Float', 'mongo/double@1'],
+  ]);
+  const { document, sourceFile } = parse(schema);
+  const { table: symbolTable } = buildSymbolTable({
     document,
-    scalarTypeDescriptors: new Map([
-      ['String', 'mongo/string@1'],
-      ['Int', 'mongo/int32@1'],
-      ['Boolean', 'mongo/bool@1'],
-      ['DateTime', 'mongo/date@1'],
-      ['ObjectId', 'mongo/objectId@1'],
-      ['Float', 'mongo/double@1'],
-    ]),
+    sourceFile,
+    scalarTypes: [...scalarTypeDescriptors.keys()],
+  });
+  const result = interpretPslDocumentToMongoContract({
+    symbolTable,
+    sourceFile,
+    sourceId: 'test.prisma',
+    scalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
   });
   if (!result.ok) {

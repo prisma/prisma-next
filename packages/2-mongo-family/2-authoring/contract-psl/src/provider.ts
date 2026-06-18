@@ -1,13 +1,35 @@
 import { readFile } from 'node:fs/promises';
-import type { ContractConfig } from '@prisma-next/config/config-types';
+import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
+import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
+import { rangeToPslSpan } from './cst-read';
 import { interpretPslDocumentToMongoContract } from './interpreter';
 
 export interface MongoContractOptions {
   readonly output?: string;
+}
+
+/**
+ * Map a parser/symbol-table `ParseDiagnostic` (`{ code, message, range }`) to
+ * the `ContractSourceDiagnostic` the provider surfaces, stamping the provider's
+ * `sourceId` and deriving the span from the diagnostic `range`. Mirrors the SQL
+ * provider's `mapParseDiagnostics`, now that `parse` + `buildSymbolTable` are
+ * the source of truth.
+ */
+function mapParseDiagnostics(
+  diagnostics: readonly ParseDiagnostic[],
+  sourceFile: SourceFile,
+  sourceId: string,
+): ContractSourceDiagnostic[] {
+  return diagnostics.map((diagnostic) => ({
+    code: diagnostic.code,
+    message: diagnostic.message,
+    sourceId,
+    span: rangeToPslSpan(diagnostic.range, sourceFile),
+  }));
 }
 
 export function mongoContract(schemaPath: string, options?: MongoContractOptions): ContractConfig {
@@ -40,22 +62,32 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
           });
         }
 
-        // dispatch-4: thin bridge to keep src/ compiling. The real provider
-        // swap (combined parse + symbol-table diagnostic seeding, mirroring the
-        // SQL provider's `seedDiagnostics`) lands in dispatch 4; for now this
-        // builds the symbol table and threads the new interpreter input shape
-        // without surfacing parse/symbol-table diagnostics.
-        const { document, sourceFile } = parse(schema);
-        const { table: symbolTable } = buildSymbolTable({
+        // `parse` yields the CST + syntactic diagnostics; `buildSymbolTable`
+        // adds its own duplicate-name diagnostics (two separate lists per the
+        // project decision).
+        const { document, sourceFile, diagnostics: parseDiagnostics } = parse(schema);
+        const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
           document,
           sourceFile,
           scalarTypes: [...context.scalarTypeDescriptors.keys()],
         });
 
+        // Seed the combined parse + symbol-table diagnostics into the
+        // interpreter (rather than short-circuiting): it walks the recovered
+        // document, appends its own diagnostics, and its post-walk dedupe gate
+        // emits the deduped parse + symbol-table + interpreter union in one run
+        // — matching the legacy combined-set parser behaviour, consistent with
+        // the SQL provider.
+        const seedDiagnostics = [
+          ...mapParseDiagnostics(parseDiagnostics, sourceFile, schemaPath),
+          ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),
+        ];
+
         const interpreted = interpretPslDocumentToMongoContract({
           symbolTable,
           sourceFile,
           sourceId: schemaPath,
+          seedDiagnostics,
           scalarTypeDescriptors: context.scalarTypeDescriptors,
           codecLookup: context.codecLookup,
         });

@@ -14,13 +14,28 @@ import {
   MongoStorage,
   MongoValidator,
 } from '@prisma-next/mongo-contract';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable, type SymbolTable } from '@prisma-next/psl-parser';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToMongoContractInput,
   interpretPslDocumentToMongoContract,
 } from '../src/interpreter';
+
+function buildSymbolTableInput(
+  schema: string,
+  sourceId = 'test.prisma',
+): { symbolTable: SymbolTable; sourceFile: SourceFile; sourceId: string } {
+  const { document, sourceFile } = parse(schema);
+  const { table } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
+  });
+  return { symbolTable: table, sourceFile, sourceId };
+}
 
 const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
   ['String', 'mongo/string@1'],
@@ -89,11 +104,12 @@ function model(ir: Contract, name: string): MongoModel {
 
 function interpret(
   schema: string,
-  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'document'>>,
+  overrides?: Partial<
+    Omit<InterpretPslDocumentToMongoContractInput, 'symbolTable' | 'sourceFile' | 'sourceId'>
+  >,
 ) {
-  const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
   return interpretPslDocumentToMongoContract({
-    document,
+    ...buildSymbolTableInput(schema),
     scalarTypeDescriptors: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
     ...overrides,
@@ -102,7 +118,9 @@ function interpret(
 
 function interpretOk(
   schema: string,
-  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'document'>>,
+  overrides?: Partial<
+    Omit<InterpretPslDocumentToMongoContractInput, 'symbolTable' | 'sourceFile' | 'sourceId'>
+  >,
 ) {
   const result = interpret(schema, overrides);
   expect(result.ok).toBe(true);
@@ -1881,18 +1899,16 @@ describe('interpretPslDocumentToMongoContract', () => {
 
   describe('namespace block rejection', () => {
     it('rejects explicit namespace blocks with a Mongo-flavoured diagnostic', () => {
-      const document = parsePslDocument({
-        schema: `namespace auth {
+      const result = interpretPslDocumentToMongoContract({
+        ...buildSymbolTableInput(
+          `namespace auth {
   model User {
     id String @id
   }
 }
 `,
-        sourceId: 'schema.prisma',
-      });
-
-      const result = interpretPslDocumentToMongoContract({
-        document,
+          'schema.prisma',
+        ),
         scalarTypeDescriptors: mongoScalarTypeDescriptors,
       });
 
@@ -1913,18 +1929,16 @@ describe('interpretPslDocumentToMongoContract', () => {
     });
 
     it('rejects `namespace unbound { … }` (Mongo has no late-binding namespace)', () => {
-      const document = parsePslDocument({
-        schema: `namespace unbound {
+      const result = interpretPslDocumentToMongoContract({
+        ...buildSymbolTableInput(
+          `namespace unbound {
   model Tenant {
     id String @id
   }
 }
 `,
-        sourceId: 'schema.prisma',
-      });
-
-      const result = interpretPslDocumentToMongoContract({
-        document,
+          'schema.prisma',
+        ),
         scalarTypeDescriptors: mongoScalarTypeDescriptors,
       });
 
@@ -1938,17 +1952,15 @@ describe('interpretPslDocumentToMongoContract', () => {
     });
 
     it('accepts top-level model declarations (no namespace block)', () => {
-      const document = parsePslDocument({
-        schema: `model User {
+      const result = interpretPslDocumentToMongoContract({
+        ...buildSymbolTableInput(
+          `model User {
   id ObjectId @id @map("_id")
   name String
 }
 `,
-        sourceId: 'schema.prisma',
-      });
-
-      const result = interpretPslDocumentToMongoContract({
-        document,
+          'schema.prisma',
+        ),
         scalarTypeDescriptors: mongoScalarTypeDescriptors,
       });
 
