@@ -656,13 +656,6 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "entries": {
-          "table": {}
-        },
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema"
-      },
       "public": {
         "entries": {
           "table": {
@@ -1103,10 +1096,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:1039fc38b2e6720403a22634dfa7c1395ab92252d28f85f92cef6180535f7ae5"
+    "storageHash": "sha256:981fe037ca7e692e66fe348947d9338b2e42349e1c266482ace81da4800646fa"
   },
   "execution": {
-    "executionHash": "sha256:cee87ec002ede0c352cdf215e9e129a540bebd95555057beaa785c7dfadb95ea",
+    "executionHash": "sha256:055d44fe135482983abba0b4d9fab946a7e9587034dbb6c241317ef6021452ff",
     "mutations": {
       "defaults": [
         {
@@ -1116,6 +1109,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "event"
           }
         }

@@ -40,12 +40,6 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "entries": {
-          "table": {}
-        },
-        "id": "__unbound__"
-      },
       "public": {
         "entries": {
           "table": {
@@ -69,10 +63,10 @@
         "id": "public"
       }
     },
-    "storageHash": "sha256:58eb519c8387bc3ea36f07daf7c9dfd384a900fbe8b2a83b4e9453d23101ca9e"
+    "storageHash": "sha256:69ba22f8e5cae4917380a76136df9fadffd6f89cf1ee547d70dfda2b7671f8dd"
   },
   "execution": {
-    "executionHash": "sha256:28ad2f03f8da50b42cff2553077afb5a85e9e340c32f0cf86564d0b6712ffe41",
+    "executionHash": "sha256:f72e81af4cc505547c88a6cfaaa6b4fbf4f8889162bd426facf8a8eebefc573f",
     "mutations": {
       "defaults": [
         {
@@ -82,6 +76,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "user"
           }
         }

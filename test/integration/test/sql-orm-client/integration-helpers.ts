@@ -54,14 +54,22 @@ export async function withCollectionRuntime(
   // plan's storageHash against the contract it was built with.
   contractOverride?: Contract<SqlStorage>,
 ): Promise<void> {
-  await withDevDatabase(async ({ connectionString }) => {
-    const runtime = await createPgIntegrationRuntime(connectionString, contractOverride);
+  await withDevDatabase(
+    async ({ connectionString }) => {
+      const runtime = await createPgIntegrationRuntime(connectionString, contractOverride);
 
-    try {
-      await setupTestSchema(runtime);
-      await fn(runtime);
-    } finally {
-      await runtime.close();
-    }
-  });
+      try {
+        await setupTestSchema(runtime);
+        await fn(runtime);
+      } finally {
+        await runtime.close();
+      }
+    },
+    // The runtime now drives a single long-lived client (so transactions hold one
+    // connection on the single-backend PGlite server). The server's default 1s
+    // idle timeout reaps that client during brief idle windows under full-suite
+    // load — a pool would reconnect, a lone client cannot — so give it generous
+    // headroom. No test holds the connection idle anywhere near this long.
+    { databaseIdleTimeoutMillis: 30_000 },
+  );
 }

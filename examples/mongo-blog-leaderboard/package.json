@@ -15,18 +15,18 @@
     "lint": "biome check . --error-on-warnings"
   },
   "dependencies": {
-    "@prisma-next/adapter-mongo": "workspace:0.13.0",
-    "@prisma-next/contract": "workspace:0.13.0",
-    "@prisma-next/mongo": "workspace:0.13.0",
-    "@prisma-next/mongo-contract": "workspace:0.13.0",
-    "@prisma-next/mongo-query-builder": "workspace:0.13.0",
-    "@prisma-next/utils": "workspace:0.13.0",
+    "@prisma-next/adapter-mongo": "workspace:0.14.0",
+    "@prisma-next/contract": "workspace:0.14.0",
+    "@prisma-next/mongo": "workspace:0.14.0",
+    "@prisma-next/mongo-contract": "workspace:0.14.0",
+    "@prisma-next/mongo-query-builder": "workspace:0.14.0",
+    "@prisma-next/utils": "workspace:0.14.0",
     "mongodb": "catalog:"
   },
   "devDependencies": {
-    "@prisma-next/cli": "workspace:0.13.0",
-    "@prisma-next/test-utils": "workspace:0.13.0",
-    "@prisma-next/tsconfig": "workspace:0.13.0",
+    "@prisma-next/cli": "workspace:0.14.0",
+    "@prisma-next/test-utils": "workspace:0.14.0",
+    "@prisma-next/tsconfig": "workspace:0.14.0",
     "@types/node": "catalog:",
     "mongodb-memory-server": "catalog:",
     "tsx": "catalog:",
@@ -34,5 +34,5 @@
     "vite": "catalog:",
     "vitest": "catalog:"
   },
-  "version": "0.13.0"
+  "version": "0.14.0"
 }

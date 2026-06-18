@@ -465,13 +465,6 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "entries": {
-          "table": {}
-        },
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema"
-      },
       "public": {
         "entries": {
           "table": {
@@ -800,7 +793,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:1a02eed4ad52f589641c1e16b929427e1060acc6bc1e9cc4e3b6e663523f88b4",
+    "storageHash": "sha256:9f07ac18eb5ab5c21cff6b8414fb2a29bfae8d8b21009fbdd29616b4718e1d99",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",
@@ -813,7 +806,7 @@
     }
   },
   "execution": {
-    "executionHash": "sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e",
+    "executionHash": "sha256:a691ed4c6ad02663bcd11c7ea8b2491e67253cd7c1968687255f2e0accfdcff7",
     "mutations": {
       "defaults": [
         {
@@ -823,6 +816,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "post"
           }
         },
@@ -833,6 +827,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "task"
           }
         },
@@ -843,6 +838,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "user"
           }
         }

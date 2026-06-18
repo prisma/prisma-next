@@ -178,12 +178,6 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "entries": {
-          "table": {}
-        },
-        "id": "__unbound__"
-      },
       "public": {
         "entries": {
           "table": {
@@ -332,7 +326,7 @@
         "id": "public"
       }
     },
-    "storageHash": "sha256:630275c145f45ee2e67fe0fa4f21324b1e328bdf620a0a3c9dfbacd6509526d4",
+    "storageHash": "sha256:95e8ea1b54d444760e630a2302b6353f8c59f32bc5f44f465c67f1cd0a2e2d3f",
     "types": {
       "Email": {
         "codecId": "pg/text@1",

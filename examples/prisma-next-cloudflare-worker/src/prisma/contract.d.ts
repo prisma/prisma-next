@@ -30,9 +30,9 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:e923e2d62f4cdd6dd8b2c3678d5465d0604c3b1dd4f5c2b214760b67b9dd2deb'>;
+  StorageHashBase<'sha256:dcf1c78cc76b904700539151edfcdab997e8a95db8474069612a075f9e8d976b'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e'>;
+  ExecutionHashBase<'sha256:a691ed4c6ad02663bcd11c7ea8b2491e67253cd7c1968687255f2e0accfdcff7'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
@@ -134,11 +134,6 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = Omit<
   ContractType<{
     readonly namespaces: {
-      readonly __unbound__: {
-        readonly id: '__unbound__';
-        readonly kind: 'postgres-unbound-schema';
-        readonly entries: { readonly table: {} };
-      };
       readonly public: {
         readonly id: 'public';
         readonly kind: 'postgres-schema';
@@ -667,15 +662,27 @@ type ContractBase = Omit<
     readonly mutations: {
       readonly defaults: readonly [
         {
-          readonly ref: { readonly table: 'post'; readonly column: 'id' };
+          readonly ref: {
+            readonly namespace: 'public';
+            readonly table: 'post';
+            readonly column: 'id';
+          };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
         {
-          readonly ref: { readonly table: 'task'; readonly column: 'id' };
+          readonly ref: {
+            readonly namespace: 'public';
+            readonly table: 'task';
+            readonly column: 'id';
+          };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
         {
-          readonly ref: { readonly table: 'user'; readonly column: 'id' };
+          readonly ref: {
+            readonly namespace: 'public';
+            readonly table: 'user';
+            readonly column: 'id';
+          };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
       ];

@@ -80,7 +80,12 @@ export function buildParamValues(
     const codec = column ? codecRefFor(ctx, namespaceId, tableName, col) : undefined;
     params[col] = ParamRef.of(value, codec ? { codec } : undefined);
   }
-  for (const def of ctx.applyMutationDefaults({ op, table: tableName, values })) {
+  for (const def of ctx.applyMutationDefaults({
+    op,
+    namespace: namespaceId,
+    table: tableName,
+    values,
+  })) {
     const column = table.columns[def.column];
     const codec = column ? codecRefFor(ctx, namespaceId, tableName, def.column) : undefined;
     params[def.column] = ParamRef.of(def.value, codec ? { codec } : undefined);
@@ -137,7 +142,12 @@ export function buildSetExpressions(
   ctx: BuilderContext,
 ): Record<string, AstExpression> {
   const set: Record<string, AstExpression> = { ...exprs };
-  for (const def of ctx.applyMutationDefaults({ op, table: tableName, values: exprs })) {
+  for (const def of ctx.applyMutationDefaults({
+    op,
+    namespace: namespaceId,
+    table: tableName,
+    values: exprs,
+  })) {
     if (!(def.column in set)) {
       const column = table.columns[def.column];
       const codec = column ? codecRefFor(ctx, namespaceId, tableName, def.column) : undefined;

@@ -1,3 +1,4 @@
+import type { ContractRelationThrough } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   assertReturningCapability,
@@ -9,9 +10,15 @@ import {
   resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
   resolveRowIdentityColumns,
+  resolveThrough,
   resolveUpsertConflictColumns,
 } from '../src/collection-contract';
-import { buildMixedPolyContract, getTestContract, withPatchedDomainModels } from './helpers';
+import {
+  buildExecutionDefaultJunctionContract,
+  buildMixedPolyContract,
+  getTestContract,
+  withPatchedDomainModels,
+} from './helpers';
 import { unboundTables } from './unbound-tables';
 
 describe('collection-contract capability detection', () => {
@@ -426,22 +433,31 @@ describe('resolveModelRelations() through descriptor', () => {
     ).toEqual([]);
   });
 
-  it('omits through when the junction table is absent from its declared namespace', () => {
-    const contract = withPatchedDomainModels(getTestContract(), (models) => {
-      const user = models['User'] as { relations: Record<string, { through?: unknown }> };
-      const tags = user.relations['tags'] as { through: { table: string } };
-      return {
-        ...models,
-        User: {
-          ...user,
-          relations: {
-            ...user.relations,
-            tags: { ...tags, through: { ...tags.through, table: 'missing_junction' } },
-          },
-        },
-      };
-    });
+  it('excludes execution-defaulted non-FK columns from requiredPayloadColumns', () => {
+    // `user_roles.level` is NOT NULL with no storage default; its `field.generated`
+    // execution onCreate default is the only thing that keeps it out of the
+    // required-payload set.
+    const contract = buildExecutionDefaultJunctionContract();
 
-    expect(resolveModelRelations(contract, 'public', 'User')['tags']?.through).toBeUndefined();
+    expect(
+      resolveModelRelations(contract, 'public', 'User')['roles']?.through?.requiredPayloadColumns,
+    ).toEqual([]);
+  });
+
+  it('omits through when the junction table is absent from its declared namespace', () => {
+    // A `through` pointing at a table that isn't in storage can't be authored —
+    // it's a defensive guard, so exercise resolveThrough directly with a real
+    // contract and a typed through whose table is missing (a guard input, not a
+    // contract).
+    const contract = getTestContract();
+    const missingThrough: ContractRelationThrough = {
+      table: 'missing_junction',
+      namespaceId: 'public',
+      parentColumns: ['user_id'],
+      childColumns: ['tag_id'],
+      targetColumns: ['id'],
+    };
+
+    expect(resolveThrough(contract, missingThrough)).toBeUndefined();
   });
 });

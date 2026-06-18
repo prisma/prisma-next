@@ -182,6 +182,11 @@ TML-2786: the sql-orm-client runtime gained M:N relation filters — a
 through the junction table. Internal runtime only; no extension API or
 contract-shape change. No extension-author action required.
 
+TML-2787: the sql-orm-client runtime gained M:N nested writes — connect /
+disconnect / nested create on an N:M relation insert and delete
+junction-table rows. Internal runtime only; no extension API or
+contract-shape change. No extension-author action required.
+
 TML-2838: the temporary `--no-memory-protection-keys` test-harness workaround
 has been removed from every PGlite-backed vitest config (including
 `packages/3-extensions/{postgres,supabase}`) now that the WAL-teardown crash is
@@ -496,4 +501,12 @@ in PostgreSQL (parenthesizing an atomic primary expression in a `DEFAULT` clause
 a no-op). The pgvector `planner.behavior.test.ts` assertion that pins the recipe's
 emitted ADD COLUMN SQL was updated to the parenthesized form. Test-only assertion
 update — no extension-author API change. Incidental substrate diff only.
+-->
+
+<!--
+TML-2916: un-namespaced Postgres extension contracts (pgvector, paradedb, postgis,
+supabase) regenerate to drop the spurious empty `__unbound__` storage namespace slot
+the authoring + serializer pipeline was injecting, restoring ADR 223 compliance.
+Migration `head.json` and `migration.ts` hashes update. No extension-author action:
+re-emit picks up the new shape. Incidental substrate diff only.
 -->

@@ -35,9 +35,9 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:b2f49a9235415147960335fffb95725c120e982c19f858e1ef4affa0651e0d7f'>;
+  StorageHashBase<'sha256:54a95c9e7565db90e1b949f874aabec9aa815a95bea85711355f08d4c4cdf165'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:f044f000ac77f18b44684c98aaf941827c8ad714912430a4526a16bd88e955e7'>;
+  ExecutionHashBase<'sha256:1ddea92466511275c26e39941e15937dbb662c78f87aeaf06ae8fa033e487eec'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
@@ -118,11 +118,6 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = Omit<
   ContractType<{
     readonly namespaces: {
-      readonly __unbound__: {
-        readonly id: '__unbound__';
-        readonly kind: 'postgres-unbound-schema';
-        readonly entries: { readonly table: {} };
-      };
       readonly public: {
         readonly id: 'public';
         readonly kind: 'postgres-schema';
@@ -554,7 +549,11 @@ type ContractBase = Omit<
     readonly mutations: {
       readonly defaults: readonly [
         {
-          readonly ref: { readonly table: 'articles'; readonly column: 'id' };
+          readonly ref: {
+            readonly namespace: 'public';
+            readonly table: 'articles';
+            readonly column: 'id';
+          };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
       ];

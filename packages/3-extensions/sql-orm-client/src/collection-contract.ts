@@ -355,7 +355,7 @@ export function resolveIncludeRelation(
   };
 }
 
-function resolveThrough(
+export function resolveThrough(
   contract: Contract<SqlStorage>,
   through: ContractRelationThrough | undefined,
 ): ResolvedThrough | undefined {
@@ -369,7 +369,12 @@ function resolveThrough(
   const fkColumnSet = new Set<string>([...parentColumns, ...childColumns]);
   const requiredPayloadColumns: string[] = [];
   for (const [colName, col] of Object.entries(junctionTable.columns)) {
-    if (!fkColumnSet.has(colName) && !col.nullable && col.default === undefined) {
+    if (
+      !fkColumnSet.has(colName) &&
+      !col.nullable &&
+      col.default === undefined &&
+      !hasExecutionCreateDefault(contract, namespaceId, table, colName)
+    ) {
       requiredPayloadColumns.push(colName);
     }
   }
@@ -382,6 +387,23 @@ function resolveThrough(
     targetColumns,
     requiredPayloadColumns,
   };
+}
+
+function hasExecutionCreateDefault(
+  contract: Contract<SqlStorage>,
+  namespace: string,
+  table: string,
+  column: string,
+): boolean {
+  return (
+    contract.execution?.mutations.defaults.some(
+      (mutationDefault) =>
+        mutationDefault.ref.namespace === namespace &&
+        mutationDefault.ref.table === table &&
+        mutationDefault.ref.column === column &&
+        mutationDefault.onCreate !== undefined,
+    ) ?? false
+  );
 }
 
 const modelRelationsCache = new WeakMap<object, Map<string, Record<string, ResolvedRelation>>>();
@@ -407,12 +429,15 @@ export function resolveModelRelations(
   for (const [name, value] of Object.entries(relationMap)) {
     if (!value || typeof value !== 'object') continue;
 
-    const rel = value as {
-      to?: CrossReference;
-      cardinality?: unknown;
-      on?: { localFields?: unknown; targetFields?: unknown };
-      through?: ContractRelationThrough;
-    };
+    const rel = blindCast<
+      {
+        to?: CrossReference;
+        cardinality?: unknown;
+        on?: { localFields?: unknown; targetFields?: unknown };
+        through?: ContractRelationThrough;
+      },
+      'relation metadata is object-shaped and validated before use'
+    >(value);
     const localFields = rel.on?.localFields;
     const targetFields = rel.on?.targetFields;
 
@@ -433,8 +458,13 @@ export function resolveModelRelations(
       toNamespace: rel.to.namespace,
       cardinality: parseRelationCardinality(rel.cardinality),
       on: {
-        localFields: localFields as readonly string[],
-        targetFields: targetFields as readonly string[],
+        localFields: blindCast<readonly string[], 'relation localFields array was validated above'>(
+          localFields,
+        ),
+        targetFields: blindCast<
+          readonly string[],
+          'relation targetFields array was validated above'
+        >(targetFields),
       },
       ...(through !== undefined ? { through } : {}),
     };
@@ -557,7 +587,9 @@ function capabilityEnabled(value: unknown): boolean {
     return false;
   }
 
-  return Object.values(value as Record<string, unknown>).some((flag) => flag === true);
+  return Object.values(
+    blindCast<Record<string, unknown>, 'capability object maps names to capability flags'>(value),
+  ).some((flag) => flag === true);
 }
 
 export function isToOneCardinality(cardinality: RelationCardinalityTag | undefined): boolean {

@@ -1,5 +1,4 @@
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
-import { SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
 
@@ -37,14 +36,11 @@ describe('SqlStorage.namespaces population', () => {
       target: postgresTargetPack,
       models: [minimalModelArgs],
     });
-    expect(Object.keys(contract.storage.namespaces).sort()).toEqual(['__unbound__', 'public']);
+    expect(Object.keys(contract.storage.namespaces).sort()).toEqual(['public']);
     const publicNamespace = contract.storage.namespaces['public']!;
-    expect(publicNamespace).not.toBe(SqlUnboundNamespace.instance);
     expect(publicNamespace.id).toBe('public');
     expect(publicNamespace.entries.table?.['app_user']).toBeDefined();
-    expect(
-      Object.keys(contract.storage.namespaces['__unbound__']!.entries.table ?? {}),
-    ).toHaveLength(0);
+    expect(contract.storage.namespaces['__unbound__']).toBeUndefined(); // TML-2916
   });
 
   it('creates declared namespace slots (initially empty tables) alongside the public default coordinate', () => {
@@ -54,7 +50,7 @@ describe('SqlStorage.namespaces population', () => {
       models: [minimalModelArgs],
     });
     const namespaceIds = Object.keys(contract.storage.namespaces).sort();
-    expect(namespaceIds).toEqual(['__unbound__', 'auth', 'public']);
+    expect(namespaceIds).toEqual(['auth', 'public']);
     expect(Object.keys(contract.storage.namespaces['auth']!.entries.table ?? {})).toHaveLength(0);
     expect(contract.storage.namespaces['public']!.entries.table?.['app_user']).toBeDefined();
   });
@@ -68,7 +64,7 @@ describe('SqlStorage.namespaces population', () => {
       ],
     });
     const namespaceIds = Object.keys(contract.storage.namespaces).sort();
-    expect(namespaceIds).toEqual(['__unbound__', 'auth', 'public']);
+    expect(namespaceIds).toEqual(['auth', 'public']);
     expect(contract.storage.namespaces['auth']!.entries.table?.['app_user']).toBeDefined();
     expect(contract.storage.namespaces['public']!.entries.table?.['blog_post']).toBeDefined();
   });
@@ -78,9 +74,9 @@ describe('SqlStorage.namespaces population', () => {
       target: postgresTargetPack,
       models: [],
     });
-    expect(Object.keys(contract.storage.namespaces).sort()).toEqual(['__unbound__', 'public']);
-    expect(contract.storage.namespaces['public']).not.toBe(SqlUnboundNamespace.instance);
+    expect(Object.keys(contract.storage.namespaces).sort()).toEqual(['public']);
     expect(Object.keys(contract.storage.namespaces['public']!.entries.table ?? {})).toHaveLength(0);
+    expect(contract.storage.namespaces['__unbound__']).toBeUndefined(); // TML-2916
   });
 
   it('accepts declared namespaces without a createNamespace factory', () => {
@@ -100,7 +96,7 @@ describe('SqlStorage.namespaces population', () => {
       models: [{ ...minimalModelArgs, namespaceId: 'auth' }],
     });
     const namespaceIds = Object.keys(contract.storage.namespaces).sort();
-    expect(namespaceIds).toEqual(['__unbound__', 'auth', 'public']);
+    expect(namespaceIds).toEqual(['auth', 'public']);
     expect(contract.storage.namespaces['auth']!.entries.table?.['app_user']).toBeDefined();
   });
 });
