@@ -1,3 +1,4 @@
+import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type {
   PslExtensionBlock,
   PslExtensionBlockAttribute,
@@ -17,12 +18,19 @@ import { nodePslSpan, rangeToPslSpan, readAttribute } from './cst-read';
  * member `parameters` map (bare members → `{ kind: 'bare' }`, `key = value`
  * members → `{ kind: 'value', raw }` where `raw` is the verbatim source value,
  * matching the legacy descriptor-free path for a variadic block). First
- * occurrence of a duplicate member name wins, as the legacy parser did.
+ * occurrence of a duplicate member name wins, as the legacy parser did; each
+ * later occurrence is dropped and flagged with `PSL_EXTENSION_DUPLICATE_PARAMETER`
+ * into the supplied `diagnostics` sink (parity with the legacy
+ * `pslBlockDescriptors`-driven parser).
  */
 export function reconstructExtensionBlock(
   node: GenericBlockDeclarationAst,
   sourceFile: SourceFile,
+  diagnostics: ContractSourceDiagnostic[],
+  sourceId: string,
 ): PslExtensionBlock {
+  const keyword = node.keyword()?.text ?? '';
+  const blockName = node.name()?.name() ?? '';
   const blockAttributes: PslExtensionBlockAttribute[] = [];
   for (const attribute of node.attributes()) {
     const read = readAttribute(attribute, sourceFile);
@@ -42,8 +50,17 @@ export function reconstructExtensionBlock(
   const parameters: Record<string, PslExtensionBlockParamValue> = {};
   for (const entry of node.entries()) {
     const key = entry.key()?.name();
-    if (key === undefined || Object.hasOwn(parameters, key)) continue;
+    if (key === undefined) continue;
     const span = nodePslSpan(entry.syntax, sourceFile);
+    if (Object.hasOwn(parameters, key)) {
+      diagnostics.push({
+        code: 'PSL_EXTENSION_DUPLICATE_PARAMETER',
+        message: `Duplicate parameter "${key}" in "${keyword}" block "${blockName}"; first occurrence wins`,
+        sourceId,
+        span,
+      });
+      continue;
+    }
     const value = entry.value();
     parameters[key] =
       value === undefined
@@ -53,7 +70,7 @@ export function reconstructExtensionBlock(
 
   return {
     kind: 'enum',
-    name: node.name()?.name() ?? '',
+    name: blockName,
     parameters,
     blockAttributes,
     span: nodePslSpan(node.syntax, sourceFile),

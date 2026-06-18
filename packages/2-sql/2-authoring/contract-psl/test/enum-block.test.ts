@@ -1,3 +1,4 @@
+import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type {
   AuthoringEntityContext,
   PslExtensionBlock,
@@ -37,10 +38,19 @@ function firstGenericBlock(document: DocumentAst): GenericBlockDeclarationAst {
   throw new Error('expected a generic block declaration');
 }
 
-function reconstruct(schema: string): PslExtensionBlock {
+function reconstructWithDiagnostics(schema: string): {
+  block: PslExtensionBlock;
+  diagnostics: ContractSourceDiagnostic[];
+} {
   const { document, sourceFile } = parse(schema);
   const node = firstGenericBlock(document);
-  return reconstructExtensionBlock(node, sourceFile);
+  const diagnostics: ContractSourceDiagnostic[] = [];
+  const block = reconstructExtensionBlock(node, sourceFile, diagnostics, 'schema.prisma');
+  return { block, diagnostics };
+}
+
+function reconstruct(schema: string): PslExtensionBlock {
+  return reconstructWithDiagnostics(schema).block;
 }
 
 function runFactory(block: PslExtensionBlock): {
@@ -98,6 +108,19 @@ describe('reconstructExtensionBlock — shape parity with the enum factory read-
     expect(block.blockAttributes[0]?.span.start.line).toBeGreaterThan(0);
     expect(block.parameters['Low']?.span.start.line).toBeGreaterThan(0);
     expect(block.parameters['High']?.span.start.line).toBeGreaterThan(0);
+  });
+
+  it('emits PSL_EXTENSION_DUPLICATE_PARAMETER for a duplicate member, keeping the first', () => {
+    const { block, diagnostics } = reconstructWithDiagnostics(
+      'enum Priority {\n  @@type("pg/text@1")\n  Low = "low"\n  Low = "low-again"\n}',
+    );
+
+    expect(diagnostics.map((d) => d.code)).toEqual(['PSL_EXTENSION_DUPLICATE_PARAMETER']);
+    expect(diagnostics[0]).toMatchObject({ sourceId: 'schema.prisma' });
+    expect(diagnostics[0]?.message).toContain('Low');
+    expect(diagnostics[0]?.span?.start.line).toBeGreaterThan(0);
+    // first-wins: the kept binding is the first occurrence's value
+    expect(block.parameters['Low']).toMatchObject({ kind: 'value', raw: '"low"' });
   });
 });
 

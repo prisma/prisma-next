@@ -1735,7 +1735,7 @@ export function interpretPslDocumentToSqlContract(
   const isEnumBlock = (block: BlockSymbol): boolean => block.keyword === 'enum';
   const topLevelEnums = Object.values(topLevel.blocks)
     .filter(isEnumBlock)
-    .map((block) => reconstructExtensionBlock(block.node, sourceFile));
+    .map((block) => reconstructExtensionBlock(block.node, sourceFile, diagnostics, sourceId));
   for (const namespace of namespaceSymbols) {
     for (const block of Object.values(namespace.blocks)) {
       if (!isEnumBlock(block)) continue;
