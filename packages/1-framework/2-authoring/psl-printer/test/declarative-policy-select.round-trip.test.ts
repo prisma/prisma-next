@@ -41,7 +41,6 @@ import {
   type BlockSymbol,
   buildSymbolTable,
   findBlockDescriptor,
-  reconstructExtensionBlock,
   type SymbolTable,
   validateExtensionBlockFromSymbol,
 } from '@prisma-next/psl-parser';
@@ -149,7 +148,12 @@ interface ParsedPolicySelect {
  */
 function parsePolicySelect(schema: string, sourceId = 'r1'): ParsedPolicySelect {
   const { document, sourceFile } = parse(schema);
-  const { table } = buildSymbolTable({ document, sourceFile, scalarTypes: [] });
+  const { table } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes: [],
+    pslBlockDescriptors: assembled.pslBlockDescriptors,
+  });
   const blockSymbols = Object.values(table.topLevel.blocks).filter(
     (block) => block.keyword === POLICY_SELECT_KEYWORD,
   );
@@ -166,9 +170,13 @@ function onlyBlockSymbol(parsed: ParsedPolicySelect): BlockSymbol {
   return block;
 }
 
-/** Reconstruct the block symbol into the uniform `PslExtensionBlock` node. */
-function reconstruct(parsed: ParsedPolicySelect, block: BlockSymbol): PslExtensionBlock {
-  return reconstructExtensionBlock(block.node, POLICY_SELECT_DESCRIPTOR, parsed.sourceFile);
+/**
+ * The block symbol's resolved `PslExtensionBlock` — now built by
+ * `buildSymbolTable` (descriptor-classified via the policy_select descriptor
+ * passed above), read directly off the symbol instead of reconstructed here.
+ */
+function reconstruct(_parsed: ParsedPolicySelect, block: BlockSymbol): PslExtensionBlock {
+  return block.block;
 }
 
 /** Run the descriptor-driven validator over a block symbol. */

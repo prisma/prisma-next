@@ -115,15 +115,15 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
 
         // `parse` yields the CST + syntactic diagnostics; `buildSymbolTable`
         // adds its own duplicate-name diagnostics (two separate lists per the
-        // project decision). `pslBlockDescriptors` is intentionally not threaded:
-        // the descriptor-agnostic CST parser no longer consumes it. The enum
-        // case is covered by enum-block reconstruction; descriptor-typed block
-        // parameter validation is the tracked slice-3 follow-up.
+        // project decision). `pslBlockDescriptors` is threaded so the symbol
+        // table resolves each generic block (enum / descriptor-typed) into its
+        // `PslExtensionBlock` at construction.
         const { document, sourceFile, diagnostics: parseDiagnostics } = parse(schema);
         const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
           document,
           sourceFile,
           scalarTypes: [...context.scalarTypeDescriptors.keys()],
+          pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
         });
 
         // Seed the combined parse + symbol-table diagnostics into the

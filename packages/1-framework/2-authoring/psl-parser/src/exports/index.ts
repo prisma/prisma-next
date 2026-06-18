@@ -36,11 +36,7 @@ export {
   namespacePslExtensionBlocks,
 } from '@prisma-next/framework-components/psl-ast';
 export { getPositionalArgument, parseQuotedStringLiteral } from '../attribute-helpers';
-export {
-  findBlockDescriptor,
-  reconstructExtensionBlock,
-  validateExtensionBlockFromSymbol,
-} from '../extension-block';
+export { findBlockDescriptor, validateExtensionBlockFromSymbol } from '../extension-block';
 export type {
   MalformedQualifiedType,
   ResolvedTypeAnnotation,

@@ -31,6 +31,7 @@ function symbolTableInput(schema: string) {
     document,
     sourceFile,
     scalarTypes: [...postgresScalarTypeDescriptors.keys()],
+    pslBlockDescriptors: {},
   });
   return { symbolTable: table, sourceFile, sourceId: 'schema.prisma' };
 }

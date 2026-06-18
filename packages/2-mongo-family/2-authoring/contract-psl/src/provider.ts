@@ -70,6 +70,7 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
           document,
           sourceFile,
           scalarTypes: [...context.scalarTypeDescriptors.keys()],
+          pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
         });
 
         // Seed the combined parse + symbol-table diagnostics into the

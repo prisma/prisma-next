@@ -41,6 +41,7 @@ function interpretWithRealPacks(schema: string) {
     document,
     sourceFile,
     scalarTypes: [...scalarTypeDescriptors.keys()],
+    pslBlockDescriptors: stack.authoringContributions.pslBlockDescriptors,
   });
   return interpretPslDocumentToSqlContract({
     symbolTable: table,

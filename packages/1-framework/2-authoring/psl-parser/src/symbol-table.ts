@@ -1,4 +1,7 @@
-import type { PslSpan } from '@prisma-next/framework-components/psl-ast';
+import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
+import type { PslExtensionBlock, PslSpan } from '@prisma-next/framework-components/psl-ast';
+import { reconstructExtensionBlock } from './block-reconstruction';
+import { findBlockDescriptor } from './extension-block';
 import type { ParseDiagnostic } from './parse';
 import {
   nodePslSpan,
@@ -84,6 +87,13 @@ export interface BlockSymbol {
   readonly keyword: string;
   readonly node: GenericBlockDeclarationAst;
   readonly span: PslSpan;
+  /**
+   * The resolved extension block, reconstructed at symbol-table construction
+   * from the block's descriptor (looked up by `keyword`) or descriptor-free when
+   * no descriptor is registered. Consumers (enum factory, descriptor-driven
+   * validation) read this directly instead of reconstructing it themselves.
+   */
+  readonly block: PslExtensionBlock;
 }
 
 /**
@@ -139,6 +149,13 @@ export interface BuildSymbolTableOptions {
   readonly document: DocumentAst;
   readonly sourceFile: SourceFile;
   readonly scalarTypes: readonly string[];
+  /**
+   * Composed extension-block descriptors, used to resolve each generic block
+   * into its {@link PslExtensionBlock} at construction (descriptor-driven
+   * parameter classification). Required: block resolution cannot classify
+   * parameters without it. Pass `{}` when the document has no extension blocks.
+   */
+  readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
 }
 
 export interface SymbolTableResult {
@@ -154,7 +171,7 @@ export interface SymbolTableResult {
  * (`PSL_DUPLICATE_DECLARATION`), separate from `parse`'s diagnostics.
  */
 export function buildSymbolTable(options: BuildSymbolTableOptions): SymbolTableResult {
-  const { document, sourceFile, scalarTypes } = options;
+  const { document, sourceFile, scalarTypes, pslBlockDescriptors } = options;
   const diagnostics: ParseDiagnostic[] = [];
   const scalarSet = new Set(scalarTypes);
 
@@ -195,11 +212,19 @@ export function buildSymbolTable(options: BuildSymbolTableOptions): SymbolTableR
       }
     } else if (declaration instanceof GenericBlockDeclarationAst) {
       const name = claim(topLevelNames, declaration.name());
-      if (name !== undefined) blocks[name] = buildBlock(name, declaration, sourceFile);
+      if (name !== undefined) {
+        blocks[name] = buildBlock(name, declaration, sourceFile, pslBlockDescriptors, diagnostics);
+      }
     } else if (declaration instanceof NamespaceDeclarationAst) {
       const name = claim(topLevelNames, declaration.name());
       if (name !== undefined) {
-        namespaces[name] = buildNamespace(name, declaration, diagnostics, sourceFile);
+        namespaces[name] = buildNamespace(
+          name,
+          declaration,
+          diagnostics,
+          sourceFile,
+          pslBlockDescriptors,
+        );
       }
     } else if (declaration instanceof TypesBlockAst) {
       for (const binding of declaration.declarations()) {
@@ -258,13 +283,18 @@ function buildBlock(
   name: string,
   node: GenericBlockDeclarationAst,
   sourceFile: SourceFile,
+  pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace,
+  diagnostics: ParseDiagnostic[],
 ): BlockSymbol {
+  const keyword = node.keyword()?.text ?? '';
+  const descriptor = findBlockDescriptor(pslBlockDescriptors, keyword);
   return {
     kind: 'block',
     name,
-    keyword: node.keyword()?.text ?? '',
+    keyword,
     node,
     span: nodePslSpan(node.syntax, sourceFile),
+    block: reconstructExtensionBlock(node, descriptor, sourceFile, diagnostics),
   };
 }
 
@@ -273,6 +303,7 @@ function buildNamespace(
   node: NamespaceDeclarationAst,
   diagnostics: ParseDiagnostic[],
   sourceFile: SourceFile,
+  pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace,
 ): NamespaceSymbol {
   const models: Record<string, ModelSymbol> = {};
   const compositeTypes: Record<string, CompositeTypeSymbol> = {};
@@ -299,7 +330,13 @@ function buildNamespace(
     } else if (member instanceof CompositeTypeDeclarationAst) {
       compositeTypes[memberName] = buildCompositeType(memberName, member, sourceFile, diagnostics);
     } else if (member instanceof GenericBlockDeclarationAst) {
-      blocks[memberName] = buildBlock(memberName, member, sourceFile);
+      blocks[memberName] = buildBlock(
+        memberName,
+        member,
+        sourceFile,
+        pslBlockDescriptors,
+        diagnostics,
+      );
     }
   }
 

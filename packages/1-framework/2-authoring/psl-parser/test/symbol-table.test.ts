@@ -1,3 +1,4 @@
+import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
 import { describe, expect, it } from 'vitest';
 import { parse } from '../src/parse';
 import { buildSymbolTable } from '../src/symbol-table';
@@ -12,9 +13,13 @@ import {
 
 const SCALAR_TYPES = ['String', 'Int', 'Boolean', 'DateTime'] as const;
 
-function build(source: string, scalarTypes: readonly string[] = SCALAR_TYPES) {
+function build(
+  source: string,
+  scalarTypes: readonly string[] = SCALAR_TYPES,
+  pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace = {},
+) {
   const { document, sourceFile } = parse(source);
-  return buildSymbolTable({ document, sourceFile, scalarTypes });
+  return buildSymbolTable({ document, sourceFile, scalarTypes, pslBlockDescriptors });
 }
 
 describe('buildSymbolTable() — AC1 fault tolerance', () => {
@@ -387,5 +392,104 @@ describe('buildSymbolTable() — resolved named-type binding shape', () => {
     expect(alias?.baseType).toBeUndefined();
     expect(alias?.typeConstructor?.path).toEqual(['Vector']);
     expect(alias?.typeConstructor?.args.map((a) => a.value)).toEqual(['1536']);
+  });
+});
+
+describe('buildSymbolTable() — resolved block (BlockSymbol.block)', () => {
+  const ENUM_DESCRIPTORS: AuthoringPslBlockDescriptorNamespace = {
+    enum: {
+      kind: 'pslBlock',
+      keyword: 'enum',
+      discriminator: 'enum',
+      name: { required: true },
+      parameters: {},
+      variadicParameters: true,
+    },
+  };
+
+  const POLICY_DESCRIPTORS: AuthoringPslBlockDescriptorNamespace = {
+    policy_select: {
+      kind: 'pslBlock',
+      keyword: 'policy_select',
+      discriminator: 'fixture-policy-select',
+      name: { required: true },
+      parameters: {
+        target: { kind: 'ref', refKind: 'model', scope: 'same-namespace', required: true },
+        as: { kind: 'option', values: ['permissive', 'restrictive'] },
+        using: { kind: 'value', codecId: 'fixture/text@1', required: true },
+      },
+    },
+  };
+
+  it('resolves an enum block with the descriptor discriminator and bare/value members', () => {
+    const result = build(
+      ['enum Role {', '  Admin', '  User = "u"', '}'].join('\n'),
+      SCALAR_TYPES,
+      ENUM_DESCRIPTORS,
+    );
+    const block = result.table.topLevel.blocks.Role?.block;
+
+    expect(block?.kind).toBe('enum');
+    expect(block?.name).toBe('Role');
+    expect(block?.parameters.Admin).toMatchObject({ kind: 'bare' });
+    expect(block?.parameters.User).toMatchObject({ kind: 'value', raw: '"u"' });
+  });
+
+  it('resolves a descriptor-typed block classifying ref/option/value params', () => {
+    const result = build(
+      [
+        'model Post {',
+        '  id Int',
+        '}',
+        'policy_select ReadPosts {',
+        '  target = Post',
+        '  as     = permissive',
+        '  using  = "true"',
+        '}',
+      ].join('\n'),
+      SCALAR_TYPES,
+      POLICY_DESCRIPTORS,
+    );
+    const block = result.table.topLevel.blocks.ReadPosts?.block;
+
+    expect(block?.kind).toBe('fixture-policy-select');
+    expect(block?.name).toBe('ReadPosts');
+    expect(block?.parameters.target).toMatchObject({ kind: 'ref', identifier: 'Post' });
+    expect(block?.parameters.as).toMatchObject({ kind: 'option', token: 'permissive' });
+    expect(block?.parameters.using).toMatchObject({ kind: 'value', raw: '"true"' });
+  });
+
+  it('resolves an unknown-keyword block descriptor-free (kind = keyword, value/bare members)', () => {
+    const result = build(['mystery Thing {', '  on = read', '  flag', '}'].join('\n'));
+    const block = result.table.topLevel.blocks.Thing?.block;
+
+    expect(block?.kind).toBe('mystery');
+    expect(block?.name).toBe('Thing');
+    expect(block?.parameters.on).toMatchObject({ kind: 'value', raw: 'read' });
+    expect(block?.parameters.flag).toMatchObject({ kind: 'bare' });
+  });
+
+  it('flags a duplicate block member with PSL_EXTENSION_DUPLICATE_PARAMETER (first-wins)', () => {
+    const result = build(
+      ['enum Role {', '  Admin', '  Admin', '}'].join('\n'),
+      SCALAR_TYPES,
+      ENUM_DESCRIPTORS,
+    );
+    const block = result.table.topLevel.blocks.Role?.block;
+
+    expect(result.diagnostics.map((d) => d.code)).toContain('PSL_EXTENSION_DUPLICATE_PARAMETER');
+    expect(Object.keys(block?.parameters ?? {})).toEqual(['Admin']);
+  });
+
+  it('resolves namespace-nested blocks too', () => {
+    const result = build(
+      ['namespace ns {', '  enum Role {', '    Admin', '  }', '}'].join('\n'),
+      SCALAR_TYPES,
+      ENUM_DESCRIPTORS,
+    );
+    const block = result.table.topLevel.namespaces.ns?.blocks.Role?.block;
+
+    expect(block?.kind).toBe('enum');
+    expect(block?.parameters.Admin).toMatchObject({ kind: 'bare' });
   });
 });

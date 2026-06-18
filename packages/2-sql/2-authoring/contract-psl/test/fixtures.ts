@@ -8,6 +8,7 @@ import type {
   AuthoringContributions,
   AuthoringEntityContext,
   AuthoringEntityTypeNamespace,
+  AuthoringPslBlockDescriptorNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
@@ -305,12 +306,17 @@ export const postgresScalarTypeDescriptors = new Map([
  */
 export function buildSymbolTableInput(
   schema: string,
-  options?: { readonly sourceId?: string; readonly scalarTypes?: readonly string[] },
+  options?: {
+    readonly sourceId?: string;
+    readonly scalarTypes?: readonly string[];
+    readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
+  },
 ): { symbolTable: SymbolTable; sourceFile: SourceFile; sourceId: string } {
   const sourceId = options?.sourceId ?? 'schema.prisma';
   const scalarTypes = options?.scalarTypes ?? [...postgresScalarTypeDescriptors.keys()];
+  const pslBlockDescriptors = options?.pslBlockDescriptors ?? {};
   const { document, sourceFile } = parse(schema);
-  const { table } = buildSymbolTable({ document, sourceFile, scalarTypes });
+  const { table } = buildSymbolTable({ document, sourceFile, scalarTypes, pslBlockDescriptors });
   return { symbolTable: table, sourceFile, sourceId };
 }
 

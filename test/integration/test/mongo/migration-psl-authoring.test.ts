@@ -78,6 +78,7 @@ function pslToContract(schema: string): MongoContract {
     document,
     sourceFile,
     scalarTypes: [...scalarTypeDescriptors.keys()],
+    pslBlockDescriptors: {},
   });
   const result = interpretPslDocumentToMongoContract({
     symbolTable,

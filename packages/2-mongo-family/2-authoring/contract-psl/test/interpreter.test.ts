@@ -33,6 +33,7 @@ function buildSymbolTableInput(
     document,
     sourceFile,
     scalarTypes: [...mongoScalarTypeDescriptors.keys()],
+    pslBlockDescriptors: {},
   });
   return { symbolTable: table, sourceFile, sourceId };
 }

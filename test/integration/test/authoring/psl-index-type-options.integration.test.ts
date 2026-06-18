@@ -18,6 +18,7 @@ function interpret(schema: string) {
     document,
     sourceFile,
     scalarTypes: [...scalarTypeDescriptors.keys()],
+    pslBlockDescriptors: {},
   });
   return interpretPslDocumentToSqlContract({
     symbolTable: table,
