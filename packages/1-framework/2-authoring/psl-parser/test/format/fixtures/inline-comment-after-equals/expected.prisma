@@ -1,0 +1,4 @@
+datasource db {
+  url = // see env
+    env("DATABASE_URL")
+}
