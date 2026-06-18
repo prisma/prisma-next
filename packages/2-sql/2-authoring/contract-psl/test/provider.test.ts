@@ -347,6 +347,75 @@ model Post {
     });
   });
 
+  describe('given a syntactically invalid schema', () => {
+    it('surfaces parser diagnostics from parse() and fails before interpretation', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma', baseOptions);
+      const result = await contract.source.load(
+        createPostgresTestContext({ resolvedInputs: [schemaPath] }),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNTERMINATED_BLOCK',
+            sourceId: './schema.prisma',
+            span: expect.objectContaining({
+              start: expect.objectContaining({ line: expect.any(Number) }),
+            }),
+          }),
+        ]),
+      );
+    });
+
+    it('surfaces buildSymbolTable duplicate-declaration diagnostics', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+}
+model User {
+  id Int @id
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma', baseOptions);
+      const result = await contract.source.load(
+        createPostgresTestContext({ resolvedInputs: [schemaPath] }),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_DUPLICATE_DECLARATION',
+            sourceId: './schema.prisma',
+          }),
+        ]),
+      );
+    });
+  });
+
   describe('given namespaced extension constructors in schema', () => {
     it('returns diagnostics when extension namespace is unrecognized', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));

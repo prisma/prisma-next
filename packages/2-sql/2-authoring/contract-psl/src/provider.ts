@@ -1,16 +1,18 @@
 import { readFile } from 'node:fs/promises';
-import type { ContractConfig } from '@prisma-next/config/config-types';
+import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import { applySpecifierDefaultControlPolicy } from '@prisma-next/contract/apply-specifier-default-control-policy';
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
+import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { basename, extname } from 'pathe';
+import { rangeToPslSpan } from './cst-read';
 import { interpretPslDocumentToSqlContract } from './interpreter';
 import type { ColumnDescriptor } from './psl-column-resolution';
 
@@ -41,6 +43,26 @@ function defaultOutputFromSchemaPath(schemaPath: string): string {
     return `${base.slice(0, -'schema'.length)}contract.json`;
   }
   return `${base}.json`;
+}
+
+/**
+ * Map a parser/symbol-table `ParseDiagnostic` (`{ code, message, range }`) to
+ * the `ContractSourceDiagnostic` the provider surfaces, stamping the provider's
+ * `sourceId` and deriving the span from the diagnostic `range`. Restores the
+ * surfacing the legacy parser path provided via the interpreter's old
+ * `mapParserDiagnostics`, now that `parse` + `buildSymbolTable` are the source.
+ */
+function mapParseDiagnostics(
+  diagnostics: readonly ParseDiagnostic[],
+  sourceFile: SourceFile,
+  sourceId: string,
+): ContractSourceDiagnostic[] {
+  return diagnostics.map((diagnostic) => ({
+    code: diagnostic.code,
+    message: diagnostic.message,
+    sourceId,
+    span: rangeToPslSpan(diagnostic.range, sourceFile),
+  }));
 }
 
 function buildColumnDescriptorMap(
@@ -91,16 +113,32 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           context.codecLookup,
         );
 
-        // dispatch-5: minimal parse swap to keep the provider compiling against
-        // the symbol-table interpreter input. Dispatch 5 formalises this:
-        // surfacing both `parse`'s and `buildSymbolTable`'s diagnostic lists and
-        // rehoming the `pslBlockDescriptors` thread.
-        const { document, sourceFile } = parse(schema);
-        const { table: symbolTable } = buildSymbolTable({
+        // `parse` yields the CST + syntactic diagnostics; `buildSymbolTable`
+        // adds its own duplicate-name diagnostics (two separate lists per the
+        // project decision). `pslBlockDescriptors` is intentionally not threaded:
+        // the descriptor-agnostic CST parser no longer consumes it. The enum
+        // case is covered by enum-block reconstruction; descriptor-typed block
+        // parameter validation is the tracked slice-3 follow-up.
+        const { document, sourceFile, diagnostics: parseDiagnostics } = parse(schema);
+        const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
           document,
           sourceFile,
           scalarTypes: [...context.scalarTypeDescriptors.keys()],
         });
+
+        // Restore the legacy surfacing: when parsing or symbol-table
+        // construction reports diagnostics, fail with them rather than
+        // interpreting a structurally broken document.
+        const sourceDiagnostics = [
+          ...mapParseDiagnostics(parseDiagnostics, sourceFile, schemaPath),
+          ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),
+        ];
+        if (sourceDiagnostics.length > 0) {
+          return notOk({
+            summary: `Failed to interpret Prisma schema at "${schemaPath}"`,
+            diagnostics: sourceDiagnostics,
+          });
+        }
 
         const interpreted = interpretPslDocumentToSqlContract({
           symbolTable,
