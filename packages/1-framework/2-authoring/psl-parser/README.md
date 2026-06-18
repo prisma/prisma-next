@@ -46,9 +46,21 @@ Interpretation/validation (for example `@prisma-next/sql-contract-psl`) is respo
   scope-aware `SymbolTable` (top-level namespaces / scalars / type-aliases /
   blocks / models / composite-types as keyed records discriminated by `kind`,
   namespace members and block fields nested under their owner, every symbol
-  carrying its CST AST `node`) plus its own duplicate-name diagnostics
-  (`PSL_DUPLICATE_DECLARATION`, first-wins, colliding across kinds within one
-  scope). Qualified type references are left unresolved on field symbols.
+  carrying its CST AST `node` plus its declaration `span`) plus its own
+  duplicate-name diagnostics (`PSL_DUPLICATE_DECLARATION`, first-wins, colliding
+  across kinds within one scope). It also **resolves** the field/named-type read
+  set once: each `FieldSymbol` carries the split type
+  (`typeName`/`typeNamespaceId`/`typeContractSpaceId`), `optional`/`list`,
+  `typeConstructor?`, rendered `attributes`, and `malformedType?` (set, with a
+  `PSL_INVALID_QUALIFIED_TYPE` diagnostic, when the type is over-qualified);
+  `ScalarSymbol`/`TypeAliasSymbol` carry the resolved binding
+  (`baseType`/`typeConstructor`/`isConstructor`). Interpreters consume this
+  resolved shape directly — there is no per-package field/attribute view layer.
+- `resolveFieldTypeAnnotation` / `readResolvedAttribute(s)` /
+  `readResolvedConstructorCall` + the span maps (`nodePslSpan`, `rangeToPslSpan`,
+  `keywordPslSpan`) in `src/resolve.ts` — the shared CST read/resolution helpers
+  `buildSymbolTable` uses and that consumers (e.g. enum-block reconstruction)
+  reuse, with `PslSpan` spans.
 - `reconstructExtensionBlock` / `findBlockDescriptor` /
   `validateExtensionBlockFromSymbol` in `src/extension-block.ts` — reconstruct a
   descriptor-driven `PslExtensionBlock` from a CST `GenericBlockDeclarationAst`
