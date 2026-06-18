@@ -93,6 +93,95 @@ model PostTag {
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(envelope)).not.toThrow();
   });
 
+  it('carries the junction model namespace into through.namespaceId for a non-default-namespace junction', () => {
+    const result = interpretSchema(`namespace auth {
+  model User {
+    id Int @id
+    tags Tag[]
+  }
+
+  model Tag {
+    id Int @id
+    users User[]
+  }
+
+  model UserTag {
+    userId Int
+    tagId Int
+    user User @relation(fields: [userId], references: [id])
+    tag Tag @relation(fields: [tagId], references: [id])
+
+    @@id([userId, tagId])
+  }
+}
+`);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const models = relationsOf(result.value);
+    expect(models['User']?.relations).toEqual({
+      tags: {
+        to: crossRef('Tag', 'auth'),
+        cardinality: 'N:M',
+        on: { localFields: ['id'], targetFields: ['userId'] },
+        through: {
+          table: 'userTag',
+          namespaceId: 'auth',
+          parentColumns: ['userId'],
+          childColumns: ['tagId'],
+          targetColumns: ['id'],
+        },
+      },
+    });
+
+    const envelope = JSON.parse(JSON.stringify(result.value)) as unknown;
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(envelope)).not.toThrow();
+  });
+
+  it('recognizes a junction with extra non-foreign-key data columns', () => {
+    const result = interpretSchema(`model User {
+  id Int @id
+  tags Tag[]
+}
+
+model Tag {
+  id Int @id
+  users User[]
+}
+
+model UserTag {
+  userId Int
+  tagId Int
+  createdAt DateTime
+  note String
+  user User @relation(fields: [userId], references: [id])
+  tag Tag @relation(fields: [tagId], references: [id])
+
+  @@id([userId, tagId])
+}
+`);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const models = relationsOf(result.value);
+    expect(models['User']?.relations).toEqual({
+      tags: {
+        to: crossRef('Tag', 'public'),
+        cardinality: 'N:M',
+        on: { localFields: ['id'], targetFields: ['userId'] },
+        through: {
+          table: 'userTag',
+          namespaceId: 'public',
+          parentColumns: ['userId'],
+          childColumns: ['tagId'],
+          targetColumns: ['id'],
+        },
+      },
+    });
+  });
+
   it('populates composite-key through columns from multi-column junction foreign keys', () => {
     const result = interpretSchema(`model Project {
   tenantId Int
@@ -220,7 +309,7 @@ model ProjectLabel {
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(envelope)).not.toThrow();
   });
 
-  it('keeps the orphaned diagnostic when the junction child FK references a non-id unique', () => {
+  it('emits a junction-specific diagnostic when the junction child FK references a non-id unique', () => {
     const result = interpretSchema(`model Post {
   id Int @id
   tags Tag[]
@@ -247,11 +336,16 @@ model PostTag {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_ORPHANED_BACKRELATION_LIST',
+          code: 'PSL_JUNCTION_TARGET_FK_NOT_ID',
           message: expect.stringContaining('Post.tags'),
         }),
       ]),
     );
+    const diagnostic = result.failure.diagnostics.find(
+      (d) => d.code === 'PSL_JUNCTION_TARGET_FK_NOT_ID',
+    );
+    expect(diagnostic?.message).toContain('PostTag');
+    expect(diagnostic?.message).toContain('@id');
   });
 
   it('resolves self-referential junction lists disambiguated by relation name', () => {
@@ -356,7 +450,7 @@ model Tag {
     );
   });
 
-  it('keeps the orphaned diagnostic when the join model id does not cover its foreign keys', () => {
+  it('emits a junction-specific diagnostic when the join model id does not cover its foreign keys', () => {
     const result = interpretSchema(`model Post {
   id Int @id
   tags Tag[]
@@ -381,11 +475,16 @@ model PostTag {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_ORPHANED_BACKRELATION_LIST',
+          code: 'PSL_JUNCTION_ID_NOT_FK_COVERING',
           message: expect.stringContaining('Post.tags'),
         }),
       ]),
     );
+    const diagnostic = result.failure.diagnostics.find(
+      (d) => d.code === 'PSL_JUNCTION_ID_NOT_FK_COVERING',
+    );
+    expect(diagnostic?.message).toContain('PostTag');
+    expect(diagnostic?.message).toContain('@@id');
   });
 
   it('keeps explicit junction modelling without bare lists on the 1:N/N:1 output', () => {

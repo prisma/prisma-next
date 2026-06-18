@@ -162,6 +162,40 @@ namespace auth {
     });
   });
 
+  it('carries the related-model namespace into a 1:N backrelation toNamespaceId', () => {
+    const document = parsePslDocument({
+      schema: `namespace public {
+  model User {
+    id Int @id
+    posts Post[]
+  }
+}
+
+namespace blog {
+  model Post {
+    id Int @id
+    authorId Int
+    author User @relation(fields: [authorId], references: [id])
+  }
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const publicModels = result.value.domain.namespaces['public']?.models as
+      | Record<string, ContractModel<SqlModelStorage>>
+      | undefined;
+    expect(publicModels?.['User']?.relations?.['posts']).toMatchObject({
+      cardinality: '1:N',
+      to: { model: 'Post', namespace: 'blog' },
+    });
+  });
+
   it('lowers an unqualified relation to a model that lives in another namespace', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `namespace public {

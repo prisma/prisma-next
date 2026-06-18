@@ -41,6 +41,8 @@ export type FkRelationMetadata = {
   readonly declaringModelName: string;
   readonly declaringFieldName: string;
   readonly declaringTableName: string;
+  /** Resolved namespace coordinate of the declaring model, when known. */
+  readonly declaringNamespaceId?: string;
   readonly targetModelName: string;
   readonly targetTableName: string;
   /** Resolved namespace coordinate of the related model, when known. */
@@ -348,6 +350,18 @@ function childColumnsInTargetIdOrder(
 }
 
 /**
+ * A model that carries an FK back to the candidate's model and an FK to the
+ * candidate's target model — i.e. it is junction-shaped for this candidate —
+ * but was declined as a many-to-many junction. The reason drives a
+ * junction-specific diagnostic that is more actionable than the generic
+ * orphaned-backrelation message.
+ */
+type JunctionNearMiss = {
+  readonly junctionModelName: string;
+  readonly reason: 'id-not-fk-covering' | 'target-fk-not-id';
+};
+
+/**
  * Finds explicit junction models that connect a bare backrelation list field
  * to its target model: a model whose composite id columns are exactly the FK
  * columns of one relation back to the candidate's model (the parent side) and
@@ -356,22 +370,24 @@ function childColumnsInTargetIdOrder(
  * columns are carried in target-id order on the pair. A relation name on the
  * list field pins the parent-side FK relation, which is how self-referential
  * many-to-many sides are disambiguated.
+ *
+ * Alongside the recognised pairs, returns junction-shaped near-misses (models
+ * that link both sides but were declined) so the caller can emit a
+ * junction-specific diagnostic instead of the generic orphaned-list message.
  */
 function findJunctionFkPairs(input: {
   readonly candidate: ModelBackrelationCandidate;
   readonly fkRelationsByDeclaringModel: ReadonlyMap<string, readonly FkRelationMetadata[]>;
   readonly modelIdColumns: ReadonlyMap<string, readonly string[]>;
-}): JunctionFkPair[] {
+}): { readonly pairs: JunctionFkPair[]; readonly nearMisses: JunctionNearMiss[] } {
   const targetIdColumns = input.modelIdColumns.get(input.candidate.targetModelName);
   if (!targetIdColumns || targetIdColumns.length === 0) {
-    return [];
+    return { pairs: [], nearMisses: [] };
   }
   const pairs: JunctionFkPair[] = [];
+  const nearMisses: JunctionNearMiss[] = [];
   for (const [junctionModelName, junctionFks] of input.fkRelationsByDeclaringModel) {
     const idColumns = input.modelIdColumns.get(junctionModelName);
-    if (!idColumns || idColumns.length < 2) {
-      continue;
-    }
     for (const parentFk of junctionFks) {
       if (parentFk.targetModelName !== input.candidate.modelName) {
         continue;
@@ -386,18 +402,54 @@ function findJunctionFkPairs(input: {
         if (childFk === parentFk || childFk.targetModelName !== input.candidate.targetModelName) {
           continue;
         }
-        if (!idColumnsAreExactlyFkPair(idColumns, parentFk.localColumns, childFk.localColumns)) {
+        // The model links both sides, so it is junction-shaped for this
+        // candidate: record why it is declined rather than silently skipping.
+        if (
+          !idColumns ||
+          !idColumnsAreExactlyFkPair(idColumns, parentFk.localColumns, childFk.localColumns)
+        ) {
+          nearMisses.push({ junctionModelName, reason: 'id-not-fk-covering' });
           continue;
         }
         const orderedChildColumns = childColumnsInTargetIdOrder(childFk, targetIdColumns);
         if (!orderedChildColumns) {
+          nearMisses.push({ junctionModelName, reason: 'target-fk-not-id' });
           continue;
         }
         pairs.push({ parentFk, childFk, childColumnsInTargetIdOrder: orderedChildColumns });
       }
     }
   }
-  return pairs;
+  return { pairs, nearMisses };
+}
+
+function junctionNearMissDiagnostic(
+  candidate: ModelBackrelationCandidate,
+  nearMiss: JunctionNearMiss,
+  sourceId: string,
+): ContractSourceDiagnostic {
+  const listField = `${candidate.modelName}.${candidate.field.name}`;
+  const data = {
+    listField,
+    junctionModel: nearMiss.junctionModelName,
+    targetModel: candidate.targetModelName,
+  };
+  if (nearMiss.reason === 'target-fk-not-id') {
+    return {
+      code: 'PSL_JUNCTION_TARGET_FK_NOT_ID',
+      message: `Backrelation list field "${listField}" found junction model "${nearMiss.junctionModelName}", but its foreign key to "${candidate.targetModelName}" does not reference "${candidate.targetModelName}"'s @id. The junction's target-side foreign key must reference "${candidate.targetModelName}"'s full @id columns for many-to-many recognition.`,
+      sourceId,
+      span: candidate.field.span,
+      data,
+    };
+  }
+  return {
+    code: 'PSL_JUNCTION_ID_NOT_FK_COVERING',
+    message: `Backrelation list field "${listField}" found junction-shaped model "${nearMiss.junctionModelName}" linking "${candidate.modelName}" and "${candidate.targetModelName}", but its id does not cover exactly its foreign-key columns. Declare @@id([...]) on "${nearMiss.junctionModelName}" listing exactly the two foreign-key columns for many-to-many recognition.`,
+    sourceId,
+    span: candidate.field.span,
+    data,
+  };
 }
 
 function manyToManyRelationNode(
@@ -418,6 +470,7 @@ function manyToManyRelationNode(
     },
     through: {
       table: pair.parentFk.declaringTableName,
+      ...ifDefined('namespaceId', pair.parentFk.declaringNamespaceId),
       parentColumns: pair.parentFk.localColumns,
       childColumns: pair.childColumnsInTargetIdOrder,
     },
@@ -454,7 +507,7 @@ export function applyBackrelationCandidates(input: {
       : [...pairMatches];
 
     if (matches.length === 0) {
-      const junctionPairs = findJunctionFkPairs({
+      const { pairs: junctionPairs, nearMisses } = findJunctionFkPairs({
         candidate,
         fkRelationsByDeclaringModel: input.fkRelationsByDeclaringModel,
         modelIdColumns: input.modelIdColumns,
@@ -473,6 +526,11 @@ export function applyBackrelationCandidates(input: {
           sourceId: input.sourceId,
           span: candidate.field.span,
         });
+        continue;
+      }
+      const nearMiss = nearMisses[0];
+      if (nearMiss) {
+        input.diagnostics.push(junctionNearMissDiagnostic(candidate, nearMiss, input.sourceId));
         continue;
       }
       input.diagnostics.push({
@@ -501,6 +559,7 @@ export function applyBackrelationCandidates(input: {
       fieldName: candidate.field.name,
       toModel: matched.declaringModelName,
       toTable: matched.declaringTableName,
+      ...ifDefined('toNamespaceId', matched.declaringNamespaceId),
       cardinality: '1:N',
       on: {
         parentTable: candidate.tableName,

@@ -1061,6 +1061,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       declaringModelName: model.name,
       declaringFieldName: relationAttribute.field.name,
       declaringTableName: tableName,
+      ...ifDefined('declaringNamespaceId', input.modelNamespaceIds.get(model.name)),
       targetModelName: targetMapping.model.name,
       targetTableName: targetMapping.tableName,
       ...ifDefined('targetNamespaceId', targetNamespaceId),
