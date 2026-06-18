@@ -1,5 +1,4 @@
-import type { IncomingMessage } from 'node:http';
-import { createServer } from 'node:http';
+import type { IncomingMessage, Server } from 'node:http';
 import type { Socket } from 'node:net';
 import type { IWebSocket } from 'vscode-ws-jsonrpc';
 import { WebSocketMessageReader, WebSocketMessageWriter } from 'vscode-ws-jsonrpc';
@@ -11,34 +10,37 @@ export interface BridgeOptions {
   readonly cliEntry: string;
   /** Absolute path to the resolved `prisma-next.config.ts`. */
   readonly configPath: string;
-  /** Port the WebSocket LSP bridge listens on. */
-  readonly port: number;
   /** WebSocket path the client connects to (e.g. `/psl`). */
   readonly path: string;
-  /** Called if the underlying HTTP/WS server emits an error (e.g. EADDRINUSE). */
-  readonly onError?: (error: NodeJS.ErrnoException) => void;
 }
 
 /**
- * Stands up a WebSocket server that, on each connection, spawns
- * `node <cliEntry> lsp --stdio --config <configPath>` and forwards LSP
+ * Attaches an LSP WebSocket bridge to an existing HTTP server.
+ *
+ * The bridge does NOT own a port: it registers an `upgrade` listener on the
+ * shared server (the same one Vite serves the editor from) and only claims
+ * WebSocket upgrades on {@link BridgeOptions.path}, leaving Vite's own HMR
+ * WebSocket and all HTTP requests untouched. On each accepted connection it
+ * spawns `node <cliEntry> lsp --stdio --config <configPath>` and forwards LSP
  * JSON-RPC traffic between the browser editor and that stdio process.
  *
  * Adapted from the canonical `vscode-ws-jsonrpc` example
- * (TypeFox/monaco-languageclient, MIT): `createServerProcess` spawns the
- * stdio LSP and `forward` pipes the socket <-> process connections. The
- * server does not depend on the client's `processId`, so the example's
- * `initialize` `processId` rewrite is intentionally omitted.
+ * (TypeFox/monaco-languageclient, MIT): `createServerProcess` spawns the stdio
+ * LSP and `forward` pipes the socket <-> process connections. The server does
+ * not depend on the client's `processId`, so the example's `initialize`
+ * `processId` rewrite is intentionally omitted.
+ *
+ * Returns a disposer that detaches the bridge.
  */
-export function startBridge(options: BridgeOptions): () => void {
-  const httpServer = createServer();
+export function attachBridge(server: Server, options: BridgeOptions): () => void {
   const wss = new WebSocketServer({ noServer: true });
 
-  httpServer.on('upgrade', (request: IncomingMessage, socket: Socket, head: Buffer) => {
+  const onUpgrade = (request: IncomingMessage, socket: Socket, head: Buffer): void => {
     const baseUrl = `http://${request.headers.host ?? 'localhost'}/`;
     const pathname = request.url !== undefined ? new URL(request.url, baseUrl).pathname : undefined;
+    // Only claim our own path; ignore everything else (e.g. Vite's HMR socket)
+    // so other upgrade listeners on the shared server still get a chance.
     if (pathname !== options.path) {
-      socket.destroy();
       return;
     }
     wss.handleUpgrade(request, socket, head, (webSocket) => {
@@ -60,15 +62,12 @@ export function startBridge(options: BridgeOptions): () => void {
         webSocket.on('open', () => launch(ws, options));
       }
     });
-  });
+  };
 
-  httpServer.on('error', (error: NodeJS.ErrnoException) => {
-    options.onError?.(error);
-  });
-  httpServer.listen(options.port);
+  server.on('upgrade', onUpgrade);
   return () => {
+    server.off('upgrade', onUpgrade);
     wss.close();
-    httpServer.close();
   };
 }
 

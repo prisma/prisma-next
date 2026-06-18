@@ -3,12 +3,17 @@ import { lintGutter } from '@codemirror/lint';
 import { EditorState } from '@codemirror/state';
 import { EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
 import { languageServer } from 'codemirror-languageserver';
-import { documentUri, rootUri, schemaPath, schemaText, wsUrl } from './runtime';
+import { documentUri, rootUri, schemaPath, schemaText, wsPath } from './runtime';
 
 const pathEl = document.getElementById('schema-path');
 if (pathEl !== null) {
   pathEl.textContent = schemaPath;
 }
+
+const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const wsUrl = `${wsProtocol}//${window.location.host}${wsPath}` as
+  | `ws://${string}`
+  | `wss://${string}`;
 
 const ls = languageServer({
   serverUri: wsUrl,
