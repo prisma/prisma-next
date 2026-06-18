@@ -5,7 +5,8 @@ import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -85,19 +86,26 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           });
         }
 
-        const document = parsePslDocument({
-          schema,
-          sourceId: schemaPath,
-          pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
-        });
-
         const scalarTypeDescriptors = buildColumnDescriptorMap(
           context.scalarTypeDescriptors,
           context.codecLookup,
         );
 
-        const interpreted = interpretPslDocumentToSqlContract({
+        // dispatch-5: minimal parse swap to keep the provider compiling against
+        // the symbol-table interpreter input. Dispatch 5 formalises this:
+        // surfacing both `parse`'s and `buildSymbolTable`'s diagnostic lists and
+        // rehoming the `pslBlockDescriptors` thread.
+        const { document, sourceFile } = parse(schema);
+        const { table: symbolTable } = buildSymbolTable({
           document,
+          sourceFile,
+          scalarTypes: [...context.scalarTypeDescriptors.keys()],
+        });
+
+        const interpreted = interpretPslDocumentToSqlContract({
+          symbolTable,
+          sourceFile,
+          sourceId: schemaPath,
           target: options.target,
           authoringContributions: context.authoringContributions,
           scalarTypeDescriptors,

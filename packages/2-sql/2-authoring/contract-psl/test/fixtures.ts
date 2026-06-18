@@ -18,6 +18,10 @@ import type {
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
+import type { SymbolTable } from '@prisma-next/psl-parser';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { buildSqlNamespace } from '@prisma-next/sql-contract/types';
 import { type EnumTypeHandle, enumType } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -292,6 +296,24 @@ export const postgresScalarTypeDescriptors = new Map([
   ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
   ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
 ] as const);
+
+/**
+ * Shared test helper: parse a schema and build the symbol-table interpreter
+ * input (`symbolTable` + `sourceFile` + `sourceId`) that
+ * `interpretPslDocumentToSqlContract` consumes after the dispatch-4 walk
+ * rewrite. The dispatch-6 test fan-out points the inline `parsePslDocument`
+ * call sites at this helper.
+ */
+export function buildSymbolTableInput(
+  schema: string,
+  options?: { readonly sourceId?: string; readonly scalarTypes?: readonly string[] },
+): { symbolTable: SymbolTable; sourceFile: SourceFile; sourceId: string } {
+  const sourceId = options?.sourceId ?? 'schema.prisma';
+  const scalarTypes = options?.scalarTypes ?? [...postgresScalarTypeDescriptors.keys()];
+  const { document, sourceFile } = parse(schema);
+  const { table } = buildSymbolTable({ document, sourceFile, scalarTypes });
+  return { symbolTable: table, sourceFile, sourceId };
+}
 
 export const sqliteScalarTypeDescriptors = new Map([
   ['String', { codecId: 'sqlite/text@1', nativeType: 'text' }],

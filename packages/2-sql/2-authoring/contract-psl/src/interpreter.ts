@@ -24,13 +24,16 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import { namespacePslExtensionBlocks } from '@prisma-next/framework-components/psl-ast';
 import type {
-  ParsePslDocumentResult,
-  PslExtensionBlock,
-  PslModel,
-  PslNamespace,
+  BlockSymbol,
+  CompositeTypeSymbol,
+  ModelSymbol,
+  NamespaceSymbol,
+  ScalarSymbol,
+  SymbolTable,
+  TypeAliasSymbol,
 } from '@prisma-next/psl-parser';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { SqlModelStorage, SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import {
   buildSqlContractFromDefinition,
@@ -46,6 +49,7 @@ import {
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { nodePslSpan } from './cst-read';
 import type {
   CstAttributeView,
   CstCompositeTypeView,
@@ -53,6 +57,7 @@ import type {
   CstModelView,
   CstNamedTypeView,
 } from './cst-read-views';
+import { reconstructExtensionBlock } from './enum-block';
 import {
   findDuplicateFieldName,
   getAttribute,
@@ -90,9 +95,14 @@ import {
   parseRelationAttribute,
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
+import { buildCompositeTypeView, buildModelView, buildNamedTypeView } from './symbol-views';
 
 export interface InterpretPslDocumentToSqlContractInput {
-  readonly document: ParsePslDocumentResult;
+  readonly symbolTable: SymbolTable;
+  /** The parsed source file backing the symbol table's CST nodes; used to resolve diagnostic spans. */
+  readonly sourceFile: SourceFile;
+  /** Source file identifier threaded into diagnostics (the symbol table carries none). */
+  readonly sourceId: string;
   readonly target: TargetPackRef<'sql', string>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly composedExtensionPacks?: readonly string[];
@@ -179,15 +189,6 @@ function compareStrings(left: string, right: string): -1 | 0 | 1 {
   return 0;
 }
 
-function mapParserDiagnostics(document: ParsePslDocumentResult): ContractSourceDiagnostic[] {
-  return document.diagnostics.map((diagnostic) => ({
-    code: diagnostic.code,
-    message: diagnostic.message,
-    sourceId: diagnostic.sourceId,
-    span: diagnostic.span,
-  }));
-}
-
 /**
  * Name of the framework-parser synthesised bucket for top-level
  * declarations. Re-declared here so the per-target dispatch does not
@@ -259,46 +260,47 @@ function resolveNamespaceIdForSqlTarget(input: {
 }
 
 function validateNamespaceBlocksForSqlTarget(input: {
-  readonly namespaces: readonly PslNamespace[];
+  readonly namespaces: readonly NamespaceSymbol[];
   readonly targetId: string;
   readonly sourceId: string;
+  readonly sourceFile: SourceFile;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): void {
   if (input.targetId === 'sqlite') {
     for (const namespace of input.namespaces) {
-      if (namespace.name === UNSPECIFIED_PSL_NAMESPACE_NAME) {
-        continue;
-      }
       input.diagnostics.push({
         code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
         message: `SQLite does not support \`namespace ${namespace.name} { … }\` blocks (SQLite has no schema concept; declare models at the document top level instead).`,
         sourceId: input.sourceId,
-        span: namespace.span,
+        span: nodePslSpan(namespace.node.syntax, input.sourceFile),
       });
     }
     return;
   }
 
   if (input.targetId === 'postgres') {
-    const namedBlocks = input.namespaces.filter((ns) => ns.name !== UNSPECIFIED_PSL_NAMESPACE_NAME);
-    const hasUnbound = namedBlocks.some((ns) => ns.name === 'unbound');
-    const hasSibling = namedBlocks.some((ns) => ns.name !== 'unbound');
+    const hasUnbound = input.namespaces.some((ns) => ns.name === 'unbound');
+    const hasSibling = input.namespaces.some((ns) => ns.name !== 'unbound');
     if (hasUnbound && hasSibling) {
-      const unboundBlock = namedBlocks.find((ns) => ns.name === 'unbound');
+      const unboundBlock = input.namespaces.find((ns) => ns.name === 'unbound');
       input.diagnostics.push({
         code: 'PSL_RESERVED_NAMESPACE_NAME',
         message:
           'Namespace "unbound" is reserved for the late-binding sentinel mapping and cannot appear alongside other named namespace blocks. ' +
           'Use `namespace unbound { … }` alone (no sibling named namespaces) for late-binding multi-tenant contracts.',
         sourceId: input.sourceId,
-        ...ifDefined('span', unboundBlock?.span),
+        ...(unboundBlock !== undefined
+          ? { span: nodePslSpan(unboundBlock.node.syntax, input.sourceFile) }
+          : {}),
       });
     }
   }
 }
 
+type ReconstructedEnumBlock = ReturnType<typeof reconstructExtensionBlock>;
+
 interface ProcessEnumDeclarationsInput {
-  readonly enumBlocks: readonly PslExtensionBlock[];
+  readonly enumBlocks: readonly ReconstructedEnumBlock[];
   readonly sourceId: string;
   readonly authoringContributions: AuthoringContributions | undefined;
   readonly entityContext: AuthoringEntityContext;
@@ -350,10 +352,6 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
   return { enumHandles, enumTypeDescriptors };
 }
 
-// dispatch-4: the entry still builds legacy `PslModel`/`PslField`/`PslAttribute`
-// objects (structurally assignable to these views) and feeds them to the
-// view-consuming helpers. Dispatch 4 swaps the entry to build the views from the
-// symbol table directly and drops the legacy `Psl*` construction.
 interface BuildModelNodeInput {
   readonly model: CstModelView;
   readonly mapping: ModelNameMapping;
@@ -1236,7 +1234,7 @@ type BaseDeclaration = {
 };
 
 function collectPolymorphismDeclarations(
-  models: readonly PslModel[],
+  models: readonly CstModelView[],
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
 ): {
@@ -1636,7 +1634,7 @@ function stripStorageOnlyDomainFields(
 export function interpretPslDocumentToSqlContract(
   input: InterpretPslDocumentToSqlContractInput,
 ): Result<Contract, ContractSourceDiagnostics> {
-  const sourceId = input.document.ast.sourceId;
+  const sourceId = input.sourceId;
   if (!input.target) {
     return notOk({
       summary: 'PSL to SQL contract interpretation failed',
@@ -1662,38 +1660,65 @@ export function interpretPslDocumentToSqlContract(
     });
   }
 
-  const diagnostics: ContractSourceDiagnostic[] = mapParserDiagnostics(input.document);
+  const { topLevel } = input.symbolTable;
+  const sourceFile = input.sourceFile;
+  const namespaceSymbols = Object.values(topLevel.namespaces);
+  const diagnostics: ContractSourceDiagnostic[] = [];
   validateNamespaceBlocksForSqlTarget({
-    namespaces: input.document.ast.namespaces,
+    namespaces: namespaceSymbols,
     targetId: input.target.targetId,
     sourceId,
+    sourceFile,
     diagnostics,
   });
-  // Per-target namespace resolution: walk each AST bucket once,
-  // recording every model's resolved `namespaceId` for later threading
-  // into the `ModelNode` build. The resolution rules are target-local
-  // (see `resolveNamespaceIdForSqlTarget`); the flattened model list
-  // remains the input to the rest of the interpreter so non-namespace
-  // concerns stay structurally identical to before.
-  const models: PslModel[] = [];
+  // Per-scope namespace resolution: the symbol table's top-level scope maps to
+  // the legacy `__unspecified__` bucket; each named `NamespaceSymbol` maps to
+  // its name (and `unbound` to the late-binding sentinel) via
+  // `resolveNamespaceIdForSqlTarget`. Build the model/composite views directly
+  // from the symbol-table entries + their CST `.node`.
+  const models: CstModelView[] = [];
   const modelEntries: ModelNamespaceEntry[] = [];
   const modelNamespaceIds = new Map<string, string>();
-  for (const namespace of input.document.ast.namespaces) {
+  const compositeTypes: CstCompositeTypeView[] = [];
+
+  const collectScope = (
+    bucketName: string,
+    scopeModels: Iterable<ModelSymbol>,
+    scopeCompositeTypes: Iterable<CompositeTypeSymbol>,
+  ): void => {
     const resolvedNamespaceId = resolveNamespaceIdForSqlTarget({
-      bucketName: namespace.name,
+      bucketName,
       targetId: input.target.targetId,
     });
-    for (const model of namespace.models) {
+    for (const modelSymbol of scopeModels) {
+      const model = buildModelView(modelSymbol, sourceFile, sourceId, diagnostics);
       models.push(model);
       modelEntries.push({ model, namespaceId: resolvedNamespaceId });
       if (resolvedNamespaceId !== undefined) {
         modelNamespaceIds.set(model.name, resolvedNamespaceId);
       }
     }
+    for (const compositeTypeSymbol of scopeCompositeTypes) {
+      compositeTypes.push(
+        buildCompositeTypeView(compositeTypeSymbol, sourceFile, sourceId, diagnostics),
+      );
+    }
+  };
+
+  collectScope(
+    UNSPECIFIED_PSL_NAMESPACE_NAME,
+    Object.values(topLevel.models),
+    Object.values(topLevel.compositeTypes),
+  );
+  for (const namespace of namespaceSymbols) {
+    collectScope(
+      namespace.name,
+      Object.values(namespace.models),
+      Object.values(namespace.compositeTypes),
+    );
   }
   const defaultNamespaceId = input.target.defaultNamespaceId;
 
-  const compositeTypes = input.document.ast.namespaces.flatMap((ns) => ns.compositeTypes);
   const modelNames = new Set(models.map((model) => model.name));
   const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
   const composedExtensions = new Set(input.composedExtensionPacks ?? []);
@@ -1707,19 +1732,18 @@ export function interpretPslDocumentToSqlContract(
     generatorDescriptorById.set(descriptor.id, descriptor);
   }
 
-  const topLevelEnums = input.document.ast.namespaces
-    .filter((ns) => ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME)
-    .flatMap((ns) => namespacePslExtensionBlocks(ns).filter((b) => b.kind === 'enum'));
-  for (const ns of input.document.ast.namespaces) {
-    if (ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME) continue;
-    const nsEnums = namespacePslExtensionBlocks(ns).filter((b) => b.kind === 'enum');
-    if (nsEnums.length === 0) continue;
-    for (const decl of nsEnums) {
+  const isEnumBlock = (block: BlockSymbol): boolean => block.keyword === 'enum';
+  const topLevelEnums = Object.values(topLevel.blocks)
+    .filter(isEnumBlock)
+    .map((block) => reconstructExtensionBlock(block.node, sourceFile));
+  for (const namespace of namespaceSymbols) {
+    for (const block of Object.values(namespace.blocks)) {
+      if (!isEnumBlock(block)) continue;
       diagnostics.push({
         code: 'PSL_ENUM_NAMESPACE_NOT_SUPPORTED',
-        message: `enum "${decl.name}" inside namespace "${ns.name}" is not supported; declare enum at the top level`,
+        message: `enum "${block.name}" inside namespace "${namespace.name}" is not supported; declare enum at the top level`,
         sourceId,
-        span: decl.span,
+        span: nodePslSpan(block.node.syntax, sourceFile),
       });
     }
   }
@@ -1750,20 +1774,17 @@ export function interpretPslDocumentToSqlContract(
 
   const enumHandlesByName = new Map(Object.entries(validEnumHandles));
 
-  // dispatch-4: bridge the legacy `PslNamedTypeDeclaration[]` to the re-unioned
-  // `CstNamedTypeView[]` the rewritten resolver consumes. Dispatch 4 replaces
-  // this with the symbol table's `topLevel.scalars + topLevel.typeAliases`,
-  // dropping this map entirely.
-  const namedTypeDeclarationViews: CstNamedTypeView[] = (
-    input.document.ast.types?.declarations ?? []
-  ).map((declaration) => ({
-    name: declaration.name,
-    isConstructor: declaration.typeConstructor !== undefined,
-    ...ifDefined('baseType', declaration.baseType),
-    ...ifDefined('typeConstructor', declaration.typeConstructor),
-    attributes: declaration.attributes,
-    span: declaration.span,
-  }));
+  // The named-type re-union: the symbol table splits `types { … }` bindings into
+  // top-level scalars (base type in `scalarTypes`) and type aliases. Re-union
+  // them here as the resolver's input; `buildNamedTypeView` carries the
+  // `isConstructor` discriminant from the CST annotation.
+  const namedTypeSymbols: readonly (ScalarSymbol | TypeAliasSymbol)[] = [
+    ...Object.values(topLevel.scalars),
+    ...Object.values(topLevel.typeAliases),
+  ];
+  const namedTypeDeclarationViews: CstNamedTypeView[] = namedTypeSymbols.map((symbol) =>
+    buildNamedTypeView(symbol, sourceFile),
+  );
 
   const namedTypeResult = resolveNamedTypeDeclarations({
     declarations: namedTypeDeclarationViews,

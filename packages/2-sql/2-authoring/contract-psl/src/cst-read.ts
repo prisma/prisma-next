@@ -1,5 +1,6 @@
 import type { PslSpan } from '@prisma-next/psl-parser';
 import type {
+  AttributeArgListAst,
   ExpressionAst,
   FieldAttributeAst,
   FieldDeclarationAst,
@@ -9,8 +10,14 @@ import type {
   Range,
   SourceFile,
   SyntaxNode,
+  TypeAnnotationAst,
 } from '@prisma-next/psl-parser/syntax';
 import { printSyntax } from '@prisma-next/psl-parser/syntax';
+import type {
+  CstAttributeArgView,
+  CstAttributeView,
+  CstTypeConstructorCallView,
+} from './cst-read-views';
 
 /**
  * The read set the SQL interpreter helpers need from a field's type annotation,
@@ -114,6 +121,57 @@ export function readAttribute(
     args,
     range: nodeRange(attribute.syntax, sourceFile),
   };
+}
+
+/**
+ * Read a `FieldAttributeAst`/`ModelAttributeAst` into the `PslSpan`-spanned
+ * `CstAttributeView` the interpreter helpers consume.
+ */
+export function readAttributeView(
+  attribute: FieldAttributeAst | ModelAttributeAst,
+  sourceFile: SourceFile,
+): CstAttributeView {
+  return {
+    name: attributeName(attribute.name()),
+    args: readArgListView(attribute.argList(), sourceFile),
+    span: nodePslSpan(attribute.syntax, sourceFile),
+  };
+}
+
+/**
+ * Read a constructor type annotation (`Vector(1536)`) into a
+ * {@link CstTypeConstructorCallView}, or `undefined` when the annotation is not
+ * a constructor.
+ */
+export function readConstructorCall(
+  annotation: TypeAnnotationAst | undefined,
+  sourceFile: SourceFile,
+): CstTypeConstructorCallView | undefined {
+  const argList = annotation?.argList();
+  if (annotation === undefined || argList === undefined) return undefined;
+  return {
+    path: annotation.name()?.path() ?? [],
+    args: readArgListView(argList, sourceFile),
+    span: nodePslSpan(annotation.syntax, sourceFile),
+  };
+}
+
+function readArgListView(
+  argList: AttributeArgListAst | undefined,
+  sourceFile: SourceFile,
+): readonly CstAttributeArgView[] {
+  if (argList === undefined) return [];
+  const args: CstAttributeArgView[] = [];
+  for (const arg of argList.args()) {
+    const name = arg.name()?.name();
+    args.push({
+      kind: name !== undefined ? 'named' : 'positional',
+      ...(name !== undefined ? { name } : {}),
+      value: renderExpression(arg.value()),
+      span: nodePslSpan(arg.syntax, sourceFile),
+    });
+  }
+  return args;
 }
 
 function attributeName(name: QualifiedNameAst | undefined): string {
