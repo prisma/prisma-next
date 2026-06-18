@@ -38,6 +38,14 @@ Interpretation/validation (for example `@prisma-next/sql-contract-psl`) is respo
 ## Public API
 
 - `parsePslDocument(input)` in `src/parser.ts`
+- `buildSymbolTable({ document, sourceFile, scalarTypes })` in `src/symbol-table.ts` —
+  a pure, fault-tolerant pass over a parsed CST `DocumentAst` that returns a
+  scope-aware `SymbolTable` (top-level namespaces / scalars / type-aliases /
+  blocks / models / composite-types as keyed records discriminated by `kind`,
+  namespace members and block fields nested under their owner, every symbol
+  carrying its CST AST `node`) plus its own duplicate-name diagnostics
+  (`PSL_DUPLICATE_DECLARATION`, first-wins, colliding across kinds within one
+  scope). Qualified type references are left unresolved on field symbols.
 - AST/diagnostic/span types live in `@prisma-next/framework-components/psl-ast`
   and are re-exported from this package's root entry for convenience.
 - Subpath exports:
