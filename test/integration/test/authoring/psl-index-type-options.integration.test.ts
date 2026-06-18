@@ -1,6 +1,7 @@
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import paradedbPack from '@prisma-next/extension-paradedb/pack';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 // postgresPack is used directly in interpretPslDocumentToSqlContract (not in defineContract).
 import postgresPack from '@prisma-next/target-postgres/pack';
@@ -12,8 +13,16 @@ const scalarTypeDescriptors = new Map<string, { codecId: string; nativeType: str
 ]);
 
 function interpret(schema: string) {
+  const { document, sourceFile } = parse(schema);
+  const { table } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes: [...scalarTypeDescriptors.keys()],
+  });
   return interpretPslDocumentToSqlContract({
-    document: parsePslDocument({ schema, sourceId: 'schema.prisma' }),
+    symbolTable: table,
+    sourceFile,
+    sourceId: 'schema.prisma',
     target: postgresPack,
     scalarTypeDescriptors,
     composedExtensionContracts: new Map(),

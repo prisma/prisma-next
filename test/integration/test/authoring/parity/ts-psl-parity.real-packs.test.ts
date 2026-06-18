@@ -4,7 +4,8 @@ import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamilyControl from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { defineContract } from '@prisma-next/postgres/contract-builder';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import postgresControl from '@prisma-next/target-postgres/control';
 import postgresPack from '@prisma-next/target-postgres/pack';
@@ -34,10 +35,19 @@ function buildColumnDescriptorMap() {
 }
 
 function interpretWithRealPacks(schema: string) {
+  const scalarTypeDescriptors = buildColumnDescriptorMap();
+  const { document, sourceFile } = parse(schema);
+  const { table } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes: [...scalarTypeDescriptors.keys()],
+  });
   return interpretPslDocumentToSqlContract({
-    document: parsePslDocument({ schema, sourceId: 'schema.prisma' }),
+    symbolTable: table,
+    sourceFile,
+    sourceId: 'schema.prisma',
     target: postgresPack,
-    scalarTypeDescriptors: buildColumnDescriptorMap(),
+    scalarTypeDescriptors,
     controlMutationDefaults: stack.controlMutationDefaults,
     authoringContributions: stack.authoringContributions,
     composedExtensionContracts: new Map(),

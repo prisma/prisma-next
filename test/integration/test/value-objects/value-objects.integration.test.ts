@@ -9,7 +9,8 @@ import {
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import { mongoOrm } from '@prisma-next/mongo-orm';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable, parsePslDocument } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import { describe, expect, it } from 'vitest';
 import { describeWithMongoDB } from '../mongo/setup';
@@ -78,9 +79,16 @@ function interpretMongoPsl(schema: string) {
 }
 
 function interpretSqlPsl(schema: string) {
-  const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
-  return interpretPslDocumentToSqlContract({
+  const { document, sourceFile } = parse(schema);
+  const { table } = buildSymbolTable({
     document,
+    sourceFile,
+    scalarTypes: [...postgresScalarTypeDescriptors.keys()],
+  });
+  return interpretPslDocumentToSqlContract({
+    symbolTable: table,
+    sourceFile,
+    sourceId: 'test.prisma',
     target: postgresTarget,
     scalarTypeDescriptors: postgresScalarTypeDescriptors,
     composedExtensionContracts: new Map(),
