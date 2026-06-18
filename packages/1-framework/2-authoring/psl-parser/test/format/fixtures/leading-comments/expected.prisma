@@ -6,6 +6,7 @@ model User {
   //no-leading-space  extra   spaces
   name String
 }
+
 enum Role {
   // the privileged role
   ADMIN

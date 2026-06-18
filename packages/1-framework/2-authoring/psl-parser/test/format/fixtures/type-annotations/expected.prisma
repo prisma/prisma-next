@@ -9,6 +9,7 @@ model Annotations {
   ctor           Vector(1536)
   ctorList       Vector(1536)[]
 }
+
 types {
   Vec = Vector(1536)[]?
 }

@@ -5,6 +5,7 @@ model User {
   // second
   /// dangling doc
 }
+
 model Empty {
   // only a comment
 }

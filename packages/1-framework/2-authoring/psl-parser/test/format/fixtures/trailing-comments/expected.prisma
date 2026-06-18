@@ -4,6 +4,7 @@ model User { // a user
 
   @@map("user") // table name
 } // end of model
+
 namespace App {
   model Account {
     id Int @id
