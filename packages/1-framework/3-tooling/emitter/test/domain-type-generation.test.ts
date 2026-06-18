@@ -1388,10 +1388,22 @@ describe('resolveFieldType domain-enum narrowing edge cases', () => {
           { kind: 'valueObject', name: 'Address' },
         ],
       },
+      valueSet: priorityRef,
     };
-    const result = resolveFieldType(field);
+    // The lookup would narrow if the narrowing code ran, so this proves the
+    // non-scalar-kind guard (and not a missing-lookup short-circuit) is what
+    // keeps the union shape intact.
+    const lookup: DomainEnumLookup = () => ({
+      codecId: 'pg/text@1',
+      members: [
+        { name: 'Low', value: 'low' },
+        { name: 'High', value: 'high' },
+      ],
+    });
+    const result = resolveFieldType(field, undefined, undefined, lookup);
     expect(result.output).toBe("CodecTypes['pg/text@1']['output'] | AddressOutput");
     expect(result.input).toBe("CodecTypes['pg/text@1']['input'] | AddressInput");
+    expect(result.output).not.toContain("'low'");
   });
 });
 
