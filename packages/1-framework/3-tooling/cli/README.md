@@ -8,7 +8,7 @@
 > documented programmatic-API import target. Authors of build integrations,
 > extension packs, and advanced config wiring import from
 > `@prisma-next/cli/config-types`, `@prisma-next/cli/control-api`,
-> `@prisma-next/cli/commands/*`, and `@prisma-next/cli/config-loader`. These
+> `@prisma-next/cli/commands/*`, and `@prisma-next/config-loader`. These
 > subpaths are less stable than the facade packages
 > (`@prisma-next/postgres/config`, `@prisma-next/mongo/config`); prefer those
 > for application-level config.
@@ -1470,7 +1470,7 @@ The CLI package exports several subpaths for different use cases:
 - **`@prisma-next/cli/commands/migration-show`**: Exports `createMigrationShowCommand`
 - **`@prisma-next/cli/commands/migration-status`**: Exports `createMigrationStatusCommand`
 - **`@prisma-next/cli/commands/migrate`**: Exports `createMigrateCommand`
-- **`@prisma-next/cli/config-loader`**: Exports `loadConfig` function
+- **`@prisma-next/config-loader`**: Exports `loadConfig`
 
 **Important**: `loadContractFromTs` is exported from the main package (`@prisma-next/cli`). See `.cursor/rules/cli-package-exports.mdc` for import patterns.
 

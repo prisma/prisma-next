@@ -1,11 +1,17 @@
-import {
-  type ContractSourceProvider,
-  normalizeContractConfig,
-  type PrismaNextConfig,
-} from '@prisma-next/config/config-types';
-import { ConfigValidationError } from '@prisma-next/config/config-validation';
-import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { resolve } from 'pathe';
+import type { PrismaNextConfig } from './config-types';
+import { normalizeContractConfig } from './config-types';
+import type { ContractSourceProvider } from './contract-source-types';
+import { ConfigValidationError } from './errors';
+
+// Injected from above the layering line: the emitter-specific derivation lives
+// in the tooling layer, so `@prisma-next/config` takes it as a hook.
+export interface EmittedArtifactPaths {
+  readonly jsonPath: string;
+  readonly dtsPath: string;
+}
+
+export type EmittedArtifactPathsResolver = (outputJsonPath: string) => EmittedArtifactPaths;
 
 function throwValidation(field: string, why: string): never {
   throw new ConfigValidationError(field, why);
@@ -29,14 +35,15 @@ function finalizeContractSource(
 function validateNoOutputsAreInputs(
   inputs: readonly string[] | undefined,
   output: string | undefined,
+  resolveEmittedArtifactPaths: EmittedArtifactPathsResolver,
 ): void {
   if (inputs === undefined || output === undefined) {
     return;
   }
 
-  let emittedArtifactPaths: ReturnType<typeof getEmittedArtifactPaths>;
+  let emittedArtifactPaths: EmittedArtifactPaths;
   try {
-    emittedArtifactPaths = getEmittedArtifactPaths(output);
+    emittedArtifactPaths = resolveEmittedArtifactPaths(output);
   } catch (error) {
     throwValidation('contract.output', error instanceof Error ? error.message : String(error));
   }
@@ -53,7 +60,13 @@ function validateNoOutputsAreInputs(
   }
 }
 
-export function finalizeConfig(config: PrismaNextConfig, configDir: string): PrismaNextConfig {
+// `resolveEmittedArtifactPaths`, when supplied, rejects configs whose inputs
+// collide with emitted artifacts; omitting it skips that check (paths still resolve).
+export function finalizeConfig(
+  config: PrismaNextConfig,
+  configDir: string,
+  resolveEmittedArtifactPaths?: EmittedArtifactPathsResolver,
+): PrismaNextConfig {
   if (!config.contract) {
     return config;
   }
@@ -61,7 +74,9 @@ export function finalizeConfig(config: PrismaNextConfig, configDir: string): Pri
   const source = finalizeContractSource(contract.source, configDir);
   const output = resolve(configDir, contract.output);
 
-  validateNoOutputsAreInputs(source.inputs, output);
+  if (resolveEmittedArtifactPaths) {
+    validateNoOutputsAreInputs(source.inputs, output, resolveEmittedArtifactPaths);
+  }
 
   return {
     ...config,

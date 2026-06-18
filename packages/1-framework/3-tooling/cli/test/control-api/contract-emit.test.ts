@@ -1,13 +1,17 @@
 import { mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import * as configLoader from '@prisma-next/config-loader';
 import type { Contract } from '@prisma-next/contract/types';
 import type { EmitResult } from '@prisma-next/emitter';
 import { emit as emitFn } from '@prisma-next/emitter';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as configLoader from '../../src/config-loader';
 import { executeContractEmit } from '../../src/control-api/operations/contract-emit';
 import { disposeEmitQueue } from '../../src/utils/emit-queue';
+
+// Spy-mock the package so `vi.spyOn(configLoader, 'loadConfig')` can replace the
+// real export (ESM named exports are read-only without `{ spy: true }`).
+vi.mock('@prisma-next/config-loader', { spy: true });
 
 vi.mock('@prisma-next/emitter', async () => {
   const actual =

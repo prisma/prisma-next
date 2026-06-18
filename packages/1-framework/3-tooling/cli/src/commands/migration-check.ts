@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { loadConfig } from '@prisma-next/config-loader';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type {
   ContractSpaceAggregate,
@@ -25,7 +26,6 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
-import { loadConfig } from '../config-loader';
 import {
   type CliStructuredError,
   errorAmbiguousMigrationRef,

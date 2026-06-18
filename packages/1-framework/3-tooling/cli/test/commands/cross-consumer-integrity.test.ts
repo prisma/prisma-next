@@ -51,7 +51,7 @@ const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
 }));
 
-vi.mock('../../src/config-loader', () => ({
+vi.mock('@prisma-next/config-loader', () => ({
   loadConfig: mocks.loadConfig,
 }));
 
@@ -380,7 +380,7 @@ describe('cross-consumer contract-space integrity matrix', () => {
   afterAll(() => {
     // Repo-wide vitest runs with `isolate: false`, so the `vi.mock` leaks
     // into the next file in the same worker; unmock to restore it.
-    vi.doUnmock('../../src/config-loader');
+    vi.doUnmock('@prisma-next/config-loader');
     vi.resetModules();
   });
 

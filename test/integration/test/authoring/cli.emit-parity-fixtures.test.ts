@@ -1,9 +1,9 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
-import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractSourceContext, PrismaNextConfig } from '@prisma-next/cli/config-types';
 import { enrichContract } from '@prisma-next/cli/control-api';
+import { loadConfig } from '@prisma-next/config-loader';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';

@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import * as configLoader from '@prisma-next/config-loader';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -10,8 +11,11 @@ import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import * as configLoader from '../../src/config-loader';
 import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
+
+// Spy-mock the package so `vi.spyOn(configLoader, 'loadConfig')` can replace the
+// real export (ESM named exports are read-only without `{ spy: true }`).
+vi.mock('@prisma-next/config-loader', { spy: true });
 
 const HASH_ROOT = `sha256:4cb4256${'0'.repeat(57)}`;
 

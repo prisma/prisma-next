@@ -58,8 +58,6 @@ export default defineConfig({
         'src/commands/ref.ts',
         // Error factory functions — just constructors
         'src/utils/cli-errors.ts',
-        // Config loader — mostly file I/O and error handling, tested via e2e tests
-        'src/config-loader.ts',
         // Spinner and progress utilities — UI/UX code
         'src/utils/spinner.ts',
         'src/utils/progress-adapter.ts',
@@ -71,7 +69,6 @@ export default defineConfig({
         'src/commands/init/**',
         'src/commands/migration-new.ts',
         'src/migration-cli.ts',
-        'src/config-path-validation.ts',
         'src/utils/publish-contract-artifact-pair.ts',
         'src/utils/validate-contract-deps.ts',
         // Defensive error handling branches

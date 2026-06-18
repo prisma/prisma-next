@@ -20,6 +20,11 @@ import {
   withTempDir,
 } from './utils/cli-test-helpers';
 
+// One test spies on `loadConfig`; spy-mock the package so the named export is
+// replaceable (ESM exports are read-only without `{ spy: true }`). The real
+// implementation is preserved for every other test in this file.
+vi.mock('@prisma-next/config-loader', { spy: true });
+
 // Fixture subdirectory for db-verify tests
 const fixtureSubdir = 'db-verify';
 
@@ -989,12 +994,17 @@ withTempDir(({ createTempDir }) => {
           });
 
           // Now test verify with the no-driver config
-          // Mock loadConfig to return config without driver (bypassing validation)
-          const originalLoadConfig = await import('@prisma-next/cli/config-loader');
+          // Mock loadConfig to return config without driver (bypassing validation).
+          // The family must hydrate the on-disk contract so db-verify gets past
+          // the `deserializeContract` seam and reaches the driver check this test
+          // is about — otherwise it fails earlier with a contract-validation error.
+          const originalLoadConfig = await import('@prisma-next/config-loader');
           vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
             family: {
               familyId: 'sql',
-              create: vi.fn(),
+              create: vi.fn().mockReturnValue({
+                deserializeContract: (json: unknown) => json,
+              }),
             },
             target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
             adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },

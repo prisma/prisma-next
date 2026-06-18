@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import * as configLoader from '@prisma-next/config-loader';
 import type { Contract } from '@prisma-next/contract/types';
 import type { CliErrorEnvelope } from '@prisma-next/errors/control';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
@@ -53,7 +54,6 @@ import {
   formatStatusHumanOutput,
 } from '../../src/commands/migration-status';
 import { deriveStatusEdgeAnnotations } from '../../src/commands/migration-status-overlay';
-import * as configLoader from '../../src/config-loader';
 import { getCommandSeeAlso } from '../../src/utils/command-helpers';
 import {
   computeGlobalMaxDirNameWidth,
@@ -69,6 +69,10 @@ import {
   parseJsonObjectFromCliCapture,
   setupCommandMocks,
 } from '../utils/test-helpers';
+
+// Spy-mock the package so `vi.spyOn(configLoader, 'loadConfig')` can replace the
+// real export (ESM named exports are read-only without `{ spy: true }`).
+vi.mock('@prisma-next/config-loader', { spy: true });
 
 const HASH_4cb4256 = `sha256:4cb4256${'0'.repeat(57)}`;
 const HASH_55bada2 = `sha256:55bada2${'0'.repeat(57)}`;

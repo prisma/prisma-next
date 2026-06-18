@@ -1,6 +1,6 @@
-import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractEmitResult } from '@prisma-next/cli/control-api';
 import { disposeEmitQueue, executeContractEmit } from '@prisma-next/cli/control-api';
+import { loadConfig } from '@prisma-next/config-loader';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { extname, resolve } from 'pathe';
 import type { Plugin, ViteDevServer } from 'vite';

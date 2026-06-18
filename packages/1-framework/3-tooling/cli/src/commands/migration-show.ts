@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { loadConfig } from '@prisma-next/config-loader';
 import type { Contract } from '@prisma-next/contract/types';
 import {
   APP_SPACE_ID,
@@ -13,7 +14,6 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative } from 'pathe';
-import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
   type CliStructuredError,

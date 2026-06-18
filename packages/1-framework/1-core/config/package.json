@@ -19,7 +19,8 @@
     "@prisma-next/contract": "workspace:0.14.0",
     "@prisma-next/framework-components": "workspace:0.14.0",
     "@prisma-next/utils": "workspace:0.14.0",
-    "arktype": "^2.2.0"
+    "arktype": "^2.2.0",
+    "pathe": "^2.0.3"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:0.14.0",
@@ -43,6 +44,7 @@
   "exports": {
     "./config-types": "./dist/config-types.mjs",
     "./config-validation": "./dist/config-validation.mjs",
+    "./load-helpers": "./dist/load-helpers.mjs",
     "./package.json": "./package.json"
   },
   "engines": {

@@ -1,0 +1,209 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { timeouts } from '@prisma-next/test-utils';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { loadConfig } from '../src/load';
+
+const VALID_CONFIG_SOURCE = `
+const descriptorBase = {
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '0.0.1',
+  manifest: {},
+};
+
+export default {
+  family: {
+    ...descriptorBase,
+    kind: 'family',
+    id: 'sql',
+    emission: { id: 'sql' },
+    create: () => ({ familyId: 'sql' }),
+  },
+  target: {
+    ...descriptorBase,
+    kind: 'target',
+    id: 'postgres',
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+  },
+  adapter: {
+    ...descriptorBase,
+    kind: 'adapter',
+    id: 'postgres',
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+  },
+  contract: {
+    source: {
+      inputs: ['./schema.prisma'],
+      load: async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+    },
+    output: './generated/contract.json',
+  },
+};
+`;
+
+const INVALID_CONFIG_SOURCE = `
+export default {
+  family: { kind: 'family' },
+};
+`;
+
+const EMPTY_CONFIG_SOURCE = `
+export default {};
+`;
+
+describe('loadConfig', () => {
+  let originalCwd: string;
+  let tempDir: string;
+
+  beforeEach(() => {
+    originalCwd = process.cwd();
+    tempDir = mkdtempSync(join(tmpdir(), 'prisma-next-config-'));
+  });
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it(
+    'resolves inputs to absolute paths for a valid config',
+    async () => {
+      writeFileSync(join(tempDir, 'prisma-next.config.ts'), VALID_CONFIG_SOURCE);
+      process.chdir(tempDir);
+
+      const config = await loadConfig();
+
+      expect(config.contract?.source.inputs).toEqual([join(tempDir, 'schema.prisma')]);
+      expect(config.contract?.output).toBe(join(tempDir, 'generated', 'contract.json'));
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'maps a missing config file to a structured config-file-not-found error (4001)',
+    async () => {
+      const configPath = join(tempDir, 'nonexistent.config.ts');
+
+      await expect(loadConfig(configPath)).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        code: '4001',
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'maps a missing config to 4001 when discovery from the cwd finds nothing',
+    async () => {
+      process.chdir(tempDir);
+
+      await expect(loadConfig()).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        code: '4001',
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'maps a 4001 when c12 resolves to a different file than the requested path',
+    async () => {
+      // The caller requests an extensionless `custom.config`; c12 resolves it to
+      // `custom.config.ts`, so the loaded file differs from the requested path.
+      // The loaded config is still rejected because it isn't the file asked for.
+      writeFileSync(join(tempDir, 'custom.config.ts'), VALID_CONFIG_SOURCE);
+      process.chdir(tempDir);
+
+      const requestedPath = join(tempDir, 'custom.config');
+      await expect(loadConfig('custom.config')).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        code: '4001',
+        where: { path: requestedPath },
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'maps an empty-object config to 4001, reporting the discovered file path',
+    async () => {
+      writeFileSync(join(tempDir, 'prisma-next.config.ts'), EMPTY_CONFIG_SOURCE);
+      process.chdir(tempDir);
+
+      await expect(loadConfig()).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        code: '4001',
+        where: { path: join(tempDir, 'prisma-next.config.ts') },
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'maps an invalid config shape to a structured config-validation error (4009)',
+    async () => {
+      writeFileSync(join(tempDir, 'prisma-next.config.ts'), INVALID_CONFIG_SOURCE);
+      process.chdir(tempDir);
+
+      await expect(loadConfig()).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        code: '4009',
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'maps an input/artifact collision to a structured validation error carrying the reason',
+    async () => {
+      const collidingSource = VALID_CONFIG_SOURCE.replace(
+        "inputs: ['./schema.prisma']",
+        "inputs: ['./generated/contract.json', './generated/contract.d.ts']",
+      );
+      writeFileSync(join(tempDir, 'prisma-next.config.ts'), collidingSource);
+      process.chdir(tempDir);
+
+      await expect(loadConfig()).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        code: '4009',
+        why: 'Config.contract.source.inputs must not include emitted artifact paths derived from contract.output',
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'maps a non-json contract output to a structured validation error from the emitter hook',
+    async () => {
+      const nonJsonSource = VALID_CONFIG_SOURCE.replace(
+        "output: './generated/contract.json'",
+        "output: './generated/contract.ts'",
+      );
+      writeFileSync(join(tempDir, 'prisma-next.config.ts'), nonJsonSource);
+      process.chdir(tempDir);
+
+      await expect(loadConfig()).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        code: '4009',
+        why: 'Contract output path must end with .json',
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'wraps a c12 compilation failure in a structured unexpected error (4999)',
+    async () => {
+      const configPath = join(tempDir, 'prisma-next.config.ts');
+      writeFileSync(configPath, 'export default { invalid syntax }', 'utf-8');
+
+      await expect(loadConfig(configPath)).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        code: '4999',
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+});

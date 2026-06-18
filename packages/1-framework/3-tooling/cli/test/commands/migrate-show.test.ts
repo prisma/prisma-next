@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   graphWalkStrategy: vi.fn(),
 }));
 
-vi.mock('../../src/config-loader', () => ({ loadConfig: mocks.loadConfig }));
+vi.mock('@prisma-next/config-loader', () => ({ loadConfig: mocks.loadConfig }));
 vi.mock('../../src/control-api/client', () => ({
   createControlClient: mocks.createControlClient,
 }));
@@ -43,7 +43,7 @@ vi.mock('../../src/control-api/operations/run-migration', async (importOriginal)
 });
 
 afterAll(() => {
-  vi.doUnmock('../../src/config-loader');
+  vi.doUnmock('@prisma-next/config-loader');
   vi.doUnmock('../../src/control-api/client');
   vi.doUnmock('@prisma-next/migration-tools/aggregate');
   vi.doUnmock('../../src/control-api/operations/run-migration');

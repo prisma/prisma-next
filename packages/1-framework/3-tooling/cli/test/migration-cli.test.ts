@@ -20,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const loadConfigMock = vi.fn();
 const createControlStackMock = vi.fn();
 
-vi.mock('../src/config-loader', () => ({
+vi.mock('@prisma-next/config-loader', () => ({
   loadConfig: loadConfigMock,
 }));
 
