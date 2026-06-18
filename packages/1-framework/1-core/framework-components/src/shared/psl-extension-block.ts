@@ -108,7 +108,14 @@ export type PslDiagnosticCode =
   /**
    * A `@@`-prefixed block-attribute line inside an extension block has invalid syntax.
    */
-  | 'PSL_INVALID_EXTENSION_BLOCK_ATTRIBUTE';
+  | 'PSL_INVALID_EXTENSION_BLOCK_ATTRIBUTE'
+  /**
+   * A duplicate declaration of a name within one scope — the top level, one
+   * namespace body, or one block's fields. The first declaration of the name is
+   * kept (first-wins); each later occurrence in the same scope is flagged with
+   * this code, anchored on the later declaration's name span.
+   */
+  | 'PSL_DUPLICATE_DECLARATION';
 
 /**
  * Descriptor vocabulary for a single parameter on a declared block.

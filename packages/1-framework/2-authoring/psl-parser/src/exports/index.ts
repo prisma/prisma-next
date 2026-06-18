@@ -39,3 +39,17 @@ export {
 } from '@prisma-next/framework-components/psl-ast';
 export { getPositionalArgument, parseQuotedStringLiteral } from '../attribute-helpers';
 export { parsePslDocument } from '../parser';
+export type {
+  BlockSymbol,
+  BuildSymbolTableOptions,
+  CompositeTypeSymbol,
+  FieldSymbol,
+  ModelSymbol,
+  NamespaceSymbol,
+  ScalarSymbol,
+  SymbolTable,
+  SymbolTableResult,
+  TopLevelScope,
+  TypeAliasSymbol,
+} from '../symbol-table';
+export { buildSymbolTable } from '../symbol-table';
