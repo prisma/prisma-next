@@ -191,6 +191,7 @@ function sequenceRegion(elements: readonly SyntaxElement[]): Region {
 function emitItems(writer: LineWriter, items: readonly Item[], depth: number): void {
   let pendingRows: MemberItem[] = [];
   let lastMemberWasRegular = false;
+  let emittedInRegion = false;
 
   const flushRows = (): void => {
     if (pendingRows.length === 0) return;
@@ -202,11 +203,13 @@ function emitItems(writer: LineWriter, items: readonly Item[], depth: number): v
     if (item.kind === 'blank') {
       flushRows();
       writer.blank();
+      emittedInRegion = true;
       continue;
     }
     if (item.kind === 'comment') {
       flushRows();
       writer.push(depth, item.text);
+      emittedInRegion = true;
       continue;
     }
     const isBlockAttribute = ModelAttributeAst.cast(item.node) !== undefined;
@@ -214,6 +217,11 @@ function emitItems(writer: LineWriter, items: readonly Item[], depth: number): v
       flushRows();
       writer.blank();
     }
+    if (isBlockMember(item.node) && emittedInRegion && !writer.lastIsBlank()) {
+      flushRows();
+      writer.blank();
+    }
+    emittedInRegion = true;
     const broken = inlineBreakComment(item.node);
     if (broken) {
       flushRows();
@@ -234,6 +242,22 @@ function emitItems(writer: LineWriter, items: readonly Item[], depth: number): v
     lastMemberWasRegular = !isBlockAttribute;
   }
   flushRows();
+}
+
+/**
+ * Whether a member renders as a brace-delimited block (model / composite type /
+ * enum or other generic block / namespace / `types`). The emitter separates a
+ * block from preceding content with one blank line (house style); this predicate
+ * gates that insertion in {@link emitItems}.
+ */
+function isBlockMember(node: SyntaxNode): boolean {
+  return (
+    ModelDeclarationAst.cast(node) !== undefined ||
+    CompositeTypeDeclarationAst.cast(node) !== undefined ||
+    NamespaceDeclarationAst.cast(node) !== undefined ||
+    TypesBlockAst.cast(node) !== undefined ||
+    GenericBlockDeclarationAst.cast(node) !== undefined
+  );
 }
 
 /**

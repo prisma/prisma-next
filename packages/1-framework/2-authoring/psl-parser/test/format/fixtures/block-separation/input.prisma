@@ -1,0 +1,11 @@
+model A {
+  id Int @id
+}
+enum Role {
+  USER
+  ADMIN
+}
+// b leads the next model
+model B {
+  id Int @id
+}
