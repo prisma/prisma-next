@@ -8,8 +8,6 @@ import { WebSocketServer } from 'ws';
 export interface BridgeOptions {
   /** Absolute path to the built CLI entry (`dist/cli.js`) to spawn. */
   readonly cliEntry: string;
-  /** Absolute path to the resolved `prisma-next.config.ts`. */
-  readonly configPath: string;
   /** WebSocket path the client connects to (e.g. `/psl`). */
   readonly path: string;
 }
@@ -21,7 +19,7 @@ export interface BridgeOptions {
  * shared server (the same one Vite serves the editor from) and only claims
  * WebSocket upgrades on {@link BridgeOptions.path}, leaving Vite's own HMR
  * WebSocket and all HTTP requests untouched. On each accepted connection it
- * spawns `node <cliEntry> lsp --stdio --config <configPath>` and forwards LSP
+ * spawns `node <cliEntry> lsp --stdio` and forwards LSP
  * JSON-RPC traffic between the browser editor and that stdio process.
  *
  * Adapted from the canonical `vscode-ws-jsonrpc` example
@@ -75,13 +73,7 @@ function launch(socket: IWebSocket, options: BridgeOptions): void {
   const reader = new WebSocketMessageReader(socket);
   const writer = new WebSocketMessageWriter(socket);
   const socketConnection = createConnection(reader, writer, () => socket.dispose());
-  const serverConnection = createServerProcess('PSL', 'node', [
-    options.cliEntry,
-    'lsp',
-    '--stdio',
-    '--config',
-    options.configPath,
-  ]);
+  const serverConnection = createServerProcess('PSL', 'node', [options.cliEntry, 'lsp', '--stdio']);
   if (serverConnection === undefined) {
     return;
   }

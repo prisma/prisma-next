@@ -4,29 +4,28 @@ import { fileURLToPath } from 'node:url';
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
+/** Absolute path to the playground's working directory under the package. */
+export const PLAYGROUND_DIR = join(packageRoot, '.playground');
+
 /**
- * Generates a default-postgres `prisma-next.config.ts` whose contract source is
- * the given absolute `.psl` path, and returns the generated config's absolute
- * path. Used when the user did not point the playground at an existing config:
- * "without the config, assume default postgres configuration."
+ * Writes a default-postgres `prisma-next.config.ts` into {@link PLAYGROUND_DIR}
+ * whose contract source is `absoluteSchemaPath`, and returns the config's path.
+ * This is the "without a config, assume default postgres" path.
  *
- * The config is written under the playground package's own `.playground/`
- * directory (NOT the OS temp dir) so that the `@prisma-next/*` imports resolve
- * through the workspace `node_modules` when `c12` loads it.
+ * The config lives in `.playground/` (NOT the OS temp dir, NOT the user's
+ * directory) for two reasons: (1) its `@prisma-next/*` imports resolve through
+ * the workspace `node_modules`, and (2) the language server discovers a
+ * document's config by walking up from the document's own path, so the schema
+ * the editor opens must live at or under this directory. Callers therefore
+ * stage the schema into `.playground/` before generating the config.
  *
- * The config mirrors the canonical postgres + PSL recipe used across the repo's
- * fixtures. The language server only ever reads `contract.source.inputs` (it
- * never invokes `load`), so the full postgres pipeline is wired for fidelity but
- * is not exercised for diagnostics.
- *
- * `prismaContract` resolves `inputs` relative to the config dir; passing the
- * absolute schema path keeps the resolved input exactly equal to the file URI
- * the browser editor opens, which is what the server matches against.
+ * The config mirrors the canonical postgres + PSL recipe. The language server
+ * only reads `contract.source.inputs` (it never invokes `load`), so the full
+ * postgres pipeline is wired for fidelity but not exercised for diagnostics.
  */
 export async function generateDefaultPostgresConfig(absoluteSchemaPath: string): Promise<string> {
-  const dir = join(packageRoot, '.playground');
-  await mkdir(dir, { recursive: true });
-  const configPath = join(dir, 'prisma-next.config.ts');
+  await mkdir(PLAYGROUND_DIR, { recursive: true });
+  const configPath = join(PLAYGROUND_DIR, 'prisma-next.config.ts');
   const json = JSON.stringify(absoluteSchemaPath);
   const contents = `import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';

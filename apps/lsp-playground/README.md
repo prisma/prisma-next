@@ -13,25 +13,37 @@ graph and exempt from `lint:deps` layering.
 # 1. Build the CLI once (the bridge spawns its dist/cli.js):
 pnpm --filter @prisma-next/cli build
 
-# 2. Point the playground at a PSL file:
-pnpm --filter @prisma-next/lsp-playground start path/to/schema.psl
-# or, after `pnpm install` links the bin:
+# 2a. Open a blank scratch schema (no file needed):
+psl-playground
+
+# 2b. Or open an existing PSL file:
 psl-playground path/to/schema.psl
 ```
 
-Then open the printed `http://localhost:5273/` URL. Edit the schema; parse
-diagnostics update live.
+The PSL file is **optional**. With no argument — or a path that does not yet
+exist — the playground opens a writable scratch schema under `.playground/`
+so you can start authoring immediately. Then open the printed
+`http://localhost:5273/` URL; parse diagnostics update live as you edit.
+
+Everything (editor + LSP) is served on the single port `5273`.
 
 ### Config resolution
 
 The language server identifies schema documents from `prisma-next.config.ts`
-(`contract.source.inputs`). The playground resolves the config in this order:
+(`contract.source.inputs`), discovering a document's config by walking up from
+the document's own path. The playground resolves what the editor opens, and the
+config that sits above it, as follows:
 
-1. `--config <path>` if given.
-2. The nearest `prisma-next.config.ts` walking up from the `.psl` file.
-3. **Fallback:** a generated **default-postgres** config pointing `prismaContract`
-   at your `.psl`. Without any config, you still get diagnostics under a default
-   Postgres setup.
+1. `--config <path>` + an existing `<schema.psl>`: open the real file in place;
+   the server uses the given project config.
+2. An **existing** file already inside a project (a `prisma-next.config.ts` is
+   found walking up from it): open it in place under that config.
+3. Otherwise (no file, a non-existent path, or an existing file with no project
+   config): **stage a copy** of the schema under `.playground/` and generate a
+   **default-postgres** config beside it — the "without a config, assume default
+   postgres" path. Staging is required because the server resolves the generated
+   config's `@prisma-next/*` imports and discovers the config by walking up from
+   the staged file.
 
 ## How it works
 

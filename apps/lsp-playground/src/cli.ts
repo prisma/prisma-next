@@ -1,10 +1,10 @@
-import { access, readFile, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer as createHttpServer } from 'node:http';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createServer as createViteServer } from 'vite';
 import { attachBridge } from './bridge';
-import { generateDefaultPostgresConfig } from './default-config';
+import { generateDefaultPostgresConfig, PLAYGROUND_DIR } from './default-config';
 import { findNearestConfig } from './find-config';
 
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -18,6 +18,28 @@ async function fileExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Stages a writable schema file under `.playground/` and returns its path.
+ *
+ * `.playground/` is where the server can resolve both the generated config's
+ * `@prisma-next/*` imports and (via walk-up) the config for the opened
+ * document. When `sourceFile` points at an existing file, its contents are
+ * copied so the playground edits a sandbox copy rather than the user's file;
+ * otherwise an empty scratch file is created. The staged file reuses the
+ * source's basename (or `scratch.psl`) so the editor tab reads naturally.
+ */
+async function stageSchema(sourceFile?: string): Promise<string> {
+  await mkdir(PLAYGROUND_DIR, { recursive: true });
+  const name = sourceFile !== undefined ? basename(sourceFile) : 'scratch.psl';
+  const target = resolve(PLAYGROUND_DIR, name);
+  if (sourceFile !== undefined && (await fileExists(sourceFile))) {
+    await copyFile(sourceFile, target);
+  } else if (!(await fileExists(target))) {
+    await writeFile(target, '', 'utf8');
+  }
+  return target;
 }
 
 function resolveCliEntry(): string {
@@ -40,32 +62,61 @@ async function main(): Promise<void> {
   });
   const schemaArg = positional[0];
 
-  if (schemaArg === undefined) {
-    console.error('Usage: psl-playground <schema.psl> [--config <prisma-next.config.ts>]');
-    process.exit(1);
-  }
-
-  const schemaPath = isAbsolute(schemaArg) ? schemaArg : resolve(process.cwd(), schemaArg);
-  if (!(await fileExists(schemaPath))) {
-    console.error(`Schema file not found: ${schemaPath}`);
-    process.exit(1);
-  }
-
+  // Resolve the schema the editor opens and the config the server will find for
+  // it. The language server (post-merge) discovers a document's config by
+  // walking up from the document's own path, so the schema must sit at or under
+  // a directory that contains a resolvable `prisma-next.config.ts`.
+  //
+  // The PSL file is optional. Unless the user points us at an existing config
+  // (`--config`) — in which case we open the real file in place and let the
+  // server discover that project's config — we stage the schema into
+  // `.playground/` (whose `@prisma-next/*` imports resolve) and generate a
+  // default-postgres config beside it. That is the "without a config, assume
+  // default postgres" path, and it covers no-arg, missing-path, and
+  // existing-file-without-config uniformly.
+  let schemaPath: string;
   let configPath: string;
+
+  const sourceFile =
+    schemaArg === undefined
+      ? undefined
+      : isAbsolute(schemaArg)
+        ? schemaArg
+        : resolve(process.cwd(), schemaArg);
+
   if (explicitConfig !== undefined) {
+    if (sourceFile === undefined || !(await fileExists(sourceFile))) {
+      console.error('--config requires an existing <schema.psl> argument.');
+      process.exit(1);
+    }
+    schemaPath = sourceFile;
     configPath = isAbsolute(explicitConfig)
       ? explicitConfig
       : resolve(process.cwd(), explicitConfig);
+    console.log(`Using schema in place: ${schemaPath}`);
     console.log(`Using config (explicit): ${configPath}`);
-  } else {
-    const found = await findNearestConfig(schemaPath);
-    if (found !== undefined) {
-      configPath = found;
+  } else if (sourceFile !== undefined && (await fileExists(sourceFile))) {
+    const discovered = await findNearestConfig(sourceFile);
+    if (discovered !== undefined) {
+      // The file belongs to a real project; open it in place under its own config.
+      schemaPath = sourceFile;
+      configPath = discovered;
+      console.log(`Using schema in place: ${schemaPath}`);
       console.log(`Using config (discovered): ${configPath}`);
     } else {
+      // Existing file, no project config: stage a copy and assume default postgres.
+      schemaPath = await stageSchema(sourceFile);
       configPath = await generateDefaultPostgresConfig(schemaPath);
-      console.log(`No config found; generated default-postgres config: ${configPath}`);
+      console.log(
+        `No project config found; staged copy under default-postgres config: ${schemaPath}`,
+      );
     }
+  } else {
+    // No file, or a path that does not exist yet: scratch under default postgres.
+    schemaPath = await stageSchema(sourceFile);
+    configPath = await generateDefaultPostgresConfig(schemaPath);
+    const why = sourceFile === undefined ? 'No schema given' : 'Schema not found';
+    console.log(`${why}; opening scratch schema: ${schemaPath}`);
   }
 
   const cliEntry = resolveCliEntry();
@@ -113,7 +164,7 @@ export const schemaText = ${JSON.stringify(schemaText)};
   });
   httpServer.on('request', vite.middlewares);
 
-  const stopBridge = attachBridge(httpServer, { cliEntry, configPath, path: LSP_PATH });
+  const stopBridge = attachBridge(httpServer, { cliEntry, path: LSP_PATH });
 
   httpServer.on('error', (error: NodeJS.ErrnoException) => {
     if (error.code === 'EADDRINUSE') {
