@@ -23,17 +23,19 @@ import {
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import type { CollationOptions } from '@prisma-next/mongo-value/mongodb-types';
-import type { NamespaceSymbol, PslSpan, SymbolTable } from '@prisma-next/psl-parser';
+import type {
+  CompositeTypeSymbol,
+  FieldSymbol,
+  ModelSymbol,
+  NamespaceSymbol,
+  PslSpan,
+  ResolvedAttribute,
+  SymbolTable,
+} from '@prisma-next/psl-parser';
+import { nodePslSpan } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import { blindCast } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { nodePslSpan } from './cst-read';
-import type {
-  CstAttributeView,
-  CstCompositeTypeView,
-  CstFieldView,
-  CstModelView,
-} from './cst-read-views';
 import { deriveJsonSchema, derivePolymorphicJsonSchema } from './derive-json-schema';
 import {
   getAttribute,
@@ -45,7 +47,6 @@ import {
   parseQuotedStringLiteral,
   parseRelationAttribute,
 } from './psl-helpers';
-import { buildCompositeTypeView, buildModelView } from './symbol-views';
 
 export interface InterpretPslDocumentToMongoContractInput {
   readonly symbolTable: SymbolTable;
@@ -128,16 +129,16 @@ function fkRelationPairKey(declaringModel: string, targetModel: string): string 
   return `${declaringModel}::${targetModel}`;
 }
 
-function resolveFieldMappings(model: CstModelView): FieldMappings {
+function resolveFieldMappings(model: ModelSymbol): FieldMappings {
   const pslNameToMapped = new Map<string, string>();
-  for (const field of model.fields) {
+  for (const field of Object.values(model.fields)) {
     const mapped = getMapName(field.attributes) ?? field.name;
     pslNameToMapped.set(field.name, mapped);
   }
   return { pslNameToMapped };
 }
 
-function resolveCollectionName(model: CstModelView): string {
+function resolveCollectionName(model: ModelSymbol): string {
   return getMapName(model.attributes) ?? lowerFirst(model.name);
 }
 
@@ -163,7 +164,7 @@ function mongoCrossRef(modelName: string): CrossReference {
 }
 
 function collectPolymorphismDeclarations(
-  models: readonly CstModelView[],
+  models: readonly ModelSymbol[],
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
 ): {
@@ -186,7 +187,7 @@ function collectPolymorphismDeclarations(
           });
           continue;
         }
-        const discField = model.fields.find((f) => f.name === fieldName);
+        const discField = model.fields[fieldName];
         if (discField && discField.typeName !== 'String') {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
@@ -233,7 +234,7 @@ function resolvePolymorphism(input: {
   models: Record<string, MongoModelEntry>;
   roots: Record<string, CrossReference>;
   collections: Record<string, Record<string, unknown>>;
-  allModels: readonly CstModelView[];
+  allModels: readonly ModelSymbol[];
   discriminatorDeclarations: Map<string, DiscriminatorDeclaration>;
   baseDeclarations: Map<string, BaseDeclaration>;
   modelNames: ReadonlySet<string>;
@@ -508,7 +509,7 @@ function parseJsonArg(raw: string | undefined): Record<string, unknown> | undefi
   return undefined;
 }
 
-function parseCollation(attr: CstAttributeView): CollationOptions | null | undefined {
+function parseCollation(attr: ResolvedAttribute): CollationOptions | null | undefined {
   const locale = stripQuotesHelper(getNamedArgument(attr, 'collationLocale'));
   if (!locale) {
     const hasAnyCollationArg =
@@ -568,7 +569,7 @@ function parseProjectionList(
 }
 
 function collectIndexes(
-  pslModel: CstModelView,
+  pslModel: ModelSymbol,
   fieldMappings: FieldMappings,
   modelNames: ReadonlySet<string>,
   sourceId: string,
@@ -584,12 +585,12 @@ function collectIndexes(
   // rather than fieldMappings.pslNameToMapped because the latter contains
   // every PSL field including relation fields.
   const indexableFieldNames = new Set<string>();
-  for (const f of pslModel.fields) {
+  for (const f of Object.values(pslModel.fields)) {
     if (modelNames.has(f.typeName)) continue;
     indexableFieldNames.add(f.name);
   }
 
-  for (const field of pslModel.fields) {
+  for (const field of Object.values(pslModel.fields)) {
     if (modelNames.has(field.typeName)) continue;
     const uniqueAttr = getAttribute(field.attributes, 'unique');
     if (!uniqueAttr) continue;
@@ -823,7 +824,7 @@ function collectIndexes(
   return indexes;
 }
 
-function isRelationField(field: CstFieldView, modelNames: ReadonlySet<string>): boolean {
+function isRelationField(field: FieldSymbol, modelNames: ReadonlySet<string>): boolean {
   return modelNames.has(field.typeName);
 }
 
@@ -831,14 +832,14 @@ function isRelationField(field: CstFieldView, modelNames: ReadonlySet<string>): 
 const MONGO_OBJECT_ID_PSL_TYPE = 'ObjectId';
 
 function resolveFieldCodecId(
-  field: CstFieldView,
+  field: FieldSymbol,
   scalarTypeDescriptors: ReadonlyMap<string, string>,
 ): string | undefined {
   return scalarTypeDescriptors.get(field.typeName);
 }
 
 function resolveNonRelationField(
-  field: CstFieldView,
+  field: FieldSymbol,
   ownerName: string,
   compositeTypeNames: ReadonlySet<string>,
   scalarTypeDescriptors: ReadonlyMap<string, string>,
@@ -854,10 +855,10 @@ function resolveNonRelationField(
   }
 
   // The field's qualified type was malformed and already flagged
-  // (PSL_INVALID_QUALIFIED_TYPE) at view-build time. Don't cascade a spurious
+  // (PSL_INVALID_QUALIFIED_TYPE) by `buildSymbolTable`. Don't cascade a spurious
   // PSL_UNSUPPORTED_FIELD_TYPE — the legacy parser rejected such types before
   // the interpreter ran.
-  if (field.typeAlreadyReported) {
+  if (field.malformedType) {
     return undefined;
   }
 
@@ -896,14 +897,13 @@ export function interpretPslDocumentToMongoContract(
   // `namespace { … }` blocks were rejected above. The IR collection map
   // remains flat (and the Mongo target represents databases via
   // `MongoTargetDatabase`, populated at compose time by the connection
-  // string rather than authoring-time PSL). Build the model/composite views
-  // directly from the symbol-table entries + their CST `.node`.
-  const allModels: CstModelView[] = Object.values(topLevel.models).map((m) =>
-    buildModelView(m, sourceFile, sourceId, diagnostics),
-  );
-  const allCompositeTypes: CstCompositeTypeView[] = Object.values(topLevel.compositeTypes).map(
-    (ct) => buildCompositeTypeView(ct, sourceFile, sourceId, diagnostics),
-  );
+  // string rather than authoring-time PSL). The symbol-table entries already
+  // carry the resolved read-set (type split, attributes, span) and any
+  // `PSL_INVALID_QUALIFIED_TYPE` diagnostic (emitted by `buildSymbolTable`,
+  // seeded into `diagnostics` via the provider), so the interpreter consumes
+  // them directly — no view-build pass.
+  const allModels: ModelSymbol[] = Object.values(topLevel.models);
+  const allCompositeTypes: CompositeTypeSymbol[] = Object.values(topLevel.compositeTypes);
   const modelNames = new Set(allModels.map((m) => m.name));
   const compositeTypeNames = new Set(allCompositeTypes.map((ct) => ct.name));
 
@@ -920,7 +920,7 @@ export function interpretPslDocumentToMongoContract(
     readonly targetModelName: string;
     readonly relationName?: string;
     readonly cardinality: '1:1' | '1:N';
-    readonly field: CstFieldView;
+    readonly field: FieldSymbol;
   }
   const backrelationCandidates: BackrelationCandidate[] = [];
 
@@ -931,7 +931,7 @@ export function interpretPslDocumentToMongoContract(
     const fields: Record<string, ContractField> = {};
     const relations: Record<string, ContractReferenceRelation> = {};
 
-    for (const field of pslModel.fields) {
+    for (const field of Object.values(pslModel.fields)) {
       if (isRelationField(field, modelNames)) {
         const relation = parseRelationAttribute(field.attributes);
 
@@ -994,7 +994,9 @@ export function interpretPslDocumentToMongoContract(
     }
 
     const isVariantModel = pslModel.attributes.some((attr) => attr.name === 'base');
-    const hasIdField = pslModel.fields.some((f) => getAttribute(f.attributes, 'id') !== undefined);
+    const hasIdField = Object.values(pslModel.fields).some(
+      (f) => getAttribute(f.attributes, 'id') !== undefined,
+    );
     // Variant models inherit the base's identity and are validated through their base.
     if (!isVariantModel) {
       if (!hasIdField) {
@@ -1049,7 +1051,7 @@ export function interpretPslDocumentToMongoContract(
   const valueObjects: Record<string, ContractValueObject> = {};
   for (const compositeType of allCompositeTypes) {
     const fields: Record<string, ContractField> = {};
-    for (const field of compositeType.fields) {
+    for (const field of Object.values(compositeType.fields)) {
       const resolved = resolveNonRelationField(
         field,
         compositeType.name,

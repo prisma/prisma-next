@@ -1,11 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
-import { rangeToPslSpan } from './cst-read';
+
 import { interpretPslDocumentToMongoContract } from './interpreter';
 
 export interface MongoContractOptions {
