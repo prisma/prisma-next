@@ -33,7 +33,7 @@ Already landed on the branch: the architecture (generic differ, content-addresse
 
 - **DoD (operator-observable):** declare a SELECT policy in the example app → migrate → only permitted rows visible under the role; edit the predicate → migrate → **exactly one policy active**, with the new predicate (the old version dropped via same-prefix replace); remove it from the contract → `db verify` reports the now-orphaned DB policy as drift (exits non-zero naming it) — auto-drop-on-removal is slice 2; drop/alter it out-of-band → `prisma db verify` exits non-zero naming the policy. Workspace typecheck green; all suites green.
 
-### Slice 1.5 — `entity-kind-migration-seam` · _(Linear: see § Linear sync)_
+### Slice 1.5 — `entity-kind-migration-seam` · [TML-2931](https://linear.app/prisma-company/issue/TML-2931)
 
 **Status: ⬜ not started.** Design seed: [`specs/extension-migration-participation.md`](specs/extension-migration-participation.md).
 
@@ -106,4 +106,4 @@ The slice-4 resolution: when introspecting for the differ, only collect policies
 
 ## Linear sync
 
-TML-2868 → `select-policies-dependable` (re-scoped; PR #771 continues under it). TML-2869 → `drift-handled-correctly`. TML-2870 → `all-policy-types`. [TML-2883](https://linear.app/prisma-company/issue/TML-2883) → `typescript-authoring` (slice 4, re-added 2026-06-10). TML-2871 → canceled (contents split: example-app skeleton → slice 1; role existence → slice 2; cross-space role validation → dropped). Blocking: 2869 blockedBy 2868; 2870 blockedBy 2869; 2883 blockedBy 2870.
+TML-2868 → `select-policies-dependable` (re-scoped; PR #771 continues under it). [TML-2931](https://linear.app/prisma-company/issue/TML-2931) → `entity-kind-migration-seam` (slice 1.5, added 2026-06-18; the generic two-sided derivation seam). TML-2869 → `drift-handled-correctly`. TML-2870 → `all-policy-types`. [TML-2883](https://linear.app/prisma-company/issue/TML-2883) → `typescript-authoring` (slice 4, re-added 2026-06-10). TML-2871 → canceled (contents split: example-app skeleton → slice 1; role existence → slice 2; cross-space role validation → dropped). Blocking: 2931 blockedBy 2868; 2869 blockedBy 2931; 2870 blockedBy 2869; 2883 blockedBy 2870.
