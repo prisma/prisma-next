@@ -154,10 +154,8 @@ function scanIdent(source: string, pos: number): Token | undefined {
 
 const KEYWORD_NUMBERS = ['-Infinity', 'Infinity', 'NaN'] as const;
 
-// `NaN`, `Infinity`, and `-Infinity` are numeric literals, not identifiers.
-// They must match before `scanIdent` (which would otherwise claim the
-// identifier-led words) and are word-bounded: a following identifier-part char
-// (so `Infinityx` / `NaNxyz`) keeps the run an `Ident` rather than a number.
+// `NaN`, `Infinity`, and `-Infinity` are numeric literals; they must match
+// before `scanIdent` and are word-bounded, so `Infinityx` stays an `Ident`.
 function scanKeywordNumber(source: string, pos: number): Token | undefined {
   for (const word of KEYWORD_NUMBERS) {
     if (!source.startsWith(word, pos)) continue;
@@ -181,7 +179,7 @@ function scanNumber(source: string, pos: number): Token | undefined {
     end++;
   }
   if (source.charAt(end) === '.' && end + 1 < source.length && isDigit(source.charAt(end + 1))) {
-    end++; // consume the dot
+    end++;
     while (end < source.length && isDigit(source.charAt(end))) {
       end++;
     }
@@ -190,50 +188,44 @@ function scanNumber(source: string, pos: number): Token | undefined {
 }
 
 function scanString(source: string, pos: number): Token | undefined {
-  if (source.charAt(pos) !== '"') return undefined;
+  const quote = source.charAt(pos);
+  if (quote !== '"' && quote !== "'") return undefined;
   let end = pos + 1;
   while (end < source.length) {
     const c = source.charAt(end);
     if (c === '\\' && end + 1 < source.length) {
-      end += 2; // skip escape sequence
+      end += 2;
       continue;
     }
-    if (c === '"') {
-      end++; // include closing quote
+    if (c === quote) {
+      end++;
       return { kind: 'StringLiteral', text: source.slice(pos, end) };
     }
     if (c === '\n' || c === '\r') {
-      // Unterminated: stop before newline
+      // Unterminated string: stop before the newline.
       return { kind: 'StringLiteral', text: source.slice(pos, end) };
     }
     end++;
   }
-  // Unterminated at EOF
   return { kind: 'StringLiteral', text: source.slice(pos, end) };
 }
 
 /**
- * Whether a `StringLiteral` token's text is properly closed. `scanString` emits
- * the same `StringLiteral` kind for both well-formed and unterminated strings —
- * it stops at a newline or EOF when no closing quote is found — so callers that
- * need to distinguish the two ask here.
+ * `scanString` emits the same `StringLiteral` kind for well-formed and
+ * unterminated strings, so callers ask here to tell them apart.
  *
- * Because `scanString` stops at the *first* unescaped `"`, the only quote whose
- * escaping can be in question is the **last character**: the text is terminated
- * iff it opens with `"`, ends with `"`, and that closing `"` is not escaped.
- * Under the `\\`-escapes-the-next-character rule, a `"` is unescaped iff an
- * **even** number of backslashes immediately precede it — each `\\` pair cancels,
- * and an odd run leaves the final `\` escaping the quote. So it suffices to
- * count the trailing backslash run; no full re-scan is needed:
+ * The closing quote is unescaped iff an **even** number of backslashes precede
+ * it (each `\\` pair cancels; an odd run leaves the final `\` escaping the
+ * quote), so counting the trailing backslash run suffices — no full re-scan:
  *
- * - `"ok"`  → 0 backslashes (even) → closing quote stands → terminated
- * - `"a\"`  → 1 backslash  (odd)   → the `"` is escaped     → unterminated
- * - `"a\\"` → 2 backslashes (even) → escaped `\`, real `"`  → terminated
- *
- * A lone `"` (length 1) or a text with no closing `"` is unterminated.
+ * - `"ok"`  → 0 backslashes (even) → terminated
+ * - `'a\'`  → 1 backslash  (odd)   → the quote is escaped → unterminated
+ * - `"a\\"` → 2 backslashes (even) → escaped `\`, real `"` → terminated
  */
 export function isTerminatedStringLiteral(text: string): boolean {
-  if (text.length < 2 || text.charAt(0) !== '"' || text.charAt(text.length - 1) !== '"') {
+  const quote = text.charAt(0);
+  if (quote !== '"' && quote !== "'") return false;
+  if (text.length < 2 || text.charAt(text.length - 1) !== quote) {
     return false;
   }
   let backslashes = 0;

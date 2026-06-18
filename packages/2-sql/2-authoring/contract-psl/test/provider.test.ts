@@ -506,15 +506,15 @@ model Document {
         mutations: {
           defaults: [
             {
-              ref: { table: 'user', column: 'cuid2' },
+              ref: { namespace: 'public', table: 'user', column: 'cuid2' },
               onCreate: { kind: 'generator', id: 'cuid2' },
             },
             {
-              ref: { table: 'user', column: 'nanoid16' },
+              ref: { namespace: 'public', table: 'user', column: 'nanoid16' },
               onCreate: { kind: 'generator', id: 'nanoid', params: { size: 16 } },
             },
             {
-              ref: { table: 'user', column: 'uuidV7' },
+              ref: { namespace: 'public', table: 'user', column: 'uuidV7' },
               onCreate: { kind: 'generator', id: 'uuidv7' },
             },
           ],

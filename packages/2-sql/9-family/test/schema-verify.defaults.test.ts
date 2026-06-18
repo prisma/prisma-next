@@ -349,7 +349,7 @@ describe('verifySqlSchema - defaults', () => {
         mutations: {
           defaults: [
             {
-              ref: { table: 'user', column: 'id' },
+              ref: { namespace: 'public', table: 'user', column: 'id' },
               onCreate: { kind: 'generator', id: 'uuidv4' },
             },
           ],

@@ -6,6 +6,143 @@ Changelog tracking starts at **v0.12.0**, the first release cut after this conve
 
 <!-- New release entries go here, newest first, each mirroring docs/releases/v<version>.md under a `## v<version>` header. -->
 
+## v0.14.0
+
+This release reshapes the enum surface (PSL `enum` is now a domain concept backed by a value-set CHECK constraint, not a native Postgres type), makes the SQL builder always-qualified by namespace, adds native UUID storage on Postgres, ships a new fault-tolerant PSL parser, completes the read side of many-to-many (correlated includes plus `some` / `every` / `none` filters through the junction), and adds a Supabase façade alongside several runtime-class renamings. Most breaking changes have a matching codemod or upgrade recipe.
+
+### Breaking changes
+
+- **PSL `enum` becomes the domain enum** — an `enum` block now authors a text-class column whose value set is enforced by a CHECK constraint, not a native `CREATE TYPE … AS ENUM`. Each block must declare `@@type("<codec-id>")` (typically `pg/text@1`) and map members to database values with `Name = "value"`. The transitional `enum2` keyword is retired (rename to `enum` — emitted contract is identical). Native enum machinery is deleted: `enumType(name, values[])` / `enumColumn` from `@prisma-next/adapter-postgres/column-types`, the `pg/enum@1` codec, and adoption of native enum types in `contract infer` are all gone. Databases carrying a native enum type need a one-time converting migration (ALTER column to `text` USING `::text`, add the value-set CHECK, `DROP TYPE`) — `contract infer` refuses native enum types and names them. See the [0.13→0.14 upgrade recipe](https://github.com/prisma/prisma-next/blob/v0.14.0/skills/upgrade/prisma-next-upgrade/upgrades/0.13-to-0.14/) and the [extension-author recipe](https://github.com/prisma/prisma-next/blob/v0.14.0/skills/extension-author/prisma-next-extension-upgrade/upgrades/0.13-to-0.14/). ([#817](https://github.com/prisma/prisma-next/pull/817))
+
+  Before:
+
+  ```prisma
+  enum user_type {
+    admin
+    user
+  }
+  ```
+
+  After:
+
+  ```prisma
+  enum user_type {
+    @@type("pg/text@1")
+    admin = "admin"
+    user  = "user"
+  }
+  ```
+
+- **Query builder and ORM are always qualified by namespace** — the flat by-bare-name accessors are removed at the builder layer; the Postgres facade exposes the namespaced surface. On Postgres, `db.sql.<table>` becomes `db.sql.<namespace>.<table>` and `db.orm.<Model>` becomes `db.orm.<namespace>.<Model>` (`public` for a standard single-schema project). Direct builder calls (`sql.<table>`, `orm.<Model>`) migrate the same way. SQLite and Mongo are unaffected — their single-namespace facade keeps the flat surface working. No codemod: the correct namespace is the one each table/model is declared in. The generated `contract.d.ts` also drops the flat top-level `export type Models` — read models per-namespace as `Contract['domain']['namespaces']['<namespace>']['models']` and re-emit. See the [0.13→0.14 upgrade recipe](https://github.com/prisma/prisma-next/blob/v0.14.0/skills/upgrade/prisma-next-upgrade/upgrades/0.13-to-0.14/). ([#778](https://github.com/prisma/prisma-next/pull/778))
+
+  Before:
+
+  ```ts
+  const users = await db.sql.user.select('id', 'email').build().execute();
+  const alice = await db.orm.User.find({ where: { id } });
+  ```
+
+  After:
+
+  ```ts
+  const users = await db.sql.public.user.select('id', 'email').build().execute();
+  const alice = await db.orm.public.User.find({ where: { id } });
+  ```
+
+- **UUID field presets renamed by storage encoding** — `field.uuid()` → `field.uuidString()`, `field.id.uuidv4()` → `field.id.uuidv4String()`, `field.id.uuidv7()` → `field.id.uuidv7String()`. The new names describe the `char(36)` storage encoding (the emitted codec, `sql/char@1`, is unchanged). Postgres-native `uuid` columns use the new `field.uuidNative()` / `field.id.uuidv4Native()` / `field.id.uuidv7Native()` presets from `@prisma-next/postgres/contract-builder`. The rename is mechanical — a colocated codemod ships in the [0.13→0.14 upgrade recipe](https://github.com/prisma/prisma-next/blob/v0.14.0/skills/upgrade/prisma-next-upgrade/upgrades/0.13-to-0.14/). ([#810](https://github.com/prisma/prisma-next/pull/810))
+
+  Before:
+
+  ```ts
+  id: field.id.uuidv7(),
+  externalId: field.uuid(),
+  ```
+
+  After:
+
+  ```ts
+  id: field.id.uuidv7String(),
+  externalId: field.uuidString(),
+  ```
+
+- **Postgres migration op factories become methods on `Migration`** — the bare op factory functions previously exported from `@prisma-next/postgres/migration` (and the `@prisma-next/target-postgres/migration` alias) are removed. Each is now a protected method on the `PostgresMigration` base class — call it as `this.<op>(...)`. Positional arguments are replaced by a single options object. A codemod ships in the [0.13→0.14 upgrade recipe](https://github.com/prisma/prisma-next/blob/v0.14.0/skills/upgrade/prisma-next-upgrade/upgrades/0.13-to-0.14/). ([#813](https://github.com/prisma/prisma-next/pull/813))
+
+  Before:
+
+  ```ts
+  import { addForeignKey, dropColumn } from '@prisma-next/postgres/migration';
+
+  override get operations() {
+    return [
+      dropColumn('public', 'user', 'legacyName'),
+      addForeignKey('public', 'post', { name: 'post_userId_fkey', columns: ['userId'], references: { schema: 'public', table: 'user', columns: ['id'] } }),
+    ];
+  }
+  ```
+
+  After:
+
+  ```ts
+  override get operations() {
+    return [
+      this.dropColumn({ schema: 'public', table: 'user', column: 'legacyName' }),
+      this.addForeignKey({ schema: 'public', table: 'post', foreignKey: { name: 'post_userId_fkey', columns: ['userId'], references: { schema: 'public', table: 'user', columns: ['id'] } } }),
+    ];
+  }
+  ```
+
+- **SQL runtime class renames** — `@prisma-next/sql-runtime` exports `abstract class SqlRuntimeBase` (previously `SqlRuntime`). The bare names `PostgresRuntime` and `SqliteRuntime` are now **interfaces** — the types to depend on in extension and app code. The concrete classes are `PostgresRuntimeImpl` (from `@prisma-next/postgres/runtime`) and `SqliteRuntimeImpl` (from `@prisma-next/sqlite/runtime`). Code that referenced the class names to subclass them switches to the `Impl` names. Code using the facade factories (`postgres(...)`, `sqlite(...)`) is unaffected. ([#806](https://github.com/prisma/prisma-next/pull/806))
+
+- **`createRuntime` removed from `@prisma-next/sql-runtime`** — use the target facade factory (`postgres(...)` / `sqlite(...)`) or construct the target class directly (`new PostgresRuntimeImpl({...})` / `new SqliteRuntimeImpl({...})`). The constructor options match what `createRuntime` accepted, except `stackInstance` is not taken — pass `adapter` directly. App code using the facade factories is unaffected. ([#806](https://github.com/prisma/prisma-next/pull/806))
+
+- **`SqlContractSerializer` no longer accepts Postgres contracts** — the family serializer's entries registry only knows SQL-family built-ins (`table`, `valueSet`) and rejects the Postgres-specific `type` key that every Postgres namespace carries. Migration files and app code that deserialize a Postgres-emitted contract must use `PostgresContractSerializer` from `@prisma-next/target-postgres/runtime`. SQLite and family-only contracts are unaffected. ([#812](https://github.com/prisma/prisma-next/pull/812))
+
+  Before:
+
+  ```ts
+  import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+  const contract = new SqlContractSerializer().deserializeContract(json) as Contract;
+  ```
+
+  After:
+
+  ```ts
+  import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+  const contract = new PostgresContractSerializer().deserializeContract(json) as Contract;
+  ```
+
+- **Extension authors: `SqlNamespace.entries` is an open dictionary** — the closed shape (`{ table?, valueSet? }`) is gone. `entries` is now `Readonly<Record<string, Readonly<Record<string, unknown>>>>`, so dot-access like `.entries.table` no longer compiles. Read tables via the `namespaceTables(ns)` helper from `@prisma-next/sql-contract/types`, or via bracket notation `entries['table']`; the concrete class instances still expose typed getters (`ns.table`). See the [extension-author recipe](https://github.com/prisma/prisma-next/blob/v0.14.0/skills/extension-author/prisma-next-extension-upgrade/upgrades/0.13-to-0.14/). ([#812](https://github.com/prisma/prisma-next/pull/812))
+
+### Features
+
+- **Postgres-native UUID storage** — `field.uuidNative()` / `field.id.uuidv4Native()` / `field.id.uuidv7Native()` from `@prisma-next/postgres/contract-builder` author columns backed by the native `uuid` type. The cross-target `*String()` presets continue to emit `char(36)`. ([#810](https://github.com/prisma/prisma-next/pull/810))
+
+- **Many-to-many reads land** — `N:M` relations through a `through` junction can now be eagerly loaded via `include()` (correlated reads, slice 1) and filtered with `some` / `every` / `none` through the junction (slice 2). M:N validation arrived in 0.13; the runtime read surface is wired up in this release. ([#679](https://github.com/prisma/prisma-next/pull/679), [#680](https://github.com/prisma/prisma-next/pull/680))
+
+- **Supabase façade** — `@prisma-next/extension-supabase` ships a `supabase()` façade and `SupabaseRuntime` that composes the cross-contract foreign keys introduced in 0.13 into a runnable extension. ([#792](https://github.com/prisma/prisma-next/pull/792))
+
+- **Fault-tolerant PSL parser** — a new recursive-descent parser produces a full syntax tree (`SourceFile`) even when the input contains errors, so editor integrations can report diagnostics and surface partial structure without bailing on the first failure. ([#795](https://github.com/prisma/prisma-next/pull/795))
+
+- **Custom and parameterized codecs in control-path queries** — adapters now honor custom and parameterized codecs when encoding values on the control path (catalog reads, schema-verification queries, migration-state lookups), matching how user-data queries already handled them. ([#807](https://github.com/prisma/prisma-next/pull/807))
+
+- **`contract infer` writes a `pragma` header** — inferred PSL contracts now carry a `pragma` block recording the inference source and options, so re-running infer or auditing a generated schema is unambiguous. ([#801](https://github.com/prisma/prisma-next/pull/801))
+
+- **Per-namespace typed resolution in the builder** — the emitted `contract.d.ts` TypeMaps nest by namespace, so the query builder and ORM client resolve each namespace's own columns and fields — fixing same-bare-name models declared in more than one namespace. Re-emit picks up the new shape. ([#803](https://github.com/prisma/prisma-next/pull/803))
+
+- **Enum input types are exhaustively typed in the emitted `.d.ts`** — an enum-restricted field's input type renders as the literal member union (matching the output side), so create/update calls are exhaustiveness-checked at compile time. Re-emit picks up the new shape. ([#797](https://github.com/prisma/prisma-next/pull/797))
+
+- **Typed `db.enums.<namespace>.<Name>` accessor** — the emitter generates a `domain` block in `contract.d.ts` that exposes each PSL-authored enum as a literal-typed `ContractEnumAccessor` (`values`, `names`, `members`). `contract.json` is unchanged; re-emit picks up the new types. ([#809](https://github.com/prisma/prisma-next/pull/809))
+
+- **Enum member defaults via `@default(EnumType.Member)`** — the PSL interpreter and contract-ts authoring surface resolve a member default to the corresponding database value literal. ([#808](https://github.com/prisma/prisma-next/pull/808))
+
+### Fixes
+
+- **`sql-orm-client` model accessors typed by selected variant** — accessing a model on the ORM client narrows the result type to the selected variant rather than the union of all variants. ([#790](https://github.com/prisma/prisma-next/pull/790))
+
+- **Emitter emits enum input literals** — fixes a hole where enum-restricted input types fell back to the codec's broad input type instead of the literal member union. ([#797](https://github.com/prisma/prisma-next/pull/797))
+
+- **Un-namespaced Postgres models default to `public`** — un-namespaced models in a Postgres contract correctly default to the `public` namespace per ADR 223; the spurious empty `__unbound__` storage slot is gone. Re-emit picks up the shape change. ([#838](https://github.com/prisma/prisma-next/pull/838))
+
 ## v0.13.0
 
 This release makes namespaces a first-class part of the query surface, adds cross-contract foreign keys to the SQL ORM, makes many-to-many a validatable contract shape, introduces a per-object control policy (`@@control`) that decides what Prisma manages, ships domain enums backed by storage value-sets, and gives the migration CLI a unified graph-tree view across `list` / `log` / `status` / `show`. Telemetry also flips from opt-in to opt-out. A few changes require a one-time contract re-emit — all are covered by the linked upgrade recipes.

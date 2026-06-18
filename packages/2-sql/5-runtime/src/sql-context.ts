@@ -678,6 +678,9 @@ function applyMutationDefaults(
     if (mutationDefault.ref.table !== options.table) {
       continue;
     }
+    if (mutationDefault.ref.namespace !== options.namespace) {
+      continue;
+    }
 
     const defaultSpec =
       options.op === 'create' ? mutationDefault.onCreate : mutationDefault.onUpdate;

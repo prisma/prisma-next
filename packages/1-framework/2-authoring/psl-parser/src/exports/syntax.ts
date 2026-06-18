@@ -11,8 +11,6 @@ export type { NamespaceMemberAst } from '../syntax/ast/declarations';
 export {
   CompositeTypeDeclarationAst,
   DocumentAst,
-  EnumDeclarationAst,
-  EnumValueDeclarationAst,
   FieldDeclarationAst,
   GenericBlockDeclarationAst,
   KeyValuePairAst,
@@ -35,9 +33,10 @@ export {
 } from '../syntax/ast/expressions';
 // AST wrappers
 export { IdentifierAst } from '../syntax/ast/identifier';
+export { QualifiedNameAst } from '../syntax/ast/qualified-name';
 export { TypeAnnotationAst } from '../syntax/ast/type-annotation';
 export type { AstNode } from '../syntax/ast-helpers';
-export { filterChildren, findChildToken, findFirstChild } from '../syntax/ast-helpers';
+export { filterChildren, findChildToken, findFirstChild, printSyntax } from '../syntax/ast-helpers';
 export type { GreenElement, GreenNode, GreenToken } from '../syntax/green';
 export { greenNode, greenToken } from '../syntax/green';
 export { GreenNodeBuilder } from '../syntax/green-builder';

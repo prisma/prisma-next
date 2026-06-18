@@ -278,7 +278,7 @@
     "storageHash": "sha256:5736eda44575a2e995e8c1d5ed6d7884859a882e9551844f776d2a497c6d0154"
   },
   "execution": {
-    "executionHash": "sha256:aa79980d83d295977c2ca3fd5a1407ea2bc67b4538b19971512d2f47ff71338e",
+    "executionHash": "sha256:fc24f3095f0326cf60b175c98cf8878d3f5637131f9650aff69f396556b6335a",
     "mutations": {
       "defaults": [
         {
@@ -288,6 +288,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "__unbound__",
             "table": "post"
           }
         },
@@ -298,6 +299,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "__unbound__",
             "table": "user"
           }
         }

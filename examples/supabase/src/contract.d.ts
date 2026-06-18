@@ -32,7 +32,7 @@ import type {
 export type StorageHash =
   StorageHashBase<'sha256:3e726ba9cb41c8296a27aee3fb08f754e202d5bb6a354230234852e386331341'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:09bd7caf0ad111e77df2565dce0c4c5b0b784f9d3dfe5c97f969f1016a6b66bb'>;
+  ExecutionHashBase<'sha256:ed14abd667c95e810498cf90d4adaa694b5130bc29593f0d88c31837a278d704'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
@@ -213,7 +213,7 @@ type ContractBase = Omit<
       readonly id: 'supabase';
       readonly kind: 'extension';
       readonly targetId: 'postgres';
-      readonly version: '0.13.0';
+      readonly version: '0.14.0';
     };
   };
   readonly execution: {
@@ -221,7 +221,11 @@ type ContractBase = Omit<
     readonly mutations: {
       readonly defaults: readonly [
         {
-          readonly ref: { readonly table: 'profile'; readonly column: 'id' };
+          readonly ref: {
+            readonly namespace: 'public';
+            readonly table: 'profile';
+            readonly column: 'id';
+          };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
       ];
