@@ -160,6 +160,36 @@ describe('parse() syntactic diagnostics', () => {
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
 
+  it('reports a model field missing its type, anchored on the field name', () => {
+    const source = 'model Foo {\n  field\n}';
+    const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_MODEL_MEMBER');
+    expect(message).toBe('Expected a type after field "field"');
+    expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
+      "
+      model Foo {
+        field
+        ~~~~~
+      }
+      "
+    `);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+  });
+
+  it('reports a composite-type field missing its type, anchored on the field name', () => {
+    const source = 'type Foo {\n  field\n}';
+    const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_MODEL_MEMBER');
+    expect(message).toBe('Expected a type after field "field"');
+    expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
+      "
+      type Foo {
+        field
+        ~~~~~
+      }
+      "
+    `);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+  });
+
   it('reports a malformed types-block member with the offending token', () => {
     const source = 'types {\n  123\n  Ok = Int\n}';
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_TYPES_MEMBER');

@@ -693,7 +693,16 @@ function invalidMember(cursor: Cursor, code: PslDiagnosticCode, message: string)
 export function parseField(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
   cursor.startNode('FieldDeclaration');
+  const nameMark = cursor.mark();
+  const nameText = cursor.peekToken().text;
   parseIdentifier(cursor);
+  if (cursor.peekKind() !== 'Ident') {
+    cursor.diagnostic(
+      'PSL_INVALID_MODEL_MEMBER',
+      `Expected a type after field "${nameText}"`,
+      nameMark,
+    );
+  }
   parseTypeAnnotation(cursor);
   while (cursor.peekKind() === 'At') {
     parseAttribute(cursor);
