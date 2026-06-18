@@ -169,6 +169,14 @@ export interface SymbolTableResult {
  * A pure, fault-tolerant pass: it never throws on recovered/malformed CST, and
  * its `diagnostics` carry only this pass's own duplicate-name findings
  * (`PSL_DUPLICATE_DECLARATION`), separate from `parse`'s diagnostics.
+ *
+ * This pass is the **sole owner** of duplicate-declaration detection: it is the
+ * only production emitter of `PSL_DUPLICATE_DECLARATION`, resolving same-scope
+ * duplicate names first-wins (one symbol per name, colliding regardless of
+ * kind). Downstream consumers (the SQL/Mongo interpreters) rely on this — they
+ * never re-detect or re-emit duplicate declarations; an interpreter-side guard
+ * against a same-coordinate duplicate is an invariant documenting this
+ * guarantee, not a live error path.
  */
 export function buildSymbolTable(options: BuildSymbolTableOptions): SymbolTableResult {
   const { document, sourceFile, scalarTypes, pslBlockDescriptors } = options;

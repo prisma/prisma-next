@@ -59,32 +59,11 @@ export interface InterpretPslDocumentToMongoContractInput {
   /**
    * Diagnostics produced before interpretation (the provider's combined
    * `parse` + `buildSymbolTable` set), seeded into the interpreter's collection
-   * so the post-walk dedupe gate emits the parse + symbol-table + interpreter
-   * union in one run — matching the legacy combined-set parser behaviour rather
-   * than failing before interpreting.
+   * so interpretation can emit the parse + symbol-table + interpreter union in
+   * one run — matching the legacy combined-set parser behaviour rather than
+   * failing before interpreting.
    */
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
-}
-
-function diagnosticDedupKey(diagnostic: ContractSourceDiagnostic): string {
-  const span = diagnostic.span;
-  const spanKey = span
-    ? `${span.start.offset}:${span.end.offset}:${span.start.line}:${span.end.line}`
-    : '';
-  return `${diagnostic.code}\u0000${diagnostic.sourceId}\u0000${spanKey}\u0000${diagnostic.message}`;
-}
-
-function dedupeDiagnostics(
-  diagnostics: readonly ContractSourceDiagnostic[],
-): ContractSourceDiagnostic[] {
-  const seen = new Map<string, ContractSourceDiagnostic>();
-  for (const diagnostic of diagnostics) {
-    const key = diagnosticDedupKey(diagnostic);
-    if (!seen.has(key)) {
-      seen.set(key, diagnostic);
-    }
-  }
-  return [...seen.values()];
 }
 
 /**
@@ -1138,7 +1117,7 @@ export function interpretPslDocumentToMongoContract(
   if (diagnostics.length > 0 || polyResult.diagnostics.length > 0) {
     return notOk({
       summary: 'PSL to Mongo contract interpretation failed',
-      diagnostics: dedupeDiagnostics([...diagnostics, ...polyResult.diagnostics]),
+      diagnostics: [...diagnostics, ...polyResult.diagnostics],
     });
   }
 

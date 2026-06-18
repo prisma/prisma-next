@@ -55,6 +55,7 @@ import {
   type RelationNode,
   type UniqueConstraintNode,
 } from '@prisma-next/sql-contract-ts/contract-builder';
+import { invariant } from '@prisma-next/utils/assertions';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -135,9 +136,9 @@ export interface InterpretPslDocumentToSqlContractInput {
   /**
    * Diagnostics produced before interpretation (the provider's combined
    * `parse` + `buildSymbolTable` set), seeded into the interpreter's collection
-   * so the post-walk dedupe gate emits the parse + symbol-table + interpreter
-   * union in one run — matching the legacy combined-set parser behaviour rather
-   * than failing before interpreting.
+   * so interpretation can emit the parse + symbol-table + interpreter union in
+   * one run — matching the legacy combined-set parser behaviour rather than
+   * failing before interpreting.
    */
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
 }
@@ -166,27 +167,6 @@ function buildComposedExtensionPackRefs(
         } satisfies ExtensionPackRef<'sql', string>),
     ]),
   );
-}
-
-function diagnosticDedupKey(diagnostic: ContractSourceDiagnostic): string {
-  const span = diagnostic.span;
-  const spanKey = span
-    ? `${span.start.offset}:${span.end.offset}:${span.start.line}:${span.end.line}`
-    : '';
-  return `${diagnostic.code}\u0000${diagnostic.sourceId}\u0000${spanKey}\u0000${diagnostic.message}`;
-}
-
-function dedupeDiagnostics(
-  diagnostics: readonly ContractSourceDiagnostic[],
-): ContractSourceDiagnostic[] {
-  const seen = new Map<string, ContractSourceDiagnostic>();
-  for (const diagnostic of diagnostics) {
-    const key = diagnosticDedupKey(diagnostic);
-    if (!seen.has(key)) {
-      seen.set(key, diagnostic);
-    }
-  }
-  return [...seen.values()];
 }
 
 function compareStrings(left: string, right: string): -1 | 0 | 1 {
@@ -1979,7 +1959,7 @@ export function interpretPslDocumentToSqlContract(
   if (diagnostics.length > 0) {
     return notOk({
       summary: 'PSL to SQL contract interpretation failed',
-      diagnostics: dedupeDiagnostics(diagnostics),
+      diagnostics,
     });
   }
 
@@ -2010,14 +1990,20 @@ export function interpretPslDocumentToSqlContract(
 
   // Keyed by `(namespaceId, modelName)` coordinate so two models that share a
   // bare name across namespaces stay distinct through the patch/polymorphism
-  // passes; only a genuine same-namespace duplicate is an error.
+  // passes. A same-coordinate duplicate is unreachable on the PSL path: the
+  // symbol table is the sole owner of duplicate-declaration detection and
+  // resolves same-scope duplicate names first-wins (one symbol, with
+  // `PSL_DUPLICATE_DECLARATION`), so two models never reach interpretation at
+  // the same coordinate. The invariant documents that guarantee and still trips
+  // loudly on a true regression rather than silently overwriting.
   const modelsForPatch: Record<string, ContractModel> = {};
   for (const [namespaceId, namespaceSlice] of Object.entries(contract.domain.namespaces)) {
     for (const [modelName, model] of Object.entries(namespaceSlice.models)) {
       const coordinate = modelCoordinateKey(namespaceId, modelName);
-      if (Object.hasOwn(modelsForPatch, coordinate)) {
-        throw new Error(`duplicate model "${namespaceId}.${modelName}" during PSL interpretation`);
-      }
+      invariant(
+        !Object.hasOwn(modelsForPatch, coordinate),
+        `symbol table guarantees coordinate uniqueness; duplicate model "${namespaceId}.${modelName}" reached interpretation`,
+      );
       modelsForPatch[coordinate] = model;
     }
   }
