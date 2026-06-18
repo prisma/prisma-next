@@ -28,14 +28,18 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import type {
-  BlockSymbol,
-  CompositeTypeSymbol,
-  ModelSymbol,
-  NamespaceSymbol,
-  ScalarSymbol,
-  SymbolTable,
-  TypeAliasSymbol,
+import {
+  type BlockSymbol,
+  type CompositeTypeSymbol,
+  type FieldSymbol,
+  keywordPslSpan,
+  type ModelSymbol,
+  type NamespaceSymbol,
+  nodePslSpan,
+  type ResolvedAttribute,
+  type ScalarSymbol,
+  type SymbolTable,
+  type TypeAliasSymbol,
 } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { SqlModelStorage, SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
@@ -53,14 +57,6 @@ import {
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { keywordPslSpan, nodePslSpan } from './cst-read';
-import type {
-  CstAttributeView,
-  CstCompositeTypeView,
-  CstFieldView,
-  CstModelView,
-  CstNamedTypeView,
-} from './cst-read-views';
 import { reconstructExtensionBlock } from './enum-block';
 import {
   findDuplicateFieldName,
@@ -99,7 +95,8 @@ import {
   parseRelationAttribute,
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
-import { buildCompositeTypeView, buildModelView, buildNamedTypeView } from './symbol-views';
+
+type NamedTypeSymbol = ScalarSymbol | TypeAliasSymbol;
 
 export interface InterpretPslDocumentToSqlContractInput {
   readonly symbolTable: SymbolTable;
@@ -388,7 +385,7 @@ function composedBlockKeywords(
 }
 
 interface BuildModelNodeInput {
-  readonly model: CstModelView;
+  readonly model: ModelSymbol;
   readonly mapping: ModelNameMapping;
   readonly modelMappings: ReadonlyMap<string, ModelNameMapping>;
   /**
@@ -471,7 +468,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
   let controlPolicy: ControlPolicy | undefined;
 
   const resultBackrelationCandidates: ModelBackrelationCandidate[] = [];
-  for (const field of model.fields) {
+  for (const field of Object.values(model.fields)) {
     if (!field.list || !input.modelNames.has(field.typeName)) {
       continue;
     }
@@ -531,12 +528,12 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     });
   }
 
-  const relationAttributes = model.fields
+  const relationAttributes = Object.values(model.fields)
     .map((field) => ({
       field,
       relation: getAttribute(field.attributes, 'relation'),
     }))
-    .filter((entry): entry is { field: CstFieldView; relation: CstAttributeView } =>
+    .filter((entry): entry is { field: FieldSymbol; relation: ResolvedAttribute } =>
       Boolean(entry.relation),
     );
   const uniqueConstraints: UniqueConstraintNode[] = resolvedFields
@@ -617,9 +614,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         });
         continue;
       }
-      const nullableFieldName = fieldNames.find(
-        (name) => model.fields.find((f) => f.name === name)?.optional === true,
-      );
+      const nullableFieldName = fieldNames.find((name) => model.fields[name]?.optional === true);
       if (nullableFieldName !== undefined) {
         diagnostics.push({
           code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
@@ -1143,7 +1138,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
 }
 
 interface BuildValueObjectsInput {
-  readonly compositeTypes: readonly CstCompositeTypeView[];
+  readonly compositeTypes: readonly CompositeTypeSymbol[];
   readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
@@ -1173,7 +1168,7 @@ function buildValueObjects(input: BuildValueObjectsInput): Record<string, Contra
 
   for (const compositeType of compositeTypes) {
     const fields: Record<string, ContractField> = {};
-    for (const field of compositeType.fields) {
+    for (const field of Object.values(compositeType.fields)) {
       if (compositeTypeNames.has(field.typeName)) {
         const result: ContractField = {
           type: { kind: 'valueObject', name: field.typeName },
@@ -1269,7 +1264,7 @@ type BaseDeclaration = {
 };
 
 function collectPolymorphismDeclarations(
-  models: readonly CstModelView[],
+  models: readonly ModelSymbol[],
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
 ): {
@@ -1292,7 +1287,7 @@ function collectPolymorphismDeclarations(
           });
           continue;
         }
-        const discField = model.fields.find((f) => f.name === fieldName);
+        const discField = model.fields[fieldName];
         if (discField && discField.typeName !== 'String') {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
@@ -1709,12 +1704,15 @@ export function interpretPslDocumentToSqlContract(
   // Per-scope namespace resolution: the symbol table's top-level scope maps to
   // the legacy `__unspecified__` bucket; each named `NamespaceSymbol` maps to
   // its name (and `unbound` to the late-binding sentinel) via
-  // `resolveNamespaceIdForSqlTarget`. Build the model/composite views directly
-  // from the symbol-table entries + their CST `.node`.
-  const models: CstModelView[] = [];
+  // `resolveNamespaceIdForSqlTarget`. The symbol-table entries already carry the
+  // resolved read-set (type split, attributes, span) and any
+  // `PSL_INVALID_QUALIFIED_TYPE` diagnostic (emitted by `buildSymbolTable`, seeded
+  // into `diagnostics` via the provider), so the interpreter consumes them
+  // directly — no view-build pass.
+  const models: ModelSymbol[] = [];
   const modelEntries: ModelNamespaceEntry[] = [];
   const modelNamespaceIds = new Map<string, string>();
-  const compositeTypes: CstCompositeTypeView[] = [];
+  const compositeTypes: CompositeTypeSymbol[] = [];
 
   const collectScope = (
     bucketName: string,
@@ -1725,18 +1723,15 @@ export function interpretPslDocumentToSqlContract(
       bucketName,
       targetId: input.target.targetId,
     });
-    for (const modelSymbol of scopeModels) {
-      const model = buildModelView(modelSymbol, sourceFile, sourceId, diagnostics);
+    for (const model of scopeModels) {
       models.push(model);
       modelEntries.push({ model, namespaceId: resolvedNamespaceId });
       if (resolvedNamespaceId !== undefined) {
         modelNamespaceIds.set(model.name, resolvedNamespaceId);
       }
     }
-    for (const compositeTypeSymbol of scopeCompositeTypes) {
-      compositeTypes.push(
-        buildCompositeTypeView(compositeTypeSymbol, sourceFile, sourceId, diagnostics),
-      );
+    for (const compositeType of scopeCompositeTypes) {
+      compositeTypes.push(compositeType);
     }
   };
 
@@ -1836,18 +1831,15 @@ export function interpretPslDocumentToSqlContract(
 
   // The named-type re-union: the symbol table splits `types { … }` bindings into
   // top-level scalars (base type in `scalarTypes`) and type aliases. Re-union
-  // them here as the resolver's input; `buildNamedTypeView` carries the
-  // `isConstructor` discriminant from the CST annotation.
-  const namedTypeSymbols: readonly (ScalarSymbol | TypeAliasSymbol)[] = [
+  // them here as the resolver's input; each symbol carries the resolved binding
+  // shape (`baseType` / `typeConstructor` + the `isConstructor` discriminant).
+  const namedTypeSymbols: readonly NamedTypeSymbol[] = [
     ...Object.values(topLevel.scalars),
     ...Object.values(topLevel.typeAliases),
   ];
-  const namedTypeDeclarationViews: CstNamedTypeView[] = namedTypeSymbols.map((symbol) =>
-    buildNamedTypeView(symbol, sourceFile),
-  );
 
   const namedTypeResult = resolveNamedTypeDeclarations({
-    declarations: namedTypeDeclarationViews,
+    declarations: namedTypeSymbols,
     sourceId,
     enumTypeDescriptors: allEnumTypeDescriptors,
     scalarTypeDescriptors: input.scalarTypeDescriptors,

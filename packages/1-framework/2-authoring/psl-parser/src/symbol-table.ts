@@ -1,5 +1,7 @@
+import type { PslSpan } from '@prisma-next/framework-components/psl-ast';
 import type { ParseDiagnostic } from './parse';
 import {
+  nodePslSpan,
   type ResolvedAttribute,
   type ResolvedTypeConstructorCall,
   readResolvedAttributes,
@@ -52,6 +54,7 @@ export interface NamespaceSymbol {
   readonly kind: 'namespace';
   readonly name: string;
   readonly node: NamespaceDeclarationAst;
+  readonly span: PslSpan;
   readonly models: Record<string, ModelSymbol>;
   readonly compositeTypes: Record<string, CompositeTypeSymbol>;
   readonly blocks: Record<string, BlockSymbol>;
@@ -61,6 +64,7 @@ export interface ModelSymbol {
   readonly kind: 'model';
   readonly name: string;
   readonly node: ModelDeclarationAst;
+  readonly span: PslSpan;
   readonly fields: Record<string, FieldSymbol>;
   readonly attributes: readonly ResolvedAttribute[];
 }
@@ -69,6 +73,7 @@ export interface CompositeTypeSymbol {
   readonly kind: 'compositeType';
   readonly name: string;
   readonly node: CompositeTypeDeclarationAst;
+  readonly span: PslSpan;
   readonly fields: Record<string, FieldSymbol>;
   readonly attributes: readonly ResolvedAttribute[];
 }
@@ -78,6 +83,7 @@ export interface BlockSymbol {
   readonly name: string;
   readonly keyword: string;
   readonly node: GenericBlockDeclarationAst;
+  readonly span: PslSpan;
 }
 
 /**
@@ -97,18 +103,21 @@ export interface ScalarSymbol extends ResolvedNamedTypeBinding {
   readonly kind: 'scalar';
   readonly name: string;
   readonly node: NamedTypeDeclarationAst;
+  readonly span: PslSpan;
 }
 
 export interface TypeAliasSymbol extends ResolvedNamedTypeBinding {
   readonly kind: 'typeAlias';
   readonly name: string;
   readonly node: NamedTypeDeclarationAst;
+  readonly span: PslSpan;
 }
 
 export interface FieldSymbol {
   readonly kind: 'field';
   readonly name: string;
   readonly node: FieldDeclarationAst;
+  readonly span: PslSpan;
   readonly typeName: string;
   readonly typeNamespaceId?: string;
   readonly typeContractSpaceId?: string;
@@ -186,7 +195,7 @@ export function buildSymbolTable(options: BuildSymbolTableOptions): SymbolTableR
       }
     } else if (declaration instanceof GenericBlockDeclarationAst) {
       const name = claim(topLevelNames, declaration.name());
-      if (name !== undefined) blocks[name] = buildBlock(name, declaration);
+      if (name !== undefined) blocks[name] = buildBlock(name, declaration, sourceFile);
     } else if (declaration instanceof NamespaceDeclarationAst) {
       const name = claim(topLevelNames, declaration.name());
       if (name !== undefined) {
@@ -197,10 +206,11 @@ export function buildSymbolTable(options: BuildSymbolTableOptions): SymbolTableR
         const name = claim(topLevelNames, binding.name());
         if (name === undefined) continue;
         const resolved = resolveNamedTypeBinding(binding, sourceFile);
+        const span = nodePslSpan(binding.syntax, sourceFile);
         if (isScalarBinding(binding, scalarSet)) {
-          scalars[name] = { kind: 'scalar', name, node: binding, ...resolved };
+          scalars[name] = { kind: 'scalar', name, node: binding, span, ...resolved };
         } else {
-          typeAliases[name] = { kind: 'typeAlias', name, node: binding, ...resolved };
+          typeAliases[name] = { kind: 'typeAlias', name, node: binding, span, ...resolved };
         }
       }
     }
@@ -222,6 +232,7 @@ function buildModel(
     kind: 'model',
     name,
     node,
+    span: nodePslSpan(node.syntax, sourceFile),
     fields: buildFields(name, node.fields(), sourceFile, diagnostics),
     attributes: readResolvedAttributes(node.attributes(), sourceFile),
   };
@@ -237,13 +248,24 @@ function buildCompositeType(
     kind: 'compositeType',
     name,
     node,
+    span: nodePslSpan(node.syntax, sourceFile),
     fields: buildFields(name, node.fields(), sourceFile, diagnostics),
     attributes: readResolvedAttributes(node.attributes(), sourceFile),
   };
 }
 
-function buildBlock(name: string, node: GenericBlockDeclarationAst): BlockSymbol {
-  return { kind: 'block', name, keyword: node.keyword()?.text ?? '', node };
+function buildBlock(
+  name: string,
+  node: GenericBlockDeclarationAst,
+  sourceFile: SourceFile,
+): BlockSymbol {
+  return {
+    kind: 'block',
+    name,
+    keyword: node.keyword()?.text ?? '',
+    node,
+    span: nodePslSpan(node.syntax, sourceFile),
+  };
 }
 
 function buildNamespace(
@@ -277,11 +299,19 @@ function buildNamespace(
     } else if (member instanceof CompositeTypeDeclarationAst) {
       compositeTypes[memberName] = buildCompositeType(memberName, member, sourceFile, diagnostics);
     } else if (member instanceof GenericBlockDeclarationAst) {
-      blocks[memberName] = buildBlock(memberName, member);
+      blocks[memberName] = buildBlock(memberName, member, sourceFile);
     }
   }
 
-  return { kind: 'namespace', name, node, models, compositeTypes, blocks };
+  return {
+    kind: 'namespace',
+    name,
+    node,
+    span: nodePslSpan(node.syntax, sourceFile),
+    models,
+    compositeTypes,
+    blocks,
+  };
 }
 
 function buildFields(
@@ -307,6 +337,7 @@ function buildField(
   diagnostics: ParseDiagnostic[],
 ): FieldSymbol {
   const attributes = readResolvedAttributes(node.attributes(), sourceFile);
+  const span = nodePslSpan(node.syntax, sourceFile);
   const annotation = resolveFieldTypeAnnotation(node, sourceFile);
 
   if (!annotation.ok) {
@@ -319,6 +350,7 @@ function buildField(
       kind: 'field',
       name,
       node,
+      span,
       typeName: annotation.path[annotation.path.length - 1] ?? '',
       optional: false,
       list: false,
@@ -335,6 +367,7 @@ function buildField(
     kind: 'field',
     name,
     node,
+    span,
     typeName: annotation.annotation.typeName ?? '',
     ...(annotation.annotation.typeNamespaceId !== undefined
       ? { typeNamespaceId: annotation.annotation.typeNamespaceId }

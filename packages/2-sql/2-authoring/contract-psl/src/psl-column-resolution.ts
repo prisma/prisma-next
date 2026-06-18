@@ -19,9 +19,14 @@ import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
-import type { PslSpan } from '@prisma-next/psl-parser';
+import type {
+  FieldSymbol,
+  PslSpan,
+  ResolvedAttribute,
+  ResolvedTypeConstructorCall,
+} from '@prisma-next/psl-parser';
 import { blindCast } from '@prisma-next/utils/casts';
-import type { CstAttributeView, CstFieldView, CstTypeConstructorCallView } from './cst-read-views';
+
 import {
   lowerDefaultFunctionWithRegistry,
   parseDefaultFunctionCall,
@@ -203,7 +208,7 @@ export function reportUnknownFieldPreset(input: {
 }
 
 export function instantiatePslTypeConstructor(input: {
-  readonly call: CstTypeConstructorCallView;
+  readonly call: ResolvedTypeConstructorCall;
   readonly descriptor: AuthoringTypeConstructorDescriptor;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
@@ -261,7 +266,7 @@ function pushUnsupportedTypeConstructorDiagnostic(input: {
 }
 
 export function resolvePslTypeConstructorDescriptor(input: {
-  readonly call: CstTypeConstructorCallView;
+  readonly call: ResolvedTypeConstructorCall;
   readonly authoringContributions: AuthoringContributions | undefined;
   readonly composedExtensions: ReadonlySet<string>;
   readonly familyId: string;
@@ -311,7 +316,7 @@ export function resolvePslTypeConstructorDescriptor(input: {
  * Symmetric with `instantiatePslTypeConstructor` but richer: a field preset can contribute `default`, `executionDefaults`, `id`, `unique`, and `nullable` in addition to the storage-type triple. PSL → typed-args coercion happens here (via `mapPslHelperArgs`) so that `instantiateAuthoringFieldPreset` itself stays typed-input-only and TS keeps its zero-runtime-validation cost.
  */
 export function instantiateFieldPreset(input: {
-  readonly call: CstTypeConstructorCallView;
+  readonly call: ResolvedTypeConstructorCall;
   readonly descriptor: AuthoringFieldPresetDescriptor;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
@@ -391,7 +396,7 @@ export type ResolveFieldTypeResult =
   | { readonly ok: false; readonly alreadyReported: boolean };
 
 export function resolveFieldTypeDescriptor(input: {
-  readonly field: CstFieldView;
+  readonly field: FieldSymbol;
   readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
@@ -403,11 +408,11 @@ export function resolveFieldTypeDescriptor(input: {
   readonly sourceId: string;
   readonly entityLabel: string;
 }): ResolveFieldTypeResult {
-  // The field's qualified type was malformed and already diagnosed at
-  // view-build time (PSL_INVALID_QUALIFIED_TYPE). Treat it as already-reported
+  // The field's qualified type was malformed and already diagnosed by
+  // `buildSymbolTable` (PSL_INVALID_QUALIFIED_TYPE). Treat it as already-reported
   // so resolution does not cascade a spurious PSL_UNSUPPORTED_FIELD_TYPE — the
   // legacy parser rejected such types before the interpreter ran.
-  if (input.field.typeAlreadyReported) {
+  if (input.field.malformedType) {
     return { ok: false, alreadyReported: true };
   }
   if (input.field.typeConstructor) {
@@ -591,7 +596,7 @@ export const NATIVE_TYPE_SPECS: Readonly<Record<string, NativeTypeSpec>> = {
 };
 
 export function resolveDbNativeTypeAttribute(input: {
-  readonly attribute: CstAttributeView;
+  readonly attribute: ResolvedAttribute;
   readonly baseType: string;
   readonly baseDescriptor: ColumnDescriptor;
   readonly diagnostics: ContractSourceDiagnostic[];
@@ -706,7 +711,7 @@ export function parseDefaultLiteralValue(expression: string): ColumnDefault | un
 export function lowerDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
-  readonly defaultAttribute: CstAttributeView;
+  readonly defaultAttribute: ResolvedAttribute;
   readonly columnDescriptor: ColumnDescriptor;
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly sourceId: string;
@@ -812,14 +817,11 @@ export function lowerDefaultForField(input: {
 }
 
 export function resolveColumnDescriptor(
-  field: CstFieldView,
+  field: FieldSymbol,
   enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
   namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
   scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
 ): ColumnDescriptor | undefined {
-  if (field.typeRef && namedTypeDescriptors.has(field.typeRef)) {
-    return namedTypeDescriptors.get(field.typeRef);
-  }
   if (namedTypeDescriptors.has(field.typeName)) {
     return namedTypeDescriptors.get(field.typeName);
   }

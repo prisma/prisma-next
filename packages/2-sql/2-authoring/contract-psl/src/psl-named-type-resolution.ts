@@ -1,7 +1,7 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import type { ResolvedAttribute, ScalarSymbol, TypeAliasSymbol } from '@prisma-next/psl-parser';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import type { CstAttributeView, CstNamedTypeView } from './cst-read-views';
 import {
   type ColumnDescriptor,
   checkUncomposedNamespace,
@@ -12,13 +12,15 @@ import {
   toNamedTypeFieldDescriptor,
 } from './psl-column-resolution';
 
+type NamedTypeSymbol = ScalarSymbol | TypeAliasSymbol;
+
 /**
  * Re-unioned named-type input: the symbol table's top-level scalars + type
- * aliases, each as a {@link CstNamedTypeView} discriminated by `isConstructor`
+ * aliases, each as a {@link NamedTypeSymbol} discriminated by `isConstructor`
  * (replacing the legacy `baseType` vs `typeConstructor` presence check).
  */
 export interface ResolveNamedTypeDeclarationsInput {
-  readonly declarations: readonly CstNamedTypeView[];
+  readonly declarations: readonly NamedTypeSymbol[];
   readonly sourceId: string;
   readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
@@ -30,7 +32,7 @@ export interface ResolveNamedTypeDeclarationsInput {
 }
 
 function validateNamedTypeAttributes(input: {
-  readonly declaration: CstNamedTypeView;
+  readonly declaration: NamedTypeSymbol;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly composedExtensions: ReadonlySet<string>;
@@ -39,7 +41,7 @@ function validateNamedTypeAttributes(input: {
   readonly familyId: string;
   readonly targetId: string;
 }): {
-  readonly dbNativeTypeAttribute: CstAttributeView | undefined;
+  readonly dbNativeTypeAttribute: ResolvedAttribute | undefined;
   readonly hasUnsupportedNamedTypeAttribute: boolean;
 } {
   const dbNativeTypeAttributes = input.allowDbNativeType

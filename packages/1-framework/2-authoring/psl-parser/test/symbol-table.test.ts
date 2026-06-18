@@ -261,6 +261,32 @@ describe('buildSymbolTable() — resolved field shape', () => {
     expect(mapAttr?.args[0]?.value).toBe('"full_name"');
   });
 
+  it('renders function-call, array-literal, and object-literal arg values verbatim', () => {
+    const result = build(
+      [
+        'model M {',
+        '  id String @default(uuid(7))',
+        '  @@index([firstName, lastName])',
+        '  @@index([title], options: { tokenizer: "ngram" })',
+        '}',
+      ].join('\n'),
+    );
+    const model = result.table.topLevel.models.M;
+
+    const fnArg = model?.fields.id?.attributes.find((a) => a.name === 'default')?.args[0];
+    expect(fnArg?.value).toBe('uuid(7)');
+
+    const arrayArg = model?.attributes[0]?.args[0];
+    expect(arrayArg).toMatchObject({ kind: 'positional', value: '[firstName, lastName]' });
+
+    const objectArg = model?.attributes[1]?.args.find((a) => a.name === 'options');
+    expect(objectArg).toMatchObject({
+      kind: 'named',
+      name: 'options',
+      value: '{ tokenizer: "ngram" }',
+    });
+  });
+
   it('renders named attribute args with their argument name', () => {
     const result = build(
       [
@@ -277,6 +303,31 @@ describe('buildSymbolTable() — resolved field shape', () => {
       expect.objectContaining({ kind: 'named', name: 'fields', value: '[authorId]' }),
       expect.objectContaining({ kind: 'named', name: 'references', value: '[id]' }),
     ]);
+  });
+});
+
+describe('buildSymbolTable() — resolved declaration spans', () => {
+  it('carries each symbol span as the node span (relocated from the deleted view)', () => {
+    const result = build(
+      ['model User {', '  id Int', '}', 'type Address {', '  street String', '}'].join('\n'),
+    );
+    const { sourceFile } = parse(
+      ['model User {', '  id Int', '}', 'type Address {', '  street String', '}'].join('\n'),
+    );
+
+    const model = result.table.topLevel.models.User;
+    const expectedModelStart = sourceFile.offsetAt({ line: 0, character: 0 });
+    expect(model?.span.start.offset).toBe(expectedModelStart);
+    expect(model?.span.start.line).toBe(1); // 1-based PslSpan
+    expect(model?.span.start.column).toBe(1);
+
+    const field = model?.fields.id;
+    expect(field?.span.start.line).toBe(2);
+    expect(field?.span.start.column).toBe(3);
+
+    const composite = result.table.topLevel.compositeTypes.Address;
+    expect(composite?.span.start.line).toBe(4);
+    expect(composite?.span.start.column).toBe(1);
   });
 });
 

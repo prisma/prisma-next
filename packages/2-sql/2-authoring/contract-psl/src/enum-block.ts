@@ -1,8 +1,7 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type { PslSpan } from '@prisma-next/psl-parser';
+import { nodePslSpan, type PslSpan, readResolvedAttribute } from '@prisma-next/psl-parser';
 import type { GenericBlockDeclarationAst, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { printSyntax } from '@prisma-next/psl-parser/syntax';
-import { nodePslSpan, rangeToPslSpan, readAttribute } from './cst-read';
 
 /**
  * Package-local structural mirror of the extension-block shape the SQL enum
@@ -58,7 +57,7 @@ export function reconstructExtensionBlock(
   const blockName = node.name()?.name() ?? '';
   const blockAttributes: ReconstructedBlockAttribute[] = [];
   for (const attribute of node.attributes()) {
-    const read = readAttribute(attribute, sourceFile);
+    const read = readResolvedAttribute(attribute, sourceFile);
     blockAttributes.push({
       name: read.name,
       args: read.args
@@ -66,9 +65,9 @@ export function reconstructExtensionBlock(
         .map((arg) => ({
           kind: 'positional' as const,
           value: arg.value,
-          span: rangeToPslSpan(arg.range, sourceFile),
+          span: arg.span,
         })),
-      span: rangeToPslSpan(read.range, sourceFile),
+      span: read.span,
     });
   }
 

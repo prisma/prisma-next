@@ -5,14 +5,14 @@ import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { basename, extname } from 'pathe';
-import { rangeToPslSpan } from './cst-read';
+
 import { interpretPslDocumentToSqlContract } from './interpreter';
 import type { ColumnDescriptor } from './psl-column-resolution';
 

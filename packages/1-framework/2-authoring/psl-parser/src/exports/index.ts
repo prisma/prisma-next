@@ -42,6 +42,20 @@ export {
   validateExtensionBlockFromSymbol,
 } from '../extension-block';
 export type {
+  MalformedQualifiedType,
+  ResolvedTypeAnnotation,
+  ResolveTypeAnnotationResult,
+} from '../resolve';
+export {
+  keywordPslSpan,
+  nodePslSpan,
+  rangeToPslSpan,
+  readResolvedAttribute,
+  readResolvedAttributes,
+  readResolvedConstructorCall,
+  resolveFieldTypeAnnotation,
+} from '../resolve';
+export type {
   BlockSymbol,
   BuildSymbolTableOptions,
   CompositeTypeSymbol,
