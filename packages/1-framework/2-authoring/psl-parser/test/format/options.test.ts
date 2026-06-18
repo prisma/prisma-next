@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { format } from '../../src/exports/format';
+import { format, PslFormatError } from '../../src/exports/format';
 
 describe('format indent option', () => {
   it('defaults to two spaces', () => {
@@ -56,5 +56,28 @@ describe('format newline option', () => {
   it('rejects an unknown newline value', () => {
     // @ts-expect-error invalid newline value rejected at runtime
     expect(() => format('model User {\nid Int\n}', { newline: 'CR' })).toThrow();
+  });
+});
+
+describe('format refuse-on-diagnostics', () => {
+  it('throws PslFormatError carrying diagnostics on diagnostic-bearing input', () => {
+    expect(() => format('model {\n}')).toThrow(PslFormatError);
+  });
+
+  it('exposes the parser diagnostics on the thrown error', () => {
+    let thrown: unknown;
+    try {
+      format('model {\n}');
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(PslFormatError);
+    const error = thrown as PslFormatError;
+    expect(error.diagnostics.length).toBeGreaterThan(0);
+    expect(error.diagnostics[0]?.message).toBeTypeOf('string');
+  });
+
+  it('does not emit best-effort output for malformed input', () => {
+    expect(() => format('model User {\nid Int @\n}')).toThrow(PslFormatError);
   });
 });
