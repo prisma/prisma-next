@@ -130,7 +130,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         // interpreter (rather than short-circuiting): it walks the recovered
         // document, appends its own diagnostics, and its post-walk dedupe gate
         // emits the deduped parse + symbol-table + interpreter union in one run
-        // — matching the legacy `parsePslDocument` combined-set behaviour.
+        // — matching the legacy combined-set parser behaviour.
         const seedDiagnostics = [
           ...mapParseDiagnostics(parseDiagnostics, sourceFile, schemaPath),
           ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),

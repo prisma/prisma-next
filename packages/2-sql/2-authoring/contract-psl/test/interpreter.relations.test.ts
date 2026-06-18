@@ -1,5 +1,4 @@
 import { crossRef } from '@prisma-next/contract/types';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
@@ -7,6 +6,7 @@ import {
   modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  symbolTableInputFromParseArgs,
 } from './fixtures';
 import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
 import { unboundTables } from './unbound-tables';
@@ -21,7 +21,7 @@ const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults(
 
 describe('interpretPslDocumentToSqlContract relations', () => {
   it('accepts relation navigation list fields and emits relation metadata for both sides', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
   posts Post[]
@@ -36,7 +36,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -73,7 +73,7 @@ model Post {
   });
 
   it('matches named backrelations using positional and named relation forms', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
   authored Post[] @relation("AuthoredPosts")
@@ -91,7 +91,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -121,7 +121,7 @@ model Post {
   });
 
   it('matches backrelations with unrelated FK metadata present', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
   posts Post[]
@@ -146,7 +146,7 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -174,7 +174,7 @@ model Member {
   });
 
   it('matches self-referential backrelations when disambiguated by relation name', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Employee {
   id Int @id
   managerId Int?
@@ -185,7 +185,7 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -215,7 +215,7 @@ model Member {
   });
 
   it('returns diagnostics for ambiguous self-referential backrelations without a relation name', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Employee {
   id Int @id
   managerId Int?
@@ -228,7 +228,7 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -245,7 +245,7 @@ model Member {
   });
 
   it('accepts Prisma relation map argument and records foreign key constraint name', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Team {
   id Int @id @map("team_id")
   members Member[]
@@ -263,7 +263,7 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -282,7 +282,7 @@ model Member {
   });
 
   it('returns diagnostics for unsupported referential action tokens', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
 }
@@ -298,7 +298,7 @@ model Post {
 
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -317,7 +317,7 @@ model Post {
   });
 
   it('returns diagnostics when relation fields reference unknown local fields', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
 }
@@ -333,7 +333,7 @@ model Post {
 
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -353,7 +353,7 @@ model Post {
   });
 
   it('returns diagnostics when relation references target unknown fields', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
 }
@@ -369,7 +369,7 @@ model Post {
 
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -389,7 +389,7 @@ model Post {
   });
 
   it('returns diagnostics when relation omits required fields argument', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
 }
@@ -405,7 +405,7 @@ model Post {
 
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 

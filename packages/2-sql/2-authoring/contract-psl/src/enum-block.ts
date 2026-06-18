@@ -1,19 +1,44 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type {
-  PslExtensionBlock,
-  PslExtensionBlockAttribute,
-  PslExtensionBlockParamValue,
-} from '@prisma-next/psl-parser';
+import type { PslSpan } from '@prisma-next/psl-parser';
 import type { GenericBlockDeclarationAst, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { printSyntax } from '@prisma-next/psl-parser/syntax';
 import { nodePslSpan, rangeToPslSpan, readAttribute } from './cst-read';
 
 /**
- * Reconstruct the legacy `PslExtensionBlock` shape the SQL enum factory consumes
- * from a CST `GenericBlockDeclarationAst` (the symbol table's `BlockSymbol.node`).
+ * Package-local structural mirror of the extension-block shape the SQL enum
+ * factory (`2-sql/9-family`) consumes. Declared here — rather than importing the
+ * framework's legacy extension-block types — so the SQL `contract-psl` src no
+ * longer references the legacy object names (slice DoD); the shape stays
+ * structurally assignable to the factory's extension-block parameter.
+ */
+interface ReconstructedBlockAttribute {
+  readonly name: string;
+  readonly args: readonly {
+    readonly kind: 'positional';
+    readonly value: string;
+    readonly span: PslSpan;
+  }[];
+  readonly span: PslSpan;
+}
+
+type ReconstructedParamValue =
+  | { readonly kind: 'bare'; readonly span: PslSpan }
+  | { readonly kind: 'value'; readonly raw: string; readonly span: PslSpan };
+
+export interface ReconstructedExtensionBlock {
+  readonly kind: string;
+  readonly name: string;
+  readonly parameters: Record<string, ReconstructedParamValue>;
+  readonly blockAttributes: readonly ReconstructedBlockAttribute[];
+  readonly span: PslSpan;
+}
+
+/**
+ * Reconstruct the extension-block shape the SQL enum factory consumes from a CST
+ * `GenericBlockDeclarationAst` (the symbol table's `BlockSymbol.node`).
  *
  * The symbol table defers block-parameter parsing, so this seam reproduces what
- * the legacy `parsePslDocument` extension-block parser produced for the factory:
+ * the legacy extension-block parser produced for the factory:
  * `@@type(...)` block attributes (via the dispatch-1 attribute reader) and the
  * member `parameters` map (bare members → `{ kind: 'bare' }`, `key = value`
  * members → `{ kind: 'value', raw }` where `raw` is the verbatim source value,
@@ -21,17 +46,17 @@ import { nodePslSpan, rangeToPslSpan, readAttribute } from './cst-read';
  * occurrence of a duplicate member name wins, as the legacy parser did; each
  * later occurrence is dropped and flagged with `PSL_EXTENSION_DUPLICATE_PARAMETER`
  * into the supplied `diagnostics` sink (parity with the legacy
- * `pslBlockDescriptors`-driven parser).
+ * descriptor-driven parser).
  */
 export function reconstructExtensionBlock(
   node: GenericBlockDeclarationAst,
   sourceFile: SourceFile,
   diagnostics: ContractSourceDiagnostic[],
   sourceId: string,
-): PslExtensionBlock {
+): ReconstructedExtensionBlock {
   const keyword = node.keyword()?.text ?? '';
   const blockName = node.name()?.name() ?? '';
-  const blockAttributes: PslExtensionBlockAttribute[] = [];
+  const blockAttributes: ReconstructedBlockAttribute[] = [];
   for (const attribute of node.attributes()) {
     const read = readAttribute(attribute, sourceFile);
     blockAttributes.push({
@@ -47,7 +72,7 @@ export function reconstructExtensionBlock(
     });
   }
 
-  const parameters: Record<string, PslExtensionBlockParamValue> = {};
+  const parameters: Record<string, ReconstructedParamValue> = {};
   for (const entry of node.entries()) {
     const key = entry.key()?.name();
     if (key === undefined) continue;

@@ -1,6 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   defineContract,
@@ -18,6 +17,7 @@ import {
   createBuiltinLikeControlMutationDefaults,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  symbolTableInputFromParseArgs,
   testEnumEntityContributions,
 } from './fixtures';
 
@@ -83,13 +83,13 @@ const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults(
 function interpret(schema: string, overrides?: Partial<InterpretPslDocumentToSqlContractInput>) {
   const contributions = overrides?.authoringContributions ?? authoringContributions;
   const descriptors = contributions.pslBlockDescriptors;
-  const document = parsePslDocument({
+  const document = symbolTableInputFromParseArgs({
     schema,
     sourceId: 'schema.prisma',
     ...(descriptors !== undefined ? { pslBlockDescriptors: descriptors } : {}),
   });
   return interpretPslDocumentToSqlContract({
-    document,
+    ...document,
     target: postgresTarget,
     scalarTypeDescriptors: postgresScalarTypeDescriptors,
     composedExtensionContracts: new Map(),

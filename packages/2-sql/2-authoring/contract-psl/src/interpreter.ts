@@ -134,8 +134,8 @@ export interface InterpretPslDocumentToSqlContractInput {
    * Diagnostics produced before interpretation (the provider's combined
    * `parse` + `buildSymbolTable` set), seeded into the interpreter's collection
    * so the post-walk dedupe gate emits the parse + symbol-table + interpreter
-   * union in one run — matching the legacy `parsePslDocument` combined-set
-   * behaviour rather than failing before interpreting.
+   * union in one run — matching the legacy combined-set parser behaviour rather
+   * than failing before interpreting.
    */
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
 }

@@ -315,6 +315,26 @@ export function buildSymbolTableInput(
   return { symbolTable: table, sourceFile, sourceId };
 }
 
+/**
+ * Object-form shim mirroring the legacy `parsePslDocument({ schema, sourceId,
+ * pslBlockDescriptors? })` call shape, so the dispatch-6 fan-out can mechanically
+ * swap `parsePslDocument(` → `symbolTableInputFromParseArgs(` and spread the
+ * result (`{ ...document, ... }`) into the migrated interpreter input. The
+ * `pslBlockDescriptors` field is accepted-and-ignored (the CST parser no longer
+ * consumes it; the scalar-name key set drives `types {}` scalar-vs-alias
+ * classification, identical across the postgres/sqlite descriptor maps).
+ */
+export function symbolTableInputFromParseArgs(args: {
+  readonly schema: string;
+  readonly sourceId?: string;
+  readonly pslBlockDescriptors?: unknown;
+}): { symbolTable: SymbolTable; sourceFile: SourceFile; sourceId: string } {
+  return buildSymbolTableInput(
+    args.schema,
+    args.sourceId !== undefined ? { sourceId: args.sourceId } : undefined,
+  );
+}
+
 export const sqliteScalarTypeDescriptors = new Map([
   ['String', { codecId: 'sqlite/text@1', nativeType: 'text' }],
   ['Boolean', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
