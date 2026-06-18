@@ -337,6 +337,7 @@ describe('role + policy round-trip', () => {
                   name: 'posts_select_own_a1b2c3d4',
                   prefix: 'posts_select_own',
                   tableName: 'posts',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
                   operation: 'select',
                   roles: ['app_user'],
                   using: 'user_id = current_user_id()',
@@ -347,6 +348,7 @@ describe('role + policy round-trip', () => {
                   name: 'posts_insert_restrictive_b5c6d7e8',
                   prefix: 'posts_insert_restrictive',
                   tableName: 'posts',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
                   operation: 'insert',
                   roles: ['app_user', 'admin'],
                   using: 'user_id = current_user_id()',
@@ -477,6 +479,7 @@ describe('role + policy round-trip', () => {
                   name: 'bad_policy_a1b2c3d4',
                   prefix: 'bad_policy',
                   tableName: 'posts',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
                   operation: 'truncate', // invalid — not in the closed set
                   roles: ['app_user'],
                   permissive: true,
@@ -543,6 +546,7 @@ describe('role + policy round-trip', () => {
                   name: 'bad_policy_a1b2c3d4',
                   prefix: 'bad_policy',
                   tableName: 'posts',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
                   operation: 'select',
                   roles: ['app_user'],
                   // permissive missing
