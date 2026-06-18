@@ -7,7 +7,7 @@
 
 ## At a glance
 
-Four slices. Slice 1 makes **SELECT policies dependable end-to-end** — full lifecycle (create, change, remove), drift makes `db verify` fail, proven in the Supabase example app. Slice 2 makes **drift handling correct per variation** and introduces the **policy→role traversal** that seeds the dependency graph. Slice 3 extends everything to **the other policy types**. Slice 4 adds the **TypeScript authoring surface** with PSL parity.
+Slice 1 makes **SELECT policies dependable end-to-end** — full lifecycle (create, change, remove), drift makes `db verify` fail, proven in the Supabase example app. Slice 1.5 (`entity-kind-migration-seam`), discovered during slice 1, builds the **generic two-sided derivation seam** so a target-contributed entity kind works on every migration command — notably `migration plan`, which slice 1 defers with a fail-loud stopgap. Slice 2 makes **drift handling correct per variation** and introduces the **policy→role traversal** that seeds the dependency graph. Slice 3 extends everything to **the other policy types**. Slice 4 adds the **TypeScript authoring surface** with PSL parity.
 
 RLS rides the generic schema-diff architecture (unchanged — see § Architecture decisions): generic differ + `{coordinate, outcome}` issues; zero RLS symbols in framework/SQL-family; content-addressed wire names; side-by-side with the untouched legacy relational verifier/planner. The relational port and dependency-aware planner ordering remain independent follow-on projects.
 
@@ -32,6 +32,17 @@ Already landed on the branch: the architecture (generic differ, content-addresse
 5. Review follow-ups in scope: F03 (role-name rendering shim hardening or input constraint), F05 (a parsed extension block with no registered factory must not be silently dropped), F07 (`rlsEnabledByTable` keyed by bare table name — cross-schema collision), the structural anti-leak test (assert no RLS tokens in framework/SQL-core, since `lint:deps` can't catch this class).
 
 - **DoD (operator-observable):** declare a SELECT policy in the example app → migrate → only permitted rows visible under the role; edit the predicate → migrate → **exactly one policy active**, with the new predicate (the old version dropped via same-prefix replace); remove it from the contract → `db verify` reports the now-orphaned DB policy as drift (exits non-zero naming it) — auto-drop-on-removal is slice 2; drop/alter it out-of-band → `prisma db verify` exits non-zero naming the policy. Workspace typecheck green; all suites green.
+
+### Slice 1.5 — `entity-kind-migration-seam` · _(Linear: see § Linear sync)_
+
+**Status: ⬜ not started.** Design seed: [`specs/extension-migration-participation.md`](specs/extension-migration-participation.md).
+
+Foundational seam, discovered during slice 1. Today a target-contributed entity kind only half-participates in migrations: the live-database derivation is hardcoded per target, and the contract→schema derivation drops target-specific objects entirely. The consequence is that `migration plan` cannot emit RLS at all — slice 1 ships a fail-loud stopgap (it refuses to plan when the contract declares policies). This slice builds the generic seam so a contributed kind works on **every** command.
+
+- **First task: complete the design + ADRs** from the seed doc — the schema IR as the single diff substrate; the diff-engine model (coordinate/identity, equality, nesting, cross-kind dependency ordering); the two-sided **derivation contribution** API (per kind: identity/equality + project-from-contract + project-from-database + planner + dependencies), registered like authoring contributions are.
+- Replace the hardcoded Postgres introspection of policies/roles with a registered **project-from-database**; add **project-from-contract** so a contract-derived schema IR carries policies/roles.
+- Make the planner **provenance-agnostic**: remove the `migration plan` fail-loud stopgap and the `isPostgresSchemaIR` command-awareness; `planRlsDiff` collapses to `diffNodes(from, to)`.
+- **DoD (operator-observable):** `migration plan` on a contract with a SELECT policy emits `CREATE POLICY` in the generated migration; both diff sides are homogeneous schema IRs (no contract fed directly); RLS continues to work on `db init` / `db update` / `db verify`.
 
 ### Slice 2 — `drift-handled-correctly` · [TML-2869](https://linear.app/prisma-company/issue/TML-2869)
 
