@@ -9,12 +9,10 @@ import type {
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
 import {
-  flatPslModels,
   makePslNamespace,
   makePslNamespaceEntries,
   UNSPECIFIED_PSL_NAMESPACE_ID,
 } from '@prisma-next/framework-components/psl-ast';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { printPslFromAst } from '../src/print-psl';
 
@@ -495,110 +493,243 @@ describe('printPslFromAst', () => {
     expect(() => printPslFromAst(ast)).not.toThrow();
   });
 
-  it('preserves @map values containing PSL escape sequences across parse → print round-trip', () => {
+  it('preserves @map values containing PSL escape sequences on print (no double-escape)', () => {
     // Regression for double-escape in `getPositionalStringArg`. The parser stores
     // a quoted-literal argument with PSL escape sequences (`\\`, `\"`, `\n`,
-    // `\r`) intact; we must decode them once on extraction so that the printer's
-    // `escapePslString` does not re-escape them on output.
-    const source = `model Doc {
-  id   Int    @id
-  body String @map("with \\"quote\\" and \\\\backslash and \\nnewline")
-}
-`;
-    const parsed1 = parsePslDocument({ schema: source, sourceId: 'r' });
-    expect(parsed1.ok).toBe(true);
-    const printed = printPslFromAst(parsed1.ast);
-    const parsed2 = parsePslDocument({ schema: printed, sourceId: 'r2' });
-    expect(parsed2.ok).toBe(true);
-
-    const findMap = (ast: typeof parsed1.ast): string | undefined => {
-      const model = flatPslModels(ast).find((m) => m.name === 'Doc');
-      const field = model?.fields.find((f) => f.name === 'body');
-      const mapAttr = field?.attributes.find((a) => a.name === 'map' && a.target === 'field');
-      const positional = mapAttr?.args.find((a) => a.kind === 'positional');
-      return positional?.value;
+    // `\r`) intact; the printer must decode them once on extraction so that
+    // `escapePslString` does not re-escape them on output. The AST below mirrors
+    // the parser-stored form (escapes intact, quotes included); the assertion is
+    // that the printed text carries each escape exactly once.
+    const models: PslModel[] = [
+      {
+        kind: 'model',
+        name: 'Doc',
+        fields: [
+          {
+            kind: 'field',
+            name: 'id',
+            typeName: 'Int',
+            optional: false,
+            list: false,
+            attributes: [attr('field', 'id', [], 0)],
+            span: span(0),
+          },
+          {
+            kind: 'field',
+            name: 'body',
+            typeName: 'String',
+            optional: false,
+            list: false,
+            attributes: [
+              attr(
+                'field',
+                'map',
+                [
+                  {
+                    kind: 'positional',
+                    value: '"with \\"quote\\" and \\\\backslash and \\nnewline"',
+                    span: span(1),
+                  },
+                ],
+                2,
+              ),
+            ],
+            span: span(0),
+          },
+        ],
+        attributes: [],
+        span: span(0),
+      },
+    ];
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], 0)],
+      span: span(0),
     };
-
-    expect(findMap(parsed2.ast)).toBe(findMap(parsed1.ast));
+    const printed = printPslFromAst(ast);
+    expect(printed).toContain('@map("with \\"quote\\" and \\\\backslash and \\nnewline")');
   });
 
-  it('parser → printer → parser round-trip for a small schema', () => {
-    const source = `// use prisma-next
-// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
-
-model User {
-  id    Int    @id
-  email String @unique
-  posts Post[]
-}
-
-model Post {
-  id       Int    @id
-  authorId Int
-  author   User   @relation(fields: [authorId], references: [id])
-}`;
-    const parsed1 = parsePslDocument({ schema: source, sourceId: 'r' });
-    expect(parsed1.ok).toBe(true);
-    const printed = printPslFromAst(parsed1.ast);
-    const parsed2 = parsePslDocument({ schema: printed, sourceId: 'r2' });
-    expect(parsed2.ok).toBe(true);
-    const models1 = flatPslModels(parsed1.ast);
-    const models2 = flatPslModels(parsed2.ast);
-    expect(models2.length).toBe(models1.length);
-    expect(models2.map((m) => m.name).sort()).toEqual(models1.map((m) => m.name).sort());
+  it('prints a small two-model schema with a relation', () => {
+    const models: PslModel[] = [
+      {
+        kind: 'model',
+        name: 'User',
+        fields: [
+          {
+            kind: 'field',
+            name: 'id',
+            typeName: 'Int',
+            optional: false,
+            list: false,
+            attributes: [attr('field', 'id', [], 0)],
+            span: span(0),
+          },
+          {
+            kind: 'field',
+            name: 'email',
+            typeName: 'String',
+            optional: false,
+            list: false,
+            attributes: [attr('field', 'unique', [], 0)],
+            span: span(0),
+          },
+          {
+            kind: 'field',
+            name: 'posts',
+            typeName: 'Post',
+            optional: false,
+            list: true,
+            attributes: [],
+            span: span(0),
+          },
+        ],
+        attributes: [],
+        span: span(0),
+      },
+      {
+        kind: 'model',
+        name: 'Post',
+        fields: [
+          {
+            kind: 'field',
+            name: 'id',
+            typeName: 'Int',
+            optional: false,
+            list: false,
+            attributes: [attr('field', 'id', [], 0)],
+            span: span(0),
+          },
+          {
+            kind: 'field',
+            name: 'authorId',
+            typeName: 'Int',
+            optional: false,
+            list: false,
+            attributes: [],
+            span: span(0),
+          },
+          {
+            kind: 'field',
+            name: 'author',
+            typeName: 'User',
+            optional: false,
+            list: false,
+            attributes: [
+              attr(
+                'field',
+                'relation',
+                [
+                  { kind: 'named', name: 'fields', value: '[authorId]', span: span(1) },
+                  { kind: 'named', name: 'references', value: '[id]', span: span(2) },
+                ],
+                3,
+              ),
+            ],
+            span: span(0),
+          },
+        ],
+        attributes: [],
+        span: span(0),
+      },
+    ];
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], 0)],
+      span: span(0),
+    };
+    const printed = printPslFromAst(ast);
+    expect(printed).toContain('model User {');
+    expect(printed).toContain('model Post {');
+    expect(printed).toContain('posts Post[]');
+    expect(printed).toContain('@relation(fields: [authorId], references: [id])');
   });
 
   describe('namespace blocks', () => {
+    function idModel(name: string): PslModel {
+      return {
+        kind: 'model',
+        name,
+        fields: [
+          {
+            kind: 'field',
+            name: 'id',
+            typeName: 'Int',
+            optional: false,
+            list: false,
+            attributes: [attr('field', 'id', [], 0)],
+            span: span(0),
+          },
+        ],
+        attributes: [],
+        span: span(0),
+      };
+    }
+
     it('emits top-level declarations from the synthesised __unspecified__ bucket without a namespace wrapper', () => {
-      const source = `model A {
-  id Int @id
-}
-`;
-      const parsed = parsePslDocument({ schema: source, sourceId: 'r' });
-      expect(parsed.ok).toBe(true);
-      const printed = printPslFromAst(parsed.ast);
+      const ast: PslDocumentAst = {
+        kind: 'document',
+        sourceId: 't',
+        namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, [idModel('A')], [], 0)],
+        span: span(0),
+      };
+      const printed = printPslFromAst(ast);
       expect(printed).not.toMatch(/namespace\s+\w+\s*\{/);
       expect(printed).toContain('model A {');
     });
 
-    it('round-trips a mixed top-level + namespaced schema through parser → printer → parser', () => {
-      const source = `model TopLevel {
-  id Int @id
-}
-
-namespace auth {
-  model User {
-    id Int @id
-  }
-}
-`;
-      const parsed1 = parsePslDocument({ schema: source, sourceId: 'r' });
-      expect(parsed1.ok).toBe(true);
-      const printed = printPslFromAst(parsed1.ast);
-      const parsed2 = parsePslDocument({ schema: printed, sourceId: 'r2' });
-      expect(parsed2.ok).toBe(true);
-      expect(parsed2.ast.namespaces.map((ns) => ns.name).sort()).toEqual(
-        parsed1.ast.namespaces.map((ns) => ns.name).sort(),
-      );
-      expect(
-        flatPslModels(parsed2.ast)
-          .map((m) => m.name)
-          .sort(),
-      ).toEqual(
-        flatPslModels(parsed1.ast)
-          .map((m) => m.name)
-          .sort(),
-      );
+    it('prints a mixed top-level + namespaced schema with the top-level model unwrapped and the named namespace wrapped', () => {
+      const ast: PslDocumentAst = {
+        kind: 'document',
+        sourceId: 't',
+        namespaces: [
+          makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, [idModel('TopLevel')], [], 0),
+          makeNs('auth', [idModel('User')], [], 0),
+        ],
+        span: span(0),
+      };
+      const printed = printPslFromAst(ast);
+      // The top-level model is emitted without a namespace wrapper.
+      expect(printed).toMatch(/^model TopLevel \{/m);
+      // The named namespace wraps its model.
+      expect(printed).toContain('namespace auth {');
+      expect(printed).toMatch(/namespace auth \{[\s\S]*model User \{/);
     });
   });
 
   describe('namespace ordering and escape handling', () => {
     it('sorts non-unspecified namespaces alphabetically', () => {
-      const source =
-        'namespace billing {\n  model Invoice {\n    id Int @id\n  }\n}\n\nnamespace auth {\n  model User {\n    id Int @id\n  }\n}\n';
-      const parsed = parsePslDocument({ schema: source, sourceId: 't' });
-      expect(parsed.ok).toBe(true);
-      const printed = printPslFromAst(parsed.ast);
+      function idModel(name: string): PslModel {
+        return {
+          kind: 'model',
+          name,
+          fields: [
+            {
+              kind: 'field',
+              name: 'id',
+              typeName: 'Int',
+              optional: false,
+              list: false,
+              attributes: [attr('field', 'id', [], 0)],
+              span: span(0),
+            },
+          ],
+          attributes: [],
+          span: span(0),
+        };
+      }
+      const ast: PslDocumentAst = {
+        kind: 'document',
+        sourceId: 't',
+        namespaces: [
+          makeNs('billing', [idModel('Invoice')], [], 0),
+          makeNs('auth', [idModel('User')], [], 0),
+        ],
+        span: span(0),
+      };
+      const printed = printPslFromAst(ast);
       expect(printed.indexOf('namespace auth')).toBeLessThan(printed.indexOf('namespace billing'));
     });
   });
@@ -723,28 +854,73 @@ namespace auth {
       expect(printPslFromAst(ast)).toContain('balance Money(2)');
     });
 
-    it('parser → printer → parser round-trip for a cross-space colon-prefix field', () => {
-      // AC2: a field authored as `supabase:auth.User` must survive a full
-      // text→parse→print→text round-trip with the colon-prefix intact.
-      const source = `// use prisma-next
-// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
-
-model Profile {
-  id     Int             @id
-  userId Int
-  user   supabase:auth.User? @relation(fields: [userId], references: [id])
-}`;
-      const parsed1 = parsePslDocument({ schema: source, sourceId: 'r' });
-      expect(parsed1.ok).toBe(true);
-      const printed = printPslFromAst(parsed1.ast);
+    it('prints a cross-space colon-prefix relation field with the qualifier intact', () => {
+      // AC2: a field whose type is `supabase:auth.User` must render with the
+      // colon-prefix + namespace qualifier intact, alongside its @relation.
+      const ast: PslDocumentAst = {
+        kind: 'document',
+        sourceId: 't',
+        namespaces: [
+          makeNs(
+            UNSPECIFIED_PSL_NAMESPACE_ID,
+            [
+              {
+                kind: 'model',
+                name: 'Profile',
+                fields: [
+                  {
+                    kind: 'field',
+                    name: 'id',
+                    typeName: 'Int',
+                    optional: false,
+                    list: false,
+                    attributes: [attr('field', 'id', [], 0)],
+                    span: span(0),
+                  },
+                  {
+                    kind: 'field',
+                    name: 'userId',
+                    typeName: 'Int',
+                    optional: false,
+                    list: false,
+                    attributes: [],
+                    span: span(0),
+                  },
+                  {
+                    kind: 'field',
+                    name: 'user',
+                    typeName: 'User',
+                    typeNamespaceId: 'auth',
+                    typeContractSpaceId: 'supabase',
+                    optional: true,
+                    list: false,
+                    attributes: [
+                      attr(
+                        'field',
+                        'relation',
+                        [
+                          { kind: 'named', name: 'fields', value: '[userId]', span: span(1) },
+                          { kind: 'named', name: 'references', value: '[id]', span: span(2) },
+                        ],
+                        3,
+                      ),
+                    ],
+                    span: span(0),
+                  },
+                ],
+                attributes: [],
+                span: span(0),
+              },
+            ],
+            [],
+            0,
+          ),
+        ],
+        span: span(0),
+      };
+      const printed = printPslFromAst(ast);
       expect(printed).toContain('supabase:auth.User?');
-      const parsed2 = parsePslDocument({ schema: printed, sourceId: 'r2' });
-      expect(parsed2.ok).toBe(true);
-      const profile = flatPslModels(parsed2.ast).find((m) => m.name === 'Profile');
-      const userField = profile?.fields.find((f) => f.name === 'user');
-      expect(userField?.typeContractSpaceId).toBe('supabase');
-      expect(userField?.typeNamespaceId).toBe('auth');
-      expect(userField?.typeName).toBe('User');
+      expect(printed).toMatch(/user\s+supabase:auth\.User\?\s+@relation/);
     });
   });
 });
