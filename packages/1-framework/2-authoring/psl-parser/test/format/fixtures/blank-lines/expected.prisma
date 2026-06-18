@@ -1,5 +1,5 @@
 model User {
-  id Int @id
+  id   Int    @id
 
   name String
 

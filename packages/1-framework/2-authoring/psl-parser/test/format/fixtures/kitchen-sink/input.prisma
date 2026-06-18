@@ -1,7 +1,7 @@
 // the primary user record
 model User {
   // the surrogate key
-  id Int @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   email       String   @unique
   displayName String?
   role        Role     @default(USER)

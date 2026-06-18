@@ -384,10 +384,7 @@ function emitModel(
   const columns = alignmentMap(model.syntax);
   emitBlockBody(writer, model.syntax, trailing, (node) => {
     const field = FieldDeclarationAst.cast(node);
-    if (field)
-      return leafMember(writer, 'regular', () =>
-        emitField(writer, field, columns.get(node.offset)),
-      );
+    if (field) return leafMember(writer, 'regular', () => emitField(writer, field, columns));
     const attribute = ModelAttributeAst.cast(node);
     if (attribute)
       return leafMember(writer, 'blockAttribute', () => emitBlockAttribute(writer, attribute));
@@ -404,10 +401,7 @@ function emitCompositeType(
   const columns = alignmentMap(composite.syntax);
   emitBlockBody(writer, composite.syntax, trailing, (node) => {
     const field = FieldDeclarationAst.cast(node);
-    if (field)
-      return leafMember(writer, 'regular', () =>
-        emitField(writer, field, columns.get(node.offset)),
-      );
+    if (field) return leafMember(writer, 'regular', () => emitField(writer, field, columns));
     const attribute = ModelAttributeAst.cast(node);
     if (attribute)
       return leafMember(writer, 'blockAttribute', () => emitBlockAttribute(writer, attribute));
@@ -748,72 +742,24 @@ interface AlignmentColumns {
 }
 
 /**
- * A block's alignment pre-pass: groups consecutive single-line field rows into
- * runs (broken by a blank, an own-line comment, an interior comment, a leading
- * comment on the row, or any non-field member) and maps each field node to its
- * run's column widths. Widths are a pure function of the rows' ASTs (the rendered
- * name and type cells) — the only look-ahead in emission; no rendered output is
- * buffered, the block's walk looks the columns up when it reaches each field.
+ * A block's alignment pre-pass: column widths are computed over ALL the block's
+ * field rows at once — every field shares one set of columns, regardless of any
+ * blanks or comments between them. Widths are a pure function of the rows' ASTs
+ * (the rendered name and type cells) — the only look-ahead in emission; no
+ * rendered output is buffered. A field carrying an interior `//` comment breaks
+ * across continuation lines, so it does not contribute to the width math.
+ * Returns `undefined` when the block has no alignable field.
  */
-function alignmentMap(block: SyntaxNode): Map<number, AlignmentColumns> {
-  const map = new Map<number, AlignmentColumns>();
-  let sawOpenBrace = false;
-  let newlines = 0;
-  let leadingComment = false;
-  let run: SyntaxNode[] = [];
-
-  const flush = (): void => {
-    if (run.length === 0) return;
-    const columns = alignmentColumns(run);
-    for (const node of run) map.set(node.offset, columns);
-    run = [];
-  };
-
+function alignmentMap(block: SyntaxNode): AlignmentColumns | undefined {
+  const fields: SyntaxNode[] = [];
   for (const element of block.children()) {
-    if (element instanceof SyntaxNode) {
-      if (!sawOpenBrace) continue;
-      const alignable =
-        FieldDeclarationAst.cast(element) !== undefined && !hasInteriorComment(element);
-      const poolable = alignable && !leadingComment && !(newlines >= 2 && run.length > 0);
-      if (poolable) run.push(element);
-      else {
-        flush();
-        if (alignable && !leadingComment) run.push(element);
-        // A row carrying its own leading comment stands alone: it neither joins
-        // the prior run nor pools with the row that follows it.
-        else if (alignable) {
-          run.push(element);
-          flush();
-        }
-      }
-      newlines = 0;
-      leadingComment = false;
-      continue;
-    }
-    if (element.kind === 'LBrace' && !sawOpenBrace) {
-      sawOpenBrace = true;
-      newlines = 0;
-      continue;
-    }
-    if (!sawOpenBrace) continue;
-    if (element.kind === 'RBrace') break;
-    if (element.kind === 'Whitespace') continue;
-    if (element.kind === 'Newline') {
-      newlines += 1;
-      continue;
-    }
-    if (element.kind === 'Comment') {
-      // An own-line comment (preceded by a newline) breaks the run and leads the
-      // next row; a same-line trailing comment leaves the run intact.
-      if (newlines > 0) {
-        flush();
-        leadingComment = true;
-      }
-      newlines = 0;
-    }
+    if (!(element instanceof SyntaxNode)) continue;
+    if (FieldDeclarationAst.cast(element) === undefined) continue;
+    if (hasInteriorComment(element)) continue;
+    fields.push(element);
   }
-  flush();
-  return map;
+  if (fields.length === 0) return undefined;
+  return alignmentColumns(fields);
 }
 
 function alignmentColumns(rows: readonly SyntaxNode[]): AlignmentColumns {

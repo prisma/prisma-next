@@ -2,7 +2,7 @@
 model User {
   // first
   // second
-  id Int @id
+  id   Int    @id
   //no-leading-space  extra   spaces
   name String
 }
