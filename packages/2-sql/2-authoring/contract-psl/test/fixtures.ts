@@ -1,4 +1,7 @@
-import type { ContractSourceContext } from '@prisma-next/config/config-types';
+import type {
+  ContractSourceContext,
+  ContractSourceDiagnostic,
+} from '@prisma-next/config/config-types';
 import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import {
   domainModelsAtDefaultNamespace,
@@ -20,7 +23,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import type { SymbolTable } from '@prisma-next/psl-parser';
-import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
@@ -311,32 +314,59 @@ export function buildSymbolTableInput(
     readonly scalarTypes?: readonly string[];
     readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
   },
-): { symbolTable: SymbolTable; sourceFile: SourceFile; sourceId: string } {
+): {
+  symbolTable: SymbolTable;
+  sourceFile: SourceFile;
+  sourceId: string;
+  seedDiagnostics: ContractSourceDiagnostic[];
+} {
   const sourceId = options?.sourceId ?? 'schema.prisma';
   const scalarTypes = options?.scalarTypes ?? [...postgresScalarTypeDescriptors.keys()];
   const pslBlockDescriptors = options?.pslBlockDescriptors ?? {};
   const { document, sourceFile } = parse(schema);
-  const { table } = buildSymbolTable({ document, sourceFile, scalarTypes, pslBlockDescriptors });
-  return { symbolTable: table, sourceFile, sourceId };
+  const { table, diagnostics } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes,
+    pslBlockDescriptors,
+  });
+  // Mirror the provider: surface `buildSymbolTable`'s diagnostics (e.g. block
+  // `PSL_EXTENSION_DUPLICATE_PARAMETER`, over-qualified `PSL_INVALID_QUALIFIED_TYPE`)
+  // to the interpreter as seeds, so the interpreter-driven tests see the same
+  // diagnostic set the provider would produce.
+  const seedDiagnostics: ContractSourceDiagnostic[] = diagnostics.map((diagnostic) => ({
+    code: diagnostic.code,
+    message: diagnostic.message,
+    sourceId,
+    span: rangeToPslSpan(diagnostic.range, sourceFile),
+  }));
+  return { symbolTable: table, sourceFile, sourceId, seedDiagnostics };
 }
 
 /**
  * Object-form shim mirroring the legacy parser's `{ schema, sourceId,
  * pslBlockDescriptors? }` call shape, so call sites can spread the result
  * (`{ ...document, ... }`) into the migrated interpreter input. The
- * `pslBlockDescriptors` field is accepted-and-ignored (the CST parser no longer
- * consumes it; the scalar-name key set drives `types {}` scalar-vs-alias
- * classification, identical across the postgres/sqlite descriptor maps).
+ * `pslBlockDescriptors` are threaded into `buildSymbolTable` so each block's
+ * `BlockSymbol.block` is descriptor-classified (the SQL enum factory reads it),
+ * and the symbol-table diagnostics are surfaced as `seedDiagnostics`.
  */
 export function symbolTableInputFromParseArgs(args: {
   readonly schema: string;
   readonly sourceId?: string;
-  readonly pslBlockDescriptors?: unknown;
-}): { symbolTable: SymbolTable; sourceFile: SourceFile; sourceId: string } {
-  return buildSymbolTableInput(
-    args.schema,
-    args.sourceId !== undefined ? { sourceId: args.sourceId } : undefined,
-  );
+  readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
+}): {
+  symbolTable: SymbolTable;
+  sourceFile: SourceFile;
+  sourceId: string;
+  seedDiagnostics: ContractSourceDiagnostic[];
+} {
+  return buildSymbolTableInput(args.schema, {
+    ...(args.sourceId !== undefined ? { sourceId: args.sourceId } : {}),
+    ...(args.pslBlockDescriptors !== undefined
+      ? { pslBlockDescriptors: args.pslBlockDescriptors }
+      : {}),
+  });
 }
 
 export const sqliteScalarTypeDescriptors = new Map([

@@ -15,6 +15,7 @@ import type {
   AuthoringContributions,
   AuthoringEntityContext,
   AuthoringPslBlockDescriptorNamespace,
+  PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
 import {
   instantiateAuthoringEntityType,
@@ -57,7 +58,7 @@ import {
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { reconstructExtensionBlock } from './enum-block';
+
 import {
   findDuplicateFieldName,
   getAttribute,
@@ -306,10 +307,8 @@ function validateNamespaceBlocksForSqlTarget(input: {
   }
 }
 
-type ReconstructedEnumBlock = ReturnType<typeof reconstructExtensionBlock>;
-
 interface ProcessEnumDeclarationsInput {
-  readonly enumBlocks: readonly ReconstructedEnumBlock[];
+  readonly enumBlocks: readonly PslExtensionBlock[];
   readonly sourceId: string;
   readonly authoringContributions: AuthoringContributions | undefined;
   readonly entityContext: AuthoringEntityContext;
@@ -1785,7 +1784,10 @@ export function interpretPslDocumentToSqlContract(
       }
       return isEnumBlock(block);
     })
-    .map((block) => reconstructExtensionBlock(block.node, sourceFile, diagnostics, sourceId));
+    // The resolved `PslExtensionBlock` is built once by `buildSymbolTable`
+    // (descriptor-classified from the composed `enum` descriptor); the enum
+    // factory consumes it directly — no consumer-side reconstruction.
+    .map((block) => block.block);
   for (const namespace of namespaceSymbols) {
     for (const block of Object.values(namespace.blocks)) {
       if (isEnumBlock(block)) {
