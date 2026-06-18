@@ -7,6 +7,7 @@ import {
   DidChangeWatchedFilesNotification,
   type InitializeParams,
   type InitializeResult,
+  RegistrationRequest,
   TextDocumentSyncKind,
   TextDocuments,
 } from 'vscode-languageserver';
@@ -84,9 +85,17 @@ export function createServer(
       connection.console.warn(degradedReason);
     }
     if (supportsWatchedFilesRegistration) {
-      void connection.client.register(DidChangeWatchedFilesNotification.type, {
-        watchers: [{ globPattern: watchedConfigPath }],
-      });
+      void connection
+        .sendRequest(RegistrationRequest.type, {
+          registrations: [
+            {
+              id: 'prisma-next-config-watcher',
+              method: DidChangeWatchedFilesNotification.type.method,
+              registerOptions: { watchers: [{ globPattern: watchedConfigPath }] },
+            },
+          ],
+        })
+        .catch(() => undefined);
     } else {
       connection.console.warn(
         'Client does not support dynamic file-watcher registration; Prisma Next config changes will not be picked up without a restart.',
