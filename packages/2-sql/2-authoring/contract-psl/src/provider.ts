@@ -126,24 +126,21 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           scalarTypes: [...context.scalarTypeDescriptors.keys()],
         });
 
-        // Restore the legacy surfacing: when parsing or symbol-table
-        // construction reports diagnostics, fail with them rather than
-        // interpreting a structurally broken document.
-        const sourceDiagnostics = [
+        // Seed the combined parse + symbol-table diagnostics into the
+        // interpreter (rather than short-circuiting): it walks the recovered
+        // document, appends its own diagnostics, and its post-walk dedupe gate
+        // emits the deduped parse + symbol-table + interpreter union in one run
+        // — matching the legacy `parsePslDocument` combined-set behaviour.
+        const seedDiagnostics = [
           ...mapParseDiagnostics(parseDiagnostics, sourceFile, schemaPath),
           ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),
         ];
-        if (sourceDiagnostics.length > 0) {
-          return notOk({
-            summary: `Failed to interpret Prisma schema at "${schemaPath}"`,
-            diagnostics: sourceDiagnostics,
-          });
-        }
 
         const interpreted = interpretPslDocumentToSqlContract({
           symbolTable,
           sourceFile,
           sourceId: schemaPath,
+          seedDiagnostics,
           target: options.target,
           authoringContributions: context.authoringContributions,
           scalarTypeDescriptors,

@@ -348,7 +348,7 @@ model Post {
   });
 
   describe('given a syntactically invalid schema', () => {
-    it('surfaces parser diagnostics from parse() and fails before interpretation', async () => {
+    it('surfaces parse() diagnostics via the combined interpret path in one run', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
       tempDirs.push(tempDir);
       const schemaPath = join(tempDir, 'schema.prisma');
@@ -381,7 +381,7 @@ model Post {
       );
     });
 
-    it('surfaces buildSymbolTable duplicate-declaration diagnostics', async () => {
+    it('surfaces buildSymbolTable duplicate-declaration diagnostics via the combined path', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
       tempDirs.push(tempDir);
       const schemaPath = join(tempDir, 'schema.prisma');
@@ -413,6 +413,42 @@ model User {
           }),
         ]),
       );
+    });
+
+    it('surfaces BOTH a symbol-table error and an interpreter error in one combined run', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      // `Dup` is declared twice (symbol-table: PSL_DUPLICATE_DECLARATION);
+      // `Other.bad` uses an unknown scalar type (interpreter:
+      // PSL_UNSUPPORTED_FIELD_TYPE). The combined run must surface both.
+      await writeFile(
+        schemaPath,
+        `model Dup {
+  id Int @id
+}
+model Dup {
+  id Int @id
+}
+model Other {
+  id Int @id
+  bad Mystery
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma', baseOptions);
+      const result = await contract.source.load(
+        createPostgresTestContext({ resolvedInputs: [schemaPath] }),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const codes = result.failure.diagnostics.map((d) => d.code);
+      expect(codes).toContain('PSL_DUPLICATE_DECLARATION');
+      expect(codes).toContain('PSL_UNSUPPORTED_FIELD_TYPE');
     });
   });
 

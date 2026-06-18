@@ -38,6 +38,14 @@ export interface CstFieldView {
   readonly typeConstructor?: CstTypeConstructorCallView;
   readonly attributes: readonly CstAttributeView[];
   readonly span: PslSpan;
+  /**
+   * Set when the field's qualified type was malformed (over-qualified) and the
+   * `PSL_INVALID_QUALIFIED_TYPE` diagnostic was already emitted at view-build
+   * time. Type resolution treats it as already-reported and does NOT cascade a
+   * `PSL_UNSUPPORTED_FIELD_TYPE` — the legacy parser rejected such types before
+   * the interpreter ran, so that cascade would be a spurious extra diagnostic.
+   */
+  readonly typeAlreadyReported?: boolean;
 }
 
 export interface CstModelView {

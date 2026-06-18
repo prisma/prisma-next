@@ -52,6 +52,7 @@ export function buildFieldView(
       typeName: annotation.path[annotation.path.length - 1] ?? '',
       optional: false,
       list: false,
+      typeAlreadyReported: true,
       attributes,
       span,
     };

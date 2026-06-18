@@ -403,6 +403,13 @@ export function resolveFieldTypeDescriptor(input: {
   readonly sourceId: string;
   readonly entityLabel: string;
 }): ResolveFieldTypeResult {
+  // The field's qualified type was malformed and already diagnosed at
+  // view-build time (PSL_INVALID_QUALIFIED_TYPE). Treat it as already-reported
+  // so resolution does not cascade a spurious PSL_UNSUPPORTED_FIELD_TYPE — the
+  // legacy parser rejected such types before the interpreter ran.
+  if (input.field.typeAlreadyReported) {
+    return { ok: false, alreadyReported: true };
+  }
   if (input.field.typeConstructor) {
     // Field presets carry richer semantics than type constructors, so a field preset match is the complete answer. Shared composition rejects exact cross-registry collisions before PSL resolution can observe them.
     const presetDescriptor = getAuthoringFieldPreset(

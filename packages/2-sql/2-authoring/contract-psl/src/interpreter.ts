@@ -130,6 +130,14 @@ export interface InterpretPslDocumentToSqlContractInput {
    */
   readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly codecLookup?: CodecLookup;
+  /**
+   * Diagnostics produced before interpretation (the provider's combined
+   * `parse` + `buildSymbolTable` set), seeded into the interpreter's collection
+   * so the post-walk dedupe gate emits the parse + symbol-table + interpreter
+   * union in one run — matching the legacy `parsePslDocument` combined-set
+   * behaviour rather than failing before interpreting.
+   */
+  readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
 }
 
 function buildComposedExtensionPackRefs(
@@ -1663,7 +1671,7 @@ export function interpretPslDocumentToSqlContract(
   const { topLevel } = input.symbolTable;
   const sourceFile = input.sourceFile;
   const namespaceSymbols = Object.values(topLevel.namespaces);
-  const diagnostics: ContractSourceDiagnostic[] = [];
+  const diagnostics: ContractSourceDiagnostic[] = [...(input.seedDiagnostics ?? [])];
   validateNamespaceBlocksForSqlTarget({
     namespaces: namespaceSymbols,
     targetId: input.target.targetId,
