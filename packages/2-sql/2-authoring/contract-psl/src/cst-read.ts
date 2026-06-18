@@ -206,6 +206,21 @@ export function nodePslSpan(node: SyntaxNode, sourceFile: SourceFile): PslSpan {
   };
 }
 
+/**
+ * Span covering only a block node's leading keyword token (e.g. the `datasource`
+ * / `enum` keyword on the declaration's first line), rather than the whole
+ * multi-line block. Matches the legacy parser's single-line
+ * `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK` span anchor.
+ */
+export function keywordPslSpan(node: SyntaxNode, keyword: string, sourceFile: SourceFile): PslSpan {
+  const start = node.offset;
+  const end = start + keyword.length;
+  return {
+    start: offsetToPslPosition(start, sourceFile),
+    end: offsetToPslPosition(end, sourceFile),
+  };
+}
+
 /** Map a parser `Range` to the legacy `PslSpan` shape. */
 export function rangeToPslSpan(range: Range, sourceFile: SourceFile): PslSpan {
   return {

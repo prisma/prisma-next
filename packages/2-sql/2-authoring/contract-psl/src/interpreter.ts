@@ -14,8 +14,12 @@ import { crossRef } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
   AuthoringEntityContext,
+  AuthoringPslBlockDescriptorNamespace,
 } from '@prisma-next/framework-components/authoring';
-import { instantiateAuthoringEntityType } from '@prisma-next/framework-components/authoring';
+import {
+  instantiateAuthoringEntityType,
+  isAuthoringPslBlockDescriptor,
+} from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
@@ -49,7 +53,7 @@ import {
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { nodePslSpan } from './cst-read';
+import { keywordPslSpan, nodePslSpan } from './cst-read';
 import type {
   CstAttributeView,
   CstCompositeTypeView,
@@ -358,6 +362,29 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
   }
 
   return { enumHandles, enumTypeDescriptors };
+}
+
+/**
+ * The legitimate top-level block keywords the interpreter recognises, matching
+ * the legacy parser's allow-list: a keyword is legitimate when the composed
+ * `authoringContributions.pslBlockDescriptors` registers a descriptor under it
+ * (the legacy parser keyed `lookupExtensionBlockDescriptor` by exactly this).
+ * A `BlockSymbol` whose keyword is absent is an unsupported top-level block —
+ * including an `enum` when no `pslBlockDescriptors.enum` was composed, which the
+ * legacy descriptor-driven parser rejected as unknown.
+ */
+function composedBlockKeywords(
+  authoringContributions: AuthoringContributions | undefined,
+): ReadonlySet<string> {
+  const keywords = new Set<string>();
+  const descriptors: AuthoringPslBlockDescriptorNamespace =
+    authoringContributions?.pslBlockDescriptors ?? {};
+  for (const [keyword, value] of Object.entries(descriptors)) {
+    if (isAuthoringPslBlockDescriptor(value)) {
+      keywords.add(keyword);
+    }
+  }
+  return keywords;
 }
 
 interface BuildModelNodeInput {
@@ -1741,18 +1768,43 @@ export function interpretPslDocumentToSqlContract(
   }
 
   const isEnumBlock = (block: BlockSymbol): boolean => block.keyword === 'enum';
+  // Restore the legacy parser's unknown-top-level-block rejection (it consulted
+  // `pslBlockDescriptors`): a generic block whose keyword was not registered by
+  // a composed descriptor is an unsupported top-level block. This includes an
+  // `enum` block when no `pslBlockDescriptors.enum` was composed.
+  const legitimateBlockKeywords = composedBlockKeywords(input.authoringContributions);
+  const reportUnsupportedTopLevelBlock = (block: BlockSymbol): void => {
+    diagnostics.push({
+      code: 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK',
+      message: `Unsupported top-level block "${block.keyword}"`,
+      sourceId,
+      span: keywordPslSpan(block.node.syntax, block.keyword, sourceFile),
+    });
+  };
+
   const topLevelEnums = Object.values(topLevel.blocks)
-    .filter(isEnumBlock)
+    .filter((block) => {
+      if (!legitimateBlockKeywords.has(block.keyword)) {
+        reportUnsupportedTopLevelBlock(block);
+        return false;
+      }
+      return isEnumBlock(block);
+    })
     .map((block) => reconstructExtensionBlock(block.node, sourceFile, diagnostics, sourceId));
   for (const namespace of namespaceSymbols) {
     for (const block of Object.values(namespace.blocks)) {
-      if (!isEnumBlock(block)) continue;
-      diagnostics.push({
-        code: 'PSL_ENUM_NAMESPACE_NOT_SUPPORTED',
-        message: `enum "${block.name}" inside namespace "${namespace.name}" is not supported; declare enum at the top level`,
-        sourceId,
-        span: nodePslSpan(block.node.syntax, sourceFile),
-      });
+      if (isEnumBlock(block)) {
+        diagnostics.push({
+          code: 'PSL_ENUM_NAMESPACE_NOT_SUPPORTED',
+          message: `enum "${block.name}" inside namespace "${namespace.name}" is not supported; declare enum at the top level`,
+          sourceId,
+          span: nodePslSpan(block.node.syntax, sourceFile),
+        });
+        continue;
+      }
+      if (!legitimateBlockKeywords.has(block.keyword)) {
+        reportUnsupportedTopLevelBlock(block);
+      }
     }
   }
 
