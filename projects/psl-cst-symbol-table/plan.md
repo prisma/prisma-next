@@ -36,6 +36,7 @@ A fully-stacked, three-slice **refactor-with-call-site-migration**: build the `b
 
 ## Open items
 
+- **Descriptor-typed extension-block parameters have no symbol-table home.** The legacy parser parsed declared block parameters (`ref`/`option`/`list`) descriptor-awarely at parse time; the symbol table defers all block-parameter parsing (a `BlockSymbol` carries the raw `GenericBlockDeclarationAst`). The SQL enum descriptor uses `parameters:{} + variadicParameters:true`, so slice 2 reconstructs the descriptor-free `{kind:bare|value}` path with full parity — no gap there. But any future extension block shipping a typed-parameter descriptor would need that richer parsing rehomed (into a consumer-side reconstruction, or back into `buildSymbolTable`). Slice 3 must decide where `pslBlockDescriptors`-driven validation lives, or record it as a project follow-up if no current consumer needs it. (Surfaced at slice-2 dispatch 2; confirmed out of scope for the enum seam.)
 - **Exhaustive switches on `PslDiagnosticCode`.** Slice 1 added `PSL_DUPLICATE_DECLARATION` to the union. Slices 2 and 3 (which touch the interpreters and any diagnostic renderers) must verify no consumer switches exhaustively on `PslDiagnosticCode` without a default arm — a new union member silently breaks an exhaustive switch at typecheck. Surfaced by the reviewer at dispatch 1; not addressable in slice 1.
 
 ## Sequencing rationale
