@@ -25,7 +25,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
-import type { PostgresRlsPolicy } from '../postgres-rls-policy';
+import { isPostgresRlsPolicy } from '../postgres-rls-policy';
 import { isPostgresSchemaIR } from '../postgres-schema-ir';
 import { resolveDdlSchemaForNamespaceStorage } from '../postgres-schema-ir-annotations';
 import {
@@ -266,8 +266,14 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 
   private planRlsDiff(options: PlannerOptionsWithComponents): readonly PostgresOpFactoryCall[] {
     if (!isPostgresSchemaIR(options.schema)) {
-      // The schema came from contractToSchemaIR (migration plan path), not from
-      // live DB introspection. There are no live DB policies to reconcile against.
+      // `migration plan` path: the schema was derived from the "from" contract
+      // (contractToSchemaIR), not from live DB introspection. There are no live
+      // policies to reconcile against, so no RLS DDL is emitted. This is correct
+      // only because `migration plan` never has a live schema — `db update` and
+      // `db init` always introspect a real database and will produce a
+      // PostgresSchemaIR, so this branch is unreachable on any live-reconciliation
+      // path (verify adapter throws on non-PostgresSchemaIR; planner returns []
+      // as the "no live state" signal, not as a silent skip).
       return [];
     }
     const diffIssues = diffPostgresRlsPolicies({
@@ -287,22 +293,22 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         options.schema,
       );
 
-      if (issue.outcome === 'missing' || issue.outcome === 'mismatch') {
-        const policy = issue.expected as PostgresRlsPolicy;
-        const tableName = policy.tableName;
-        const tableKey = `${schemaForTable}.${tableName}`;
+      // 'mismatch' is unreachable for content-addressed policies: the wire name
+      // encodes the body hash, so two policies sharing a coordinate (same name)
+      // are always equal and isEqualTo never returns false.
+      if (issue.outcome === 'missing') {
+        const expected = issue.expected;
+        if (!isPostgresRlsPolicy(expected)) continue;
+        const tableKey = `${schemaForTable}.${expected.tableName}`;
         if (!seenEnableTables.has(tableKey)) {
           seenEnableTables.add(tableKey);
-          calls.push(new EnableRowLevelSecurityCall(schemaForTable, tableName));
+          calls.push(new EnableRowLevelSecurityCall(schemaForTable, expected.tableName));
         }
-        if (issue.outcome === 'mismatch' && allowsDestructive) {
-          const actualPolicy = issue.actual as PostgresRlsPolicy;
-          calls.push(new DropPostgresRlsPolicyCall(schemaForTable, tableName, actualPolicy.name));
-        }
-        calls.push(new CreatePostgresRlsPolicyCall(schemaForTable, tableName, policy));
-      } else if (allowsDestructive) {
-        const policy = issue.actual as PostgresRlsPolicy;
-        calls.push(new DropPostgresRlsPolicyCall(schemaForTable, policy.tableName, policyName));
+        calls.push(new CreatePostgresRlsPolicyCall(schemaForTable, expected.tableName, expected));
+      } else if (issue.outcome === 'extra' && allowsDestructive) {
+        const actual = issue.actual;
+        if (!isPostgresRlsPolicy(actual)) continue;
+        calls.push(new DropPostgresRlsPolicyCall(schemaForTable, actual.tableName, policyName));
       }
     }
 

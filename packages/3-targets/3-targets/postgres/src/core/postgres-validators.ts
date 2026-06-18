@@ -11,6 +11,7 @@ export const PostgresRlsPolicySchema = type({
   name: 'string',
   prefix: 'string',
   tableName: 'string',
+  namespaceId: 'string',
   operation: "'select' | 'insert' | 'update' | 'delete' | 'all'",
   roles: type.string.array().readonly(),
   'using?': 'string',

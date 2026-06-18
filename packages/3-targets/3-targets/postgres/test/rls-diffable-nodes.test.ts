@@ -25,10 +25,9 @@ describe('PostgresRlsPolicy DiffableNode', () => {
     });
   });
 
-  it('identity() defaults namespaceId to UNBOUND_NAMESPACE_ID when not provided', () => {
-    const { namespaceId: _omit, ...rest } = baseInput;
-    const policy = new PostgresRlsPolicy(rest);
-    expect(policy.identity().namespaceId).toBe(UNBOUND_NAMESPACE_ID);
+  it('identity() propagates namespaceId from input', () => {
+    const policy = new PostgresRlsPolicy({ ...baseInput, namespaceId: 'my_schema' });
+    expect(policy.identity().namespaceId).toBe('my_schema');
   });
 
   it('isEqualTo() returns true for two policies with the same wire name', () => {
@@ -106,25 +105,25 @@ describe('PostgresRole DiffableNode', () => {
     });
   });
 
-  it('identity() uses UNBOUND_NAMESPACE_ID when namespaceId is omitted', () => {
-    const role = new PostgresRole({ name: 'app_user' });
+  it('identity() propagates namespaceId from input', () => {
+    const role = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
     expect(role.identity().namespaceId).toBe(UNBOUND_NAMESPACE_ID);
   });
 
   it('isEqualTo() returns true for two roles with the same name', () => {
-    const a = new PostgresRole({ name: 'app_user' });
-    const b = new PostgresRole({ name: 'app_user' });
+    const a = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
+    const b = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
     expect(a.isEqualTo(b)).toBe(true);
   });
 
   it('isEqualTo() returns false for roles with different names', () => {
-    const a = new PostgresRole({ name: 'app_user' });
-    const b = new PostgresRole({ name: 'anon' });
+    const a = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
+    const b = new PostgresRole({ name: 'anon', namespaceId: UNBOUND_NAMESPACE_ID });
     expect(a.isEqualTo(b)).toBe(false);
   });
 
   it('isEqualTo() throws when other is not a PostgresRole', () => {
-    const role = new PostgresRole({ name: 'app_user' });
+    const role = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
     const notARole = new PostgresRlsPolicy({
       name: 'read_own_a1b2c3d4',
       prefix: 'read_own',
@@ -138,7 +137,7 @@ describe('PostgresRole DiffableNode', () => {
   });
 
   it('identity() and isEqualTo() are accessible on frozen instances', () => {
-    const role = new PostgresRole({ name: 'app_user' });
+    const role = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
     expect(Object.isFrozen(role)).toBe(true);
     expect(typeof role.identity).toBe('function');
     expect(typeof role.isEqualTo).toBe('function');

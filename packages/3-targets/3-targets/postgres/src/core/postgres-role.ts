@@ -1,16 +1,15 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import type { EntityCoordinate } from '@prisma-next/framework-components/ir';
-import { freezeNode, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
 
 export interface PostgresRoleInput {
   readonly name: string;
   /**
-   * Namespace coordinate. Roles are cluster-scoped (not schema-scoped), so this
-   * defaults to `UNBOUND_NAMESPACE_ID`. Stored for structural completeness; the
-   * serializer and verifier will read it in later slices.
+   * Namespace coordinate. Roles are cluster-scoped; pass `UNBOUND_NAMESPACE_ID`
+   * from `@prisma-next/framework-components/ir`.
    */
-  readonly namespaceId?: string;
+  readonly namespaceId: string;
 }
 
 /**
@@ -30,7 +29,7 @@ export class PostgresRole extends SqlNode implements DiffableNode {
   constructor(input: PostgresRoleInput) {
     super();
     this.name = input.name;
-    this.namespaceId = input.namespaceId ?? UNBOUND_NAMESPACE_ID;
+    this.namespaceId = input.namespaceId;
     freezeNode(this);
   }
 

@@ -13,8 +13,8 @@ const emptyTableInput = {
 } as const;
 
 describe('PostgresRole', () => {
-  it('constructs with required fields and defaults namespaceId to UNBOUND_NAMESPACE_ID', () => {
-    const role = new PostgresRole({ name: 'authenticated' });
+  it('constructs with required fields', () => {
+    const role = new PostgresRole({ name: 'authenticated', namespaceId: UNBOUND_NAMESPACE_ID });
     expect(role.kind).toBe('role');
     expect(role.name).toBe('authenticated');
     expect(role.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
@@ -26,7 +26,7 @@ describe('PostgresRole', () => {
   });
 
   it('is frozen — mutation throws in strict mode', () => {
-    const role = new PostgresRole({ name: 'authenticated' });
+    const role = new PostgresRole({ name: 'authenticated', namespaceId: UNBOUND_NAMESPACE_ID });
     expect(Object.isFrozen(role)).toBe(true);
     expect(() => {
       (role as { name: string }).name = 'mutated';
@@ -34,7 +34,7 @@ describe('PostgresRole', () => {
   });
 
   it('kind is enumerable and survives JSON round-trip', () => {
-    const role = new PostgresRole({ name: 'authenticated' });
+    const role = new PostgresRole({ name: 'authenticated', namespaceId: UNBOUND_NAMESPACE_ID });
     const json = JSON.parse(JSON.stringify(role)) as Record<string, unknown>;
     expect(json['kind']).toBe('role');
     expect(json['name']).toBe('authenticated');
@@ -47,6 +47,7 @@ describe('PostgresRlsPolicy', () => {
     name: 'user_select_a1b2c3d4',
     prefix: 'user_select',
     tableName: 'user',
+    namespaceId: 'public',
     operation: 'select' as const,
     roles: ['authenticated', 'anon'],
     using: 'auth.uid() = user_id',
@@ -76,6 +77,7 @@ describe('PostgresRlsPolicy', () => {
       name: 'user_insert_a1b2c3d4',
       prefix: 'user_insert',
       tableName: 'user',
+      namespaceId: 'public',
       operation: 'insert',
       roles: ['authenticated'],
       withCheck: 'true',
@@ -135,7 +137,7 @@ describe('PostgresSchema role and policy slots', () => {
       id: 'public',
       entries: {
         table: {},
-        role: { authenticated: { name: 'authenticated' } },
+        role: { authenticated: { name: 'authenticated', namespaceId: UNBOUND_NAMESPACE_ID } },
       },
     });
     const role = schema.role['authenticated'];
@@ -153,6 +155,7 @@ describe('PostgresSchema role and policy slots', () => {
             name: 'user_select_a1b2c3d4',
             prefix: 'user_select',
             tableName: 'user',
+            namespaceId: 'public',
             operation: 'select',
             roles: ['authenticated'],
             permissive: true,
@@ -166,7 +169,7 @@ describe('PostgresSchema role and policy slots', () => {
   });
 
   it('normalises already-constructed role instances (structural equality preserved)', () => {
-    const role = new PostgresRole({ name: 'authenticated' });
+    const role = new PostgresRole({ name: 'authenticated', namespaceId: UNBOUND_NAMESPACE_ID });
     const schema = new PostgresSchema({
       id: 'public',
       entries: { table: {}, role: { authenticated: role } },

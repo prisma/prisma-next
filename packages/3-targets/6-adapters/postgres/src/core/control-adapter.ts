@@ -1160,7 +1160,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     });
 
     const roles: PostgresRole[] = rolesResult.rows.map(
-      (row) => new PostgresRole({ name: row.rolname }),
+      (row) => new PostgresRole({ name: row.rolname, namespaceId: UNBOUND_NAMESPACE_ID }),
     );
 
     return new PostgresSchemaIR({
