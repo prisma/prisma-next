@@ -82,6 +82,30 @@ describe('loadConfig', () => {
   );
 
   it(
+    'loads config without contract artifacts',
+    async () => {
+      const noContractSource = VALID_CONFIG_SOURCE.replace(
+        `  contract: {
+    source: {
+      inputs: ['./schema.prisma'],
+      load: async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+    },
+    output: './generated/contract.json',
+  },
+`,
+        '',
+      );
+      writeFileSync(join(tempDir, 'prisma-next.config.ts'), noContractSource);
+      process.chdir(tempDir);
+
+      const config = await loadConfig();
+
+      expect(config.contract).toBeUndefined();
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
     'maps a missing config file to a structured config-file-not-found error (4001)',
     async () => {
       const configPath = join(tempDir, 'nonexistent.config.ts');
