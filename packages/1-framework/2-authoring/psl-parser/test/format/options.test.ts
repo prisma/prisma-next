@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { format, PslFormatError } from '../../src/exports/format';
+import { type FormatOptions, format, PslFormatError } from '../../src/exports/format';
 
 describe('format indent option', () => {
   it('defaults to two spaces', () => {
@@ -37,8 +37,8 @@ describe('format indent option', () => {
   });
 
   it('rejects an unknown string indent', () => {
-    // @ts-expect-error invalid indent value rejected at runtime
-    expect(() => format('model User {\nid Int\n}', { indent: 'spaces' })).toThrow();
+    const options: FormatOptions = JSON.parse('{"indent":"spaces"}');
+    expect(() => format('model User {\nid Int\n}', options)).toThrow();
   });
 });
 
@@ -54,8 +54,8 @@ describe('format newline option', () => {
   });
 
   it('rejects an unknown newline value', () => {
-    // @ts-expect-error invalid newline value rejected at runtime
-    expect(() => format('model User {\nid Int\n}', { newline: 'CR' })).toThrow();
+    const options: FormatOptions = JSON.parse('{"newline":"CR"}');
+    expect(() => format('model User {\nid Int\n}', options)).toThrow();
   });
 });
 

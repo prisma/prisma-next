@@ -119,7 +119,7 @@ export default defineConfig({
         const result = await runFormatWithConfig(ctx.testDir, ctx.configPath);
 
         expect(result.exitCode, 'F.02: non-PSL source exits 0').toBe(0);
-        expect(result.stderr, 'F.02: reports nothing to format').toContain('Nothing to format');
+        expect(result.stdout, 'F.02: reports nothing to format').toContain('Nothing to format');
 
         const after = readFileSync(sourcePath, 'utf-8');
         expect(after, 'F.02: source byte-identical').toBe(before);

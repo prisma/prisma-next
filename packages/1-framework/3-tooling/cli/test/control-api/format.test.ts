@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -132,5 +132,25 @@ describe('executeFormat', () => {
 
     expect(result.ok).toBe(false);
     expect(await readFile(inputPath, 'utf-8')).toBe(broken);
+  });
+
+  it('returns a structured error when write-back fails', async () => {
+    const inputPath = join(tmpDir, 'schema.prisma');
+    await writeFile(inputPath, MESSY_PSL, 'utf-8');
+    await chmod(inputPath, 0o444);
+
+    try {
+      const result = await withMockedConfig(pslConfig(inputPath), () =>
+        executeFormat({ configPath: join(tmpDir, 'prisma-next.config.ts'), eol: '\n' }),
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failure.message).toBe('Failed to write formatted contract source file');
+      }
+      expect(await readFile(inputPath, 'utf-8')).toBe(MESSY_PSL);
+    } finally {
+      await chmod(inputPath, 0o644);
+    }
   });
 });

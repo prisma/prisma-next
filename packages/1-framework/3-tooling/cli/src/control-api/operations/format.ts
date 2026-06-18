@@ -106,7 +106,16 @@ export async function executeFormat(
     return notOk(errorUnexpected(error instanceof Error ? error.message : String(error)));
   }
 
-  await writeFile(inputPath, formatted, 'utf-8');
+  try {
+    await writeFile(inputPath, formatted, 'utf-8');
+  } catch (error) {
+    return notOk(
+      errorRuntime('Failed to write formatted contract source file', {
+        why: error instanceof Error ? error.message : String(error),
+        fix: `Check that ${inputPath} is writable.`,
+      }),
+    );
+  }
 
   return ok({ formatted: true, path: inputPath });
 }

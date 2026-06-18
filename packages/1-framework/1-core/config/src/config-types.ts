@@ -146,8 +146,10 @@ const MigrationsConfigSchema = type({
   'dir?': 'string',
 });
 
+const FormatterIndentSchema = type('number.integer >= 1').or("'tab'");
+
 export const FormatterConfigSchema = type({
-  'indent?': "number | 'tab'",
+  'indent?': FormatterIndentSchema,
   'newline?': "'LF' | 'CRLF'",
 });
 

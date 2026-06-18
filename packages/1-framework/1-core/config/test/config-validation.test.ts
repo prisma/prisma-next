@@ -601,6 +601,27 @@ describe('formatter section', () => {
     expect(() => defineConfig(config)).toThrow('Config validation failed');
   });
 
+  it('rejects a zero indent', () => {
+    const config = createValidConfig({
+      formatter: { indent: 0 },
+    });
+    expect(() => defineConfig(config)).toThrow('Config validation failed');
+  });
+
+  it('rejects a negative indent', () => {
+    const config = createValidConfig({
+      formatter: { indent: -1 },
+    });
+    expect(() => defineConfig(config)).toThrow('Config validation failed');
+  });
+
+  it('rejects a non-integer indent', () => {
+    const config = createValidConfig({
+      formatter: { indent: 1.5 },
+    });
+    expect(() => defineConfig(config)).toThrow('Config validation failed');
+  });
+
   it('rejects an unsupported indent literal', () => {
     const config = createValidConfig({
       formatter: { indent: 'spaces' },
