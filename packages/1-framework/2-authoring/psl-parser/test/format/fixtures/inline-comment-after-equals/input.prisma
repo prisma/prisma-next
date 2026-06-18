@@ -1,4 +1,4 @@
-datasource db {
+settings db {
 url = // see env
 env("DATABASE_URL")
 }

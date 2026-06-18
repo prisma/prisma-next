@@ -1,4 +1,5 @@
 enum    B    {
+@@type("pg/text@1")
 X
 }
 model    User    {

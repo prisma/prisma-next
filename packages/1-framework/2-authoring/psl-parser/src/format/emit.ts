@@ -13,49 +13,12 @@ import {
 import { type SyntaxElement, SyntaxNode, type SyntaxToken } from '../syntax/red';
 import type { TokenKind } from '../tokenizer';
 
-/**
- * Emission reads structure from the typed AST and prints it as tokens.
- *
- * Each construct has its own emit function (`emitModel`, `emitField`,
- * `emitFieldAttribute`, …) that reaches into the AST it understands — a model
- * knows its fields and attributes, a field knows its name / type / attributes —
- * and streams *that node's* tokens through a {@link LineWriter}. The writer owns
- * spacing, indentation, and blank lines; reading the AST is how a function finds
- * the pieces, streaming tokens is how it prints them, so canonical layout lives
- * next to the structure it formats rather than in a single generic machine.
- *
- * Each block construct has its own emit function — {@link emitModel},
- * {@link emitCompositeType}, {@link emitGenericBlock}, {@link emitNamespace},
- * {@link emitTypesBlock} — that walks *its own* children in source order,
- * recognises *its own* member kinds (a model's fields and block attributes, a
- * generic block's key/value entries and block attributes, a namespace's nested
- * declarations, …) and emits each through the matching per-member function. The
- * shared trivia between members (own-line / same-line comments, collapsed blank
- * runs, house-style separation blanks) is placed by {@link emitBlockBody}, a
- * helper each block function calls with a classifier describing *its* members —
- * the layout mechanics are factored out, the member set stays owned by the block.
- *
- * Two facts cannot be read from one construct in isolation, so they are computed
- * up front per block: the alignment column widths (a pure function of the block's
- * field rows, see {@link alignmentColumns}) and the placement of comments and
- * blank lines *between* members. A `//` comment between any two tokens forces a
- * hard break — the comment is written, the line ends, and the continuation is
- * indented one extra level until the construct that opened the break closes it.
- */
 export function emitDocument(document: DocumentAst, indentUnit: string, newline: string): string {
   const writer = new LineWriter(indentUnit, newline);
   emitTopLevel(writer, document);
   return writer.finish();
 }
 
-/**
- * Accumulates the emitted output line by line. Indentation is materialised at
- * line start from the current depth; a `//` comment written mid-line forces a
- * {@link newline} plus a continuation {@link indent}, which the construct that
- * opened the break balances with {@link unindent} once it has emitted all of its
- * tokens. Inter-token spacing is applied here from the token kinds, so the
- * canonical punctuation layout lives in one place.
- */
 class LineWriter {
   readonly #indentUnit: string;
   readonly #newline: string;
@@ -92,7 +55,6 @@ class LineWriter {
     return this.#prevKind;
   }
 
-  /** Ends the current line (no-op when no line is open). */
   newline(): void {
     if (!this.#lineOpen) return;
     this.#out.push(`${this.#indentUnit.repeat(this.#depth)}${this.#line}`);
@@ -103,7 +65,6 @@ class LineWriter {
     this.#hasContent = true;
   }
 
-  /** Emits one blank line, collapsing a run and never doubling. */
   blank(): void {
     this.newline();
     if (!this.#hasContent || this.#lastWasBlank) return;
@@ -111,12 +72,6 @@ class LineWriter {
     this.#lastWasBlank = true;
   }
 
-  /**
-   * Writes one significant token's text. When `padTo` is set the line is first
-   * padded out to that column (an alignment-column boundary); otherwise a single
-   * space is inserted iff `space` is true. The caller decides spacing from the
-   * structural context it can see (e.g. a qualified name's segments hug).
-   */
   write(token: SyntaxToken, space: boolean, padTo?: number): void {
     if (this.#lineOpen && padTo !== undefined) {
       this.#line = this.#line.padEnd(padTo);
@@ -128,18 +83,11 @@ class LineWriter {
     this.#prevKind = token.kind;
   }
 
-  /** Appends raw text to the current line with no spacing logic. */
   writeRaw(text: string): void {
     this.#line += text;
     this.#lineOpen = true;
   }
 
-  /**
-   * Writes a `//`/`///` comment as a hard break: the comment trails the current
-   * line (or stands alone if the line is empty), the line ends, and the
-   * continuation is indented one extra level. The caller balances the matching
-   * {@link unindent} once its construct finishes.
-   */
   comment(text: string): void {
     if (this.#lineOpen) this.#line += ` ${text}`;
     else this.#line = text;
@@ -154,13 +102,7 @@ class LineWriter {
   }
 }
 
-/**
- * Canonical inter-token spacing: whether a single space precedes `cur` given the
- * previous token `prev`. `inQualifiedName` flags that both tokens sit inside a
- * qualified name (`space:Type`, `ns.Type`, `supabase:auth.User`), where every
- * segment and separator hugs — the one context that flips the colon from the
- * argument/object form (`name: value`, hug-then-space) to the namespace form.
- */
+// Qualified-name separators hug; argument/object colons keep the usual value space.
 function spaceBetween(
   prev: TokenKind | undefined,
   cur: TokenKind,
@@ -196,18 +138,6 @@ function spaceBetween(
   }
 }
 
-/**
- * Streams one AST node's significant tokens (and any interior `//` comments) in
- * source order through the writer. The recursion tracks whether it is inside a
- * qualified name (where segments hug), normalises whitespace/newline trivia to
- * canonical spacing, and routes every comment through the universal break+indent
- * rule. `padTo`, when given, pads the line out to that column *before* the node's
- * first significant token — how a caller that knows its alignment column (e.g.
- * {@link emitField} reaching the type) places the cell boundary explicitly.
- *
- * Returns the number of continuation indents the interior comments pushed; the
- * caller must {@link LineWriter.unindent} that many times once its construct ends.
- */
 function streamNode(writer: LineWriter, node: SyntaxNode, padTo?: number): number {
   let continuation = 0;
   let first = true;
@@ -240,18 +170,10 @@ function streamNode(writer: LineWriter, node: SyntaxNode, padTo?: number): numbe
   return continuation;
 }
 
-/** Pops `count` continuation indents opened by interior comments. */
 function closeContinuation(writer: LineWriter, count: number): void {
   for (let i = 0; i < count; i++) writer.unindent();
 }
 
-/**
- * A field row: `name<pad>Type<pad>@attr @attr`. Reads the field's name, type
- * annotation, and attributes from the AST and streams that row via
- * {@link streamRow}, which pads the type and first-attribute cells to the block's
- * precomputed columns and routes any interior `//` comment through the universal
- * break. Returns the continuation indents to close.
- */
 function emitField(
   writer: LineWriter,
   field: FieldDeclarationAst,
@@ -260,27 +182,10 @@ function emitField(
   return streamRow(writer, field.syntax, columns);
 }
 
-/**
- * A `types {}` member: `Name = Type @attr`. Identical row shape to a field with
- * an extra `=` token before the type; {@link streamRow} streams the declaration's
- * children in order, so the `=` falls out with canonical spacing and no separate
- * handling. Named-type rows are never column-aligned. Returns continuation.
- */
 function emitNamedType(writer: LineWriter, decl: NamedTypeDeclarationAst): number {
   return streamRow(writer, decl.syntax, undefined);
 }
 
-/**
- * Streams a single declaration row (field or named type) by walking the
- * declaration's *direct* children in source order — the one place an interior
- * `//` comment can sit between the type and the first attribute, which is why the
- * walk is over direct children rather than per-sub-node. The type annotation cell
- * pads to `columns.typeColumn` and the first field attribute to
- * `columns.attributeColumn`; once an interior comment has broken the line, the
- * remaining attributes drop onto fresh continuation lines instead of aligning.
- * Comments nested deeper (inside an attribute arg list) are caught by
- * {@link streamNode}'s recursion. Returns the continuation indents to close.
- */
 function streamRow(
   writer: LineWriter,
   row: SyntaxNode,
@@ -316,41 +221,21 @@ function streamRow(
   return continuation;
 }
 
-/** A `@@attr` block attribute on its own line. Returns continuation to close. */
 function emitBlockAttribute(writer: LineWriter, attribute: ModelAttributeAst): number {
   return streamNode(writer, attribute.syntax);
 }
 
-/** A generic-block entry: `key = value`. Returns continuation to close. */
 function emitKeyValue(writer: LineWriter, pair: KeyValuePairAst): number {
   return streamNode(writer, pair.syntax);
 }
 
-/**
- * How a block tells {@link emitBlockBody} to handle one of *its* members: which
- * separation category it falls into (so the shared trivia walk can place the
- * house-style blank) and how to print it (the per-member function the block
- * picked for that kind). Each block builds these from its own typed members, so
- * the member set — not a generic dispatcher — stays owned by the block function.
- */
 type MemberCategory = 'regular' | 'blockAttribute' | 'nestedBlock';
 
 interface BlockMember {
   readonly category: MemberCategory;
-  /**
-   * Prints the member's tokens and terminates its line — trailing the given
-   * same-line `//` comment when present, otherwise ending the line plainly — and
-   * returns the continuation indents the region walk must close afterwards.
-   */
   emit(trailing: string | undefined): number;
 }
 
-/**
- * Wraps a per-member function as a leaf {@link BlockMember}: print the row, then
- * trail its same-line comment (or end the line) before the caller closes the
- * continuation it returned. Block attributes and entries share this terminator;
- * only nested blocks terminate themselves.
- */
 function leafMember(
   writer: LineWriter,
   category: MemberCategory,
@@ -367,15 +252,8 @@ function leafMember(
   };
 }
 
-/**
- * Maps one of a block's child nodes to a {@link BlockMember}, or `undefined` when
- * the child is not one of this block's member kinds. This is the function each
- * block function supplies to {@link emitBlockBody}; it is where a block names the
- * member kinds it owns and the per-member function each is printed with.
- */
 type MemberClassifier = (node: SyntaxNode) => BlockMember | undefined;
 
-/** `model Name {` — fields and block attributes, then `}`. */
 function emitModel(
   writer: LineWriter,
   model: ModelDeclarationAst,
@@ -392,7 +270,6 @@ function emitModel(
   });
 }
 
-/** `type Name {` — fields and block attributes, then `}`. */
 function emitCompositeType(
   writer: LineWriter,
   composite: CompositeTypeDeclarationAst,
@@ -409,7 +286,6 @@ function emitCompositeType(
   });
 }
 
-/** `keyword Name {` (enum / datasource / generator) — key/value entries and block attributes, then `}`. */
 function emitGenericBlock(
   writer: LineWriter,
   block: GenericBlockDeclarationAst,
@@ -425,7 +301,6 @@ function emitGenericBlock(
   });
 }
 
-/** `namespace Name {` — nested declarations (models / composite types / generic blocks), then `}`. */
 function emitNamespace(
   writer: LineWriter,
   namespace: NamespaceDeclarationAst,
@@ -438,7 +313,6 @@ function emitNamespace(
   });
 }
 
-/** `types {` — named-type declarations, then `}`. */
 function emitTypesBlock(
   writer: LineWriter,
   block: TypesBlockAst,
@@ -451,13 +325,6 @@ function emitTypesBlock(
   });
 }
 
-/**
- * The document body: a sequence of top-level declarations (every one a block) with
- * the same inter-member trivia as a block interior, but no surrounding braces. The
- * walk reads the document's heterogeneous declarations — a thin cast-dispatch to
- * each block's emit function — and lets {@link walkRegion} place the blanks and
- * comments between them.
- */
 function emitTopLevel(writer: LineWriter, document: DocumentAst): void {
   walkRegion(writer, Array.from(document.syntax.children()), undefined, (node) => {
     const declaration = castTopLevelDeclaration(node);
@@ -466,20 +333,8 @@ function emitTopLevel(writer: LineWriter, document: DocumentAst): void {
   });
 }
 
-/**
- * A bound emitter for one nested block — prints the block, carrying its own
- * `} // trailing` same-line comment into its close (a block owns its closing
- * line, so it cannot be terminated by the region walk like a leaf member). Used
- * by the namespace / document classifiers so they recognise *which* block kinds
- * are valid in their position without re-implementing each block's emission.
- */
 type BlockEmitter = (writer: LineWriter, trailing: string | undefined) => void;
 
-/**
- * Wraps a nested block's emitter as a {@link BlockMember}: the block writes its
- * own closing line (carrying any `} // trailing` comment) and balances its own
- * continuation indents, so it leaves none for the region walk to close.
- */
 function nestedBlockMember(writer: LineWriter, block: BlockEmitter): BlockMember {
   return {
     category: 'nestedBlock',
@@ -510,14 +365,6 @@ function castTopLevelDeclaration(node: SyntaxNode): BlockEmitter | undefined {
   return undefined;
 }
 
-/**
- * Emits a block's `keyword [Name] {` header, its body, and its closing `}`. The
- * caller supplies a {@link MemberClassifier} naming the member kinds it owns;
- * this helper streams the header tokens, carries a same-line `{ // header`
- * comment, walks the body at one deeper indent via {@link walkRegion}, and closes
- * with `}` carrying the comment that trailed it on the same source line. The
- * shared header + trivia mechanics live here; the member set stays with the block.
- */
 function emitBlockBody(
   writer: LineWriter,
   node: SyntaxNode,
@@ -541,12 +388,6 @@ function emitBlockBody(
   else writer.newline();
 }
 
-/**
- * Streams a block's header tokens (keyword, optional name) up to and including
- * the opening `{`, recursing into the name's `Identifier` node so the name lands
- * between the keyword and the brace. Header names are never qualified, so the
- * plain inter-token spacing table applies with no qualified-name hugging.
- */
 function streamHeader(writer: LineWriter, node: SyntaxNode): void {
   let done = false;
   const walk = (parent: SyntaxNode): void => {
@@ -570,25 +411,6 @@ function streamHeader(writer: LineWriter, node: SyntaxNode): void {
   walk(node);
 }
 
-/**
- * Walks a region's children in source order — a block interior up to its closing
- * `}`, or the document body — placing the comments and blank lines the block's
- * member emitters cannot see. The block-supplied {@link MemberClassifier} decides
- * which children are members and how each prints (and which separation category
- * it falls into); this walk owns only the trivia *between* members:
- *
- *   - an own-line comment (preceded by a newline) writes on its own line;
- *   - a same-line comment trails the member just written;
- *   - a run of ≥2 newlines between members collapses to one blank;
- *   - a nested block, and the first block attribute after a regular member, get
- *     one house-style blank.
- *
- * A leading comment run attaches to the member it precedes and carries that
- * member's separation blank, so the blank lands before the comment. `closeKind`
- * is `RBrace` for a block (the walk skips up to and including the opening `{`,
- * whose header {@link emitBlockBody} already wrote) and `undefined` for the
- * document.
- */
 function walkRegion(
   writer: LineWriter,
   elements: readonly SyntaxElement[],
@@ -657,12 +479,6 @@ function walkRegion(
   }
 }
 
-/**
- * Whether the house style places a blank before a member of `category`: one
- * before a nested block, and one before the first block attribute that follows a
- * regular member. Decided from the writer's current state and the last member's
- * kind — the categories are assigned by each block's own classifier.
- */
 function separationBlankWanted(
   writer: LineWriter,
   category: MemberCategory,
@@ -674,13 +490,6 @@ function separationBlankWanted(
   return category === 'blockAttribute' && lastWasRegular;
 }
 
-/**
- * The separation category of the member a leading comment at `commentIndex`
- * precedes — the next member reached by skipping intervening own-line comments and
- * trivia, or `undefined` when the comment dangles (the region closes first). A
- * pure forward scan that buffers no output; it only locates the category whose
- * separation blank the leading comment carries, using the block's own classifier.
- */
 function leadingMemberAfter(
   elements: readonly SyntaxElement[],
   commentIndex: number,
@@ -695,12 +504,6 @@ function leadingMemberAfter(
   return undefined;
 }
 
-/**
- * The same-line `//` comment that trails the member ending at `memberIndex` — the
- * next non-whitespace element when it is a `Comment` reached with no intervening
- * newline. Returns its text and the element index to skip past, or `undefined`
- * for both when the member is the last thing on its source line.
- */
 function sameLineTrailingComment(
   elements: readonly SyntaxElement[],
   memberIndex: number,
@@ -716,11 +519,6 @@ function sameLineTrailingComment(
   return { text: undefined, index: undefined };
 }
 
-/**
- * The same-line `//` comment trailing the opening `{` (a `{ // header` block),
- * found by scanning the children just past the brace up to the first newline.
- * `undefined` when the brace is the last thing on its line.
- */
 function sameLineCommentAfter(
   children: readonly SyntaxElement[],
   openIndex: number,
@@ -741,20 +539,12 @@ interface AlignmentColumns {
   readonly attributeColumn: number;
 }
 
-/**
- * A block's alignment pre-pass: column widths are computed over ALL the block's
- * field rows at once — every field shares one set of columns, regardless of any
- * blanks or comments between them. Widths are a pure function of the rows' ASTs
- * (the rendered name and type cells) — the only look-ahead in emission; no
- * rendered output is buffered. A field carrying an interior `//` comment breaks
- * across continuation lines, so it does not contribute to the width math.
- * Returns `undefined` when the block has no alignable field.
- */
 function alignmentMap(block: SyntaxNode): AlignmentColumns | undefined {
   const fields: SyntaxNode[] = [];
   for (const element of block.children()) {
     if (!(element instanceof SyntaxNode)) continue;
     if (FieldDeclarationAst.cast(element) === undefined) continue;
+    // Interior comments split rows into continuation lines, so those rows opt out of alignment.
     if (hasInteriorComment(element)) continue;
     fields.push(element);
   }
@@ -781,11 +571,6 @@ function alignmentColumns(rows: readonly SyntaxNode[]): AlignmentColumns {
   return { typeColumn, attributeColumn: cellEnd + 1 };
 }
 
-/**
- * Whether a field carries a `//` comment before its closing boundary — the
- * interior-comment break that pulls the row out of an alignment run (its
- * continuation attributes drop to their own indented lines).
- */
 function hasInteriorComment(node: SyntaxNode): boolean {
   for (const token of node.tokens()) {
     if (token.kind === 'Comment') return true;
@@ -793,11 +578,6 @@ function hasInteriorComment(node: SyntaxNode): boolean {
   return false;
 }
 
-/**
- * The canonical text of a sub-tree's significant tokens with spacing applied —
- * used only to measure alignment column widths in the pre-pass, never to emit
- * (emission streams tokens through the writer).
- */
 function renderTokens(node: SyntaxNode | undefined): string {
   if (!node) return '';
   let out = '';

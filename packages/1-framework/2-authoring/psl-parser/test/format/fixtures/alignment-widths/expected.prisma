@@ -15,6 +15,7 @@ model Widths {
 }
 
 enum Role {
+  @@type("pg/text@1")
   USER
   ADMINISTRATOR
   GUEST

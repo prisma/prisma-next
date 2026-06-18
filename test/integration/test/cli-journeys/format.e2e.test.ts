@@ -1,18 +1,3 @@
-/**
- * Format command (Journey F)
- *
- * Proves the three behaviours that anchor the `prisma format` slice, each
- * against a real `format` command invocation in a temp project (no database):
- *
- *   F.01 — a PSL contract source (`sourceFormat: 'psl'`) is formatted in place.
- *   F.02 — a non-PSL source (`sourceFormat: 'typescript'`) is left untouched.
- *   F.03 — unparseable PSL is refused (non-zero exit, no partial write).
- *
- * Each test writes a self-contained config + source file into the temp dir, so
- * the discriminator (`contract.source.sourceFormat`) and the on-disk effect are
- * both visible in the test body.
- */
-
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { format } from '@prisma-next/psl-parser/format';
@@ -21,8 +6,6 @@ import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import { runFormatWithConfig, setupJourney } from '../utils/journey-test-helpers';
 
-// A deliberately-unformatted schema: collapsed-then-expanded whitespace, ragged
-// field columns, and a second block so the formatter has real work to do.
 const MESSY_PSL = `model    User    {
 id     Int      @id @default(autoincrement())
 email String @unique
@@ -30,12 +13,11 @@ email String @unique
 }
 
 enum Role {
+@@type("pg/text@1")
 USER
 ADMIN
 }`;
 
-// Built inline rather than copied from a fixture so the source-format
-// discriminator that drives the command's behaviour is visible in the test.
 function pslConfig(): string {
   return `import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';
@@ -85,8 +67,6 @@ withTempDir(({ createTempDir }) => {
       'F.02: leaves a non-PSL contract source untouched',
       async () => {
         const ctx = setupJourney({ createTempDir });
-        // A source file that is byte-for-byte messy PSL on disk, but the config
-        // declares the source as TypeScript — so the discriminator must skip it.
         const sourcePath = join(ctx.testDir, 'contract.prisma');
         writeFileSync(sourcePath, MESSY_PSL, 'utf-8');
         writeFileSync(

@@ -47,20 +47,11 @@ export interface ContractSourceContext {
   readonly resolvedInputs: readonly string[];
 }
 
-/**
- * Authoring format of a contract source. Lets format-aware tooling (e.g. the
- * PSL formatter) branch on the source language without sniffing file extensions
- * or inspecting the opaque `load` closure: only `'psl'` sources carry PSL text
- * worth formatting.
- */
+/** Lets format-aware tooling avoid file-extension sniffing and opaque loader introspection. */
 export type ContractSourceFormat = 'psl' | 'typescript';
 
 export interface ContractSourceProvider {
-  /**
-   * Authoring format this provider reads from. Every first-party provider
-   * declares it; an absent value is treated as "not known to be PSL" by
-   * format-aware tooling, i.e. left untouched.
-   */
+  /** Absent means format-aware tooling must leave the source untouched. */
   readonly sourceFormat?: ContractSourceFormat;
   readonly inputs?: readonly string[];
   readonly load: (

@@ -2,6 +2,7 @@ model A {
   id Int @id
 }
 enum Role {
+  @@type("pg/text@1")
   USER
   ADMIN
 }

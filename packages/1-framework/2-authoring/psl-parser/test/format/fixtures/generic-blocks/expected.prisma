@@ -1,8 +1,8 @@
-datasource db {
+settings db {
   provider = "postgresql"
   url = env("DATABASE_URL")
 }
 
-generator {
+client {
   output = "./client"
 }

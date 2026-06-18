@@ -12,6 +12,7 @@ related SomeVeryLongTypeName
 name String
 }
 enum Role {
+@@type("pg/text@1")
 USER
 ADMINISTRATOR
 GUEST

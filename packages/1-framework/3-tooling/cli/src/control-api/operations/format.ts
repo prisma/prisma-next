@@ -6,28 +6,16 @@ import { loadConfig } from '../../config-loader';
 import { CliStructuredError, errorRuntime, errorUnexpected } from '../../utils/cli-errors';
 
 export interface FormatOperationOptions {
-  /** Path to the prisma-next.config.ts file. */
   readonly configPath?: string;
-  /**
-   * System newline string used when `formatter.newline` is absent. Defaults to
-   * `os.EOL`; injectable so the resolution is testable without touching
-   * `process`/`os`. This is the ONLY place `os.EOL` enters the format flow —
-   * the engine never reads `os`.
-   */
+  /** Injected at the CLI boundary so the formatter engine never reads `os`. */
   readonly eol?: string;
 }
 
 export interface FormatOperationResult {
-  /** Whether the source was a PSL file that got rewritten in place. */
   readonly formatted: boolean;
-  /** Absolute path that was formatted; undefined when nothing was formatted. */
   readonly path?: string;
 }
 
-/**
- * Resolves the engine `newline` option: an explicit `formatter.newline` wins;
- * otherwise the system EOL maps `\r\n` → `CRLF` and anything else → `LF`.
- */
 export function resolveNewline(
   formatterNewline: 'LF' | 'CRLF' | undefined,
   eol: string,
@@ -38,16 +26,6 @@ export function resolveNewline(
   return eol === '\r\n' ? 'CRLF' : 'LF';
 }
 
-/**
- * Formats the contract source file in place when it is PSL.
- *
- * Loads the config, reads `config.contract.source.sourceFormat`: anything other
- * than `'psl'` (including absent) is left untouched and reported as "nothing to
- * format" (`formatted: false`). For PSL, it reads `inputs[0]` (resolved to an
- * absolute path by the config loader), formats it via the PSL formatter engine,
- * and writes the result back to the same file. A `PslFormatError` surfaces as a
- * structured CLI error with no partial write.
- */
 export async function executeFormat(
   options: FormatOperationOptions,
 ): Promise<Result<FormatOperationResult, CliStructuredError>> {

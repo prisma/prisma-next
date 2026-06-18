@@ -311,7 +311,6 @@ const telemetryCommand = createTelemetryCommand();
 // Top-level init command
 const initCommand = createInitCommand();
 
-// Top-level format command
 const formatCommand = createFormatCommand();
 
 // Register top-level commands in the order the spec's intended-surface
