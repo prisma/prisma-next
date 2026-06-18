@@ -38,6 +38,11 @@ export {
   namespacePslExtensionBlocks,
 } from '@prisma-next/framework-components/psl-ast';
 export { getPositionalArgument, parseQuotedStringLiteral } from '../attribute-helpers';
+export {
+  findBlockDescriptor,
+  reconstructExtensionBlock,
+  validateExtensionBlockFromSymbol,
+} from '../extension-block';
 export { parsePslDocument } from '../parser';
 export type {
   BlockSymbol,
