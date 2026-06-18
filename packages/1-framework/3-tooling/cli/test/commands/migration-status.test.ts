@@ -20,8 +20,6 @@ import {
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
 
-// Spy-mock the package so `vi.spyOn(configLoader, 'loadConfig')` can replace the
-// real export (ESM named exports are read-only without `{ spy: true }`).
 vi.mock('@prisma-next/config-loader', { spy: true });
 
 const mocks = vi.hoisted(() => ({

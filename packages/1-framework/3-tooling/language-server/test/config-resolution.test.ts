@@ -8,9 +8,6 @@ import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resolveConfigInputs } from '../src/config-resolution';
 
-// Spy-mock the loader so the rethrow test can inject an unexpected structured
-// error; the on-disk cases keep the real implementation (ESM named exports are
-// read-only without `{ spy: true }`).
 vi.mock('@prisma-next/config-loader', { spy: true });
 
 describe('resolveConfigInputs', { timeout: timeouts.coldTransformImport }, () => {

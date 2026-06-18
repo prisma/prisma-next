@@ -60,8 +60,6 @@ function validateNoOutputsAreInputs(
   }
 }
 
-// `resolveEmittedArtifactPaths`, when supplied, rejects configs whose inputs
-// collide with emitted artifacts; omitting it skips that check (paths still resolve).
 export function finalizeConfig(
   config: PrismaNextConfig,
   configDir: string,

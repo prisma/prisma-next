@@ -110,9 +110,6 @@ describe('loadConfig', () => {
   it(
     'maps a 4001 when c12 resolves to a different file than the requested path',
     async () => {
-      // The caller requests an extensionless `custom.config`; c12 resolves it to
-      // `custom.config.ts`, so the loaded file differs from the requested path.
-      // The loaded config is still rejected because it isn't the file asked for.
       writeFileSync(join(tempDir, 'custom.config.ts'), VALID_CONFIG_SOURCE);
       process.chdir(tempDir);
 

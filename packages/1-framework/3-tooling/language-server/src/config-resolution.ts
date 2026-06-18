@@ -6,9 +6,6 @@ import { emptySchemaInputSet, resolveSchemaInputs, type SchemaInputSet } from '.
 // Exported so the watcher glob and the resolution load from the same path.
 export const CONFIG_FILENAME = 'prisma-next.config.ts';
 
-// Stable structured-error codes the loader raises for the two degradable
-// config failures (see `@prisma-next/errors/control`): 4001 = config file not
-// found, 4009 = config validation. Any other code is a genuine failure.
 const CODE_CONFIG_FILE_NOT_FOUND = '4001';
 const CODE_CONFIG_VALIDATION = '4009';
 
@@ -17,9 +14,6 @@ export interface ConfigResolution {
   readonly degradedReason?: string;
 }
 
-// `loadConfig` raises a structured `CliStructuredError`; a missing or invalid
-// config degrades gracefully to an empty input set with a `degradedReason` the
-// caller can log. Any other structured code (or non-structured error) re-throws.
 export async function resolveConfigInputs(
   rootPath: string,
   configPath?: string,

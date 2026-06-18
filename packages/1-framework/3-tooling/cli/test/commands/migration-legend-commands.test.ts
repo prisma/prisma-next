@@ -13,8 +13,6 @@ import { join } from 'pathe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
 
-// Spy-mock the package so `vi.spyOn(configLoader, 'loadConfig')` can replace the
-// real export (ESM named exports are read-only without `{ spy: true }`).
 vi.mock('@prisma-next/config-loader', { spy: true });
 
 const HASH_ROOT = `sha256:4cb4256${'0'.repeat(57)}`;

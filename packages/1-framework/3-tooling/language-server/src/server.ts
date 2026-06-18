@@ -20,8 +20,6 @@ export interface LanguageServer {
   dispose(): void;
 }
 
-// Injectable so tests can supply a deterministic resolution; defaults to the
-// config-backed {@link resolveConfigInputs}.
 export type ResolveInputs = (rootPath: string, configPath?: string) => Promise<ConfigResolution>;
 
 export interface CreateServerOptions {
@@ -29,9 +27,6 @@ export interface CreateServerOptions {
   readonly resolveInputs?: ResolveInputs;
 }
 
-// Connection is injected (not created here) so tests can drive the server over
-// an in-memory stream pair; `startServer` supplies the stdio one. Sync is
-// incremental: the client ships deltas, but the server re-parses the full buffer.
 export function createServer(
   connection: Connection,
   options?: CreateServerOptions,
@@ -40,8 +35,6 @@ export function createServer(
   const resolveInputs = options?.resolveInputs ?? resolveConfigInputs;
   let schemaInputs: SchemaInputSet = emptySchemaInputSet;
   let degradedReason: string | undefined;
-  // Mutable: captured at `initialize`, reused by the watcher registration and the
-  // re-resolution on a config change.
   let rootPath = process.cwd();
   let watchedConfigPath = join(rootPath, CONFIG_FILENAME);
   let supportsWatchedFilesRegistration = false;
@@ -49,7 +42,6 @@ export function createServer(
   function publish(uri: string, text: string): void {
     const computed = computeDocumentDiagnostics(uri, text, schemaInputs);
     if (computed === null) {
-      // Not a configured input: clear any markers published while it was one.
       void connection.sendDiagnostics({ uri, diagnostics: [] });
       return;
     }
@@ -69,9 +61,6 @@ export function createServer(
   }
 
   function republishOpenDocuments(): void {
-    // `publish` is idempotent per document, so re-running it over every open
-    // document after a config change handles added / removed / unchanged inputs
-    // uniformly without tracking which membership transitioned.
     for (const document of documents.all()) {
       publish(document.uri, document.getText());
     }
@@ -83,8 +72,6 @@ export function createServer(
     supportsWatchedFilesRegistration = clientSupportsWatchedFilesRegistration(params);
     applyResolution(await resolveInputs(rootPath, options?.configPath));
 
-    // Diagnostics are push-only: `diagnosticProvider` (the pull model) is
-    // deliberately not advertised.
     return {
       capabilities: {
         textDocumentSync: TextDocumentSyncKind.Incremental,
@@ -92,17 +79,11 @@ export function createServer(
     };
   });
 
-  // Deferred to `onInitialized` (not `onInitialize`): the connection only
-  // accepts log messages and capability registrations after the handshake.
   connection.onInitialized(() => {
     if (degradedReason !== undefined) {
       connection.console.warn(degradedReason);
     }
     if (supportsWatchedFilesRegistration) {
-      // Dynamic registration is the only mechanism for watched files: the LSP
-      // protocol has no static `InitializeResult` form for them (see
-      // `DidChangeWatchedFilesClientCapabilities`). Watch ONLY the config path
-      // — schema `.psl` files are deliberately not watched (see spec non-goal).
       void connection.client.register(DidChangeWatchedFilesNotification.type, {
         watchers: [{ globPattern: watchedConfigPath }],
       });
@@ -113,9 +94,6 @@ export function createServer(
     }
   });
 
-  // The watcher is scoped to the config path, so any event it delivers is a
-  // config change: re-resolve the input set and fan diagnostics back out. This
-  // fires on the on-disk change whether or not the config is open in the editor.
   connection.onDidChangeWatchedFiles(async () => {
     applyResolution(await resolveInputs(rootPath, options?.configPath));
     if (degradedReason !== undefined) {

@@ -33,8 +33,6 @@ const mocks = vi.hoisted(() => ({
   sign: vi.fn(),
 }));
 
-// Spy-mock the package so `vi.spyOn(configLoader, 'loadConfig')` can replace the
-// real export (ESM named exports are read-only without `{ spy: true }`).
 vi.mock('@prisma-next/config-loader', { spy: true });
 
 vi.mock('@prisma-next/migration-tools/refs', async (importOriginal) => {

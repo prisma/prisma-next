@@ -315,7 +315,6 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
   });
 });
 
-// Swappable result between calls, to simulate a config edit changing the inputs.
 function mutableResolve(initial: ResolveInputs): {
   resolve: ResolveInputs;
   set: (next: ResolveInputs) => void;
@@ -358,11 +357,6 @@ describe('language server config watching', { timeout: timeouts.databaseOperatio
   it('does not request registration when the client lacks dynamic registration', async () => {
     harness = startHarness(resolveToSchema);
     await harness.initialize();
-    // The no-registration path of `onInitialized` still warns about the missing
-    // dynamic-registration capability. That warning is emitted in the same
-    // handler that would otherwise register the watcher, so once it arrives the
-    // registration phase has fully run — a deterministic completion signal that
-    // lets us assert the absence of a registration without a fixed sleep.
     await harness.waitForWarning((message) =>
       message.includes('does not support dynamic file-watcher registration'),
     );
@@ -378,7 +372,6 @@ describe('language server config watching', { timeout: timeouts.databaseOperatio
     harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
       textDocument: { uri: schemaUri, languageId: 'prisma', version: 1, text: 'model {' },
     });
-    // Not yet an input: the open publishes an empty set.
     expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
 
     const diagnosed = harness.waitForDiagnosticsMatching(

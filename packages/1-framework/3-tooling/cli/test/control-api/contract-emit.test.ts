@@ -9,8 +9,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { executeContractEmit } from '../../src/control-api/operations/contract-emit';
 import { disposeEmitQueue } from '../../src/utils/emit-queue';
 
-// Spy-mock the package so `vi.spyOn(configLoader, 'loadConfig')` can replace the
-// real export (ESM named exports are read-only without `{ spy: true }`).
 vi.mock('@prisma-next/config-loader', { spy: true });
 
 vi.mock('@prisma-next/emitter', async () => {
