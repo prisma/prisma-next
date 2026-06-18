@@ -1,4 +1,11 @@
 import type { ParseDiagnostic } from './parse';
+import {
+  type ResolvedAttribute,
+  type ResolvedTypeConstructorCall,
+  readResolvedAttributes,
+  readResolvedConstructorCall,
+  resolveFieldTypeAnnotation,
+} from './resolve';
 import type { Range, SourceFile } from './source-file';
 import {
   CompositeTypeDeclarationAst,
@@ -11,6 +18,12 @@ import {
   TypesBlockAst,
 } from './syntax/ast/declarations';
 import type { IdentifierAst } from './syntax/ast/identifier';
+
+export type {
+  ResolvedAttribute,
+  ResolvedAttributeArg,
+  ResolvedTypeConstructorCall,
+} from './resolve';
 
 /**
  * A scope-aware model of a PSL `DocumentAst`, produced by {@link buildSymbolTable}.
@@ -49,6 +62,7 @@ export interface ModelSymbol {
   readonly name: string;
   readonly node: ModelDeclarationAst;
   readonly fields: Record<string, FieldSymbol>;
+  readonly attributes: readonly ResolvedAttribute[];
 }
 
 export interface CompositeTypeSymbol {
@@ -56,6 +70,7 @@ export interface CompositeTypeSymbol {
   readonly name: string;
   readonly node: CompositeTypeDeclarationAst;
   readonly fields: Record<string, FieldSymbol>;
+  readonly attributes: readonly ResolvedAttribute[];
 }
 
 export interface BlockSymbol {
@@ -65,13 +80,26 @@ export interface BlockSymbol {
   readonly node: GenericBlockDeclarationAst;
 }
 
-export interface ScalarSymbol {
+/**
+ * The resolved binding shape shared by `types {}` entries: exactly one of
+ * `baseType` / `typeConstructor` is meaningful, discriminated by `isConstructor`
+ * (the CST `typeAnnotation().isConstructor()` discriminant), plus the binding's
+ * attributes.
+ */
+export interface ResolvedNamedTypeBinding {
+  readonly baseType?: string;
+  readonly typeConstructor?: ResolvedTypeConstructorCall;
+  readonly isConstructor: boolean;
+  readonly attributes: readonly ResolvedAttribute[];
+}
+
+export interface ScalarSymbol extends ResolvedNamedTypeBinding {
   readonly kind: 'scalar';
   readonly name: string;
   readonly node: NamedTypeDeclarationAst;
 }
 
-export interface TypeAliasSymbol {
+export interface TypeAliasSymbol extends ResolvedNamedTypeBinding {
   readonly kind: 'typeAlias';
   readonly name: string;
   readonly node: NamedTypeDeclarationAst;
@@ -81,6 +109,21 @@ export interface FieldSymbol {
   readonly kind: 'field';
   readonly name: string;
   readonly node: FieldDeclarationAst;
+  readonly typeName: string;
+  readonly typeNamespaceId?: string;
+  readonly typeContractSpaceId?: string;
+  readonly optional: boolean;
+  readonly list: boolean;
+  readonly typeConstructor?: ResolvedTypeConstructorCall;
+  readonly attributes: readonly ResolvedAttribute[];
+  /**
+   * Set when the field's qualified type was over-qualified and
+   * `PSL_INVALID_QUALIFIED_TYPE` was already emitted into the symbol-table
+   * diagnostics. Interpreters treat it as already-reported and do NOT cascade a
+   * `PSL_UNSUPPORTED_FIELD_TYPE` (the legacy parser rejected such types before
+   * the interpreter ran, so that cascade would be a spurious extra diagnostic).
+   */
+  readonly malformedType?: boolean;
 }
 
 export interface BuildSymbolTableOptions {
@@ -135,10 +178,12 @@ export function buildSymbolTable(options: BuildSymbolTableOptions): SymbolTableR
   for (const declaration of document.declarations()) {
     if (declaration instanceof ModelDeclarationAst) {
       const name = claim(topLevelNames, declaration.name());
-      if (name !== undefined) models[name] = buildModel(name, declaration);
+      if (name !== undefined) models[name] = buildModel(name, declaration, sourceFile, diagnostics);
     } else if (declaration instanceof CompositeTypeDeclarationAst) {
       const name = claim(topLevelNames, declaration.name());
-      if (name !== undefined) compositeTypes[name] = buildCompositeType(name, declaration);
+      if (name !== undefined) {
+        compositeTypes[name] = buildCompositeType(name, declaration, sourceFile, diagnostics);
+      }
     } else if (declaration instanceof GenericBlockDeclarationAst) {
       const name = claim(topLevelNames, declaration.name());
       if (name !== undefined) blocks[name] = buildBlock(name, declaration);
@@ -151,10 +196,11 @@ export function buildSymbolTable(options: BuildSymbolTableOptions): SymbolTableR
       for (const binding of declaration.declarations()) {
         const name = claim(topLevelNames, binding.name());
         if (name === undefined) continue;
+        const resolved = resolveNamedTypeBinding(binding, sourceFile);
         if (isScalarBinding(binding, scalarSet)) {
-          scalars[name] = { kind: 'scalar', name, node: binding };
+          scalars[name] = { kind: 'scalar', name, node: binding, ...resolved };
         } else {
-          typeAliases[name] = { kind: 'typeAlias', name, node: binding };
+          typeAliases[name] = { kind: 'typeAlias', name, node: binding, ...resolved };
         }
       }
     }
@@ -166,12 +212,34 @@ export function buildSymbolTable(options: BuildSymbolTableOptions): SymbolTableR
   return { table, diagnostics };
 }
 
-function buildModel(name: string, node: ModelDeclarationAst): ModelSymbol {
-  return { kind: 'model', name, node, fields: buildFields(node.fields()) };
+function buildModel(
+  name: string,
+  node: ModelDeclarationAst,
+  sourceFile: SourceFile,
+  diagnostics: ParseDiagnostic[],
+): ModelSymbol {
+  return {
+    kind: 'model',
+    name,
+    node,
+    fields: buildFields(name, node.fields(), sourceFile, diagnostics),
+    attributes: readResolvedAttributes(node.attributes(), sourceFile),
+  };
 }
 
-function buildCompositeType(name: string, node: CompositeTypeDeclarationAst): CompositeTypeSymbol {
-  return { kind: 'compositeType', name, node, fields: buildFields(node.fields()) };
+function buildCompositeType(
+  name: string,
+  node: CompositeTypeDeclarationAst,
+  sourceFile: SourceFile,
+  diagnostics: ParseDiagnostic[],
+): CompositeTypeSymbol {
+  return {
+    kind: 'compositeType',
+    name,
+    node,
+    fields: buildFields(name, node.fields(), sourceFile, diagnostics),
+    attributes: readResolvedAttributes(node.attributes(), sourceFile),
+  };
 }
 
 function buildBlock(name: string, node: GenericBlockDeclarationAst): BlockSymbol {
@@ -205,9 +273,9 @@ function buildNamespace(
     }
     taken.add(memberName);
     if (member instanceof ModelDeclarationAst) {
-      models[memberName] = buildModel(memberName, member);
+      models[memberName] = buildModel(memberName, member, sourceFile, diagnostics);
     } else if (member instanceof CompositeTypeDeclarationAst) {
-      compositeTypes[memberName] = buildCompositeType(memberName, member);
+      compositeTypes[memberName] = buildCompositeType(memberName, member, sourceFile, diagnostics);
     } else if (member instanceof GenericBlockDeclarationAst) {
       blocks[memberName] = buildBlock(memberName, member);
     }
@@ -216,14 +284,90 @@ function buildNamespace(
   return { kind: 'namespace', name, node, models, compositeTypes, blocks };
 }
 
-function buildFields(fields: Iterable<FieldDeclarationAst>): Record<string, FieldSymbol> {
+function buildFields(
+  ownerName: string,
+  fields: Iterable<FieldDeclarationAst>,
+  sourceFile: SourceFile,
+  diagnostics: ParseDiagnostic[],
+): Record<string, FieldSymbol> {
   const result: Record<string, FieldSymbol> = {};
   for (const field of fields) {
     const name = field.name()?.name();
     if (name === undefined || name in result) continue;
-    result[name] = { kind: 'field', name, node: field };
+    result[name] = buildField(ownerName, name, field, sourceFile, diagnostics);
   }
   return result;
+}
+
+function buildField(
+  ownerName: string,
+  name: string,
+  node: FieldDeclarationAst,
+  sourceFile: SourceFile,
+  diagnostics: ParseDiagnostic[],
+): FieldSymbol {
+  const attributes = readResolvedAttributes(node.attributes(), sourceFile);
+  const annotation = resolveFieldTypeAnnotation(node, sourceFile);
+
+  if (!annotation.ok) {
+    diagnostics.push({
+      code: 'PSL_INVALID_QUALIFIED_TYPE',
+      message: `Field "${ownerName}.${name}" has an invalid qualified type "${annotation.path.join('.')}"; use at most one namespace qualifier (e.g. "ns.TypeName")`,
+      range: annotation.range,
+    });
+    return {
+      kind: 'field',
+      name,
+      node,
+      typeName: annotation.path[annotation.path.length - 1] ?? '',
+      optional: false,
+      list: false,
+      malformedType: true,
+      attributes,
+    };
+  }
+
+  const typeConstructor = annotation.annotation.isConstructor
+    ? readResolvedConstructorCall(node.typeAnnotation(), sourceFile)
+    : undefined;
+
+  return {
+    kind: 'field',
+    name,
+    node,
+    typeName: annotation.annotation.typeName ?? '',
+    ...(annotation.annotation.typeNamespaceId !== undefined
+      ? { typeNamespaceId: annotation.annotation.typeNamespaceId }
+      : {}),
+    ...(annotation.annotation.typeContractSpaceId !== undefined
+      ? { typeContractSpaceId: annotation.annotation.typeContractSpaceId }
+      : {}),
+    optional: annotation.annotation.optional,
+    list: annotation.annotation.list,
+    ...(typeConstructor !== undefined ? { typeConstructor } : {}),
+    attributes,
+  };
+}
+
+function resolveNamedTypeBinding(
+  node: NamedTypeDeclarationAst,
+  sourceFile: SourceFile,
+): {
+  baseType?: string;
+  typeConstructor?: ResolvedTypeConstructorCall;
+  isConstructor: boolean;
+  attributes: readonly ResolvedAttribute[];
+} {
+  const annotation = node.typeAnnotation();
+  const isConstructor = annotation?.isConstructor() ?? false;
+  const baseType = annotation?.name()?.identifier()?.name();
+  const typeConstructor = readResolvedConstructorCall(annotation, sourceFile);
+  return {
+    isConstructor,
+    ...(!isConstructor && baseType !== undefined ? { baseType } : {}),
+    ...(typeConstructor !== undefined ? { typeConstructor } : {}),
+    attributes: readResolvedAttributes(node.attributes(), sourceFile),
+  };
 }
 
 function isScalarBinding(node: NamedTypeDeclarationAst, scalarTypes: Set<string>): boolean {

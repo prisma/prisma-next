@@ -181,3 +181,160 @@ describe('buildSymbolTable() — pre-investigated edge cases', () => {
     expect(Object.keys(result.table.topLevel.models)).toEqual([]);
   });
 });
+
+describe('buildSymbolTable() — resolved field shape', () => {
+  it('splits a bare type onto typeName with no qualifiers', () => {
+    const result = build(['model User {', '  name String', '}'].join('\n'));
+    const field = result.table.topLevel.models.User?.fields.name;
+
+    expect(field?.typeName).toBe('String');
+    expect(field?.typeNamespaceId).toBeUndefined();
+    expect(field?.typeContractSpaceId).toBeUndefined();
+    expect(field?.optional).toBe(false);
+    expect(field?.list).toBe(false);
+    expect(field?.malformedType).toBeUndefined();
+  });
+
+  it('splits a dot-qualified type onto typeName + typeNamespaceId', () => {
+    const result = build(['model Profile {', '  user auth.User', '}'].join('\n'));
+    const field = result.table.topLevel.models.Profile?.fields.user;
+
+    expect(field?.typeName).toBe('User');
+    expect(field?.typeNamespaceId).toBe('auth');
+    expect(field?.typeContractSpaceId).toBeUndefined();
+  });
+
+  it('splits a colon-qualified type onto typeName + typeNamespaceId + typeContractSpaceId', () => {
+    const result = build(['model Profile {', '  user supabase:auth.User', '}'].join('\n'));
+    const field = result.table.topLevel.models.Profile?.fields.user;
+
+    expect(field?.typeName).toBe('User');
+    expect(field?.typeNamespaceId).toBe('auth');
+    expect(field?.typeContractSpaceId).toBe('supabase');
+  });
+
+  it('flags an over-qualified type with PSL_INVALID_QUALIFIED_TYPE and malformedType', () => {
+    const result = build(['model Profile {', '  user a.b.c', '}'].join('\n'));
+    const field = result.table.topLevel.models.Profile?.fields.user;
+
+    expect(result.diagnostics.map((d) => d.code)).toContain('PSL_INVALID_QUALIFIED_TYPE');
+    expect(field?.malformedType).toBe(true);
+    expect(field?.typeName).toBe('c');
+  });
+
+  it('derives optional and list modifiers', () => {
+    const result = build(['model User {', '  nickname String?', '  tags String[]', '}'].join('\n'));
+    const fields = result.table.topLevel.models.User?.fields ?? {};
+
+    expect(fields.nickname?.optional).toBe(true);
+    expect(fields.nickname?.list).toBe(false);
+    expect(fields.tags?.optional).toBe(false);
+    expect(fields.tags?.list).toBe(true);
+  });
+
+  it('resolves a constructor field type onto typeConstructor', () => {
+    const result = build(['model Doc {', '  embedding Vector(1536)', '}'].join('\n'));
+    const field = result.table.topLevel.models.Doc?.fields.embedding;
+
+    expect(field?.typeConstructor?.path).toEqual(['Vector']);
+    expect(field?.typeConstructor?.args.map((a) => a.value)).toEqual(['1536']);
+  });
+
+  it('renders field attributes with dotted names and verbatim arg values', () => {
+    const result = build(
+      [
+        'model User {',
+        '  id Int @id @db.VarChar(255)',
+        '  name String @map("full_name")',
+        '}',
+      ].join('\n'),
+    );
+    const id = result.table.topLevel.models.User?.fields.id;
+    const name = result.table.topLevel.models.User?.fields.name;
+
+    expect(id?.attributes.map((a) => a.name)).toEqual(['id', 'db.VarChar']);
+    const dbAttr = id?.attributes.find((a) => a.name === 'db.VarChar');
+    expect(dbAttr?.args.map((a) => ({ kind: a.kind, value: a.value }))).toEqual([
+      { kind: 'positional', value: '255' },
+    ]);
+    const mapAttr = name?.attributes.find((a) => a.name === 'map');
+    expect(mapAttr?.args[0]?.value).toBe('"full_name"');
+  });
+
+  it('renders named attribute args with their argument name', () => {
+    const result = build(
+      [
+        'model Post {',
+        '  authorId Int',
+        '  author User @relation(fields: [authorId], references: [id])',
+        '}',
+      ].join('\n'),
+    );
+    const author = result.table.topLevel.models.Post?.fields.author;
+    const relation = author?.attributes.find((a) => a.name === 'relation');
+
+    expect(relation?.args).toEqual([
+      expect.objectContaining({ kind: 'named', name: 'fields', value: '[authorId]' }),
+      expect.objectContaining({ kind: 'named', name: 'references', value: '[id]' }),
+    ]);
+  });
+});
+
+describe('buildSymbolTable() — resolved model/composite attributes', () => {
+  it('resolves model-level and composite-level attributes', () => {
+    const result = build(
+      [
+        'model User {',
+        '  id Int',
+        '  @@map("users")',
+        '}',
+        'type Address {',
+        '  street String',
+        '  @@map("addr")',
+        '}',
+      ].join('\n'),
+    );
+
+    const model = result.table.topLevel.models.User;
+    expect(model?.attributes.map((a) => a.name)).toEqual(['map']);
+    expect(model?.attributes[0]?.args[0]?.value).toBe('"users"');
+
+    const composite = result.table.topLevel.compositeTypes.Address;
+    expect(composite?.attributes.map((a) => a.name)).toEqual(['map']);
+    expect(composite?.attributes[0]?.args[0]?.value).toBe('"addr"');
+  });
+});
+
+describe('buildSymbolTable() — resolved named-type binding shape', () => {
+  it('resolves a scalar-backed binding with baseType and isConstructor=false', () => {
+    const result = build(['types {', '  Email = String', '}'].join('\n'));
+    const scalar = result.table.topLevel.scalars.Email;
+
+    expect(scalar?.isConstructor).toBe(false);
+    expect(scalar?.baseType).toBe('String');
+    expect(scalar?.typeConstructor).toBeUndefined();
+  });
+
+  it('resolves an alias binding to another declaration with baseType', () => {
+    const result = build(
+      ['model User {', '  id Int', '}', 'types {', '  UserId = User', '}'].join('\n'),
+    );
+    const alias = result.table.topLevel.typeAliases.UserId;
+
+    expect(alias?.isConstructor).toBe(false);
+    expect(alias?.baseType).toBe('User');
+  });
+
+  it('resolves a constructor binding with isConstructor=true and no baseType', () => {
+    const result = build(['types {', '  Embedding = Vector(1536)', '}'].join('\n'), [
+      'Vector',
+      'String',
+    ]);
+    const alias = result.table.topLevel.typeAliases.Embedding;
+
+    expect(alias?.isConstructor).toBe(true);
+    expect(alias?.baseType).toBeUndefined();
+    expect(alias?.typeConstructor?.path).toEqual(['Vector']);
+    expect(alias?.typeConstructor?.args.map((a) => a.value)).toEqual(['1536']);
+  });
+});
