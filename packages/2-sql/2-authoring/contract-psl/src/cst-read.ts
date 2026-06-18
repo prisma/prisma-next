@@ -1,8 +1,10 @@
+import type { PslSpan } from '@prisma-next/psl-parser';
 import type {
   ExpressionAst,
   FieldAttributeAst,
   FieldDeclarationAst,
   ModelAttributeAst,
+  Position,
   QualifiedNameAst,
   Range,
   SourceFile,
@@ -130,4 +132,31 @@ function nodeRange(node: SyntaxNode, sourceFile: SourceFile): Range {
     start: sourceFile.positionAt(start),
     end: sourceFile.positionAt(end),
   };
+}
+
+/**
+ * Map a CST node to the legacy `PslSpan` (1-based line/column + byte offset) the
+ * interpreter and its helpers carry on diagnostics. The wiring-seam map between
+ * the parser's 0-based `Range` and the legacy span shape.
+ */
+export function nodePslSpan(node: SyntaxNode, sourceFile: SourceFile): PslSpan {
+  const start = node.offset;
+  const end = start + node.green.textLength;
+  return {
+    start: offsetToPslPosition(start, sourceFile),
+    end: offsetToPslPosition(end, sourceFile),
+  };
+}
+
+/** Map a parser `Range` to the legacy `PslSpan` shape. */
+export function rangeToPslSpan(range: Range, sourceFile: SourceFile): PslSpan {
+  return {
+    start: offsetToPslPosition(sourceFile.offsetAt(range.start), sourceFile),
+    end: offsetToPslPosition(sourceFile.offsetAt(range.end), sourceFile),
+  };
+}
+
+function offsetToPslPosition(offset: number, sourceFile: SourceFile): PslSpan['start'] {
+  const position: Position = sourceFile.positionAt(offset);
+  return { offset, line: position.line + 1, column: position.character + 1 };
 }

@@ -27,19 +27,11 @@ import type { Namespace } from '@prisma-next/framework-components/ir';
 import { namespacePslExtensionBlocks } from '@prisma-next/framework-components/psl-ast';
 import type {
   ParsePslDocumentResult,
-  PslAttribute,
-  PslCompositeType,
   PslExtensionBlock,
-  PslField,
   PslModel,
-  PslNamedTypeDeclaration,
   PslNamespace,
 } from '@prisma-next/psl-parser';
-import type {
-  SqlModelStorage,
-  SqlNamespaceTablesInput,
-  StorageTypeInstance,
-} from '@prisma-next/sql-contract/types';
+import type { SqlModelStorage, SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import {
   buildSqlContractFromDefinition,
   type EnumTypeHandle,
@@ -54,6 +46,13 @@ import {
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import type {
+  CstAttributeView,
+  CstCompositeTypeView,
+  CstFieldView,
+  CstModelView,
+  CstNamedTypeView,
+} from './cst-read-views';
 import {
   findDuplicateFieldName,
   getAttribute,
@@ -70,12 +69,8 @@ import type { ColumnDescriptor } from './psl-column-resolution';
 import {
   checkUncomposedNamespace,
   getAuthoringEntity,
-  instantiatePslTypeConstructor,
   reportUncomposedNamespace,
-  resolveDbNativeTypeAttribute,
   resolveFieldTypeDescriptor,
-  resolvePslTypeConstructorDescriptor,
-  toNamedTypeFieldDescriptor,
 } from './psl-column-resolution';
 import {
   buildModelMappings,
@@ -85,6 +80,7 @@ import {
   modelCoordinateKey,
   type ResolvedField,
 } from './psl-field-resolution';
+import { resolveNamedTypeDeclarations } from './psl-named-type-resolution';
 import {
   applyBackrelationCandidates,
   type FkRelationMetadata,
@@ -354,225 +350,12 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
   return { enumHandles, enumTypeDescriptors };
 }
 
-interface ResolveNamedTypeDeclarationsInput {
-  readonly declarations: readonly PslNamedTypeDeclaration[];
-  readonly sourceId: string;
-  readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
-  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
-  readonly composedExtensions: ReadonlySet<string>;
-  readonly familyId: string;
-  readonly targetId: string;
-  readonly authoringContributions: AuthoringContributions | undefined;
-  readonly diagnostics: ContractSourceDiagnostic[];
-}
-
-function validateNamedTypeAttributes(input: {
-  readonly declaration: PslNamedTypeDeclaration;
-  readonly sourceId: string;
-  readonly diagnostics: ContractSourceDiagnostic[];
-  readonly composedExtensions: ReadonlySet<string>;
-  readonly authoringContributions: AuthoringContributions | undefined;
-  readonly allowDbNativeType: boolean;
-  readonly familyId: string;
-  readonly targetId: string;
-}): {
-  readonly dbNativeTypeAttribute: PslAttribute | undefined;
-  readonly hasUnsupportedNamedTypeAttribute: boolean;
-} {
-  const dbNativeTypeAttributes = input.allowDbNativeType
-    ? input.declaration.attributes.filter((attribute) => attribute.name.startsWith('db.'))
-    : [];
-  const [dbNativeTypeAttribute, ...extraDbNativeTypeAttributes] = dbNativeTypeAttributes;
-  let hasUnsupportedNamedTypeAttribute = false;
-
-  for (const extra of extraDbNativeTypeAttributes) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-      message: `Named type "${input.declaration.name}" can declare at most one @db.* attribute`,
-      sourceId: input.sourceId,
-      span: extra.span,
-    });
-    hasUnsupportedNamedTypeAttribute = true;
-  }
-
-  for (const attribute of input.declaration.attributes) {
-    if (input.allowDbNativeType && attribute.name.startsWith('db.')) {
-      continue;
-    }
-
-    const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions, {
-      familyId: input.familyId,
-      targetId: input.targetId,
-      authoringContributions: input.authoringContributions,
-    });
-    if (uncomposedNamespace) {
-      reportUncomposedNamespace({
-        subjectLabel: `Attribute "@${attribute.name}"`,
-        namespace: uncomposedNamespace,
-        sourceId: input.sourceId,
-        span: attribute.span,
-        diagnostics: input.diagnostics,
-      });
-      hasUnsupportedNamedTypeAttribute = true;
-      continue;
-    }
-
-    input.diagnostics.push({
-      code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
-      message: `Named type "${input.declaration.name}" uses unsupported attribute "${attribute.name}"`,
-      sourceId: input.sourceId,
-      span: attribute.span,
-    });
-    hasUnsupportedNamedTypeAttribute = true;
-  }
-
-  return { dbNativeTypeAttribute, hasUnsupportedNamedTypeAttribute };
-}
-
-function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput): {
-  readonly storageTypes: Record<string, StorageTypeInstance>;
-  readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
-} {
-  const storageTypes: Record<string, StorageTypeInstance> = {};
-  const namedTypeDescriptors = new Map<string, ColumnDescriptor>();
-
-  for (const declaration of input.declarations) {
-    if (declaration.typeConstructor) {
-      const { hasUnsupportedNamedTypeAttribute } = validateNamedTypeAttributes({
-        declaration,
-        sourceId: input.sourceId,
-        diagnostics: input.diagnostics,
-        composedExtensions: input.composedExtensions,
-        authoringContributions: input.authoringContributions,
-        allowDbNativeType: false,
-        familyId: input.familyId,
-        targetId: input.targetId,
-      });
-      if (hasUnsupportedNamedTypeAttribute) {
-        continue;
-      }
-
-      const helperPath = declaration.typeConstructor.path.join('.');
-      const typeConstructor = resolvePslTypeConstructorDescriptor({
-        call: declaration.typeConstructor,
-        authoringContributions: input.authoringContributions,
-        composedExtensions: input.composedExtensions,
-        familyId: input.familyId,
-        targetId: input.targetId,
-        diagnostics: input.diagnostics,
-        sourceId: input.sourceId,
-        unsupportedCode: 'PSL_UNSUPPORTED_NAMED_TYPE_CONSTRUCTOR',
-        unsupportedMessage: `Named type "${declaration.name}" references unsupported constructor "${helperPath}"`,
-      });
-      if (!typeConstructor) {
-        continue;
-      }
-
-      const storageType = instantiatePslTypeConstructor({
-        call: declaration.typeConstructor,
-        descriptor: typeConstructor,
-        diagnostics: input.diagnostics,
-        sourceId: input.sourceId,
-        entityLabel: `Named type "${declaration.name}"`,
-      });
-      if (!storageType) {
-        continue;
-      }
-
-      namedTypeDescriptors.set(
-        declaration.name,
-        toNamedTypeFieldDescriptor(declaration.name, storageType),
-      );
-      storageTypes[declaration.name] = {
-        kind: 'codec-instance',
-        codecId: storageType.codecId,
-        nativeType: storageType.nativeType,
-        typeParams: storageType.typeParams ?? {},
-      };
-      continue;
-    }
-
-    // Parser invariant: when typeConstructor is absent, baseType is defined.
-    // The check below narrows `baseType` for TypeScript and guards against a
-    // parser regression; it is unreachable under a correct parser.
-    if (declaration.baseType === undefined) {
-      input.diagnostics.push({
-        code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
-        message: `Named type "${declaration.name}" must declare a base type or constructor`,
-        sourceId: input.sourceId,
-        span: declaration.span,
-      });
-      continue;
-    }
-    const { baseType } = declaration;
-    const baseDescriptor =
-      input.enumTypeDescriptors.get(baseType) ?? input.scalarTypeDescriptors.get(baseType);
-    if (!baseDescriptor) {
-      input.diagnostics.push({
-        code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
-        message: `Named type "${declaration.name}" references unsupported base type "${baseType}"`,
-        sourceId: input.sourceId,
-        span: declaration.span,
-      });
-      continue;
-    }
-
-    const { dbNativeTypeAttribute, hasUnsupportedNamedTypeAttribute } = validateNamedTypeAttributes(
-      {
-        declaration,
-        sourceId: input.sourceId,
-        diagnostics: input.diagnostics,
-        composedExtensions: input.composedExtensions,
-        authoringContributions: input.authoringContributions,
-        allowDbNativeType: true,
-        familyId: input.familyId,
-        targetId: input.targetId,
-      },
-    );
-    if (hasUnsupportedNamedTypeAttribute) {
-      continue;
-    }
-
-    if (dbNativeTypeAttribute) {
-      const descriptor = resolveDbNativeTypeAttribute({
-        attribute: dbNativeTypeAttribute,
-        baseType,
-        baseDescriptor,
-        diagnostics: input.diagnostics,
-        sourceId: input.sourceId,
-        entityLabel: `Named type "${declaration.name}"`,
-      });
-      if (!descriptor) {
-        continue;
-      }
-      namedTypeDescriptors.set(
-        declaration.name,
-        toNamedTypeFieldDescriptor(declaration.name, descriptor),
-      );
-      storageTypes[declaration.name] = {
-        kind: 'codec-instance',
-        codecId: descriptor.codecId,
-        nativeType: descriptor.nativeType,
-        typeParams: descriptor.typeParams ?? {},
-      };
-      continue;
-    }
-
-    const descriptor = toNamedTypeFieldDescriptor(declaration.name, baseDescriptor);
-    namedTypeDescriptors.set(declaration.name, descriptor);
-    storageTypes[declaration.name] = {
-      kind: 'codec-instance',
-      codecId: baseDescriptor.codecId,
-      nativeType: baseDescriptor.nativeType,
-      typeParams: {},
-    };
-  }
-
-  return { storageTypes, namedTypeDescriptors };
-}
-
+// dispatch-4: the entry still builds legacy `PslModel`/`PslField`/`PslAttribute`
+// objects (structurally assignable to these views) and feeds them to the
+// view-consuming helpers. Dispatch 4 swaps the entry to build the views from the
+// symbol table directly and drops the legacy `Psl*` construction.
 interface BuildModelNodeInput {
-  readonly model: PslModel;
+  readonly model: CstModelView;
   readonly mapping: ModelNameMapping;
   readonly modelMappings: ReadonlyMap<string, ModelNameMapping>;
   /**
@@ -720,7 +503,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       field,
       relation: getAttribute(field.attributes, 'relation'),
     }))
-    .filter((entry): entry is { field: PslField; relation: PslAttribute } =>
+    .filter((entry): entry is { field: CstFieldView; relation: CstAttributeView } =>
       Boolean(entry.relation),
     );
   const uniqueConstraints: UniqueConstraintNode[] = resolvedFields
@@ -1327,7 +1110,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
 }
 
 interface BuildValueObjectsInput {
-  readonly compositeTypes: readonly PslCompositeType[];
+  readonly compositeTypes: readonly CstCompositeTypeView[];
   readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
@@ -1967,8 +1750,23 @@ export function interpretPslDocumentToSqlContract(
 
   const enumHandlesByName = new Map(Object.entries(validEnumHandles));
 
+  // dispatch-4: bridge the legacy `PslNamedTypeDeclaration[]` to the re-unioned
+  // `CstNamedTypeView[]` the rewritten resolver consumes. Dispatch 4 replaces
+  // this with the symbol table's `topLevel.scalars + topLevel.typeAliases`,
+  // dropping this map entirely.
+  const namedTypeDeclarationViews: CstNamedTypeView[] = (
+    input.document.ast.types?.declarations ?? []
+  ).map((declaration) => ({
+    name: declaration.name,
+    isConstructor: declaration.typeConstructor !== undefined,
+    ...ifDefined('baseType', declaration.baseType),
+    ...ifDefined('typeConstructor', declaration.typeConstructor),
+    attributes: declaration.attributes,
+    span: declaration.span,
+  }));
+
   const namedTypeResult = resolveNamedTypeDeclarations({
-    declarations: input.document.ast.types?.declarations ?? [],
+    declarations: namedTypeDeclarationViews,
     sourceId,
     enumTypeDescriptors: allEnumTypeDescriptors,
     scalarTypeDescriptors: input.scalarTypeDescriptors,

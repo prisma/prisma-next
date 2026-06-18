@@ -9,10 +9,10 @@ import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
-import type { PslAttribute, PslField, PslModel } from '@prisma-next/psl-parser';
 import type { EnumTypeHandle } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { CstAttributeView, CstFieldView, CstModelView } from './cst-read-views';
 import {
   getAttribute,
   getPositionalArgumentEntry,
@@ -36,7 +36,7 @@ type LoweredFieldDefault = {
 function lowerEnumDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
-  readonly defaultAttribute: PslAttribute;
+  readonly defaultAttribute: CstAttributeView;
   readonly enumHandle: EnumTypeHandle;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
@@ -84,7 +84,7 @@ function lowerEnumDefaultForField(input: {
 }
 
 export type ResolvedField = {
-  readonly field: PslField;
+  readonly field: CstFieldView;
   readonly columnName: string;
   readonly descriptor: ColumnDescriptor;
   readonly defaultValue?: ColumnDefault;
@@ -99,7 +99,7 @@ export type ResolvedField = {
 };
 
 export type ModelNameMapping = {
-  readonly model: PslModel;
+  readonly model: CstModelView;
   readonly tableName: string;
   readonly fieldColumns: Map<string, string>;
 };
@@ -112,7 +112,7 @@ export type ModelNameMapping = {
  * {@link modelCoordinateKey} rather than the bare model name.
  */
 export type ModelNamespaceEntry = {
-  readonly model: PslModel;
+  readonly model: CstModelView;
   readonly namespaceId: string | undefined;
 };
 
@@ -123,7 +123,7 @@ export function modelCoordinateKey(namespaceId: string, modelName: string): stri
 }
 
 export interface CollectResolvedFieldsInput {
-  readonly model: PslModel;
+  readonly model: CstModelView;
   readonly mapping: ModelNameMapping;
   readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
@@ -163,7 +163,7 @@ const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
  */
 interface RemovedAttributeRule {
   readonly hint: string;
-  readonly suppressWhen: (field: PslField) => boolean;
+  readonly suppressWhen: (field: CstFieldView) => boolean;
 }
 
 const REMOVED_ATTRIBUTE_RULES: ReadonlyMap<string, RemovedAttributeRule> = new Map([
@@ -193,8 +193,8 @@ const REMOVED_ATTRIBUTE_RULES: ReadonlyMap<string, RemovedAttributeRule> = new M
 }
 
 function validateFieldAttributes(input: {
-  readonly model: PslModel;
-  readonly field: PslField;
+  readonly model: CstModelView;
+  readonly field: CstFieldView;
   readonly composedExtensions: ReadonlySet<string>;
   readonly authoringContributions: AuthoringContributions | undefined;
   readonly diagnostics: ContractSourceDiagnostic[];
@@ -240,13 +240,13 @@ function validateFieldAttributes(input: {
 }
 
 function extractFieldConstraintNames(input: {
-  readonly model: PslModel;
-  readonly field: PslField;
+  readonly model: CstModelView;
+  readonly field: CstFieldView;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): {
-  readonly idAttribute: PslAttribute | undefined;
-  readonly uniqueAttribute: PslAttribute | undefined;
+  readonly idAttribute: CstAttributeView | undefined;
+  readonly uniqueAttribute: CstAttributeView | undefined;
   readonly idName: string | undefined;
   readonly uniqueName: string | undefined;
 } {

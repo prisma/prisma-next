@@ -1,10 +1,11 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import type { PslAttribute, PslField, PslSpan } from '@prisma-next/psl-parser';
+import type { PslSpan } from '@prisma-next/psl-parser';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { CstAttributeView, CstFieldView } from './cst-read-views';
 import {
   getNamedArgument,
   getPositionalArgumentEntry,
@@ -52,7 +53,7 @@ export type FkRelationMetadata = {
 export type ModelBackrelationCandidate = {
   readonly modelName: string;
   readonly tableName: string;
-  readonly field: PslField;
+  readonly field: CstFieldView;
   readonly targetModelName: string;
   readonly relationName?: string;
 };
@@ -88,7 +89,7 @@ export function normalizeReferentialAction(input: {
 }
 
 export function parseRelationAttribute(input: {
-  readonly attribute: PslAttribute;
+  readonly attribute: CstAttributeView;
   readonly modelName: string;
   readonly fieldName: string;
   readonly sourceId: string;
@@ -334,7 +335,7 @@ export function applyBackrelationCandidates(input: {
 
 export function validateNavigationListFieldAttributes(input: {
   readonly modelName: string;
-  readonly field: PslField;
+  readonly field: CstFieldView;
   readonly sourceId: string;
   readonly composedExtensions: Set<string>;
   readonly authoringContributions: AuthoringContributions | undefined;

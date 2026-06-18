@@ -19,13 +19,9 @@ import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
-import type {
-  PslAttribute,
-  PslField,
-  PslSpan,
-  PslTypeConstructorCall,
-} from '@prisma-next/psl-parser';
+import type { PslSpan } from '@prisma-next/psl-parser';
 import { blindCast } from '@prisma-next/utils/casts';
+import type { CstAttributeView, CstFieldView, CstTypeConstructorCallView } from './cst-read-views';
 import {
   lowerDefaultFunctionWithRegistry,
   parseDefaultFunctionCall,
@@ -207,7 +203,7 @@ export function reportUnknownFieldPreset(input: {
 }
 
 export function instantiatePslTypeConstructor(input: {
-  readonly call: PslTypeConstructorCall;
+  readonly call: CstTypeConstructorCallView;
   readonly descriptor: AuthoringTypeConstructorDescriptor;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
@@ -265,7 +261,7 @@ function pushUnsupportedTypeConstructorDiagnostic(input: {
 }
 
 export function resolvePslTypeConstructorDescriptor(input: {
-  readonly call: PslTypeConstructorCall;
+  readonly call: CstTypeConstructorCallView;
   readonly authoringContributions: AuthoringContributions | undefined;
   readonly composedExtensions: ReadonlySet<string>;
   readonly familyId: string;
@@ -314,8 +310,8 @@ export function resolvePslTypeConstructorDescriptor(input: {
  *
  * Symmetric with `instantiatePslTypeConstructor` but richer: a field preset can contribute `default`, `executionDefaults`, `id`, `unique`, and `nullable` in addition to the storage-type triple. PSL → typed-args coercion happens here (via `mapPslHelperArgs`) so that `instantiateAuthoringFieldPreset` itself stays typed-input-only and TS keeps its zero-runtime-validation cost.
  */
-export function instantiatePslFieldPreset(input: {
-  readonly call: PslTypeConstructorCall;
+export function instantiateFieldPreset(input: {
+  readonly call: CstTypeConstructorCallView;
   readonly descriptor: AuthoringFieldPresetDescriptor;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
@@ -395,7 +391,7 @@ export type ResolveFieldTypeResult =
   | { readonly ok: false; readonly alreadyReported: boolean };
 
 export function resolveFieldTypeDescriptor(input: {
-  readonly field: PslField;
+  readonly field: CstFieldView;
   readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
@@ -414,7 +410,7 @@ export function resolveFieldTypeDescriptor(input: {
       input.field.typeConstructor.path,
     );
     if (presetDescriptor) {
-      const instantiated = instantiatePslFieldPreset({
+      const instantiated = instantiateFieldPreset({
         call: input.field.typeConstructor,
         descriptor: presetDescriptor,
         diagnostics: input.diagnostics,
@@ -588,7 +584,7 @@ export const NATIVE_TYPE_SPECS: Readonly<Record<string, NativeTypeSpec>> = {
 };
 
 export function resolveDbNativeTypeAttribute(input: {
-  readonly attribute: PslAttribute;
+  readonly attribute: CstAttributeView;
   readonly baseType: string;
   readonly baseDescriptor: ColumnDescriptor;
   readonly diagnostics: ContractSourceDiagnostic[];
@@ -703,7 +699,7 @@ export function parseDefaultLiteralValue(expression: string): ColumnDefault | un
 export function lowerDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
-  readonly defaultAttribute: PslAttribute;
+  readonly defaultAttribute: CstAttributeView;
   readonly columnDescriptor: ColumnDescriptor;
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly sourceId: string;
@@ -809,7 +805,7 @@ export function lowerDefaultForField(input: {
 }
 
 export function resolveColumnDescriptor(
-  field: PslField,
+  field: CstFieldView,
   enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
   namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
   scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
