@@ -42,6 +42,13 @@ Dispatches sequenced so deletion (D6) lands only after every consumer is migrate
 - **Hands to:** A printer test suite with no `parsePslDocument` dependency — the last non-parser-package consumer cleared.
 - **Focus:** The two printer test files only. Printer `src/` + legacy `PslDocumentAst` types untouched.
 
+### Dispatch 5d: descriptor-validation-and-policy-select-test
+
+- **Outcome:** The descriptor-driven extension-block validation pass runs over CST-reconstructed blocks: a small consumer-side helper invokes the framework  over a `reconstructExtensionBlock`-produced `PslExtensionBlock`, given the composed `pslBlockDescriptors` + `codecLookup`. `declarative-policy-select.round-trip.test.ts` is migrated to the full `parse` → reconstruct → `validateExtensionBlock` → factory → print pipeline (off `parsePslDocument`), with ALL 9 assertions preserved — including the `PSL_EXTENSION_MISSING_REQUIRED_PARAMETER` and `PSL_EXTENSION_UNRESOLVED_REF` diagnostics. This corrects the false "no symbol-table home" premise (E3): policy_select is a generic block, the validator is a standalone framework function, and the path reproduces at full FR12 parity.
+- **Builds on:** Slice 2's `reconstructExtensionBlock` (enum/generic-block reconstruction) + the framework `validateExtensionBlock`.
+- **Hands to:** The last printer consumer off `parsePslDocument` AT PARITY (not as a dropped capability) — clearing the path for the deletion (D6) with genuine feature parity. Resolves the descriptor-typed-extension-block-parameters project follow-up.
+- **Focus:** A small descriptor-validation helper (consumer-side, e.g. in the printer test or a shared spot the test can reach) + the migrated `declarative-policy-select.round-trip.test.ts`. Where the helper lives — printer-test-local vs. a reusable framework/parser export — is the implementer's call, but it must NOT reintroduce a `parsePslDocument` dependency. The descriptor-driven validation is generic (framework-owned); only the wiring over a reconstructed block is new. HALT if reconstruct+validate genuinely cannot reproduce a specific diagnostic the legacy path emitted (a real gap, operator decision) — but the validator is standalone, so this is unlikely.
+
 ### Dispatch 6: delete-legacy-parser
 
 - **Outcome:** `parsePslDocument` is gone: delete `src/parser.ts`, `src/exports/parser.ts`, the `parsePslDocument` export line in `src/exports/index.ts`, and `test/parser.test.ts` + `test/parser-enum.test.ts`; prune the now-legacy-only `ParsePslDocumentInput`/`ParsePslDocumentResult` re-exports. KEEP `attribute-helpers.ts` (+ its test), the CST path, the `PslDocumentAst`-family types. Update READMEs + ADR 163 reference. Repo-wide `rg 'parsePslDocument' --glob '!**/*.md'` empty.
