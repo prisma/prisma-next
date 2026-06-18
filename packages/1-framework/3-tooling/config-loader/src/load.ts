@@ -15,6 +15,37 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { loadConfig as loadConfigC12 } from 'c12';
 import { dirname, resolve } from 'pathe';
 
+function throwValidation(field: string, why: string): never {
+  throw new ConfigValidationError(field, why);
+}
+
+function validateNoOutputsAreInputs(
+  inputs: readonly string[] | undefined,
+  output: string | undefined,
+): void {
+  if (inputs === undefined || output === undefined) {
+    return;
+  }
+
+  let emittedArtifactPaths: ReturnType<typeof getEmittedArtifactPaths>;
+  try {
+    emittedArtifactPaths = getEmittedArtifactPaths(output);
+  } catch (error) {
+    throwValidation('contract.output', error instanceof Error ? error.message : String(error));
+  }
+
+  const emittedPaths = new Set([emittedArtifactPaths.jsonPath, emittedArtifactPaths.dtsPath]);
+
+  for (const input of inputs) {
+    if (emittedPaths.has(input)) {
+      throwValidation(
+        'contract.source.inputs[]',
+        'Config.contract.source.inputs must not include emitted artifact paths derived from contract.output',
+      );
+    }
+  }
+}
+
 async function discoverAndFinalizeConfig(configPath?: string): Promise<PrismaNextConfig> {
   const cwd = process.cwd();
   const resolvedConfigPath = configPath ? resolve(cwd, configPath) : undefined;
@@ -40,7 +71,9 @@ async function discoverAndFinalizeConfig(configPath?: string): Promise<PrismaNex
 
   /* v8 ignore next -- @preserve */
   const loadedConfigDir = result.configFile ? dirname(result.configFile) : configCwd;
-  return finalizeConfig(result.config, loadedConfigDir, getEmittedArtifactPaths);
+  const config = finalizeConfig(result.config, loadedConfigDir);
+  validateNoOutputsAreInputs(config.contract?.source.inputs, config.contract?.output);
+  return config;
 }
 
 function hasStringCode(error: Error): error is Error & { readonly code: string } {

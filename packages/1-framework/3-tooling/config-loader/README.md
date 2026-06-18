@@ -9,9 +9,8 @@ Discovers, validates, and finalizes `prisma-next.config.ts`.
 ## Overview
 
 This package owns config _loading_ — the file I/O (`c12`), validation, and finalization
-that turns a `prisma-next.config.ts` on disk into a resolved `PrismaNextConfig`. It always
-supplies the emitter-derived artifact-collision check (`getEmittedArtifactPaths`), so callers
-never pass a hook.
+that turns a `prisma-next.config.ts` on disk into a resolved `PrismaNextConfig`. It also
+performs the emitter-derived artifact-collision check (`getEmittedArtifactPaths`).
 
 It exposes a single `loadConfig(configPath?)` that maps failures to the CLI's structured
 `@prisma-next/errors/control` errors (`CliStructuredError`). Consumers that need to react to

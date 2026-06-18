@@ -7,8 +7,7 @@ import type {
 import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 import type { PrismaNextConfig } from '../src/config-types';
-import { ConfigValidationError } from '../src/errors';
-import { type EmittedArtifactPathsResolver, finalizeConfig } from '../src/finalize-config';
+import { finalizeConfig } from '../src/finalize-config';
 
 function createConfig(
   contract?: PrismaNextConfig['contract'],
@@ -94,79 +93,16 @@ describe('finalizeConfig', () => {
     expect(result.contract?.source.inputs).toBeUndefined();
   });
 
-  it('throws ConfigValidationError when an input collides with an emitted artifact', () => {
+  it('leaves emitted artifact collision checks to tooling config loaders', () => {
     const config = createConfig({
       source: createSource(['./generated/contract.json']),
       output: './generated/contract.json',
     });
 
-    expect(() =>
-      finalizeConfig(config, '/project', (output) => ({
-        jsonPath: output,
-        dtsPath: output.replace(/\.json$/, '.d.ts'),
-      })),
-    ).toThrow(ConfigValidationError);
-  });
+    const result = finalizeConfig(config, '/project');
 
-  it('skips the collision check when no resolver hook is supplied', () => {
-    const config = createConfig({
-      source: createSource(['./generated/contract.json']),
-      output: './generated/contract.json',
-    });
-
-    expect(() => finalizeConfig(config, '/project')).not.toThrow();
-  });
-
-  it('does not invoke the resolver hook when the source has no inputs', () => {
-    const config = createConfig({
-      source: createSource(),
-      output: './generated/contract.json',
-    });
-    let hookCalled = false;
-
-    const result = finalizeConfig(config, '/project', (output) => {
-      hookCalled = true;
-      return { jsonPath: output, dtsPath: output.replace(/\.json$/, '.d.ts') };
-    });
-
-    expect(hookCalled).toBe(false);
+    expect(result.contract?.source.inputs).toEqual(['/project/generated/contract.json']);
     expect(result.contract?.output).toBe('/project/generated/contract.json');
-  });
-
-  it('wraps a resolver hook failure in a ConfigValidationError carrying the thrown message', () => {
-    const config = createConfig({
-      source: createSource(['./schema.prisma']),
-      output: './generated/contract.json',
-    });
-
-    expect(() =>
-      finalizeConfig(config, '/project', () => {
-        throw new Error('cannot derive artifact paths');
-      }),
-    ).toThrow(new ConfigValidationError('contract.output', 'cannot derive artifact paths'));
-  });
-
-  it('stringifies non-Error resolver failures into the ConfigValidationError', () => {
-    const config = createConfig({
-      source: createSource(['./schema.prisma']),
-      output: './generated/contract.json',
-    });
-    const rejectWithNonError: EmittedArtifactPathsResolver = () => {
-      const nonError: unknown = 'boom';
-      throw nonError;
-    };
-
-    let captured: unknown;
-    try {
-      finalizeConfig(config, '/project', rejectWithNonError);
-    } catch (error) {
-      captured = error;
-    }
-
-    expect(captured).toBeInstanceOf(ConfigValidationError);
-    if (captured instanceof ConfigValidationError) {
-      expect(captured.why).toBe('boom');
-    }
   });
 
   it('preserves non-contract authoring fields while resolving the contract', () => {

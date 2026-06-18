@@ -172,7 +172,7 @@ describe('loadConfig', () => {
   );
 
   it(
-    'maps a non-json contract output to a structured validation error from the emitter hook',
+    'maps a non-json contract output to a structured validation error from artifact path derivation',
     async () => {
       const nonJsonSource = VALID_CONFIG_SOURCE.replace(
         "output: './generated/contract.json'",
