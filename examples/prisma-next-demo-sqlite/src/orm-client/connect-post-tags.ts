@@ -18,13 +18,9 @@ export async function ormClientConnectPostTags(
   runtime: Runtime,
 ) {
   const db = createOrmClient(runtime);
-  const updated = await db.Post.where({ id: castAs<PostId>(postId) }).update({
-    tags: (t) => t.connect(tagIds.map((id) => ({ id: castAs<TagId>(id) }))),
-  });
-  if (!updated) {
-    return null;
-  }
-  return db.Post.include('tags', (tag) => tag.select('id', 'label').orderBy((t) => t.label.asc()))
-    .where({ id: castAs<PostId>(postId) })
-    .first();
+  return db.Post.where({ id: castAs<PostId>(postId) })
+    .include('tags', (tag) => tag.select('id', 'label').orderBy((t) => t.label.asc()))
+    .update({
+      tags: (t) => t.connect(tagIds.map((id) => ({ id: castAs<TagId>(id) }))),
+    });
 }
