@@ -12,24 +12,26 @@ import { type SyntaxElement, SyntaxNode, type SyntaxToken } from '../syntax/red'
 import type { TokenKind } from '../tokenizer';
 
 /**
- * Emission is driven by the CST token stream rather than reconstructed from AST
- * accessors as strings. A {@link LineWriter} owns spacing, indentation, blank
- * lines, and the one universal rule that makes this design pay off: a `//`
- * (or `///`) line comment appearing between *any* two tokens forces a hard
- * break — the comment is written, the line ends, and the continuation is
- * indented one extra level until the enclosing construct's emission completes.
+ * Emission is one source-order walk of the CST token stream. A {@link LineWriter}
+ * owns spacing, indentation, and blank lines; the trivia *in the stream* decides
+ * layout in place — an own-line comment writes on its own line, a same-line
+ * comment trails the current line, an author blank-run collapses to one blank,
+ * and a `//` (or `///`) comment between *any* two significant tokens forces a
+ * hard break: the comment is written, the line ends, and the continuation is
+ * indented one extra level until the enclosing construct finishes.
  *
- * Per-construct functions stay, but they *drive* the writer (writing the
- * construct's significant tokens to its structural boundaries, letting the
- * writer normalise the interleaved trivia) instead of building strings. The
- * one place column widths are needed — a block's aligned field/enum rows — is
- * a pure function of the block AST, computed in a pre-pass and padded to while
- * the tokens stream past, so the writer stays single-pass with no buffering.
+ * Per-construct drivers stay, but they *drive* the writer through
+ * {@link writeUntil} (streaming significant tokens to a structural boundary,
+ * letting the writer normalise the interleaved trivia) instead of building
+ * strings. The one place column widths are needed — a block's aligned field rows
+ * — is a pure function of the block AST, computed in a per-region pre-pass and
+ * padded to while the tokens stream past, so the walk stays single-pass with no
+ * output buffering.
  */
 
 export function emitDocument(document: DocumentAst, indentUnit: string, newline: string): string {
   const writer = new LineWriter(indentUnit, newline);
-  emitRegion(writer, Array.from(document.syntax.children()), 0, undefined);
+  emitRegion(writer, Array.from(document.syntax.children()), undefined);
   return writer.finish();
 }
 
@@ -125,8 +127,7 @@ class LineWriter {
    * Writes a `//`/`///` comment as a hard break: the comment trails the current
    * line (or stands alone if the line is empty), the line ends, and the
    * continuation is indented one extra level. The caller is responsible for the
-   * matching {@link unindent} once the construct finishes — see
-   * {@link emitDeclarationTokens}.
+   * matching {@link unindent} once the construct finishes.
    */
   comment(text: string): void {
     if (this.#lineOpen) this.#line += ` ${text}`;
@@ -185,79 +186,154 @@ function spaceBetween(
 }
 
 /**
- * A region is the document body or a block interior. {@link emitRegion} walks
- * the region's source-order elements once, separating significant member nodes
- * (driven through {@link emitMember}) from the inter-member trivia it must
- * canonicalise: blank lines (author runs collapse to one, never adjacent to a
- * brace), own-line leading comments, same-line trailing comments, and the
- * `{ // header` and dangling-before-close comment positions. Brace tokens, when
- * present, delimit the interior; `closeKind` is the token kind that ends the
- * region (`RBrace` for a block, `undefined` for the document).
+ * One significant token (or interior `//` comment) flattened out of a node's
+ * sub-tree in source order, annotated with the structural facts the writer needs
+ * but cannot see from the flat token alone: whether it sits inside a qualified
+ * name (colon/dot hug), and whether it opens a field's type annotation or its
+ * first/next field attribute (the alignment-pad and attribute-break boundaries).
+ */
+interface StreamToken {
+  readonly token: SyntaxToken;
+  readonly inQualifiedName: boolean;
+  readonly typeAnnotationStart: boolean;
+  readonly fieldAttributeStart: boolean;
+}
+
+/**
+ * Flattens a node's significant tokens and interior `//` comments in source
+ * order, dropping whitespace/newline trivia (the writer re-derives spacing). The
+ * first significant token of a `TypeAnnotation` / `FieldAttribute` child is
+ * flagged so the driver can pad to a column or break a continuation in place.
+ */
+function* streamTokens(node: SyntaxNode): Generator<StreamToken> {
+  let pendingTypeAnnotation = false;
+  let pendingFieldAttribute = false;
+
+  function* walk(parent: SyntaxNode, qualified: boolean): Generator<StreamToken> {
+    for (const child of parent.children()) {
+      if (child instanceof SyntaxNode) {
+        if (child.kind === 'TypeAnnotation') pendingTypeAnnotation = true;
+        if (child.kind === 'FieldAttribute') pendingFieldAttribute = true;
+        yield* walk(child, qualified || child.kind === 'QualifiedName');
+        continue;
+      }
+      if (child.kind === 'Whitespace' || child.kind === 'Newline') continue;
+      const typeAnnotationStart = pendingTypeAnnotation;
+      const fieldAttributeStart = pendingFieldAttribute && child.kind !== 'Comment';
+      if (child.kind !== 'Comment') {
+        pendingTypeAnnotation = false;
+        if (fieldAttributeStart) pendingFieldAttribute = false;
+      }
+      yield { token: child, inQualifiedName: qualified, typeAnnotationStart, fieldAttributeStart };
+    }
+  }
+
+  yield* walk(node, false);
+}
+
+/**
+ * Streams the significant tokens of `syntax` through the writer until (and
+ * including) the next token of `tokenKind` — or to exhaustion when `tokenKind`
+ * is `undefined` — normalising trivia and applying the universal `//`-comment
+ * break+indent rule in place. Returns the number of continuation indents pushed
+ * by interior comments, which the driver must {@link LineWriter.unindent} once
+ * the construct finishes. `columns`, when present, pads to the type and
+ * attribute columns of an aligned field row as the stream reaches them. A block
+ * driver calls it with `LBrace` to write just the header up to the opening `{`.
+ */
+function writeUntil(
+  writer: LineWriter,
+  syntax: SyntaxNode,
+  tokenKind: TokenKind | undefined,
+  columns: AlignmentColumns | undefined,
+): number {
+  let continuation = 0;
+  let prevQualified = false;
+  let sawAttribute = false;
+
+  for (const entry of streamTokens(syntax)) {
+    const { token } = entry;
+    if (token.kind === 'Comment') {
+      writer.comment(token.text);
+      writer.indent();
+      continuation += 1;
+      prevQualified = false;
+      continue;
+    }
+
+    let padTo: number | undefined;
+    if (entry.fieldAttributeStart) {
+      if (continuation > 0) writer.newline();
+      else if (columns && !sawAttribute) padTo = columns.attributeColumn;
+      sawAttribute = true;
+    } else if (entry.typeAnnotationStart && columns) {
+      padTo = columns.typeColumn;
+    }
+
+    const space = spaceBetween(
+      writer.prevKind(),
+      token.kind,
+      entry.inQualifiedName && prevQualified,
+    );
+    writer.write(token, space, writer.lineOpen() ? padTo : undefined);
+    prevQualified = entry.inQualifiedName;
+
+    if (tokenKind !== undefined && token.kind === tokenKind) break;
+  }
+
+  return continuation;
+}
+
+/**
+ * A region is the document body or a block interior. The single source-order
+ * walk writes each member as it is reached and lets the interleaved trivia
+ * decide layout in place: a same-line comment trails the line just written; an
+ * own-line comment (preceded by a newline) writes on its own line; a `≥2`
+ * newline run between members collapses to exactly one blank (never adjacent to a
+ * brace); a nested block, and the first block attribute of a block, get one
+ * house-style blank, decided from what the writer just emitted. `closeKind` is
+ * the token kind that ends the region (`RBrace` for a block, `undefined` for the
+ * document); for a block the walk skips everything up to and including the
+ * opening `{` (the block header is written by {@link emitBlock}).
  */
 function emitRegion(
   writer: LineWriter,
   elements: readonly SyntaxElement[],
-  depth: number,
   closeKind: 'RBrace' | undefined,
 ): void {
-  const members = collectMembers(elements, closeKind);
-  emitMembers(writer, members, depth);
-}
+  const alignment = alignmentMap(elements, closeKind);
 
-interface MemberItem {
-  readonly kind: 'member';
-  readonly node: SyntaxNode;
-  readonly leading: readonly string[];
-  trailing: string | undefined;
-  readonly blankBefore: boolean;
-}
-
-interface CommentItem {
-  readonly kind: 'comment';
-  readonly text: string;
-  readonly blankBefore: boolean;
-}
-
-type RegionItem = MemberItem | CommentItem;
-
-/**
- * One source-order pass over a region's elements, reducing interleaved nodes
- * and trivia into a flat member/dangling-comment sequence with each item's
- * leading comments, same-line trailing comment, and whether a (single) blank
- * line precedes it already resolved. A same-line comment after the opening
- * `{` attaches to the just-written block header by the caller; here it surfaces
- * as a trailing comment on no member, so it is captured as a header trailing by
- * {@link emitBlock} before the region walk begins. Blank-line runs collapse to
- * one and never sit directly after the opening boundary nor before the close.
- */
-function collectMembers(
-  elements: readonly SyntaxElement[],
-  closeKind: 'RBrace' | undefined,
-): RegionItem[] {
-  const items: RegionItem[] = [];
-  let leading: string[] = [];
-  let blankPending = false;
-  let sawContent = false;
   let sawOpenBrace = closeKind === undefined;
+  let sawContent = false;
+  let lastWasRegular = false;
+  let ledByComment = false;
   let newlines = 0;
 
-  for (const element of elements) {
+  for (let i = 0; i < elements.length; i++) {
+    const element = elements[i];
+    if (element === undefined) continue;
+
     if (element instanceof SyntaxNode) {
       if (!sawOpenBrace) continue;
-      if (newlines >= 2 && sawContent && leading.length === 0) blankPending = true;
-      items.push({
-        kind: 'member',
-        node: element,
-        leading,
-        trailing: undefined,
-        blankBefore: blankPending,
-      });
-      leading = [];
-      blankPending = false;
+      const isBlockAttribute = ModelAttributeAst.cast(element) !== undefined;
+      // When a leading comment run precedes the member it attaches directly: any
+      // author blank is dropped and the comment already placed the house-style
+      // separation blank. Otherwise the member places its own blank here.
+      if (!ledByComment) {
+        if (newlines >= 2 && sawContent && !writer.lastIsBlank()) writer.blank();
+        else if (separationBlankWanted(writer, element, sawContent, lastWasRegular)) writer.blank();
+      }
+
+      const trailing = sameLineTrailingComment(elements, i);
+      emitMember(writer, element, alignment.get(element), trailing.text);
+      if (trailing.index !== undefined) i = trailing.index;
       sawContent = true;
+      lastWasRegular = !isBlockAttribute;
+      ledByComment = false;
       newlines = 0;
       continue;
     }
+
     if (element.kind === 'LBrace' && closeKind === 'RBrace' && !sawOpenBrace) {
       sawOpenBrace = true;
       newlines = 0;
@@ -271,99 +347,82 @@ function collectMembers(
       continue;
     }
     if (element.kind === 'Comment') {
-      const last = items.at(-1);
-      if (closeKind === 'RBrace' && newlines === 0 && !sawContent && items.length === 0) {
+      if (closeKind === 'RBrace' && newlines === 0 && !sawContent) {
         // Same-line comment trailing the opening `{`: owned by the block header.
         continue;
       }
-      if (newlines === 0 && last?.kind === 'member' && last.trailing === undefined) {
-        last.trailing = element.text;
-      } else {
-        if (newlines >= 2 && sawContent && leading.length === 0) blankPending = true;
-        leading.push(element.text);
-        sawContent = true;
+      if (newlines >= 2 && sawContent && !writer.lastIsBlank()) writer.blank();
+      else if (!ledByComment) {
+        // The first comment of a leading run carries the separation blank of the
+        // block / block-attribute it leads, so the blank lands before the
+        // comment rather than between the comment and the member.
+        const led = leadingMemberAfter(elements, i);
+        if (led && separationBlankWanted(writer, led, sawContent, lastWasRegular)) writer.blank();
       }
+      writer.writeRaw(element.text);
+      writer.newline();
+      sawContent = true;
+      ledByComment = true;
       newlines = 0;
     }
   }
-  if (leading.length > 0) {
-    let blank = blankPending;
-    for (const comment of leading) {
-      items.push({ kind: 'comment', text: comment, blankBefore: blank });
-      blank = false;
-    }
-  }
-  return items;
 }
 
 /**
- * Renders the sequenced region items. Consecutive single-line field/enum
- * members with no leading comment form an alignment run, padded to widths
- * computed from the run's AST; everything else (blocks, block attributes,
- * key/value pairs, named types, members that carry a leading comment or an
- * interior comment break) renders on its own. The blank before a block, and
- * before the first block attribute of a block, is house style applied here.
+ * Whether the house style places a blank before `member`: one blank before a
+ * nested block, and one before the first block attribute that follows a regular
+ * member. Decided purely from the writer's current state (prior content, whether
+ * the last line is already blank) and the last member's kind.
  */
-function emitMembers(writer: LineWriter, items: readonly RegionItem[], depth: number): void {
-  let run: MemberItem[] = [];
-  let lastWasRegular = false;
-  let emittedInRegion = false;
+function separationBlankWanted(
+  writer: LineWriter,
+  member: SyntaxNode,
+  sawContent: boolean,
+  lastWasRegular: boolean,
+): boolean {
+  if (!sawContent || writer.lastIsBlank()) return false;
+  if (isBlockMember(member)) return true;
+  return ModelAttributeAst.cast(member) !== undefined && lastWasRegular;
+}
 
-  const flushRun = (): void => {
-    if (run.length === 0) return;
-    emitAlignedRun(writer, run, depth);
-    run = [];
-  };
-
-  for (const item of items) {
-    if (item.kind === 'comment') {
-      flushRun();
-      if (item.blankBefore) writer.blank();
-      for (let i = 0; i < depth; i++) writer.indent();
-      writer.writeRaw(item.text);
-      writer.newline();
-      for (let i = 0; i < depth; i++) writer.unindent();
-      emittedInRegion = true;
-      continue;
-    }
-
-    const isBlockAttribute = ModelAttributeAst.cast(item.node) !== undefined;
-    const isBlock = isBlockMember(item.node);
-
-    if (item.blankBefore) {
-      flushRun();
-      writer.blank();
-    } else if (isBlockAttribute && lastWasRegular && emittedInRegion && !writer.lastIsBlank()) {
-      flushRun();
-      writer.blank();
-    } else if (isBlock && emittedInRegion && !writer.lastIsBlank()) {
-      flushRun();
-      writer.blank();
-    }
-    emittedInRegion = true;
-
-    if (
-      item.leading.length === 0 &&
-      !isBlock &&
-      isAlignmentRow(item.node) &&
-      !hasInteriorComment(item.node)
-    ) {
-      run.push(item);
-      lastWasRegular = true;
-      continue;
-    }
-
-    flushRun();
-    for (let i = 0; i < depth; i++) writer.indent();
-    for (const comment of item.leading) {
-      writer.writeRaw(comment);
-      writer.newline();
-    }
-    for (let i = 0; i < depth; i++) writer.unindent();
-    emitMember(writer, item, depth, undefined);
-    lastWasRegular = !isBlockAttribute;
+/**
+ * The member node a comment at `commentIndex` leads — the next member reached by
+ * skipping intervening own-line comments and trivia, or `undefined` when the
+ * comment is dangling (the region closes first). A pure forward CST scan; it
+ * buffers no output.
+ */
+function leadingMemberAfter(
+  elements: readonly SyntaxElement[],
+  commentIndex: number,
+): SyntaxNode | undefined {
+  for (let i = commentIndex + 1; i < elements.length; i++) {
+    const element = elements[i];
+    if (element === undefined) continue;
+    if (element instanceof SyntaxNode) return element;
+    if (element.kind === 'RBrace') return undefined;
   }
-  flushRun();
+  return undefined;
+}
+
+/**
+ * The same-line `//` comment that trails the member ending at `memberIndex` — the
+ * next non-whitespace element when it is a `Comment` reached with no intervening
+ * newline. Returns its text and the element index to skip past, or `undefined`
+ * for both when the member is the last thing on its source line.
+ */
+function sameLineTrailingComment(
+  elements: readonly SyntaxElement[],
+  memberIndex: number,
+): { text: string | undefined; index: number | undefined } {
+  for (let i = memberIndex + 1; i < elements.length; i++) {
+    const element = elements[i];
+    if (element === undefined) continue;
+    if (element instanceof SyntaxNode) break;
+    if (element.kind === 'Whitespace') continue;
+    if (element.kind === 'Comment') return { text: element.text, index: i };
+    break;
+  }
+  return { text: undefined, index: undefined };
 }
 
 function isBlockMember(node: SyntaxNode): boolean {
@@ -376,7 +435,7 @@ function isBlockMember(node: SyntaxNode): boolean {
   );
 }
 
-/** A field or enum value: the row kinds whose columns are aligned per block. */
+/** A field: the row kind whose name/type columns are aligned per block. */
 function isAlignmentRow(node: SyntaxNode): boolean {
   return FieldDeclarationAst.cast(node) !== undefined;
 }
@@ -394,79 +453,25 @@ function hasInteriorComment(node: SyntaxNode): boolean {
 }
 
 /**
- * Emits one non-row member: a nested block, a block attribute, a key/value
- * pair, a named type, or a single field/enum row outside an alignment run. The
- * driver walks the member's own children, writing significant tokens through
- * the writer (which applies spacing) and routing every interior `//` comment
- * through the universal break+indent rule, then appends the same-line trailing
- * comment.
+ * Emits one member. A block (model / composite type / enum or other generic
+ * block / namespace / `types`) recurses through {@link emitBlock}; everything
+ * else streams its own tokens through {@link writeUntil}, routing interior `//`
+ * comments through the universal break+indent rule and padding aligned field
+ * columns from the precomputed `columns`. The same-line `trailing` comment, when
+ * present, closes the member's final line.
  */
 function emitMember(
   writer: LineWriter,
-  item: MemberItem,
-  depth: number,
-  columns: AlignmentColumns | undefined,
-): void {
-  const node = item.node;
-  if (emitBlock(writer, node, depth, item.trailing)) return;
-
-  for (let i = 0; i < depth; i++) writer.indent();
-  const continuation = emitDeclarationTokens(writer, node, columns);
-  if (item.trailing !== undefined) writer.comment(item.trailing);
-  else writer.newline();
-  for (let i = 0; i < continuation; i++) writer.unindent();
-  for (let i = 0; i < depth; i++) writer.unindent();
-}
-
-/**
- * Walks a non-block member node's children in source order, streaming its
- * significant tokens through the writer and routing every interior `//` comment
- * through the universal break+indent rule (the continuation indent is popped
- * when the member finishes). Spacing is decided here from the structural
- * context: tokens inside a qualified name hug. When `columns` is present the
- * walker pads to the type column at the first token of the field's type
- * annotation and to the attribute column at the first token of its first field
- * attribute, so an aligned run lays its columns out without buffering.
- */
-function emitDeclarationTokens(
-  writer: LineWriter,
   node: SyntaxNode,
   columns: AlignmentColumns | undefined,
-): number {
-  let continuation = 0;
-  let padNext: number | undefined;
-  let sawAttribute = false;
-  let prevQualified = false;
+  trailing: string | undefined,
+): void {
+  if (emitBlock(writer, node, trailing)) return;
 
-  const walk = (parent: SyntaxNode, qualified: boolean): void => {
-    for (const child of parent.children()) {
-      if (child instanceof SyntaxNode) {
-        if (columns && child.kind === 'TypeAnnotation') padNext = columns.typeColumn;
-        if (child.kind === 'FieldAttribute') {
-          if (continuation > 0) writer.newline();
-          else if (columns && !sawAttribute) padNext = columns.attributeColumn;
-          sawAttribute = true;
-        }
-        walk(child, qualified || child.kind === 'QualifiedName');
-        continue;
-      }
-      if (child.kind === 'Whitespace' || child.kind === 'Newline') continue;
-      if (child.kind === 'Comment') {
-        writer.comment(child.text);
-        writer.indent();
-        continuation += 1;
-        padNext = undefined;
-        prevQualified = false;
-        continue;
-      }
-      const space = spaceBetween(writer.prevKind(), child.kind, qualified && prevQualified);
-      writer.write(child, space, writer.lineOpen() ? padNext : undefined);
-      padNext = undefined;
-      prevQualified = qualified;
-    }
-  };
-  walk(node, false);
-  return continuation;
+  const continuation = writeUntil(writer, node, undefined, columns);
+  if (trailing !== undefined) writer.comment(trailing);
+  else writer.newline();
+  for (let i = 0; i < continuation; i++) writer.unindent();
 }
 
 interface AlignmentColumns {
@@ -475,28 +480,87 @@ interface AlignmentColumns {
 }
 
 /**
- * Renders a run of single-line field rows as an aligned table. The column
- * widths are a pure function of the rows' ASTs (the rendered name and type
- * cells), computed here in a pre-pass, then padded to while each row's tokens
- * stream past — no line buffering. The type column opens one space past the
- * widest name; the attribute column one space past the widest name+type cell.
+ * The per-region alignment pre-pass: groups consecutive single-line field rows
+ * into runs (broken by a blank, an own-line comment, an interior comment, a
+ * leading comment on the row, or any non-field member) and maps each field node
+ * to its run's column widths. Widths are a pure function of the rows' ASTs (the
+ * rendered name and type cells) — no rendered output is buffered; the single
+ * walk looks the columns up when it reaches each field.
  */
-function emitAlignedRun(writer: LineWriter, rows: readonly MemberItem[], depth: number): void {
-  const columns = alignmentColumns(rows);
-  for (const row of rows) emitMember(writer, row, depth, columns);
+function alignmentMap(
+  elements: readonly SyntaxElement[],
+  closeKind: 'RBrace' | undefined,
+): Map<SyntaxNode, AlignmentColumns> {
+  const map = new Map<SyntaxNode, AlignmentColumns>();
+  let sawOpenBrace = closeKind === undefined;
+  let newlines = 0;
+  let leadingComment = false;
+  let run: SyntaxNode[] = [];
+
+  const flush = (): void => {
+    if (run.length === 0) return;
+    const columns = alignmentColumns(run);
+    for (const node of run) map.set(node, columns);
+    run = [];
+  };
+
+  for (const element of elements) {
+    if (element instanceof SyntaxNode) {
+      if (!sawOpenBrace) continue;
+      const alignable = isAlignmentRow(element) && !hasInteriorComment(element);
+      const poolable = alignable && !leadingComment && !(newlines >= 2 && run.length > 0);
+      if (poolable) run.push(element);
+      else {
+        flush();
+        if (alignable && !leadingComment) run.push(element);
+        // A row carrying its own leading comment stands alone: it neither joins
+        // the prior run nor pools with the row that follows it.
+        else if (alignable) {
+          run.push(element);
+          flush();
+        }
+      }
+      newlines = 0;
+      leadingComment = false;
+      continue;
+    }
+    if (element.kind === 'LBrace' && closeKind === 'RBrace' && !sawOpenBrace) {
+      sawOpenBrace = true;
+      newlines = 0;
+      continue;
+    }
+    if (!sawOpenBrace) continue;
+    if (closeKind === 'RBrace' && element.kind === 'RBrace') break;
+    if (element.kind === 'Whitespace') continue;
+    if (element.kind === 'Newline') {
+      newlines += 1;
+      continue;
+    }
+    if (element.kind === 'Comment') {
+      // An own-line comment (preceded by a newline) breaks the run and leads the
+      // next row; a same-line trailing comment leaves the run intact.
+      if (newlines > 0) {
+        flush();
+        leadingComment = true;
+      }
+      newlines = 0;
+    }
+  }
+  flush();
+  return map;
 }
 
-function alignmentColumns(rows: readonly MemberItem[]): AlignmentColumns {
+function alignmentColumns(rows: readonly SyntaxNode[]): AlignmentColumns {
   let nameWidth = 0;
   for (const row of rows) {
-    const field = FieldDeclarationAst.cast(row.node);
+    const field = FieldDeclarationAst.cast(row);
     if (!field) continue;
     nameWidth = Math.max(nameWidth, renderTokens(field.name()?.syntax).length);
   }
   const typeColumn = nameWidth + 1;
   let cellEnd = 0;
   for (const row of rows) {
-    const field = FieldDeclarationAst.cast(row.node);
+    const field = FieldDeclarationAst.cast(row);
     if (!field) continue;
     const name = renderTokens(field.name()?.syntax);
     const type = renderTokens(field.typeAnnotation()?.syntax);
@@ -536,47 +600,33 @@ function renderTokens(node: SyntaxNode | undefined): string {
 
 /**
  * Emits a block member (model / composite type / enum or other generic block /
- * namespace / `types`). Returns `true` when handled. The header line carries
- * the block's `{ // header` same-line comment (if any); the closing line
- * carries the comment that trailed the member's `}` on the same source line.
- * The interior recurses through {@link emitRegion} at the deeper indent.
+ * namespace / `types`). Returns `true` when handled. The header is streamed up to
+ * and including the opening `{` via {@link writeUntil}; a same-line `{ // header`
+ * comment trails it; the interior recurses through {@link emitRegion}; the close
+ * `}` carries the comment that trailed it on the same source line.
  */
 function emitBlock(
   writer: LineWriter,
   node: SyntaxNode,
-  depth: number,
   closingTrailing: string | undefined,
 ): boolean {
   if (!isBlockMember(node)) return false;
 
   const children = Array.from(node.children());
-  const openIndex = children.findIndex((el) => !(el instanceof SyntaxNode) && el.kind === 'LBrace');
+  writeUntil(writer, node, 'LBrace', undefined);
 
-  for (let i = 0; i < depth; i++) writer.indent();
-  for (let i = 0; i <= openIndex; i++) {
-    const child = children[i];
-    if (child === undefined) continue;
-    if (child instanceof SyntaxNode) {
-      emitInlineNode(writer, child);
-      continue;
-    }
-    if (child.kind === 'Whitespace' || child.kind === 'Newline' || child.kind === 'Comment') {
-      continue;
-    }
-    writer.write(child, spaceBetween(writer.prevKind(), child.kind, false));
-  }
+  const openIndex = children.findIndex((el) => !(el instanceof SyntaxNode) && el.kind === 'LBrace');
   const headerComment = sameLineCommentAfter(children, openIndex);
   if (headerComment !== undefined) writer.comment(headerComment);
   else writer.newline();
-  for (let i = 0; i < depth; i++) writer.unindent();
 
-  emitRegion(writer, children, depth + 1, 'RBrace');
+  writer.indent();
+  emitRegion(writer, children, 'RBrace');
+  writer.unindent();
 
-  for (let i = 0; i < depth; i++) writer.indent();
   writer.writeRaw('}');
   if (closingTrailing !== undefined) writer.comment(closingTrailing);
   else writer.newline();
-  for (let i = 0; i < depth; i++) writer.unindent();
   return true;
 }
 
@@ -598,14 +648,4 @@ function sameLineCommentAfter(
     return undefined;
   }
   return undefined;
-}
-
-/** Writes a header sub-node (the block name identifier) as inline tokens. */
-function emitInlineNode(writer: LineWriter, node: SyntaxNode): void {
-  for (const token of node.tokens()) {
-    if (token.kind === 'Whitespace' || token.kind === 'Newline' || token.kind === 'Comment') {
-      continue;
-    }
-    writer.write(token, spaceBetween(writer.prevKind(), token.kind, false));
-  }
 }
