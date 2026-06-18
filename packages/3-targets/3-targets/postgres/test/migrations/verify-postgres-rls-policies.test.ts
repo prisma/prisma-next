@@ -1,5 +1,4 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -9,13 +8,14 @@ import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
 
 const TABLE_NAME = 'profiles';
+const SCHEMA_NAME = 'public';
 
 function makePolicy(name: string, tableName = TABLE_NAME): PostgresRlsPolicy {
   return new PostgresRlsPolicy({
     name,
     prefix: name.replace(/_[0-9a-f]{8}$/, ''),
     tableName,
-    namespaceId: UNBOUND_NAMESPACE_ID,
+    namespaceId: SCHEMA_NAME,
     operation: 'select',
     roles: ['authenticated'],
     using: '(auth.uid() = user_id)',
@@ -29,7 +29,7 @@ function makeContract(policies: readonly PostgresRlsPolicy[]): Contract<SqlStora
     policyEntries[p.name] = p;
   }
   const schema = new PostgresSchema({
-    id: UNBOUND_NAMESPACE_ID,
+    id: SCHEMA_NAME,
     entries: {
       table: {
         [TABLE_NAME]: new StorageTable({
@@ -52,7 +52,7 @@ function makeContract(policies: readonly PostgresRlsPolicy[]): Contract<SqlStora
     profileHash: profileHash('sha256:rls-verify-test'),
     storage: new SqlStorage({
       storageHash: coreHash('sha256:rls-verify-test'),
-      namespaces: { [UNBOUND_NAMESPACE_ID]: schema },
+      namespaces: { [SCHEMA_NAME]: schema },
     }),
     roots: {},
     domain: applicationDomainOf({ models: {} }),
@@ -122,7 +122,7 @@ describe('diffPostgresRlsPolicies', () => {
         name: 'read_own_profiles_a1b2c3d4',
         prefix: 'read_own_profiles',
         tableName: TABLE_NAME,
-        namespaceId: UNBOUND_NAMESPACE_ID,
+        namespaceId: SCHEMA_NAME,
         operation: 'select',
         roles: ['authenticated'],
         using: '(auth.uid() = user_id)',
@@ -158,7 +158,7 @@ describe('diffPostgresRlsPolicies', () => {
     const issues = diffPostgresRlsPolicies({ contract, schema });
 
     for (const issue of issues) {
-      expect(issue.coordinate.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
+      expect(issue.coordinate.namespaceId).toBe(SCHEMA_NAME);
     }
   });
 

@@ -1,6 +1,10 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
-import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
+import {
+  assertPostgresRlsPolicy,
+  isPostgresRlsPolicy,
+  PostgresRlsPolicy,
+} from '../src/core/postgres-rls-policy';
 import { PostgresRole } from '../src/core/postgres-role';
 
 describe('PostgresRlsPolicy DiffableNode', () => {
@@ -55,6 +59,39 @@ describe('PostgresRlsPolicy DiffableNode', () => {
     expect(typeof policy.isEqualTo).toBe('function');
   });
 
+  describe('isPostgresRlsPolicy guard', () => {
+    it('returns true for a real PostgresRlsPolicy', () => {
+      expect(isPostgresRlsPolicy(new PostgresRlsPolicy(baseInput))).toBe(true);
+    });
+
+    it('returns false for a node with a different kind', () => {
+      const role = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
+      expect(isPostgresRlsPolicy(role)).toBe(false);
+    });
+
+    it('returns false for undefined', () => {
+      expect(isPostgresRlsPolicy(undefined)).toBe(false);
+    });
+  });
+
+  describe('assertPostgresRlsPolicy guard', () => {
+    it('does not throw for a real PostgresRlsPolicy', () => {
+      expect(() => assertPostgresRlsPolicy(new PostgresRlsPolicy(baseInput))).not.toThrow();
+    });
+
+    it('throws with a descriptive message when given a non-policy node', () => {
+      const role = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
+      expect(() => assertPostgresRlsPolicy(role)).toThrow(
+        /planRlsDiff: expected a PostgresRlsPolicy/,
+      );
+    });
+
+    it('throws mentioning the actual kind when given a non-policy node', () => {
+      const role = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
+      expect(() => assertPostgresRlsPolicy(role)).toThrow(/role/);
+    });
+  });
+
   describe('content-addressed equality invariant', () => {
     // Wire name == prefix + '_' + hash(body). Same prefix + different body
     // produces different hashes, so the wire names differ and isEqualTo is
@@ -106,8 +143,8 @@ describe('PostgresRole DiffableNode', () => {
   });
 
   it('identity() propagates namespaceId from input', () => {
-    const role = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
-    expect(role.identity().namespaceId).toBe(UNBOUND_NAMESPACE_ID);
+    const role = new PostgresRole({ name: 'app_user', namespaceId: 'sentinel_namespace' });
+    expect(role.identity().namespaceId).toBe('sentinel_namespace');
   });
 
   it('isEqualTo() returns true for two roles with the same name', () => {

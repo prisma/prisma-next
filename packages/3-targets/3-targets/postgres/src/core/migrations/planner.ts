@@ -25,7 +25,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
-import { isPostgresRlsPolicy } from '../postgres-rls-policy';
+import { assertPostgresRlsPolicy } from '../postgres-rls-policy';
 import { isPostgresSchemaIR } from '../postgres-schema-ir';
 import { resolveDdlSchemaForNamespaceStorage } from '../postgres-schema-ir-annotations';
 import {
@@ -297,18 +297,20 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       // encodes the body hash, so two policies sharing a coordinate (same name)
       // are always equal and isEqualTo never returns false.
       if (issue.outcome === 'missing') {
-        const expected = issue.expected;
-        if (!isPostgresRlsPolicy(expected)) continue;
-        const tableKey = `${schemaForTable}.${expected.tableName}`;
+        assertPostgresRlsPolicy(issue.expected);
+        const tableKey = `${schemaForTable}.${issue.expected.tableName}`;
         if (!seenEnableTables.has(tableKey)) {
           seenEnableTables.add(tableKey);
-          calls.push(new EnableRowLevelSecurityCall(schemaForTable, expected.tableName));
+          calls.push(new EnableRowLevelSecurityCall(schemaForTable, issue.expected.tableName));
         }
-        calls.push(new CreatePostgresRlsPolicyCall(schemaForTable, expected.tableName, expected));
+        calls.push(
+          new CreatePostgresRlsPolicyCall(schemaForTable, issue.expected.tableName, issue.expected),
+        );
       } else if (issue.outcome === 'extra' && allowsDestructive) {
-        const actual = issue.actual;
-        if (!isPostgresRlsPolicy(actual)) continue;
-        calls.push(new DropPostgresRlsPolicyCall(schemaForTable, actual.tableName, policyName));
+        assertPostgresRlsPolicy(issue.actual);
+        calls.push(
+          new DropPostgresRlsPolicyCall(schemaForTable, issue.actual.tableName, policyName),
+        );
       }
     }
 
