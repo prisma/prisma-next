@@ -15,6 +15,8 @@ import {
   InitializedNotification,
   InitializeRequest,
   type InitializeResult,
+  LogMessageNotification,
+  MessageType,
   PublishDiagnosticsNotification,
   type RegistrationParams,
   RegistrationRequest,
@@ -49,6 +51,8 @@ interface Harness {
     predicate: (diagnostics: readonly Diagnostic[]) => boolean,
   ) => Promise<readonly Diagnostic[]>;
   readonly registrations: RegistrationParams[];
+  readonly waitForWatchedFilesRegistration: (timeoutMs: number) => Promise<void>;
+  readonly waitForWarning: (predicate: (message: string) => boolean) => Promise<string>;
   readonly notifyConfigChanged: () => void;
   dispose: () => void;
 }
@@ -95,14 +99,83 @@ function startHarness(
   });
 
   const registrations: RegistrationParams[] = [];
+  const isWatchedFilesRegistration = (params: RegistrationParams) =>
+    params.registrations.some(
+      (registration) => registration.method === 'workspace/didChangeWatchedFiles',
+    );
+  interface RegistrationWaiter {
+    readonly resolve: () => void;
+  }
+  const registrationWaiters: RegistrationWaiter[] = [];
   client.onRequest(RegistrationRequest.type, (params) => {
     registrations.push(params);
+    if (!isWatchedFilesRegistration(params)) {
+      return;
+    }
+    for (const waiter of registrationWaiters.splice(0)) {
+      waiter.resolve();
+    }
+  });
+
+  const warnings: string[] = [];
+  interface WarningWaiter {
+    readonly predicate: (message: string) => boolean;
+    readonly resolve: (message: string) => void;
+  }
+  const warningWaiters: WarningWaiter[] = [];
+  client.onNotification(LogMessageNotification.type, (params) => {
+    if (params.type !== MessageType.Warning) {
+      return;
+    }
+    warnings.push(params.message);
+    for (const waiter of warningWaiters.splice(0)) {
+      if (waiter.predicate(params.message)) {
+        waiter.resolve(params.message);
+      } else {
+        warningWaiters.push(waiter);
+      }
+    }
   });
   client.listen();
 
   return {
     client,
     registrations,
+    waitForWatchedFilesRegistration: (timeoutMs) =>
+      new Promise((resolve, reject) => {
+        if (registrations.some(isWatchedFilesRegistration)) {
+          resolve();
+          return;
+        }
+        let timeout: ReturnType<typeof setTimeout>;
+        const waiter = {
+          resolve: () => {
+            clearTimeout(timeout);
+            resolve();
+          },
+        };
+        timeout = setTimeout(() => {
+          const index = registrationWaiters.indexOf(waiter);
+          if (index !== -1) {
+            registrationWaiters.splice(index, 1);
+          }
+          reject(
+            new Error(
+              `No workspace/didChangeWatchedFiles registration observed within ${timeoutMs}ms`,
+            ),
+          );
+        }, timeoutMs);
+        registrationWaiters.push(waiter);
+      }),
+    waitForWarning: (predicate) =>
+      new Promise((resolve) => {
+        const existing = warnings.find((message) => predicate(message));
+        if (existing !== undefined) {
+          resolve(existing);
+          return;
+        }
+        warningWaiters.push({ predicate, resolve });
+      }),
     initialize: async () => {
       const result = await client.sendRequest(InitializeRequest.type, {
         processId: process.pid,
@@ -265,16 +338,19 @@ const resolveDegraded: ResolveInputs = async () => ({
   degradedReason: 'no config',
 });
 
+function watchedFilesRegistrations(harness: Harness) {
+  return harness.registrations
+    .flatMap((params) => params.registrations)
+    .filter((registration) => registration.method === 'workspace/didChangeWatchedFiles');
+}
+
 describe('language server config watching', { timeout: timeouts.databaseOperation }, () => {
   it('requests a watched-files registration scoped to the config path', async () => {
     harness = startHarness(resolveToSchema, watchedFilesCapabilities);
     await harness.initialize();
-    // Let the post-initialized registration round-trip settle.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await harness.waitForWatchedFilesRegistration(timeouts.default);
 
-    const watchedFiles = harness.registrations
-      .flatMap((params) => params.registrations)
-      .filter((registration) => registration.method === 'workspace/didChangeWatchedFiles');
+    const watchedFiles = watchedFilesRegistrations(harness);
     expect(watchedFiles.length).toBe(1);
     expect(JSON.stringify(watchedFiles[0]?.registerOptions)).toContain('prisma-next.config.ts');
   });
@@ -282,12 +358,16 @@ describe('language server config watching', { timeout: timeouts.databaseOperatio
   it('does not request registration when the client lacks dynamic registration', async () => {
     harness = startHarness(resolveToSchema);
     await harness.initialize();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // The no-registration path of `onInitialized` still warns about the missing
+    // dynamic-registration capability. That warning is emitted in the same
+    // handler that would otherwise register the watcher, so once it arrives the
+    // registration phase has fully run — a deterministic completion signal that
+    // lets us assert the absence of a registration without a fixed sleep.
+    await harness.waitForWarning((message) =>
+      message.includes('does not support dynamic file-watcher registration'),
+    );
 
-    const watchedFiles = harness.registrations
-      .flatMap((params) => params.registrations)
-      .filter((registration) => registration.method === 'workspace/didChangeWatchedFiles');
-    expect(watchedFiles.length).toBe(0);
+    expect(watchedFilesRegistrations(harness).length).toBe(0);
   });
 
   it('starts diagnosing an open doc that a config edit adds as an input', async () => {
