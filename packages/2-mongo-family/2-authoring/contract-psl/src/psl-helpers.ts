@@ -1,9 +1,13 @@
-import type { PslAttribute, PslAttributeArgument } from '@prisma-next/psl-parser';
-import { getPositionalArgument, parseQuotedStringLiteral } from '@prisma-next/psl-parser';
+import { parseQuotedStringLiteral } from '@prisma-next/psl-parser';
+import type { CstAttributeArgView, CstAttributeView } from './cst-read-views';
 
-export { getPositionalArgument, parseQuotedStringLiteral };
+export { parseQuotedStringLiteral };
 
-export function getNamedArgument(attr: PslAttribute, name: string): string | undefined {
+export function getPositionalArgument(attr: CstAttributeView, index = 0): string | undefined {
+  return attr.args.filter((arg) => arg.kind === 'positional')[index]?.value;
+}
+
+export function getNamedArgument(attr: CstAttributeView, name: string): string | undefined {
   const arg = attr.args.find((a) => a.kind === 'named' && a.name === name);
   return arg?.value;
 }
@@ -72,13 +76,13 @@ export function lowerFirst(value: string): string {
 }
 
 export function getAttribute(
-  attributes: readonly PslAttribute[],
+  attributes: readonly CstAttributeView[],
   name: string,
-): PslAttribute | undefined {
+): CstAttributeView | undefined {
   return attributes.find((attr) => attr.name === name);
 }
 
-export function getMapName(attributes: readonly PslAttribute[]): string | undefined {
+export function getMapName(attributes: readonly CstAttributeView[]): string | undefined {
   const mapAttr = getAttribute(attributes, 'map');
   if (!mapAttr) return undefined;
   const arg = mapAttr.args[0];
@@ -93,14 +97,14 @@ export interface ParsedRelationAttribute {
 }
 
 export function parseRelationAttribute(
-  attributes: readonly PslAttribute[],
+  attributes: readonly CstAttributeView[],
 ): ParsedRelationAttribute | undefined {
   const relationAttr = getAttribute(attributes, 'relation');
   if (!relationAttr) return undefined;
 
   let relationName: string | undefined;
-  let fieldsArg: PslAttributeArgument | undefined;
-  let referencesArg: PslAttributeArgument | undefined;
+  let fieldsArg: CstAttributeArgView | undefined;
+  let referencesArg: CstAttributeArgView | undefined;
 
   for (const arg of relationAttr.args) {
     if (arg.kind === 'positional') {

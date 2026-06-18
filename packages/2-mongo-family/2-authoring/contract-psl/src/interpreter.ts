@@ -23,15 +23,17 @@ import {
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import type { CollationOptions } from '@prisma-next/mongo-value/mongodb-types';
-import type {
-  ParsePslDocumentResult,
-  PslField,
-  PslModel,
-  PslNamespace,
-  PslSpan,
-} from '@prisma-next/psl-parser';
+import type { NamespaceSymbol, PslSpan, SymbolTable } from '@prisma-next/psl-parser';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import { blindCast } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { nodePslSpan } from './cst-read';
+import type {
+  CstAttributeView,
+  CstCompositeTypeView,
+  CstFieldView,
+  CstModelView,
+} from './cst-read-views';
 import { deriveJsonSchema, derivePolymorphicJsonSchema } from './derive-json-schema';
 import {
   getAttribute,
@@ -43,43 +45,39 @@ import {
   parseQuotedStringLiteral,
   parseRelationAttribute,
 } from './psl-helpers';
+import { buildCompositeTypeView, buildModelView } from './symbol-views';
 
 export interface InterpretPslDocumentToMongoContractInput {
-  readonly document: ParsePslDocumentResult;
+  readonly symbolTable: SymbolTable;
+  /** The parsed source file backing the symbol table's CST nodes; used to resolve diagnostic spans. */
+  readonly sourceFile: SourceFile;
+  /** Source file identifier threaded into diagnostics (the symbol table carries none). */
+  readonly sourceId: string;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly codecLookup?: CodecLookup;
 }
 
 /**
- * Name of the framework-parser synthesised bucket for top-level
- * declarations. Re-declared locally so the interpreter does not have to
- * import from `@prisma-next/framework-components/psl-ast`.
- */
-const UNSPECIFIED_PSL_NAMESPACE_NAME = '__unspecified__';
-
-/**
  * Mongo FR16c validation: Mongo's authoring DSL exposes the connection's
  * database as the only namespace surface today, so the PSL interpreter
- * rejects every explicit `namespace { … }` block. The implicit
- * `__unspecified__` bucket (top-level declarations) is the only
- * namespace Mongo accepts. `namespace unbound { … }` is rejected too —
- * Mongo has no late-binding namespace concept on the PSL surface (the
- * database name comes from the connection string, not from PSL).
+ * rejects every explicit `namespace { … }` block. In the symbol table, named
+ * namespaces are `topLevel.namespaces` (top-level declarations are not a
+ * namespace), so every entry here is an explicit block to reject — including
+ * `namespace unbound { … }`, since Mongo has no late-binding namespace concept
+ * on the PSL surface (the database name comes from the connection string).
  */
 function validateNamespaceBlocksForMongoTarget(input: {
-  readonly namespaces: readonly PslNamespace[];
+  readonly namespaces: readonly NamespaceSymbol[];
   readonly sourceId: string;
+  readonly sourceFile: SourceFile;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): void {
   for (const namespace of input.namespaces) {
-    if (namespace.name === UNSPECIFIED_PSL_NAMESPACE_NAME) {
-      continue;
-    }
     input.diagnostics.push({
       code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
       message: `Mongo does not support \`namespace ${namespace.name} { … }\` blocks (the database is bound by the connection string; declare models at the document top level instead).`,
       sourceId: input.sourceId,
-      span: namespace.span,
+      span: nodePslSpan(namespace.node.syntax, input.sourceFile),
     });
   }
 }
@@ -101,7 +99,7 @@ function fkRelationPairKey(declaringModel: string, targetModel: string): string 
   return `${declaringModel}::${targetModel}`;
 }
 
-function resolveFieldMappings(model: PslModel): FieldMappings {
+function resolveFieldMappings(model: CstModelView): FieldMappings {
   const pslNameToMapped = new Map<string, string>();
   for (const field of model.fields) {
     const mapped = getMapName(field.attributes) ?? field.name;
@@ -110,7 +108,7 @@ function resolveFieldMappings(model: PslModel): FieldMappings {
   return { pslNameToMapped };
 }
 
-function resolveCollectionName(model: PslModel): string {
+function resolveCollectionName(model: CstModelView): string {
   return getMapName(model.attributes) ?? lowerFirst(model.name);
 }
 
@@ -123,12 +121,12 @@ interface MongoModelEntry {
   readonly base?: CrossReference;
 }
 
-type DiscriminatorDeclaration = { readonly fieldName: string; readonly span: PslModel['span'] };
+type DiscriminatorDeclaration = { readonly fieldName: string; readonly span: PslSpan };
 type BaseDeclaration = {
   readonly baseName: string;
   readonly value: string;
   readonly collectionName: string;
-  readonly span: PslModel['span'];
+  readonly span: PslSpan;
 };
 
 function mongoCrossRef(modelName: string): CrossReference {
@@ -136,7 +134,7 @@ function mongoCrossRef(modelName: string): CrossReference {
 }
 
 function collectPolymorphismDeclarations(
-  document: ParsePslDocumentResult,
+  models: readonly CstModelView[],
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
 ): {
@@ -145,32 +143,31 @@ function collectPolymorphismDeclarations(
 } {
   const discriminatorDeclarations = new Map<string, DiscriminatorDeclaration>();
   const baseDeclarations = new Map<string, BaseDeclaration>();
-  const allPslModels = document.ast.namespaces.flatMap((ns) => ns.models);
 
-  for (const pslModel of allPslModels) {
-    for (const attr of pslModel.attributes) {
+  for (const model of models) {
+    for (const attr of model.attributes) {
       if (attr.name === 'discriminator') {
         const fieldName = getPositionalArgument(attr);
         if (!fieldName) {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: `Model "${pslModel.name}" @@discriminator requires a field name argument`,
+            message: `Model "${model.name}" @@discriminator requires a field name argument`,
             sourceId,
             span: attr.span,
           });
           continue;
         }
-        const discField = pslModel.fields.find((f) => f.name === fieldName);
+        const discField = model.fields.find((f) => f.name === fieldName);
         if (discField && discField.typeName !== 'String') {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: `Discriminator field "${fieldName}" on model "${pslModel.name}" must be of type String, but is "${discField.typeName}"`,
+            message: `Discriminator field "${fieldName}" on model "${model.name}" must be of type String, but is "${discField.typeName}"`,
             sourceId,
             span: attr.span,
           });
           continue;
         }
-        discriminatorDeclarations.set(pslModel.name, { fieldName, span: attr.span });
+        discriminatorDeclarations.set(model.name, { fieldName, span: attr.span });
       }
       if (attr.name === 'base') {
         const baseName = getPositionalArgument(attr, 0);
@@ -178,7 +175,7 @@ function collectPolymorphismDeclarations(
         if (!baseName || !rawValue) {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: `Model "${pslModel.name}" @@base requires two arguments: base model name and discriminator value`,
+            message: `Model "${model.name}" @@base requires two arguments: base model name and discriminator value`,
             sourceId,
             span: attr.span,
           });
@@ -188,14 +185,14 @@ function collectPolymorphismDeclarations(
         if (value === undefined) {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: `Model "${pslModel.name}" @@base discriminator value must be a quoted string literal`,
+            message: `Model "${model.name}" @@base discriminator value must be a quoted string literal`,
             sourceId,
             span: attr.span,
           });
           continue;
         }
-        const collectionName = resolveCollectionName(pslModel);
-        baseDeclarations.set(pslModel.name, { baseName, value, collectionName, span: attr.span });
+        const collectionName = resolveCollectionName(model);
+        baseDeclarations.set(model.name, { baseName, value, collectionName, span: attr.span });
       }
     }
   }
@@ -207,7 +204,7 @@ function resolvePolymorphism(input: {
   models: Record<string, MongoModelEntry>;
   roots: Record<string, CrossReference>;
   collections: Record<string, Record<string, unknown>>;
-  document: ParsePslDocumentResult;
+  allModels: readonly CstModelView[];
   discriminatorDeclarations: Map<string, DiscriminatorDeclaration>;
   baseDeclarations: Map<string, BaseDeclaration>;
   modelNames: ReadonlySet<string>;
@@ -225,11 +222,10 @@ function resolvePolymorphism(input: {
     baseDeclarations,
     modelNames,
     sourceId,
-    document,
+    allModels: allModelViews,
     indexSpans,
     modelIndexesByName,
   } = input;
-  const allPslModels = document.ast.namespaces.flatMap((ns) => ns.models);
   let patched = input.models;
   let roots = input.roots;
   let collections = input.collections;
@@ -249,9 +245,9 @@ function resolvePolymorphism(input: {
     const model = patched[modelName];
     if (!model) continue;
 
-    const pslModel = allPslModels.find((m) => m.name === modelName);
-    const mappedDiscriminatorField = pslModel
-      ? (resolveFieldMappings(pslModel).pslNameToMapped.get(decl.fieldName) ?? decl.fieldName)
+    const modelView = allModelViews.find((m) => m.name === modelName);
+    const mappedDiscriminatorField = modelView
+      ? (resolveFieldMappings(modelView).pslNameToMapped.get(decl.fieldName) ?? decl.fieldName)
       : decl.fieldName;
 
     if (!Object.hasOwn(model.fields, mappedDiscriminatorField)) {
@@ -312,9 +308,9 @@ function resolvePolymorphism(input: {
     }
 
     const baseModel = patched[baseDecl.baseName];
-    const variantPslModel = allPslModels.find((m) => m.name === variantName);
-    if (!variantPslModel) continue;
-    const hasExplicitMap = getMapName(variantPslModel.attributes) !== undefined;
+    const variantModelView = allModelViews.find((m) => m.name === variantName);
+    if (!variantModelView) continue;
+    const hasExplicitMap = getMapName(variantModelView.attributes) !== undefined;
 
     if (hasExplicitMap && baseModel && baseDecl.collectionName !== baseModel.storage.collection) {
       diagnostics.push({
@@ -339,7 +335,7 @@ function resolvePolymorphism(input: {
       };
     }
 
-    const variantCollectionName = resolveCollectionName(variantPslModel);
+    const variantCollectionName = resolveCollectionName(variantModelView);
     if (roots[variantCollectionName]?.model === variantName) {
       if (variantCollectionName === baseCollection && baseModel) {
         roots = { ...roots, [variantCollectionName]: mongoCrossRef(baseDecl.baseName) };
@@ -483,9 +479,7 @@ function parseJsonArg(raw: string | undefined): Record<string, unknown> | undefi
   return undefined;
 }
 
-function parseCollation(
-  attr: import('@prisma-next/psl-parser').PslAttribute,
-): CollationOptions | null | undefined {
+function parseCollation(attr: CstAttributeView): CollationOptions | null | undefined {
   const locale = stripQuotesHelper(getNamedArgument(attr, 'collationLocale'));
   if (!locale) {
     const hasAnyCollationArg =
@@ -545,7 +539,7 @@ function parseProjectionList(
 }
 
 function collectIndexes(
-  pslModel: PslModel,
+  pslModel: CstModelView,
   fieldMappings: FieldMappings,
   modelNames: ReadonlySet<string>,
   sourceId: string,
@@ -800,7 +794,7 @@ function collectIndexes(
   return indexes;
 }
 
-function isRelationField(field: PslField, modelNames: ReadonlySet<string>): boolean {
+function isRelationField(field: CstFieldView, modelNames: ReadonlySet<string>): boolean {
   return modelNames.has(field.typeName);
 }
 
@@ -808,14 +802,14 @@ function isRelationField(field: PslField, modelNames: ReadonlySet<string>): bool
 const MONGO_OBJECT_ID_PSL_TYPE = 'ObjectId';
 
 function resolveFieldCodecId(
-  field: PslField,
+  field: CstFieldView,
   scalarTypeDescriptors: ReadonlyMap<string, string>,
 ): string | undefined {
   return scalarTypeDescriptors.get(field.typeName);
 }
 
 function resolveNonRelationField(
-  field: PslField,
+  field: CstFieldView,
   ownerName: string,
   compositeTypeNames: ReadonlySet<string>,
   scalarTypeDescriptors: ReadonlyMap<string, string>,
@@ -828,6 +822,14 @@ function resolveNonRelationField(
       nullable: field.optional,
     };
     return field.list ? { ...result, many: true } : result;
+  }
+
+  // The field's qualified type was malformed and already flagged
+  // (PSL_INVALID_QUALIFIED_TYPE) at view-build time. Don't cascade a spurious
+  // PSL_UNSUPPORTED_FIELD_TYPE — the legacy parser rejected such types before
+  // the interpreter ran.
+  if (field.typeAlreadyReported) {
+    return undefined;
   }
 
   const codecId = resolveFieldCodecId(field, scalarTypeDescriptors);
@@ -851,21 +853,28 @@ function resolveNonRelationField(
 export function interpretPslDocumentToMongoContract(
   input: InterpretPslDocumentToMongoContractInput,
 ): Result<Contract, ContractSourceDiagnostics> {
-  const { document, scalarTypeDescriptors, codecLookup } = input;
-  const sourceId = document.ast.sourceId;
+  const { symbolTable, sourceFile, scalarTypeDescriptors, codecLookup } = input;
+  const sourceId = input.sourceId;
   const diagnostics: ContractSourceDiagnostic[] = [];
+  const topLevel = symbolTable.topLevel;
   validateNamespaceBlocksForMongoTarget({
-    namespaces: document.ast.namespaces,
+    namespaces: Object.values(topLevel.namespaces),
     sourceId,
+    sourceFile,
     diagnostics,
   });
-  // Mongo lowers only the implicit `__unspecified__` bucket today —
-  // explicit `namespace { … }` blocks were rejected above. The IR
-  // collection map remains flat (and the Mongo target represents
-  // databases via `MongoTargetDatabase`, populated at compose time by
-  // the connection string rather than authoring-time PSL).
-  const allModels = document.ast.namespaces.flatMap((ns) => ns.models);
-  const allCompositeTypes = document.ast.namespaces.flatMap((ns) => ns.compositeTypes);
+  // Mongo lowers only the implicit top-level bucket today — explicit
+  // `namespace { … }` blocks were rejected above. The IR collection map
+  // remains flat (and the Mongo target represents databases via
+  // `MongoTargetDatabase`, populated at compose time by the connection
+  // string rather than authoring-time PSL). Build the model/composite views
+  // directly from the symbol-table entries + their CST `.node`.
+  const allModels: CstModelView[] = Object.values(topLevel.models).map((m) =>
+    buildModelView(m, sourceFile, sourceId, diagnostics),
+  );
+  const allCompositeTypes: CstCompositeTypeView[] = Object.values(topLevel.compositeTypes).map(
+    (ct) => buildCompositeTypeView(ct, sourceFile, sourceId, diagnostics),
+  );
   const modelNames = new Set(allModels.map((m) => m.name));
   const compositeTypeNames = new Set(allCompositeTypes.map((ct) => ct.name));
 
@@ -882,7 +891,7 @@ export function interpretPslDocumentToMongoContract(
     readonly targetModelName: string;
     readonly relationName?: string;
     readonly cardinality: '1:1' | '1:N';
-    readonly field: PslField;
+    readonly field: CstFieldView;
   }
   const backrelationCandidates: BackrelationCandidate[] = [];
 
@@ -1078,7 +1087,7 @@ export function interpretPslDocumentToMongoContract(
   }
 
   const { discriminatorDeclarations, baseDeclarations } = collectPolymorphismDeclarations(
-    document,
+    allModels,
     sourceId,
     diagnostics,
   );
@@ -1086,7 +1095,7 @@ export function interpretPslDocumentToMongoContract(
     models,
     roots,
     collections,
-    document,
+    allModels,
     discriminatorDeclarations,
     baseDeclarations,
     modelNames,

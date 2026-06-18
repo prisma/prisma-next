@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig } from '@prisma-next/config/config-types';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { interpretPslDocumentToMongoContract } from './interpreter';
@@ -39,13 +40,22 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
           });
         }
 
-        const document = parsePslDocument({
-          schema,
-          sourceId: schemaPath,
+        // dispatch-4: thin bridge to keep src/ compiling. The real provider
+        // swap (combined parse + symbol-table diagnostic seeding, mirroring the
+        // SQL provider's `seedDiagnostics`) lands in dispatch 4; for now this
+        // builds the symbol table and threads the new interpreter input shape
+        // without surfacing parse/symbol-table diagnostics.
+        const { document, sourceFile } = parse(schema);
+        const { table: symbolTable } = buildSymbolTable({
+          document,
+          sourceFile,
+          scalarTypes: [...context.scalarTypeDescriptors.keys()],
         });
 
         const interpreted = interpretPslDocumentToMongoContract({
-          document,
+          symbolTable,
+          sourceFile,
+          sourceId: schemaPath,
           scalarTypeDescriptors: context.scalarTypeDescriptors,
           codecLookup: context.codecLookup,
         });
