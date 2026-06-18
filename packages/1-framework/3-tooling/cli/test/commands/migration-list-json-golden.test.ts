@@ -5,21 +5,15 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { writeRef } from '@prisma-next/migration-tools/refs';
+import { blindCast } from '@prisma-next/utils/casts';
 import { type } from 'arktype';
 import { join } from 'pathe';
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { migrationListResultSchema } from '../../src/commands/json/schemas';
 import { executeMigrationListCommand } from '../../src/commands/migration-list';
+import * as configLoader from '../../src/config-loader';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
-
-const mocks = vi.hoisted(() => ({
-  loadConfig: vi.fn(),
-}));
-
-vi.mock('../../src/config-loader', () => ({
-  loadConfig: mocks.loadConfig,
-}));
 
 const TARGET = 'postgres';
 const TARGET_FAMILY = 'sql';
@@ -34,12 +28,12 @@ const ADDITIVE_OP: MigrationPlanOperation = {
   operationClass: 'additive',
 };
 
-const BACKFILL_OP = {
+const BACKFILL_OP: MigrationPlanOperation = {
   id: 'data.backfill_emails',
   label: 'Backfill emails',
   operationClass: 'data',
   invariantId: 'backfill_emails_v1',
-} as unknown as MigrationPlanOperation;
+};
 
 const createdDirs: string[] = [];
 
@@ -63,6 +57,13 @@ function baseConfig(contractOutput: string) {
     contract: { output: contractOutput },
     migrations: { dir: 'migrations' },
   };
+}
+
+function loadedConfig(contractOutput: string): Awaited<ReturnType<typeof configLoader.loadConfig>> {
+  return blindCast<
+    Awaited<ReturnType<typeof configLoader.loadConfig>>,
+    'migration list golden tests only exercise config fields read by executeMigrationListCommand'
+  >(baseConfig(contractOutput));
 }
 
 async function writeContract(cwd: string, storageHash: string): Promise<string> {
@@ -124,10 +125,13 @@ describe('migration list --json golden', () => {
     vi.doUnmock('../../src/config-loader');
   });
 
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
   afterEach(async () => {
     await Promise.all(createdDirs.map((dir) => rm(dir, { recursive: true, force: true })));
     createdDirs.length = 0;
-    vi.clearAllMocks();
   });
 
   it('pins migration list --json for the slice-spec worked example', async () => {
@@ -136,7 +140,7 @@ describe('migration list --json golden', () => {
     const contractPath = await writeContract(cwd, HASH_55bada2);
     await mkdir(join(cwd, 'migrations', 'app'), { recursive: true });
     await writeSliceSpecPackages(join(cwd, 'migrations'));
-    mocks.loadConfig.mockResolvedValue(baseConfig(contractPath));
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(loadedConfig(contractPath));
 
     const flags = parseGlobalFlags({ json: true, quiet: true });
     const ui = createTerminalUI(flags);
@@ -200,7 +204,7 @@ describe('migration list --json golden', () => {
         targetFamily: TARGET_FAMILY,
       }),
     );
-    mocks.loadConfig.mockResolvedValue(baseConfig(contractPath));
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(loadedConfig(contractPath));
 
     const flags = parseGlobalFlags({ json: true, quiet: true });
     const ui = createTerminalUI(flags);

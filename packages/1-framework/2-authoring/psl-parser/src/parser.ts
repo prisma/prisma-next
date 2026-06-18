@@ -25,9 +25,18 @@ import type {
   PslNamedTypeDeclaration,
   PslNamespace,
   PslPosition,
+  PslPrismaBlock,
+  PslPrismaBlockKeyword,
   PslSpan,
   PslTypeConstructorCall,
   PslTypesBlock,
+  PslWorkflow,
+  PslWorkflowExecutableNode,
+  PslWorkflowExecutableNodeKind,
+  PslWorkflowMember,
+  PslWorkflowProperty,
+  PslWorkflowPropertyValueKind,
+  PslWorkflowState,
 } from '@prisma-next/framework-components/psl-ast';
 import {
   makePslNamespace,
@@ -108,6 +117,8 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
 
   let typesBlock: PslTypesBlock | undefined;
   const pslBlockNamespace: AuthoringPslBlockDescriptorNamespace = input.pslBlockDescriptors ?? {};
+  const prismaBlocks: PslPrismaBlock[] = [];
+  const workflows: PslWorkflow[] = [];
 
   // Walk a contiguous range of lines, routing top-level declarations into the
   // active namespace bucket. Called once for the whole document and once per
@@ -199,6 +210,42 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
           });
         } else {
           typesBlock = parseTypesBlock(context, bounds);
+        }
+        lineIndex = bounds.endLine + 1;
+        continue;
+      }
+
+      const prismaBlockMatch = line.match(/^(generator|datasource)\s+([A-Za-z_]\w*)\s*\{$/);
+      if (prismaBlockMatch) {
+        const bounds = findBlockBounds(context, lineIndex);
+        const keyword = parsePrismaBlockKeyword(prismaBlockMatch[1] ?? '');
+        const name = prismaBlockMatch[2] ?? '';
+        if (isInsideNamespace) {
+          pushDiagnostic(context, {
+            code: 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK',
+            message: `Prisma "${keyword}" blocks must be declared at the document top level, not inside a namespace block`,
+            span: createTrimmedLineSpan(context, lineIndex),
+          });
+        } else if (name.length > 0) {
+          prismaBlocks.push(parsePrismaBlock(context, keyword, name, bounds));
+        }
+        lineIndex = bounds.endLine + 1;
+        continue;
+      }
+
+      const workflowMatch = line.match(/^workflow\s+([A-Za-z_]\w*)\s*\{$/);
+      if (workflowMatch) {
+        const bounds = findBlockBounds(context, lineIndex);
+        const name = workflowMatch[1] ?? '';
+        if (isInsideNamespace) {
+          pushDiagnostic(context, {
+            code: 'PSL_INVALID_WORKFLOW_MEMBER',
+            message:
+              '`workflow` blocks must be declared at the document top level, not inside a namespace block',
+            span: createTrimmedLineSpan(context, lineIndex),
+          });
+        } else if (name.length > 0) {
+          workflows.push(parseWorkflowBlock(context, name, bounds));
         }
         lineIndex = bounds.endLine + 1;
         continue;
@@ -384,7 +431,9 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     kind: 'document',
     sourceId: input.sourceId,
     namespaces,
+    ...ifDefined('prismaBlocks', prismaBlocks.length > 0 ? prismaBlocks : undefined),
     ...ifDefined('types', typesBlock),
+    ...ifDefined('workflows', workflows.length > 0 ? workflows : undefined),
     span: documentSpan,
   };
 
@@ -393,6 +442,265 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     diagnostics,
     ok: diagnostics.length === 0,
   };
+}
+
+function parseWorkflowBlock(
+  context: ParserContext,
+  name: string,
+  bounds: BlockBounds,
+): PslWorkflow {
+  const members: PslWorkflowMember[] = [];
+  const triggers: PslWorkflowExecutableNode[] = [];
+  const states: PslWorkflowState[] = [];
+  const steps: PslWorkflowExecutableNode[] = [];
+  const approvals: PslWorkflowExecutableNode[] = [];
+  const conditions: PslWorkflowExecutableNode[] = [];
+  const timers: PslWorkflowExecutableNode[] = [];
+  const parallels: PslWorkflowExecutableNode[] = [];
+
+  for (let lineIndex = bounds.startLine + 1; lineIndex < bounds.endLine; ) {
+    const raw = context.lines[lineIndex] ?? '';
+    const line = stripInlineComment(raw).trim();
+    if (line.length === 0) {
+      lineIndex += 1;
+      continue;
+    }
+
+    const memberMatch = line.match(
+      /^(trigger|state|step|approval|condition|timer|parallel)\s+([A-Za-z_]\w*)\s*\{$/,
+    );
+    if (!memberMatch) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_WORKFLOW_MEMBER',
+        message: `Invalid workflow member declaration "${line}"`,
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      lineIndex += 1;
+      continue;
+    }
+
+    const memberKind = memberMatch[1] as PslWorkflowExecutableNodeKind | 'state';
+    const memberName = memberMatch[2] ?? '';
+    const memberBounds = findBlockBounds(context, lineIndex);
+
+    if (memberKind === 'state') {
+      const state = parseWorkflowStateBlock(context, memberName, memberBounds);
+      states.push(state);
+      members.push(state);
+    } else {
+      const node = parseWorkflowExecutableBlock(context, memberKind, memberName, memberBounds);
+      members.push(node);
+      switch (memberKind) {
+        case 'trigger':
+          triggers.push(node);
+          break;
+        case 'step':
+          steps.push(node);
+          break;
+        case 'approval':
+          approvals.push(node);
+          break;
+        case 'condition':
+          conditions.push(node);
+          break;
+        case 'timer':
+          timers.push(node);
+          break;
+        case 'parallel':
+          parallels.push(node);
+          break;
+      }
+    }
+
+    lineIndex = memberBounds.endLine + 1;
+  }
+
+  return {
+    kind: 'workflow',
+    name,
+    members,
+    triggers,
+    states,
+    steps,
+    approvals,
+    conditions,
+    timers,
+    parallels,
+    span: createLineRangeSpan(context, bounds.startLine, bounds.endLine),
+  };
+}
+
+function parsePrismaBlockKeyword(value: string): PslPrismaBlockKeyword {
+  return value === 'generator' ? 'generator' : 'datasource';
+}
+
+function parsePrismaBlock(
+  context: ParserContext,
+  keyword: PslPrismaBlockKeyword,
+  name: string,
+  bounds: BlockBounds,
+): PslPrismaBlock {
+  const span = createLineRangeSpan(context, bounds.startLine, bounds.endLine);
+  return {
+    kind: 'prismaBlock',
+    keyword,
+    name,
+    source: context.schema.slice(span.start.offset, span.end.offset),
+    span,
+  };
+}
+
+function parseWorkflowStateBlock(
+  context: ParserContext,
+  name: string,
+  bounds: BlockBounds,
+): PslWorkflowState {
+  const fields: PslField[] = [];
+  for (let lineIndex = bounds.startLine + 1; lineIndex < bounds.endLine; lineIndex += 1) {
+    const raw = context.lines[lineIndex] ?? '';
+    const line = stripInlineComment(raw).trim();
+    if (line.length === 0) {
+      continue;
+    }
+    if (line.startsWith('@@')) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_WORKFLOW_MEMBER',
+        message: `Workflow state "${name}" does not support model attributes`,
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      continue;
+    }
+    const field = parseField(context, line, lineIndex);
+    if (field) {
+      fields.push(field);
+    }
+  }
+  return {
+    kind: 'state',
+    name,
+    fields,
+    span: createLineRangeSpan(context, bounds.startLine, bounds.endLine),
+  };
+}
+
+function parseWorkflowExecutableBlock(
+  context: ParserContext,
+  kind: PslWorkflowExecutableNodeKind,
+  name: string,
+  bounds: BlockBounds,
+): PslWorkflowExecutableNode {
+  return {
+    kind,
+    name,
+    properties: parseWorkflowProperties(context, bounds),
+    span: createLineRangeSpan(context, bounds.startLine, bounds.endLine),
+  };
+}
+
+function parseWorkflowProperties(
+  context: ParserContext,
+  bounds: BlockBounds,
+): PslWorkflowProperty[] {
+  const properties: PslWorkflowProperty[] = [];
+  for (let lineIndex = bounds.startLine + 1; lineIndex < bounds.endLine; ) {
+    const raw = context.lines[lineIndex] ?? '';
+    const line = stripInlineComment(raw).trim();
+    if (line.length === 0) {
+      lineIndex += 1;
+      continue;
+    }
+
+    const assignment = readWorkflowPropertyAssignment(context, lineIndex, bounds.endLine);
+    if (!assignment) {
+      const diagnosticLine = stripInlineComment(context.lines[lineIndex] ?? '').trim();
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_WORKFLOW_MEMBER',
+        message: `Invalid workflow property declaration "${diagnosticLine}"`,
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      lineIndex += 1;
+      continue;
+    }
+    properties.push(assignment.property);
+    lineIndex = assignment.nextLine;
+  }
+  return properties;
+}
+
+function readWorkflowPropertyAssignment(
+  context: ParserContext,
+  lineIndex: number,
+  endLineExclusive: number,
+): { readonly property: PslWorkflowProperty; readonly nextLine: number } | undefined {
+  const firstRaw = context.lines[lineIndex] ?? '';
+  const firstLine = stripInlineComment(firstRaw).trim();
+  const match = firstLine.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
+  if (!match) {
+    return undefined;
+  }
+
+  const name = match[1] ?? '';
+  const firstValue = (match[2] ?? '').trim();
+  const valueLines = [firstValue];
+  let nextLine = lineIndex + 1;
+  let balance = workflowLiteralBalance(firstValue);
+
+  while (balance > 0 && nextLine < endLineExclusive) {
+    const raw = context.lines[nextLine] ?? '';
+    const line = stripInlineComment(raw).trim();
+    valueLines.push(line);
+    balance += workflowLiteralBalance(line);
+    nextLine += 1;
+  }
+
+  const value = valueLines.join(' ').trim();
+  return {
+    property: {
+      kind: 'workflowProperty',
+      name,
+      value,
+      valueKind: classifyWorkflowPropertyValue(value),
+      span:
+        nextLine === lineIndex + 1
+          ? createTrimmedLineSpan(context, lineIndex)
+          : createLineRangeSpan(context, lineIndex, nextLine - 1),
+    },
+    nextLine,
+  };
+}
+
+function workflowLiteralBalance(value: string): number {
+  let balance = 0;
+  let quote: '"' | "'" | null = null;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index] ?? '';
+    if (quote) {
+      if (character === quote && !isQuoteEscaped(value, index)) {
+        quote = null;
+      }
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '{' || character === '[' || character === '(') {
+      balance += 1;
+    } else if (character === '}' || character === ']' || character === ')') {
+      balance -= 1;
+    }
+  }
+  return balance;
+}
+
+function classifyWorkflowPropertyValue(value: string): PslWorkflowPropertyValueKind {
+  if (/^"(?:[^"\\]|\\.)*"$/.test(value) || /^'(?:[^'\\]|\\.)*'$/.test(value)) return 'string';
+  if (/^-?\d+(?:\.\d+)?$/.test(value)) return 'number';
+  if (value === 'true' || value === 'false') return 'boolean';
+  if (value.startsWith('{') && value.endsWith('}')) return 'object';
+  if (value.startsWith('[') && value.endsWith(']')) return 'array';
+  if (/^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$/.test(value)) return 'identifier';
+  return 'expression';
 }
 
 function parseModelBlock(context: ParserContext, name: string, bounds: BlockBounds): PslModel {

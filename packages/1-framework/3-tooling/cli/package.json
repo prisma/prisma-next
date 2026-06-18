@@ -30,6 +30,7 @@
     "@prisma-next/psl-printer": "workspace:0.13.0",
     "@prisma-next/cli-telemetry": "workspace:0.13.0",
     "@prisma-next/utils": "workspace:0.13.0",
+    "@prisma-next/workflows": "workspace:0.13.0",
     "arktype": "^2.2.0",
     "c12": "^3.3.4",
     "ci-info": "^4.3.1",
@@ -43,6 +44,7 @@
     "pathe": "^2.0.3",
     "string-width": "^8.2.1",
     "strip-ansi": "^7.2.0",
+    "tsx": "catalog:",
     "wrap-ansi": "^10.0.0"
   },
   "devDependencies": {
@@ -155,6 +157,10 @@
     "./commands/telemetry": {
       "types": "./dist/commands/telemetry/index.d.mts",
       "import": "./dist/commands/telemetry/index.mjs"
+    },
+    "./commands/workflow": {
+      "types": "./dist/commands/workflow.d.mts",
+      "import": "./dist/commands/workflow.mjs"
     },
     "./config-loader": {
       "types": "./dist/config-loader.d.mts",

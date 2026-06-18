@@ -1,0 +1,27 @@
+{
+  "name": "@prisma-next/example-workflow-stripe-disputes",
+  "private": true,
+  "type": "module",
+  "version": "0.13.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "workflow:generate": "prisma-next workflow generate --schema src/schema.prisma --studio studio/workflows.html --svg studio/dispute-evidence.svg",
+    "workflow:test": "prisma-next workflow test --schema src/schema.prisma --payload fixtures/stripe-dispute-created.json --json",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "biome check . --error-on-warnings"
+  },
+  "dependencies": {
+    "@prisma-next/workflows": "workspace:0.13.0"
+  },
+  "devDependencies": {
+    "@prisma-next/cli": "workspace:0.13.0",
+    "@prisma-next/tsconfig": "workspace:0.13.0",
+    "@types/node": "catalog:",
+    "@prisma/dev": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

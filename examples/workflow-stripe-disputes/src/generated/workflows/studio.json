@@ -1,0 +1,179 @@
+{
+  "kind": "prisma-workflow-studio-model",
+  "version": 1,
+  "runtime": {
+    "datasets": [
+      "ingestEvents",
+      "runs",
+      "steps",
+      "timeline",
+      "stateSnapshots",
+      "approvals",
+      "outbox",
+      "deadLetters"
+    ],
+    "endpoints": {
+      "snapshot": "/api/prisma-workflows/studio",
+      "inspectRun": "/api/prisma-workflows/inspect/:runId",
+      "approve": "/api/prisma-workflows/approve/:approvalId",
+      "reject": "/api/prisma-workflows/reject/:approvalId",
+      "replay": "/api/prisma-workflows/replay/:runId",
+      "worker": "/api/prisma-workflows/run"
+    }
+  },
+  "workflows": [
+    {
+      "id": "dispute-evidence",
+      "name": "DisputeEvidence",
+      "slug": "dispute-evidence",
+      "version": 1568414036,
+      "canvas": {
+        "nodes": [
+          {
+            "id": "trigger:stripeDisputeCreated",
+            "kind": "trigger",
+            "label": "stripeDisputeCreated",
+            "x": 80,
+            "y": 80,
+            "sourceRef": "stripe",
+            "config": {
+              "event": "charge.dispute.created",
+              "dedupeBy": "event.data.object.id"
+            }
+          },
+          {
+            "id": "state:DisputeCaseState",
+            "kind": "state",
+            "label": "DisputeCaseState",
+            "x": 80,
+            "y": 260
+          },
+          {
+            "id": "step:collectCustomerHistory",
+            "kind": "step",
+            "label": "collectCustomerHistory",
+            "x": 320,
+            "y": 140,
+            "codeRef": "./src/steps/collect-customer-history.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "internal",
+              "retry": {
+                "maxAttempts": 3,
+                "backoff": "exponential"
+              }
+            }
+          },
+          {
+            "id": "step:draftResponse",
+            "kind": "step",
+            "label": "draftResponse",
+            "x": 540,
+            "y": 140,
+            "codeRef": "./src/steps/draft-response.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "internal",
+              "budget": {
+                "maxUsd": 1.25,
+                "maxTokens": 2000,
+                "timeout": "45s"
+              }
+            }
+          },
+          {
+            "id": "approval:humanApproval",
+            "kind": "approval",
+            "label": "humanApproval",
+            "x": 760,
+            "y": 140,
+            "config": {
+              "when": "state.amount > 50000",
+              "timeout": "48h",
+              "assignees": [
+                "role:finance_ops"
+              ],
+              "onApprove": "submitEvidence"
+            }
+          },
+          {
+            "id": "step:submitEvidence",
+            "kind": "step",
+            "label": "submitEvidence",
+            "x": 980,
+            "y": 140,
+            "codeRef": "./src/steps/submit-evidence.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "external",
+              "idempotency": "state.disputeId"
+            }
+          },
+          {
+            "id": "step:postSummary",
+            "kind": "step",
+            "label": "postSummary",
+            "x": 1200,
+            "y": 140,
+            "codeRef": "./src/steps/post-summary.ts",
+            "config": {
+              "checkpoint": false,
+              "sideEffects": "external",
+              "idempotency": "state.disputeId"
+            }
+          },
+          {
+            "id": "step:learnFromApproval",
+            "kind": "step",
+            "label": "learnFromApproval",
+            "x": 1420,
+            "y": 140,
+            "codeRef": "./src/steps/learn-from-approved-response.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "internal"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "DisputeEvidence:edge:0",
+            "from": "trigger:stripeDisputeCreated",
+            "to": "step:collectCustomerHistory"
+          },
+          {
+            "id": "DisputeEvidence:edge:1",
+            "from": "step:collectCustomerHistory",
+            "to": "step:draftResponse"
+          },
+          {
+            "id": "DisputeEvidence:edge:2",
+            "from": "step:draftResponse",
+            "to": "approval:humanApproval"
+          },
+          {
+            "id": "DisputeEvidence:edge:3",
+            "from": "approval:humanApproval",
+            "to": "step:submitEvidence"
+          },
+          {
+            "id": "DisputeEvidence:edge:4",
+            "from": "step:submitEvidence",
+            "to": "step:postSummary"
+          },
+          {
+            "id": "DisputeEvidence:edge:5",
+            "from": "step:postSummary",
+            "to": "step:learnFromApproval"
+          },
+          {
+            "id": "DisputeEvidence:approval:humanApproval:approve",
+            "from": "approval:humanApproval",
+            "to": "step:submitEvidence",
+            "label": "approve"
+          }
+        ]
+      }
+    }
+  ]
+}

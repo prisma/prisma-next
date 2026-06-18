@@ -151,6 +151,90 @@
       "plane": "shared"
     },
     {
+      "glob": "packages/1-framework/3-tooling/workflows/src/shared/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/workflows/src/studio/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/workflows/src/exports/index.ts",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/workflows/src/exports/studio.ts",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/workflows/src/compiler/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/workflows/src/exports/compiler.ts",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/workflows/src/runtime/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/workflows/src/connectors/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/workflows/src/connector-sdk/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/workflows/src/testing/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/workflows/src/exports/runtime.ts",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/workflows/src/exports/connectors.ts",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/workflows/src/exports/connector-sdk.ts",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/workflows/src/exports/testing.ts",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "runtime"
+    },
+    {
       "glob": "packages/2-sql/1-core/**",
       "domain": "sql",
       "layer": "core",

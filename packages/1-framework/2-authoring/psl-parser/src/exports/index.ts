@@ -29,9 +29,18 @@ export type {
   PslNamedTypeDeclaration,
   PslNamespace,
   PslPosition,
+  PslPrismaBlock,
+  PslPrismaBlockKeyword,
   PslSpan,
   PslTypeConstructorCall,
   PslTypesBlock,
+  PslWorkflow,
+  PslWorkflowExecutableNode,
+  PslWorkflowExecutableNodeKind,
+  PslWorkflowMember,
+  PslWorkflowProperty,
+  PslWorkflowPropertyValueKind,
+  PslWorkflowState,
 } from '@prisma-next/framework-components/psl-ast';
 export {
   flatPslModels,

@@ -5,9 +5,18 @@ import type {
 import { isAuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
+  PslAttribute,
   PslBlockParam,
   PslExtensionBlock,
   PslExtensionBlockParamValue,
+  PslField,
+  PslPrismaBlock,
+  PslTypeConstructorCall,
+  PslWorkflow,
+  PslWorkflowExecutableNode,
+  PslWorkflowMember,
+  PslWorkflowProperty,
+  PslWorkflowState,
 } from '@prisma-next/framework-components/psl-ast';
 import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -74,6 +83,10 @@ export function serializePrintDocument(
 
   sections.push(doc.headerComment);
 
+  for (const block of doc.prismaBlocks) {
+    sections.push(serializePrismaBlock(block));
+  }
+
   const namedTypeEntries = [...doc.namedTypes].sort((a, b) => a.name.localeCompare(b.name));
   if (namedTypeEntries.length > 0) {
     sections.push(serializeTypesBlock(namedTypeEntries));
@@ -98,6 +111,10 @@ export function serializePrintDocument(
     } else {
       sections.push(wrapNamespaceBlock(namespace.name, namespaceSections));
     }
+  }
+
+  for (const workflow of doc.workflows) {
+    sections.push(serializeWorkflow(workflow));
   }
 
   return `${sections.join('\n\n')}\n`;
@@ -243,6 +260,10 @@ function serializeTypesBlock(namedTypes: readonly PrinterNamedType[]): string {
   return lines.join('\n');
 }
 
+function serializePrismaBlock(block: PslPrismaBlock): string {
+  return block.source;
+}
+
 function serializeModel(model: import('./types').PrinterModel): string {
   const lines: string[] = [];
 
@@ -296,4 +317,88 @@ function formatFieldType(field: PrinterField): string {
     type += '?';
   }
   return type;
+}
+
+function serializeWorkflow(workflow: PslWorkflow): string {
+  const sections = workflowMembersInPrintOrder(workflow).map(serializeWorkflowMember);
+
+  const body = sections
+    .map((section) =>
+      section
+        .split('\n')
+        .map((line) => `${PSL_INDENT_UNIT}${line}`)
+        .join('\n'),
+    )
+    .join('\n\n');
+  return `workflow ${workflow.name} {\n${body}\n}`;
+}
+
+function workflowMembersInPrintOrder(workflow: PslWorkflow): readonly PslWorkflowMember[] {
+  if (workflow.members.length > 0) {
+    return workflow.members;
+  }
+  return [
+    ...workflow.triggers,
+    ...workflow.states,
+    ...workflow.steps,
+    ...workflow.approvals,
+    ...workflow.conditions,
+    ...workflow.timers,
+    ...workflow.parallels,
+  ];
+}
+
+function serializeWorkflowMember(member: PslWorkflowMember): string {
+  return member.kind === 'state'
+    ? serializeWorkflowState(member)
+    : serializeWorkflowExecutableNode(member);
+}
+
+function serializeWorkflowExecutableNode(node: PslWorkflowExecutableNode): string {
+  const lines = [`${node.kind} ${node.name} {`];
+  for (const property of node.properties) {
+    lines.push(`${PSL_INDENT_UNIT}${serializeWorkflowProperty(property)}`);
+  }
+  lines.push('}');
+  return lines.join('\n');
+}
+
+function serializeWorkflowProperty(property: PslWorkflowProperty): string {
+  return `${property.name} = ${property.value}`;
+}
+
+function serializeWorkflowState(state: PslWorkflowState): string {
+  const lines = [`state ${state.name} {`];
+  for (const field of state.fields) {
+    lines.push(`${PSL_INDENT_UNIT}${serializeWorkflowStateField(field)}`);
+  }
+  lines.push('}');
+  return lines.join('\n');
+}
+
+function serializeWorkflowStateField(field: PslField): string {
+  const typeSource =
+    field.typeConstructor !== undefined
+      ? formatWorkflowTypeConstructor(field.typeConstructor)
+      : field.typeName;
+  const listOrOptional = field.list ? '[]' : field.optional ? '?' : '';
+  const attributes =
+    field.attributes.length > 0 ? ` ${field.attributes.map(serializePslAttribute).join(' ')}` : '';
+  return `${field.name} ${typeSource}${listOrOptional}${attributes}`;
+}
+
+function formatWorkflowTypeConstructor(tc: PslTypeConstructorCall): string {
+  const path = tc.path.join('.');
+  if (tc.args.length === 0) return path;
+  return `${path}(${tc.args
+    .map((arg) => (arg.kind === 'positional' ? arg.value : `${arg.name}: ${arg.value}`))
+    .join(', ')})`;
+}
+
+function serializePslAttribute(attr: PslAttribute): string {
+  const prefix = attr.target === 'model' || attr.target === 'enum' ? '@@' : '@';
+  if (attr.args.length === 0) return `${prefix}${attr.name}`;
+  return `${prefix}${attr.name}(${attr.args
+    .map((arg) => (arg.kind === 'positional' ? arg.value : `${arg.name}: ${arg.value}`))
+    .join(', ')})`;
 }

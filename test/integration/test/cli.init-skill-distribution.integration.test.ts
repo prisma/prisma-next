@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { delimiter as pathDelimiter } from 'node:path';
+import { timeouts } from '@prisma-next/test-utils';
 import { join, resolve } from 'pathe';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { INIT_EXIT_OK } from '../../../packages/1-framework/3-tooling/cli/src/commands/init/exit-codes';
@@ -38,13 +39,13 @@ let workspaceClone: string;
 
 beforeAll(() => {
   workspaceClone = makeWorkspaceClone();
-}, 30_000);
+}, timeouts.spinUpPpgDev);
 
 afterAll(() => {
   if (workspaceClone) {
     rmSync(workspaceClone, { recursive: true, force: true });
   }
-});
+}, timeouts.spinUpPpgDev);
 
 describe('init skill distribution (offline integration, real CLI)', () => {
   const testDirs = new Set<string>();

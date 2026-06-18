@@ -61,70 +61,94 @@ describe.each(
     ctx?.project?.cleanup();
   });
 
-  it('step 1 (init): scaffolds the expected project skeleton', () => {
-    expect(ctx.project.initResult.exitCode, formatInitDiagnostic(ctx.project)).toBe(0);
+  it(
+    'step 1 (init): scaffolds the expected project skeleton',
+    () => {
+      expect(ctx.project.initResult.exitCode, formatInitDiagnostic(ctx.project)).toBe(0);
 
-    expectScaffoldedFiles(ctx.project);
-    expectSchemaFile(ctx.project, cell);
-    expectConfigFile(ctx.project, cell);
-    expectPackageJsonIsEsm(ctx.project);
-  });
+      expectScaffoldedFiles(ctx.project);
+      expectSchemaFile(ctx.project, cell);
+      expectConfigFile(ctx.project, cell);
+      expectPackageJsonIsEsm(ctx.project);
+    },
+    timeouts.typeScriptCompilation,
+  );
 
-  it('step 2 (install): pnpm install succeeds with isolated linker', () => {
-    const install = ctx.project.installResult;
-    expect(install, 'install was skipped — harness option mismatch').not.toBeNull();
-    if (install === null) return;
-    expect(install.exitCode, formatInstallDiagnostic(ctx.project, install)).toBe(0);
+  it(
+    'step 2 (install): pnpm install succeeds with isolated linker',
+    () => {
+      const install = ctx.project.installResult;
+      expect(install, 'install was skipped — harness option mismatch').not.toBeNull();
+      if (install === null) return;
+      expect(install.exitCode, formatInstallDiagnostic(ctx.project, install)).toBe(0);
 
-    expectFacadeIsResolvable(ctx.project);
-  });
+      expectFacadeIsResolvable(ctx.project);
+    },
+    timeouts.typeScriptCompilation,
+  );
 
-  it('step 3 (emit): produces contract.json + contract.d.ts next to the input', () => {
-    const emit = ctx.emit;
-    expect(emit, 'emit was not run (precondition failure)').not.toBeNull();
-    if (emit === null) return;
-    expect(emit.exitCode, formatStepDiagnostic('emit', ctx.project, emit)).toBe(0);
+  it(
+    'step 3 (emit): produces contract.json + contract.d.ts next to the input',
+    () => {
+      const emit = ctx.emit;
+      expect(emit, 'emit was not run (precondition failure)').not.toBeNull();
+      if (emit === null) return;
+      expect(emit.exitCode, formatStepDiagnostic('emit', ctx.project, emit)).toBe(0);
 
-    // The init scaffold passes a single string `contract: "./src/prisma/contract.ts"`
-    // to the facade `defineConfig`, which derives an output path next to the
-    // input. The journey verifies that derivation actually reaches the emitter
-    // — this is the seam that breaks when init scaffold and emit output get
-    // out of sync (the symptom shape of TML-2461, even if the facade currently
-    // masks the underlying default-output bug).
-    expect(
-      existsSync(join(ctx.project.dir, 'src/prisma/contract.json')),
-      'contract.json must land next to the scaffolded contract source',
-    ).toBe(true);
-    expect(
-      existsSync(join(ctx.project.dir, 'src/prisma/contract.d.ts')),
-      'contract.d.ts must land next to the scaffolded contract source',
-    ).toBe(true);
-  });
+      // The init scaffold passes a single string `contract: "./src/prisma/contract.ts"`
+      // to the facade `defineConfig`, which derives an output path next to the
+      // input. The journey verifies that derivation actually reaches the emitter
+      // — this is the seam that breaks when init scaffold and emit output get
+      // out of sync (the symptom shape of TML-2461, even if the facade currently
+      // masks the underlying default-output bug).
+      expect(
+        existsSync(join(ctx.project.dir, 'src/prisma/contract.json')),
+        'contract.json must land next to the scaffolded contract source',
+      ).toBe(true);
+      expect(
+        existsSync(join(ctx.project.dir, 'src/prisma/contract.d.ts')),
+        'contract.d.ts must land next to the scaffolded contract source',
+      ).toBe(true);
+    },
+    timeouts.typeScriptCompilation,
+  );
 
-  it('step 4a (migration plan): materialises a create-from-scratch migration draft', () => {
-    const result = ctx.migrationPlan;
-    expect(result, 'migration plan was not run (precondition failure)').not.toBeNull();
-    if (result === null) return;
-    expect(result.exitCode, formatStepDiagnostic('migration plan', ctx.project, result)).toBe(0);
-    expect(
-      existsSync(join(ctx.project.dir, 'migrations/app')),
-      'migration plan must create migrations/app/<timestamp>_init/',
-    ).toBe(true);
-  });
+  it(
+    'step 4a (migration plan): materialises a create-from-scratch migration draft',
+    () => {
+      const result = ctx.migrationPlan;
+      expect(result, 'migration plan was not run (precondition failure)').not.toBeNull();
+      if (result === null) return;
+      expect(result.exitCode, formatStepDiagnostic('migration plan', ctx.project, result)).toBe(0);
+      expect(
+        existsSync(join(ctx.project.dir, 'migrations/app')),
+        'migration plan must create migrations/app/<timestamp>_init/',
+      ).toBe(true);
+    },
+    timeouts.typeScriptCompilation,
+  );
 
-  it('step 4b (migration emit): self-emits ops.json next to the draft migration.ts', () => {
-    const result = ctx.migrationEmit;
-    expect(result, 'migration self-emit was not run (precondition failure)').not.toBeNull();
-    if (result === null) return;
-    expect(result.exitCode, formatStepDiagnostic('migration emit', ctx.project, result)).toBe(0);
-  });
+  it(
+    'step 4b (migration emit): self-emits ops.json next to the draft migration.ts',
+    () => {
+      const result = ctx.migrationEmit;
+      expect(result, 'migration self-emit was not run (precondition failure)').not.toBeNull();
+      if (result === null) return;
+      expect(result.exitCode, formatStepDiagnostic('migration emit', ctx.project, result)).toBe(0);
+    },
+    timeouts.typeScriptCompilation,
+  );
 
-  it('step 4c (migration apply): applies the planned migration (TML-2486 seam)', () => {
-    const result = ctx.migrationApply;
-    expect(result, 'migration apply was not run (precondition failure)').not.toBeNull();
-    if (result === null) return;
-    TML_2486_seam(cell, ctx.project, result);
-  });
+  it(
+    'step 4c (migration apply): applies the planned migration (TML-2486 seam)',
+    () => {
+      const result = ctx.migrationApply;
+      expect(result, 'migration apply was not run (precondition failure)').not.toBeNull();
+      if (result === null) return;
+      TML_2486_seam(cell, ctx.project, result);
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it(
     'step 5 (user code: ObjectId import) (TML-2487 seam)',

@@ -1,0 +1,276 @@
+{
+  "kind": "prisma-workflow-manifest",
+  "version": 1,
+  "sourceId": "src/schema.prisma",
+  "sourceHash": "sha256:3406000150ebd67994c6be5b4349b08d790f7efad81852edc7742e6f5f8eba9d",
+  "schema": "generator workflows {\n  provider = \"prisma-workflows\"\n  output   = \"./generated/workflows\"\n  schema   = \"_prisma_workflows\"\n}\n\nmodel OnboardingCase {\n  id            String   @id\n  accountId     String\n  companyDomain String\n  riskScore     Float\n  status        String\n  approvedBy    String?\n  createdAt     DateTime\n  updatedAt     DateTime\n}\n\nworkflow OnboardingRiskReview {\n  trigger accountCreated {\n    source = \"product\"\n    event = \"account.created\"\n    dedupeBy = \"event.accountId\"\n  }\n\n  state OnboardingState {\n    accountId String @id\n    companyDomain String\n    crmAccount Json?\n    billingProfile Json?\n    identitySignals Json?\n    riskScore Float\n    provisioningPlan Json?\n    approvedBy String?\n    slackMessage Json?\n  }\n\n  step enrichAccount {\n    run = \"./src/steps/enrich-account.ts\"\n    checkpoint = true\n  }\n\n  step scoreRisk {\n    run = \"./src/steps/score-risk.ts\"\n    checkpoint = true\n  }\n\n  approval salesOpsApproval {\n    when = \"state.riskScore > 0.7\"\n    assignees = [\"role:sales_ops\"]\n    timeout = \"24h\"\n    onApprove = provisionWorkspace\n  }\n\n  step provisionWorkspace {\n    run = \"./src/steps/provision-workspace.ts\"\n    checkpoint = true\n    sideEffects = \"external\"\n    idempotency = \"state.accountId\"\n  }\n\n  step notifyTeam {\n    run = \"./src/steps/notify-team.ts\"\n    sideEffects = \"external\"\n    idempotency = \"state.accountId\"\n  }\n}\n",
+  "workflows": [
+    {
+      "id": "onboarding-risk-review",
+      "name": "OnboardingRiskReview",
+      "slug": "onboarding-risk-review",
+      "version": 211149355,
+      "sourceHash": "sha256:8c95e22903a5e821ffd7ce0c5f1cb071dff160ca505249cae5bfb2abc20aed10",
+      "triggers": [
+        {
+          "id": "trigger:accountCreated",
+          "kind": "trigger",
+          "name": "accountCreated",
+          "source": "product",
+          "event": "account.created",
+          "dedupeBy": "event.accountId"
+        }
+      ],
+      "states": [
+        {
+          "name": "OnboardingState",
+          "fields": [
+            {
+              "name": "accountId",
+              "type": "String",
+              "optional": false,
+              "list": false,
+              "id": true
+            },
+            {
+              "name": "companyDomain",
+              "type": "String",
+              "optional": false,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "crmAccount",
+              "type": "Json",
+              "optional": true,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "billingProfile",
+              "type": "Json",
+              "optional": true,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "identitySignals",
+              "type": "Json",
+              "optional": true,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "riskScore",
+              "type": "Float",
+              "optional": false,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "provisioningPlan",
+              "type": "Json",
+              "optional": true,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "approvedBy",
+              "type": "String",
+              "optional": true,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "slackMessage",
+              "type": "Json",
+              "optional": true,
+              "list": false,
+              "id": false
+            }
+          ]
+        }
+      ],
+      "nodes": [
+        {
+          "id": "step:enrichAccount",
+          "kind": "step",
+          "name": "enrichAccount",
+          "run": "./src/steps/enrich-account.ts",
+          "checkpoint": true,
+          "sideEffects": "internal"
+        },
+        {
+          "id": "step:scoreRisk",
+          "kind": "step",
+          "name": "scoreRisk",
+          "run": "./src/steps/score-risk.ts",
+          "checkpoint": true,
+          "sideEffects": "internal"
+        },
+        {
+          "id": "approval:salesOpsApproval",
+          "kind": "approval",
+          "name": "salesOpsApproval",
+          "when": "state.riskScore > 0.7",
+          "timeout": "24h",
+          "assignees": [
+            "role:sales_ops"
+          ],
+          "onApprove": "provisionWorkspace"
+        },
+        {
+          "id": "step:provisionWorkspace",
+          "kind": "step",
+          "name": "provisionWorkspace",
+          "run": "./src/steps/provision-workspace.ts",
+          "checkpoint": true,
+          "sideEffects": "external",
+          "idempotency": "state.accountId"
+        },
+        {
+          "id": "step:notifyTeam",
+          "kind": "step",
+          "name": "notifyTeam",
+          "run": "./src/steps/notify-team.ts",
+          "checkpoint": false,
+          "sideEffects": "external",
+          "idempotency": "state.accountId"
+        }
+      ],
+      "policies": {},
+      "connectors": [
+        {
+          "id": "product",
+          "connector": "product",
+          "events": [
+            "account.created"
+          ],
+          "actions": [],
+          "syncs": []
+        }
+      ],
+      "canvas": {
+        "nodes": [
+          {
+            "id": "trigger:accountCreated",
+            "kind": "trigger",
+            "label": "accountCreated",
+            "x": 80,
+            "y": 80,
+            "sourceRef": "product",
+            "config": {
+              "event": "account.created",
+              "dedupeBy": "event.accountId"
+            }
+          },
+          {
+            "id": "state:OnboardingState",
+            "kind": "state",
+            "label": "OnboardingState",
+            "x": 80,
+            "y": 260
+          },
+          {
+            "id": "step:enrichAccount",
+            "kind": "step",
+            "label": "enrichAccount",
+            "x": 320,
+            "y": 140,
+            "codeRef": "./src/steps/enrich-account.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "internal"
+            }
+          },
+          {
+            "id": "step:scoreRisk",
+            "kind": "step",
+            "label": "scoreRisk",
+            "x": 540,
+            "y": 140,
+            "codeRef": "./src/steps/score-risk.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "internal"
+            }
+          },
+          {
+            "id": "approval:salesOpsApproval",
+            "kind": "approval",
+            "label": "salesOpsApproval",
+            "x": 760,
+            "y": 140,
+            "config": {
+              "when": "state.riskScore > 0.7",
+              "timeout": "24h",
+              "assignees": [
+                "role:sales_ops"
+              ],
+              "onApprove": "provisionWorkspace"
+            }
+          },
+          {
+            "id": "step:provisionWorkspace",
+            "kind": "step",
+            "label": "provisionWorkspace",
+            "x": 980,
+            "y": 140,
+            "codeRef": "./src/steps/provision-workspace.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "external",
+              "idempotency": "state.accountId"
+            }
+          },
+          {
+            "id": "step:notifyTeam",
+            "kind": "step",
+            "label": "notifyTeam",
+            "x": 1200,
+            "y": 140,
+            "codeRef": "./src/steps/notify-team.ts",
+            "config": {
+              "checkpoint": false,
+              "sideEffects": "external",
+              "idempotency": "state.accountId"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "OnboardingRiskReview:edge:0",
+            "from": "trigger:accountCreated",
+            "to": "step:enrichAccount"
+          },
+          {
+            "id": "OnboardingRiskReview:edge:1",
+            "from": "step:enrichAccount",
+            "to": "step:scoreRisk"
+          },
+          {
+            "id": "OnboardingRiskReview:edge:2",
+            "from": "step:scoreRisk",
+            "to": "approval:salesOpsApproval"
+          },
+          {
+            "id": "OnboardingRiskReview:edge:3",
+            "from": "approval:salesOpsApproval",
+            "to": "step:provisionWorkspace"
+          },
+          {
+            "id": "OnboardingRiskReview:edge:4",
+            "from": "step:provisionWorkspace",
+            "to": "step:notifyTeam"
+          },
+          {
+            "id": "OnboardingRiskReview:approval:salesOpsApproval:approve",
+            "from": "approval:salesOpsApproval",
+            "to": "step:provisionWorkspace",
+            "label": "approve"
+          }
+        ]
+      }
+    }
+  ]
+}

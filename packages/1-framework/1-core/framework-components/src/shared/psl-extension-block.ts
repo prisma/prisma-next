@@ -34,6 +34,7 @@ export type PslDiagnosticCode =
   | 'PSL_INVALID_DEFAULT_VALUE'
   | 'PSL_INVALID_ENUM_MEMBER'
   | 'PSL_INVALID_TYPES_MEMBER'
+  | 'PSL_INVALID_WORKFLOW_MEMBER'
   | 'PSL_INVALID_QUALIFIED_TYPE'
   /**
    * A reserved declaration keyword (`model`/`enum`/`namespace`/`type`) that

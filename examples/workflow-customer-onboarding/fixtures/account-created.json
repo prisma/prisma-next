@@ -1,0 +1,7 @@
+{
+  "id": "evt_account_created_001",
+  "accountId": "acct_001",
+  "companyDomain": "globex.example",
+  "plan": "enterprise",
+  "createdAt": "2026-06-15T09:00:00.000Z"
+}

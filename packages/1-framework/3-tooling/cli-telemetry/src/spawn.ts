@@ -106,15 +106,16 @@ export function runTelemetry(inputs: RunTelemetryInputs): TelemetryRunOutcome {
   try {
     const child = fork(inputs.senderPath, [], {
       detached: true,
-      stdio: ['pipe', 'ignore', 'ignore', 'ipc'],
+      execArgv: [],
+      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
     });
     child.send(payload, (err) => {
-      if (err !== null && process.env['PRISMA_NEXT_DEBUG'] === '1') {
+      if (err !== null && err !== undefined && process.env['PRISMA_NEXT_DEBUG'] === '1') {
         process.stderr.write(`[cli-telemetry] parent send error: ${String(err)}\n`);
       }
+      child.unref();
+      child.channel?.unref();
     });
-    child.disconnect();
-    child.unref();
     return { spawned: true };
   } catch (err) {
     if (process.env['PRISMA_NEXT_DEBUG'] === '1') {

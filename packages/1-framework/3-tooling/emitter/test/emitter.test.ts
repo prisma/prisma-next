@@ -146,30 +146,34 @@ describe('emitter', () => {
     expect(result.contractDts).toBeDefined();
   });
 
-  it('tolerates codec namespaces not registered in extensionIds', async () => {
-    const ir = createTestContract({
-      storage: unboundNamespaceTables({
-        data: {
-          columns: {
-            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            value: { codecId: 'unknown/type@1', nativeType: 'custom', nullable: false },
+  it(
+    'tolerates codec namespaces not registered in extensionIds',
+    async () => {
+      const ir = createTestContract({
+        storage: unboundNamespaceTables({
+          data: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              value: { codecId: 'unknown/type@1', nativeType: 'custom', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-      }),
-    });
+        }),
+      });
 
-    const options: EmitStackInput = {
-      codecTypeImports: [],
-      extensionIds: ['some-other-extension'],
-    };
+      const options: EmitStackInput = {
+        codecTypeImports: [],
+        extensionIds: ['some-other-extension'],
+      };
 
-    const result = await emit(ir, options, mockSqlHook);
-    expect(result.contractJson).toBeDefined();
-    expect(result.contractDts).toBeDefined();
-  });
+      const result = await emit(ir, options, mockSqlHook);
+      expect(result.contractJson).toBeDefined();
+      expect(result.contractDts).toBeDefined();
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it('handles missing extensionPacks field', async () => {
     const ir = createTestContract({

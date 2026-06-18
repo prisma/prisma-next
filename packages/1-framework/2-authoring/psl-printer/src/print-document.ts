@@ -1,4 +1,8 @@
-import type { PslExtensionBlock } from '@prisma-next/framework-components/psl-ast';
+import type {
+  PslExtensionBlock,
+  PslPrismaBlock,
+  PslWorkflow,
+} from '@prisma-next/framework-components/psl-ast';
 import type { PrinterModel, PrinterNamedType } from './types';
 
 /**
@@ -25,6 +29,8 @@ export type PrintNamespaceSection = {
 
 export type PrintDocument = {
   readonly headerComment: string;
+  readonly prismaBlocks: readonly PslPrismaBlock[];
   readonly namedTypes: readonly PrinterNamedType[];
   readonly namespaces: readonly PrintNamespaceSection[];
+  readonly workflows: readonly PslWorkflow[];
 };

@@ -1,0 +1,65 @@
+{
+  "name": "@prisma-next/workflows",
+  "version": "0.13.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "description": "Prisma Workflow compiler, durable runtime primitives, testing helpers, connectors, and Studio data model",
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
+  },
+  "dependencies": {
+    "@prisma-next/framework-components": "workspace:0.13.0",
+    "@prisma-next/psl-parser": "workspace:0.13.0",
+    "@prisma-next/utils": "workspace:0.13.0",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@prisma/dev": "catalog:",
+    "@prisma-next/tsconfig": "workspace:0.13.0",
+    "@prisma-next/tsdown": "workspace:0.13.0",
+    "@types/pg": "catalog:",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./compiler": "./dist/compiler.mjs",
+    "./connector-sdk": "./dist/connector-sdk.mjs",
+    "./connectors": "./dist/connectors.mjs",
+    "./runtime": "./dist/runtime.mjs",
+    "./studio": "./dist/studio.mjs",
+    "./testing": "./dist/testing.mjs",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/1-framework/3-tooling/workflows"
+  }
+}

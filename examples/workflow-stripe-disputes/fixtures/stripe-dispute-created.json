@@ -1,0 +1,18 @@
+{
+  "id": "evt_dispute_created_001",
+  "type": "charge.dispute.created",
+  "data": {
+    "object": {
+      "id": "du_001",
+      "amount": 72500,
+      "currency": "usd",
+      "reason": "fraudulent",
+      "charge": "ch_001",
+      "customer": "cus_001",
+      "metadata": {
+        "order_id": "ord_1001",
+        "risk_score": "0.23"
+      }
+    }
+  }
+}

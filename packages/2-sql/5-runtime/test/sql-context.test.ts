@@ -8,7 +8,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
-import { applicationDomainOf } from '@prisma-next/test-utils';
+import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import {
   createExecutionContext,
@@ -902,29 +902,33 @@ describe('capability folding', () => {
     expect(context.contract.capabilities['sql']?.['returning']).toBe(true);
   });
 
-  it('does not mutate the input contract', () => {
-    const inputCapabilities = Object.freeze({ sql: Object.freeze({ select: true }) });
-    const inputContract: Contract<SqlStorage> = Object.freeze({
-      ...testContract,
-      capabilities: inputCapabilities,
-    });
+  it(
+    'does not mutate the input contract',
+    () => {
+      const inputCapabilities = Object.freeze({ sql: Object.freeze({ select: true }) });
+      const inputContract: Contract<SqlStorage> = Object.freeze({
+        ...testContract,
+        capabilities: inputCapabilities,
+      });
 
-    const context = createExecutionContext({
-      contract: inputContract,
-      stack: {
-        target: createTestTargetDescriptor(),
-        adapter: adapterWithCapabilities({ sql: { returning: true } }),
-        extensionPacks: [],
-      },
-    });
+      const context = createExecutionContext({
+        contract: inputContract,
+        stack: {
+          target: createTestTargetDescriptor(),
+          adapter: adapterWithCapabilities({ sql: { returning: true } }),
+          extensionPacks: [],
+        },
+      });
 
-    expect(inputContract.capabilities).toBe(inputCapabilities);
-    expect(inputCapabilities).toEqual({ sql: { select: true } });
-    expect(context.contract).not.toBe(inputContract);
-    expect(context.contract.capabilities).toEqual({
-      sql: { returning: true, select: true },
-    });
-  });
+      expect(inputContract.capabilities).toBe(inputCapabilities);
+      expect(inputCapabilities).toEqual({ sql: { select: true } });
+      expect(context.contract).not.toBe(inputContract);
+      expect(context.contract.capabilities).toEqual({
+        sql: { returning: true, select: true },
+      });
+    },
+    timeouts.default,
+  );
 
   it('matches mergeCapabilityMatrices output across the full stack', () => {
     const target = targetWithCapabilities({ sql: { select: true } });

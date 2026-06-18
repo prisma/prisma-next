@@ -561,8 +561,8 @@ model Post {
 
   it('preserves parser diagnostics with source spans', () => {
     const document = parsePslDocument({
-      schema: `datasource db {
-  provider = "postgresql"
+      schema: `view UserView {
+  id Int
 }
 
 model User {

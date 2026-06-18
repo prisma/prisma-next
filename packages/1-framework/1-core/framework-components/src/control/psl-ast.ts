@@ -166,6 +166,71 @@ export interface PslTypesBlock {
   readonly span: PslSpan;
 }
 
+export type PslWorkflowPropertyValueKind =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'object'
+  | 'array'
+  | 'identifier'
+  | 'expression';
+
+export interface PslWorkflowProperty {
+  readonly kind: 'workflowProperty';
+  readonly name: string;
+  readonly value: string;
+  readonly valueKind: PslWorkflowPropertyValueKind;
+  readonly span: PslSpan;
+}
+
+export type PslWorkflowExecutableNodeKind =
+  | 'trigger'
+  | 'step'
+  | 'approval'
+  | 'condition'
+  | 'timer'
+  | 'parallel';
+
+export interface PslWorkflowExecutableNode {
+  readonly kind: PslWorkflowExecutableNodeKind;
+  readonly name: string;
+  readonly properties: readonly PslWorkflowProperty[];
+  readonly span: PslSpan;
+}
+
+export interface PslWorkflowState {
+  readonly kind: 'state';
+  readonly name: string;
+  readonly fields: readonly PslField[];
+  readonly span: PslSpan;
+}
+
+export type PslWorkflowMember = PslWorkflowExecutableNode | PslWorkflowState;
+
+export interface PslWorkflow {
+  readonly kind: 'workflow';
+  readonly name: string;
+  readonly members: readonly PslWorkflowMember[];
+  readonly triggers: readonly PslWorkflowExecutableNode[];
+  readonly states: readonly PslWorkflowState[];
+  readonly steps: readonly PslWorkflowExecutableNode[];
+  readonly approvals: readonly PslWorkflowExecutableNode[];
+  readonly conditions: readonly PslWorkflowExecutableNode[];
+  readonly timers: readonly PslWorkflowExecutableNode[];
+  readonly parallels: readonly PslWorkflowExecutableNode[];
+  readonly span: PslSpan;
+}
+
+export type PslPrismaBlockKeyword = 'generator' | 'datasource';
+
+export interface PslPrismaBlock {
+  readonly kind: 'prismaBlock';
+  readonly keyword: PslPrismaBlockKeyword;
+  readonly name: string;
+  readonly source: string;
+  readonly span: PslSpan;
+}
+
 /**
  * Name of the synthesised namespace bucket the framework parser uses for
  * top-level declarations that appear outside any `namespace { … }` block.
@@ -296,7 +361,9 @@ export interface PslDocumentAst {
   readonly kind: 'document';
   readonly sourceId: string;
   readonly namespaces: readonly PslNamespace[];
+  readonly prismaBlocks?: readonly PslPrismaBlock[];
   readonly types?: PslTypesBlock;
+  readonly workflows?: readonly PslWorkflow[];
   readonly span: PslSpan;
 }
 

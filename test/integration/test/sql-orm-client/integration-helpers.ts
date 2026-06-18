@@ -54,14 +54,17 @@ export async function withCollectionRuntime(
   // plan's storageHash against the contract it was built with.
   contractOverride?: Contract<SqlStorage>,
 ): Promise<void> {
-  await withDevDatabase(async ({ connectionString }) => {
-    const runtime = await createPgIntegrationRuntime(connectionString, contractOverride);
+  await withDevDatabase(
+    async ({ connectionString }) => {
+      const runtime = await createPgIntegrationRuntime(connectionString, contractOverride);
 
-    try {
-      await setupTestSchema(runtime);
-      await fn(runtime);
-    } finally {
-      await runtime.close();
-    }
-  });
+      try {
+        await setupTestSchema(runtime);
+        await fn(runtime);
+      } finally {
+        await runtime.close();
+      }
+    },
+    { databaseIdleTimeoutMillis: timeouts.spinUpPpgDev },
+  );
 }

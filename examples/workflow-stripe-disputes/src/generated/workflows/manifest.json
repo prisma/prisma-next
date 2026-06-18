@@ -1,0 +1,349 @@
+{
+  "kind": "prisma-workflow-manifest",
+  "version": 1,
+  "sourceId": "src/schema.prisma",
+  "sourceHash": "sha256:d117e5baa93f4a89f000366cf5c2cd63b9cbd8860eb9a817c690d9aebe73d325",
+  "schema": "generator workflows {\n  provider = \"prisma-workflows\"\n  output   = \"./generated/workflows\"\n  schema   = \"_prisma_workflows\"\n}\n\nmodel DisputeCase {\n  id               String   @id\n  stripeDisputeId  String\n  amountCents      Int\n  customerEmail    String\n  status           String\n  draftResponse    String?\n  approvedResponse String?\n  evidenceId       String?\n  createdAt        DateTime\n  updatedAt        DateTime\n}\n\nmodel ApprovedDisputeResponse {\n  id              String   @id\n  disputeReason   String\n  amountCents     Int\n  response        String\n  confidence      Float\n  approvedBy      String\n  createdAt       DateTime\n}\n\nworkflow DisputeEvidence {\n  trigger stripeDisputeCreated {\n    source = \"stripe\"\n    event = \"charge.dispute.created\"\n    dedupeBy = \"event.data.object.id\"\n  }\n\n  state DisputeCaseState {\n    disputeId String @id\n    customerId String\n    customerEmail String?\n    amount Int\n    currency String\n    reason String\n    hubspotHistory Json?\n    shopifyOrders Json?\n    zendeskTickets Json?\n    stripeMetadata Json?\n    draftResponse String?\n    approvedBy String?\n    evidenceId String?\n  }\n\n  step collectCustomerHistory {\n    run = \"./src/steps/collect-customer-history.ts\"\n    checkpoint = true\n    retry = { maxAttempts: 3, backoff: \"exponential\" }\n  }\n\n  step draftResponse {\n    run = \"./src/steps/draft-response.ts\"\n    checkpoint = true\n    budget = { maxUsd: 1.25, maxTokens: 2000, timeout: \"45s\" }\n  }\n\n  approval humanApproval {\n    when = \"state.amount > 50000\"\n    assignees = [\"role:finance_ops\"]\n    timeout = \"48h\"\n    onApprove = submitEvidence\n  }\n\n  step submitEvidence {\n    run = \"./src/steps/submit-evidence.ts\"\n    checkpoint = true\n    sideEffects = \"external\"\n    idempotency = \"state.disputeId\"\n  }\n\n  step postSummary {\n    run = \"./src/steps/post-summary.ts\"\n    sideEffects = \"external\"\n    idempotency = \"state.disputeId\"\n  }\n\n  step learnFromApproval {\n    run = \"./src/steps/learn-from-approved-response.ts\"\n    checkpoint = true\n  }\n}\n",
+  "workflows": [
+    {
+      "id": "dispute-evidence",
+      "name": "DisputeEvidence",
+      "slug": "dispute-evidence",
+      "version": 1568414036,
+      "sourceHash": "sha256:dd7c1952d143938e71ed8da185ba6483d783539f3c25a8fc602e93836aa29738",
+      "triggers": [
+        {
+          "id": "trigger:stripeDisputeCreated",
+          "kind": "trigger",
+          "name": "stripeDisputeCreated",
+          "source": "stripe",
+          "event": "charge.dispute.created",
+          "dedupeBy": "event.data.object.id"
+        }
+      ],
+      "states": [
+        {
+          "name": "DisputeCaseState",
+          "fields": [
+            {
+              "name": "disputeId",
+              "type": "String",
+              "optional": false,
+              "list": false,
+              "id": true
+            },
+            {
+              "name": "customerId",
+              "type": "String",
+              "optional": false,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "customerEmail",
+              "type": "String",
+              "optional": true,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "amount",
+              "type": "Int",
+              "optional": false,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "currency",
+              "type": "String",
+              "optional": false,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "reason",
+              "type": "String",
+              "optional": false,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "hubspotHistory",
+              "type": "Json",
+              "optional": true,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "shopifyOrders",
+              "type": "Json",
+              "optional": true,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "zendeskTickets",
+              "type": "Json",
+              "optional": true,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "stripeMetadata",
+              "type": "Json",
+              "optional": true,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "draftResponse",
+              "type": "String",
+              "optional": true,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "approvedBy",
+              "type": "String",
+              "optional": true,
+              "list": false,
+              "id": false
+            },
+            {
+              "name": "evidenceId",
+              "type": "String",
+              "optional": true,
+              "list": false,
+              "id": false
+            }
+          ]
+        }
+      ],
+      "nodes": [
+        {
+          "id": "step:collectCustomerHistory",
+          "kind": "step",
+          "name": "collectCustomerHistory",
+          "run": "./src/steps/collect-customer-history.ts",
+          "checkpoint": true,
+          "sideEffects": "internal",
+          "retry": {
+            "maxAttempts": 3,
+            "backoff": "exponential"
+          }
+        },
+        {
+          "id": "step:draftResponse",
+          "kind": "step",
+          "name": "draftResponse",
+          "run": "./src/steps/draft-response.ts",
+          "checkpoint": true,
+          "sideEffects": "internal",
+          "budget": {
+            "maxUsd": 1.25,
+            "maxTokens": 2000,
+            "timeout": "45s"
+          }
+        },
+        {
+          "id": "approval:humanApproval",
+          "kind": "approval",
+          "name": "humanApproval",
+          "when": "state.amount > 50000",
+          "timeout": "48h",
+          "assignees": [
+            "role:finance_ops"
+          ],
+          "onApprove": "submitEvidence"
+        },
+        {
+          "id": "step:submitEvidence",
+          "kind": "step",
+          "name": "submitEvidence",
+          "run": "./src/steps/submit-evidence.ts",
+          "checkpoint": true,
+          "sideEffects": "external",
+          "idempotency": "state.disputeId"
+        },
+        {
+          "id": "step:postSummary",
+          "kind": "step",
+          "name": "postSummary",
+          "run": "./src/steps/post-summary.ts",
+          "checkpoint": false,
+          "sideEffects": "external",
+          "idempotency": "state.disputeId"
+        },
+        {
+          "id": "step:learnFromApproval",
+          "kind": "step",
+          "name": "learnFromApproval",
+          "run": "./src/steps/learn-from-approved-response.ts",
+          "checkpoint": true,
+          "sideEffects": "internal"
+        }
+      ],
+      "policies": {
+        "maxRetries": 3
+      },
+      "connectors": [
+        {
+          "id": "stripe",
+          "connector": "stripe",
+          "events": [
+            "charge.dispute.created"
+          ],
+          "actions": [],
+          "syncs": []
+        }
+      ],
+      "canvas": {
+        "nodes": [
+          {
+            "id": "trigger:stripeDisputeCreated",
+            "kind": "trigger",
+            "label": "stripeDisputeCreated",
+            "x": 80,
+            "y": 80,
+            "sourceRef": "stripe",
+            "config": {
+              "event": "charge.dispute.created",
+              "dedupeBy": "event.data.object.id"
+            }
+          },
+          {
+            "id": "state:DisputeCaseState",
+            "kind": "state",
+            "label": "DisputeCaseState",
+            "x": 80,
+            "y": 260
+          },
+          {
+            "id": "step:collectCustomerHistory",
+            "kind": "step",
+            "label": "collectCustomerHistory",
+            "x": 320,
+            "y": 140,
+            "codeRef": "./src/steps/collect-customer-history.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "internal",
+              "retry": {
+                "maxAttempts": 3,
+                "backoff": "exponential"
+              }
+            }
+          },
+          {
+            "id": "step:draftResponse",
+            "kind": "step",
+            "label": "draftResponse",
+            "x": 540,
+            "y": 140,
+            "codeRef": "./src/steps/draft-response.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "internal",
+              "budget": {
+                "maxUsd": 1.25,
+                "maxTokens": 2000,
+                "timeout": "45s"
+              }
+            }
+          },
+          {
+            "id": "approval:humanApproval",
+            "kind": "approval",
+            "label": "humanApproval",
+            "x": 760,
+            "y": 140,
+            "config": {
+              "when": "state.amount > 50000",
+              "timeout": "48h",
+              "assignees": [
+                "role:finance_ops"
+              ],
+              "onApprove": "submitEvidence"
+            }
+          },
+          {
+            "id": "step:submitEvidence",
+            "kind": "step",
+            "label": "submitEvidence",
+            "x": 980,
+            "y": 140,
+            "codeRef": "./src/steps/submit-evidence.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "external",
+              "idempotency": "state.disputeId"
+            }
+          },
+          {
+            "id": "step:postSummary",
+            "kind": "step",
+            "label": "postSummary",
+            "x": 1200,
+            "y": 140,
+            "codeRef": "./src/steps/post-summary.ts",
+            "config": {
+              "checkpoint": false,
+              "sideEffects": "external",
+              "idempotency": "state.disputeId"
+            }
+          },
+          {
+            "id": "step:learnFromApproval",
+            "kind": "step",
+            "label": "learnFromApproval",
+            "x": 1420,
+            "y": 140,
+            "codeRef": "./src/steps/learn-from-approved-response.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "internal"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "DisputeEvidence:edge:0",
+            "from": "trigger:stripeDisputeCreated",
+            "to": "step:collectCustomerHistory"
+          },
+          {
+            "id": "DisputeEvidence:edge:1",
+            "from": "step:collectCustomerHistory",
+            "to": "step:draftResponse"
+          },
+          {
+            "id": "DisputeEvidence:edge:2",
+            "from": "step:draftResponse",
+            "to": "approval:humanApproval"
+          },
+          {
+            "id": "DisputeEvidence:edge:3",
+            "from": "approval:humanApproval",
+            "to": "step:submitEvidence"
+          },
+          {
+            "id": "DisputeEvidence:edge:4",
+            "from": "step:submitEvidence",
+            "to": "step:postSummary"
+          },
+          {
+            "id": "DisputeEvidence:edge:5",
+            "from": "step:postSummary",
+            "to": "step:learnFromApproval"
+          },
+          {
+            "id": "DisputeEvidence:approval:humanApproval:approve",
+            "from": "approval:humanApproval",
+            "to": "step:submitEvidence",
+            "label": "approve"
+          }
+        ]
+      }
+    }
+  ]
+}

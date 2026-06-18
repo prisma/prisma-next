@@ -1,0 +1,153 @@
+{
+  "kind": "prisma-workflow-studio-model",
+  "version": 1,
+  "runtime": {
+    "datasets": [
+      "ingestEvents",
+      "runs",
+      "steps",
+      "timeline",
+      "stateSnapshots",
+      "approvals",
+      "outbox",
+      "deadLetters"
+    ],
+    "endpoints": {
+      "snapshot": "/api/prisma-workflows/studio",
+      "inspectRun": "/api/prisma-workflows/inspect/:runId",
+      "approve": "/api/prisma-workflows/approve/:approvalId",
+      "reject": "/api/prisma-workflows/reject/:approvalId",
+      "replay": "/api/prisma-workflows/replay/:runId",
+      "worker": "/api/prisma-workflows/run"
+    }
+  },
+  "workflows": [
+    {
+      "id": "onboarding-risk-review",
+      "name": "OnboardingRiskReview",
+      "slug": "onboarding-risk-review",
+      "version": 211149355,
+      "canvas": {
+        "nodes": [
+          {
+            "id": "trigger:accountCreated",
+            "kind": "trigger",
+            "label": "accountCreated",
+            "x": 80,
+            "y": 80,
+            "sourceRef": "product",
+            "config": {
+              "event": "account.created",
+              "dedupeBy": "event.accountId"
+            }
+          },
+          {
+            "id": "state:OnboardingState",
+            "kind": "state",
+            "label": "OnboardingState",
+            "x": 80,
+            "y": 260
+          },
+          {
+            "id": "step:enrichAccount",
+            "kind": "step",
+            "label": "enrichAccount",
+            "x": 320,
+            "y": 140,
+            "codeRef": "./src/steps/enrich-account.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "internal"
+            }
+          },
+          {
+            "id": "step:scoreRisk",
+            "kind": "step",
+            "label": "scoreRisk",
+            "x": 540,
+            "y": 140,
+            "codeRef": "./src/steps/score-risk.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "internal"
+            }
+          },
+          {
+            "id": "approval:salesOpsApproval",
+            "kind": "approval",
+            "label": "salesOpsApproval",
+            "x": 760,
+            "y": 140,
+            "config": {
+              "when": "state.riskScore > 0.7",
+              "timeout": "24h",
+              "assignees": [
+                "role:sales_ops"
+              ],
+              "onApprove": "provisionWorkspace"
+            }
+          },
+          {
+            "id": "step:provisionWorkspace",
+            "kind": "step",
+            "label": "provisionWorkspace",
+            "x": 980,
+            "y": 140,
+            "codeRef": "./src/steps/provision-workspace.ts",
+            "config": {
+              "checkpoint": true,
+              "sideEffects": "external",
+              "idempotency": "state.accountId"
+            }
+          },
+          {
+            "id": "step:notifyTeam",
+            "kind": "step",
+            "label": "notifyTeam",
+            "x": 1200,
+            "y": 140,
+            "codeRef": "./src/steps/notify-team.ts",
+            "config": {
+              "checkpoint": false,
+              "sideEffects": "external",
+              "idempotency": "state.accountId"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "OnboardingRiskReview:edge:0",
+            "from": "trigger:accountCreated",
+            "to": "step:enrichAccount"
+          },
+          {
+            "id": "OnboardingRiskReview:edge:1",
+            "from": "step:enrichAccount",
+            "to": "step:scoreRisk"
+          },
+          {
+            "id": "OnboardingRiskReview:edge:2",
+            "from": "step:scoreRisk",
+            "to": "approval:salesOpsApproval"
+          },
+          {
+            "id": "OnboardingRiskReview:edge:3",
+            "from": "approval:salesOpsApproval",
+            "to": "step:provisionWorkspace"
+          },
+          {
+            "id": "OnboardingRiskReview:edge:4",
+            "from": "step:provisionWorkspace",
+            "to": "step:notifyTeam"
+          },
+          {
+            "id": "OnboardingRiskReview:approval:salesOpsApproval:approve",
+            "from": "approval:salesOpsApproval",
+            "to": "step:provisionWorkspace",
+            "label": "approve"
+          }
+        ]
+      }
+    }
+  ]
+}

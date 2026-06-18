@@ -132,6 +132,54 @@ describe('printPslFromAst', () => {
     expect(printPslFromAst(ast)).toContain('types {\n  Money = Decimal');
   });
 
+  it('preserves Prisma schema blocks and workflow member order', () => {
+    const parsed = parsePslDocument({
+      sourceId: 'schema.prisma',
+      schema: `
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+workflow OrderedReview {
+  step draft {
+    run = "./draft.ts"
+  }
+
+  approval approve {
+    onApprove = submit
+  }
+
+  step submit {
+    run = "./submit.ts"
+  }
+}
+`,
+    });
+
+    expect(parsed.ok).toBe(true);
+
+    const printed = printPslFromAst(parsed.ast);
+    expect(printed).toContain('generator client {\n  provider = "prisma-client-js"\n}');
+    expect(printed).toContain(
+      'datasource db {\n  provider = "postgresql"\n  url = env("DATABASE_URL")\n}',
+    );
+    expect(printed.indexOf('step draft')).toBeLessThan(printed.indexOf('approval approve'));
+    expect(printed.indexOf('approval approve')).toBeLessThan(printed.indexOf('step submit'));
+
+    const reparsed = parsePslDocument({ sourceId: 'schema.prisma', schema: printed });
+    expect(reparsed.ok).toBe(true);
+    expect(reparsed.ast.workflows?.[0]?.members.map((member) => member.name)).toEqual([
+      'draft',
+      'approve',
+      'submit',
+    ]);
+  });
+
   it('prints relation field with @relation', () => {
     const models: PslModel[] = [
       {
@@ -745,6 +793,47 @@ model Profile {
       expect(userField?.typeContractSpaceId).toBe('supabase');
       expect(userField?.typeNamespaceId).toBe('auth');
       expect(userField?.typeName).toBe('User');
+    });
+  });
+
+  describe('workflow rendering', () => {
+    it('round-trips native workflow blocks without extension descriptors', () => {
+      const source = `model Customer {
+  id String @id
+}
+
+workflow StripeDisputeResponse {
+  trigger stripeDisputeCreated {
+    source = stripe
+    event = "charge.dispute.created"
+  }
+
+  state DisputeCase {
+    disputeId String @id
+    amount Int
+  }
+
+  step submitEvidence {
+    run = "./submit-evidence.ts"
+  }
+
+  approval approveEvidence {
+    when = "state.amount > 500"
+  }
+}`;
+
+      const parsed = parsePslDocument({ schema: source, sourceId: 'workflow.prisma' });
+      expect(parsed.ok).toBe(true);
+
+      const printed = printPslFromAst(parsed.ast);
+      expect(printed).toContain('workflow StripeDisputeResponse');
+      expect(printed).toContain('trigger stripeDisputeCreated');
+      expect(printed).toContain('state DisputeCase');
+      expect(printed).toContain('approval approveEvidence');
+
+      const reparsed = parsePslDocument({ schema: printed, sourceId: 'workflow.reprinted.prisma' });
+      expect(reparsed.ok).toBe(true);
+      expect(reparsed.ast.workflows?.[0]?.name).toBe('StripeDisputeResponse');
     });
   });
 });

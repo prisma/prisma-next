@@ -24,6 +24,7 @@ import { createMigrationShowCommand } from './commands/migration-show';
 import { createMigrationStatusCommand } from './commands/migration-status';
 import { createRefCommand } from './commands/ref';
 import { createTelemetryCommand } from './commands/telemetry';
+import { createWorkflowCommand } from './commands/workflow';
 import { setCommandDescriptions } from './utils/command-helpers';
 import { formatCommandHelp, formatRootHelp } from './utils/formatters/help';
 import { parseGlobalFlags } from './utils/global-flags';
@@ -307,6 +308,9 @@ const refCommand = createRefCommand();
 // Top-level telemetry command
 const telemetryCommand = createTelemetryCommand();
 
+// Top-level workflow command
+const workflowCommand = createWorkflowCommand();
+
 // Top-level init command
 const initCommand = createInitCommand();
 
@@ -321,6 +325,7 @@ program.addCommand(contractCommand);
 program.addCommand(dbCommand);
 program.addCommand(migrationCommand);
 program.addCommand(refCommand);
+program.addCommand(workflowCommand);
 program.addCommand(telemetryCommand);
 
 // Test-only hidden command used by `cli-telemetry`'s `cli-e2e.test.ts`
@@ -337,8 +342,16 @@ program.addCommand(telemetryCommand);
 // binaries. `hidden: true` only filters the help output; without this
 // env gate the command would still be callable from production. The
 // e2e suite sets the env var when it spawns the CLI.
-const TELEMETRY_CRASH_TEST_SLEEP_MS = 200;
+const TELEMETRY_CRASH_TEST_SLEEP_MS = 1000;
 if (process.env['PRISMA_NEXT_ENABLE_TEST_COMMANDS'] === '1') {
+  const telemetryNoopTestCommand = new Command('__telemetry-noop-test')
+    .description('Internal: exit successfully for the telemetry e2e suite.')
+    .action(async () => {
+      await new Promise((settle) => setTimeout(settle, TELEMETRY_CRASH_TEST_SLEEP_MS));
+    });
+  telemetryNoopTestCommand.configureHelp({ visibleCommands: () => [] });
+  program.addCommand(telemetryNoopTestCommand, { hidden: true });
+
   const telemetryCrashTestCommand = new Command('__telemetry-crash-test')
     .description('Internal: deliberately throw for the telemetry e2e suite.')
     .action(async () => {

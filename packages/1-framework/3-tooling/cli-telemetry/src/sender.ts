@@ -22,6 +22,7 @@ import { buildTelemetryEventFromProcess } from './enrich';
 import { isParentToSenderPayload, type ParentToSenderPayload } from './payload';
 
 const REQUEST_TIMEOUT_MS = 1500;
+const TEST_REQUEST_TIMEOUT_ENV = 'PRISMA_NEXT_TELEMETRY_TEST_REQUEST_TIMEOUT_MS';
 
 function debugLog(message: string, error?: unknown): void {
   if (process.env['PRISMA_NEXT_DEBUG'] !== '1') return;
@@ -32,10 +33,22 @@ function debugLog(message: string, error?: unknown): void {
   }
 }
 
+function resolveRequestTimeoutMs(env: NodeJS.ProcessEnv): number {
+  if (env['PRISMA_NEXT_ENABLE_TEST_COMMANDS'] !== '1') {
+    return REQUEST_TIMEOUT_MS;
+  }
+  const raw = env[TEST_REQUEST_TIMEOUT_ENV];
+  if (raw === undefined || raw.length === 0) {
+    return REQUEST_TIMEOUT_MS;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : REQUEST_TIMEOUT_MS;
+}
+
 async function postEvent(payload: ParentToSenderPayload): Promise<void> {
   const event = await buildTelemetryEventFromProcess(payload);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), resolveRequestTimeoutMs(process.env));
   try {
     const response = await fetch(payload.endpoint, {
       method: 'POST',
@@ -76,5 +89,5 @@ process.once('message', (message: unknown) => {
 // Defensive: if the parent never sends a payload (or the IPC channel
 // closes before `message` arrives), exit after a generous grace period
 // so the child process is not stuck holding a handle.
-const SENDER_IDLE_EXIT_MS = REQUEST_TIMEOUT_MS * 2;
+const SENDER_IDLE_EXIT_MS = resolveRequestTimeoutMs(process.env) * 2;
 setTimeout(exitClean, SENDER_IDLE_EXIT_MS).unref();

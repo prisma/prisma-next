@@ -327,8 +327,12 @@ model User {
     );
   });
 
-  it('fails strictly for unsupported top-level constructs', () => {
+  it('accepts standard Prisma schema blocks alongside models', () => {
     const schema = `
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url = env("DATABASE_URL")
@@ -345,10 +349,11 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    expect(result.ok).toBe(false);
-    expect(
-      result.diagnostics.some((entry) => entry.code === 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK'),
-    ).toBe(true);
+    expect(result.ok).toBe(true);
+    expect(result.ast.prismaBlocks?.map((block) => `${block.keyword}:${block.name}`)).toEqual([
+      'generator:client',
+      'datasource:db',
+    ]);
     expect(
       result.diagnostics.some((entry) => entry.code === 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE'),
     ).toBe(false);
@@ -1502,6 +1507,87 @@ model Foo {
       const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
       expect(result.ok).toBe(false);
       expect(result.diagnostics[0]?.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+    });
+  });
+
+  describe('workflow blocks', () => {
+    it('parses native workflow blocks with triggers, state, steps, and approvals', () => {
+      const schema = `
+model Customer {
+  id String @id
+}
+
+workflow StripeDisputeResponse {
+  trigger stripeDisputeCreated {
+    source = stripe
+    event = "charge.dispute.created"
+    dedupeBy = "event.id"
+  }
+
+  state DisputeCase {
+    disputeId String @id
+    amount Int
+    confidence Float?
+  }
+
+  step draftEvidence {
+    run = "./workflows/stripe-dispute/draft-evidence.ts"
+    timeout = "2m"
+    retry = { maxAttempts = 3, backoff = "exponential" }
+  }
+
+  approval approveEvidence {
+    when = "state.amount > 500 || state.confidence < 0.85"
+    timeout = "24h"
+  }
+}
+`;
+
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+      expect(result.ast.workflows).toHaveLength(1);
+      const workflow = result.ast.workflows?.[0];
+      expect(workflow?.name).toBe('StripeDisputeResponse');
+      expect(workflow?.triggers[0]).toMatchObject({
+        kind: 'trigger',
+        name: 'stripeDisputeCreated',
+        properties: [
+          { name: 'source', value: 'stripe', valueKind: 'identifier' },
+          { name: 'event', value: '"charge.dispute.created"', valueKind: 'string' },
+          { name: 'dedupeBy', value: '"event.id"', valueKind: 'string' },
+        ],
+      });
+      expect(workflow?.states[0]?.fields.map((field) => field.name)).toEqual([
+        'disputeId',
+        'amount',
+        'confidence',
+      ]);
+      expect(workflow?.steps[0]?.properties.find((p) => p.name === 'retry')).toMatchObject({
+        value: '{ maxAttempts = 3, backoff = "exponential" }',
+        valueKind: 'object',
+      });
+      expect(workflow?.approvals[0]?.properties.find((p) => p.name === 'when')).toMatchObject({
+        value: '"state.amount > 500 || state.confidence < 0.85"',
+      });
+    });
+
+    it('rejects workflow blocks nested inside namespace blocks', () => {
+      const schema = `
+namespace app {
+  workflow Bad {
+    trigger event {
+      source = stripe
+    }
+  }
+}
+`;
+
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics[0]?.code).toBe('PSL_INVALID_WORKFLOW_MEMBER');
     });
   });
 });

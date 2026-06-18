@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="380" viewBox="0 0 1600 380" role="img" aria-label="Prisma Workflow canvas">
+<defs>
+  <marker id="arrow" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+    <path d="M0,0 L0,6 L6,3 z" fill="#9ca3af" />
+  </marker>
+</defs>
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<path d="M 240 112 C 290 112, 260 172, 320 172" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)" />
+<path d="M 480 172 C 530 172, 480 172, 540 172" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)" />
+<path d="M 700 172 C 750 172, 700 172, 760 172" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)" />
+<path d="M 920 172 C 970 172, 920 172, 980 172" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)" />
+<path d="M 1140 172 C 1190 172, 1140 172, 1200 172" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)" />
+<path d="M 1360 172 C 1410 172, 1360 172, 1420 172" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)" />
+<path d="M 920 172 C 970 172, 920 172, 980 172" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)" />
+<g>
+  <rect x="80" y="80" width="160" height="64" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+  <rect x="80" y="80" width="160" height="20" rx="8" fill="#2563eb"/>
+  <text x="92" y="95" fill="#ffffff" font-family="Inter, Arial" font-size="11">trigger</text>
+  <text x="92" y="122" fill="#111827" font-family="Inter, Arial" font-size="13" font-weight="600">stripeDisputeCreated</text>
+</g>
+<g>
+  <rect x="80" y="260" width="160" height="64" rx="8" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <rect x="80" y="260" width="160" height="20" rx="8" fill="#0f766e"/>
+  <text x="92" y="275" fill="#ffffff" font-family="Inter, Arial" font-size="11">state</text>
+  <text x="92" y="302" fill="#111827" font-family="Inter, Arial" font-size="13" font-weight="600">DisputeCaseState</text>
+</g>
+<g>
+  <rect x="320" y="140" width="160" height="64" rx="8" fill="#ffffff" stroke="#374151" stroke-width="2"/>
+  <rect x="320" y="140" width="160" height="20" rx="8" fill="#374151"/>
+  <text x="332" y="155" fill="#ffffff" font-family="Inter, Arial" font-size="11">step</text>
+  <text x="332" y="182" fill="#111827" font-family="Inter, Arial" font-size="13" font-weight="600">collectCustomerHistory</text>
+</g>
+<g>
+  <rect x="540" y="140" width="160" height="64" rx="8" fill="#ffffff" stroke="#374151" stroke-width="2"/>
+  <rect x="540" y="140" width="160" height="20" rx="8" fill="#374151"/>
+  <text x="552" y="155" fill="#ffffff" font-family="Inter, Arial" font-size="11">step</text>
+  <text x="552" y="182" fill="#111827" font-family="Inter, Arial" font-size="13" font-weight="600">draftResponse</text>
+</g>
+<g>
+  <rect x="760" y="140" width="160" height="64" rx="8" fill="#ffffff" stroke="#b45309" stroke-width="2"/>
+  <rect x="760" y="140" width="160" height="20" rx="8" fill="#b45309"/>
+  <text x="772" y="155" fill="#ffffff" font-family="Inter, Arial" font-size="11">approval</text>
+  <text x="772" y="182" fill="#111827" font-family="Inter, Arial" font-size="13" font-weight="600">humanApproval</text>
+</g>
+<g>
+  <rect x="980" y="140" width="160" height="64" rx="8" fill="#ffffff" stroke="#374151" stroke-width="2"/>
+  <rect x="980" y="140" width="160" height="20" rx="8" fill="#374151"/>
+  <text x="992" y="155" fill="#ffffff" font-family="Inter, Arial" font-size="11">step</text>
+  <text x="992" y="182" fill="#111827" font-family="Inter, Arial" font-size="13" font-weight="600">submitEvidence</text>
+</g>
+<g>
+  <rect x="1200" y="140" width="160" height="64" rx="8" fill="#ffffff" stroke="#374151" stroke-width="2"/>
+  <rect x="1200" y="140" width="160" height="20" rx="8" fill="#374151"/>
+  <text x="1212" y="155" fill="#ffffff" font-family="Inter, Arial" font-size="11">step</text>
+  <text x="1212" y="182" fill="#111827" font-family="Inter, Arial" font-size="13" font-weight="600">postSummary</text>
+</g>
+<g>
+  <rect x="1420" y="140" width="160" height="64" rx="8" fill="#ffffff" stroke="#374151" stroke-width="2"/>
+  <rect x="1420" y="140" width="160" height="20" rx="8" fill="#374151"/>
+  <text x="1432" y="155" fill="#ffffff" font-family="Inter, Arial" font-size="11">step</text>
+  <text x="1432" y="182" fill="#111827" font-family="Inter, Arial" font-size="13" font-weight="600">learnFromApproval</text>
+</g>
+</svg>

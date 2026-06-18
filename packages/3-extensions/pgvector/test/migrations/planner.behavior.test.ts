@@ -25,7 +25,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { buildBuiltinIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
-import { applicationDomainOf } from '@prisma-next/test-utils';
+import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
 
@@ -400,71 +400,75 @@ describe('NOT NULL column without default uses temporary default', () => {
     expect(operations.map((op) => op.id)).toContain('unique.user.user_slug_key');
   });
 
-  it('uses the empty-table fallback when the new column becomes a foreign key later in the same plan', async () => {
-    const operationsPromise = planUserTableOperations(
-      {
-        columns: {
-          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          orgId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-        },
-        primaryKey: { columns: ['id'] },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [
-          {
-            source: {
-              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-              tableName: 'user',
-              columns: ['orgId'],
-            },
-            target: {
-              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-              tableName: 'org',
-              columns: ['id'],
-            },
-            constraint: true,
-            index: true,
+  it(
+    'uses the empty-table fallback when the new column becomes a foreign key later in the same plan',
+    async () => {
+      const operationsPromise = planUserTableOperations(
+        {
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            orgId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
           },
-        ],
-      },
-      buildUserTableSchemaWithoutEmail(),
-      {
-        extraContractTables: {
-          org: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [
+            {
+              source: {
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                tableName: 'user',
+                columns: ['orgId'],
+              },
+              target: {
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                tableName: 'org',
+                columns: ['id'],
+              },
+              constraint: true,
+              index: true,
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          ],
+        },
+        buildUserTableSchemaWithoutEmail(),
+        {
+          extraContractTables: {
+            org: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          extraSchemaTables: {
+            org: {
+              name: 'org',
+              columns: {
+                id: { name: 'id', nativeType: 'uuid', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              foreignKeys: [],
+              indexes: [],
+            },
           },
         },
-        extraSchemaTables: {
-          org: {
-            name: 'org',
-            columns: {
-              id: { name: 'id', nativeType: 'uuid', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            foreignKeys: [],
-            indexes: [],
-          },
-        },
-      },
-    );
+      );
 
-    const addCol = await getRequiredOperation(operationsPromise, 'column.user.orgId');
-    expect(addCol.precheck.map((p) => p.sql)).toContain(
-      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
-    );
-    expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "orgId" uuid NOT NULL`,
-    ]);
-    const operations = await operationsPromise;
-    expect(operations.map((op) => op.id)).toContain('foreignKey.user.user_orgId_fkey');
-  });
+      const addCol = await getRequiredOperation(operationsPromise, 'column.user.orgId');
+      expect(addCol.precheck.map((p) => p.sql)).toContain(
+        `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+      );
+      expect(addCol.execute.map((step) => step.sql)).toEqual([
+        `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "orgId" uuid NOT NULL`,
+      ]);
+      const operations = await operationsPromise;
+      expect(operations.map((op) => op.id)).toContain('foreignKey.user.user_orgId_fkey');
+    },
+    timeouts.vitestPackageDefault,
+  );
 
   it('skips temporary default for nullable columns', async () => {
     const addCol = await planAddColumn('bio', {

@@ -210,7 +210,7 @@ export interface TestContext {
 }
 
 export async function createTestDatabase(): Promise<Awaited<ReturnType<typeof createDevDatabase>>> {
-  return createDevDatabase();
+  return createDevDatabase({ databaseIdleTimeoutMillis: testTimeout });
 }
 
 export async function createDriver(connectionString: string): Promise<PostgresControlDriver> {

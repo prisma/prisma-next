@@ -1,0 +1,66 @@
+generator workflows {
+  provider = "prisma-workflows"
+  output   = "./generated/workflows"
+  schema   = "_prisma_workflows"
+}
+
+model OnboardingCase {
+  id            String   @id
+  accountId     String
+  companyDomain String
+  riskScore     Float
+  status        String
+  approvedBy    String?
+  createdAt     DateTime
+  updatedAt     DateTime
+}
+
+workflow OnboardingRiskReview {
+  trigger accountCreated {
+    source = "product"
+    event = "account.created"
+    dedupeBy = "event.accountId"
+  }
+
+  state OnboardingState {
+    accountId String @id
+    companyDomain String
+    crmAccount Json?
+    billingProfile Json?
+    identitySignals Json?
+    riskScore Float
+    provisioningPlan Json?
+    approvedBy String?
+    slackMessage Json?
+  }
+
+  step enrichAccount {
+    run = "./src/steps/enrich-account.ts"
+    checkpoint = true
+  }
+
+  step scoreRisk {
+    run = "./src/steps/score-risk.ts"
+    checkpoint = true
+  }
+
+  approval salesOpsApproval {
+    when = "state.riskScore > 0.7"
+    assignees = ["role:sales_ops"]
+    timeout = "24h"
+    onApprove = provisionWorkspace
+  }
+
+  step provisionWorkspace {
+    run = "./src/steps/provision-workspace.ts"
+    checkpoint = true
+    sideEffects = "external"
+    idempotency = "state.accountId"
+  }
+
+  step notifyTeam {
+    run = "./src/steps/notify-team.ts"
+    sideEffects = "external"
+    idempotency = "state.accountId"
+  }
+}

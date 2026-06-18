@@ -1,0 +1,1290 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stripe Dispute Workflow Production Tour</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111827'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-family='Arial' font-size='15' font-weight='700' fill='white'%3EW%3C/text%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: oklch(0.975 0.006 248);
+        --surface: oklch(1 0 0);
+        --surface-alt: oklch(0.955 0.012 248);
+        --ink: oklch(0.235 0.018 248);
+        --muted: oklch(0.445 0.028 248);
+        --line: oklch(0.885 0.018 248);
+        --line-strong: oklch(0.76 0.03 248);
+        --stripe: oklch(0.52 0.19 286);
+        --compute: oklch(0.48 0.13 226);
+        --data: oklch(0.48 0.12 166);
+        --review: oklch(0.58 0.14 68);
+        --danger: oklch(0.54 0.16 28);
+        --shadow: 0 8px 24px oklch(0.25 0.04 248 / 0.08);
+        --radius: 10px;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      a {
+        color: var(--compute);
+        text-underline-offset: 3px;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      .page-shell {
+        width: min(100% - 32px, 1240px);
+        margin: 0 auto;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        border-bottom: 1px solid var(--line);
+        background: oklch(1 0 0 / 0.94);
+        backdrop-filter: blur(12px);
+      }
+
+      .topbar-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 64px;
+        gap: 16px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .brand-mark {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background: var(--ink);
+        color: white;
+        font-weight: 700;
+      }
+
+      .brand-text {
+        min-width: 0;
+      }
+
+      .brand-title {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+
+      .brand-subtitle {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 650;
+        text-decoration: none;
+      }
+
+      .button.primary {
+        border-color: var(--compute);
+        background: var(--compute);
+        color: white;
+      }
+
+      .button:focus-visible,
+      .tour-button:focus-visible {
+        outline: 3px solid oklch(0.72 0.15 226 / 0.45);
+        outline-offset: 2px;
+      }
+
+      .intro {
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
+        gap: 28px;
+        padding: 38px 0 28px;
+        align-items: stretch;
+      }
+
+      .intro-copy {
+        align-self: center;
+      }
+
+      .label {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        gap: 8px;
+        margin: 0 0 14px;
+        padding: 4px 8px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .label-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: var(--stripe);
+      }
+
+      h1,
+      h2,
+      h3 {
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 760px;
+        margin: 0;
+        font-size: 3.2rem;
+        line-height: 0.98;
+        letter-spacing: -0.03em;
+      }
+
+      .lede {
+        max-width: 68ch;
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 1.05rem;
+      }
+
+      .intro-panel {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        overflow: hidden;
+        box-shadow: var(--shadow);
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-alt);
+      }
+
+      .panel-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: oklch(0.94 0.035 166);
+        color: oklch(0.34 0.09 166);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .status-pill::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: currentColor;
+      }
+
+      .request-lines {
+        display: grid;
+        gap: 1px;
+        background: var(--line);
+      }
+
+      .request-row {
+        display: grid;
+        grid-template-columns: 118px minmax(0, 1fr);
+        gap: 14px;
+        padding: 13px 16px;
+        background: var(--surface);
+      }
+
+      .request-key {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .request-value {
+        min-width: 0;
+        font-family: var(--mono);
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+
+      .section {
+        margin: 24px 0;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        overflow: hidden;
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 22px 22px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .section-heading h2 {
+        margin: 0;
+        font-size: 1.35rem;
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+      }
+
+      .section-heading p {
+        max-width: 64ch;
+        margin: 8px 0 0;
+        color: var(--muted);
+      }
+
+      .caption {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+        white-space: nowrap;
+      }
+
+      .pipeline {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(132px, 1fr));
+        gap: 0;
+        overflow-x: auto;
+      }
+
+      .pipeline-step {
+        position: relative;
+        min-height: 156px;
+        padding: 18px;
+        border-right: 1px solid var(--line);
+      }
+
+      .pipeline-step:last-child {
+        border-right: 0;
+      }
+
+      .pipeline-step::after {
+        content: "";
+        position: absolute;
+        top: 28px;
+        right: -6px;
+        z-index: 1;
+        width: 10px;
+        height: 10px;
+        border-top: 1px solid var(--line-strong);
+        border-right: 1px solid var(--line-strong);
+        background: var(--surface);
+        transform: rotate(45deg);
+      }
+
+      .pipeline-step:last-child::after {
+        display: none;
+      }
+
+      .step-token {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        background: var(--surface-alt);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .pipeline-step h3 {
+        margin: 14px 0 8px;
+        font-size: 0.98rem;
+        line-height: 1.25;
+      }
+
+      .pipeline-step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .tour-grid {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+      }
+
+      .tour-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 16px;
+        border-right: 1px solid var(--line);
+        background: var(--surface-alt);
+      }
+
+      .tour-button {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr);
+        gap: 10px;
+        width: 100%;
+        padding: 10px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--ink);
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .tour-button:hover {
+        border-color: var(--line);
+        background: var(--surface);
+      }
+
+      .tour-button[aria-selected="true"] {
+        border-color: oklch(0.73 0.1 226);
+        background: var(--surface);
+      }
+
+      .tour-number {
+        display: inline-grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        background: var(--ink);
+        color: white;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .tour-button[aria-selected="true"] .tour-number {
+        background: var(--compute);
+      }
+
+      .tour-name {
+        display: block;
+        font-weight: 750;
+        line-height: 1.25;
+      }
+
+      .tour-summary {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .tour-content {
+        min-width: 0;
+        padding: 22px;
+      }
+
+      .tour-panel {
+        display: none;
+      }
+
+      .tour-panel.active {
+        display: block;
+      }
+
+      .tour-panel h3 {
+        margin: 0;
+        font-size: 1.3rem;
+        line-height: 1.25;
+      }
+
+      .tour-panel > p {
+        max-width: 74ch;
+        margin: 10px 0 18px;
+        color: var(--muted);
+      }
+
+      .two-column {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 0.82fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .note-list {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .note-list li {
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      .note-list strong {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 13px;
+      }
+
+      .note-list span {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      pre {
+        margin: 0;
+        max-width: 100%;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: oklch(0.22 0.018 248);
+        color: oklch(0.96 0.01 248);
+      }
+
+      code {
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      pre code {
+        display: block;
+        padding: 14px;
+        line-height: 1.55;
+      }
+
+      .keyword {
+        color: oklch(0.82 0.1 226);
+      }
+
+      .string {
+        color: oklch(0.84 0.12 142);
+      }
+
+      .comment {
+        color: oklch(0.7 0.03 248);
+      }
+
+      .workflow-visual {
+        padding: 22px;
+      }
+
+      .production-map {
+        display: block;
+        width: 100%;
+        height: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      .canvas-frame {
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: auto;
+        background: #f8fafc;
+      }
+
+      .canvas-frame img {
+        display: block;
+        min-width: 980px;
+        width: 100%;
+        height: auto;
+      }
+
+      .runtime-layers {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1px;
+        background: var(--line);
+      }
+
+      .layer {
+        padding: 18px;
+        background: var(--surface);
+      }
+
+      .layer h3 {
+        margin: 0 0 8px;
+        font-size: 1rem;
+      }
+
+      .layer p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .layer ul {
+        margin: 14px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .checklist {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1px;
+        background: var(--line);
+      }
+
+      .check-item {
+        min-height: 148px;
+        padding: 18px;
+        background: var(--surface);
+      }
+
+      .check-item h3 {
+        margin: 0 0 8px;
+        font-size: 0.98rem;
+      }
+
+      .check-item p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 28px 0 42px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .footer code {
+        color: var(--ink);
+      }
+
+      @media (max-width: 960px) {
+        .intro,
+        .tour-grid,
+        .two-column {
+          grid-template-columns: 1fr;
+        }
+
+        .tour-nav {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .pipeline {
+          grid-template-columns: repeat(6, minmax(220px, 1fr));
+        }
+
+        .runtime-layers {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 680px) {
+        .page-shell {
+          width: min(100% - 20px, 1240px);
+        }
+
+        .topbar-inner {
+          align-items: flex-start;
+          flex-direction: column;
+          padding: 12px 0;
+        }
+
+        .top-actions {
+          justify-content: flex-start;
+        }
+
+        h1 {
+          font-size: 2.2rem;
+          line-height: 1.05;
+        }
+
+        .request-row {
+          grid-template-columns: 1fr;
+          gap: 4px;
+        }
+
+        .section-heading {
+          flex-direction: column;
+          padding: 18px;
+        }
+
+        .caption {
+          white-space: normal;
+        }
+
+        .tour-content,
+        .workflow-visual {
+          padding: 16px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="page-shell topbar-inner">
+        <div class="brand">
+          <div class="brand-mark">W</div>
+          <div class="brand-text">
+            <p class="brand-title">Stripe Dispute Evidence Workflow</p>
+            <p class="brand-subtitle">Production guided tour for Prisma Workflows</p>
+          </div>
+        </div>
+        <nav class="top-actions" aria-label="Page sections">
+          <a class="button" href="#path">View request path</a>
+          <a class="button" href="#walkthrough">Start tour</a>
+          <a class="button primary" href="./studio/workflows.html">Open Studio preview</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page-shell">
+      <section class="intro" aria-labelledby="page-title">
+        <div class="intro-copy">
+          <p class="label"><span class="label-dot"></span>Production app flow</p>
+          <h1 id="page-title">How a Stripe dispute becomes an approved evidence response.</h1>
+          <p class="lede">
+            This tour follows the complete app shape: Stripe posts a signed webhook, Prisma Compute durably ingests it, a worker collects evidence from provider APIs, finance reviews high-value disputes, then the workflow submits evidence and records what was approved.
+          </p>
+        </div>
+        <aside class="intro-panel" aria-label="Example webhook request">
+          <div class="panel-header">
+            <p class="panel-title">Incoming production request</p>
+            <span class="status-pill">Accepted</span>
+          </div>
+          <div class="request-lines">
+            <div class="request-row">
+              <div class="request-key">Route</div>
+              <div class="request-value">POST /api/prisma-workflows/ingest/stripe/acct_live_123</div>
+            </div>
+            <div class="request-row">
+              <div class="request-key">Event</div>
+              <div class="request-value">charge.dispute.created</div>
+            </div>
+            <div class="request-row">
+              <div class="request-key">Dedupe key</div>
+              <div class="request-value">stripe:acct_live_123:charge.dispute.created:du_001</div>
+            </div>
+            <div class="request-row">
+              <div class="request-key">Runtime schema</div>
+              <div class="request-value">_prisma_workflows</div>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="section" id="path" aria-labelledby="path-title">
+        <div class="section-heading">
+          <div>
+            <h2 id="path-title">Production request path</h2>
+            <p>
+              The webhook handler does only the work required for a fast acknowledgement. Slow provider calls and model calls happen after durable ingest, through the worker route.
+            </p>
+          </div>
+          <span class="caption">Webhook response: 202 for new work, 200 for duplicates</span>
+        </div>
+        <div class="pipeline" aria-label="Production pipeline">
+          <article class="pipeline-step">
+            <span class="step-token">1</span>
+            <h3>Stripe sends event</h3>
+            <p>The app receives the raw body, headers, event type, and account path segment.</p>
+          </article>
+          <article class="pipeline-step">
+            <span class="step-token">2</span>
+            <h3>Connector verifies</h3>
+            <p>The Stripe connector validates the signature before any ingest event is stored.</p>
+          </article>
+          <article class="pipeline-step">
+            <span class="step-token">3</span>
+            <h3>Runtime ingests</h3>
+            <p>The event is normalized, deduped, stored, and matched to the workflow trigger.</p>
+          </article>
+          <article class="pipeline-step">
+            <span class="step-token">4</span>
+            <h3>Worker executes</h3>
+            <p>The run leaves the webhook path and executes checkpointed steps with retries.</p>
+          </article>
+          <article class="pipeline-step">
+            <span class="step-token">5</span>
+            <h3>Human approves</h3>
+            <p>Disputes over $500 pause for finance approval before external submission.</p>
+          </article>
+          <article class="pipeline-step">
+            <span class="step-token">6</span>
+            <h3>Studio observes</h3>
+            <p>Operators inspect ingest events, run state, approvals, outbox entries, and dead letters.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="map-title">
+        <div class="section-heading">
+          <div>
+            <h2 id="map-title">Systems involved</h2>
+            <p>
+              A production deployment has three clear boundaries: connector verification, durable workflow runtime, and provider-specific step code.
+            </p>
+          </div>
+          <span class="caption">Compute app plus Postgres store</span>
+        </div>
+        <div class="workflow-visual">
+          <svg class="production-map" viewBox="0 0 1120 310" role="img" aria-labelledby="map-svg-title map-svg-desc">
+            <title id="map-svg-title">Production architecture map</title>
+            <desc id="map-svg-desc">
+              Stripe sends a webhook to Prisma Compute. The workflow runtime stores the event in Postgres, workers call external providers, and Studio reads runtime state.
+            </desc>
+            <defs>
+              <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="8" refY="4" orient="auto">
+                <path d="M 0 0 L 10 4 L 0 8 z" fill="oklch(0.56 0.035 248)" />
+              </marker>
+            </defs>
+            <rect x="1" y="1" width="1118" height="308" rx="8" fill="white" stroke="oklch(0.885 0.018 248)" />
+            <g>
+              <rect x="36" y="88" width="142" height="92" rx="8" fill="oklch(0.965 0.018 286)" stroke="oklch(0.72 0.09 286)" />
+              <text x="58" y="124" fill="oklch(0.235 0.018 248)" font-size="16" font-weight="750">Stripe</text>
+              <text x="58" y="149" fill="oklch(0.445 0.028 248)" font-size="12">signed webhook</text>
+            </g>
+            <path d="M 178 134 L 278 134" stroke="oklch(0.56 0.035 248)" stroke-width="2" marker-end="url(#arrowhead)" />
+            <g>
+              <rect x="278" y="54" width="196" height="160" rx="8" fill="oklch(0.965 0.02 226)" stroke="oklch(0.72 0.09 226)" />
+              <text x="306" y="91" fill="oklch(0.235 0.018 248)" font-size="16" font-weight="750">Prisma Compute</text>
+              <text x="306" y="118" fill="oklch(0.445 0.028 248)" font-size="12">/ingest/stripe/:account</text>
+              <text x="306" y="142" fill="oklch(0.445 0.028 248)" font-size="12">verify, normalize, dedupe</text>
+              <text x="306" y="166" fill="oklch(0.445 0.028 248)" font-size="12">return before step work</text>
+            </g>
+            <path d="M 474 134 L 574 134" stroke="oklch(0.56 0.035 248)" stroke-width="2" marker-end="url(#arrowhead)" />
+            <g>
+              <rect x="574" y="54" width="190" height="160" rx="8" fill="oklch(0.965 0.019 166)" stroke="oklch(0.72 0.08 166)" />
+              <text x="602" y="91" fill="oklch(0.235 0.018 248)" font-size="16" font-weight="750">Postgres store</text>
+              <text x="602" y="118" fill="oklch(0.445 0.028 248)" font-size="12">WorkflowIngestEvent</text>
+              <text x="602" y="142" fill="oklch(0.445 0.028 248)" font-size="12">WorkflowRun</text>
+              <text x="602" y="166" fill="oklch(0.445 0.028 248)" font-size="12">timeline and snapshots</text>
+            </g>
+            <path d="M 764 134 L 864 134" stroke="oklch(0.56 0.035 248)" stroke-width="2" marker-end="url(#arrowhead)" />
+            <g>
+              <rect x="864" y="54" width="214" height="160" rx="8" fill="oklch(0.97 0.02 68)" stroke="oklch(0.76 0.09 68)" />
+              <text x="892" y="91" fill="oklch(0.235 0.018 248)" font-size="16" font-weight="750">Workflow worker</text>
+              <text x="892" y="118" fill="oklch(0.445 0.028 248)" font-size="12">HubSpot, Shopify, Zendesk</text>
+              <text x="892" y="142" fill="oklch(0.445 0.028 248)" font-size="12">Stripe evidence submission</text>
+              <text x="892" y="166" fill="oklch(0.445 0.028 248)" font-size="12">Slack summary</text>
+            </g>
+            <path d="M 670 214 C 670 258, 460 258, 460 214" fill="none" stroke="oklch(0.56 0.035 248)" stroke-width="2" marker-end="url(#arrowhead)" />
+            <text x="488" y="265" fill="oklch(0.445 0.028 248)" font-size="12">Studio reads the same runtime records</text>
+          </svg>
+          <div class="canvas-frame">
+            <img src="./studio/dispute-evidence.svg" alt="Generated Studio canvas for the DisputeEvidence workflow" />
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="walkthrough" aria-labelledby="walkthrough-title">
+        <div class="section-heading">
+          <div>
+            <h2 id="walkthrough-title">Guided workflow walkthrough</h2>
+            <p>
+              Pick each stop to see the exact production behavior and the repository file that owns it.
+            </p>
+          </div>
+          <span class="caption">Source, runtime, worker, approval, outbox, Studio</span>
+        </div>
+        <div class="tour-grid">
+          <div class="tour-nav" role="tablist" aria-label="Workflow tour stops">
+            <button class="tour-button" type="button" role="tab" aria-selected="true" aria-controls="tour-trigger" id="tab-trigger" data-tour-tab="trigger">
+              <span class="tour-number">1</span>
+              <span>
+                <span class="tour-name">Trigger schema</span>
+                <span class="tour-summary">Declares Stripe source, event, and dedupe expression.</span>
+              </span>
+            </button>
+            <button class="tour-button" type="button" role="tab" aria-selected="false" aria-controls="tour-compute" id="tab-compute" data-tour-tab="compute">
+              <span class="tour-number">2</span>
+              <span>
+                <span class="tour-name">Compute app</span>
+                <span class="tour-summary">Generated HTTP routes expose ingest, run, inspect, and approval actions.</span>
+              </span>
+            </button>
+            <button class="tour-button" type="button" role="tab" aria-selected="false" aria-controls="tour-ingest" id="tab-ingest" data-tour-tab="ingest">
+              <span class="tour-number">3</span>
+              <span>
+                <span class="tour-name">Durable ingest</span>
+                <span class="tour-summary">Stores raw and normalized payloads before queueing a run.</span>
+              </span>
+            </button>
+            <button class="tour-button" type="button" role="tab" aria-selected="false" aria-controls="tour-evidence" id="tab-evidence" data-tour-tab="evidence">
+              <span class="tour-number">4</span>
+              <span>
+                <span class="tour-name">Evidence collection</span>
+                <span class="tour-summary">Steps call provider APIs and merge their output into workflow state.</span>
+              </span>
+            </button>
+            <button class="tour-button" type="button" role="tab" aria-selected="false" aria-controls="tour-approval" id="tab-approval" data-tour-tab="approval">
+              <span class="tour-number">5</span>
+              <span>
+                <span class="tour-name">Approval gate</span>
+                <span class="tour-summary">High-value disputes wait for finance approval.</span>
+              </span>
+            </button>
+            <button class="tour-button" type="button" role="tab" aria-selected="false" aria-controls="tour-side-effects" id="tab-side-effects" data-tour-tab="side-effects">
+              <span class="tour-number">6</span>
+              <span>
+                <span class="tour-name">External side effects</span>
+                <span class="tour-summary">Stripe and Slack work is marked external and idempotent.</span>
+              </span>
+            </button>
+            <button class="tour-button" type="button" role="tab" aria-selected="false" aria-controls="tour-studio" id="tab-studio" data-tour-tab="studio">
+              <span class="tour-number">7</span>
+              <span>
+                <span class="tour-name">Studio operations</span>
+                <span class="tour-summary">Operators inspect runs, approvals, state snapshots, and failures.</span>
+              </span>
+            </button>
+          </div>
+
+          <div class="tour-content">
+            <article class="tour-panel active" role="tabpanel" id="tour-trigger" aria-labelledby="tab-trigger" data-tour-panel="trigger">
+              <h3>The schema makes Stripe ingestion explicit.</h3>
+              <p>
+                The workflow is selected by source and event type. The dedupe expression points at the Stripe dispute id, so retries for the same dispute collapse into one case.
+              </p>
+              <div class="two-column">
+                <pre><code><span class="keyword">workflow</span> DisputeEvidence {
+  <span class="keyword">trigger</span> stripeDisputeCreated {
+    source = <span class="string">"stripe"</span>
+    event = <span class="string">"charge.dispute.created"</span>
+    dedupeBy = <span class="string">"event.data.object.id"</span>
+  }
+
+  <span class="keyword">approval</span> humanApproval {
+    when = <span class="string">"state.amount &gt; 50000"</span>
+    assignees = [<span class="string">"role:finance_ops"</span>]
+    onApprove = submitEvidence
+  }
+}</code></pre>
+                <ul class="note-list">
+                  <li>
+                    <strong>Production route</strong>
+                    <span>Stripe posts to `/api/prisma-workflows/ingest/stripe/:accountId?`.</span>
+                  </li>
+                  <li>
+                    <strong>Dedupe policy</strong>
+                    <span>`event.data.object.id` makes the dispute the unit of work, not the delivery attempt.</span>
+                  </li>
+                  <li>
+                    <strong>Threshold</strong>
+                    <span>`50000` is cents, so disputes over $500 pause for review.</span>
+                  </li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="tour-panel" role="tabpanel" id="tour-compute" aria-labelledby="tab-compute" data-tour-panel="compute">
+              <h3>Generation turns the schema into a Compute app.</h3>
+              <p>
+                `workflow generate` emits a manifest, typed client helpers, Studio artifacts, and `compute.ts`. In production, `DATABASE_URL` selects `PostgresWorkflowStore`.
+              </p>
+              <div class="two-column">
+                <pre><code><span class="keyword">const</span> connectionString = process.env[<span class="string">'DATABASE_URL'</span>];
+<span class="keyword">const</span> store = connectionString
+  ? <span class="keyword">new</span> PostgresWorkflowStore({
+      connectionString,
+      schemaName: <span class="string">"_prisma_workflows"</span>,
+    })
+  : undefined;
+
+<span class="keyword">export function</span> createApp(options = {}) {
+  <span class="keyword">return</span> createWorkflowHttpApp({
+    manifest,
+    steps,
+    connectors: { ...connectors, ...(options.connectors ?? {}) },
+    ...(store ? { store } : {}),
+  });
+}</code></pre>
+                <ul class="note-list">
+                  <li>
+                    <strong>Generated imports</strong>
+                    <span>Step modules are imported from `src/steps/*` and wired by step name and file path.</span>
+                  </li>
+                  <li>
+                    <strong>Connector override</strong>
+                    <span>Deployment code can pass a real Stripe connector and secrets without changing the schema.</span>
+                  </li>
+                  <li>
+                    <strong>Runtime routes</strong>
+                    <span>The app exposes ingest, worker, approval, replay, inspect, and Studio endpoints.</span>
+                  </li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="tour-panel" role="tabpanel" id="tour-ingest" aria-labelledby="tab-ingest" data-tour-panel="ingest">
+              <h3>Webhook work ends after durable ingest.</h3>
+              <p>
+                The HTTP app preserves the raw request body for signature debugging, normalizes the event if a connector is present, stores the ingest event, creates a queued run, and returns.
+              </p>
+              <div class="two-column">
+                <pre><code>curl -X POST https://app.example.com/api/prisma-workflows/ingest/stripe/acct_live_123 \
+  -H <span class="string">"stripe-signature: t=...,v1=..."</span> \
+  -H <span class="string">"content-type: application/json"</span> \
+  -d <span class="string">'{
+    "type": "charge.dispute.created",
+    "data": { "object": { "id": "du_001", "amount": 72500 } }
+  }'</span>
+
+<span class="comment"># Response for new work</span>
+{ <span class="string">"matchedWorkflows"</span>: [<span class="string">"DisputeEvidence"</span>], <span class="string">"duplicate"</span>: false }</code></pre>
+                <ul class="note-list">
+                  <li>
+                    <strong>Signature first</strong>
+                    <span>Failed connector verification returns `401` and writes no ingest event.</span>
+                  </li>
+                  <li>
+                    <strong>Atomic store</strong>
+                    <span>The Postgres store inserts the ingest event, trigger match, run, and first timeline entry together.</span>
+                  </li>
+                  <li>
+                    <strong>Fast acknowledgement</strong>
+                    <span>Provider calls happen later through `POST /api/prisma-workflows/run`.</span>
+                  </li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="tour-panel" role="tabpanel" id="tour-evidence" aria-labelledby="tab-evidence" data-tour-panel="evidence">
+              <h3>The first step builds the case file.</h3>
+              <p>
+                The step reads `event.data.object`, extracts the dispute id, customer id, amount, currency, and reason, then calls the connected systems in parallel.
+              </p>
+              <div class="two-column">
+                <pre><code><span class="keyword">const</span> [hubspotHistory, shopifyOrders, zendeskTickets, stripeMetadata] =
+  <span class="keyword">await</span> Promise.all([
+    providers.hubspot.customerHistory(customerId),
+    providers.shopify.orderHistory(customerId),
+    providers.zendesk.priorTickets(customerId),
+    providers.stripe.paymentMetadata(disputeId),
+  ]);
+
+<span class="keyword">return</span> {
+  disputeId,
+  customerId,
+  customerEmail: stripeMetadata[<span class="string">'receiptEmail'</span>],
+  amount,
+  currency,
+  reason,
+  hubspotHistory,
+  shopifyOrders,
+  zendeskTickets,
+  stripeMetadata,
+};</code></pre>
+                <ul class="note-list">
+                  <li>
+                    <strong>Mocked example</strong>
+                    <span>The repository uses mocked providers so tests run without external accounts.</span>
+                  </li>
+                  <li>
+                    <strong>Production replacement</strong>
+                    <span>Real clients use account-scoped secrets, provider SDKs, rate limits, and typed responses.</span>
+                  </li>
+                  <li>
+                    <strong>State contract</strong>
+                    <span>Every returned field is merged into workflow state and becomes visible in Studio snapshots.</span>
+                  </li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="tour-panel" role="tabpanel" id="tour-approval" aria-labelledby="tab-approval" data-tour-panel="approval">
+              <h3>Large disputes block until a human decides.</h3>
+              <p>
+                The draft response is created before the approval gate. If the amount is over $500, the run waits with an approval record assigned to finance operations.
+              </p>
+              <div class="two-column">
+                <pre><code><span class="comment"># Inspect pending work for Studio or an approval queue</span>
+GET /api/prisma-workflows/studio
+
+<span class="comment"># Resume the run from submitEvidence</span>
+POST /api/prisma-workflows/approve/apr_123
+{
+  <span class="string">"approvedBy"</span>: <span class="string">"agent@example.com"</span>,
+  <span class="string">"reason"</span>: <span class="string">"Evidence matches fulfillment records."</span>
+}</code></pre>
+                <ul class="note-list">
+                  <li>
+                    <strong>Run status</strong>
+                    <span>The workflow status changes to `waiting_for_approval`, not failed or completed.</span>
+                  </li>
+                  <li>
+                    <strong>Audit trail</strong>
+                    <span>The approval decision, approver, reason, and state at the time of review are persisted.</span>
+                  </li>
+                  <li>
+                    <strong>Timeout path</strong>
+                    <span>The schema can define timeout behavior for queues that need escalation.</span>
+                  </li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="tour-panel" role="tabpanel" id="tour-side-effects" aria-labelledby="tab-side-effects" data-tour-panel="side-effects">
+              <h3>External effects are marked and keyed.</h3>
+              <p>
+                The Stripe evidence submission and Slack summary are external side effects. Their idempotency expression uses `state.disputeId`, so retries do not submit a second evidence packet for the same dispute.
+              </p>
+              <div class="two-column">
+                <pre><code><span class="keyword">step</span> submitEvidence {
+  run = <span class="string">"./src/steps/submit-evidence.ts"</span>
+  checkpoint = true
+  sideEffects = <span class="string">"external"</span>
+  idempotency = <span class="string">"state.disputeId"</span>
+}
+
+<span class="keyword">step</span> postSummary {
+  run = <span class="string">"./src/steps/post-summary.ts"</span>
+  sideEffects = <span class="string">"external"</span>
+  idempotency = <span class="string">"state.disputeId"</span>
+}</code></pre>
+                <ul class="note-list">
+                  <li>
+                    <strong>Stripe evidence</strong>
+                    <span>The production step calls Stripe's dispute evidence API with the approved response.</span>
+                  </li>
+                  <li>
+                    <strong>Slack summary</strong>
+                    <span>Finance and support can see the outcome without opening the workflow run.</span>
+                  </li>
+                  <li>
+                    <strong>Replay guard</strong>
+                    <span>External side effects require explicit confirmation during replay.</span>
+                  </li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="tour-panel" role="tabpanel" id="tour-studio" aria-labelledby="tab-studio" data-tour-panel="studio">
+              <h3>Studio is the operations console.</h3>
+              <p>
+                Studio reads the same runtime data the worker writes: definitions, ingest events, runs, step attempts, state snapshots, approvals, outbox entries, and dead letters.
+              </p>
+              <div class="two-column">
+                <pre><code>GET /api/prisma-workflows/studio
+GET /api/prisma-workflows/inspect/:runId?include=steps,timeline,stateSnapshots,approvals,outbox,deadLetters
+POST /api/prisma-workflows/replay/:runId
+
+<span class="comment"># Local generated preview</span>
+open examples/workflow-stripe-disputes/studio/workflows.html</code></pre>
+                <ul class="note-list">
+                  <li>
+                    <strong>For finance</strong>
+                    <span>Pending approvals show who must decide and what state was presented.</span>
+                  </li>
+                  <li>
+                    <strong>For operators</strong>
+                    <span>Dead letters and failed attempts show where a provider or step failed.</span>
+                  </li>
+                  <li>
+                    <strong>For builders</strong>
+                    <span>The canvas links the schema model to observed runtime behavior.</span>
+                  </li>
+                </ul>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="layers-title">
+        <div class="section-heading">
+          <div>
+            <h2 id="layers-title">What changes between this example and production</h2>
+            <p>
+              The workflow definition stays the same. The production app swaps mocks for real connectors, deploys with Postgres, and configures operational controls.
+            </p>
+          </div>
+          <span class="caption">Mocked locally, connected in deployment</span>
+        </div>
+        <div class="runtime-layers">
+          <article class="layer">
+            <h3>Example repository</h3>
+            <p>Designed for repeatable local tests.</p>
+            <ul>
+              <li>Mocked Stripe, HubSpot, Shopify, Zendesk, and Slack providers</li>
+              <li>Fixture-based `charge.dispute.created` payload</li>
+              <li>Generated static Studio preview</li>
+            </ul>
+          </article>
+          <article class="layer">
+            <h3>Production connector layer</h3>
+            <p>Owns account-specific integration concerns.</p>
+            <ul>
+              <li>Stripe signature verification with raw request body</li>
+              <li>Secret lookup by connector account</li>
+              <li>Normalization and explicit dedupe key policy</li>
+            </ul>
+          </article>
+          <article class="layer">
+            <h3>Workflow runtime</h3>
+            <p>Owns durable orchestration behavior.</p>
+            <ul>
+              <li>Transactional ingest and run creation</li>
+              <li>Retries, leases, checkpoints, approvals, and replay</li>
+              <li>Studio datasets for operations visibility</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="checklist-title">
+        <div class="section-heading">
+          <div>
+            <h2 id="checklist-title">Production checklist</h2>
+            <p>
+              These are the pieces a real app wires before accepting live Stripe events.
+            </p>
+          </div>
+          <span class="caption">Before switching Stripe to live mode</span>
+        </div>
+        <div class="checklist">
+          <article class="check-item">
+            <h3>Database</h3>
+            <p>Provision Postgres, run workflow DDL, and set `DATABASE_URL` so Compute uses `PostgresWorkflowStore` with `_prisma_workflows`.</p>
+          </article>
+          <article class="check-item">
+            <h3>Stripe connector</h3>
+            <p>Implement signature verification, event normalization, account scoping, and the dispute-level dedupe policy.</p>
+          </article>
+          <article class="check-item">
+            <h3>Secrets</h3>
+            <p>Store Stripe, HubSpot, Shopify, Zendesk, and Slack credentials outside code and resolve them by tenant or account.</p>
+          </article>
+          <article class="check-item">
+            <h3>Worker cadence</h3>
+            <p>Run `POST /api/prisma-workflows/run` from a worker loop or scheduler so webhook requests stay fast.</p>
+          </article>
+          <article class="check-item">
+            <h3>Approval queue</h3>
+            <p>Connect `role:finance_ops` to the real user directory and expose approve or reject actions in the operator UI.</p>
+          </article>
+          <article class="check-item">
+            <h3>Observability</h3>
+            <p>Watch dead letters, failed attempts, approval timeouts, duplicate events, and provider rate-limit responses in Studio.</p>
+          </article>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <span>Open this file directly: <code>examples/workflow-stripe-disputes/production-tour.html</code></span>
+        <span>Run the example with <code>pnpm --filter @prisma-next/example-workflow-stripe-disputes workflow:test</code></span>
+      </footer>
+    </main>
+
+    <script>
+      const buttons = Array.from(document.querySelectorAll("[data-tour-tab]"));
+      const panels = Array.from(document.querySelectorAll("[data-tour-panel]"));
+
+      function activateTourStep(step) {
+        for (const button of buttons) {
+          const selected = button.dataset.tourTab === step;
+          button.setAttribute("aria-selected", String(selected));
+        }
+
+        for (const panel of panels) {
+          panel.classList.toggle("active", panel.dataset.tourPanel === step);
+        }
+      }
+
+      for (const button of buttons) {
+        button.addEventListener("click", () => {
+          const step = button.dataset.tourTab;
+          if (step) activateTourStep(step);
+        });
+
+        button.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+          event.preventDefault();
+          const currentIndex = buttons.indexOf(button);
+          const offset = event.key === "ArrowDown" ? 1 : -1;
+          const next = buttons[(currentIndex + offset + buttons.length) % buttons.length];
+          next.focus();
+          const step = next.dataset.tourTab;
+          if (step) activateTourStep(step);
+        });
+      }
+    </script>
+  </body>
+</html>

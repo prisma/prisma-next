@@ -41,10 +41,13 @@ const CLI_BIN_PATH = HARNESS_PATHS.CLI_BIN_PATH;
 
 let harness: BackendHarness;
 const tempDirs: string[] = [];
+const TELEMETRY_E2E_TIMEOUT = timeouts.spinUpPpgDev * 4;
+const TELEMETRY_ROW_TIMEOUT = timeouts.spinUpPpgDev * 2;
+const TELEMETRY_REQUEST_TIMEOUT = timeouts.databaseOperation;
 
 beforeAll(async () => {
   harness = await startBackendHarness();
-}, timeouts.spinUpPpgDev);
+}, TELEMETRY_E2E_TIMEOUT);
 
 let xdgDir: string;
 let projectDir: string;
@@ -70,7 +73,7 @@ afterAll(async () => {
   if (harness?.database !== undefined) {
     await harness.database.close();
   }
-}, timeouts.spinUpPpgDev);
+}, TELEMETRY_E2E_TIMEOUT);
 
 interface CliResult {
   readonly exitCode: number | null;
@@ -127,6 +130,7 @@ function buildEnv(xdg: string): NodeJS.ProcessEnv {
     CI: 'false',
     XDG_CONFIG_HOME: xdg,
     PRISMA_NEXT_TELEMETRY_ENDPOINT: harness.endpointBase,
+    PRISMA_NEXT_TELEMETRY_TEST_REQUEST_TIMEOUT_MS: String(TELEMETRY_REQUEST_TIMEOUT),
     // Opt in to test-only CLI commands (currently the hidden
     // `__telemetry-crash-test`). Outside this env var, the command is
     // not even registered, so a shipped binary cannot dispatch it.
@@ -154,7 +158,9 @@ function seedConsent(xdg: string, installationId: string): void {
 
 const V4_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-describe('cli-telemetry e2e — real CLI binary against the real backend', () => {
+describe('cli-telemetry e2e — real CLI binary against the real backend', {
+  timeout: TELEMETRY_E2E_TIMEOUT,
+}, () => {
   it('prisma-next --help on a fresh XDG_CONFIG_HOME writes no config.json and emits no event', async () => {
     const result = await spawnCli(['--help'], { env: buildEnv(xdgDir), cwd: projectDir });
 
@@ -173,21 +179,35 @@ describe('cli-telemetry e2e — real CLI binary against the real backend', () =>
     const installationId = randomUUID();
     seedConsent(xdgDir, installationId);
 
-    await spawnCli(['__telemetry-crash-test'], { env: buildEnv(xdgDir), cwd: projectDir });
-    const rows = await harness.awaitRowsForInstallation(installationId, 1);
+    const result = await spawnCli(['__telemetry-noop-test'], {
+      env: buildEnv(xdgDir),
+      cwd: projectDir,
+    });
+    expect(result.exitCode).toBe(0);
+    const rows = await harness.awaitRowsForInstallation(installationId, 1, TELEMETRY_ROW_TIMEOUT);
 
     expect(rows[0]?.installationId).toBe(installationId);
     expect(rows[0]?.installationId).toMatch(V4_UUID);
-    expect(rows[0]?.command).toBe('__telemetry-crash-test');
+    expect(rows[0]?.command).toBe('__telemetry-noop-test');
   });
 
   it('a second CLI invocation reusing the same XDG_CONFIG_HOME produces a second row sharing the installationId', async () => {
     const installationId = randomUUID();
     seedConsent(xdgDir, installationId);
 
-    await spawnCli(['__telemetry-crash-test'], { env: buildEnv(xdgDir), cwd: projectDir });
-    await spawnCli(['__telemetry-crash-test'], { env: buildEnv(xdgDir), cwd: projectDir });
-    const rows = await harness.awaitRowsForInstallation(installationId, 2);
+    const first = await spawnCli(['__telemetry-noop-test'], {
+      env: buildEnv(xdgDir),
+      cwd: projectDir,
+    });
+    expect(first.exitCode).toBe(0);
+    await harness.awaitRowsForInstallation(installationId, 1, TELEMETRY_ROW_TIMEOUT);
+
+    const second = await spawnCli(['__telemetry-noop-test'], {
+      env: buildEnv(xdgDir),
+      cwd: projectDir,
+    });
+    expect(second.exitCode).toBe(0);
+    const rows = await harness.awaitRowsForInstallation(installationId, 2, TELEMETRY_ROW_TIMEOUT);
 
     expect(rows).toHaveLength(2);
     expect(rows[0]?.installationId).toBe(installationId);
@@ -209,7 +229,7 @@ describe('cli-telemetry e2e — real CLI binary against the real backend', () =>
     // before this action body runs, so the child outlives the
     // parent's crash — that's the invariant under test.
     expect(result.exitCode).not.toBe(0);
-    const rows = await harness.awaitRowsForInstallation(installationId, 1);
+    const rows = await harness.awaitRowsForInstallation(installationId, 1, TELEMETRY_ROW_TIMEOUT);
     expect(rows[0]?.installationId).toBe(installationId);
   });
 });

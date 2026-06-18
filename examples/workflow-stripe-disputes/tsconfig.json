@@ -1,0 +1,10 @@
+{
+  "extends": "@prisma-next/tsconfig/base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist-tsc",
+    "types": ["node", "vitest/globals"],
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "vitest.config.ts"]
+}

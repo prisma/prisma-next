@@ -1,0 +1,89 @@
+generator workflows {
+  provider = "prisma-workflows"
+  output   = "./generated/workflows"
+  schema   = "_prisma_workflows"
+}
+
+model DisputeCase {
+  id               String   @id
+  stripeDisputeId  String
+  amountCents      Int
+  customerEmail    String
+  status           String
+  draftResponse    String?
+  approvedResponse String?
+  evidenceId       String?
+  createdAt        DateTime
+  updatedAt        DateTime
+}
+
+model ApprovedDisputeResponse {
+  id              String   @id
+  disputeReason   String
+  amountCents     Int
+  response        String
+  confidence      Float
+  approvedBy      String
+  createdAt       DateTime
+}
+
+workflow DisputeEvidence {
+  trigger stripeDisputeCreated {
+    source = "stripe"
+    event = "charge.dispute.created"
+    dedupeBy = "event.data.object.id"
+  }
+
+  state DisputeCaseState {
+    disputeId String @id
+    customerId String
+    customerEmail String?
+    amount Int
+    currency String
+    reason String
+    hubspotHistory Json?
+    shopifyOrders Json?
+    zendeskTickets Json?
+    stripeMetadata Json?
+    draftResponse String?
+    approvedBy String?
+    evidenceId String?
+  }
+
+  step collectCustomerHistory {
+    run = "./src/steps/collect-customer-history.ts"
+    checkpoint = true
+    retry = { maxAttempts: 3, backoff: "exponential" }
+  }
+
+  step draftResponse {
+    run = "./src/steps/draft-response.ts"
+    checkpoint = true
+    budget = { maxUsd: 1.25, maxTokens: 2000, timeout: "45s" }
+  }
+
+  approval humanApproval {
+    when = "state.amount > 50000"
+    assignees = ["role:finance_ops"]
+    timeout = "48h"
+    onApprove = submitEvidence
+  }
+
+  step submitEvidence {
+    run = "./src/steps/submit-evidence.ts"
+    checkpoint = true
+    sideEffects = "external"
+    idempotency = "state.disputeId"
+  }
+
+  step postSummary {
+    run = "./src/steps/post-summary.ts"
+    sideEffects = "external"
+    idempotency = "state.disputeId"
+  }
+
+  step learnFromApproval {
+    run = "./src/steps/learn-from-approved-response.ts"
+    checkpoint = true
+  }
+}

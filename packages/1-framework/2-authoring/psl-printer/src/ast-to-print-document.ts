@@ -69,8 +69,10 @@ export function astDocumentToPrintDocument(ast: PslDocumentAst): PrintDocument {
 
   return {
     headerComment: DEFAULT_AST_PRINT_HEADER,
+    prismaBlocks: ast.prismaBlocks ?? [],
     namedTypes,
     namespaces: namespaceSections,
+    workflows: ast.workflows ?? [],
   };
 }
 

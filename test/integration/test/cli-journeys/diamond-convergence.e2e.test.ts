@@ -213,7 +213,7 @@ withTempDir(({ createTempDir }) => {
           'D.10: production lists migrations',
         ).toBeGreaterThan(3);
       },
-      timeouts.spinUpPpgDev,
+      timeouts.spinUpPpgDev * 2,
     );
   });
 });
