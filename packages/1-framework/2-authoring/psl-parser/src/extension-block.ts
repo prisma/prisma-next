@@ -175,10 +175,9 @@ export function findBlockDescriptor(
  * `ref`-kind parameters (e.g. `target = Post`) resolve against the document's
  * declarations. Returns the validator's diagnostics (possibly empty).
  *
- * This is the consumer-side replacement for the validation the legacy
- * `parsePslDocument` ran post-parse for descriptor-driven extension blocks; it
- * depends only on the CST + symbol table + framework validator, not on the
- * legacy parser.
+ * This is the consumer-side replacement for the validation the legacy parser ran
+ * post-parse for descriptor-driven extension blocks; it depends only on the CST
+ * + symbol table + framework validator.
  */
 export function validateExtensionBlockFromSymbol(input: {
   readonly block: BlockSymbol;

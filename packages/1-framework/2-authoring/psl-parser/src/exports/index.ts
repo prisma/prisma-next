@@ -1,6 +1,4 @@
 export type {
-  ParsePslDocumentInput,
-  ParsePslDocumentResult,
   PslAttribute,
   PslAttributeArgument,
   PslAttributeNamedArgument,
@@ -43,7 +41,6 @@ export {
   reconstructExtensionBlock,
   validateExtensionBlockFromSymbol,
 } from '../extension-block';
-export { parsePslDocument } from '../parser';
 export type {
   BlockSymbol,
   BuildSymbolTableOptions,

@@ -301,8 +301,7 @@ export const postgresScalarTypeDescriptors = new Map([
  * Shared test helper: parse a schema and build the symbol-table interpreter
  * input (`symbolTable` + `sourceFile` + `sourceId`) that
  * `interpretPslDocumentToSqlContract` consumes after the dispatch-4 walk
- * rewrite. The dispatch-6 test fan-out points the inline `parsePslDocument`
- * call sites at this helper.
+ * rewrite. The interpreter-driven test sites call this helper to build input.
  */
 export function buildSymbolTableInput(
   schema: string,
@@ -316,10 +315,9 @@ export function buildSymbolTableInput(
 }
 
 /**
- * Object-form shim mirroring the legacy `parsePslDocument({ schema, sourceId,
- * pslBlockDescriptors? })` call shape, so the dispatch-6 fan-out can mechanically
- * swap `parsePslDocument(` → `symbolTableInputFromParseArgs(` and spread the
- * result (`{ ...document, ... }`) into the migrated interpreter input. The
+ * Object-form shim mirroring the legacy parser's `{ schema, sourceId,
+ * pslBlockDescriptors? }` call shape, so call sites can spread the result
+ * (`{ ...document, ... }`) into the migrated interpreter input. The
  * `pslBlockDescriptors` field is accepted-and-ignored (the CST parser no longer
  * consumes it; the scalar-name key set drives `types {}` scalar-vs-alias
  * classification, identical across the postgres/sqlite descriptor maps).

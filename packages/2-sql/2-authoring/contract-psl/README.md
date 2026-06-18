@@ -39,7 +39,7 @@ Determinism note:
 
 The **pure interpreter entrypoint** specifically excludes:
 - File I/O (`schema.prisma` reading)
-- PSL parsing (`parsePslDocument`)
+- PSL parsing (`parse` + `buildSymbolTable`)
 - Artifact emission (`contract.json`, `contract.d.ts`) and hashing
 - CLI or ControlClient orchestration
 

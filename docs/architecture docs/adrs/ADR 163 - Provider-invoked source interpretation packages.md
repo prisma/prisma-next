@@ -45,8 +45,8 @@ The CLI / ControlClient remain source-agnostic and do not import PSL-specific pa
 
 ## Implementation notes (non-normative)
 
-- The interpretation package accepts **PSL parser output** (AST + parser diagnostics) and produces `Contract` (e.g. `interpretPslDocumentToSqlContract` in `@prisma-next/sql-contract-psl`).
-- The provider owns parsing: it calls `parsePslDocument({ schema, sourceId })`, then passes the parser output to the interpreter.
+- The interpretation package accepts a **PSL symbol table** (the scope-aware view over the parsed CST, plus parse + symbol-table diagnostics) and produces `Contract` (e.g. `interpretPslDocumentToSqlContract` in `@prisma-next/sql-contract-psl`).
+- The provider owns parsing: it calls `parse(schema)` then `buildSymbolTable({ document, sourceFile, scalarTypes })` (from `@prisma-next/psl-parser`), seeds the combined parse + symbol-table diagnostics, and passes the symbol table to the interpreter.
 - File paths belong in diagnostics only; canonical artifacts must not embed provenance.
 
 ## Related

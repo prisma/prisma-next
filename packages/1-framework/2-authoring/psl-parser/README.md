@@ -6,7 +6,7 @@ Reusable PSL parser for Prisma Next.
 
 `@prisma-next/psl-parser` parses Prisma Schema Language (PSL) source into a deterministic AST with source spans and stable machine-readable diagnostics. It is intentionally parser-only: normalization to contract IR and emit integration happen in downstream milestones/packages.
 
-In the provider-based authoring model, PSL providers call this parser and then return `Result<Contract, ContractSourceDiagnostics>` to the framework emit pipeline.
+In the provider-based authoring model, PSL providers call `parse` to obtain the CST and then `buildSymbolTable` to obtain a scope-aware view, before returning `Result<Contract, ContractSourceDiagnostics>` to the framework emit pipeline.
 
 ## Responsibilities
 
@@ -37,7 +37,10 @@ Interpretation/validation (for example `@prisma-next/sql-contract-psl`) is respo
 
 ## Public API
 
-- `parsePslDocument(input)` in `src/parser.ts`
+- `parse(schema)` in `src/parse.ts` (also at `@prisma-next/psl-parser/syntax`) —
+  the CST parser: returns the `DocumentAst`, its backing `SourceFile`, and
+  syntactic diagnostics. The recursive-descent / lossless-CST path that
+  superseded the legacy `parsePslDocument`.
 - `buildSymbolTable({ document, sourceFile, scalarTypes })` in `src/symbol-table.ts` —
   a pure, fault-tolerant pass over a parsed CST `DocumentAst` that returns a
   scope-aware `SymbolTable` (top-level namespaces / scalars / type-aliases /
@@ -46,10 +49,16 @@ Interpretation/validation (for example `@prisma-next/sql-contract-psl`) is respo
   carrying its CST AST `node`) plus its own duplicate-name diagnostics
   (`PSL_DUPLICATE_DECLARATION`, first-wins, colliding across kinds within one
   scope). Qualified type references are left unresolved on field symbols.
+- `reconstructExtensionBlock` / `findBlockDescriptor` /
+  `validateExtensionBlockFromSymbol` in `src/extension-block.ts` — reconstruct a
+  descriptor-driven `PslExtensionBlock` from a CST `GenericBlockDeclarationAst`
+  (a `BlockSymbol`) and run the framework's standalone `validateExtensionBlock`
+  over it, building the ref-resolution context from the symbol table.
+- `parseQuotedStringLiteral` / `getPositionalArgument` in `src/attribute-helpers.ts`.
 - AST/diagnostic/span types live in `@prisma-next/framework-components/psl-ast`
   and are re-exported from this package's root entry for convenience.
 - Subpath exports:
-  - `@prisma-next/psl-parser/parser`
+  - `@prisma-next/psl-parser/syntax`
   - `@prisma-next/psl-parser/tokenizer`
 
 ## Dependencies
