@@ -42,9 +42,31 @@ Dispatches are sequential; each builds on the prior's hand-off. Test files migra
 - **Hands to:** A production SQL path fully off `parsePslDocument`. (Mongo + the legacy parser deletion remain slice 3.)
 - **Focus:** `provider.ts` only.
 
+### Dispatch 5b: enum-member-duplicate-parity
+
+- **Outcome:** A duplicate enum member (the same member name declared twice in an `enum {}` block) again produces `PSL_EXTENSION_DUPLICATE_PARAMETER` — the validation the legacy `pslBlockDescriptors`-driven parser performed, lost when dispatch 5 dropped the descriptor thread. `reconstructExtensionBlock` (dispatch 2's `enum-block.ts`) gains a diagnostics sink + sourceId and emits the existing code (span from the duplicate entry's `.node`) where it currently drops the duplicate first-wins silently; the interpreter walk threads its diagnostics array into the call site.
+- **Builds on:** Dispatch 2's `reconstructExtensionBlock` and dispatch 4's interpreter walk.
+- **Hands to:** Full diagnostic parity for enum blocks — so the dispatch-6 fan-out lands on a genuinely-green suite (the `interpreter.enum.test.ts` duplicate-member assertion passes).
+- **Focus:** `enum-block.ts` (sink + emit) + the one walk call site in `interpreter.ts` that calls it. Preserve the existing code `PSL_EXTENSION_DUPLICATE_PARAMETER`; first-wins resolution unchanged (only the now-emitted diagnostic is added). No provider/Mongo/9-family touch.
+
+### Dispatch 5c: combined-diagnostic-surfacing
+
+- **Outcome:** The SQL provider matches the legacy combined-set behaviour (operator decision E1): instead of failing before interpreting when `parse`/`buildSymbolTable` produce diagnostics, it **seeds** those diagnostics into the interpreter's collection, interprets the recovered document, and returns the deduped parse + symbol-table + interpreter union in one run. The interpreter walk must NOT emit *spurious* diagnostics about content the symbol table dropped first-wins (the other half of FR12) — a dropped duplicate must not make the interpreter complain about a now-missing declaration beyond what the legacy recovered-AST walk produced.
+- **Builds on:** Dispatch 5's two-list collection + `mapParseDiagnostics`; dispatch 4's interpreter entry (which gains a diagnostic-seed input).
+- **Hands to:** The AC6 parity behaviour the dispatch-6 corpus encodes — combined diagnostics in one provider run.
+- **Focus:** `provider.ts` (replace short-circuit with seed-and-combine) + the interpreter entry's diagnostic-seed input thread. A test asserts a schema with both a parse/symbol-table error and an interpreter error surfaces both in one run. No Mongo/9-family touch.
+
 ### Dispatch 6: test-migration-and-dod
 
 - **Outcome:** A shared test helper (`parse` → `buildSymbolTable` → interpret) replaces the 160 inline `parsePslDocument` calls across the 14 test files; the hand-built-`ParsePslDocumentResult` test in `interpreter.diagnostics.test.ts` is rewritten against the symbol-table input. The full SQL `contract-psl` suite is green with diagnostic **codes** unchanged from pre-migration. Slice-DoD grep gate passes (`rg 'PslModel|PslField|PslCompositeType|PslNamedTypeDeclaration|PslExtensionBlock|parsePslDocument' …/src` empty).
 - **Builds on:** Dispatches 1–5 (the full migrated production surface).
 - **Hands to:** Slice-DoD — SQL interpreter proven on the symbol-table input; the canary's findings (any `buildSymbolTable` API gaps) resolved. Hands the proven consumption pattern to slice 3 (Mongo).
 - **Focus:** Test fan-out + the coupled-test rewrite + the final grep gate. Mechanical apart from the one hand-built-AST test.
+
+### Dispatch 6b: restore-unknown-top-level-block-rejection
+
+- **Outcome:** The SQL interpreter walk re-emits `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK` for any `BlockSymbol` whose `keyword` is neither a framework built-in nor present in the composed contributions (re-threading `authoringContributions.pslBlockDescriptors` / composed entity contributions into the walk for this gate). This restores the strictness the descriptor-driven legacy parser enforced and the descriptor-agnostic CST parser dropped (operator decision E2). The two dispatch-6 tests (`datasource db {}` unknown block; `enum` with no descriptors composed) pass with their ORIGINAL `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK` assertions — unchanged. Resolves project Open Question #1 (`pslBlockDescriptors` rehomes to the interpreter walk, not the parser).
+- **Builds on:** Dispatch 4's interpreter walk + dispatch 6's fanned-out tests.
+- **Hands to:** Slice-2 DoD — full SQL suite green, strictness parity restored. Hands slice 3 the settled answer that `pslBlockDescriptors` validation lives interpreter-side.
+- **Focus:** `interpreter.ts` walk gate + the `authoringContributions` thread for the allowed-keyword source. Match the legacy code + message substance. No parser change; no Mongo/9-family.
+
