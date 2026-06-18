@@ -820,6 +820,40 @@ export interface ValidateSqlContractFullyOptions {
  * validated flat-data shape; IR class hydration happens in the SPI
  * base on top of this helper.
  */
+/**
+ * Defensive check that an N:M relation's `through` column arrays line up with
+ * the arrays they pair against positionally. The arktype schema only checks
+ * that the fields are present; their relative lengths are an invariant the
+ * lowering already guarantees, but the runtime join builder pairs
+ * `through.parentColumns[i]` against `on.localFields[i]` and
+ * `through.childColumns[i]` against `through.targetColumns[i]`, so a length
+ * mismatch would otherwise surface as a silently wrong JOIN at query time
+ * rather than a validation error here.
+ */
+function validateRelationThroughConsistency(contract: Contract<SqlStorage>): void {
+  for (const [namespaceId, namespace] of Object.entries(contract.domain.namespaces)) {
+    for (const [modelName, model] of Object.entries(namespace.models)) {
+      for (const [relationName, relation] of Object.entries(model.relations)) {
+        if (relation.cardinality !== 'N:M') continue;
+        const qualifiedName = `${namespaceId}:${modelName}.${relationName}`;
+        const { on, through } = relation;
+        if (through.parentColumns.length !== on.localFields.length) {
+          throw new ContractValidationError(
+            `Many-to-many relation "${qualifiedName}" has through.parentColumns (${through.parentColumns.length}) and on.localFields (${on.localFields.length}) of differing length; they pair positionally and must match.`,
+            'storage',
+          );
+        }
+        if (through.childColumns.length !== through.targetColumns.length) {
+          throw new ContractValidationError(
+            `Many-to-many relation "${qualifiedName}" has through.childColumns (${through.childColumns.length}) and through.targetColumns (${through.targetColumns.length}) of differing length; they pair positionally and must match.`,
+            'storage',
+          );
+        }
+      }
+    }
+  }
+}
+
 export function validateSqlContractFully<T extends Contract<SqlStorage>>(
   value: unknown,
   options?: ValidateSqlContractFullyOptions,
@@ -846,5 +880,6 @@ export function validateSqlContractFully<T extends Contract<SqlStorage>>(
     );
   }
   validateModelStorageReferences(validated);
+  validateRelationThroughConsistency(validated);
   return validated;
 }

@@ -271,6 +271,73 @@ describe('SQL contract validators', () => {
       expect(() => validateSqlContractFully(c)).not.toThrow();
     });
 
+    const manyToManyContract = (relationOverrides: {
+      on: { localFields: readonly string[]; targetFields: readonly string[] };
+      through: {
+        table: string;
+        namespaceId: string;
+        parentColumns: readonly string[];
+        childColumns: readonly string[];
+        targetColumns: readonly string[];
+      };
+    }) =>
+      createContract<SqlStorage>({
+        storage: unboundTables({
+          user: table({ id: col('int4', 'pg/int4@1') }),
+          tag: table({ id: col('int4', 'pg/int4@1') }),
+          user_tags: table({
+            user_id: col('int4', 'pg/int4@1'),
+            tag_id: col('int4', 'pg/int4@1'),
+          }),
+        }),
+        models: {
+          User: model(
+            'user',
+            { id: { column: 'id' } },
+            {
+              tags: {
+                to: { model: 'Tag', namespace: UNBOUND_NAMESPACE_ID },
+                cardinality: 'N:M',
+                ...relationOverrides,
+              },
+            },
+          ),
+          Tag: model('tag', { id: { column: 'id' } }),
+        },
+      });
+
+    const consistentThrough = {
+      table: 'user_tags',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      parentColumns: ['user_id'],
+      childColumns: ['tag_id'],
+      targetColumns: ['id'],
+    };
+
+    it('accepts an N:M relation with a length-consistent through', () => {
+      const c = manyToManyContract({
+        on: { localFields: ['id'], targetFields: ['user_id'] },
+        through: consistentThrough,
+      });
+      expect(() => validateSqlContractFully(c)).not.toThrow();
+    });
+
+    it('rejects an N:M relation whose through.parentColumns and on.localFields differ in length', () => {
+      const c = manyToManyContract({
+        on: { localFields: [], targetFields: ['user_id'] },
+        through: consistentThrough,
+      });
+      expect(() => validateSqlContractFully(c)).toThrow(/through\.parentColumns/);
+    });
+
+    it('rejects an N:M relation whose through.childColumns and through.targetColumns differ in length', () => {
+      const c = manyToManyContract({
+        on: { localFields: ['id'], targetFields: ['user_id'] },
+        through: { ...consistentThrough, targetColumns: ['id', 'id'] },
+      });
+      expect(() => validateSqlContractFully(c)).toThrow(/through\.childColumns/);
+    });
+
     it('throws on missing targetFamily', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
