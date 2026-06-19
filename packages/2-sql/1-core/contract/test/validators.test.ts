@@ -387,6 +387,44 @@ describe('SQL contract validators', () => {
       expect(() => validateSqlContractFully(c)).toThrow(/differing storage type/);
     });
 
+    it('validates child-side through length even for a cross-space target', () => {
+      // The target Tag lives in another contract space, so its storage is not
+      // resolvable here — but the childColumns ↔ targetColumns length is still
+      // checkable, and here it is wrong.
+      const c = createContract<SqlStorage>({
+        storage: unboundTables({
+          user: table({ id: col('int4', 'pg/int4@1') }),
+          user_tags: table({
+            user_id: col('int4', 'pg/int4@1'),
+            tag_id: col('int4', 'pg/int4@1'),
+          }),
+        }),
+        models: {
+          User: model(
+            'user',
+            { id: { column: 'id' } },
+            {
+              tags: {
+                to: { model: 'Tag', namespace: UNBOUND_NAMESPACE_ID, space: 'other' },
+                cardinality: 'N:M',
+                on: { localFields: ['id'], targetFields: ['user_id'] },
+                through: {
+                  table: 'user_tags',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  parentColumns: ['user_id'],
+                  childColumns: ['tag_id'],
+                  targetColumns: ['id', 'id'],
+                },
+              },
+            },
+          ),
+        },
+      });
+      expect(() => validateSqlContractFully(c)).toThrow(
+        /through\.childColumns \(1\) with through\.targetColumns \(2\) of differing length/,
+      );
+    });
+
     it('resolves on.localFields field names to storage columns when they differ', () => {
       const c = createContract<SqlStorage>({
         storage: unboundTables({
