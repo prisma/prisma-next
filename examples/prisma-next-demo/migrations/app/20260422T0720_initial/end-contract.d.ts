@@ -492,17 +492,17 @@ type ContractBase = Omit<
       };
     };
     readonly types: {
-      readonly Embedding1536: {
-        readonly kind: 'codec-instance';
-        readonly codecId: 'pg/vector@1';
-        readonly nativeType: 'vector';
-        readonly typeParams: { readonly length: 1536 };
-      };
       readonly Uuid: {
         readonly kind: 'codec-instance';
         readonly codecId: 'pg/uuid@1';
         readonly nativeType: 'uuid';
         readonly typeParams: Record<string, never>;
+      };
+      readonly Embedding1536: {
+        readonly kind: 'codec-instance';
+        readonly codecId: 'pg/vector@1';
+        readonly nativeType: 'vector';
+        readonly typeParams: { readonly length: 1536 };
       };
     };
     readonly storageHash: StorageHash;
