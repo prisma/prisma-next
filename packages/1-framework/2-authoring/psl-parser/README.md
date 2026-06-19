@@ -4,7 +4,7 @@ Reusable PSL parser for Prisma Next.
 
 ## Overview
 
-`@prisma-next/psl-parser` parses Prisma Schema Language (PSL) source into a deterministic AST with source spans and stable machine-readable diagnostics. It is intentionally parser-only: normalization to contract IR and emit integration happen in downstream milestones/packages.
+`@prisma-next/psl-parser` parses Prisma Schema Language (PSL) source into a deterministic CST with source spans and stable machine-readable diagnostics, then offers shared symbol-table resolution for the target-agnostic semantics every PSL interpreter needs. Normalization to contract IR and emit integration stay in downstream target packages.
 
 In the provider-based authoring model, PSL providers call `parse` to obtain the CST and then `buildSymbolTable` to obtain a scope-aware view, before returning `Result<Contract, ContractSourceDiagnostics>` to the framework emit pipeline.
 
@@ -15,8 +15,9 @@ In the provider-based authoring model, PSL providers call `parse` to obtain the 
 - Preserve raw PSL relation action tokens (for example `Cascade`) without semantic normalization.
 - Return stable diagnostics (`code`, `message`, `span`, `sourceId`) for invalid and unsupported constructs.
 - Enforce strict error behavior for unsupported syntax (no warning or best-effort mode).
-- Parse attributes generically (namespaced or not), including optional argument lists; semantics live downstream.
+- Parse attributes generically (namespaced or not), including optional argument lists; target semantics live downstream.
 - Emit attribute nodes with explicit target (`field` / `model` / `namedType`), attribute name, and parsed argument list with spans.
+- Build a scope-aware symbol table from the CST, including duplicate-declaration diagnostics, target-supplied scalar/type-alias classification, and descriptor-driven generic-block reconstruction.
 
 ## Attributes (generic parsing boundary)
 
@@ -37,25 +38,8 @@ Interpretation/validation (for example `@prisma-next/sql-contract-psl`) is respo
 
 ## Public API
 
-- `parse(schema)` in `src/parse.ts` (also at `@prisma-next/psl-parser/syntax`) —
-  the CST parser: returns the `DocumentAst`, its backing `SourceFile`, and
-  syntactic diagnostics. The recursive-descent / lossless-CST path that
-  superseded the legacy `parsePslDocument`.
-- `buildSymbolTable({ document, sourceFile, scalarTypes })` in `src/symbol-table.ts` —
-  a pure, fault-tolerant pass over a parsed CST `DocumentAst` that returns a
-  scope-aware `SymbolTable` (top-level namespaces / scalars / type-aliases /
-  blocks / models / composite-types as keyed records discriminated by `kind`,
-  namespace members and block fields nested under their owner, every symbol
-  carrying its CST AST `node` plus its declaration `span`) plus its own
-  duplicate-name diagnostics (`PSL_DUPLICATE_DECLARATION`, first-wins, colliding
-  across kinds within one scope). It also **resolves** the field/named-type read
-  set once: each `FieldSymbol` carries the split type
-  (`typeName`/`typeNamespaceId`/`typeContractSpaceId`), `optional`/`list`,
-  `typeConstructor?`, rendered `attributes`, and `malformedType?` (set, with a
-  `PSL_INVALID_QUALIFIED_TYPE` diagnostic, when the type is over-qualified);
-  `ScalarSymbol`/`TypeAliasSymbol` carry the resolved binding
-  (`baseType`/`typeConstructor`/`isConstructor`). Interpreters consume this
-  resolved shape directly — there is no per-package field/attribute view layer.
+- `parse(schema)` in `src/parse.ts` (also at `@prisma-next/psl-parser/syntax`) — the CST parser: returns the `DocumentAst`, its backing `SourceFile`, and syntactic diagnostics. The recursive-descent / lossless-CST path supersedes the legacy `parsePslDocument`.
+- `buildSymbolTable({ document, sourceFile, scalarTypes, pslBlockDescriptors })` in `src/symbol-table.ts` — a pure, fault-tolerant pass over a parsed CST `DocumentAst` that returns a scope-aware `SymbolTable` (top-level namespaces / scalars / type-aliases / blocks / models / composite-types as keyed records discriminated by `kind`, namespace members and block fields nested under their owner, every symbol carrying its CST AST `node` plus its declaration `span`) plus its own duplicate-name diagnostics (`PSL_DUPLICATE_DECLARATION`, first-wins, colliding across kinds within one scope). `scalarTypes` is supplied by the target to classify `types { ... }` bindings, while `pslBlockDescriptors` is supplied from authoring contributions so generic/extension blocks can be reconstructed once into `BlockSymbol.block`. The pass also **resolves** the field/named-type read set once: each `FieldSymbol` carries the split type (`typeName`/`typeNamespaceId`/`typeContractSpaceId`), `optional`/`list`, `typeConstructor?`, rendered `attributes`, and `malformedType?` (set, with a `PSL_INVALID_QUALIFIED_TYPE` diagnostic, when the type is over-qualified); `ScalarSymbol`/`TypeAliasSymbol` carry the resolved binding (`baseType`/`typeConstructor`/`isConstructor`). Interpreters consume this resolved shape directly — there is no per-package field/attribute view layer.
 - `readResolvedAttribute(s)` / `readResolvedConstructorCall` + the span maps
   (`nodePslSpan`, `rangeToPslSpan`, `keywordPslSpan`) in `src/resolve.ts` — the
   shared CST read helpers `buildSymbolTable` uses and that consumers (e.g.
@@ -84,11 +68,17 @@ Interpretation/validation (for example `@prisma-next/sql-contract-psl`) is respo
 
 ```mermaid
 flowchart LR
-  PSL[PSL source text] --> Parser[psl-parser]
-  Parser --> AST[PSL AST with spans]
-  Parser --> Diagnostics[Structured diagnostics]
-  AST --> Normalizer[PSL -> contract IR normalizer]
-  Diagnostics --> CLI[CLI/editor renderers]
+  PSL[PSL source text] --> Parse[parse]
+  Parse --> CST[DocumentAst + SourceFile]
+  Parse --> ParseDiagnostics[Parser diagnostics]
+  CST --> Symbols[buildSymbolTable]
+  Scalars[target scalarTypes] --> Symbols
+  Descriptors[pslBlockDescriptors] --> Symbols
+  Symbols --> SymbolTable[SymbolTable]
+  Symbols --> SymbolDiagnostics[Symbol-table diagnostics]
+  SymbolTable --> Interpreter[Target PSL interpreter]
+  ParseDiagnostics --> Provider[Provider diagnostic seeding]
+  SymbolDiagnostics --> Provider
 ```
 
 ## Package Boundaries

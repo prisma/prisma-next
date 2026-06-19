@@ -174,6 +174,30 @@ describe('buildSymbolTable() — AC5 duplicate detection', () => {
     expect(diagnostic?.range.start.character).toBe(6);
     expect(diagnostic?.range.end.character).toBe(10);
   });
+
+  it('keeps the first model field and flags the later duplicate field', () => {
+    const source = ['model User {', '  email String', '  email Int', '}'].join('\n');
+
+    const result = build(source);
+
+    expect(result.diagnostics.map((d) => d.code)).toEqual(['PSL_DUPLICATE_DECLARATION']);
+    expect(result.diagnostics[0]?.range.start.line).toBe(2);
+    expect(result.diagnostics[0]?.range.start.character).toBe(2);
+    expect(Object.keys(result.table.topLevel.models.User?.fields ?? {})).toEqual(['email']);
+    expect(result.table.topLevel.models.User?.fields.email?.typeName).toBe('String');
+  });
+
+  it('keeps the first composite field and flags the later duplicate field', () => {
+    const source = ['type Address {', '  street String', '  street Int', '}'].join('\n');
+
+    const result = build(source);
+
+    expect(result.diagnostics.map((d) => d.code)).toEqual(['PSL_DUPLICATE_DECLARATION']);
+    expect(Object.keys(result.table.topLevel.compositeTypes.Address?.fields ?? {})).toEqual([
+      'street',
+    ]);
+    expect(result.table.topLevel.compositeTypes.Address?.fields.street?.typeName).toBe('String');
+  });
 });
 
 describe('buildSymbolTable() — pre-investigated edge cases', () => {

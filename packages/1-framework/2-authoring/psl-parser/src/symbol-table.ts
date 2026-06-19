@@ -323,8 +323,20 @@ function buildFields(
 ): Record<string, FieldSymbol> {
   const result: Record<string, FieldSymbol> = {};
   for (const field of fields) {
-    const name = field.name()?.name();
-    if (name === undefined || name in result) continue;
+    const nameNode = field.name();
+    const name = nameNode?.name();
+    if (name === undefined) continue;
+    if (Object.hasOwn(result, name)) {
+      const range = nameRange(nameNode, sourceFile);
+      if (range) {
+        diagnostics.push({
+          code: 'PSL_DUPLICATE_DECLARATION',
+          message: `Duplicate declaration of "${name}"`,
+          range,
+        });
+      }
+      continue;
+    }
     result[name] = buildField(ownerName, name, field, sourceFile, diagnostics);
   }
   return result;

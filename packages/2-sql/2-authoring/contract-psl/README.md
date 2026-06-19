@@ -13,7 +13,7 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 
 ## Responsibilities
 
-- Interpret `ParsePslDocumentResult` into SQL `Contract`
+- Interpret a PSL `SymbolTable` into SQL `Contract`
 - Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`, `@@control`)
 - Interpret SQL timestamp semantics: `DateTime @default(now())` (or the equivalent `temporal.createdAt()` field-preset call) as a storage default, and `temporal.updatedAt()` as an execution mutation default
 - Lower shared constructor expressions in both `types {}` blocks and inline field positions (for example `ShortName = sql.String(length: 35)` and `embedding pgvector.Vector(length: 1536)?`)
@@ -104,9 +104,13 @@ Contract-level default (specifier options bag):
 flowchart LR
   config[prisma-next.config.ts] --> providerHelper[@prisma-next/sql-contract-psl/provider]
   providerHelper --> fsRead[read schema.prisma]
-  fsRead --> parser[@prisma-next/psl-parser]
-  parser --> parsed[ParsePslDocumentResult]
-  parsed --> interpreter[@prisma-next/sql-contract-psl]
+  fsRead --> parse[parse]
+  parse --> parsed[DocumentAst + SourceFile + parser diagnostics]
+  parsed --> symbols[buildSymbolTable]
+  providerHelper --> descriptors[pslBlockDescriptors]
+  descriptors --> symbols
+  symbols --> symbolTable[SymbolTable + symbol-table diagnostics]
+  symbolTable --> interpreter[@prisma-next/sql-contract-psl]
   interpreter --> irResult[Result_Contract_Diagnostics]
   irResult --> emit[Framework emit pipeline]
 ```
