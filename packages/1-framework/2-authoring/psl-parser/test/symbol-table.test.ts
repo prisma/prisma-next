@@ -1,5 +1,7 @@
 import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
+import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
+import { validateExtensionBlockFromSymbol } from '../src/extension-block';
 import { parse } from '../src/parse';
 import { buildSymbolTable } from '../src/symbol-table';
 import {
@@ -12,6 +14,13 @@ import {
 } from '../src/syntax/ast/declarations';
 
 const SCALAR_TYPES = ['String', 'Int', 'Boolean', 'DateTime'] as const;
+
+const emptyCodecLookup: CodecLookup = {
+  get: (): Codec | undefined => undefined,
+  targetTypesFor: () => undefined,
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
+};
 
 function build(
   source: string,
@@ -491,5 +500,128 @@ describe('buildSymbolTable() — resolved block (BlockSymbol.block)', () => {
 
     expect(block?.kind).toBe('enum');
     expect(block?.parameters.Admin).toMatchObject({ kind: 'bare' });
+  });
+
+  it('reports non-array values for list parameters instead of accepting an empty list', () => {
+    const result = build(
+      ['policy_select ReadPosts {', '  targets = Post', '}'].join('\n'),
+      SCALAR_TYPES,
+      {
+        policy_select: {
+          kind: 'pslBlock',
+          keyword: 'policy_select',
+          discriminator: 'fixture-policy-select',
+          name: { required: true },
+          parameters: {
+            targets: {
+              kind: 'list',
+              of: { kind: 'ref', refKind: 'model', scope: 'same-space' },
+              required: true,
+            },
+          },
+        },
+      },
+    );
+    const block = result.table.topLevel.blocks.ReadPosts?.block;
+
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_EXTENSION_INVALID_VALUE' })]),
+    );
+    expect(block?.parameters.targets).toMatchObject({ kind: 'value', raw: 'Post' });
+  });
+
+  it('validates same-namespace refs against the block owner namespace', () => {
+    const { document, sourceFile } = parse(
+      [
+        'model Post {',
+        '  id Int',
+        '}',
+        'namespace blog {',
+        '  model Article {',
+        '    id Int',
+        '  }',
+        '  policy_select ReadArticles {',
+        '    target = Article',
+        '  }',
+        '}',
+      ].join('\n'),
+    );
+    const descriptors: AuthoringPslBlockDescriptorNamespace = {
+      policy_select: {
+        kind: 'pslBlock',
+        keyword: 'policy_select',
+        discriminator: 'fixture-policy-select',
+        name: { required: true },
+        parameters: {
+          target: { kind: 'ref', refKind: 'model', scope: 'same-namespace', required: true },
+        },
+      },
+    };
+    const result = buildSymbolTable({
+      document,
+      sourceFile,
+      scalarTypes: SCALAR_TYPES,
+      pslBlockDescriptors: descriptors,
+    });
+    const block = result.table.topLevel.namespaces.blog?.blocks.ReadArticles;
+
+    expect(block).toBeDefined();
+    if (block === undefined) return;
+    expect(
+      validateExtensionBlockFromSymbol({
+        block,
+        descriptor: descriptors.policy_select,
+        symbolTable: result.table,
+        sourceFile,
+        sourceId: 'schema.prisma',
+        codecLookup: emptyCodecLookup,
+      }),
+    ).toEqual([]);
+  });
+
+  it('validates same-space refs against models from every namespace', () => {
+    const { document, sourceFile } = parse(
+      [
+        'namespace blog {',
+        '  model Article {',
+        '    id Int',
+        '  }',
+        '}',
+        'policy_anywhere ReadArticles {',
+        '  target = Article',
+        '}',
+      ].join('\n'),
+    );
+    const descriptors: AuthoringPslBlockDescriptorNamespace = {
+      policy_anywhere: {
+        kind: 'pslBlock',
+        keyword: 'policy_anywhere',
+        discriminator: 'fixture-policy-anywhere',
+        name: { required: true },
+        parameters: {
+          target: { kind: 'ref', refKind: 'model', scope: 'same-space', required: true },
+        },
+      },
+    };
+    const result = buildSymbolTable({
+      document,
+      sourceFile,
+      scalarTypes: SCALAR_TYPES,
+      pslBlockDescriptors: descriptors,
+    });
+    const block = result.table.topLevel.blocks.ReadArticles;
+
+    expect(block).toBeDefined();
+    if (block === undefined) return;
+    expect(
+      validateExtensionBlockFromSymbol({
+        block,
+        descriptor: descriptors.policy_anywhere,
+        symbolTable: result.table,
+        sourceFile,
+        sourceId: 'schema.prisma',
+        codecLookup: emptyCodecLookup,
+      }),
+    ).toEqual([]);
   });
 });

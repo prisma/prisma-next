@@ -367,6 +367,47 @@ model Post {
     );
   });
 
+  it('multi-argument enum defaults emit PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT', () => {
+    const result = interpret(`
+enum Priority {
+  @@type("pg/text@1")
+  Low  = "low"
+  High = "high"
+}
+model Post {
+  id Int @id
+  priority Priority @default(Low, High)
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT' }),
+      ]),
+    );
+  });
+
+  it('named-argument enum defaults emit PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT', () => {
+    const result = interpret(`
+enum Priority {
+  @@type("pg/text@1")
+  Low = "low"
+}
+model Post {
+  id Int @id
+  priority Priority @default(value: Low)
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT' }),
+      ]),
+    );
+  });
+
   it('duplicate member values emits diagnostic', () => {
     const result = interpret(`
 enum Priority {

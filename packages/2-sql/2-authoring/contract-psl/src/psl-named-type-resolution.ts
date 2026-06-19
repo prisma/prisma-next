@@ -93,7 +93,7 @@ export function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarations
   readonly storageTypes: Record<string, StorageTypeInstance>;
   readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
 } {
-  const storageTypes: Record<string, StorageTypeInstance> = {};
+  const storageTypeEntries: [string, StorageTypeInstance][] = [];
   const namedTypeDescriptors = new Map<string, ColumnDescriptor>();
 
   for (const declaration of input.declarations) {
@@ -154,12 +154,15 @@ export function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarations
         declaration.name,
         toNamedTypeFieldDescriptor(declaration.name, storageType),
       );
-      storageTypes[declaration.name] = {
-        kind: 'codec-instance',
-        codecId: storageType.codecId,
-        nativeType: storageType.nativeType,
-        typeParams: storageType.typeParams ?? {},
-      };
+      storageTypeEntries.push([
+        declaration.name,
+        {
+          kind: 'codec-instance',
+          codecId: storageType.codecId,
+          nativeType: storageType.nativeType,
+          typeParams: storageType.typeParams ?? {},
+        },
+      ]);
       continue;
     }
 
@@ -218,24 +221,30 @@ export function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarations
         declaration.name,
         toNamedTypeFieldDescriptor(declaration.name, descriptor),
       );
-      storageTypes[declaration.name] = {
-        kind: 'codec-instance',
-        codecId: descriptor.codecId,
-        nativeType: descriptor.nativeType,
-        typeParams: descriptor.typeParams ?? {},
-      };
+      storageTypeEntries.push([
+        declaration.name,
+        {
+          kind: 'codec-instance',
+          codecId: descriptor.codecId,
+          nativeType: descriptor.nativeType,
+          typeParams: descriptor.typeParams ?? {},
+        },
+      ]);
       continue;
     }
 
     const descriptor = toNamedTypeFieldDescriptor(declaration.name, baseDescriptor);
     namedTypeDescriptors.set(declaration.name, descriptor);
-    storageTypes[declaration.name] = {
-      kind: 'codec-instance',
-      codecId: baseDescriptor.codecId,
-      nativeType: baseDescriptor.nativeType,
-      typeParams: {},
-    };
+    storageTypeEntries.push([
+      declaration.name,
+      {
+        kind: 'codec-instance',
+        codecId: baseDescriptor.codecId,
+        nativeType: baseDescriptor.nativeType,
+        typeParams: {},
+      },
+    ]);
   }
 
-  return { storageTypes, namedTypeDescriptors };
+  return { storageTypes: Object.fromEntries(storageTypeEntries), namedTypeDescriptors };
 }

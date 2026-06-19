@@ -1,5 +1,6 @@
 import type { ResolvedAttribute, ResolvedAttributeArg } from '@prisma-next/psl-parser';
 import { parseQuotedStringLiteral } from '@prisma-next/psl-parser';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 export { parseQuotedStringLiteral };
 
@@ -122,9 +123,9 @@ export function parseRelationAttribute(
   const references = referencesArg ? parseFieldList(referencesArg.value) : undefined;
 
   return {
-    ...(relationName !== undefined ? { relationName } : {}),
-    ...(fields !== undefined ? { fields } : {}),
-    ...(references !== undefined ? { references } : {}),
+    ...ifDefined('relationName', relationName),
+    ...ifDefined('fields', fields),
+    ...ifDefined('references', references),
   };
 }
 

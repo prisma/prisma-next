@@ -14,7 +14,7 @@ import {
   validateExtensionBlock,
 } from '@prisma-next/framework-components/psl-ast';
 import type { SourceFile } from './source-file';
-import type { BlockSymbol, SymbolTable } from './symbol-table';
+import type { BlockSymbol, ModelSymbol, SymbolTable } from './symbol-table';
 
 export function findBlockDescriptor(
   descriptors: AuthoringPslBlockDescriptorNamespace | undefined,
@@ -41,7 +41,7 @@ export function validateExtensionBlockFromSymbol(input: {
   readonly sourceId: string;
   readonly codecLookup: CodecLookup;
 }): readonly PslDiagnostic[] {
-  const refCtx = buildRefResolutionContext(input.symbolTable);
+  const refCtx = buildRefResolutionContext(input.symbolTable, input.block);
   return validateExtensionBlock(
     input.block.block,
     input.descriptor,
@@ -56,24 +56,52 @@ const ZERO_SPAN: PslSpan = {
   end: { offset: 0, line: 1, column: 1 },
 };
 
-function buildRefResolutionContext(symbolTable: SymbolTable): {
+function buildRefResolutionContext(
+  symbolTable: SymbolTable,
+  block: BlockSymbol,
+): {
   ownerNamespace: ReturnType<typeof makePslNamespace>;
   allNamespaces: readonly ReturnType<typeof makePslNamespace>[];
 } {
-  // Ref validation checks only `entries[refKind][name]` key presence, so model
-  // stubs are enough for top-level declarations in the `__unspecified__` bucket.
-  const modelStubs: PslModel[] = Object.values(symbolTable.topLevel.models).map((model) => ({
+  const unspecifiedNamespace = makeNamespace(
+    UNSPECIFIED_PSL_NAMESPACE_ID,
+    Object.values(symbolTable.topLevel.models),
+  );
+  const namedNamespaces = Object.values(symbolTable.topLevel.namespaces).map((namespace) =>
+    makeNamespace(namespace.name, Object.values(namespace.models)),
+  );
+  const allNamespaces = [unspecifiedNamespace, ...namedNamespaces];
+  const ownerNamespaceName = findOwnerNamespaceName(symbolTable, block);
+  const ownerNamespace =
+    allNamespaces.find((namespace) => namespace.name === ownerNamespaceName) ??
+    unspecifiedNamespace;
+  return { ownerNamespace, allNamespaces };
+}
+
+function makeNamespace(
+  name: string,
+  models: readonly ModelSymbol[],
+): ReturnType<typeof makePslNamespace> {
+  const modelStubs: PslModel[] = models.map((model) => ({
     kind: 'model',
     name: model.name,
     fields: [],
     attributes: [],
     span: ZERO_SPAN,
   }));
-  const ownerNamespace = makePslNamespace({
+  return makePslNamespace({
     kind: 'namespace',
-    name: UNSPECIFIED_PSL_NAMESPACE_ID,
+    name,
     entries: makePslNamespaceEntries(modelStubs, [], []),
     span: ZERO_SPAN,
   });
-  return { ownerNamespace, allNamespaces: [ownerNamespace] };
+}
+
+function findOwnerNamespaceName(symbolTable: SymbolTable, block: BlockSymbol): string {
+  for (const namespace of Object.values(symbolTable.topLevel.namespaces)) {
+    if (Object.values(namespace.blocks).some((candidate) => candidate === block)) {
+      return namespace.name;
+    }
+  }
+  return UNSPECIFIED_PSL_NAMESPACE_ID;
 }

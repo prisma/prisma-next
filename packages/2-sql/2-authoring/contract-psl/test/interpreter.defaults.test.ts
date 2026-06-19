@@ -639,6 +639,58 @@ model UuidNativeBad {
     expect(defaults.find((entry) => entry.ref.column === 'example')).toBeUndefined();
   });
 
+  it('uses nullable from field presets when lowering storage columns', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Synthetic {
+  id Int @id
+  maybe temporal.nullableField()
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+      authoringContributions: {
+        field: {
+          temporal: {
+            nullableField: {
+              kind: 'fieldPreset',
+              output: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+                nullable: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      namespaces: {
+        public: {
+          entries: {
+            table: {
+              synthetic: {
+                columns: {
+                  maybe: {
+                    codecId: 'pg/text@1',
+                    nativeType: 'text',
+                    nullable: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
   it('resolves a type constructor sharing a field-preset namespace', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model Synthetic {

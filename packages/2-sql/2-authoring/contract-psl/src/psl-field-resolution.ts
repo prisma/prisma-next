@@ -15,7 +15,6 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   getAttribute,
-  getPositionalArgumentEntry,
   lowerFirst,
   parseConstraintMapArgument,
   parseMapName,
@@ -41,8 +40,16 @@ function lowerEnumDefaultForField(input: {
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): LoweredFieldDefault {
-  const expressionEntry = getPositionalArgumentEntry(input.defaultAttribute);
-  if (!expressionEntry) {
+  const positionalEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'positional');
+  const hasNamedEntries = input.defaultAttribute.args.some((arg) => arg.kind === 'named');
+  const expressionEntry = positionalEntries[0];
+  if (hasNamedEntries || positionalEntries.length !== 1 || expressionEntry === undefined) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
+      message: `Field "${input.modelName}.${input.fieldName}" @default on an enum field expects exactly one positional enum member argument.`,
+      sourceId: input.sourceId,
+      span: input.defaultAttribute.span,
+    });
     return {};
   }
 
@@ -87,6 +94,7 @@ export type ResolvedField = {
   readonly field: FieldSymbol;
   readonly columnName: string;
   readonly descriptor: ColumnDescriptor;
+  readonly nullable: boolean;
   readonly defaultValue?: ColumnDefault;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly isId: boolean;
@@ -501,6 +509,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       field,
       columnName: mappedColumnName,
       descriptor,
+      nullable: presetContributions?.nullable ?? field.optional,
       ...ifDefined('defaultValue', fieldDefaultValue),
       ...ifDefined('executionDefaults', fieldExecutionDefaults),
       isId: isIdField || Boolean(presetContributions?.id),

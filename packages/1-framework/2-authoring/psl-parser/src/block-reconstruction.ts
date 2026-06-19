@@ -60,7 +60,13 @@ export function reconstructExtensionBlock(
       });
       continue;
     }
-    parameters[key] = reconstructParamValue(entry, descriptor?.parameters[key], span, sourceFile);
+    parameters[key] = reconstructParamValue(
+      entry,
+      descriptor?.parameters[key],
+      span,
+      sourceFile,
+      diagnostics,
+    );
   }
 
   return {
@@ -77,12 +83,13 @@ function reconstructParamValue(
   param: PslBlockParam | undefined,
   span: PslSpan,
   sourceFile: SourceFile,
+  diagnostics: ParseDiagnostic[],
 ): PslExtensionBlockParamValue {
   const value = entry.value();
   if (value === undefined) {
     return { kind: 'bare', span };
   }
-  return reconstructFromExpression(value, param, span, sourceFile);
+  return reconstructFromExpression(value, param, span, sourceFile, diagnostics);
 }
 
 function reconstructFromExpression(
@@ -90,26 +97,37 @@ function reconstructFromExpression(
   param: PslBlockParam | undefined,
   span: PslSpan,
   sourceFile: SourceFile,
+  diagnostics?: ParseDiagnostic[],
 ): PslExtensionBlockParamValue {
+  const raw = printSyntax(value.syntax).trim();
   if (param?.kind === 'list') {
     const array = ArrayLiteralAst.cast(value.syntax);
+    if (!array) {
+      diagnostics?.push({
+        code: 'PSL_EXTENSION_INVALID_VALUE',
+        message: `List parameter expects an array literal, got ${raw}`,
+        range: {
+          start: sourceFile.positionAt(value.syntax.offset),
+          end: sourceFile.positionAt(value.syntax.offset + value.syntax.green.textLength),
+        },
+      });
+      return { kind: 'value', raw, span };
+    }
+
     const items: PslExtensionBlockParamValue[] = [];
-    if (array) {
-      for (const element of array.elements()) {
-        items.push(
-          reconstructFromExpression(
-            element,
-            param.of,
-            nodePslSpan(element.syntax, sourceFile),
-            sourceFile,
-          ),
-        );
-      }
+    for (const element of array.elements()) {
+      items.push(
+        reconstructFromExpression(
+          element,
+          param.of,
+          nodePslSpan(element.syntax, sourceFile),
+          sourceFile,
+          diagnostics,
+        ),
+      );
     }
     return { kind: 'list', items, span };
   }
-
-  const raw = printSyntax(value.syntax).trim();
   switch (param?.kind) {
     case 'ref':
       return { kind: 'ref', identifier: raw, span };
