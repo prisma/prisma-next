@@ -13,7 +13,7 @@ import {
   TextDocuments,
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { CONFIG_FILENAME, type ConfigResolution, resolveConfigInputs } from './config-resolution';
+import { CONFIG_FILENAME, resolveConfigInputs } from './config-resolution';
 import { ParseDiagnosticSeverity } from './diagnostic-mapping';
 import { computeDocumentDiagnostics } from './document-diagnostics';
 import type { SchemaInputSet } from './schema-inputs';
@@ -22,18 +22,15 @@ export interface LanguageServer {
   dispose(): void;
 }
 
-export type ResolveInputs = (rootPath: string, configPath?: string) => Promise<ConfigResolution>;
 export type FindConfigPathForFile = (filePath: string) => Promise<string | undefined>;
 
 interface ProjectState {
   readonly configPath: string;
   readonly inputs: SchemaInputSet;
-  readonly degradedReason?: string;
 }
 
 export interface CreateServerOptions {
   readonly configPath?: string;
-  readonly resolveInputs?: ResolveInputs;
   readonly findConfigPathForFile?: FindConfigPathForFile;
 }
 
@@ -42,7 +39,6 @@ export function createServer(
   options?: CreateServerOptions,
 ): LanguageServer {
   const documents = new TextDocuments(TextDocument);
-  const resolveInputs = options?.resolveInputs ?? resolveConfigInputs;
   const findConfigPathForFile = options?.findConfigPathForFile ?? findNearestConfigPathForFile;
   const projects = new Map<string, ProjectState>();
   const projectLoads = new Map<string, Promise<ProjectState>>();
@@ -54,7 +50,10 @@ export function createServer(
 
   async function publish(uri: string, text: string): Promise<void> {
     const project = await resolveProjectForDocument(uri);
-    const computed = project ? computeDocumentDiagnostics(uri, text, project.inputs) : null;
+    if (project === undefined) {
+      return;
+    }
+    const computed = computeDocumentDiagnostics(uri, text, project.inputs);
     if (computed === null) {
       void connection.sendDiagnostics({ uri, diagnostics: [] });
       return;
@@ -86,7 +85,20 @@ export function createServer(
     }
 
     documentConfigPaths.set(uri, configPath);
-    return resolveProject(configPath);
+    const project = await resolveProjectIfLoadable(configPath);
+    if (project === undefined) {
+      documentConfigPaths.delete(uri);
+    }
+    return project;
+  }
+
+  async function resolveProjectIfLoadable(configPath: string): Promise<ProjectState | undefined> {
+    try {
+      return await resolveProject(configPath);
+    } catch {
+      stopManagingProject(configPath);
+      return undefined;
+    }
   }
 
   async function resolveProject(configPath: string): Promise<ProjectState> {
@@ -120,15 +132,22 @@ export function createServer(
   }
 
   async function loadProject(configPath: string): Promise<ProjectState> {
-    const resolution = await resolveInputs(dirname(configPath), configPath);
-    const project: ProjectState = resolution.degradedReason
-      ? { configPath, inputs: resolution.inputs, degradedReason: resolution.degradedReason }
-      : { configPath, inputs: resolution.inputs };
+    const resolution = await resolveConfigInputs(dirname(configPath), configPath);
+    const project: ProjectState = { configPath, inputs: resolution.inputs };
     projects.set(configPath, project);
-    if (project.degradedReason !== undefined) {
-      connection.console.warn(project.degradedReason);
-    }
     return project;
+  }
+
+  function stopManagingProject(configPath: string): void {
+    const hadProject = projects.delete(configPath);
+    for (const document of documents.all()) {
+      if (documentConfigPaths.get(document.uri) === configPath) {
+        documentConfigPaths.delete(document.uri);
+        if (hadProject) {
+          void connection.sendDiagnostics({ uri: document.uri, diagnostics: [] });
+        }
+      }
+    }
   }
 
   async function republishOpenDocumentsForConfig(configPath: string): Promise<void> {
@@ -196,7 +215,12 @@ export function createServer(
       explicitConfigPath,
     );
     for (const configPath of changedConfigPaths) {
-      await refreshProject(configPath);
+      try {
+        await refreshProject(configPath);
+      } catch {
+        stopManagingProject(configPath);
+        continue;
+      }
       await republishOpenDocumentsForConfig(configPath);
     }
   });

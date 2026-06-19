@@ -12,17 +12,11 @@ subcommand, so the diagnostics an editor sees always come from the project's own
 
 ## Scope
 
-Diagnostics only — no hover, completion, navigation, or formatting over LSP. One
-server per project root (no multi-root workspaces).
+Diagnostics only — no hover, completion, navigation, or formatting over LSP. A server process can manage multiple projects under the workspace root, keyed by the config file each open document belongs to.
 
 ## How it works
 
-1. **`initialize`** — resolves the project root from the client's `rootUri`,
-   loads `prisma-next.config.ts` via `@prisma-next/config-loader`'s `loadConfig`,
-   and records which absolute paths are schema inputs (path ∈ resolved
-   `contract.source.inputs` — all of them). A missing or
-   invalid config degrades gracefully: the server still initializes with an empty
-   input set and logs a warning. Config is resolved once here.
+1. **`initialize`** — resolves the workspace root from the client's `rootUri` and registers config-file watching when the client supports it. Configs are loaded when matching documents open or when watched config files change. If a config cannot be loaded, the server does not manage that project.
 2. **Document sync** — text-document sync is **incremental**
    (`TextDocumentSyncKind.Incremental`); the `TextDocuments` manager applies
    incremental edits, and the server re-parses the full current buffer on each
@@ -41,9 +35,7 @@ server per project root (no multi-root workspaces).
   adapts the numeric severity to the LSP enum.
 - `schema-inputs.ts` — resolves the schema-input set (`SchemaInputSet`) from a
   config and answers URI membership.
-- `config-resolution.ts` — wraps `loadConfig` and maps its structured error
-  (by `code`) to graceful degradation. A standalone async function so it can be
-  re-run on a config change without rewiring the server.
+- `config-resolution.ts` — wraps `loadConfig` and resolves the schema inputs for a config. A standalone async function so it can be re-run on a config change without rewiring the server.
 - `document-diagnostics.ts` — `computeDocumentDiagnostics(uri, text, inputs)`,
   the seam the connection layer calls.
 - `server.ts` — `createServer(connection, options)` wires handlers onto an

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 import { timeouts } from '@prisma-next/test-utils';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   type ClientCapabilities,
   createConnection,
@@ -23,10 +23,21 @@ import {
   StreamMessageReader,
   StreamMessageWriter,
 } from 'vscode-languageserver/node';
+import type { ConfigResolution } from '../src/config-resolution';
 import { resolveSchemaInputs } from '../src/schema-inputs';
-import { createServer, type ResolveInputs } from '../src/server';
+import { createServer } from '../src/server';
 
+type ResolveInputs = (rootPath: string, configPath?: string) => Promise<ConfigResolution>;
 type FindConfigPathForFile = (filePath: string) => Promise<string | undefined>;
+
+const configResolutionMock = vi.hoisted(() => ({
+  resolveConfigInputs: vi.fn<ResolveInputs>(),
+}));
+
+vi.mock('../src/config-resolution', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/config-resolution')>();
+  return { ...actual, resolveConfigInputs: configResolutionMock.resolveConfigInputs };
+});
 
 const root = tmpdir();
 const schemaPath = join(root, 'schema.psl');
@@ -55,6 +66,7 @@ interface Harness {
   readonly registrations: RegistrationParams[];
   readonly waitForWatchedFilesRegistration: (timeoutMs: number) => Promise<void>;
   readonly waitForWarning: (predicate: (message: string) => boolean) => Promise<string>;
+  readonly latestDiagnostics: (uri: string) => readonly Diagnostic[] | undefined;
   readonly notifyConfigChanged: (uri?: string) => void;
   dispose: () => void;
 }
@@ -65,6 +77,7 @@ function startHarness(
   findConfigPathForFile: FindConfigPathForFile = async () => configPath,
   explicitConfigPath?: string,
 ): Harness {
+  configResolutionMock.resolveConfigInputs.mockImplementation(resolveInputs);
   const clientToServer = new PassThrough();
   const serverToClient = new PassThrough();
 
@@ -73,7 +86,6 @@ function startHarness(
     new StreamMessageWriter(serverToClient),
   );
   const server = createServer(serverConnection, {
-    resolveInputs,
     findConfigPathForFile,
     ...(explicitConfigPath ? { configPath: explicitConfigPath } : {}),
   });
@@ -184,6 +196,7 @@ function startHarness(
         }
         warningWaiters.push({ predicate, resolve });
       }),
+    latestDiagnostics: (uri) => latest.get(uri),
     initialize: async () => {
       const result = await client.sendRequest(InitializeRequest.type, {
         processId: process.pid,
@@ -231,6 +244,7 @@ afterEach(async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
   harness?.dispose();
   harness = undefined;
+  configResolutionMock.resolveConfigInputs.mockReset();
 });
 
 describe('language server', { timeout: timeouts.databaseOperation }, () => {
@@ -306,20 +320,17 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
     expect(await cleared).toEqual([]);
   });
 
-  it('initializes even when config resolution degrades to an empty input set', async () => {
-    const degraded: ResolveInputs = async () => ({
-      inputs: resolveSchemaInputs({}),
-      degradedReason: 'no config',
-    });
-    harness = startHarness(degraded);
+  it('does not publish diagnostics when config resolution fails', async () => {
+    harness = startHarness(resolveFails);
     const result = await harness.initialize();
     expect(result).toBeDefined();
 
     harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
       textDocument: { uri: schemaUri, languageId: 'prisma', version: 1, text: 'model {' },
     });
-    const diagnostics = await harness.waitForDiagnostics(schemaUri);
-    expect(diagnostics).toEqual([]);
+    await waitUntil(() => configResolutionMock.resolveConfigInputs.mock.calls.length === 1);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(harness.latestDiagnostics(schemaUri)).toBeUndefined();
   });
 });
 
@@ -340,10 +351,9 @@ const resolveToNothing: ResolveInputs = async () => ({
   inputs: resolveSchemaInputs({}),
 });
 
-const resolveDegraded: ResolveInputs = async () => ({
-  inputs: resolveSchemaInputs({}),
-  degradedReason: 'no config',
-});
+const resolveFails: ResolveInputs = async () => {
+  throw new Error('config failed');
+};
 
 function watchedFilesRegistrations(harness: Harness) {
   return harness.registrations
@@ -541,7 +551,7 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     expect(await harness.waitForDiagnostics(otherUri)).toEqual([]);
   });
 
-  it('does not fall back to a parent config when the nearest config degrades', async () => {
+  it('does not fall back to a parent config when the nearest config fails to load', async () => {
     const parentRoot = join(root, 'parent-project');
     const childRoot = join(parentRoot, 'child-project');
     const parentConfigPath = join(parentRoot, 'prisma-next.config.ts');
@@ -560,7 +570,7 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
           }),
         };
       }
-      return { inputs: resolveSchemaInputs({}), degradedReason: 'invalid child config' };
+      throw new Error('invalid child config');
     };
     harness = startHarness(
       resolveInputs,
@@ -573,7 +583,9 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
       textDocument: { uri: childSchemaUri, languageId: 'prisma', version: 1, text: 'model {' },
     });
 
-    expect(await harness.waitForDiagnostics(childSchemaUri)).toEqual([]);
+    await waitUntil(() => resolvedConfigs.length === 1);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(harness.latestDiagnostics(childSchemaUri)).toBeUndefined();
     expect(resolvedConfigs).toEqual([childConfigPath]);
   });
 
@@ -747,15 +759,17 @@ describe('language server config watching', { timeout: timeouts.databaseOperatio
     expect(await cleared).toEqual([]);
   });
 
-  it('begins diagnosing once a previously-degraded config edit makes inputs live', async () => {
-    const hook = mutableResolve(resolveDegraded);
+  it('begins diagnosing once a previously unloadable config edit makes inputs live', async () => {
+    const hook = mutableResolve(resolveFails);
     harness = startHarness(hook.resolve, watchedFilesCapabilities);
     await harness.initialize();
 
     harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
       textDocument: { uri: schemaUri, languageId: 'prisma', version: 1, text: 'model {' },
     });
-    expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
+    await waitUntil(() => configResolutionMock.resolveConfigInputs.mock.calls.length === 1);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(harness.latestDiagnostics(schemaUri)).toBeUndefined();
 
     const diagnosed = harness.waitForDiagnosticsMatching(
       schemaUri,
@@ -766,7 +780,7 @@ describe('language server config watching', { timeout: timeouts.databaseOperatio
     expect((await diagnosed).length).toBeGreaterThan(0);
   });
 
-  it('degrades gracefully and clears when a config edit breaks the config', async () => {
+  it('stops managing a project when a config edit breaks the config', async () => {
     const hook = mutableResolve(resolveToSchema);
     harness = startHarness(hook.resolve, watchedFilesCapabilities);
     await harness.initialize();
@@ -780,7 +794,7 @@ describe('language server config watching', { timeout: timeouts.databaseOperatio
       schemaUri,
       (diagnostics) => diagnostics.length === 0,
     );
-    hook.set(resolveDegraded);
+    hook.set(resolveFails);
     harness.notifyConfigChanged();
     expect(await cleared).toEqual([]);
   });
