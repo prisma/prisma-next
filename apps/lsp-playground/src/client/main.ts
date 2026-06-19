@@ -10,10 +10,15 @@ if (pathEl !== null) {
   pathEl.textContent = schemaPath;
 }
 
-const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const wsUrl = `${wsProtocol}//${window.location.host}${wsPath}` as
-  | `ws://${string}`
-  | `wss://${string}`;
+// Build the WS URL so each branch is already the right template-literal type
+// (`ws://...` / `wss://...`) that `languageServer` expects — no cast needed.
+// Plain `ws://` is intentional: this is a localhost-only dev playground served
+// over http, where the editor and the LSP bridge share one loopback origin;
+// `wss` (TLS) is meaningless on localhost. When served over https we do use wss.
+const host = `${window.location.host}${wsPath}`;
+// nosemgrep: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket
+const wsUrl: `ws://${string}` | `wss://${string}` =
+  window.location.protocol === 'https:' ? `wss://${host}` : `ws://${host}`;
 
 const ls = languageServer({
   serverUri: wsUrl,

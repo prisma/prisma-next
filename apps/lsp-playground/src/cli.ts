@@ -1,8 +1,8 @@
 import { access, copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { createServer as createHttpServer } from 'node:http';
+import * as nodeHttp from 'node:http';
 import { basename, dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createServer as createViteServer } from 'vite';
+import * as vite from 'vite';
 import { attachBridge } from './bridge';
 import { generateDefaultPostgresConfig, PLAYGROUND_DIR } from './default-config';
 import { findNearestConfig } from './find-config';
@@ -152,9 +152,9 @@ export const schemaText = ${JSON.stringify(schemaText)};
   // One HTTP server hosts both the editor (Vite, in middleware mode) and the
   // LSP WebSocket bridge (on LSP_PATH). Vite's HMR WebSocket is bound to the
   // same server via `hmr.server`, so a single port serves everything.
-  const httpServer = createHttpServer();
+  const httpServer = nodeHttp.createServer();
 
-  const vite = await createViteServer({
+  const viteServer = await vite.createServer({
     root: PACKAGE_ROOT,
     server: {
       middlewareMode: true,
@@ -162,7 +162,7 @@ export const schemaText = ${JSON.stringify(schemaText)};
     },
     appType: 'spa',
   });
-  httpServer.on('request', vite.middlewares);
+  httpServer.on('request', viteServer.middlewares);
 
   const stopBridge = attachBridge(httpServer, { cliEntry, path: LSP_PATH });
 
@@ -186,7 +186,7 @@ export const schemaText = ${JSON.stringify(schemaText)};
 
   const shutdown = async (): Promise<void> => {
     stopBridge();
-    await vite.close();
+    await viteServer.close();
     httpServer.close();
     process.exit(0);
   };
