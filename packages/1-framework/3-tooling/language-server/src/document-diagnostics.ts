@@ -1,4 +1,4 @@
-import { parse } from '@prisma-next/psl-parser/parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import { type LspDiagnostic, mapParseDiagnostics } from './diagnostic-mapping';
 import type { SchemaInputSet } from './schema-inputs';
 

@@ -1,12 +1,28 @@
 import { readFile } from 'node:fs/promises';
-import type { ContractConfig } from '@prisma-next/config/config-types';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
+import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
+import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
+
 import { interpretPslDocumentToMongoContract } from './interpreter';
 
 export interface MongoContractOptions {
   readonly output?: string;
+}
+
+function mapParseDiagnostics(
+  diagnostics: readonly ParseDiagnostic[],
+  sourceFile: SourceFile,
+  sourceId: string,
+): ContractSourceDiagnostic[] {
+  return diagnostics.map((diagnostic) => ({
+    code: diagnostic.code,
+    message: diagnostic.message,
+    sourceId,
+    span: rangeToPslSpan(diagnostic.range, sourceFile),
+  }));
 }
 
 export function mongoContract(schemaPath: string, options?: MongoContractOptions): ContractConfig {
@@ -39,13 +55,26 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
           });
         }
 
-        const document = parsePslDocument({
-          schema,
-          sourceId: schemaPath,
+        const { document, sourceFile, diagnostics: parseDiagnostics } = parse(schema);
+        const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
+          document,
+          sourceFile,
+          scalarTypes: [...context.scalarTypeDescriptors.keys()],
+          pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
         });
 
+        // Do not short-circuit on provider-level diagnostics; recovered CST can
+        // still produce interpreter diagnostics in the same response.
+        const seedDiagnostics = [
+          ...mapParseDiagnostics(parseDiagnostics, sourceFile, schemaPath),
+          ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),
+        ];
+
         const interpreted = interpretPslDocumentToMongoContract({
-          document,
+          symbolTable,
+          sourceFile,
+          sourceId: schemaPath,
+          seedDiagnostics,
           scalarTypeDescriptors: context.scalarTypeDescriptors,
           codecLookup: context.codecLookup,
         });

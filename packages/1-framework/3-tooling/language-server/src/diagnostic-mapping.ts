@@ -1,4 +1,4 @@
-import type { ParseDiagnostic, Range } from '@prisma-next/psl-parser/parser';
+import type { ParseDiagnostic, Range } from '@prisma-next/psl-parser/syntax';
 
 export const ParseDiagnosticSeverity = {
   Error: 1,

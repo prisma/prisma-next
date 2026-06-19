@@ -7,7 +7,9 @@ function modelsOf(ir: Contract): Record<string, unknown> {
   return ir.domain.namespaces[UNBOUND_NAMESPACE_ID]!.models;
 }
 
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable, type SymbolTable } from '@prisma-next/psl-parser';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToMongoContract } from '../src/interpreter';
 
@@ -53,10 +55,24 @@ function mongoCollectionsOf(ir: { readonly storage: unknown }): Record<string, u
   return storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.collection;
 }
 
-function interpret(schema: string) {
-  const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
-  return interpretPslDocumentToMongoContract({
+function buildSymbolTableInput(schema: string): {
+  symbolTable: SymbolTable;
+  sourceFile: SourceFile;
+  sourceId: string;
+} {
+  const { document, sourceFile } = parse(schema);
+  const { table } = buildSymbolTable({
     document,
+    sourceFile,
+    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
+    pslBlockDescriptors: {},
+  });
+  return { symbolTable: table, sourceFile, sourceId: 'test.prisma' };
+}
+
+function interpret(schema: string) {
+  return interpretPslDocumentToMongoContract({
+    ...buildSymbolTableInput(schema),
     scalarTypeDescriptors: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
   });

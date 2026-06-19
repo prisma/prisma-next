@@ -1,4 +1,4 @@
-import { parse } from '@prisma-next/psl-parser/parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
 import { mapParseDiagnostics, ParseDiagnosticSeverity } from '../src/diagnostic-mapping';
 

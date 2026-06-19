@@ -1,6 +1,6 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { AuthoringArgumentDescriptor } from '@prisma-next/framework-components/authoring';
-import type { PslAttributeArgument, PslSpan } from '@prisma-next/psl-parser';
+import type { PslSpan, ResolvedAttributeArg } from '@prisma-next/psl-parser';
 import { unquoteStringLiteral } from './psl-attribute-parsing';
 
 const INVALID_AUTHORING_ARGUMENT = Symbol('invalidAuthoringArgument');
@@ -351,7 +351,7 @@ function pushInvalidPslHelperArgument(input: {
 }
 
 export function mapPslHelperArgs(input: {
-  readonly args: readonly PslAttributeArgument[];
+  readonly args: readonly ResolvedAttributeArg[];
   readonly descriptors: readonly AuthoringArgumentDescriptor[];
   readonly helperLabel: string;
   readonly span: PslSpan;

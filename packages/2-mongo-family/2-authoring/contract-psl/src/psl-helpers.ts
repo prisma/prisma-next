@@ -1,9 +1,14 @@
-import type { PslAttribute, PslAttributeArgument } from '@prisma-next/psl-parser';
-import { getPositionalArgument, parseQuotedStringLiteral } from '@prisma-next/psl-parser';
+import type { ResolvedAttribute, ResolvedAttributeArg } from '@prisma-next/psl-parser';
+import { parseQuotedStringLiteral } from '@prisma-next/psl-parser';
+import { ifDefined } from '@prisma-next/utils/defined';
 
-export { getPositionalArgument, parseQuotedStringLiteral };
+export { parseQuotedStringLiteral };
 
-export function getNamedArgument(attr: PslAttribute, name: string): string | undefined {
+export function getPositionalArgument(attr: ResolvedAttribute, index = 0): string | undefined {
+  return attr.args.filter((arg) => arg.kind === 'positional')[index]?.value;
+}
+
+export function getNamedArgument(attr: ResolvedAttribute, name: string): string | undefined {
   const arg = attr.args.find((a) => a.kind === 'named' && a.name === name);
   return arg?.value;
 }
@@ -72,13 +77,13 @@ export function lowerFirst(value: string): string {
 }
 
 export function getAttribute(
-  attributes: readonly PslAttribute[],
+  attributes: readonly ResolvedAttribute[],
   name: string,
-): PslAttribute | undefined {
+): ResolvedAttribute | undefined {
   return attributes.find((attr) => attr.name === name);
 }
 
-export function getMapName(attributes: readonly PslAttribute[]): string | undefined {
+export function getMapName(attributes: readonly ResolvedAttribute[]): string | undefined {
   const mapAttr = getAttribute(attributes, 'map');
   if (!mapAttr) return undefined;
   const arg = mapAttr.args[0];
@@ -93,14 +98,14 @@ export interface ParsedRelationAttribute {
 }
 
 export function parseRelationAttribute(
-  attributes: readonly PslAttribute[],
+  attributes: readonly ResolvedAttribute[],
 ): ParsedRelationAttribute | undefined {
   const relationAttr = getAttribute(attributes, 'relation');
   if (!relationAttr) return undefined;
 
   let relationName: string | undefined;
-  let fieldsArg: PslAttributeArgument | undefined;
-  let referencesArg: PslAttributeArgument | undefined;
+  let fieldsArg: ResolvedAttributeArg | undefined;
+  let referencesArg: ResolvedAttributeArg | undefined;
 
   for (const arg of relationAttr.args) {
     if (arg.kind === 'positional') {
@@ -118,9 +123,9 @@ export function parseRelationAttribute(
   const references = referencesArg ? parseFieldList(referencesArg.value) : undefined;
 
   return {
-    ...(relationName !== undefined ? { relationName } : {}),
-    ...(fields !== undefined ? { fields } : {}),
-    ...(references !== undefined ? { references } : {}),
+    ...ifDefined('relationName', relationName),
+    ...ifDefined('fields', fields),
+    ...ifDefined('references', references),
   };
 }
 
