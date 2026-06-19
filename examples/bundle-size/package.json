@@ -42,7 +42,7 @@
     "@prisma-next/test-utils": "workspace:0.14.0",
     "@prisma-next/tsconfig": "workspace:0.14.0",
     "@prisma/dev": "catalog:",
-    "@cloudflare/workers-types": "4.20260515.1",
+    "@cloudflare/workers-types": "4.20260609.1",
     "@size-limit/file": "^12.1.0",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
@@ -52,6 +52,6 @@
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "wrangler": "4.91.0"
+    "wrangler": "4.99.0"
   }
 }
