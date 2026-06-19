@@ -35,7 +35,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:0c2f8a63a778d1dc173c397d79b93d1dff153aa498510d05d0f2b27b6f72f5c4'>;
+  StorageHashBase<'sha256:ede5c1b84cd105676bc676a6984c0a783ae00625814b58b61c36ff2055ea6e82'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:6dcd81f86735007ae62319a6ecb5c147052e6792d7c5a2b9e396b45823090f28'>;
 export type ProfileHash =
@@ -71,29 +71,32 @@ export type FieldOutputTypes = {
       readonly targetRelease: CodecTypes['pg/text@1']['output'] | null;
     };
     readonly Post: {
-      readonly id: Char<36>;
+      readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly title: CodecTypes['pg/text@1']['output'];
-      readonly userId: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/uuid@1']['output'];
       readonly priority: 'low' | 'high' | 'urgent';
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly embedding: Vector<1536> | null;
     };
     readonly PostTag: {
-      readonly postId: CodecTypes['pg/text@1']['output'];
-      readonly tagId: CodecTypes['pg/text@1']['output'];
+      readonly postId: CodecTypes['pg/uuid@1']['output'];
+      readonly tagId: CodecTypes['pg/uuid@1']['output'];
     };
-    readonly Tag: { readonly id: Char<36>; readonly label: CodecTypes['pg/text@1']['output'] };
+    readonly Tag: {
+      readonly id: CodecTypes['pg/uuid@1']['output'];
+      readonly label: CodecTypes['pg/text@1']['output'];
+    };
     readonly Task: {
-      readonly id: Char<36>;
+      readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly description: CodecTypes['pg/text@1']['output'] | null;
       readonly status: CodecTypes['pg/text@1']['output'];
       readonly type: CodecTypes['pg/text@1']['output'];
-      readonly userId: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/uuid@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
     };
     readonly User: {
-      readonly id: Char<36>;
+      readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly email: CodecTypes['pg/text@1']['output'];
       readonly displayName: CodecTypes['pg/text@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
@@ -113,32 +116,32 @@ export type FieldInputTypes = {
       readonly targetRelease: CodecTypes['pg/text@1']['input'] | null;
     };
     readonly Post: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly title: CodecTypes['pg/text@1']['input'];
-      readonly userId: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/uuid@1']['input'];
       readonly priority: 'low' | 'high' | 'urgent';
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly embedding: CodecTypes['pg/vector@1']['input'] | null;
     };
     readonly PostTag: {
-      readonly postId: CodecTypes['pg/text@1']['input'];
-      readonly tagId: CodecTypes['pg/text@1']['input'];
+      readonly postId: CodecTypes['pg/uuid@1']['input'];
+      readonly tagId: CodecTypes['pg/uuid@1']['input'];
     };
     readonly Tag: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly label: CodecTypes['pg/text@1']['input'];
     };
     readonly Task: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly title: CodecTypes['pg/text@1']['input'];
       readonly description: CodecTypes['pg/text@1']['input'] | null;
       readonly status: CodecTypes['pg/text@1']['input'];
       readonly type: CodecTypes['pg/text@1']['input'];
-      readonly userId: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/uuid@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
     };
     readonly User: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly email: CodecTypes['pg/text@1']['input'];
       readonly displayName: CodecTypes['pg/text@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
@@ -165,10 +168,10 @@ type ContractBase = Omit<
             readonly bug: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
+                  readonly typeRef: 'Uuid';
                 };
                 readonly severity: {
                   readonly nativeType: 'text';
@@ -204,10 +207,10 @@ type ContractBase = Omit<
             readonly feature: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
+                  readonly typeRef: 'Uuid';
                 };
                 readonly priority: {
                   readonly nativeType: 'text';
@@ -243,10 +246,10 @@ type ContractBase = Omit<
             readonly post: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
+                  readonly typeRef: 'Uuid';
                 };
                 readonly title: {
                   readonly nativeType: 'text';
@@ -254,9 +257,10 @@ type ContractBase = Omit<
                   readonly nullable: false;
                 };
                 readonly userId: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
                   readonly nullable: false;
+                  readonly typeRef: 'Uuid';
                 };
                 readonly priority: {
                   readonly nativeType: 'text';
@@ -303,14 +307,16 @@ type ContractBase = Omit<
             readonly post_tag: {
               columns: {
                 readonly postId: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
                   readonly nullable: false;
+                  readonly typeRef: 'Uuid';
                 };
                 readonly tagId: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
                   readonly nullable: false;
+                  readonly typeRef: 'Uuid';
                 };
               };
               primaryKey: { readonly columns: readonly ['postId', 'tagId'] };
@@ -350,10 +356,10 @@ type ContractBase = Omit<
             readonly tag: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
+                  readonly typeRef: 'Uuid';
                 };
                 readonly label: {
                   readonly nativeType: 'text';
@@ -369,10 +375,10 @@ type ContractBase = Omit<
             readonly task: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
+                  readonly typeRef: 'Uuid';
                 };
                 readonly title: {
                   readonly nativeType: 'text';
@@ -399,9 +405,10 @@ type ContractBase = Omit<
                   readonly nullable: false;
                 };
                 readonly userId: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
                   readonly nullable: false;
+                  readonly typeRef: 'Uuid';
                 };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
@@ -433,10 +440,10 @@ type ContractBase = Omit<
             readonly user: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
+                  readonly typeRef: 'Uuid';
                 };
                 readonly email: {
                   readonly nativeType: 'text';
@@ -490,6 +497,12 @@ type ContractBase = Omit<
         readonly codecId: 'pg/vector@1';
         readonly nativeType: 'vector';
         readonly typeParams: { readonly length: 1536 };
+      };
+      readonly Uuid: {
+        readonly kind: 'codec-instance';
+        readonly codecId: 'pg/uuid@1';
+        readonly nativeType: 'uuid';
+        readonly typeParams: Record<string, never>;
       };
     };
     readonly storageHash: StorageHash;
@@ -557,11 +570,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 36 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
               readonly title: {
                 readonly nullable: false;
@@ -569,7 +578,7 @@ type ContractBase = Omit<
               };
               readonly userId: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
               readonly priority: {
                 readonly nullable: false;
@@ -626,11 +635,11 @@ type ContractBase = Omit<
             readonly fields: {
               readonly postId: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
               readonly tagId: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
             };
             readonly relations: {
@@ -664,11 +673,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 36 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
               readonly label: {
                 readonly nullable: false;
@@ -705,11 +710,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 36 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
               readonly title: {
                 readonly nullable: false;
@@ -729,7 +730,7 @@ type ContractBase = Omit<
               };
               readonly userId: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
               readonly createdAt: {
                 readonly nullable: false;
@@ -769,11 +770,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 36 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
               readonly email: {
                 readonly nullable: false;

@@ -4,16 +4,16 @@
   "target": "postgres",
   "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
-    "bug": {
-      "model": "Bug",
-      "namespace": "public"
-    },
-    "feature": {
-      "model": "Feature",
-      "namespace": "public"
-    },
     "post": {
       "model": "Post",
+      "namespace": "public"
+    },
+    "post_tag": {
+      "model": "PostTag",
+      "namespace": "public"
+    },
+    "tag": {
+      "model": "Tag",
       "namespace": "public"
     },
     "task": {
@@ -29,6 +29,23 @@
     "namespaces": {
       "public": {
         "enum": {
+          "Priority": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "Low",
+                "value": "low"
+              },
+              {
+                "name": "High",
+                "value": "high"
+              },
+              {
+                "name": "Urgent",
+                "value": "urgent"
+              }
+            ]
+          },
           "user_type": {
             "codecId": "pg/text@1",
             "members": [
@@ -45,6 +62,10 @@
         },
         "models": {
           "Bug": {
+            "base": {
+              "model": "Task",
+              "namespace": "public"
+            },
             "fields": {
               "severity": {
                 "nullable": false,
@@ -76,6 +97,10 @@
             }
           },
           "Feature": {
+            "base": {
+              "model": "Task",
+              "namespace": "public"
+            },
             "fields": {
               "priority": {
                 "nullable": false,
@@ -125,11 +150,21 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "priority": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "Priority",
+                  "namespaceId": "public",
+                  "plane": "domain"
                 }
               },
               "title": {
@@ -142,12 +177,30 @@
               "userId": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/uuid@1",
                   "kind": "scalar"
                 }
               }
             },
             "relations": {
+              "tags": {
+                "cardinality": "N:M",
+                "on": {
+                  "localFields": ["id"],
+                  "targetFields": ["postId"]
+                },
+                "through": {
+                  "childColumns": ["tagId"],
+                  "namespaceId": "public",
+                  "parentColumns": ["postId"],
+                  "table": "post_tag",
+                  "targetColumns": ["id"]
+                },
+                "to": {
+                  "model": "Tag",
+                  "namespace": "public"
+                }
+              },
               "user": {
                 "cardinality": "N:1",
                 "on": {
@@ -171,6 +224,9 @@
                 "id": {
                   "column": "id"
                 },
+                "priority": {
+                  "column": "priority"
+                },
                 "title": {
                   "column": "title"
                 },
@@ -182,7 +238,114 @@
               "table": "post"
             }
           },
+          "PostTag": {
+            "fields": {
+              "postId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "tagId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "post": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": ["postId"],
+                  "targetFields": ["id"]
+                },
+                "to": {
+                  "model": "Post",
+                  "namespace": "public"
+                }
+              },
+              "tag": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": ["tagId"],
+                  "targetFields": ["id"]
+                },
+                "to": {
+                  "model": "Tag",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "postId": {
+                  "column": "postId"
+                },
+                "tagId": {
+                  "column": "tagId"
+                }
+              },
+              "namespaceId": "public",
+              "table": "post_tag"
+            }
+          },
+          "Tag": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "label": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "posts": {
+                "cardinality": "N:M",
+                "on": {
+                  "localFields": ["id"],
+                  "targetFields": ["tagId"]
+                },
+                "through": {
+                  "childColumns": ["postId"],
+                  "namespaceId": "public",
+                  "parentColumns": ["tagId"],
+                  "table": "post_tag",
+                  "targetColumns": ["id"]
+                },
+                "to": {
+                  "model": "Post",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "label": {
+                  "column": "label"
+                }
+              },
+              "namespaceId": "public",
+              "table": "tag"
+            }
+          },
           "Task": {
+            "discriminator": {
+              "field": "type"
+            },
             "fields": {
               "createdAt": {
                 "nullable": false,
@@ -201,11 +364,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
                 }
               },
               "status": {
@@ -232,7 +392,7 @@
               "userId": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/uuid@1",
                   "kind": "scalar"
                 }
               }
@@ -276,6 +436,14 @@
               },
               "namespaceId": "public",
               "table": "task"
+            },
+            "variants": {
+              "Bug": {
+                "value": "bug"
+              },
+              "Feature": {
+                "value": "feature"
+              }
             }
           },
           "User": {
@@ -294,6 +462,13 @@
                   "kind": "scalar"
                 }
               },
+              "displayName": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "email": {
                 "nullable": false,
                 "type": {
@@ -304,11 +479,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
                 }
               },
               "kind": {
@@ -356,6 +528,9 @@
                 },
                 "createdAt": {
                   "column": "createdAt"
+                },
+                "displayName": {
+                  "column": "displayName"
                 },
                 "email": {
                   "column": "email"
@@ -416,6 +591,12 @@
           "table": {
             "bug": {
               "columns": {
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
+                },
                 "severity": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -427,12 +608,37 @@
                   "nullable": true
                 }
               },
-              "foreignKeys": [],
+              "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": false,
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": ["id"],
+                    "namespaceId": "public",
+                    "tableName": "bug"
+                  },
+                  "target": {
+                    "columns": ["id"],
+                    "namespaceId": "public",
+                    "tableName": "task"
+                  }
+                }
+              ],
               "indexes": [],
+              "primaryKey": {
+                "columns": ["id"]
+              },
               "uniques": []
             },
             "feature": {
               "columns": {
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
+                },
                 "priority": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -444,11 +650,42 @@
                   "nullable": true
                 }
               },
-              "foreignKeys": [],
+              "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": false,
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": ["id"],
+                    "namespaceId": "public",
+                    "tableName": "feature"
+                  },
+                  "target": {
+                    "columns": ["id"],
+                    "namespaceId": "public",
+                    "tableName": "task"
+                  }
+                }
+              ],
               "indexes": [],
+              "primaryKey": {
+                "columns": ["id"]
+              },
               "uniques": []
             },
             "post": {
+              "checks": [
+                {
+                  "column": "priority",
+                  "name": "post_priority_check",
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Priority",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                }
+              ],
               "columns": {
                 "createdAt": {
                   "codecId": "pg/timestamptz@1",
@@ -466,11 +703,24 @@
                   "typeRef": "Embedding1536"
                 },
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": false,
-                  "typeParams": {
-                    "length": 36
+                  "typeRef": "Uuid"
+                },
+                "priority": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "low"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Priority",
+                    "namespaceId": "public",
+                    "plane": "storage"
                   }
                 },
                 "title": {
@@ -479,9 +729,10 @@
                   "nullable": false
                 },
                 "userId": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
                 }
               },
               "foreignKeys": [
@@ -506,6 +757,78 @@
               },
               "uniques": []
             },
+            "post_tag": {
+              "columns": {
+                "postId": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
+                },
+                "tagId": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
+                }
+              },
+              "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": true,
+                  "source": {
+                    "columns": ["postId"],
+                    "namespaceId": "public",
+                    "tableName": "post_tag"
+                  },
+                  "target": {
+                    "columns": ["id"],
+                    "namespaceId": "public",
+                    "tableName": "post"
+                  }
+                },
+                {
+                  "constraint": true,
+                  "index": true,
+                  "source": {
+                    "columns": ["tagId"],
+                    "namespaceId": "public",
+                    "tableName": "post_tag"
+                  },
+                  "target": {
+                    "columns": ["id"],
+                    "namespaceId": "public",
+                    "tableName": "tag"
+                  }
+                }
+              ],
+              "indexes": [],
+              "primaryKey": {
+                "columns": ["postId", "tagId"]
+              },
+              "uniques": []
+            },
+            "tag": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
+                },
+                "label": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": ["id"]
+              },
+              "uniques": []
+            },
             "task": {
               "columns": {
                 "createdAt": {
@@ -523,12 +846,10 @@
                   "nullable": true
                 },
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "typeRef": "Uuid"
                 },
                 "status": {
                   "codecId": "pg/text@1",
@@ -550,9 +871,10 @@
                   "nullable": false
                 },
                 "userId": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
                 }
               },
               "foreignKeys": [
@@ -605,18 +927,21 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "displayName": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
                 "email": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
                 },
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "typeRef": "Uuid"
                 },
                 "kind": {
                   "codecId": "pg/text@1",
@@ -639,6 +964,10 @@
             }
           },
           "valueSet": {
+            "Priority": {
+              "kind": "valueSet",
+              "values": ["low", "high", "urgent"]
+            },
             "user_type": {
               "kind": "valueSet",
               "values": ["admin", "user"]
@@ -649,7 +978,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:3db2cb9bd69609a89ee049f99a464cae59bd531db8a646066addebbeeaf8bbc7",
+    "storageHash": "sha256:ede5c1b84cd105676bc676a6984c0a783ae00625814b58b61c36ff2055ea6e82",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",
@@ -658,11 +987,16 @@
         "typeParams": {
           "length": 1536
         }
+      },
+      "Uuid": {
+        "codecId": "pg/uuid@1",
+        "kind": "codec-instance",
+        "nativeType": "uuid"
       }
     }
   },
   "execution": {
-    "executionHash": "sha256:a691ed4c6ad02663bcd11c7ea8b2491e67253cd7c1968687255f2e0accfdcff7",
+    "executionHash": "sha256:6dcd81f86735007ae62319a6ecb5c147052e6792d7c5a2b9e396b45823090f28",
     "mutations": {
       "defaults": [
         {
@@ -674,6 +1008,17 @@
             "column": "id",
             "namespace": "public",
             "table": "post"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "tag"
           }
         },
         {

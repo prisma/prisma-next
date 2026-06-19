@@ -150,11 +150,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
                 }
               },
               "priority": {
@@ -180,7 +177,7 @@
               "userId": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/uuid@1",
                   "kind": "scalar"
                 }
               }
@@ -260,14 +257,14 @@
               "postId": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/uuid@1",
                   "kind": "scalar"
                 }
               },
               "tagId": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/uuid@1",
                   "kind": "scalar"
                 }
               }
@@ -322,11 +319,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
                 }
               },
               "label": {
@@ -402,11 +396,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
                 }
               },
               "status": {
@@ -433,7 +424,7 @@
               "userId": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/uuid@1",
                   "kind": "scalar"
                 }
               }
@@ -524,11 +515,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
                 }
               },
               "kind": {
@@ -648,12 +636,10 @@
             "bug": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "typeRef": "Uuid"
                 },
                 "severity": {
                   "codecId": "pg/text@1",
@@ -698,12 +684,10 @@
             "feature": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "typeRef": "Uuid"
                 },
                 "priority": {
                   "codecId": "pg/text@1",
@@ -775,12 +759,10 @@
                   "typeRef": "Embedding1536"
                 },
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "typeRef": "Uuid"
                 },
                 "priority": {
                   "codecId": "pg/text@1",
@@ -803,9 +785,10 @@
                   "nullable": false
                 },
                 "userId": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
                 }
               },
               "foreignKeys": [
@@ -839,14 +822,16 @@
             "post_tag": {
               "columns": {
                 "postId": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
                 },
                 "tagId": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
                 }
               },
               "foreignKeys": [
@@ -899,12 +884,10 @@
             "tag": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "typeRef": "Uuid"
                 },
                 "label": {
                   "codecId": "pg/text@1",
@@ -938,12 +921,10 @@
                   "nullable": true
                 },
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "typeRef": "Uuid"
                 },
                 "status": {
                   "codecId": "pg/text@1",
@@ -965,9 +946,10 @@
                   "nullable": false
                 },
                 "userId": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
                 }
               },
               "foreignKeys": [
@@ -1037,12 +1019,10 @@
                   "nullable": false
                 },
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "typeRef": "Uuid"
                 },
                 "kind": {
                   "codecId": "pg/text@1",
@@ -1088,7 +1068,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:0c2f8a63a778d1dc173c397d79b93d1dff153aa498510d05d0f2b27b6f72f5c4",
+    "storageHash": "sha256:ede5c1b84cd105676bc676a6984c0a783ae00625814b58b61c36ff2055ea6e82",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",
@@ -1097,6 +1077,11 @@
         "typeParams": {
           "length": 1536
         }
+      },
+      "Uuid": {
+        "codecId": "pg/uuid@1",
+        "kind": "codec-instance",
+        "nativeType": "uuid"
       }
     }
   },
