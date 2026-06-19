@@ -1,7 +1,6 @@
 import { access } from 'node:fs/promises';
 import type { PrismaNextConfig } from '@prisma-next/config/config-types';
-import { validateConfig } from '@prisma-next/config/config-validation';
-import { ConfigFileNotFoundError, ConfigValidationError } from '@prisma-next/config/load-helpers';
+import { ConfigValidationError, validateConfig } from '@prisma-next/config/config-validation';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import {
   errorConfigFileNotFound,
@@ -10,6 +9,7 @@ import {
 } from '@prisma-next/errors/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { dirname, join, resolve } from 'pathe';
+import { ConfigFileNotFoundError } from './errors';
 import { finalizeConfig } from './finalize-config';
 
 const CONFIG_FILENAME = 'prisma-next.config.ts';

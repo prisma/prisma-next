@@ -44,7 +44,6 @@
   "exports": {
     "./config-types": "./dist/config-types.mjs",
     "./config-validation": "./dist/config-validation.mjs",
-    "./load-helpers": "./dist/load-helpers.mjs",
     "./package.json": "./package.json"
   },
   "engines": {

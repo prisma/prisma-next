@@ -1,5 +1,6 @@
-import { ConfigFileNotFoundError, ConfigValidationError } from '@prisma-next/config/load-helpers';
+import { ConfigValidationError } from '@prisma-next/config/config-validation';
 import { describe, expect, it } from 'vitest';
+import { ConfigFileNotFoundError } from '../src/errors';
 import { toStructuredConfigError } from '../src/load';
 
 describe('toStructuredConfigError', () => {
