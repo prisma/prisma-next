@@ -1,4 +1,4 @@
-import { access, copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import * as nodeHttp from 'node:http';
 import { basename, dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -53,7 +53,19 @@ function resolveCliEntry(): string {
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const schemaArg = args.find((a) => !a.startsWith('--'));
+  const flags = args.filter((a) => a.startsWith('-'));
+  if (flags.length > 0) {
+    console.error(`Unknown option(s): ${flags.join(', ')}`);
+    console.error('Usage: psl-playground [<schema.psl>]');
+    process.exit(1);
+  }
+  const positionals = args.filter((a) => !a.startsWith('-'));
+  if (positionals.length > 1) {
+    console.error(`Expected at most one schema path, got ${positionals.length}.`);
+    console.error('Usage: psl-playground [<schema.psl>]');
+    process.exit(1);
+  }
+  const schemaArg = positionals[0];
 
   // Resolve the schema the editor opens and the config the server will find for
   // it. The language server discovers a document's config by walking up from
@@ -79,6 +91,10 @@ async function main(): Promise<void> {
         : resolve(process.cwd(), schemaArg);
 
   if (sourceFile !== undefined && (await fileExists(sourceFile))) {
+    if (!(await stat(sourceFile)).isFile()) {
+      console.error(`Schema path must be a file: ${sourceFile}`);
+      process.exit(1);
+    }
     const discovered = await findNearestConfig(sourceFile);
     if (discovered !== undefined) {
       // The file belongs to a real project; open it in place under its own config.
