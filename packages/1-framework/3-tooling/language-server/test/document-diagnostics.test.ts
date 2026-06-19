@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import { parse } from '@prisma-next/psl-parser/parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
 import { mapParseDiagnostics } from '../src/diagnostic-mapping';
 import { computeDocumentDiagnostics } from '../src/document-diagnostics';
