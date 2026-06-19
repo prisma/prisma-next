@@ -408,10 +408,7 @@ export function resolveFieldTypeDescriptor(input: {
   readonly sourceId: string;
   readonly entityLabel: string;
 }): ResolveFieldTypeResult {
-  // The field's qualified type was malformed and already diagnosed by
-  // `buildSymbolTable` (PSL_INVALID_QUALIFIED_TYPE). Treat it as already-reported
-  // so resolution does not cascade a spurious PSL_UNSUPPORTED_FIELD_TYPE — the
-  // legacy parser rejected such types before the interpreter ran.
+  // Avoid cascading unsupported-type diagnostics after invalid qualification.
   if (input.field.malformedType) {
     return { ok: false, alreadyReported: true };
   }

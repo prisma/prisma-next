@@ -102,9 +102,7 @@ type NamedTypeSymbol = ScalarSymbol | TypeAliasSymbol;
 
 export interface InterpretPslDocumentToSqlContractInput {
   readonly symbolTable: SymbolTable;
-  /** The parsed source file backing the symbol table's CST nodes; used to resolve diagnostic spans. */
   readonly sourceFile: SourceFile;
-  /** Source file identifier threaded into diagnostics (the symbol table carries none). */
   readonly sourceId: string;
   readonly target: TargetPackRef<'sql', string>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
@@ -133,13 +131,6 @@ export interface InterpretPslDocumentToSqlContractInput {
    */
   readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly codecLookup?: CodecLookup;
-  /**
-   * Diagnostics produced before interpretation (the provider's combined
-   * `parse` + `buildSymbolTable` set), seeded into the interpreter's collection
-   * so interpretation can emit the parse + symbol-table + interpreter union in
-   * one run — matching the legacy combined-set parser behaviour rather than
-   * failing before interpreting.
-   */
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
 }
 
@@ -340,15 +331,7 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
   return { enumHandles, enumTypeDescriptors };
 }
 
-/**
- * The legitimate top-level block keywords the interpreter recognises, matching
- * the legacy parser's allow-list: a keyword is legitimate when the composed
- * `authoringContributions.pslBlockDescriptors` registers a descriptor under it
- * (the legacy parser keyed `lookupExtensionBlockDescriptor` by exactly this).
- * A `BlockSymbol` whose keyword is absent is an unsupported top-level block —
- * including an `enum` when no `pslBlockDescriptors.enum` was composed, which the
- * legacy descriptor-driven parser rejected as unknown.
- */
+/** Generic top-level blocks are supported only when a composed descriptor claims their keyword. */
 function composedBlockKeywords(
   authoringContributions: AuthoringContributions | undefined,
 ): ReadonlySet<string> {
@@ -1680,14 +1663,6 @@ export function interpretPslDocumentToSqlContract(
     sourceFile,
     diagnostics,
   });
-  // Per-scope namespace resolution: the symbol table's top-level scope maps to
-  // the legacy `__unspecified__` bucket; each named `NamespaceSymbol` maps to
-  // its name (and `unbound` to the late-binding sentinel) via
-  // `resolveNamespaceIdForSqlTarget`. The symbol-table entries already carry the
-  // resolved read-set (type split, attributes, span) and any
-  // `PSL_INVALID_QUALIFIED_TYPE` diagnostic (emitted by `buildSymbolTable`, seeded
-  // into `diagnostics` via the provider), so the interpreter consumes them
-  // directly — no view-build pass.
   const models: ModelSymbol[] = [];
   const modelEntries: ModelNamespaceEntry[] = [];
   const modelNamespaceIds = new Map<string, string>();
@@ -1742,10 +1717,6 @@ export function interpretPslDocumentToSqlContract(
   }
 
   const isEnumBlock = (block: BlockSymbol): boolean => block.keyword === 'enum';
-  // Restore the legacy parser's unknown-top-level-block rejection (it consulted
-  // `pslBlockDescriptors`): a generic block whose keyword was not registered by
-  // a composed descriptor is an unsupported top-level block. This includes an
-  // `enum` block when no `pslBlockDescriptors.enum` was composed.
   const legitimateBlockKeywords = composedBlockKeywords(input.authoringContributions);
   const reportUnsupportedTopLevelBlock = (block: BlockSymbol): void => {
     diagnostics.push({
@@ -1764,9 +1735,6 @@ export function interpretPslDocumentToSqlContract(
       }
       return isEnumBlock(block);
     })
-    // The resolved `PslExtensionBlock` is built once by `buildSymbolTable`
-    // (descriptor-classified from the composed `enum` descriptor); the enum
-    // factory consumes it directly — no consumer-side reconstruction.
     .map((block) => block.block);
   for (const namespace of namespaceSymbols) {
     for (const block of Object.values(namespace.blocks)) {
@@ -1811,10 +1779,6 @@ export function interpretPslDocumentToSqlContract(
 
   const enumHandlesByName = new Map(Object.entries(validEnumHandles));
 
-  // The named-type re-union: the symbol table splits `types { … }` bindings into
-  // top-level scalars (base type in `scalarTypes`) and type aliases. Re-union
-  // them here as the resolver's input; each symbol carries the resolved binding
-  // shape (`baseType` / `typeConstructor` + the `isConstructor` discriminant).
   const namedTypeSymbols: readonly NamedTypeSymbol[] = [
     ...Object.values(topLevel.scalars),
     ...Object.values(topLevel.typeAliases),
@@ -1988,14 +1952,8 @@ export function interpretPslDocumentToSqlContract(
     })),
   });
 
-  // Keyed by `(namespaceId, modelName)` coordinate so two models that share a
-  // bare name across namespaces stay distinct through the patch/polymorphism
-  // passes. A same-coordinate duplicate is unreachable on the PSL path: the
-  // symbol table is the sole owner of duplicate-declaration detection and
-  // resolves same-scope duplicate names first-wins (one symbol, with
-  // `PSL_DUPLICATE_DECLARATION`), so two models never reach interpretation at
-  // the same coordinate. The invariant documents that guarantee and still trips
-  // loudly on a true regression rather than silently overwriting.
+  // Include namespace in patch keys so same bare model names across namespaces
+  // stay distinct; same-coordinate duplicates were already collapsed first-wins.
   const modelsForPatch: Record<string, ContractModel> = {};
   for (const [namespaceId, namespaceSlice] of Object.entries(contract.domain.namespaces)) {
     for (const [modelName, model] of Object.entries(namespaceSlice.models)) {

@@ -494,12 +494,8 @@ describe('printPslFromAst', () => {
   });
 
   it('preserves @map values containing PSL escape sequences on print (no double-escape)', () => {
-    // Regression for double-escape in `getPositionalStringArg`. The parser stores
-    // a quoted-literal argument with PSL escape sequences (`\\`, `\"`, `\n`,
-    // `\r`) intact; the printer must decode them once on extraction so that
-    // `escapePslString` does not re-escape them on output. The AST below mirrors
-    // the parser-stored form (escapes intact, quotes included); the assertion is
-    // that the printed text carries each escape exactly once.
+    // Parser-stored quoted literals keep escapes intact; printing must decode
+    // once so `escapePslString` does not double-escape the output.
     const models: PslModel[] = [
       {
         kind: 'model',
@@ -691,9 +687,7 @@ describe('printPslFromAst', () => {
         span: span(0),
       };
       const printed = printPslFromAst(ast);
-      // The top-level model is emitted without a namespace wrapper.
       expect(printed).toMatch(/^model TopLevel \{/m);
-      // The named namespace wraps its model.
       expect(printed).toContain('namespace auth {');
       expect(printed).toMatch(/namespace auth \{[\s\S]*model User \{/);
     });
@@ -855,8 +849,6 @@ describe('printPslFromAst', () => {
     });
 
     it('prints a cross-space colon-prefix relation field with the qualifier intact', () => {
-      // AC2: a field whose type is `supabase:auth.User` must render with the
-      // colon-prefix + namespace qualifier intact, alongside its @relation.
       const ast: PslDocumentAst = {
         kind: 'document',
         sourceId: 't',

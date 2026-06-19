@@ -24,7 +24,6 @@ const postgresScalarTypeDescriptors = new Map([
   ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
 ] as const);
 
-/** Build the symbol-table SQL interpreter input from a schema string. */
 function symbolTableInput(schema: string) {
   const { document, sourceFile } = parse(schema);
   const { table } = buildSymbolTable({

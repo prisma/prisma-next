@@ -14,11 +14,6 @@ import {
 
 type NamedTypeSymbol = ScalarSymbol | TypeAliasSymbol;
 
-/**
- * Re-unioned named-type input: the symbol table's top-level scalars + type
- * aliases, each as a {@link NamedTypeSymbol} discriminated by `isConstructor`
- * (replacing the legacy `baseType` vs `typeConstructor` presence check).
- */
 export interface ResolveNamedTypeDeclarationsInput {
   readonly declarations: readonly NamedTypeSymbol[];
   readonly sourceId: string;

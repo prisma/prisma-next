@@ -50,30 +50,16 @@ import {
 
 export interface InterpretPslDocumentToMongoContractInput {
   readonly symbolTable: SymbolTable;
-  /** The parsed source file backing the symbol table's CST nodes; used to resolve diagnostic spans. */
   readonly sourceFile: SourceFile;
-  /** Source file identifier threaded into diagnostics (the symbol table carries none). */
   readonly sourceId: string;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly codecLookup?: CodecLookup;
-  /**
-   * Diagnostics produced before interpretation (the provider's combined
-   * `parse` + `buildSymbolTable` set), seeded into the interpreter's collection
-   * so interpretation can emit the parse + symbol-table + interpreter union in
-   * one run — matching the legacy combined-set parser behaviour rather than
-   * failing before interpreting.
-   */
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
 }
 
 /**
- * Mongo FR16c validation: Mongo's authoring DSL exposes the connection's
- * database as the only namespace surface today, so the PSL interpreter
- * rejects every explicit `namespace { … }` block. In the symbol table, named
- * namespaces are `topLevel.namespaces` (top-level declarations are not a
- * namespace), so every entry here is an explicit block to reject — including
- * `namespace unbound { … }`, since Mongo has no late-binding namespace concept
- * on the PSL surface (the database name comes from the connection string).
+ * Mongo's PSL surface binds the database from the connection string, so every
+ * explicit namespace block is invalid, including `namespace unbound { … }`.
  */
 function validateNamespaceBlocksForMongoTarget(input: {
   readonly namespaces: readonly NamespaceSymbol[];
@@ -833,10 +819,7 @@ function resolveNonRelationField(
     return field.list ? { ...result, many: true } : result;
   }
 
-  // The field's qualified type was malformed and already flagged
-  // (PSL_INVALID_QUALIFIED_TYPE) by `buildSymbolTable`. Don't cascade a spurious
-  // PSL_UNSUPPORTED_FIELD_TYPE — the legacy parser rejected such types before
-  // the interpreter ran.
+  // Avoid cascading unsupported-type diagnostics after invalid qualification.
   if (field.malformedType) {
     return undefined;
   }
@@ -872,15 +855,6 @@ export function interpretPslDocumentToMongoContract(
     sourceFile,
     diagnostics,
   });
-  // Mongo lowers only the implicit top-level bucket today — explicit
-  // `namespace { … }` blocks were rejected above. The IR collection map
-  // remains flat (and the Mongo target represents databases via
-  // `MongoTargetDatabase`, populated at compose time by the connection
-  // string rather than authoring-time PSL). The symbol-table entries already
-  // carry the resolved read-set (type split, attributes, span) and any
-  // `PSL_INVALID_QUALIFIED_TYPE` diagnostic (emitted by `buildSymbolTable`,
-  // seeded into `diagnostics` via the provider), so the interpreter consumes
-  // them directly — no view-build pass.
   const allModels: ModelSymbol[] = Object.values(topLevel.models);
   const allCompositeTypes: CompositeTypeSymbol[] = Object.values(topLevel.compositeTypes);
   const modelNames = new Set(allModels.map((m) => m.name));

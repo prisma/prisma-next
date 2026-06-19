@@ -67,11 +67,6 @@ describe('interpretPslDocumentToSqlContract diagnostics', () => {
   });
 
   it('guards against named type declarations missing both base type and constructor', () => {
-    // A bare `types { Broken }` binding (no `= <type>`) yields a
-    // NamedTypeDeclarationAst with no type annotation, so the symbol table
-    // surfaces it as a type-alias with neither a base type nor a constructor —
-    // reaching the `PSL_UNSUPPORTED_NAMED_TYPE_BASE` guard via the real walk
-    // (replacing the pre-migration hand-built ParsePslDocumentResult).
     const document = symbolTableInputFromParseArgs({
       schema: `types {
   Broken

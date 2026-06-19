@@ -419,9 +419,6 @@ model User {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
       tempDirs.push(tempDir);
       const schemaPath = join(tempDir, 'schema.prisma');
-      // `Dup` is declared twice (symbol-table: PSL_DUPLICATE_DECLARATION);
-      // `Other.bad` uses an unknown scalar type (interpreter:
-      // PSL_UNSUPPORTED_FIELD_TYPE). The combined run must surface both.
       await writeFile(
         schemaPath,
         `model Dup {

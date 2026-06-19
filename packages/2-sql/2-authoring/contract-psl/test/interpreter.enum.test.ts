@@ -401,10 +401,6 @@ model Post {
   id Int @id
 }
 `);
-    // The symbol table resolves duplicate top-level names first-wins and flags
-    // each later occurrence with PSL_DUPLICATE_DECLARATION (operator decisions
-    // #2/#4), so a second `enum Priority` is a hard error — matching the real
-    // provider path (see provider.test.ts).
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.diagnostics).toEqual(

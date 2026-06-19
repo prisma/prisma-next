@@ -14,22 +14,8 @@ import { ArrayLiteralAst, type ExpressionAst } from './syntax/ast/expressions';
 import { printSyntax } from './syntax/ast-helpers';
 
 /**
- * Reconstruct a descriptor-driven {@link PslExtensionBlock} from a CST
- * `GenericBlockDeclarationAst` (a `BlockSymbol.node`).
- *
- * When a {@link AuthoringPslBlockDescriptor} is supplied, each `key = value`
- * member is classified into its declared `ref` / `option` / `value` / `list`
- * shape and `kind` is the descriptor's discriminator. When no descriptor is
- * registered for the block's keyword (`descriptor === undefined`), the block is
- * reconstructed descriptor-free: `kind` is the raw keyword and every member is a
- * `bare`/`value` stub — matching the legacy descriptor-free variadic-block path.
- * Members not declared by a present descriptor likewise fall back to `value`
- * stubs so the validator's unknown-parameter detection still fires.
- *
- * First occurrence of a duplicate member name wins; each later occurrence is
- * dropped and flagged with `PSL_EXTENSION_DUPLICATE_PARAMETER` into the supplied
- * diagnostics sink (parity with the legacy descriptor-driven parser). Never
- * throws.
+ * Descriptor-free and unknown parameters become `value` stubs so validation can
+ * report them via key-set comparison. Duplicate member names are first-wins.
  */
 export function reconstructExtensionBlock(
   node: GenericBlockDeclarationAst,
@@ -130,9 +116,6 @@ function reconstructFromExpression(
     case 'option':
       return { kind: 'option', token: raw, span };
     default:
-      // `value`-kind parameters and members absent from the descriptor both
-      // become `value` stubs: the descriptor-free fallback keeps the validator's
-      // unknown-parameter detection (key-set difference) working unchanged.
       return { kind: 'value', raw, span };
   }
 }

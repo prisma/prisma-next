@@ -30,20 +30,10 @@ export type {
   ResolvedTypeConstructorCall,
 } from './resolve';
 
-/**
- * A scope-aware model of a PSL `DocumentAst`, produced by {@link buildSymbolTable}.
- * Top-level declarations are grouped by kind into keyed records; namespace
- * members and block fields are nested under their owning symbol. Every symbol is
- * discriminated by a `kind` literal and carries its originating CST AST `node`.
- */
 export interface SymbolTable {
   readonly topLevel: TopLevelScope;
 }
 
-/**
- * The document's top-level scope. Each record is keyed by declared name and
- * holds the first-wins symbol for that kind.
- */
 export interface TopLevelScope {
   readonly namespaces: Record<string, NamespaceSymbol>;
   readonly scalars: Record<string, ScalarSymbol>;
@@ -87,21 +77,10 @@ export interface BlockSymbol {
   readonly keyword: string;
   readonly node: GenericBlockDeclarationAst;
   readonly span: PslSpan;
-  /**
-   * The resolved extension block, reconstructed at symbol-table construction
-   * from the block's descriptor (looked up by `keyword`) or descriptor-free when
-   * no descriptor is registered. Consumers (enum factory, descriptor-driven
-   * validation) read this directly instead of reconstructing it themselves.
-   */
+  /** Resolved once so consumers do not independently classify block parameters. */
   readonly block: PslExtensionBlock;
 }
 
-/**
- * The resolved binding shape shared by `types {}` entries: exactly one of
- * `baseType` / `typeConstructor` is meaningful, discriminated by `isConstructor`
- * (the CST `typeAnnotation().isConstructor()` discriminant), plus the binding's
- * attributes.
- */
 export interface ResolvedNamedTypeBinding {
   readonly baseType?: string;
   readonly typeConstructor?: ResolvedTypeConstructorCall;
@@ -135,13 +114,7 @@ export interface FieldSymbol {
   readonly list: boolean;
   readonly typeConstructor?: ResolvedTypeConstructorCall;
   readonly attributes: readonly ResolvedAttribute[];
-  /**
-   * Set when the field's qualified type was over-qualified and
-   * `PSL_INVALID_QUALIFIED_TYPE` was already emitted into the symbol-table
-   * diagnostics. Interpreters treat it as already-reported and do NOT cascade a
-   * `PSL_UNSUPPORTED_FIELD_TYPE` (the legacy parser rejected such types before
-   * the interpreter ran, so that cascade would be a spurious extra diagnostic).
-   */
+  /** Prevents cascading unsupported-type diagnostics after invalid qualification. */
   readonly malformedType?: boolean;
 }
 
@@ -149,12 +122,6 @@ export interface BuildSymbolTableOptions {
   readonly document: DocumentAst;
   readonly sourceFile: SourceFile;
   readonly scalarTypes: readonly string[];
-  /**
-   * Composed extension-block descriptors, used to resolve each generic block
-   * into its {@link PslExtensionBlock} at construction (descriptor-driven
-   * parameter classification). Required: block resolution cannot classify
-   * parameters without it. Pass `{}` when the document has no extension blocks.
-   */
   readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
 }
 
@@ -164,19 +131,8 @@ export interface SymbolTableResult {
 }
 
 /**
- * Build a scope-aware {@link SymbolTable} from a parsed CST `DocumentAst`.
- *
- * A pure, fault-tolerant pass: it never throws on recovered/malformed CST, and
- * its `diagnostics` carry only this pass's own duplicate-name findings
- * (`PSL_DUPLICATE_DECLARATION`), separate from `parse`'s diagnostics.
- *
- * This pass is the **sole owner** of duplicate-declaration detection: it is the
- * only production emitter of `PSL_DUPLICATE_DECLARATION`, resolving same-scope
- * duplicate names first-wins (one symbol per name, colliding regardless of
- * kind). Downstream consumers (the SQL/Mongo interpreters) rely on this — they
- * never re-detect or re-emit duplicate declarations; an interpreter-side guard
- * against a same-coordinate duplicate is an invariant documenting this
- * guarantee, not a live error path.
+ * Owns duplicate-declaration detection for all PSL scopes; downstream consumers
+ * should consume first-wins symbols rather than re-emitting duplicate diagnostics.
  */
 export function buildSymbolTable(options: BuildSymbolTableOptions): SymbolTableResult {
   const { document, sourceFile, scalarTypes, pslBlockDescriptors } = options;

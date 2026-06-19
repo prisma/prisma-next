@@ -301,12 +301,6 @@ export const postgresScalarTypeDescriptors = new Map([
   ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
 ] as const);
 
-/**
- * Shared test helper: parse a schema and build the symbol-table interpreter
- * input (`symbolTable` + `sourceFile` + `sourceId`) that
- * `interpretPslDocumentToSqlContract` consumes after the dispatch-4 walk
- * rewrite. The interpreter-driven test sites call this helper to build input.
- */
 export function buildSymbolTableInput(
   schema: string,
   options?: {
@@ -330,10 +324,6 @@ export function buildSymbolTableInput(
     scalarTypes,
     pslBlockDescriptors,
   });
-  // Mirror the provider: surface `buildSymbolTable`'s diagnostics (e.g. block
-  // `PSL_EXTENSION_DUPLICATE_PARAMETER`, over-qualified `PSL_INVALID_QUALIFIED_TYPE`)
-  // to the interpreter as seeds, so the interpreter-driven tests see the same
-  // diagnostic set the provider would produce.
   const seedDiagnostics: ContractSourceDiagnostic[] = diagnostics.map((diagnostic) => ({
     code: diagnostic.code,
     message: diagnostic.message,
@@ -343,14 +333,6 @@ export function buildSymbolTableInput(
   return { symbolTable: table, sourceFile, sourceId, seedDiagnostics };
 }
 
-/**
- * Object-form shim mirroring the legacy parser's `{ schema, sourceId,
- * pslBlockDescriptors? }` call shape, so call sites can spread the result
- * (`{ ...document, ... }`) into the migrated interpreter input. The
- * `pslBlockDescriptors` are threaded into `buildSymbolTable` so each block's
- * `BlockSymbol.block` is descriptor-classified (the SQL enum factory reads it),
- * and the symbol-table diagnostics are surfaced as `seedDiagnostics`.
- */
 export function symbolTableInputFromParseArgs(args: {
   readonly schema: string;
   readonly sourceId?: string;

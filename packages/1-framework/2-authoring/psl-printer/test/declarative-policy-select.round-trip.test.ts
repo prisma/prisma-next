@@ -136,16 +136,9 @@ interface ParsedPolicySelect {
   readonly symbolTable: SymbolTable;
   readonly sourceFile: SourceFile;
   readonly sourceId: string;
-  /** All top-level `policy_select` block symbols, in source order. */
   readonly blockSymbols: readonly BlockSymbol[];
 }
 
-/**
- * Parse a schema and build its symbol table, returning the top-level
- * `policy_select` block symbols alongside the table + source file. Replaces the
- * legacy parse + extension-block lookup; the descriptor-driven block now
- * surfaces as a `BlockSymbol`.
- */
 function parsePolicySelect(schema: string, sourceId = 'r1'): ParsedPolicySelect {
   const { document, sourceFile } = parse(schema);
   const { table } = buildSymbolTable({
@@ -160,7 +153,6 @@ function parsePolicySelect(schema: string, sourceId = 'r1'): ParsedPolicySelect 
   return { symbolTable: table, sourceFile, sourceId, blockSymbols };
 }
 
-/** The single expected `policy_select` block symbol; throws if not exactly one. */
 function onlyBlockSymbol(parsed: ParsedPolicySelect): BlockSymbol {
   if (parsed.blockSymbols.length !== 1) {
     throw new Error(`expected one policy_select block, got ${parsed.blockSymbols.length}`);
@@ -170,16 +162,10 @@ function onlyBlockSymbol(parsed: ParsedPolicySelect): BlockSymbol {
   return block;
 }
 
-/**
- * The block symbol's resolved `PslExtensionBlock` — now built by
- * `buildSymbolTable` (descriptor-classified via the policy_select descriptor
- * passed above), read directly off the symbol instead of reconstructed here.
- */
 function reconstruct(_parsed: ParsedPolicySelect, block: BlockSymbol): PslExtensionBlock {
   return block.block;
 }
 
-/** Run the descriptor-driven validator over a block symbol. */
 function validate(parsed: ParsedPolicySelect, block: BlockSymbol) {
   return validateExtensionBlockFromSymbol({
     block,
@@ -191,11 +177,6 @@ function validate(parsed: ParsedPolicySelect, block: BlockSymbol) {
   });
 }
 
-/**
- * Build a `PslDocumentAst` (the printer's input) from a reconstructed
- * `policy_select` extension block plus the top-level models, so the generic
- * printer can render the block back to PSL text.
- */
 function documentForPrinting(
   symbolTable: SymbolTable,
   extensionBlock: PslExtensionBlock,
@@ -367,19 +348,14 @@ policy_select NakedParse {
   using  = "auth.uid() = id"
 }
 `;
-      // With an empty codec lookup every codec id is unknown — so a value
-      // parameter always fails validation (the symbol-table equivalent of the
-      // legacy parser's emptyCodecLookup fallback when codecLookup was omitted).
       const parsed = parsePolicySelect(source);
       const block = onlyBlockSymbol(parsed);
 
-      // The block node still reconstructs cleanly.
       expect(reconstruct(parsed, block)).toMatchObject({
         kind: POLICY_SELECT_DISCRIMINATOR,
         name: 'NakedParse',
       });
 
-      // But validation with an empty codec lookup flags the value parameter.
       const diagnostics = validateExtensionBlockFromSymbol({
         block,
         descriptor: POLICY_SELECT_DESCRIPTOR,
@@ -432,7 +408,6 @@ policy_select ProfilesSelect {
         codecLookup,
       });
 
-      // Re-parse the printed text through the same CST pipeline.
       const reParsed = parsePolicySelect(printed, 'rt2-reparse');
       const reParsedBlockSymbol = onlyBlockSymbol(reParsed);
       expect(validate(reParsed, reParsedBlockSymbol)).toEqual([]);

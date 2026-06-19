@@ -12,13 +12,6 @@ export interface MongoContractOptions {
   readonly output?: string;
 }
 
-/**
- * Map a parser/symbol-table `ParseDiagnostic` (`{ code, message, range }`) to
- * the `ContractSourceDiagnostic` the provider surfaces, stamping the provider's
- * `sourceId` and deriving the span from the diagnostic `range`. Mirrors the SQL
- * provider's `mapParseDiagnostics`, now that `parse` + `buildSymbolTable` are
- * the source of truth.
- */
 function mapParseDiagnostics(
   diagnostics: readonly ParseDiagnostic[],
   sourceFile: SourceFile,
@@ -62,9 +55,6 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
           });
         }
 
-        // `parse` yields the CST + syntactic diagnostics; `buildSymbolTable`
-        // adds its own duplicate-name diagnostics (two separate lists per the
-        // project decision).
         const { document, sourceFile, diagnostics: parseDiagnostics } = parse(schema);
         const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
           document,
@@ -73,12 +63,8 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
           pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
         });
 
-        // Seed the combined parse + symbol-table diagnostics into the
-        // interpreter (rather than short-circuiting): it walks the recovered
-        // document, appends its own diagnostics, and its post-walk dedupe gate
-        // emits the deduped parse + symbol-table + interpreter union in one run
-        // — matching the legacy combined-set parser behaviour, consistent with
-        // the SQL provider.
+        // Do not short-circuit on provider-level diagnostics; recovered CST can
+        // still produce interpreter diagnostics in the same response.
         const seedDiagnostics = [
           ...mapParseDiagnostics(parseDiagnostics, sourceFile, schemaPath),
           ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),

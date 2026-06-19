@@ -16,11 +16,6 @@ import {
 import type { SourceFile } from './source-file';
 import type { BlockSymbol, SymbolTable } from './symbol-table';
 
-/**
- * Resolve the descriptor that claims `keyword` from a composed
- * {@link AuthoringPslBlockDescriptorNamespace}. Returns `undefined` when no
- * registered descriptor matches.
- */
 export function findBlockDescriptor(
   descriptors: AuthoringPslBlockDescriptorNamespace | undefined,
   keyword: string,
@@ -38,18 +33,6 @@ export function findBlockDescriptor(
   return undefined;
 }
 
-/**
- * Run the descriptor-driven {@link validateExtensionBlock} over a
- * {@link BlockSymbol}'s already-resolved `block` ({@link PslExtensionBlock},
- * reconstructed by `buildSymbolTable`), building the ref-resolution context from
- * the symbol table's top-level models so `ref`-kind parameters (e.g.
- * `target = Post`) resolve against the document's declarations. Returns the
- * validator's diagnostics (possibly empty).
- *
- * This is the consumer-side replacement for the validation the legacy parser ran
- * post-parse for descriptor-driven extension blocks; it depends only on the
- * resolved block + symbol table + framework validator.
- */
 export function validateExtensionBlockFromSymbol(input: {
   readonly block: BlockSymbol;
   readonly descriptor: AuthoringPslBlockDescriptor;
@@ -77,10 +60,8 @@ function buildRefResolutionContext(symbolTable: SymbolTable): {
   ownerNamespace: ReturnType<typeof makePslNamespace>;
   allNamespaces: readonly ReturnType<typeof makePslNamespace>[];
 } {
-  // The validator resolves `same-namespace`/`same-space` refs by checking
-  // `entries[refKind][name]` for key presence only — so a minimal model stub
-  // keyed by name is sufficient. Top-level declarations live in the synthesised
-  // `__unspecified__` namespace, matching the legacy bucket the validator saw.
+  // Ref validation checks only `entries[refKind][name]` key presence, so model
+  // stubs are enough for top-level declarations in the `__unspecified__` bucket.
   const modelStubs: PslModel[] = Object.values(symbolTable.topLevel.models).map((model) => ({
     kind: 'model',
     name: model.name,

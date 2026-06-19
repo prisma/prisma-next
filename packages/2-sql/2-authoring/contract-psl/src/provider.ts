@@ -45,13 +45,6 @@ function defaultOutputFromSchemaPath(schemaPath: string): string {
   return `${base}.json`;
 }
 
-/**
- * Map a parser/symbol-table `ParseDiagnostic` (`{ code, message, range }`) to
- * the `ContractSourceDiagnostic` the provider surfaces, stamping the provider's
- * `sourceId` and deriving the span from the diagnostic `range`. Restores the
- * surfacing the legacy parser path provided via the interpreter's old
- * `mapParserDiagnostics`, now that `parse` + `buildSymbolTable` are the source.
- */
 function mapParseDiagnostics(
   diagnostics: readonly ParseDiagnostic[],
   sourceFile: SourceFile,
@@ -113,11 +106,6 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           context.codecLookup,
         );
 
-        // `parse` yields the CST + syntactic diagnostics; `buildSymbolTable`
-        // adds its own duplicate-name diagnostics (two separate lists per the
-        // project decision). `pslBlockDescriptors` is threaded so the symbol
-        // table resolves each generic block (enum / descriptor-typed) into its
-        // `PslExtensionBlock` at construction.
         const { document, sourceFile, diagnostics: parseDiagnostics } = parse(schema);
         const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
           document,
@@ -126,11 +114,8 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
         });
 
-        // Seed the combined parse + symbol-table diagnostics into the
-        // interpreter (rather than short-circuiting): it walks the recovered
-        // document, appends its own diagnostics, and its post-walk dedupe gate
-        // emits the deduped parse + symbol-table + interpreter union in one run
-        // — matching the legacy combined-set parser behaviour.
+        // Do not short-circuit on provider-level diagnostics; recovered CST can
+        // still produce interpreter diagnostics in the same response.
         const seedDiagnostics = [
           ...mapParseDiagnostics(parseDiagnostics, sourceFile, schemaPath),
           ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),

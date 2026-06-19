@@ -12,11 +12,6 @@ import type { TypeAnnotationAst } from './syntax/ast/type-annotation';
 import { printSyntax } from './syntax/ast-helpers';
 import type { SyntaxNode } from './syntax/red';
 
-/**
- * A single attribute argument resolved off the CST, with its value rendered to
- * the verbatim source text the legacy `PslAttributeArgument.value` carried (so
- * the interpreters' existing string-based argument parsers consume it unchanged).
- */
 export interface ResolvedAttributeArg {
   readonly kind: 'positional' | 'named';
   readonly name?: string;
@@ -24,28 +19,18 @@ export interface ResolvedAttributeArg {
   readonly span: PslSpan;
 }
 
-/**
- * A `@`/`@@` attribute resolved off the CST: a dotted name (e.g. `db.VarChar`)
- * plus its rendered argument list, with `PslSpan` diagnostic spans.
- */
 export interface ResolvedAttribute {
   readonly name: string;
   readonly args: readonly ResolvedAttributeArg[];
   readonly span: PslSpan;
 }
 
-/** A `Type(args…)` constructor call (e.g. `Vector(1536)`) resolved off the CST. */
 export interface ResolvedTypeConstructorCall {
   readonly path: readonly string[];
   readonly args: readonly ResolvedAttributeArg[];
   readonly span: PslSpan;
 }
 
-/**
- * The resolved type-annotation read-set, derived directly from the CST
- * `QualifiedNameAst` (the split the legacy parser pre-computed into
- * `PslField.typeName`/`typeNamespaceId`/`typeContractSpaceId`).
- */
 export interface ResolvedTypeAnnotation {
   readonly typeName: string | undefined;
   readonly typeNamespaceId: string | undefined;
@@ -56,11 +41,6 @@ export interface ResolvedTypeAnnotation {
   readonly path: readonly string[];
 }
 
-/**
- * A malformed qualified type (an over-qualified name such as `a.b.c` or
- * `x:y:z`). Carries the `Range` so callers can emit `PSL_INVALID_QUALIFIED_TYPE`
- * with the offending name's span.
- */
 export interface MalformedQualifiedType {
   readonly ok: false;
   readonly path: readonly string[];
@@ -71,11 +51,6 @@ export type ResolveTypeAnnotationResult =
   | { readonly ok: true; readonly annotation: ResolvedTypeAnnotation }
   | MalformedQualifiedType;
 
-/**
- * Resolve a field's type annotation into the {@link ResolvedTypeAnnotation}
- * read-set, or a {@link MalformedQualifiedType} signal when the type is
- * over-qualified (more than one namespace/space qualifier). Never throws.
- */
 export function resolveFieldTypeAnnotation(
   field: FieldDeclarationAst,
   sourceFile: SourceFile,
@@ -105,7 +80,6 @@ export function resolveFieldTypeAnnotation(
   };
 }
 
-/** Resolve a single `@`/`@@` attribute into a {@link ResolvedAttribute}. */
 export function readResolvedAttribute(
   attribute: FieldAttributeAst | ModelAttributeAst,
   sourceFile: SourceFile,
@@ -117,7 +91,6 @@ export function readResolvedAttribute(
   };
 }
 
-/** Resolve every `@`/`@@` attribute on a declaration into {@link ResolvedAttribute}s. */
 export function readResolvedAttributes(
   attributes: Iterable<FieldAttributeAst | ModelAttributeAst>,
   sourceFile: SourceFile,
@@ -125,11 +98,6 @@ export function readResolvedAttributes(
   return Array.from(attributes, (attribute) => readResolvedAttribute(attribute, sourceFile));
 }
 
-/**
- * Resolve a constructor type annotation (`Vector(1536)`) into a
- * {@link ResolvedTypeConstructorCall}, or `undefined` when the annotation is not
- * a constructor.
- */
 export function readResolvedConstructorCall(
   annotation: TypeAnnotationAst | undefined,
   sourceFile: SourceFile,
@@ -179,10 +147,6 @@ function nodeRange(node: SyntaxNode, sourceFile: SourceFile): Range {
   };
 }
 
-/**
- * Map a CST node to a {@link PslSpan} (1-based line/column + byte offset), the
- * span shape carried on the resolved symbol-table attribute/constructor reads.
- */
 export function nodePslSpan(node: SyntaxNode, sourceFile: SourceFile): PslSpan {
   const start = node.offset;
   const end = start + node.green.textLength;
@@ -192,12 +156,7 @@ export function nodePslSpan(node: SyntaxNode, sourceFile: SourceFile): PslSpan {
   };
 }
 
-/**
- * Span covering only a node's leading keyword token (e.g. the `enum` keyword on
- * a block declaration's first line), rather than the whole multi-line node.
- * Matches the legacy parser's single-line `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK`
- * span anchor.
- */
+/** Unsupported-top-level-block diagnostics are anchored to the keyword token. */
 export function keywordPslSpan(node: SyntaxNode, keyword: string, sourceFile: SourceFile): PslSpan {
   const start = node.offset;
   const end = start + keyword.length;
@@ -207,7 +166,6 @@ export function keywordPslSpan(node: SyntaxNode, keyword: string, sourceFile: So
   };
 }
 
-/** Map a parser `Range` (0-based positions) to the {@link PslSpan} shape. */
 export function rangeToPslSpan(range: Range, sourceFile: SourceFile): PslSpan {
   return {
     start: offsetToPslPosition(sourceFile.offsetAt(range.start), sourceFile),
