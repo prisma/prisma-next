@@ -5,7 +5,8 @@
  *
  * Run with: pnpm seed
  *
- * Creates 2 users (alice, bob) and 3 posts.
+ * Creates 2 users (alice, bob), 3 posts, 3 tags, and junction rows demonstrating
+ * the Post ↔ Tag many-to-many relation.
  *
  * Prerequisites:
  * - SQLITE_PATH env var (defaults to ./demo.db)
@@ -70,20 +71,73 @@ async function main() {
     console.log(`Created user: ${alice.email} (id: ${alice.id})`);
     console.log(`Created user: ${bob.email} (id: ${bob.id})`);
 
-    await runtime.execute(
+    const firstPostRows = await runtime.execute(
       db.sql.post
         .insert([{ title: 'First Post', userId: alice.id, createdAt: new Date() }])
+        .returning('id', 'title')
         .build(),
     );
-    await runtime.execute(
+    const secondPostRows = await runtime.execute(
       db.sql.post
         .insert([{ title: 'Second Post', userId: alice.id, createdAt: new Date() }])
+        .returning('id', 'title')
         .build(),
     );
     await runtime.execute(
       db.sql.post.insert([{ title: 'Third Post', userId: bob.id, createdAt: new Date() }]).build(),
     );
 
+    const firstPost = firstPostRows[0] ?? null;
+    const secondPost = secondPostRows[0] ?? null;
+    if (!firstPost || !secondPost) {
+      throw new Error('Failed to create posts');
+    }
+
+    console.log(`Created post: ${firstPost.title} (id: ${firstPost.id})`);
+    console.log(`Created post: ${secondPost.title} (id: ${secondPost.id})`);
+
+    const tagTypeScriptRows = await runtime.execute(
+      db.sql.tag
+        .insert([{ label: 'typescript' }])
+        .returning('id', 'label')
+        .build(),
+    );
+    const tagOrmRows = await runtime.execute(
+      db.sql.tag
+        .insert([{ label: 'orm' }])
+        .returning('id', 'label')
+        .build(),
+    );
+    const tagDemoRows = await runtime.execute(
+      db.sql.tag
+        .insert([{ label: 'demo' }])
+        .returning('id', 'label')
+        .build(),
+    );
+
+    const tagTypeScript = tagTypeScriptRows[0] ?? null;
+    const tagOrm = tagOrmRows[0] ?? null;
+    const tagDemo = tagDemoRows[0] ?? null;
+    if (!tagTypeScript || !tagOrm || !tagDemo) {
+      throw new Error('Failed to create tags');
+    }
+
+    console.log(`Created tag: ${tagTypeScript.label} (id: ${tagTypeScript.id})`);
+    console.log(`Created tag: ${tagOrm.label} (id: ${tagOrm.id})`);
+    console.log(`Created tag: ${tagDemo.label} (id: ${tagDemo.id})`);
+
+    await runtime.execute(
+      db.sql.post_tag
+        .insert([
+          { postId: firstPost.id, tagId: tagTypeScript.id },
+          { postId: firstPost.id, tagId: tagOrm.id },
+          { postId: secondPost.id, tagId: tagOrm.id },
+          { postId: secondPost.id, tagId: tagDemo.id },
+        ])
+        .build(),
+    );
+
+    console.log('Seeded post_tag junction rows.');
     console.log('Seed completed successfully!');
   } finally {
     await runtime.close();

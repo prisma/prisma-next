@@ -47,6 +47,25 @@ export class SqlQueryError extends Error implements SqlDriverError<'sql_query'> 
 }
 
 /**
+ * SQLSTATE for a unique-constraint / primary-key violation — the SQL-standard
+ * `unique_violation` class. Drivers normalize their target-specific codes (e.g.
+ * Postgres `23505`, SQLite `SQLITE_CONSTRAINT_UNIQUE`/`PRIMARYKEY`) onto this
+ * value on {@link SqlQueryError.sqlState}, so consumers classify violations
+ * without knowing any target-specific error shape.
+ */
+export const UNIQUE_VIOLATION_SQLSTATE = '23505';
+
+/**
+ * Whether an error is a unique-constraint (or primary-key) violation, decided
+ * solely from the driver-normalized {@link SqlQueryError.sqlState}. Raw driver
+ * errors that were never normalized are not classified — callers run behind the
+ * driver, which always normalizes before the error escapes.
+ */
+export function isUniqueConstraintViolation(error: unknown): boolean {
+  return SqlQueryError.is(error) && error.sqlState === UNIQUE_VIOLATION_SQLSTATE;
+}
+
+/**
  * SQL connection error (timeouts, connection resets, etc.).
  */
 export class SqlConnectionError extends Error implements SqlDriverError<'sql_connection'> {

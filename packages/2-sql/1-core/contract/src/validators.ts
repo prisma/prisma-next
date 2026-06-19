@@ -58,6 +58,7 @@ const ExecutionMutationDefaultSchema = type({
   '+': 'reject',
   ref: {
     '+': 'reject',
+    namespace: 'string',
     table: 'string',
     column: 'string',
   },

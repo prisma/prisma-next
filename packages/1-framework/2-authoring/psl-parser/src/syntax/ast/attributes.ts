@@ -3,7 +3,7 @@ import type { AstNode } from '../ast-helpers';
 import { filterChildren, findChildToken, findFirstChild } from '../ast-helpers';
 import type { SyntaxNode } from '../red';
 import { AttributeArgAst } from './expressions';
-import { IdentifierAst } from './identifier';
+import { QualifiedNameAst } from './qualified-name';
 
 export class AttributeArgListAst implements AstNode {
   readonly syntax: SyntaxNode;
@@ -40,27 +40,8 @@ export class FieldAttributeAst implements AstNode {
     return findChildToken(this.syntax, 'At');
   }
 
-  name(): IdentifierAst | undefined {
-    if (this.dot()) {
-      let count = 0;
-      for (const child of this.syntax.childNodes()) {
-        if (child.kind === 'Identifier') {
-          count++;
-          if (count === 2) return new IdentifierAst(child);
-        }
-      }
-      return undefined;
-    }
-    return findFirstChild(this.syntax, IdentifierAst.cast);
-  }
-
-  dot(): Token | undefined {
-    return findChildToken(this.syntax, 'Dot');
-  }
-
-  namespaceName(): IdentifierAst | undefined {
-    if (!this.dot()) return undefined;
-    return findFirstChild(this.syntax, IdentifierAst.cast);
+  name(): QualifiedNameAst | undefined {
+    return findFirstChild(this.syntax, QualifiedNameAst.cast);
   }
 
   argList(): AttributeArgListAst | undefined {
@@ -83,8 +64,8 @@ export class ModelAttributeAst implements AstNode {
     return findChildToken(this.syntax, 'DoubleAt');
   }
 
-  name(): IdentifierAst | undefined {
-    return findFirstChild(this.syntax, IdentifierAst.cast);
+  name(): QualifiedNameAst | undefined {
+    return findFirstChild(this.syntax, QualifiedNameAst.cast);
   }
 
   argList(): AttributeArgListAst | undefined {

@@ -1,4 +1,9 @@
-import type { InsertAst, ProjectionItem, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type {
+  InsertAst,
+  ProjectionItem,
+  SelectAst,
+  UpdateAst,
+} from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../../src/runtime/sql';
@@ -51,9 +56,16 @@ const stubBase = {
   applyMutationDefaults: () => [],
 };
 
+type FieldProxyStub = { id: unknown };
+type FnsStub = { eq(field: unknown, value: unknown): unknown };
 type TableHandle = {
   select(column: string): { build(): { ast: SelectAst } };
   insert(rows: ReadonlyArray<Record<string, unknown>>): { build(): { ast: InsertAst } };
+  update(set: (fields: FieldProxyStub) => Record<string, unknown>): {
+    where(predicate: (fields: FieldProxyStub, fns: FnsStub) => unknown): {
+      build(): { ast: UpdateAst };
+    };
+  };
 };
 type TwoNamespaceDb = {
   public: { users: TableHandle };
@@ -107,5 +119,62 @@ describe('same bare table name across namespaces', () => {
     expect(insertParamCodecId(authInsert, 'token_col')).toBe('pg/varchar@1');
     expect(insertParamCodecId(authInsert, 'id')).toBe('pg/int4@1');
     expect(authInsert.table.namespaceId).toBe('auth');
+  });
+
+  // Regression: execution-default refs are namespace-scoped, so the builder must
+  // forward the proxy's namespace to `applyMutationDefaults`. With two same-named
+  // `users` tables whose execution defaults differ by namespace, each write must
+  // pick up *its own* namespace's default and not the collision twin's. Before the
+  // builder forwarded `namespace`, the matcher saw `namespace === undefined` and
+  // either applied the wrong namespace's default or none at all.
+  function namespacedDefaultsDb() {
+    const applyMutationDefaults = (options: {
+      readonly table: string;
+      readonly namespace?: string;
+      readonly values: Record<string, unknown>;
+    }) => {
+      if (options.table !== 'users') return [];
+      if (options.namespace === 'public' && !('email_addr' in options.values)) {
+        return [{ column: 'email_addr', value: 'public-default' }];
+      }
+      if (options.namespace === 'auth' && !('token_col' in options.values)) {
+        return [{ column: 'token_col', value: 'auth-default' }];
+      }
+      return [];
+    };
+    return sql({
+      context: {
+        ...stubBase,
+        applyMutationDefaults,
+        contract: twoNamespaceContract,
+      } as unknown as ExecutionContext<Contract>,
+      rawCodecInferer: { inferCodec: () => 'pg/text@1' },
+    }) as unknown as TwoNamespaceDb;
+  }
+
+  it('forwards the proxy namespace so execution defaults disambiguate same-named tables (insert)', () => {
+    const publicInsert = namespacedDefaultsDb()
+      .public.users.insert([{ id: 1 }])
+      .build().ast;
+    const authInsert = namespacedDefaultsDb()
+      .auth.users.insert([{ id: 2 }])
+      .build().ast;
+
+    expect(Object.keys(publicInsert.rows[0]!).sort()).toEqual(['email_addr', 'id']);
+    expect(Object.keys(authInsert.rows[0]!).sort()).toEqual(['id', 'token_col']);
+  });
+
+  it('forwards the proxy namespace so execution defaults disambiguate same-named tables (update)', () => {
+    const publicUpdate = namespacedDefaultsDb()
+      .public.users.update((f) => ({ id: f.id }))
+      .where((f, fns) => fns.eq(f.id, 1))
+      .build().ast;
+    const authUpdate = namespacedDefaultsDb()
+      .auth.users.update((f) => ({ id: f.id }))
+      .where((f, fns) => fns.eq(f.id, 2))
+      .build().ast;
+
+    expect(Object.keys(publicUpdate.set).sort()).toEqual(['email_addr', 'id']);
+    expect(Object.keys(authUpdate.set).sort()).toEqual(['id', 'token_col']);
   });
 });

@@ -67,6 +67,7 @@ describe('SqlContractSerializer logic validation', () => {
           defaults: [
             {
               ref: {
+                namespace: 'public',
                 table: 'User',
                 column: 'id',
               },

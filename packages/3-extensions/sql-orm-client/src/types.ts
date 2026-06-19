@@ -938,10 +938,15 @@ type HasExecutionCreateDefault<
   Extract<
     ExecutionDefaultEntry<TContract>,
     {
+      // Execution-default refs are namespace-scoped. When a namespace is known
+      // (e.g. a junction resolved through its declared `namespaceId`), the match
+      // must include it so a same-named `table.column` in another namespace
+      // cannot borrow this namespace's default. With no namespace (`never`), fall
+      // back to table/column matching.
       readonly ref: {
         readonly table: ModelTableName<TContract, ModelName, NsId>;
         readonly column: FieldColumnName<TContract, ModelName, FieldName, NsId>;
-      };
+      } & ([NsId] extends [never] ? unknown : { readonly namespace: NsId });
       readonly onCreate?: unknown;
     }
   >,
@@ -1015,7 +1020,7 @@ export type CreateInput<
       OptionalCreateFieldNames<TContract, ModelName, NsId>
     >
   > &
-  RelationMutationFields<TContract, ModelName>;
+  RelationMutationFields<TContract, ModelName, 'create'>;
 
 type IsPolymorphicBase<
   TContract extends Contract<SqlStorage>,
@@ -1175,38 +1180,195 @@ export type RelationMutation<TContract extends Contract<SqlStorage>, ModelName e
   | RelationMutationConnect<TContract, ModelName>
   | RelationMutationDisconnect<TContract, ModelName>;
 
-export interface RelationMutator<TContract extends Contract<SqlStorage>, ModelName extends string> {
+type RelationThrough<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  RelName extends string,
+> =
+  RelationsOf<TContract, ModelName> extends infer Rels extends Record<string, unknown>
+    ? RelName extends keyof Rels
+      ? Rels[RelName] extends {
+          readonly through: infer Through extends {
+            readonly table: string;
+            readonly parentColumns: readonly string[];
+            readonly childColumns: readonly string[];
+          };
+        }
+        ? Through
+        : never
+      : never
+    : never;
+
+type HasJunctionThrough<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  RelName extends string,
+> = [RelationThrough<TContract, ModelName, RelName>] extends [never] ? false : true;
+
+/**
+ * Resolves a storage table name to its owning domain model by scanning the
+ * model map for the model whose `storage.table` and `storage.namespaceId`
+ * match. Junction tables (e.g. `user_roles`) surface their generated model
+ * (e.g. `UserRole`) so the junction's own field nullability/defaults can be
+ * inspected.
+ */
+type ModelNameForTable<
+  TContract extends Contract<SqlStorage>,
+  NamespaceId extends string,
+  TableName extends string,
+> = {
+  [M in keyof NamespaceModelsOf<TContract, NamespaceId> & string]: NamespaceModelsOf<
+    TContract,
+    NamespaceId
+  >[M] extends {
+    readonly storage: { readonly namespaceId: NamespaceId; readonly table: TableName };
+  }
+    ? M
+    : never;
+}[keyof NamespaceModelsOf<TContract, NamespaceId> & string];
+
+/**
+ * A junction field is a *payload* field when its backing column is neither a
+ * parent-side nor a child-side foreign-key column of the join. Those payload
+ * fields are the ones the relation API can't populate from `create`/`connect`.
+ */
+type JunctionPayloadFieldNames<
+  TContract extends Contract<SqlStorage>,
+  JunctionModel extends string,
+  JoinColumns extends string,
+  NsId extends string = never,
+> = {
+  [F in CreateFieldNames<TContract, JunctionModel, NsId>]: FieldColumnName<
+    TContract,
+    JunctionModel,
+    F,
+    NsId
+  > extends JoinColumns
+    ? never
+    : F;
+}[CreateFieldNames<TContract, JunctionModel, NsId>];
+
+/**
+ * True when the relation's junction carries at least one required payload
+ * column — a non-join column that is not nullable and has no default. Such a
+ * relation can't be populated through nested `create`, so its create input is
+ * disabled at the type level (mirroring the runtime guard in
+ * `mutation-executor.ts`).
+ */
+type HasRequiredJunctionPayload<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  RelName extends string,
+> =
+  RelationThrough<TContract, ModelName, RelName> extends infer Through extends {
+    readonly table: string;
+    readonly namespaceId: string;
+    readonly parentColumns: readonly string[];
+    readonly childColumns: readonly string[];
+  }
+    ? ModelNameForTable<
+        TContract,
+        Through['namespaceId'],
+        Through['table']
+      > extends infer JunctionModel extends string
+      ? JunctionPayloadFieldNames<
+          TContract,
+          JunctionModel,
+          Through['parentColumns'][number] | Through['childColumns'][number],
+          Through['namespaceId']
+        > extends infer PayloadFields extends string
+        ? {
+            [F in PayloadFields]: IsOptionalCreateField<
+              TContract,
+              JunctionModel,
+              F,
+              Through['namespaceId']
+            > extends true
+              ? never
+              : F;
+          }[PayloadFields] extends never
+          ? false
+          : true
+        : false
+      : false
+    : false;
+
+type DisconnectMutator<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  BareDisconnectDisabled extends boolean,
+> = BareDisconnectDisabled extends true
+  ? (
+      criteria: readonly RelationConnectCriterion<TContract, ModelName>[],
+    ) => RelationMutationDisconnect<TContract, ModelName>
+  : {
+      (): RelationMutationDisconnect<TContract, ModelName>;
+      (
+        criteria: readonly RelationConnectCriterion<TContract, ModelName>[],
+      ): RelationMutationDisconnect<TContract, ModelName>;
+    };
+
+export interface RelationMutator<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  LinkWritesDisabled extends boolean = false,
+  BareDisconnectDisabled extends boolean = false,
+  DisconnectDisabled extends boolean = false,
+> {
   create(
-    data: MutationCreateInput<TContract, ModelName>,
+    data: LinkWritesDisabled extends true ? never : MutationCreateInput<TContract, ModelName>,
   ): RelationMutationCreate<TContract, ModelName>;
   create(
-    data: readonly MutationCreateInput<TContract, ModelName>[],
+    data: LinkWritesDisabled extends true
+      ? never
+      : readonly MutationCreateInput<TContract, ModelName>[],
   ): RelationMutationCreate<TContract, ModelName>;
   connect(
-    criterion: RelationConnectCriterion<TContract, ModelName>,
+    criterion: LinkWritesDisabled extends true
+      ? never
+      : RelationConnectCriterion<TContract, ModelName>,
   ): RelationMutationConnect<TContract, ModelName>;
   connect(
-    criteria: readonly RelationConnectCriterion<TContract, ModelName>[],
+    criteria: LinkWritesDisabled extends true
+      ? never
+      : readonly RelationConnectCriterion<TContract, ModelName>[],
   ): RelationMutationConnect<TContract, ModelName>;
-  disconnect(): RelationMutationDisconnect<TContract, ModelName>;
-  disconnect(
-    criteria: readonly RelationConnectCriterion<TContract, ModelName>[],
-  ): RelationMutationDisconnect<TContract, ModelName>;
+  // `disconnect` is update-only: `createGraph` rejects any nested disconnect
+  // during `create()`, so in the create context the criteria parameter narrows
+  // to `never`, making every call a type error (mirrors the `LinkWritesDisabled`
+  // arms above). `never` is callable, so disabling must live on the parameter,
+  // not the property type.
+  readonly disconnect: DisconnectDisabled extends true
+    ? (criteria: never) => RelationMutationDisconnect<TContract, ModelName>
+    : DisconnectMutator<TContract, ModelName, BareDisconnectDisabled>;
 }
 
 type RelationMutationCallback<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   RelName extends RelationNames<TContract, ModelName>,
+  Context extends 'create' | 'update' = 'update',
 > = (
-  mutator: RelationMutator<TContract, RelatedModelName<TContract, ModelName, RelName> & string>,
+  mutator: RelationMutator<
+    TContract,
+    RelatedModelName<TContract, ModelName, RelName> & string,
+    HasRequiredJunctionPayload<TContract, ModelName, RelName>,
+    HasJunctionThrough<TContract, ModelName, RelName>,
+    Context extends 'create' ? true : false
+  >,
 ) => RelationMutation<TContract, RelatedModelName<TContract, ModelName, RelName> & string>;
 
 type RelationMutationFields<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
+  Context extends 'create' | 'update' = 'update',
 > = Partial<{
-  [K in RelationNames<TContract, ModelName>]: RelationMutationCallback<TContract, ModelName, K>;
+  [K in RelationNames<TContract, ModelName>]: RelationMutationCallback<
+    TContract,
+    ModelName,
+    K,
+    Context
+  >;
 }>;
 
 type AllModelRelationEntries<TContract extends Contract<SqlStorage>> = {
@@ -1283,21 +1445,22 @@ export type MutationCreateInput<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   NsId extends string = never,
-> = NestedCreateInput<TContract, ModelName, NsId> & RelationMutationFields<TContract, ModelName>;
+> = NestedCreateInput<TContract, ModelName, NsId> &
+  RelationMutationFields<TContract, ModelName, 'create'>;
 
 export type MutationCreateInputWithRelations<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   NsId extends string = never,
 > = NestedCreateInput<TContract, ModelName, NsId> &
-  AtLeastOne<RelationMutationFields<TContract, ModelName>>;
+  AtLeastOne<RelationMutationFields<TContract, ModelName, 'create'>>;
 
 export type MutationUpdateInput<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   NsId extends string = never,
 > = Partial<DefaultModelRow<TContract, ModelName, NsId>> &
-  RelationMutationFields<TContract, ModelName>;
+  RelationMutationFields<TContract, ModelName, 'update'>;
 
 type ModelRelations<
   TContract extends Contract<SqlStorage>,

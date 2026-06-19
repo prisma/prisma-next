@@ -8,6 +8,14 @@
       "model": "Post",
       "namespace": "__unbound__"
     },
+    "post_tag": {
+      "model": "PostTag",
+      "namespace": "__unbound__"
+    },
+    "tag": {
+      "model": "Tag",
+      "namespace": "__unbound__"
+    },
     "user": {
       "model": "User",
       "namespace": "__unbound__"
@@ -55,6 +63,34 @@
               }
             },
             "relations": {
+              "tags": {
+                "cardinality": "N:M",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "postId"
+                  ]
+                },
+                "through": {
+                  "childColumns": [
+                    "tagId"
+                  ],
+                  "namespaceId": "__unbound__",
+                  "parentColumns": [
+                    "postId"
+                  ],
+                  "table": "post_tag",
+                  "targetColumns": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Tag",
+                  "namespace": "__unbound__"
+                }
+              },
               "user": {
                 "cardinality": "N:1",
                 "on": {
@@ -88,6 +124,106 @@
               },
               "namespaceId": "__unbound__",
               "table": "post"
+            }
+          },
+          "PostTag": {
+            "fields": {
+              "postId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "tagId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "postId": {
+                  "column": "postId"
+                },
+                "tagId": {
+                  "column": "tagId"
+                }
+              },
+              "namespaceId": "__unbound__",
+              "table": "post_tag"
+            }
+          },
+          "Tag": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "label": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sqlite/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "posts": {
+                "cardinality": "N:M",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "tagId"
+                  ]
+                },
+                "through": {
+                  "childColumns": [
+                    "postId"
+                  ],
+                  "namespaceId": "__unbound__",
+                  "parentColumns": [
+                    "tagId"
+                  ],
+                  "table": "post_tag",
+                  "targetColumns": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Post",
+                  "namespace": "__unbound__"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "label": {
+                  "column": "label"
+                }
+              },
+              "namespaceId": "__unbound__",
+              "table": "tag"
             }
           },
           "User": {
@@ -231,6 +367,100 @@
               },
               "uniques": []
             },
+            "post_tag": {
+              "columns": {
+                "postId": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
+                },
+                "tagId": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": true,
+                  "name": "post_tag_postId_fkey",
+                  "source": {
+                    "columns": [
+                      "postId"
+                    ],
+                    "namespaceId": "__unbound__",
+                    "tableName": "post_tag"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "__unbound__",
+                    "tableName": "post"
+                  }
+                },
+                {
+                  "constraint": true,
+                  "index": true,
+                  "name": "post_tag_tagId_fkey",
+                  "source": {
+                    "columns": [
+                      "tagId"
+                    ],
+                    "namespaceId": "__unbound__",
+                    "tableName": "post_tag"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "__unbound__",
+                    "tableName": "tag"
+                  }
+                }
+              ],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "postId",
+                  "tagId"
+                ],
+                "name": "post_tag_pkey"
+              },
+              "uniques": []
+            },
+            "tag": {
+              "columns": {
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
+                },
+                "label": {
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "user": {
               "columns": {
                 "createdAt": {
@@ -275,10 +505,10 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:5736eda44575a2e995e8c1d5ed6d7884859a882e9551844f776d2a497c6d0154"
+    "storageHash": "sha256:664e11eed7f1d28dcf79412d71801ffa7c0a6369c717c38a0aa655b033e2213e"
   },
   "execution": {
-    "executionHash": "sha256:aa79980d83d295977c2ca3fd5a1407ea2bc67b4538b19971512d2f47ff71338e",
+    "executionHash": "sha256:b5689b5ab97f808cfa98afa9bb2b762a559d895cef8c68395c9ab4611166f605",
     "mutations": {
       "defaults": [
         {
@@ -288,6 +518,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "__unbound__",
             "table": "post"
           }
         },
@@ -298,6 +529,18 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "__unbound__",
+            "table": "tag"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "__unbound__",
             "table": "user"
           }
         }

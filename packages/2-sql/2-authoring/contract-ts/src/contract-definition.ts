@@ -104,6 +104,14 @@ export interface RelationNode {
   };
   readonly through?: {
     readonly table: string;
+    /**
+     * Namespace the junction table lives in. Set from the junction model's
+     * declared namespace at lowering time; junction table names are unique per
+     * namespace, not globally, so this disambiguates a junction whose bare table
+     * name also exists in another namespace. Omitted for a junction in the
+     * default namespace (resolved to the target's default at build time).
+     */
+    readonly namespaceId?: string;
     readonly parentColumns: readonly string[];
     readonly childColumns: readonly string[];
   };

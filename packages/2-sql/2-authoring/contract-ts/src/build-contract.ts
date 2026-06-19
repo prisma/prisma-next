@@ -180,13 +180,18 @@ function buildThroughDescriptor(
   targetModel: ModelNode,
   modelName: string,
   fieldName: string,
+  defaultNamespaceId: string,
 ): ContractRelationThrough {
-  const namespaceId = tableNamespaceByName.get(through.table);
-  if (namespaceId === undefined) {
+  if (!tableNamespaceByName.has(through.table)) {
     throw new Error(
       `buildSqlContractFromDefinition: junction table "${through.table}" for relation "${modelName}.${fieldName}" is not a declared model.`,
     );
   }
+  // Junction table names are unique per namespace, not globally. Prefer the
+  // junction's own declared namespace (carried on the through node); fall back to
+  // the target's default namespace. Resolving by bare table name would pick the
+  // wrong namespace when the same junction table name exists in two namespaces.
+  const namespaceId = through.namespaceId ?? defaultNamespaceId;
 
   return {
     table: through.table,
@@ -430,7 +435,7 @@ export function buildSqlContractFromDefinition(
 
       if (executionDefaultPhases) {
         executionDefaults.push({
-          ref: { table: tableName, column: field.columnName },
+          ref: { namespace: namespaceId, table: tableName, column: field.columnName },
           ...ifDefined('onCreate', executionDefaultPhases.onCreate),
           ...ifDefined('onUpdate', executionDefaultPhases.onUpdate),
         });
@@ -624,6 +629,7 @@ export function buildSqlContractFromDefinition(
             targetModel,
             semanticModel.modelName,
             relation.fieldName,
+            defaultNamespaceId,
           ),
         };
       } else {

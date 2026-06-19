@@ -38,7 +38,7 @@ import type {
 export type StorageHash =
   StorageHashBase<'sha256:981fe037ca7e692e66fe348947d9338b2e42349e1c266482ace81da4800646fa'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:cee87ec002ede0c352cdf215e9e129a540bebd95555057beaa785c7dfadb95ea'>;
+  ExecutionHashBase<'sha256:055d44fe135482983abba0b4d9fab946a7e9587034dbb6c241317ef6021452ff'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
@@ -1052,7 +1052,11 @@ type ContractBase = Omit<
     readonly mutations: {
       readonly defaults: readonly [
         {
-          readonly ref: { readonly table: 'event'; readonly column: 'id' };
+          readonly ref: {
+            readonly namespace: 'public';
+            readonly table: 'event';
+            readonly column: 'id';
+          };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv7' };
         },
       ];
