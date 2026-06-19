@@ -867,16 +867,39 @@ function lookupStorageColumn(
 }
 
 /**
+ * Two storage columns share a type when their `nativeType` and `typeParams`
+ * match. The contract is canonicalized, so `typeParams` key order is stable and
+ * a JSON comparison is exact. `codecId` and `nullable` are intentionally not
+ * compared: they do not change the database-level type that governs a join.
+ */
+function sameStorageType(a: StorageColumn, b: StorageColumn): boolean {
+  return (
+    a.nativeType === b.nativeType &&
+    JSON.stringify(a.typeParams ?? null) === JSON.stringify(b.typeParams ?? null)
+  );
+}
+
+function describeColumnType(column: StorageColumn): string {
+  return column.typeParams === undefined
+    ? column.nativeType
+    : `${column.nativeType} ${JSON.stringify(column.typeParams)}`;
+}
+
+/**
  * Validates one side of an N:M join: the junction columns and the model
- * columns they pair against positionally must be equal in number and exist in
- * their tables. The junction's storage foreign keys already guarantee this for
- * user-declared FK constraints, but `through` is a logical descriptor never
- * tied to them by the rest of validation — and the TS builder accepts explicit
- * join columns without requiring a junction FK at all — so this checks the
- * columns directly against storage, one path regardless of how the junction
- * was authored. Type *compatibility* of paired columns is target-specific (a
- * `text`↔`character` join is valid on Postgres) and enforced by the
- * migration/database layer, not asserted here.
+ * columns they pair against positionally must be equal in number, exist in
+ * their tables, and share the same storage type (`nativeType` + `typeParams`).
+ * The junction's storage foreign keys already guarantee this for user-declared
+ * FK constraints, but `through` is a logical descriptor never tied to them by
+ * the rest of validation — and the TS builder accepts explicit join columns
+ * without requiring a junction FK at all — so this checks the columns directly
+ * against storage, one path regardless of how the junction was authored.
+ *
+ * Joined columns must be the *same* storage type, not merely compatible:
+ * relying on implicit conversion (e.g. `text`↔`character`) is unsafe on writes
+ * — `character(n)` space-padding makes such coercions non-associative — and no
+ * ADR sanctions heterogeneous junction columns. Equality is the conservative
+ * default; it can be relaxed deliberately if a real use case ever appears.
  */
 function validateThroughJoinSide(input: {
   readonly contract: Contract<SqlStorage>;
@@ -943,15 +966,20 @@ function validateThroughJoinSide(input: {
         `${input.modelColumnsLabel} references column "${modelColumnName}" absent from table "${input.modelNamespaceId}.${input.modelTable}".`,
       );
     }
+    if (!sameStorageType(junctionColumn, modelColumn)) {
+      throw fail(
+        `joins "${input.junctionTable}.${junctionColumnName}" (${describeColumnType(junctionColumn)}) with "${input.modelTable}.${modelColumnName}" (${describeColumnType(modelColumn)}) of differing storage type; junction columns must match the type of the column they reference.`,
+      );
+    }
   }
 }
 
 /**
  * Validates that every N:M relation's `through` descriptor is consistent with
- * the storage columns it joins: both join sides match in column count and
- * reference columns that exist in their tables. Without this, a `through` that
- * disagrees with storage surfaces as a silently wrong JOIN at query time rather
- * than a validation error here.
+ * the storage columns it joins: both join sides match in column count,
+ * reference columns that exist in their tables, and pair columns of the same
+ * storage type. Without this, a `through` that disagrees with storage surfaces
+ * as a silently wrong JOIN at query time rather than a validation error here.
  */
 function validateRelationThroughConsistency(contract: Contract<SqlStorage>): void {
   for (const [namespaceId, namespace] of Object.entries(contract.domain.namespaces)) {

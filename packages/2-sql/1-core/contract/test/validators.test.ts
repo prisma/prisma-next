@@ -352,6 +352,41 @@ describe('SQL contract validators', () => {
       );
     });
 
+    it('rejects an N:M relation whose through joins columns of differing storage type', () => {
+      const c = createContract<SqlStorage>({
+        storage: unboundTables({
+          user: table({ id: col('int4', 'pg/int4@1') }),
+          tag: table({ id: col('int4', 'pg/int4@1') }),
+          user_tags: table({
+            user_id: col('text', 'pg/text@1'),
+            tag_id: col('int4', 'pg/int4@1'),
+          }),
+        }),
+        models: {
+          User: model(
+            'user',
+            { id: { column: 'id' } },
+            {
+              tags: {
+                to: { model: 'Tag', namespace: UNBOUND_NAMESPACE_ID },
+                cardinality: 'N:M',
+                on: { localFields: ['id'], targetFields: ['user_id'] },
+                through: {
+                  table: 'user_tags',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  parentColumns: ['user_id'],
+                  childColumns: ['tag_id'],
+                  targetColumns: ['id'],
+                },
+              },
+            },
+          ),
+          Tag: model('tag', { id: { column: 'id' } }),
+        },
+      });
+      expect(() => validateSqlContractFully(c)).toThrow(/differing storage type/);
+    });
+
     it('resolves on.localFields field names to storage columns when they differ', () => {
       const c = createContract<SqlStorage>({
         storage: unboundTables({
