@@ -10,18 +10,18 @@ if (pathEl !== null) {
   pathEl.textContent = schemaPath;
 }
 
-// Build the WS URL so each branch is already the right template-literal type
-// (`ws://...` / `wss://...`) that `languageServer` expects — no cast needed.
-// Plain `ws://` is intentional: this is a localhost-only dev playground served
-// over http, where the editor and the LSP bridge share one loopback origin;
-// `wss` (TLS) is meaningless on localhost. When served over https we do use wss.
+// The WebSocket scheme mirrors the page origin: plain on http, secure on https.
+// This is a localhost-only dev playground, so a plain socket on loopback is
+// expected and fine. The serverUri type is derived from the library to avoid a
+// cast. (Semgrep's detect-insecure-websocket is suppressed inline below.)
+type ServerUri = Parameters<typeof languageServer>[0]['serverUri'];
 const host = `${window.location.host}${wsPath}`;
-// nosemgrep: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket
-const wsUrl: `ws://${string}` | `wss://${string}` =
+const serverUri: ServerUri =
+  // nosemgrep: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket -- localhost dev playground; scheme mirrors page origin
   window.location.protocol === 'https:' ? `wss://${host}` : `ws://${host}`;
 
 const ls = languageServer({
-  serverUri: wsUrl,
+  serverUri,
   rootUri,
   workspaceFolders: null,
   documentUri,

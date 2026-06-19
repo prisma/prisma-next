@@ -180,6 +180,7 @@ export const schemaText = ${JSON.stringify(schemaText)};
   httpServer.listen(PORT, () => {
     const url = `http://localhost:${PORT}/`;
     console.log(`Playground: ${url}`);
+    // nosemgrep: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket -- localhost dev playground bridge URL log
     console.log(`LSP bridge: ws://localhost:${PORT}${LSP_PATH}`);
     console.log('Open the URL above in your browser. Ctrl+C to stop.');
   });
