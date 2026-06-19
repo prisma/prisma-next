@@ -167,7 +167,7 @@ namespace auth {
       schema: `namespace public {
   model User {
     id Int @id
-    posts Post[]
+    posts blog.Post[]
   }
 }
 
