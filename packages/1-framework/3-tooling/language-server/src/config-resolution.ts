@@ -8,10 +8,6 @@ export interface ConfigResolution {
 }
 
 export async function resolveConfigInputs(configPath: string): Promise<ConfigResolution> {
-  return loadResolvedConfigInputs(configPath);
-}
-
-async function loadResolvedConfigInputs(resolvedConfigPath: string): Promise<ConfigResolution> {
-  const config = await loadConfig(resolvedConfigPath);
+  const config = await loadConfig(configPath);
   return { inputs: resolveSchemaInputs(config) };
 }
