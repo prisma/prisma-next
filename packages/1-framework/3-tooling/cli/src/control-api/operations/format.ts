@@ -1,13 +1,12 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { EOL } from 'node:os';
+import { loadConfig } from '@prisma-next/config-loader';
 import { type FormatOptions, format, PslFormatError } from '@prisma-next/psl-parser/format';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { loadConfig } from '../../config-loader';
 import { CliStructuredError, errorRuntime, errorUnexpected } from '../../utils/cli-errors';
 
 export interface FormatOperationOptions {
   readonly configPath?: string;
-  /** Injected at the CLI boundary so the formatter engine never reads `os`. */
   readonly eol?: string;
 }
 

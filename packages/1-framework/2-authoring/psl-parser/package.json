@@ -40,11 +40,26 @@
   ],
   "types": "./dist/index.d.mts",
   "exports": {
-    ".": "./dist/index.mjs",
-    "./parser": "./dist/parser.mjs",
-    "./format": "./dist/format.mjs",
-    "./syntax": "./dist/syntax.mjs",
-    "./tokenizer": "./dist/tokenizer.mjs",
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./format": {
+      "types": "./dist/format.d.mts",
+      "import": "./dist/format.mjs"
+    },
+    "./parser": {
+      "types": "./dist/parser.d.mts",
+      "import": "./dist/parser.mjs"
+    },
+    "./syntax": {
+      "types": "./dist/syntax.d.mts",
+      "import": "./dist/syntax.mjs"
+    },
+    "./tokenizer": {
+      "types": "./dist/tokenizer.d.mts",
+      "import": "./dist/tokenizer.mjs"
+    },
     "./package.json": "./package.json"
   },
   "engines": {
