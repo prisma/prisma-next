@@ -27,12 +27,23 @@ import type { ConfigResolution } from '../src/config-resolution';
 import { resolveSchemaInputs } from '../src/schema-inputs';
 import { createServer } from '../src/server';
 
-type ResolveInputs = (rootPath: string, configPath?: string) => Promise<ConfigResolution>;
-type FindConfigPathForFile = (filePath: string) => Promise<string | undefined>;
+type ResolveInputs = (configPath: string) => Promise<ConfigResolution>;
+type FindNearestConfigPathForFile = (filePath: string) => Promise<string | undefined>;
 
+const configLoaderMock = vi.hoisted(() => ({
+  findNearestConfigPathForFile: vi.fn<FindNearestConfigPathForFile>(),
+}));
 const configResolutionMock = vi.hoisted(() => ({
   resolveConfigInputs: vi.fn<ResolveInputs>(),
 }));
+
+vi.mock('@prisma-next/config-loader', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@prisma-next/config-loader')>();
+  return {
+    ...actual,
+    findNearestConfigPathForFile: configLoaderMock.findNearestConfigPathForFile,
+  };
+});
 
 vi.mock('../src/config-resolution', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/config-resolution')>();
@@ -74,10 +85,10 @@ interface Harness {
 function startHarness(
   resolveInputs: ResolveInputs,
   capabilities: ClientCapabilities = {},
-  findConfigPathForFile: FindConfigPathForFile = async () => configPath,
-  explicitConfigPath?: string,
+  findNearestConfigPathForFile: FindNearestConfigPathForFile = async () => configPath,
 ): Harness {
   configResolutionMock.resolveConfigInputs.mockImplementation(resolveInputs);
+  configLoaderMock.findNearestConfigPathForFile.mockImplementation(findNearestConfigPathForFile);
   const clientToServer = new PassThrough();
   const serverToClient = new PassThrough();
 
@@ -85,10 +96,7 @@ function startHarness(
     new StreamMessageReader(clientToServer),
     new StreamMessageWriter(serverToClient),
   );
-  const server = createServer(serverConnection, {
-    findConfigPathForFile,
-    ...(explicitConfigPath ? { configPath: explicitConfigPath } : {}),
-  });
+  const server = createServer(serverConnection);
 
   const client = createConnection(
     new StreamMessageReader(serverToClient),
@@ -245,6 +253,7 @@ afterEach(async () => {
   harness?.dispose();
   harness = undefined;
   configResolutionMock.resolveConfigInputs.mockReset();
+  configLoaderMock.findNearestConfigPathForFile.mockReset();
 });
 
 describe('language server', { timeout: timeouts.databaseOperation }, () => {
@@ -340,7 +349,7 @@ function mutableResolve(initial: ResolveInputs): {
 } {
   let current = initial;
   return {
-    resolve: (rootPath, configPathArg) => current(rootPath, configPathArg),
+    resolve: (configPath) => current(configPath),
     set: (next) => {
       current = next;
     },
@@ -361,9 +370,9 @@ function watchedFilesRegistrations(harness: Harness) {
     .filter((registration) => registration.method === 'workspace/didChangeWatchedFiles');
 }
 
-function findConfigForPrefixes(
+function findNearestConfigForPrefixes(
   entries: readonly { readonly prefix: string; readonly configPath: string }[],
-): FindConfigPathForFile {
+): FindNearestConfigPathForFile {
   return async (filePath) => entries.find((entry) => filePath.startsWith(entry.prefix))?.configPath;
 }
 
@@ -396,19 +405,17 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     const projectASchemaUri = pathToFileURL(projectASchemaPath).toString();
     const projectBSchemaUri = pathToFileURL(projectBSchemaPath).toString();
     const resolvedConfigs: string[] = [];
-    const resolveInputs: ResolveInputs = async (_rootPath, configPathArg) => {
-      if (configPathArg !== undefined) {
-        resolvedConfigs.push(configPathArg);
-      }
+    const resolveInputs: ResolveInputs = async (configPath) => {
+      resolvedConfigs.push(configPath);
       return {
         inputs: resolveSchemaInputs({
           contract: {
             source: {
               sourceFormat: 'psl',
               inputs:
-                configPathArg === projectAConfigPath
+                configPath === projectAConfigPath
                   ? [projectASchemaPath]
-                  : configPathArg === projectBConfigPath
+                  : configPath === projectBConfigPath
                     ? [projectBSchemaPath]
                     : [],
             },
@@ -419,7 +426,7 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     harness = startHarness(
       resolveInputs,
       {},
-      findConfigForPrefixes([
+      findNearestConfigForPrefixes([
         { prefix: projectARoot, configPath: projectAConfigPath },
         { prefix: projectBRoot, configPath: projectBConfigPath },
       ]),
@@ -454,16 +461,14 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     const unseenSchemaPath = join(unseenRoot, 'schema.psl');
     const unseenSchemaUri = pathToFileURL(unseenSchemaPath).toString();
     const resolvedConfigs: string[] = [];
-    const resolveInputs: ResolveInputs = async (_rootPath, configPathArg) => {
-      if (configPathArg !== undefined) {
-        resolvedConfigs.push(configPathArg);
-      }
+    const resolveInputs: ResolveInputs = async (configPath) => {
+      resolvedConfigs.push(configPath);
       return {
         inputs: resolveSchemaInputs({
           contract: {
             source: {
               sourceFormat: 'psl',
-              inputs: configPathArg === unseenConfigPath ? [unseenSchemaPath] : [],
+              inputs: configPath === unseenConfigPath ? [unseenSchemaPath] : [],
             },
           },
         }),
@@ -472,7 +477,7 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     harness = startHarness(
       resolveInputs,
       {},
-      findConfigForPrefixes([{ prefix: unseenRoot, configPath: unseenConfigPath }]),
+      findNearestConfigForPrefixes([{ prefix: unseenRoot, configPath: unseenConfigPath }]),
     );
     await harness.initialize();
     expect(resolvedConfigs).toEqual([]);
@@ -490,42 +495,6 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     expect(resolvedConfigs).toEqual([unseenConfigPath]);
   });
 
-  it('uses an explicit custom config path instead of nearest default config discovery', async () => {
-    const projectRoot = join(root, 'explicit-config-project');
-    const customConfigPath = join(projectRoot, 'custom-config.ts');
-    const relativeCustomConfigPath = join('explicit-config-project', 'custom-config.ts');
-    const schemaPath = join(projectRoot, 'schema.psl');
-    const schemaUri = pathToFileURL(schemaPath).toString();
-    const resolvedConfigs: string[] = [];
-    const resolveInputs: ResolveInputs = async (_rootPath, configPathArg) => {
-      if (configPathArg !== undefined) {
-        resolvedConfigs.push(configPathArg);
-      }
-      return {
-        inputs: resolveSchemaInputs({
-          contract: {
-            source: {
-              sourceFormat: 'psl',
-              inputs: configPathArg === customConfigPath ? [schemaPath] : [],
-            },
-          },
-        }),
-      };
-    };
-    const failNearestDiscovery: FindConfigPathForFile = async () => {
-      throw new Error('nearest config discovery must not run when an explicit config path is set');
-    };
-    harness = startHarness(resolveInputs, {}, failNearestDiscovery, relativeCustomConfigPath);
-    await harness.initialize();
-
-    harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
-      textDocument: { uri: schemaUri, languageId: 'prisma', version: 1, text: 'model {' },
-    });
-
-    expect((await harness.waitForDiagnostics(schemaUri)).length).toBeGreaterThan(0);
-    expect(resolvedConfigs).toEqual([customConfigPath]);
-  });
-
   it('publishes no diagnostics for a PSL file that is not a configured input in its project', async () => {
     const projectRoot = join(root, 'non-input-project');
     const projectConfigPath = join(projectRoot, 'prisma-next.config.ts');
@@ -540,7 +509,7 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     harness = startHarness(
       resolveInputs,
       {},
-      findConfigForPrefixes([{ prefix: projectRoot, configPath: projectConfigPath }]),
+      findNearestConfigForPrefixes([{ prefix: projectRoot, configPath: projectConfigPath }]),
     );
     await harness.initialize();
 
@@ -559,11 +528,9 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     const childSchemaPath = join(childRoot, 'schema.psl');
     const childSchemaUri = pathToFileURL(childSchemaPath).toString();
     const resolvedConfigs: string[] = [];
-    const resolveInputs: ResolveInputs = async (_rootPath, configPathArg) => {
-      if (configPathArg !== undefined) {
-        resolvedConfigs.push(configPathArg);
-      }
-      if (configPathArg === parentConfigPath) {
+    const resolveInputs: ResolveInputs = async (configPath) => {
+      resolvedConfigs.push(configPath);
+      if (configPath === parentConfigPath) {
         return {
           inputs: resolveSchemaInputs({
             contract: { source: { sourceFormat: 'psl', inputs: [childSchemaPath] } },
@@ -575,7 +542,7 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     harness = startHarness(
       resolveInputs,
       {},
-      findConfigForPrefixes([{ prefix: childRoot, configPath: childConfigPath }]),
+      findNearestConfigForPrefixes([{ prefix: childRoot, configPath: childConfigPath }]),
     );
     await harness.initialize();
 
@@ -613,7 +580,7 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     harness = startHarness(
       resolveInputs,
       watchedFilesCapabilities,
-      findConfigForPrefixes([{ prefix: projectRoot, configPath: projectConfigPath }]),
+      findNearestConfigForPrefixes([{ prefix: projectRoot, configPath: projectConfigPath }]),
     );
     await harness.initialize();
 
@@ -648,19 +615,17 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     const projectBSchemaUri = pathToFileURL(projectBSchemaPath).toString();
     const resolvedConfigs: string[] = [];
     let projectBIsConfigured = true;
-    const resolveInputs: ResolveInputs = async (_rootPath, configPathArg) => {
-      if (configPathArg !== undefined) {
-        resolvedConfigs.push(configPathArg);
-      }
+    const resolveInputs: ResolveInputs = async (configPath) => {
+      resolvedConfigs.push(configPath);
       return {
         inputs: resolveSchemaInputs({
           contract: {
             source: {
               sourceFormat: 'psl',
               inputs:
-                configPathArg === projectAConfigPath
+                configPath === projectAConfigPath
                   ? [projectASchemaPath]
-                  : configPathArg === projectBConfigPath && projectBIsConfigured
+                  : configPath === projectBConfigPath && projectBIsConfigured
                     ? [projectBSchemaPath]
                     : [],
             },
@@ -671,7 +636,7 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     harness = startHarness(
       resolveInputs,
       watchedFilesCapabilities,
-      findConfigForPrefixes([
+      findNearestConfigForPrefixes([
         { prefix: projectARoot, configPath: projectAConfigPath },
         { prefix: projectBRoot, configPath: projectBConfigPath },
       ]),

@@ -1,4 +1,4 @@
-import { dirname, join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findNearestConfigPathForFile } from '@prisma-next/config-loader';
 import {
@@ -22,29 +22,17 @@ export interface LanguageServer {
   dispose(): void;
 }
 
-export type FindConfigPathForFile = (filePath: string) => Promise<string | undefined>;
-
 interface ProjectState {
   readonly configPath: string;
   readonly inputs: SchemaInputSet;
 }
 
-export interface CreateServerOptions {
-  readonly configPath?: string;
-  readonly findConfigPathForFile?: FindConfigPathForFile;
-}
-
-export function createServer(
-  connection: Connection,
-  options?: CreateServerOptions,
-): LanguageServer {
+export function createServer(connection: Connection): LanguageServer {
   const documents = new TextDocuments(TextDocument);
-  const findConfigPathForFile = options?.findConfigPathForFile ?? findNearestConfigPathForFile;
   const projects = new Map<string, ProjectState>();
   const projectLoads = new Map<string, Promise<ProjectState>>();
   const documentConfigPaths = new Map<string, string>();
   let rootPath = process.cwd();
-  let explicitConfigPath: string | undefined;
   let watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
   let supportsWatchedFilesRegistration = false;
 
@@ -79,7 +67,7 @@ export function createServer(
       return undefined;
     }
 
-    const configPath = explicitConfigPath ?? (await findConfigPathForFile(filePath));
+    const configPath = await findNearestConfigPathForFile(filePath);
     if (configPath === undefined) {
       return undefined;
     }
@@ -132,7 +120,7 @@ export function createServer(
   }
 
   async function loadProject(configPath: string): Promise<ProjectState> {
-    const resolution = await resolveConfigInputs(dirname(configPath), configPath);
+    const resolution = await resolveConfigInputs(configPath);
     const project: ProjectState = { configPath, inputs: resolution.inputs };
     projects.set(configPath, project);
     return project;
@@ -162,7 +150,7 @@ export function createServer(
       if (filePath === undefined) {
         continue;
       }
-      const nearestConfigPath = explicitConfigPath ?? (await findConfigPathForFile(filePath));
+      const nearestConfigPath = await findNearestConfigPathForFile(filePath);
       if (nearestConfigPath === configPath) {
         documentConfigPaths.set(document.uri, configPath);
         await publish(document.uri, document.getText());
@@ -178,8 +166,7 @@ export function createServer(
 
   connection.onInitialize(async (params): Promise<InitializeResult> => {
     rootPath = resolveRootPath(params.rootUri, params.rootPath);
-    explicitConfigPath = options?.configPath ? resolve(rootPath, options.configPath) : undefined;
-    watchedConfigGlob = explicitConfigPath ?? join(rootPath, '**', CONFIG_FILENAME);
+    watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
     supportsWatchedFilesRegistration = clientSupportsWatchedFilesRegistration(params);
 
     return {
@@ -212,7 +199,6 @@ export function createServer(
   connection.onDidChangeWatchedFiles(async (params) => {
     const changedConfigPaths = configPathsFromWatchedChanges(
       params.changes.map((change) => filePathFromUri(change.uri)),
-      explicitConfigPath,
     );
     for (const configPath of changedConfigPaths) {
       try {
@@ -283,22 +269,10 @@ function filePathFromUri(uri: string): string | undefined {
   }
 }
 
-function configPathsFromWatchedChanges(
-  paths: readonly (string | undefined)[],
-  explicitConfigPath: string | undefined,
-): Set<string> {
+function configPathsFromWatchedChanges(paths: readonly (string | undefined)[]): Set<string> {
   const configPaths = new Set<string>();
   for (const path of paths) {
-    if (path === undefined) {
-      continue;
-    }
-    if (explicitConfigPath !== undefined) {
-      if (path === explicitConfigPath) {
-        configPaths.add(path);
-      }
-      continue;
-    }
-    if (path.endsWith(CONFIG_FILENAME)) {
+    if (path?.endsWith(CONFIG_FILENAME)) {
       configPaths.add(path);
     }
   }

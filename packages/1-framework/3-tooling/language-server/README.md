@@ -38,10 +38,8 @@ Diagnostics only — no hover, completion, navigation, or formatting over LSP. A
 - `config-resolution.ts` — wraps `loadConfig` and resolves the schema inputs for a config. A standalone async function so it can be re-run on a config change without rewiring the server.
 - `document-diagnostics.ts` — `computeDocumentDiagnostics(uri, text, inputs)`,
   the seam the connection layer calls.
-- `server.ts` — `createServer(connection, options)` wires handlers onto an
-  injected connection.
-- `start-server.ts` — `startServer(options)` creates a stdio connection and
-  starts the server. This is what the CLI delegates to.
+- `server.ts` — `createServer(connection)` wires handlers onto an injected connection.
+- `start-server.ts` — `startServer()` creates a stdio connection and starts the server. This is what the CLI delegates to.
 
 ## Package Location
 

@@ -17,8 +17,9 @@ describe('resolveConfigInputs', { timeout: timeouts.coldTransformImport }, () =>
 
   it('rejects when no config exists', async () => {
     const root = await mkdtemp(join(tmpdir(), 'pn-lsp-noconfig-'));
+    const configPath = join(root, 'prisma-next.config.ts');
 
-    await expect(resolveConfigInputs(root)).rejects.toMatchObject({
+    await expect(resolveConfigInputs(configPath)).rejects.toMatchObject({
       name: 'CliStructuredError',
       code: '4001',
     });
@@ -26,9 +27,10 @@ describe('resolveConfigInputs', { timeout: timeouts.coldTransformImport }, () =>
 
   it('rejects when the config is invalid', async () => {
     const root = await mkdtemp(join(tmpdir(), 'pn-lsp-badconfig-'));
-    await writeFile(join(root, 'prisma-next.config.ts'), 'export default { family: {} };\n');
+    const configPath = join(root, 'prisma-next.config.ts');
+    await writeFile(configPath, 'export default { family: {} };\n');
 
-    await expect(resolveConfigInputs(root)).rejects.toMatchObject({
+    await expect(resolveConfigInputs(configPath)).rejects.toMatchObject({
       name: 'CliStructuredError',
       code: '4009',
     });
@@ -39,8 +41,9 @@ describe('resolveConfigInputs', { timeout: timeouts.coldTransformImport }, () =>
       errorUnexpected('boom', { why: 'Failed to load config: boom' }),
     );
     const root = await mkdtemp(join(tmpdir(), 'pn-lsp-unexpected-'));
+    const configPath = join(root, 'prisma-next.config.ts');
 
-    await expect(resolveConfigInputs(root)).rejects.toMatchObject({
+    await expect(resolveConfigInputs(configPath)).rejects.toMatchObject({
       name: 'CliStructuredError',
       code: '4999',
     });

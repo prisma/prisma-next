@@ -1,19 +1,14 @@
-import { join } from 'node:path';
 import { loadConfig } from '@prisma-next/config-loader';
 import { resolveSchemaInputs, type SchemaInputSet } from './schema-inputs';
 
-// Exported so the watcher glob and the resolution load from the same path.
 export const CONFIG_FILENAME = 'prisma-next.config.ts';
 
 export interface ConfigResolution {
   readonly inputs: SchemaInputSet;
 }
 
-export async function resolveConfigInputs(
-  rootPath: string,
-  configPath?: string,
-): Promise<ConfigResolution> {
-  return loadResolvedConfigInputs(configPath ?? join(rootPath, CONFIG_FILENAME));
+export async function resolveConfigInputs(configPath: string): Promise<ConfigResolution> {
+  return loadResolvedConfigInputs(configPath);
 }
 
 async function loadResolvedConfigInputs(resolvedConfigPath: string): Promise<ConfigResolution> {
