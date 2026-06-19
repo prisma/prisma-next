@@ -314,7 +314,7 @@ describe('SQL contract validators', () => {
       targetColumns: ['id'],
     };
 
-    it('accepts an N:M relation with a length-consistent through', () => {
+    it('accepts an N:M relation whose through joins existing, type-matched columns', () => {
       const c = manyToManyContract({
         on: { localFields: ['id'], targetFields: ['user_id'] },
         through: consistentThrough,
@@ -327,7 +327,9 @@ describe('SQL contract validators', () => {
         on: { localFields: [], targetFields: ['user_id'] },
         through: consistentThrough,
       });
-      expect(() => validateSqlContractFully(c)).toThrow(/through\.parentColumns/);
+      expect(() => validateSqlContractFully(c)).toThrow(
+        /through\.parentColumns \(1\) with on\.localFields \(0\) of differing length/,
+      );
     });
 
     it('rejects an N:M relation whose through.childColumns and through.targetColumns differ in length', () => {
@@ -335,7 +337,54 @@ describe('SQL contract validators', () => {
         on: { localFields: ['id'], targetFields: ['user_id'] },
         through: { ...consistentThrough, targetColumns: ['id', 'id'] },
       });
-      expect(() => validateSqlContractFully(c)).toThrow(/through\.childColumns/);
+      expect(() => validateSqlContractFully(c)).toThrow(
+        /through\.childColumns \(1\) with through\.targetColumns \(2\) of differing length/,
+      );
+    });
+
+    it('rejects an N:M relation whose through references a column absent from the junction table', () => {
+      const c = manyToManyContract({
+        on: { localFields: ['id'], targetFields: ['ghost'] },
+        through: { ...consistentThrough, parentColumns: ['ghost'] },
+      });
+      expect(() => validateSqlContractFully(c)).toThrow(
+        /through\.parentColumns references column "ghost" absent from junction table/,
+      );
+    });
+
+    it('resolves on.localFields field names to storage columns when they differ', () => {
+      const c = createContract<SqlStorage>({
+        storage: unboundTables({
+          account: table({ tenant_id: col('int4', 'pg/int4@1') }),
+          tag: table({ id: col('int4', 'pg/int4@1') }),
+          account_tags: table({
+            acct_tenant: col('int4', 'pg/int4@1'),
+            tag_id: col('int4', 'pg/int4@1'),
+          }),
+        }),
+        models: {
+          Account: model(
+            'account',
+            { tenantId: { column: 'tenant_id' } },
+            {
+              tags: {
+                to: { model: 'Tag', namespace: UNBOUND_NAMESPACE_ID },
+                cardinality: 'N:M',
+                on: { localFields: ['tenantId'], targetFields: ['acct_tenant'] },
+                through: {
+                  table: 'account_tags',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  parentColumns: ['acct_tenant'],
+                  childColumns: ['tag_id'],
+                  targetColumns: ['id'],
+                },
+              },
+            },
+          ),
+          Tag: model('tag', { id: { column: 'id' } }),
+        },
+      });
+      expect(() => validateSqlContractFully(c)).not.toThrow();
     });
 
     it('throws on missing targetFamily', () => {

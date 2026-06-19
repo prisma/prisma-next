@@ -37,6 +37,7 @@ import {
   type SqlModelStorage,
   SqlStorage,
   type SqlStorageInput,
+  type StorageColumn,
   type StorageTable,
   type StorageTypeInstanceInput,
 } from './types';
@@ -820,40 +821,6 @@ export interface ValidateSqlContractFullyOptions {
  * validated flat-data shape; IR class hydration happens in the SPI
  * base on top of this helper.
  */
-/**
- * Defensive check that an N:M relation's `through` column arrays line up with
- * the arrays they pair against positionally. The arktype schema only checks
- * that the fields are present; their relative lengths are an invariant the
- * lowering already guarantees, but the runtime join builder pairs
- * `through.parentColumns[i]` against `on.localFields[i]` and
- * `through.childColumns[i]` against `through.targetColumns[i]`, so a length
- * mismatch would otherwise surface as a silently wrong JOIN at query time
- * rather than a validation error here.
- */
-function validateRelationThroughConsistency(contract: Contract<SqlStorage>): void {
-  for (const [namespaceId, namespace] of Object.entries(contract.domain.namespaces)) {
-    for (const [modelName, model] of Object.entries(namespace.models)) {
-      for (const [relationName, relation] of Object.entries(model.relations)) {
-        if (relation.cardinality !== 'N:M') continue;
-        const qualifiedName = `${namespaceId}:${modelName}.${relationName}`;
-        const { on, through } = relation;
-        if (through.parentColumns.length !== on.localFields.length) {
-          throw new ContractValidationError(
-            `Many-to-many relation "${qualifiedName}" has through.parentColumns (${through.parentColumns.length}) and on.localFields (${on.localFields.length}) of differing length; they pair positionally and must match.`,
-            'storage',
-          );
-        }
-        if (through.childColumns.length !== through.targetColumns.length) {
-          throw new ContractValidationError(
-            `Many-to-many relation "${qualifiedName}" has through.childColumns (${through.childColumns.length}) and through.targetColumns (${through.targetColumns.length}) of differing length; they pair positionally and must match.`,
-            'storage',
-          );
-        }
-      }
-    }
-  }
-}
-
 export function validateSqlContractFully<T extends Contract<SqlStorage>>(
   value: unknown,
   options?: ValidateSqlContractFullyOptions,
@@ -882,4 +849,157 @@ export function validateSqlContractFully<T extends Contract<SqlStorage>>(
   validateModelStorageReferences(validated);
   validateRelationThroughConsistency(validated);
   return validated;
+}
+
+/** Storage column lookup for through-consistency validation. */
+function lookupStorageColumn(
+  contract: Contract<SqlStorage>,
+  namespaceId: string,
+  tableName: string,
+  columnName: string,
+): StorageColumn | undefined {
+  const rawTable = contract.storage.namespaces[namespaceId]?.entries.table?.[tableName];
+  if (rawTable === undefined) {
+    return undefined;
+  }
+  const table = blindCast<StorageTable, 'structurally validated storage table'>(rawTable);
+  return table.columns[columnName];
+}
+
+/**
+ * Validates one side of an N:M join: the junction columns and the model
+ * columns they pair against positionally must be equal in number and exist in
+ * their tables. The junction's storage foreign keys already guarantee this for
+ * user-declared FK constraints, but `through` is a logical descriptor never
+ * tied to them by the rest of validation — and the TS builder accepts explicit
+ * join columns without requiring a junction FK at all — so this checks the
+ * columns directly against storage, one path regardless of how the junction
+ * was authored. Type *compatibility* of paired columns is target-specific (a
+ * `text`↔`character` join is valid on Postgres) and enforced by the
+ * migration/database layer, not asserted here.
+ */
+function validateThroughJoinSide(input: {
+  readonly contract: Contract<SqlStorage>;
+  readonly qualifiedName: string;
+  readonly modelColumns: readonly string[];
+  readonly modelColumnsLabel: string;
+  readonly modelNamespaceId: string;
+  readonly modelTable: string;
+  /**
+   * Present when `modelColumns` are domain field names (the `on.*Fields`
+   * arrays) that must be resolved to storage columns; absent when they are
+   * already storage column names (the `through.*Columns` arrays).
+   */
+  readonly modelFieldToColumn?: Readonly<Record<string, { readonly column: string }>>;
+  readonly junctionColumns: readonly string[];
+  readonly junctionColumnsLabel: string;
+  readonly junctionNamespaceId: string;
+  readonly junctionTable: string;
+}): void {
+  const fail = (detail: string): ContractValidationError =>
+    new ContractValidationError(
+      `Many-to-many relation "${input.qualifiedName}" ${detail}`,
+      'storage',
+    );
+  if (input.junctionColumns.length !== input.modelColumns.length) {
+    throw fail(
+      `pairs ${input.junctionColumnsLabel} (${input.junctionColumns.length}) with ${input.modelColumnsLabel} (${input.modelColumns.length}) of differing length; they join positionally and must match.`,
+    );
+  }
+  for (const [index, junctionColumnName] of input.junctionColumns.entries()) {
+    const modelColumnRef = input.modelColumns[index];
+    if (modelColumnRef === undefined) {
+      continue;
+    }
+    let modelColumnName = modelColumnRef;
+    if (input.modelFieldToColumn !== undefined) {
+      const mapped = input.modelFieldToColumn[modelColumnRef];
+      if (mapped === undefined) {
+        throw fail(
+          `${input.modelColumnsLabel} references field "${modelColumnRef}" absent from model on table "${input.modelNamespaceId}.${input.modelTable}".`,
+        );
+      }
+      modelColumnName = mapped.column;
+    }
+    const junctionColumn = lookupStorageColumn(
+      input.contract,
+      input.junctionNamespaceId,
+      input.junctionTable,
+      junctionColumnName,
+    );
+    if (junctionColumn === undefined) {
+      throw fail(
+        `${input.junctionColumnsLabel} references column "${junctionColumnName}" absent from junction table "${input.junctionNamespaceId}.${input.junctionTable}".`,
+      );
+    }
+    const modelColumn = lookupStorageColumn(
+      input.contract,
+      input.modelNamespaceId,
+      input.modelTable,
+      modelColumnName,
+    );
+    if (modelColumn === undefined) {
+      throw fail(
+        `${input.modelColumnsLabel} references column "${modelColumnName}" absent from table "${input.modelNamespaceId}.${input.modelTable}".`,
+      );
+    }
+  }
+}
+
+/**
+ * Validates that every N:M relation's `through` descriptor is consistent with
+ * the storage columns it joins: both join sides match in column count and
+ * reference columns that exist in their tables. Without this, a `through` that
+ * disagrees with storage surfaces as a silently wrong JOIN at query time rather
+ * than a validation error here.
+ */
+function validateRelationThroughConsistency(contract: Contract<SqlStorage>): void {
+  for (const [namespaceId, namespace] of Object.entries(contract.domain.namespaces)) {
+    for (const [modelName, model] of Object.entries(namespace.models)) {
+      for (const [relationName, relation] of Object.entries(model.relations)) {
+        if (relation.cardinality !== 'N:M') continue;
+        const qualifiedName = `${namespaceId}.${modelName}.${relationName}`;
+        const { on, through } = relation;
+        const modelStorage = blindCast<SqlModelStorage, 'SQL contract model storage'>(
+          model.storage,
+        );
+        // Parent side: the owning model's localFields (domain field names) join
+        // the junction's parentColumns (storage columns).
+        validateThroughJoinSide({
+          contract,
+          qualifiedName,
+          modelColumns: on.localFields,
+          modelColumnsLabel: 'on.localFields',
+          modelNamespaceId: namespaceId,
+          modelTable: modelStorage.table,
+          modelFieldToColumn: modelStorage.fields,
+          junctionColumns: through.parentColumns,
+          junctionColumnsLabel: 'through.parentColumns',
+          junctionNamespaceId: through.namespaceId,
+          junctionTable: through.table,
+        });
+        // Child side: the junction's childColumns join the target model's targetColumns.
+        // Cross-space targets live in another contract; their storage is not resolvable here.
+        if (relation.to.space !== undefined) continue;
+        const targetModel =
+          contract.domain.namespaces[relation.to.namespace]?.models[relation.to.model];
+        if (targetModel === undefined) continue;
+        const targetStorage = blindCast<SqlModelStorage, 'SQL contract model storage'>(
+          targetModel.storage,
+        );
+        validateThroughJoinSide({
+          contract,
+          qualifiedName,
+          modelColumns: through.targetColumns,
+          modelColumnsLabel: 'through.targetColumns',
+          modelNamespaceId: relation.to.namespace,
+          modelTable: targetStorage.table,
+          junctionColumns: through.childColumns,
+          junctionColumnsLabel: 'through.childColumns',
+          junctionNamespaceId: through.namespaceId,
+          junctionTable: through.table,
+        });
+      }
+    }
+  }
 }
