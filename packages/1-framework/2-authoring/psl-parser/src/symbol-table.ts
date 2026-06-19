@@ -9,7 +9,6 @@ import {
   type ResolvedTypeConstructorCall,
   readResolvedAttributes,
   readResolvedConstructorCall,
-  resolveFieldTypeAnnotation,
 } from './resolve';
 import type { Range, SourceFile } from './source-file';
 import {
@@ -23,6 +22,7 @@ import {
   TypesBlockAst,
 } from './syntax/ast/declarations';
 import type { IdentifierAst } from './syntax/ast/identifier';
+import type { SyntaxNode } from './syntax/red';
 
 export type {
   ResolvedAttribute,
@@ -339,20 +339,22 @@ function buildField(
 ): FieldSymbol {
   const attributes = readResolvedAttributes(node.attributes(), sourceFile);
   const span = nodePslSpan(node.syntax, sourceFile);
-  const annotation = resolveFieldTypeAnnotation(node, sourceFile);
+  const annotation = node.typeAnnotation();
+  const typeName = annotation?.name();
 
-  if (!annotation.ok) {
+  if (typeName?.isOverQualified()) {
+    const path = typeName.path();
     diagnostics.push({
       code: 'PSL_INVALID_QUALIFIED_TYPE',
-      message: `Field "${ownerName}.${name}" has an invalid qualified type "${annotation.path.join('.')}"; use at most one namespace qualifier (e.g. "ns.TypeName")`,
-      range: annotation.range,
+      message: `Field "${ownerName}.${name}" has an invalid qualified type "${path.join('.')}"; use at most one namespace qualifier (e.g. "ns.TypeName")`,
+      range: nodeRange(typeName.syntax, sourceFile),
     });
     return {
       kind: 'field',
       name,
       node,
       span,
-      typeName: annotation.path[annotation.path.length - 1] ?? '',
+      typeName: path[path.length - 1] ?? '',
       optional: false,
       list: false,
       malformedType: true,
@@ -360,24 +362,22 @@ function buildField(
     };
   }
 
-  const typeConstructor = annotation.annotation.isConstructor
-    ? readResolvedConstructorCall(node.typeAnnotation(), sourceFile)
+  const typeConstructor = annotation?.isConstructor()
+    ? readResolvedConstructorCall(annotation, sourceFile)
     : undefined;
+  const typeNamespaceId = typeName?.namespace()?.name();
+  const typeContractSpaceId = typeName?.space()?.name();
 
   return {
     kind: 'field',
     name,
     node,
     span,
-    typeName: annotation.annotation.typeName ?? '',
-    ...(annotation.annotation.typeNamespaceId !== undefined
-      ? { typeNamespaceId: annotation.annotation.typeNamespaceId }
-      : {}),
-    ...(annotation.annotation.typeContractSpaceId !== undefined
-      ? { typeContractSpaceId: annotation.annotation.typeContractSpaceId }
-      : {}),
-    optional: annotation.annotation.optional,
-    list: annotation.annotation.list,
+    typeName: typeName?.identifier()?.name() ?? '',
+    ...(typeNamespaceId !== undefined ? { typeNamespaceId } : {}),
+    ...(typeContractSpaceId !== undefined ? { typeContractSpaceId } : {}),
+    optional: annotation?.isOptional() ?? false,
+    list: annotation?.isList() ?? false,
     ...(typeConstructor !== undefined ? { typeConstructor } : {}),
     attributes,
   };
@@ -422,4 +422,13 @@ function nameRange(name: IdentifierAst | undefined, sourceFile: SourceFile): Ran
     }
   }
   return undefined;
+}
+
+function nodeRange(node: SyntaxNode, sourceFile: SourceFile): Range {
+  const start = node.offset;
+  const end = start + node.green.textLength;
+  return {
+    start: sourceFile.positionAt(start),
+    end: sourceFile.positionAt(end),
+  };
 }

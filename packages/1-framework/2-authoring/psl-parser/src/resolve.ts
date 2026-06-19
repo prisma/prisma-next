@@ -5,7 +5,6 @@ import type {
   FieldAttributeAst,
   ModelAttributeAst,
 } from './syntax/ast/attributes';
-import type { FieldDeclarationAst } from './syntax/ast/declarations';
 import type { ExpressionAst } from './syntax/ast/expressions';
 import type { QualifiedNameAst } from './syntax/ast/qualified-name';
 import type { TypeAnnotationAst } from './syntax/ast/type-annotation';
@@ -29,55 +28,6 @@ export interface ResolvedTypeConstructorCall {
   readonly path: readonly string[];
   readonly args: readonly ResolvedAttributeArg[];
   readonly span: PslSpan;
-}
-
-export interface ResolvedTypeAnnotation {
-  readonly typeName: string | undefined;
-  readonly typeNamespaceId: string | undefined;
-  readonly typeContractSpaceId: string | undefined;
-  readonly optional: boolean;
-  readonly list: boolean;
-  readonly isConstructor: boolean;
-  readonly path: readonly string[];
-}
-
-export interface MalformedQualifiedType {
-  readonly ok: false;
-  readonly path: readonly string[];
-  readonly range: Range;
-}
-
-export type ResolveTypeAnnotationResult =
-  | { readonly ok: true; readonly annotation: ResolvedTypeAnnotation }
-  | MalformedQualifiedType;
-
-export function resolveFieldTypeAnnotation(
-  field: FieldDeclarationAst,
-  sourceFile: SourceFile,
-): ResolveTypeAnnotationResult {
-  const annotation = field.typeAnnotation();
-  const name = annotation?.name();
-
-  if (name?.isOverQualified()) {
-    return {
-      ok: false,
-      path: name.path(),
-      range: nodeRange(name.syntax, sourceFile),
-    };
-  }
-
-  return {
-    ok: true,
-    annotation: {
-      typeName: name?.identifier()?.name(),
-      typeNamespaceId: name?.namespace()?.name(),
-      typeContractSpaceId: name?.space()?.name(),
-      optional: annotation?.isOptional() ?? false,
-      list: annotation?.isList() ?? false,
-      isConstructor: annotation?.isConstructor() ?? false,
-      path: name?.path() ?? [],
-    },
-  };
 }
 
 export function readResolvedAttribute(
@@ -136,15 +86,6 @@ function attributeName(name: QualifiedNameAst | undefined): string {
 function renderExpression(expression: ExpressionAst | undefined): string {
   if (expression === undefined) return '';
   return printSyntax(expression.syntax).trim();
-}
-
-function nodeRange(node: SyntaxNode, sourceFile: SourceFile): Range {
-  const start = node.offset;
-  const end = start + node.green.textLength;
-  return {
-    start: sourceFile.positionAt(start),
-    end: sourceFile.positionAt(end),
-  };
 }
 
 export function nodePslSpan(node: SyntaxNode, sourceFile: SourceFile): PslSpan {

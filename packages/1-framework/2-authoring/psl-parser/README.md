@@ -56,11 +56,10 @@ Interpretation/validation (for example `@prisma-next/sql-contract-psl`) is respo
   `ScalarSymbol`/`TypeAliasSymbol` carry the resolved binding
   (`baseType`/`typeConstructor`/`isConstructor`). Interpreters consume this
   resolved shape directly — there is no per-package field/attribute view layer.
-- `resolveFieldTypeAnnotation` / `readResolvedAttribute(s)` /
-  `readResolvedConstructorCall` + the span maps (`nodePslSpan`, `rangeToPslSpan`,
-  `keywordPslSpan`) in `src/resolve.ts` — the shared CST read/resolution helpers
-  `buildSymbolTable` uses and that consumers (e.g. enum-block reconstruction)
-  reuse, with `PslSpan` spans.
+- `readResolvedAttribute(s)` / `readResolvedConstructorCall` + the span maps
+  (`nodePslSpan`, `rangeToPslSpan`, `keywordPslSpan`) in `src/resolve.ts` — the
+  shared CST read helpers `buildSymbolTable` uses and that consumers (e.g.
+  enum-block reconstruction) reuse, with `PslSpan` spans.
 - `reconstructExtensionBlock` / `findBlockDescriptor` /
   `validateExtensionBlockFromSymbol` in `src/extension-block.ts` — reconstruct a
   descriptor-driven `PslExtensionBlock` from a CST `GenericBlockDeclarationAst`
