@@ -2,6 +2,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { pathToFileURL } from 'node:url';
+import type { FormatOptions } from '@prisma-next/psl-parser/format';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -10,7 +11,9 @@ import {
   type Diagnostic,
   DidChangeTextDocumentNotification,
   DidChangeWatchedFilesNotification,
+  DidCloseTextDocumentNotification,
   DidOpenTextDocumentNotification,
+  DocumentFormattingRequest,
   FileChangeType,
   InitializedNotification,
   InitializeRequest,
@@ -22,6 +25,7 @@ import {
   RegistrationRequest,
   StreamMessageReader,
   StreamMessageWriter,
+  type TextEdit,
 } from 'vscode-languageserver/node';
 import type { ConfigResolution } from '../src/config-resolution';
 import { resolveSchemaInputs } from '../src/schema-inputs';
@@ -29,6 +33,10 @@ import { createServer } from '../src/server';
 
 type ResolveInputs = (configPath: string) => Promise<ConfigResolution>;
 type FindNearestConfigPathForFile = (filePath: string) => Promise<string | undefined>;
+
+interface ConfigResolutionWithFormatter extends ConfigResolution {
+  readonly formatter?: FormatOptions;
+}
 
 const configLoaderMock = vi.hoisted(() => ({
   findNearestConfigPathForFile: vi.fn<FindNearestConfigPathForFile>(),
@@ -55,12 +63,21 @@ const schemaPath = join(root, 'schema.psl');
 const schemaUri = pathToFileURL(schemaPath).toString();
 const configPath = join(root, 'prisma-next.config.ts');
 const configUri = pathToFileURL(configPath).toString();
+const unformattedPsl = 'model User {\nid Int\n}';
+const formattedPsl = 'model User {\n  id Int\n}\n';
 
-const resolveToSchema: ResolveInputs = async () => ({
-  inputs: resolveSchemaInputs({
+function schemaResolution(formatter?: FormatOptions): ConfigResolutionWithFormatter {
+  const inputs = resolveSchemaInputs({
     contract: { source: { sourceFormat: 'psl', inputs: [schemaPath] } },
-  }),
-});
+  });
+  return formatter === undefined ? { inputs } : { inputs, formatter };
+}
+
+const resolveToSchema: ResolveInputs = async () => schemaResolution();
+
+function resolveToSchemaWithFormatter(formatter: FormatOptions): ResolveInputs {
+  return async () => schemaResolution(formatter);
+}
 
 const watchedFilesCapabilities: ClientCapabilities = {
   workspace: { didChangeWatchedFiles: { dynamicRegistration: true } },
@@ -244,6 +261,25 @@ function startHarness(
   };
 }
 
+function openDocument(harness: Harness, uri: string, text: string, version = 1): void {
+  harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
+    textDocument: { uri, languageId: 'prisma', version, text },
+  });
+}
+
+function closeDocument(harness: Harness, uri: string): void {
+  harness.client.sendNotification(DidCloseTextDocumentNotification.type, {
+    textDocument: { uri },
+  });
+}
+
+function requestFormatting(harness: Harness, uri: string): Promise<TextEdit[] | null> {
+  return harness.client.sendRequest(DocumentFormattingRequest.type, {
+    textDocument: { uri },
+    options: { tabSize: 2, insertSpaces: true },
+  });
+}
+
 let harness: Harness | undefined;
 
 afterEach(async () => {
@@ -261,6 +297,7 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
     harness = startHarness(resolveToSchema);
     const result = await harness.initialize();
     expect(result.capabilities.textDocumentSync).toBeDefined();
+    expect(result.capabilities.documentFormattingProvider).toBe(true);
   });
 
   it('publishes parser diagnostics for an opened configured PSL input', async () => {
@@ -340,6 +377,78 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
     await waitUntil(() => configResolutionMock.resolveConfigInputs.mock.calls.length === 1);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(harness.latestDiagnostics(schemaUri)).toBeUndefined();
+  });
+
+  it('formats a configured PSL input with one whole-document edit', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    openDocument(harness, schemaUri, unformattedPsl);
+    expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
+
+    await expect(requestFormatting(harness, schemaUri)).resolves.toEqual([
+      {
+        range: { start: { line: 0, character: 0 }, end: { line: 2, character: 1 } },
+        newText: formattedPsl,
+      },
+    ]);
+  });
+
+  it('returns no edits for canonical PSL input', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    openDocument(harness, schemaUri, formattedPsl);
+    expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
+
+    await expect(requestFormatting(harness, schemaUri)).resolves.toEqual([]);
+  });
+
+  it('returns no edits for unconfigured PSL documents', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const otherUri = pathToFileURL(join(root, 'not-a-schema.psl')).toString();
+    openDocument(harness, otherUri, unformattedPsl);
+    expect(await harness.waitForDiagnostics(otherUri)).toEqual([]);
+
+    await expect(requestFormatting(harness, otherUri)).resolves.toEqual([]);
+  });
+
+  it('returns no edits for malformed PSL', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    openDocument(harness, schemaUri, 'model {');
+    expect((await harness.waitForDiagnostics(schemaUri)).length).toBeGreaterThan(0);
+
+    await expect(requestFormatting(harness, schemaUri)).resolves.toEqual([]);
+  });
+
+  it('returns no edits for missing and closed documents', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    await expect(requestFormatting(harness, schemaUri)).resolves.toEqual([]);
+
+    openDocument(harness, schemaUri, unformattedPsl);
+    expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
+    const cleared = harness.waitForDiagnosticsMatching(
+      schemaUri,
+      (diagnostics) => diagnostics.length === 0,
+    );
+    closeDocument(harness, schemaUri);
+    expect(await cleared).toEqual([]);
+    await expect(requestFormatting(harness, schemaUri)).resolves.toEqual([]);
+  });
+
+  it('uses Prisma config formatter options', async () => {
+    harness = startHarness(resolveToSchemaWithFormatter({ indent: 'tab', newline: 'CRLF' }));
+    await harness.initialize();
+    openDocument(harness, schemaUri, unformattedPsl);
+    expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
+
+    await expect(requestFormatting(harness, schemaUri)).resolves.toEqual([
+      {
+        range: { start: { line: 0, character: 0 }, end: { line: 2, character: 1 } },
+        newText: 'model User {\r\n\tid Int\r\n}\r\n',
+      },
+    ]);
   });
 });
 
