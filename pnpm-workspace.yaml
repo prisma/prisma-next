@@ -15,15 +15,15 @@ allowBuilds:
 blockExoticSubdeps: true
 
 catalog:
-  '@prisma/dev': 0.24.12
-  '@types/node': 25.9.1
+  '@prisma/dev': 0.24.14
+  '@types/node': 25.9.3
   '@types/pg': 8.20.0
   arktype: ^2.2.0
   gray-matter: ^4.0.3
-  mongodb: ^7.2.0
+  mongodb: ^7.3.0
   mongodb-memory-server: 11.2.0
   pg: 8.21.0
-  tsdown: 0.22.1
+  tsdown: 0.22.2
   tsx: ^4.22.4
   typescript: 5.9.3
   vite: 8.0.16
