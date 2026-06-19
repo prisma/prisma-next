@@ -1,10 +1,7 @@
+import { access } from 'node:fs/promises';
 import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { validateConfig } from '@prisma-next/config/config-validation';
-import {
-  ConfigFileNotFoundError,
-  ConfigValidationError,
-  finalizeConfig,
-} from '@prisma-next/config/load-helpers';
+import { ConfigFileNotFoundError, ConfigValidationError } from '@prisma-next/config/load-helpers';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import {
   errorConfigFileNotFound,
@@ -12,8 +9,10 @@ import {
   errorUnexpected,
 } from '@prisma-next/errors/control';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { loadConfig as loadConfigC12 } from 'c12';
-import { dirname, resolve } from 'pathe';
+import { dirname, join, resolve } from 'pathe';
+import { finalizeConfig } from './finalize-config';
+
+const CONFIG_FILENAME = 'prisma-next.config.ts';
 
 function throwValidation(field: string, why: string): never {
   throw new ConfigValidationError(field, why);
@@ -46,12 +45,38 @@ function validateNoOutputsAreInputs(
   }
 }
 
+async function findNearestConfigPathForFile(filePath: string): Promise<string | undefined> {
+  let current = dirname(resolve(process.cwd(), filePath));
+
+  while (true) {
+    const candidate = join(current, CONFIG_FILENAME);
+    if (await fileExists(candidate)) {
+      return candidate;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      return undefined;
+    }
+    current = parent;
+  }
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function discoverAndFinalizeConfig(configPath?: string): Promise<PrismaNextConfig> {
   const cwd = process.cwd();
   const resolvedConfigPath = configPath ? resolve(cwd, configPath) : undefined;
   const configCwd = resolvedConfigPath ? dirname(resolvedConfigPath) : cwd;
 
-  const result = await loadConfigC12<PrismaNextConfig>({
+  const c12 = await import('c12');
+  const result = await c12.loadConfig<PrismaNextConfig>({
     name: 'prisma-next',
     ...ifDefined('configFile', resolvedConfigPath),
     cwd: configCwd,
@@ -126,4 +151,14 @@ export async function loadConfig(configPath?: string): Promise<PrismaNextConfig>
   } catch (error) {
     throw toStructuredConfigError(error, configPath);
   }
+}
+
+export async function loadConfigForFile(filePath: string): Promise<PrismaNextConfig> {
+  const configPath = await findNearestConfigPathForFile(filePath);
+  if (configPath === undefined) {
+    throw toStructuredConfigError(
+      new ConfigFileNotFoundError(join(dirname(resolve(process.cwd(), filePath)), CONFIG_FILENAME)),
+    );
+  }
+  return loadConfig(configPath);
 }

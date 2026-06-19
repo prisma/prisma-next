@@ -1,1 +1,2 @@
-export { loadConfig } from '../load';
+export { finalizeConfig } from '../finalize-config';
+export { loadConfig, loadConfigForFile } from '../load';

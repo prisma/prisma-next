@@ -1,5 +1,4 @@
-import { access } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { join } from 'node:path';
 import { loadConfig } from '@prisma-next/config-loader';
 import { CliStructuredError } from '@prisma-next/errors/control';
 import { emptySchemaInputSet, resolveSchemaInputs, type SchemaInputSet } from './schema-inputs';
@@ -22,18 +21,6 @@ export async function resolveConfigInputs(
   return loadResolvedConfigInputs(configPath ?? join(rootPath, CONFIG_FILENAME));
 }
 
-export async function resolveConfigInputsForFile(
-  rootPath: string,
-  filePath: string,
-  configPath?: string,
-): Promise<ConfigResolution> {
-  const resolvedConfigPath =
-    configPath ??
-    (await findNearestConfigPath(rootPath, filePath)) ??
-    join(rootPath, CONFIG_FILENAME);
-  return loadResolvedConfigInputs(resolvedConfigPath);
-}
-
 async function loadResolvedConfigInputs(resolvedConfigPath: string): Promise<ConfigResolution> {
   try {
     const config = await loadConfig(resolvedConfigPath);
@@ -54,44 +41,5 @@ async function loadResolvedConfigInputs(resolvedConfigPath: string): Promise<Con
       }
     }
     throw error;
-  }
-}
-
-async function findNearestConfigPath(
-  rootPath: string,
-  filePath: string,
-): Promise<string | undefined> {
-  const root = resolve(rootPath);
-  let current = dirname(resolve(filePath));
-
-  while (isWithinRoot(root, current)) {
-    const candidate = join(current, CONFIG_FILENAME);
-    if (await fileExists(candidate)) {
-      return candidate;
-    }
-    if (current === root) {
-      break;
-    }
-    const parent = dirname(current);
-    if (parent === current) {
-      break;
-    }
-    current = parent;
-  }
-
-  return undefined;
-}
-
-function isWithinRoot(root: string, path: string): boolean {
-  const relativePath = relative(root, path);
-  return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
-}
-
-async function fileExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
   }
 }

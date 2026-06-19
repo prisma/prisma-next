@@ -1,7 +1,8 @@
+import type { PrismaNextConfig } from '@prisma-next/config/config-types';
+import { normalizeContractConfig } from '@prisma-next/config/config-types';
 import { resolve } from 'pathe';
-import type { PrismaNextConfig } from './config-types';
-import { normalizeContractConfig } from './config-types';
-import type { ContractSourceProvider } from './contract-source-types';
+
+type ContractSourceProvider = NonNullable<PrismaNextConfig['contract']>['source'];
 
 function finalizeContractSource(
   source: ContractSourceProvider,

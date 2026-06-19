@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadConfig } from '../src/load';
+import { loadConfig, loadConfigForFile } from '../src/load';
 
 const VALID_CONFIG_SOURCE = `
 const descriptorBase = {
@@ -52,6 +52,66 @@ export default {
 const EMPTY_CONFIG_SOURCE = `
 export default {};
 `;
+
+describe('loadConfigForFile', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'prisma-next-config-for-file-'));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it(
+    'loads the nearest config above the PSL file',
+    async () => {
+      const appDir = join(tempDir, 'apps', 'shop');
+      const schemaPath = join(appDir, 'prisma', 'schema.psl');
+      mkdirSync(join(appDir, 'prisma'), { recursive: true });
+      writeFileSync(join(tempDir, 'prisma-next.config.ts'), VALID_CONFIG_SOURCE);
+      writeFileSync(join(appDir, 'prisma-next.config.ts'), VALID_CONFIG_SOURCE);
+
+      const config = await loadConfigForFile(schemaPath);
+
+      expect(config.contract?.source.inputs).toEqual([join(appDir, 'schema.prisma')]);
+      expect(config.contract?.output).toBe(join(appDir, 'generated', 'contract.json'));
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'stops at an invalid nearest config instead of falling back to a parent config',
+    async () => {
+      const appDir = join(tempDir, 'apps', 'shop');
+      const schemaPath = join(appDir, 'prisma', 'schema.psl');
+      mkdirSync(join(appDir, 'prisma'), { recursive: true });
+      writeFileSync(join(tempDir, 'prisma-next.config.ts'), VALID_CONFIG_SOURCE);
+      writeFileSync(join(appDir, 'prisma-next.config.ts'), INVALID_CONFIG_SOURCE);
+
+      await expect(loadConfigForFile(schemaPath)).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        code: '4009',
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'maps a missing config above the PSL file to a structured config-file-not-found error',
+    async () => {
+      const schemaPath = join(tempDir, 'apps', 'shop', 'prisma', 'schema.psl');
+      mkdirSync(join(tempDir, 'apps', 'shop', 'prisma'), { recursive: true });
+
+      await expect(loadConfigForFile(schemaPath)).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        code: '4001',
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+});
 
 describe('loadConfig', () => {
   let originalCwd: string;

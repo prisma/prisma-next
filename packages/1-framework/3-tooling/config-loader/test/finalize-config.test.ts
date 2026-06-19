@@ -1,12 +1,6 @@
-import type { Contract } from '@prisma-next/contract/types';
-import type {
-  ControlAdapterInstance,
-  ControlFamilyInstance,
-  ControlTargetInstance,
-} from '@prisma-next/framework-components/control';
+import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
-import type { PrismaNextConfig } from '../src/config-types';
 import { finalizeConfig } from '../src/finalize-config';
 
 function createConfig(
@@ -21,7 +15,7 @@ function createConfig(
       version: '0.0.1',
       manifest: {},
       emission: { id: 'sql' } as never,
-      create: () => ({ familyId: 'sql' }) as unknown as ControlFamilyInstance<'sql', unknown>,
+      create: () => ({ familyId: 'sql' }) as never,
     },
     target: {
       kind: 'target',
@@ -30,11 +24,11 @@ function createConfig(
       id: 'postgres',
       version: '0.0.1',
       manifest: {},
-      create: () =>
-        ({ familyId: 'sql', targetId: 'postgres' }) as unknown as ControlTargetInstance<
-          'sql',
-          'postgres'
-        >,
+      contractSerializer: {
+        deserializeContract: (json) => json as never,
+        serializeContract: () => ({}),
+      },
+      create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
     adapter: {
       kind: 'adapter',
@@ -43,11 +37,7 @@ function createConfig(
       id: 'postgres',
       version: '0.0.1',
       manifest: {},
-      create: () =>
-        ({ familyId: 'sql', targetId: 'postgres' }) as unknown as ControlAdapterInstance<
-          'sql',
-          'postgres'
-        >,
+      create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
     ...(contract ? { contract } : {}),
     ...overrides,
@@ -57,7 +47,7 @@ function createConfig(
 function createSource(inputs?: readonly string[]) {
   return {
     ...(inputs ? { inputs } : {}),
-    load: async () => ok({ targetFamily: 'sql' } as Contract),
+    load: async () => ok({ targetFamily: 'sql' } as never),
   };
 }
 
