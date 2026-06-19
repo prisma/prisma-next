@@ -2,10 +2,14 @@ import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { resolveSchemaInputs, type SchemaInputConfig } from '../src/schema-inputs';
 
-function configWith(inputs: readonly string[] | undefined): SchemaInputConfig {
+function configWith(
+  inputs: readonly string[] | undefined,
+  sourceFormat: string | null = 'psl',
+): SchemaInputConfig {
   return {
     contract: {
       source: {
+        ...(sourceFormat ? { sourceFormat } : {}),
         ...(inputs ? { inputs } : {}),
       },
     },
@@ -27,6 +31,16 @@ describe('resolveSchemaInputs', () => {
 
   it('excludes everything when inputs is absent', () => {
     const set = resolveSchemaInputs(configWith(undefined));
+    expect(set.includes(pathToFileURL('/abs/schema.psl').toString())).toBe(false);
+  });
+
+  it('excludes everything when source format is typescript', () => {
+    const set = resolveSchemaInputs(configWith(['/abs/schema.psl'], 'typescript'));
+    expect(set.includes(pathToFileURL('/abs/schema.psl').toString())).toBe(false);
+  });
+
+  it('excludes everything when source format is absent', () => {
+    const set = resolveSchemaInputs(configWith(['/abs/schema.psl'], null));
     expect(set.includes(pathToFileURL('/abs/schema.psl').toString())).toBe(false);
   });
 

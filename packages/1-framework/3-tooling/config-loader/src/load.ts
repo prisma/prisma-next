@@ -45,7 +45,7 @@ function validateNoOutputsAreInputs(
   }
 }
 
-async function findNearestConfigPathForFile(filePath: string): Promise<string | undefined> {
+export async function findNearestConfigPathForFile(filePath: string): Promise<string | undefined> {
   let current = dirname(resolve(process.cwd(), filePath));
 
   while (true) {

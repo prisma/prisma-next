@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadConfig, loadConfigForFile } from '../src/load';
+import { findNearestConfigPathForFile, loadConfig, loadConfigForFile } from '../src/load';
 
 const VALID_CONFIG_SOURCE = `
 const descriptorBase = {
@@ -52,6 +52,36 @@ export default {
 const EMPTY_CONFIG_SOURCE = `
 export default {};
 `;
+
+describe('findNearestConfigPathForFile', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'prisma-next-config-path-for-file-'));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('returns the nearest config path above the file', async () => {
+    const appDir = join(tempDir, 'apps', 'shop');
+    const schemaPath = join(appDir, 'prisma', 'schema.psl');
+    const appConfigPath = join(appDir, 'prisma-next.config.ts');
+    mkdirSync(join(appDir, 'prisma'), { recursive: true });
+    writeFileSync(join(tempDir, 'prisma-next.config.ts'), VALID_CONFIG_SOURCE);
+    writeFileSync(appConfigPath, INVALID_CONFIG_SOURCE);
+
+    await expect(findNearestConfigPathForFile(schemaPath)).resolves.toBe(appConfigPath);
+  });
+
+  it('returns undefined when no config exists above the file', async () => {
+    const schemaPath = join(tempDir, 'apps', 'shop', 'prisma', 'schema.psl');
+    mkdirSync(join(tempDir, 'apps', 'shop', 'prisma'), { recursive: true });
+
+    await expect(findNearestConfigPathForFile(schemaPath)).resolves.toBeUndefined();
+  });
+});
 
 describe('loadConfigForFile', () => {
   let tempDir: string;

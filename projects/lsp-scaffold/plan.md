@@ -30,8 +30,14 @@ _Original framing retained below as the dispatch breakdown; "Slice N" now reads 
 3. **Slice `live-config-watching`** — Linear: TML-2930 (dispatch 3)
    - **Outcome:** Editing `prisma-next.config.ts` (including an on-disk change while it is not open in the editor) re-resolves the input set without a server restart: a newly-added input begins receiving diagnostics; a removed input (or one that falls under a non-`psl` `sourceFormat`) has its diagnostics cleared.
    - **Builds on:** Slice 2's server + config-resolution-at-`initialize`.
-   - **Hands to:** Project-complete: the live-config behaviour that closes the last project-DoD item. Nothing downstream consumes it within this project.
+   - **Hands to:** Live config behaviour for one known config path, which dispatch 4 generalizes to multiple config-keyed projects.
    - **Focus:** `workspace/didChangeWatchedFiles` watcher registration on the config path (dynamic `client/registerCapability` or static in `InitializeResult`), re-resolution on change, and diagnostic add/clear fan-out. NOT watching schema files (explicit non-goal); ONLY the config path is watched.
+
+4. **Slice `multi-project-lsp-registry`** — Linear: TML-2930 (dispatch 4)
+   - **Outcome:** The language server maintains an in-memory project registry keyed by `prisma-next.config.ts` path. When a document opens, the server finds the nearest config covering that file, creates a project if one does not exist yet, resolves that project's schema inputs, and diagnoses the document only if it is a configured PSL input for that project. Existing config-change fan-out operates on the project identified by the changed config path.
+   - **Builds on:** Dispatch 3's live config resolution and the config-loader nearest-config helper.
+   - **Hands to:** Project-complete multi-project scaffold: one LSP server process can handle files from multiple Prisma Next projects in a workspace without assuming `initialize.rootUri` is the only project root.
+   - **Focus:** Project registry/state model, didOpen project creation, per-config input membership, tests for two configs in one workspace and for newly-opened files under an unseen config. NOT using file extension as schema membership, NOT watching schema files, NOT adding hover/completion/navigation.
 
 ## Dependencies (external)
 
@@ -44,9 +50,10 @@ Strictly serial because the dependency graph is strictly serial — there is no 
 
 - Slice 2 cannot identify schema documents without slice 1's shared config resolution (the whole reason slice 1 exists is the layering wall: the server package can't reach the CLI-private `loadConfig`).
 - Slice 3 extends slice 2's already-running server and its config-resolution path; it has nothing to build against until slice 2 lands.
+- Slice 4 extends slice 3's single-known-config live behavior into a registry keyed by config path; it depends on the existing diagnostic fan-out so the change stays about project ownership rather than parser or protocol mechanics.
 
 Slices 2 and 3 were deliberately *not* merged: slice 2 is "config read once at `initialize`" — a complete, reviewable, demoable server on its own — and slice 3 is a clean additive increment (the watcher + re-resolution fan-out). Bundling them would put a substrate-shaped server scaffold and a distinct reactivity outcome in one review. Slice 1 was deliberately *not* folded into slice 2: lifting config resolution out of the CLI re-points several existing CLI consumers (`contract-emit`, `db-sign`, `db-verify`, `format`), a blast radius a reviewer should hold separately from the new server surface.
 
 ## Open items
 
-_None. Linear tracking is settled (TML-2930). Ready for `drive-deliver-workflow` on dispatch 1._
+_Architecture pivot recorded 2026-06-19: multi-project handling is now in scope. Dispatch 4 is ready for `drive-build-workflow`._

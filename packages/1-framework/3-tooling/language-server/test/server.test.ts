@@ -26,6 +26,8 @@ import {
 import { resolveSchemaInputs } from '../src/schema-inputs';
 import { createServer, type ResolveInputs } from '../src/server';
 
+type FindConfigPathForFile = (filePath: string) => Promise<string | undefined>;
+
 const root = tmpdir();
 const schemaPath = join(root, 'schema.psl');
 const schemaUri = pathToFileURL(schemaPath).toString();
@@ -34,7 +36,7 @@ const configUri = pathToFileURL(configPath).toString();
 
 const resolveToSchema: ResolveInputs = async () => ({
   inputs: resolveSchemaInputs({
-    contract: { source: { inputs: [schemaPath] } },
+    contract: { source: { sourceFormat: 'psl', inputs: [schemaPath] } },
   }),
 });
 
@@ -53,13 +55,15 @@ interface Harness {
   readonly registrations: RegistrationParams[];
   readonly waitForWatchedFilesRegistration: (timeoutMs: number) => Promise<void>;
   readonly waitForWarning: (predicate: (message: string) => boolean) => Promise<string>;
-  readonly notifyConfigChanged: () => void;
+  readonly notifyConfigChanged: (uri?: string) => void;
   dispose: () => void;
 }
 
 function startHarness(
   resolveInputs: ResolveInputs,
   capabilities: ClientCapabilities = {},
+  findConfigPathForFile: FindConfigPathForFile = async () => configPath,
+  explicitConfigPath?: string,
 ): Harness {
   const clientToServer = new PassThrough();
   const serverToClient = new PassThrough();
@@ -68,7 +72,11 @@ function startHarness(
     new StreamMessageReader(clientToServer),
     new StreamMessageWriter(serverToClient),
   );
-  const server = createServer(serverConnection, { resolveInputs });
+  const server = createServer(serverConnection, {
+    resolveInputs,
+    findConfigPathForFile,
+    ...(explicitConfigPath ? { configPath: explicitConfigPath } : {}),
+  });
 
   const client = createConnection(
     new StreamMessageReader(serverToClient),
@@ -201,9 +209,9 @@ function startHarness(
         queue.push({ predicate, resolve });
         predicateWaiters.set(uri, queue);
       }),
-    notifyConfigChanged: () => {
+    notifyConfigChanged: (uri = configUri) => {
       client.sendNotification(DidChangeWatchedFilesNotification.type, {
-        changes: [{ uri: configUri, type: FileChangeType.Changed }],
+        changes: [{ uri, type: FileChangeType.Changed }],
       });
     },
     dispose: () => {
@@ -342,6 +350,348 @@ function watchedFilesRegistrations(harness: Harness) {
     .flatMap((params) => params.registrations)
     .filter((registration) => registration.method === 'workspace/didChangeWatchedFiles');
 }
+
+function findConfigForPrefixes(
+  entries: readonly { readonly prefix: string; readonly configPath: string }[],
+): FindConfigPathForFile {
+  return async (filePath) => entries.find((entry) => filePath.startsWith(entry.prefix))?.configPath;
+}
+
+function controlledPromise(): { readonly promise: Promise<void>; readonly resolve: () => void } {
+  let resolvePromise: () => void = () => undefined;
+  const promise = new Promise<void>((resolve) => {
+    resolvePromise = resolve;
+  });
+  return { promise, resolve: resolvePromise };
+}
+
+async function waitUntil(predicate: () => boolean): Promise<void> {
+  const startedAt = Date.now();
+  while (!predicate()) {
+    if (Date.now() - startedAt > timeouts.default) {
+      throw new Error('Timed out waiting for condition');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
+}
+
+describe('language server project registry', { timeout: timeouts.databaseOperation }, () => {
+  it('diagnoses open inputs from two configs in one server process', async () => {
+    const projectARoot = join(root, 'project-a');
+    const projectBRoot = join(root, 'project-b');
+    const projectAConfigPath = join(projectARoot, 'prisma-next.config.ts');
+    const projectBConfigPath = join(projectBRoot, 'prisma-next.config.ts');
+    const projectASchemaPath = join(projectARoot, 'schema.psl');
+    const projectBSchemaPath = join(projectBRoot, 'schema.psl');
+    const projectASchemaUri = pathToFileURL(projectASchemaPath).toString();
+    const projectBSchemaUri = pathToFileURL(projectBSchemaPath).toString();
+    const resolvedConfigs: string[] = [];
+    const resolveInputs: ResolveInputs = async (_rootPath, configPathArg) => {
+      if (configPathArg !== undefined) {
+        resolvedConfigs.push(configPathArg);
+      }
+      return {
+        inputs: resolveSchemaInputs({
+          contract: {
+            source: {
+              sourceFormat: 'psl',
+              inputs:
+                configPathArg === projectAConfigPath
+                  ? [projectASchemaPath]
+                  : configPathArg === projectBConfigPath
+                    ? [projectBSchemaPath]
+                    : [],
+            },
+          },
+        }),
+      };
+    };
+    harness = startHarness(
+      resolveInputs,
+      {},
+      findConfigForPrefixes([
+        { prefix: projectARoot, configPath: projectAConfigPath },
+        { prefix: projectBRoot, configPath: projectBConfigPath },
+      ]),
+    );
+    await harness.initialize();
+
+    harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
+      textDocument: {
+        uri: projectASchemaUri,
+        languageId: 'prisma',
+        version: 1,
+        text: 'model {',
+      },
+    });
+    harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
+      textDocument: {
+        uri: projectBSchemaUri,
+        languageId: 'prisma',
+        version: 1,
+        text: 'model {',
+      },
+    });
+
+    expect((await harness.waitForDiagnostics(projectASchemaUri)).length).toBeGreaterThan(0);
+    expect((await harness.waitForDiagnostics(projectBSchemaUri)).length).toBeGreaterThan(0);
+    expect(resolvedConfigs).toEqual([projectAConfigPath, projectBConfigPath]);
+  });
+
+  it('creates a project when an opened file belongs to a previously unseen config', async () => {
+    const unseenRoot = join(root, 'previously-unseen');
+    const unseenConfigPath = join(unseenRoot, 'prisma-next.config.ts');
+    const unseenSchemaPath = join(unseenRoot, 'schema.psl');
+    const unseenSchemaUri = pathToFileURL(unseenSchemaPath).toString();
+    const resolvedConfigs: string[] = [];
+    const resolveInputs: ResolveInputs = async (_rootPath, configPathArg) => {
+      if (configPathArg !== undefined) {
+        resolvedConfigs.push(configPathArg);
+      }
+      return {
+        inputs: resolveSchemaInputs({
+          contract: {
+            source: {
+              sourceFormat: 'psl',
+              inputs: configPathArg === unseenConfigPath ? [unseenSchemaPath] : [],
+            },
+          },
+        }),
+      };
+    };
+    harness = startHarness(
+      resolveInputs,
+      {},
+      findConfigForPrefixes([{ prefix: unseenRoot, configPath: unseenConfigPath }]),
+    );
+    await harness.initialize();
+    expect(resolvedConfigs).toEqual([]);
+
+    harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
+      textDocument: {
+        uri: unseenSchemaUri,
+        languageId: 'prisma',
+        version: 1,
+        text: 'model {',
+      },
+    });
+
+    expect((await harness.waitForDiagnostics(unseenSchemaUri)).length).toBeGreaterThan(0);
+    expect(resolvedConfigs).toEqual([unseenConfigPath]);
+  });
+
+  it('uses an explicit custom config path instead of nearest default config discovery', async () => {
+    const projectRoot = join(root, 'explicit-config-project');
+    const customConfigPath = join(projectRoot, 'custom-config.ts');
+    const relativeCustomConfigPath = join('explicit-config-project', 'custom-config.ts');
+    const schemaPath = join(projectRoot, 'schema.psl');
+    const schemaUri = pathToFileURL(schemaPath).toString();
+    const resolvedConfigs: string[] = [];
+    const resolveInputs: ResolveInputs = async (_rootPath, configPathArg) => {
+      if (configPathArg !== undefined) {
+        resolvedConfigs.push(configPathArg);
+      }
+      return {
+        inputs: resolveSchemaInputs({
+          contract: {
+            source: {
+              sourceFormat: 'psl',
+              inputs: configPathArg === customConfigPath ? [schemaPath] : [],
+            },
+          },
+        }),
+      };
+    };
+    const failNearestDiscovery: FindConfigPathForFile = async () => {
+      throw new Error('nearest config discovery must not run when an explicit config path is set');
+    };
+    harness = startHarness(resolveInputs, {}, failNearestDiscovery, relativeCustomConfigPath);
+    await harness.initialize();
+
+    harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri, languageId: 'prisma', version: 1, text: 'model {' },
+    });
+
+    expect((await harness.waitForDiagnostics(schemaUri)).length).toBeGreaterThan(0);
+    expect(resolvedConfigs).toEqual([customConfigPath]);
+  });
+
+  it('publishes no diagnostics for a PSL file that is not a configured input in its project', async () => {
+    const projectRoot = join(root, 'non-input-project');
+    const projectConfigPath = join(projectRoot, 'prisma-next.config.ts');
+    const schemaPath = join(projectRoot, 'schema.psl');
+    const otherPath = join(projectRoot, 'other.psl');
+    const otherUri = pathToFileURL(otherPath).toString();
+    const resolveInputs: ResolveInputs = async () => ({
+      inputs: resolveSchemaInputs({
+        contract: { source: { sourceFormat: 'psl', inputs: [schemaPath] } },
+      }),
+    });
+    harness = startHarness(
+      resolveInputs,
+      {},
+      findConfigForPrefixes([{ prefix: projectRoot, configPath: projectConfigPath }]),
+    );
+    await harness.initialize();
+
+    harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
+      textDocument: { uri: otherUri, languageId: 'prisma', version: 1, text: 'model {' },
+    });
+
+    expect(await harness.waitForDiagnostics(otherUri)).toEqual([]);
+  });
+
+  it('does not fall back to a parent config when the nearest config degrades', async () => {
+    const parentRoot = join(root, 'parent-project');
+    const childRoot = join(parentRoot, 'child-project');
+    const parentConfigPath = join(parentRoot, 'prisma-next.config.ts');
+    const childConfigPath = join(childRoot, 'prisma-next.config.ts');
+    const childSchemaPath = join(childRoot, 'schema.psl');
+    const childSchemaUri = pathToFileURL(childSchemaPath).toString();
+    const resolvedConfigs: string[] = [];
+    const resolveInputs: ResolveInputs = async (_rootPath, configPathArg) => {
+      if (configPathArg !== undefined) {
+        resolvedConfigs.push(configPathArg);
+      }
+      if (configPathArg === parentConfigPath) {
+        return {
+          inputs: resolveSchemaInputs({
+            contract: { source: { sourceFormat: 'psl', inputs: [childSchemaPath] } },
+          }),
+        };
+      }
+      return { inputs: resolveSchemaInputs({}), degradedReason: 'invalid child config' };
+    };
+    harness = startHarness(
+      resolveInputs,
+      {},
+      findConfigForPrefixes([{ prefix: childRoot, configPath: childConfigPath }]),
+    );
+    await harness.initialize();
+
+    harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
+      textDocument: { uri: childSchemaUri, languageId: 'prisma', version: 1, text: 'model {' },
+    });
+
+    expect(await harness.waitForDiagnostics(childSchemaUri)).toEqual([]);
+    expect(resolvedConfigs).toEqual([childConfigPath]);
+  });
+
+  it('prevents stale initial project loads from overwriting fresher refreshes', async () => {
+    const projectRoot = join(root, 'stale-load-project');
+    const projectConfigPath = join(projectRoot, 'prisma-next.config.ts');
+    const schemaPath = join(projectRoot, 'schema.psl');
+    const schemaUri = pathToFileURL(schemaPath).toString();
+    const staleInitialLoad = controlledPromise();
+    const freshRefresh = controlledPromise();
+    let loadCount = 0;
+    const resolveInputs: ResolveInputs = async () => {
+      loadCount += 1;
+      if (loadCount === 1) {
+        await staleInitialLoad.promise;
+        return {
+          inputs: resolveSchemaInputs({
+            contract: { source: { sourceFormat: 'psl', inputs: [schemaPath] } },
+          }),
+        };
+      }
+      await freshRefresh.promise;
+      return { inputs: resolveSchemaInputs({}) };
+    };
+    harness = startHarness(
+      resolveInputs,
+      watchedFilesCapabilities,
+      findConfigForPrefixes([{ prefix: projectRoot, configPath: projectConfigPath }]),
+    );
+    await harness.initialize();
+
+    harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri, languageId: 'prisma', version: 1, text: 'model {' },
+    });
+    await waitUntil(() => loadCount === 1);
+    harness.notifyConfigChanged(pathToFileURL(projectConfigPath).toString());
+    await waitUntil(() => loadCount === 2);
+
+    freshRefresh.resolve();
+    expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
+
+    staleInitialLoad.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    harness.client.sendNotification(DidChangeTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri, version: 2 },
+      contentChanges: [{ text: 'model {' }],
+    });
+    expect(
+      await harness.waitForDiagnosticsMatching(
+        schemaUri,
+        (diagnostics) => diagnostics.length === 0,
+      ),
+    ).toEqual([]);
+  });
+
+  it('updates only the project identified by the changed config path', async () => {
+    const projectARoot = join(root, 'config-change-a');
+    const projectBRoot = join(root, 'config-change-b');
+    const projectAConfigPath = join(projectARoot, 'prisma-next.config.ts');
+    const projectBConfigPath = join(projectBRoot, 'prisma-next.config.ts');
+    const projectASchemaPath = join(projectARoot, 'schema.psl');
+    const projectBSchemaPath = join(projectBRoot, 'schema.psl');
+    const projectASchemaUri = pathToFileURL(projectASchemaPath).toString();
+    const projectBSchemaUri = pathToFileURL(projectBSchemaPath).toString();
+    const resolvedConfigs: string[] = [];
+    let projectBIsConfigured = true;
+    const resolveInputs: ResolveInputs = async (_rootPath, configPathArg) => {
+      if (configPathArg !== undefined) {
+        resolvedConfigs.push(configPathArg);
+      }
+      return {
+        inputs: resolveSchemaInputs({
+          contract: {
+            source: {
+              sourceFormat: 'psl',
+              inputs:
+                configPathArg === projectAConfigPath
+                  ? [projectASchemaPath]
+                  : configPathArg === projectBConfigPath && projectBIsConfigured
+                    ? [projectBSchemaPath]
+                    : [],
+            },
+          },
+        }),
+      };
+    };
+    harness = startHarness(
+      resolveInputs,
+      watchedFilesCapabilities,
+      findConfigForPrefixes([
+        { prefix: projectARoot, configPath: projectAConfigPath },
+        { prefix: projectBRoot, configPath: projectBConfigPath },
+      ]),
+    );
+    await harness.initialize();
+
+    harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
+      textDocument: { uri: projectASchemaUri, languageId: 'prisma', version: 1, text: 'model {' },
+    });
+    harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
+      textDocument: { uri: projectBSchemaUri, languageId: 'prisma', version: 1, text: 'model {' },
+    });
+    expect((await harness.waitForDiagnostics(projectASchemaUri)).length).toBeGreaterThan(0);
+    expect((await harness.waitForDiagnostics(projectBSchemaUri)).length).toBeGreaterThan(0);
+
+    resolvedConfigs.length = 0;
+    const projectBCleared = harness.waitForDiagnosticsMatching(
+      projectBSchemaUri,
+      (diagnostics) => diagnostics.length === 0,
+    );
+    projectBIsConfigured = false;
+    harness.notifyConfigChanged(pathToFileURL(projectBConfigPath).toString());
+
+    expect(await projectBCleared).toEqual([]);
+    expect(resolvedConfigs).toEqual([projectBConfigPath]);
+  });
+});
 
 describe('language server config watching', { timeout: timeouts.databaseOperation }, () => {
   it('requests a watched-files registration scoped to the config path', async () => {

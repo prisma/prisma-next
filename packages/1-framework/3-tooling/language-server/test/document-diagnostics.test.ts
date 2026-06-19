@@ -7,7 +7,7 @@ import { resolveSchemaInputs } from '../src/schema-inputs';
 
 const schemaUri = pathToFileURL('/abs/schema.psl').toString();
 const inputs = resolveSchemaInputs({
-  contract: { source: { inputs: ['/abs/schema.psl'] } },
+  contract: { source: { sourceFormat: 'psl', inputs: ['/abs/schema.psl'] } },
 });
 
 describe('computeDocumentDiagnostics', () => {
