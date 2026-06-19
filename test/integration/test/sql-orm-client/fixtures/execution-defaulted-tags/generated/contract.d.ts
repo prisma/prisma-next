@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:871f24995183dbc505d68be6a0ccba97a6c6baf0d5041852646d3e680b7fd29e'>;
+  StorageHashBase<'sha256:3e4db7816116cb986091cf746c2494dddf91cd072786822c3959da201dd432b9'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:06b81e884e803a620a2798659231de4288c310083aa49896b5a3dc582d73a40d'>;
 export type ProfileHash =
@@ -53,7 +53,7 @@ export type FieldOutputTypes = {
     };
     readonly UserTag: {
       readonly userId: CodecTypes['pg/int4@1']['output'];
-      readonly tagId: CodecTypes['pg/text@1']['output'];
+      readonly tagId: Char<36>;
       readonly created_at: Char<36>;
     };
   };
@@ -71,7 +71,7 @@ export type FieldInputTypes = {
     };
     readonly UserTag: {
       readonly userId: CodecTypes['pg/int4@1']['input'];
-      readonly tagId: CodecTypes['pg/text@1']['input'];
+      readonly tagId: CodecTypes['sql/char@1']['input'];
       readonly created_at: CodecTypes['sql/char@1']['input'];
     };
   };
@@ -118,9 +118,10 @@ type ContractBase = Omit<
                   readonly nullable: false;
                 };
                 readonly tag_id: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
+                  readonly nativeType: 'character';
+                  readonly codecId: 'sql/char@1';
                   readonly nullable: false;
+                  readonly typeParams: { readonly length: 36 };
                 };
                 readonly created_at: {
                   readonly nativeType: 'character';
@@ -251,7 +252,11 @@ type ContractBase = Omit<
               };
               readonly tagId: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
               };
               readonly created_at: {
                 readonly nullable: false;
