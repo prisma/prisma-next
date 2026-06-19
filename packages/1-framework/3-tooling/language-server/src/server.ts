@@ -16,7 +16,7 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import { CONFIG_FILENAME, type ConfigResolution, resolveConfigInputs } from './config-resolution';
 import { ParseDiagnosticSeverity } from './diagnostic-mapping';
 import { computeDocumentDiagnostics } from './document-diagnostics';
-import { emptySchemaInputSet, type SchemaInputSet } from './schema-inputs';
+import type { SchemaInputSet } from './schema-inputs';
 
 export interface LanguageServer {
   dispose(): void;
@@ -46,7 +46,6 @@ export function createServer(
   const findConfigPathForFile = options?.findConfigPathForFile ?? findNearestConfigPathForFile;
   const projects = new Map<string, ProjectState>();
   const projectLoads = new Map<string, Promise<ProjectState>>();
-  const projectGenerations = new Map<string, number>();
   const documentConfigPaths = new Map<string, string>();
   let rootPath = process.cwd();
   let explicitConfigPath: string | undefined;
@@ -99,46 +98,37 @@ export function createServer(
     if (existingLoad !== undefined) {
       return existingLoad;
     }
-    const generation = nextProjectGeneration(configPath);
-    const load = loadProject(configPath, generation).finally(() => {
-      if (projectLoads.get(configPath) === load) {
-        projectLoads.delete(configPath);
-      }
-    });
+    return queueProjectLoad(configPath);
+  }
+
+  function refreshProject(configPath: string): Promise<ProjectState> {
+    return queueProjectLoad(configPath);
+  }
+
+  function queueProjectLoad(configPath: string): Promise<ProjectState> {
+    const previousLoad = projectLoads.get(configPath) ?? Promise.resolve();
+    const load = previousLoad
+      .catch(() => undefined)
+      .then(() => loadProject(configPath))
+      .finally(() => {
+        if (projectLoads.get(configPath) === load) {
+          projectLoads.delete(configPath);
+        }
+      });
     projectLoads.set(configPath, load);
     return load;
   }
 
-  async function refreshProject(configPath: string): Promise<ProjectState> {
-    const generation = nextProjectGeneration(configPath);
-    const load = loadProject(configPath, generation).finally(() => {
-      if (projectLoads.get(configPath) === load) {
-        projectLoads.delete(configPath);
-      }
-    });
-    projectLoads.set(configPath, load);
-    return load;
-  }
-
-  async function loadProject(configPath: string, generation: number): Promise<ProjectState> {
+  async function loadProject(configPath: string): Promise<ProjectState> {
     const resolution = await resolveInputs(dirname(configPath), configPath);
     const project: ProjectState = resolution.degradedReason
       ? { configPath, inputs: resolution.inputs, degradedReason: resolution.degradedReason }
       : { configPath, inputs: resolution.inputs };
-    if (projectGenerations.get(configPath) !== generation) {
-      return projects.get(configPath) ?? { configPath, inputs: emptySchemaInputSet };
-    }
     projects.set(configPath, project);
     if (project.degradedReason !== undefined) {
       connection.console.warn(project.degradedReason);
     }
     return project;
-  }
-
-  function nextProjectGeneration(configPath: string): number {
-    const nextGeneration = (projectGenerations.get(configPath) ?? 0) + 1;
-    projectGenerations.set(configPath, nextGeneration);
-    return nextGeneration;
   }
 
   async function republishOpenDocumentsForConfig(configPath: string): Promise<void> {

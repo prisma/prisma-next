@@ -577,25 +577,25 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     expect(resolvedConfigs).toEqual([childConfigPath]);
   });
 
-  it('prevents stale initial project loads from overwriting fresher refreshes', async () => {
-    const projectRoot = join(root, 'stale-load-project');
+  it('queues project refreshes behind in-flight project loads', async () => {
+    const projectRoot = join(root, 'queued-load-project');
     const projectConfigPath = join(projectRoot, 'prisma-next.config.ts');
     const schemaPath = join(projectRoot, 'schema.psl');
     const schemaUri = pathToFileURL(schemaPath).toString();
-    const staleInitialLoad = controlledPromise();
-    const freshRefresh = controlledPromise();
+    const initialLoad = controlledPromise();
+    const refreshLoad = controlledPromise();
     let loadCount = 0;
     const resolveInputs: ResolveInputs = async () => {
       loadCount += 1;
       if (loadCount === 1) {
-        await staleInitialLoad.promise;
+        await initialLoad.promise;
         return {
           inputs: resolveSchemaInputs({
             contract: { source: { sourceFormat: 'psl', inputs: [schemaPath] } },
           }),
         };
       }
-      await freshRefresh.promise;
+      await refreshLoad.promise;
       return { inputs: resolveSchemaInputs({}) };
     };
     harness = startHarness(
@@ -610,18 +610,13 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     });
     await waitUntil(() => loadCount === 1);
     harness.notifyConfigChanged(pathToFileURL(projectConfigPath).toString());
-    await waitUntil(() => loadCount === 2);
-
-    freshRefresh.resolve();
-    expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
-
-    staleInitialLoad.resolve();
     await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(loadCount).toBe(1);
 
-    harness.client.sendNotification(DidChangeTextDocumentNotification.type, {
-      textDocument: { uri: schemaUri, version: 2 },
-      contentChanges: [{ text: 'model {' }],
-    });
+    initialLoad.resolve();
+    await waitUntil(() => loadCount === 2);
+    refreshLoad.resolve();
+
     expect(
       await harness.waitForDiagnosticsMatching(
         schemaUri,
