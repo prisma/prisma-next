@@ -1,11 +1,9 @@
 {
   "extends": ["@prisma-next/tsconfig/base"],
   "compilerOptions": {
-    "rootDir": ".",
-    "outDir": "dist",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["dist", "node_modules"]
+  "exclude": ["dist", "dist-tsc", "node_modules"]
 }

@@ -53,27 +53,21 @@ function resolveCliEntry(): string {
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const explicitConfigIndex = args.indexOf('--config');
-  const explicitConfig = explicitConfigIndex !== -1 ? args[explicitConfigIndex + 1] : undefined;
-  const positional = args.filter((a, i) => {
-    if (a.startsWith('--')) return false;
-    if (i > 0 && args[i - 1] === '--config') return false;
-    return true;
-  });
-  const schemaArg = positional[0];
+  const schemaArg = args.find((a) => !a.startsWith('--'));
 
   // Resolve the schema the editor opens and the config the server will find for
-  // it. The language server (post-merge) discovers a document's config by
-  // walking up from the document's own path, so the schema must sit at or under
-  // a directory that contains a resolvable `prisma-next.config.ts`.
+  // it. The language server discovers a document's config by walking up from
+  // the document's own path, so the schema must sit at or under a directory
+  // that contains a resolvable `prisma-next.config.ts`. (There is deliberately
+  // no `--config` flag: the server has no way to be pointed at an arbitrary
+  // config path, so accepting one would be misleading.)
   //
-  // The PSL file is optional. Unless the user points us at an existing config
-  // (`--config`) — in which case we open the real file in place and let the
-  // server discover that project's config — we stage the schema into
-  // `.playground/` (whose `@prisma-next/*` imports resolve) and generate a
-  // default-postgres config beside it. That is the "without a config, assume
-  // default postgres" path, and it covers no-arg, missing-path, and
-  // existing-file-without-config uniformly.
+  // The PSL file is optional. An existing file already inside a project opens
+  // in place under its discovered config; otherwise (no file, missing path, or
+  // an existing file with no project config) the schema is staged into
+  // `.playground/` (whose `@prisma-next/*` imports resolve) beside a generated
+  // default-postgres config — the "without a config, assume default postgres"
+  // path.
   let schemaPath: string;
   let configPath: string;
 
@@ -84,18 +78,7 @@ async function main(): Promise<void> {
         ? schemaArg
         : resolve(process.cwd(), schemaArg);
 
-  if (explicitConfig !== undefined) {
-    if (sourceFile === undefined || !(await fileExists(sourceFile))) {
-      console.error('--config requires an existing <schema.psl> argument.');
-      process.exit(1);
-    }
-    schemaPath = sourceFile;
-    configPath = isAbsolute(explicitConfig)
-      ? explicitConfig
-      : resolve(process.cwd(), explicitConfig);
-    console.log(`Using schema in place: ${schemaPath}`);
-    console.log(`Using config (explicit): ${configPath}`);
-  } else if (sourceFile !== undefined && (await fileExists(sourceFile))) {
+  if (sourceFile !== undefined && (await fileExists(sourceFile))) {
     const discovered = await findNearestConfig(sourceFile);
     if (discovered !== undefined) {
       // The file belongs to a real project; open it in place under its own config.

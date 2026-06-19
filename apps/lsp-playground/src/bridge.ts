@@ -45,8 +45,11 @@ export function attachBridge(server: Server, options: BridgeOptions): () => void
       const ws: IWebSocket = {
         send: (content) =>
           webSocket.send(content, (error) => {
+            // A transient send error (peer gone, socket closing) must not crash
+            // the playground process; close the socket and let the LSP
+            // connection tear down through the normal close path.
             if (error !== null && error !== undefined) {
-              throw error;
+              webSocket.close();
             }
           }),
         onMessage: (cb) => webSocket.on('message', (data) => cb(data)),
@@ -75,6 +78,12 @@ function launch(socket: IWebSocket, options: BridgeOptions): void {
   const socketConnection = createConnection(reader, writer, () => socket.dispose());
   const serverConnection = createServerProcess('PSL', 'node', [options.cliEntry, 'lsp', '--stdio']);
   if (serverConnection === undefined) {
+    // The LSP subprocess could not be spawned. Don't leave the client hanging
+    // on a backend-less socket: report it and close the connection.
+    console.error(
+      `Failed to spawn the language server (node ${options.cliEntry} lsp --stdio). Is @prisma-next/cli built?`,
+    );
+    socket.dispose();
     return;
   }
   forward(socketConnection, serverConnection);
