@@ -1,21 +1,27 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { crossRef } from '@prisma-next/contract/types';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
-import { modelsOf, postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
+import {
+  createBuiltinLikeControlMutationDefaults,
+  modelsOf,
+  postgresScalarTypeDescriptors,
+  postgresTarget,
+  symbolTableInputFromParseArgs,
+} from './fixtures';
 
 const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
+  controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
   composedExtensionContracts: new Map(),
 } as const;
 
 function interpretSchema(schema: string) {
-  const document = parsePslDocument({ schema, sourceId: 'schema.prisma' });
-  return interpretPslDocumentToSqlContract({ ...baseInput, document });
+  const document = symbolTableInputFromParseArgs({ schema, sourceId: 'schema.prisma' });
+  return interpretPslDocumentToSqlContract({ ...baseInput, ...document });
 }
 
 function relationsOf(contract: Contract) {

@@ -163,7 +163,7 @@ namespace auth {
   });
 
   it('carries the related-model namespace into a 1:N backrelation toNamespaceId', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `namespace public {
   model User {
     id Int @id
@@ -182,7 +182,7 @@ namespace blog {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
