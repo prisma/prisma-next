@@ -6,5 +6,6 @@ export default defineConfig({
     'src/exports/parser.ts',
     'src/exports/tokenizer.ts',
     'src/exports/syntax.ts',
+    'src/exports/format.ts',
   ],
 });

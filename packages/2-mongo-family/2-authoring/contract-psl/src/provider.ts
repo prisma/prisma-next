@@ -12,6 +12,7 @@ export interface MongoContractOptions {
 export function mongoContract(schemaPath: string, options?: MongoContractOptions): ContractConfig {
   return {
     source: {
+      sourceFormat: 'psl',
       inputs: [schemaPath],
       load: async (context) => {
         const [absoluteSchemaPath] = context.resolvedInputs;

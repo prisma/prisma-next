@@ -21,6 +21,7 @@
     "@prisma-next/errors": "workspace:0.14.0",
     "@prisma-next/framework-components": "workspace:0.14.0",
     "@prisma-next/migration-tools": "workspace:0.14.0",
+    "@prisma-next/psl-parser": "workspace:0.14.0",
     "@prisma-next/psl-printer": "workspace:0.14.0",
     "@prisma-next/cli-telemetry": "workspace:0.14.0",
     "@prisma-next/utils": "workspace:0.14.0",

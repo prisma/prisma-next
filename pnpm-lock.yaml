@@ -1590,6 +1590,9 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:0.14.0
         version: link:../migration
+      '@prisma-next/psl-parser':
+        specifier: workspace:0.14.0
+        version: link:../../2-authoring/psl-parser
       '@prisma-next/psl-printer':
         specifier: workspace:0.14.0
         version: link:../../2-authoring/psl-printer
@@ -1828,6 +1831,9 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:0.14.0
         version: link:../migration
+      '@prisma-next/psl-parser':
+        specifier: workspace:0.14.0
+        version: link:../../2-authoring/psl-parser
       '@prisma-next/psl-printer':
         specifier: workspace:0.14.0
         version: link:../../2-authoring/psl-printer

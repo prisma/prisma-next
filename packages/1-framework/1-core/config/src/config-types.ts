@@ -33,6 +33,11 @@ export interface ContractConfig {
   readonly output?: string;
 }
 
+export interface FormatterConfig {
+  readonly indent?: number | 'tab';
+  readonly newline?: 'LF' | 'CRLF';
+}
+
 /**
  * Default *source* directory for the contract file the user authors at `init`
  * time. Output artefacts colocate with source per the same rule path-bearing
@@ -106,11 +111,13 @@ export interface PrismaNextConfig<
     /** Directory for migration packages, relative to config file. Defaults to 'migrations'. */
     readonly dir?: string;
   };
+  readonly formatter?: FormatterConfig;
 }
 
 const ContractSourceInputSchema = type('string');
 
 export const ContractSourceProviderSchema = type({
+  'sourceFormat?': "'psl' | 'typescript'",
   'inputs?': ContractSourceInputSchema.array(),
   load: 'Function',
 });
@@ -128,6 +135,13 @@ const MigrationsConfigSchema = type({
   'dir?': 'string',
 });
 
+const FormatterIndentSchema = type('number.integer >= 1').or("'tab'");
+
+export const FormatterConfigSchema = type({
+  'indent?': FormatterIndentSchema,
+  'newline?': "'LF' | 'CRLF'",
+});
+
 const PrismaNextConfigSchema = type({
   family: 'unknown', // ControlFamilyDescriptor - validated separately
   target: 'unknown', // ControlTargetDescriptor - validated separately
@@ -137,6 +151,7 @@ const PrismaNextConfigSchema = type({
   'db?': 'unknown',
   'contract?': ContractConfigSchema,
   'migrations?': MigrationsConfigSchema,
+  'formatter?': FormatterConfigSchema,
 });
 
 /**

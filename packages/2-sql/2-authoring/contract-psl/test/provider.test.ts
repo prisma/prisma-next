@@ -30,6 +30,13 @@ describe('prismaContract provider helper', () => {
     tempDirs.length = 0;
   });
 
+  describe('source format discriminator', () => {
+    it('tags the source as PSL', () => {
+      const contract = prismaContract('./src/contract/schema.prisma', baseOptions);
+      expect(contract.source.sourceFormat).toBe('psl');
+    });
+  });
+
   describe('output derivation (TML-2461)', () => {
     it('derives output colocated with schema path when output is not provided', () => {
       const contract = prismaContract('./src/contract/schema.prisma', baseOptions);

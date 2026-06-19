@@ -31,6 +31,18 @@ function minimalMongoContract(overrides?: {
   } as unknown as Contract;
 }
 
+describe('source format discriminator', () => {
+  it('typescriptContract tags the source as TypeScript', () => {
+    const config = typescriptContract(minimalMongoContract());
+    expect(config.source.sourceFormat).toBe('typescript');
+  });
+
+  it('typescriptContractFromPath tags the source as TypeScript', () => {
+    const config = typescriptContractFromPath('./contract.ts');
+    expect(config.source.sourceFormat).toBe('typescript');
+  });
+});
+
 describe('defaultControlPolicy specifier precedence', () => {
   it('typescriptContract keeps an existing contract default when the specifier sets another', async () => {
     const contract = minimalMongoContract({ defaultControlPolicy: 'managed' });
