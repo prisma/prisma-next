@@ -15,6 +15,15 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   defaultNamespaceId: 'public',
 };
 
+const sqliteTargetPack: TargetPackRef<'sql', 'sqlite'> = {
+  kind: 'target',
+  id: 'sqlite',
+  familyId: 'sql',
+  targetId: 'sqlite',
+  version: '0.0.1',
+  defaultNamespaceId: '__unbound__',
+};
+
 const idDescriptor = { codecId: 'pg/int4@1', nativeType: 'int4' } as const;
 const textDescriptor = { codecId: 'pg/text@1', nativeType: 'text' } as const;
 
@@ -115,5 +124,30 @@ describe('same bare table name across namespaces with a cross-namespace FK', () 
   it('round-trips through JSON and validates without error', () => {
     const json: unknown = JSON.parse(JSON.stringify(contract));
     expect(() => validateSqlContractFully(json)).not.toThrow();
+  });
+});
+
+describe('same bare table name across non-Postgres default and explicit namespace', () => {
+  const unboundUser: ModelNode = {
+    modelName: publicUser.modelName,
+    tableName: publicUser.tableName,
+    fields: publicUser.fields,
+    id: { columns: ['id'] },
+  };
+  const publicUserWithSameTable: ModelNode = {
+    ...authUser,
+    namespaceId: 'public',
+  };
+
+  const contract = buildSqlContractFromDefinition({
+    target: sqliteTargetPack,
+    namespaces: ['public'],
+    models: [unboundUser, publicUserWithSameTable],
+  });
+  const storage = contract.storage as SqlStorage;
+
+  it('keeps the unbound default coordinate distinct from public', () => {
+    expect(storage.namespaces['__unbound__']!.entries.table?.['users']).toBeDefined();
+    expect(storage.namespaces['public']!.entries.table?.['users']).toBeDefined();
   });
 });

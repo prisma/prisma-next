@@ -1,4 +1,5 @@
 import { mkdir } from 'node:fs/promises';
+import { loadConfig } from '@prisma-next/config-loader';
 import type { Contract } from '@prisma-next/contract/types';
 import { emit, getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
@@ -7,7 +8,6 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { dirname, join } from 'pathe';
-import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import { queueEmitByOutput } from '../../utils/emit-queue';
 import { toExtensionInputs } from '../../utils/extension-pack-inputs';

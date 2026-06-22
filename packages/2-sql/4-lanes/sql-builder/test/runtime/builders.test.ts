@@ -477,6 +477,7 @@ describe('mutation defaults', () => {
     expect(spy).toHaveBeenCalledWith({
       op: 'create',
       table: 'users',
+      namespace: 'public',
       values: { id: 1, name: 'A', email: 'a@b.com' },
     });
   });
@@ -490,6 +491,7 @@ describe('mutation defaults', () => {
     expect(spy).toHaveBeenCalledWith({
       op: 'update',
       table: 'users',
+      namespace: 'public',
       values: { name: 'B' },
     });
   });
@@ -517,6 +519,7 @@ describe('INSERT multi-row', () => {
     expect(spy).toHaveBeenCalledWith({
       op: 'create',
       table: 'users',
+      namespace: 'public',
       values: { id: 1, name: 'A' },
     });
   });

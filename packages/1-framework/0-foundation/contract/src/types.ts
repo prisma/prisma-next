@@ -173,7 +173,7 @@ export function isExecutionMutationDefaultValue(
 }
 
 export type ExecutionMutationDefault = {
-  readonly ref: { readonly table: string; readonly column: string };
+  readonly ref: { readonly namespace: string; readonly table: string; readonly column: string };
   readonly onCreate?: ExecutionMutationDefaultValue;
   readonly onUpdate?: ExecutionMutationDefaultValue;
 };

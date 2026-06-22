@@ -1,5 +1,4 @@
 import { crossRef } from '@prisma-next/contract/types';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
@@ -8,6 +7,7 @@ import {
   documentScopedTypes,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  symbolTableInputFromParseArgs,
   testEnumEntityContributions,
 } from './fixtures';
 
@@ -23,7 +23,7 @@ describe('interpretPslDocumentToSqlContract types', () => {
   const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
 
   it('lowers preserved native type named types into storage descriptors', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `types {
   Id = String @db.Uuid
   Slug = String @db.VarChar(191)
@@ -49,7 +49,7 @@ model Event {
 
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -133,7 +133,7 @@ model Event {
   });
 
   it('lowers additional Postgres native type attributes on named types', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `types {
   Code = String @db.Char(12)
   Score = Float @db.Real
@@ -155,7 +155,7 @@ model Event {
 
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 

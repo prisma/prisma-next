@@ -9,7 +9,8 @@ import {
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import { mongoOrm } from '@prisma-next/mongo-orm';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
@@ -64,24 +65,41 @@ const postgresScalarTypeDescriptors = new Map([
 ]) as ReadonlyMap<string, { codecId: string; nativeType: string }>;
 
 function interpretMongoPsl(schema: string) {
-  const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
-  return interpretPslDocumentToMongoContract({
+  const mongoScalarTypeDescriptors = new Map([
+    ['String', 'mongo/string@1'],
+    ['Int', 'mongo/int32@1'],
+    ['Boolean', 'mongo/bool@1'],
+    ['DateTime', 'mongo/date@1'],
+    ['ObjectId', 'mongo/objectId@1'],
+    ['Float', 'mongo/double@1'],
+  ]);
+  const { document, sourceFile } = parse(schema);
+  const { table } = buildSymbolTable({
     document,
-    scalarTypeDescriptors: new Map([
-      ['String', 'mongo/string@1'],
-      ['Int', 'mongo/int32@1'],
-      ['Boolean', 'mongo/bool@1'],
-      ['DateTime', 'mongo/date@1'],
-      ['ObjectId', 'mongo/objectId@1'],
-      ['Float', 'mongo/double@1'],
-    ]),
+    sourceFile,
+    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
+    pslBlockDescriptors: {},
+  });
+  return interpretPslDocumentToMongoContract({
+    symbolTable: table,
+    sourceFile,
+    sourceId: 'test.prisma',
+    scalarTypeDescriptors: mongoScalarTypeDescriptors,
   });
 }
 
 function interpretSqlPsl(schema: string) {
-  const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
-  return interpretPslDocumentToSqlContract({
+  const { document, sourceFile } = parse(schema);
+  const { table } = buildSymbolTable({
     document,
+    sourceFile,
+    scalarTypes: [...postgresScalarTypeDescriptors.keys()],
+    pslBlockDescriptors: {},
+  });
+  return interpretPslDocumentToSqlContract({
+    symbolTable: table,
+    sourceFile,
+    sourceId: 'test.prisma',
     target: postgresTarget,
     scalarTypeDescriptors: postgresScalarTypeDescriptors,
     composedExtensionContracts: new Map(),

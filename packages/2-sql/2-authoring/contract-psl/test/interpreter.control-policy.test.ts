@@ -1,5 +1,4 @@
 import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
@@ -9,6 +8,7 @@ import {
   createTestNamespace,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  symbolTableInputFromParseArgs,
 } from './fixtures';
 import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
 import { unboundTables } from './unbound-tables';
@@ -16,9 +16,9 @@ import { unboundTables } from './unbound-tables';
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
 
 function interpretSchema(schema: string) {
-  const document = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+  const document = symbolTableInputFromParseArgs({ schema, sourceId: 'schema.prisma' });
   return interpretPslDocumentToSqlContract({
-    document,
+    ...document,
     target: postgresTarget,
     scalarTypeDescriptors: postgresScalarTypeDescriptors,
     composedExtensionContracts: new Map(),

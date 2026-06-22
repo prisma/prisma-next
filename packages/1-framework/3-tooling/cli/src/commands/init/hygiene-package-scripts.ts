@@ -1,3 +1,5 @@
+import { blindCast } from '@prisma-next/utils/casts';
+
 /**
  * The package.json `scripts` entries `init` adds idempotently (FR3.5).
  * The script *name* mirrors the CLI subcommand path (`contract:emit` →
@@ -58,10 +60,18 @@ export function mergePackageScripts(
   existing: string,
   required: readonly RequiredScript[] = REQUIRED_SCRIPTS,
 ): PackageScriptsMergeResult {
-  const parsed = JSON.parse(existing) as Record<string, unknown>;
+  const parsed = blindCast<
+    Record<string, unknown>,
+    'JSON.parse returns `unknown`; package.json is a JSON object so its top level is a string-keyed record'
+  >(JSON.parse(existing));
   const scripts: Record<string, string> =
     typeof parsed['scripts'] === 'object' && parsed['scripts'] !== null
-      ? { ...(parsed['scripts'] as Record<string, string>) }
+      ? {
+          ...blindCast<
+            Record<string, string>,
+            'guarded above: parsed.scripts is a non-null object; package.json `scripts` values are command strings'
+          >(parsed['scripts']),
+        }
       : {};
 
   const warnings: string[] = [];
@@ -131,7 +141,10 @@ export interface EsmModuleTypeResult {
  *   ESM and we don't silently overwrite that.
  */
 export function ensureEsmModuleType(existing: string): EsmModuleTypeResult {
-  const parsed = JSON.parse(existing) as Record<string, unknown>;
+  const parsed = blindCast<
+    Record<string, unknown>,
+    'JSON.parse returns `unknown`; package.json is a JSON object so its top level is a string-keyed record'
+  >(JSON.parse(existing));
   const currentType = parsed['type'];
 
   if (currentType === 'module') {

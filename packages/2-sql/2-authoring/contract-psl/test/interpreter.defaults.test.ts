@@ -1,4 +1,3 @@
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
@@ -11,6 +10,7 @@ import {
   postgresTarget,
   sqliteScalarTypeDescriptors,
   sqliteTarget,
+  symbolTableInputFromParseArgs,
 } from './fixtures';
 import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
 import { unboundTables } from './unbound-tables';
@@ -32,7 +32,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       ...input,
     });
   it('lowers supported default functions into execution and storage contract shapes', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Defaults {
   id Int @id
   idCuid2 String @default(cuid(2))
@@ -48,7 +48,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -59,27 +59,27 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       mutations: {
         defaults: [
           {
-            ref: { table: 'defaults', column: 'idCuid2' },
+            ref: { namespace: 'public', table: 'defaults', column: 'idCuid2' },
             onCreate: { kind: 'generator', id: 'cuid2' },
           },
           {
-            ref: { table: 'defaults', column: 'idNanoidDefault' },
+            ref: { namespace: 'public', table: 'defaults', column: 'idNanoidDefault' },
             onCreate: { kind: 'generator', id: 'nanoid' },
           },
           {
-            ref: { table: 'defaults', column: 'idNanoidSized' },
+            ref: { namespace: 'public', table: 'defaults', column: 'idNanoidSized' },
             onCreate: { kind: 'generator', id: 'nanoid', params: { size: 16 } },
           },
           {
-            ref: { table: 'defaults', column: 'idUlid' },
+            ref: { namespace: 'public', table: 'defaults', column: 'idUlid' },
             onCreate: { kind: 'generator', id: 'ulid' },
           },
           {
-            ref: { table: 'defaults', column: 'idUuidV4' },
+            ref: { namespace: 'public', table: 'defaults', column: 'idUuidV4' },
             onCreate: { kind: 'generator', id: 'uuidv4' },
           },
           {
-            ref: { table: 'defaults', column: 'idUuidV7' },
+            ref: { namespace: 'public', table: 'defaults', column: 'idUuidV7' },
             onCreate: { kind: 'generator', id: 'uuidv7' },
           },
         ],
@@ -124,7 +124,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
   });
 
   it('accepts uuid() and uuid(7) defaults on @db.Uuid columns, preserving native uuid storage type', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `types {
   UuidNativeId = String @db.Uuid
 }
@@ -137,7 +137,7 @@ model UuidNative {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -148,11 +148,11 @@ model UuidNative {
       mutations: {
         defaults: expect.arrayContaining([
           {
-            ref: { table: 'uuidNative', column: 'idV4' },
+            ref: { namespace: 'public', table: 'uuidNative', column: 'idV4' },
             onCreate: { kind: 'generator', id: 'uuidv4' },
           },
           {
-            ref: { table: 'uuidNative', column: 'idV7' },
+            ref: { namespace: 'public', table: 'uuidNative', column: 'idV7' },
             onCreate: { kind: 'generator', id: 'uuidv7' },
           },
         ]),
@@ -172,7 +172,7 @@ model UuidNative {
   });
 
   it('accepts uuid() default on a named Uuid type field (e.g. id Uuid @id @default(uuid())), preserving native uuid storage type', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `types {
   Uuid = String @db.Uuid
 }
@@ -185,7 +185,7 @@ model Profile {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -196,7 +196,7 @@ model Profile {
       mutations: {
         defaults: [
           {
-            ref: { table: 'profile', column: 'id' },
+            ref: { namespace: 'public', table: 'profile', column: 'id' },
             onCreate: { kind: 'generator', id: 'uuidv4' },
           },
         ],
@@ -212,7 +212,7 @@ model Profile {
   });
 
   it('rejects non-uuid generators on @db.Uuid columns with PSL_INVALID_DEFAULT_APPLICABILITY', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `types {
   UuidNativeId = String @db.Uuid
 }
@@ -224,7 +224,7 @@ model UuidNativeBad {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -242,7 +242,7 @@ model UuidNativeBad {
   });
 
   it('returns diagnostics for unsupported default functions and invalid arguments', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model InvalidDefaults {
   id Int @id
   cuidValue String @default(cuid())
@@ -254,7 +254,7 @@ model UuidNativeBad {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -288,7 +288,7 @@ model UuidNativeBad {
   });
 
   it('returns diagnostics for optional fields with execution defaults', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model OptionalDefaults {
   id Int @id
   token String? @default(nanoid())
@@ -297,7 +297,7 @@ model UuidNativeBad {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -318,7 +318,7 @@ model UuidNativeBad {
   });
 
   it('preserves raw dbgenerated defaults for timestamp and json columns', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Defaults {
   id Int @id
   touchedAt DateTime @default(dbgenerated("clock_timestamp()"))
@@ -328,7 +328,7 @@ model UuidNativeBad {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -419,7 +419,7 @@ model UuidNativeBad {
   } as const;
 
   it('lowers boolean literal defaults into the storage contract', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Flags {
   id Int @id
   enabled Boolean @default(true)
@@ -429,7 +429,7 @@ model UuidNativeBad {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -448,7 +448,7 @@ model UuidNativeBad {
   });
 
   it('lowers temporal.updatedAt() to create and update execution defaults', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Timestamped {
   id Int @id
   createdAt DateTime @default(now())
@@ -458,7 +458,7 @@ model UuidNativeBad {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
       authoringContributions: postgresTemporalContributions,
     });
@@ -473,7 +473,7 @@ model UuidNativeBad {
     });
     expect(result.value.execution?.mutations.defaults).toEqual([
       {
-        ref: { table: 'timestamped', column: 'updatedAt' },
+        ref: { namespace: 'public', table: 'timestamped', column: 'updatedAt' },
         onCreate: { kind: 'generator', id: 'timestampNow' },
         onUpdate: { kind: 'generator', id: 'timestampNow' },
       },
@@ -481,7 +481,7 @@ model UuidNativeBad {
   });
 
   it('lowers SQLite temporal.updatedAt() to SQLite timestamp codecs', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Timestamped {
   id Int @id
   createdAt DateTime @default(now())
@@ -491,7 +491,7 @@ model UuidNativeBad {
     });
 
     const result = interpretPslDocumentToSqlContractInternal({
-      document,
+      ...document,
       target: sqliteTarget,
       scalarTypeDescriptors: sqliteScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
@@ -511,7 +511,7 @@ model UuidNativeBad {
     });
     expect(result.value.execution?.mutations.defaults).toEqual([
       {
-        ref: { table: 'timestamped', column: 'updatedAt' },
+        ref: { namespace: '__unbound__', table: 'timestamped', column: 'updatedAt' },
         onCreate: { kind: 'generator', id: 'timestampNow' },
         onUpdate: { kind: 'generator', id: 'timestampNow' },
       },
@@ -519,7 +519,7 @@ model UuidNativeBad {
   });
 
   it('emits a migration hint when @updatedAt is used (after attribute removal)', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Stale {
   id Int @id
   updatedAt DateTime @updatedAt
@@ -528,7 +528,7 @@ model UuidNativeBad {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -552,7 +552,7 @@ model UuidNativeBad {
     // so the diagnostic still fires — but we don't tell users to do what
     // they already did. The migration hint is suppressed; only the bare
     // unsupported-attribute message is emitted.
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Migrated {
   id Int @id
   updatedAt temporal.updatedAt() @updatedAt
@@ -561,7 +561,7 @@ model UuidNativeBad {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
       authoringContributions: postgresTemporalContributions,
     });
@@ -583,7 +583,7 @@ model UuidNativeBad {
     // that PSL's field-preset dispatch is generic — it walks
     // `authoringContributions.field` for any registered preset, not just the
     // real `temporal.{createdAt,updatedAt}` pair.
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Synthetic {
   id Int @id
   example temporal.exampleField()
@@ -592,7 +592,7 @@ model UuidNativeBad {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
       authoringContributions: {
         field: {
@@ -642,8 +642,60 @@ model UuidNativeBad {
     expect(defaults.find((entry) => entry.ref.column === 'example')).toBeUndefined();
   });
 
+  it('uses nullable from field presets when lowering storage columns', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Synthetic {
+  id Int @id
+  maybe temporal.nullableField()
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+      authoringContributions: {
+        field: {
+          temporal: {
+            nullableField: {
+              kind: 'fieldPreset',
+              output: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+                nullable: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      namespaces: {
+        public: {
+          entries: {
+            table: {
+              synthetic: {
+                columns: {
+                  maybe: {
+                    codecId: 'pg/text@1',
+                    nativeType: 'text',
+                    nullable: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
   it('resolves a type constructor sharing a field-preset namespace', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Synthetic {
   id Int @id
   example audit.Custom()
@@ -652,7 +704,7 @@ model UuidNativeBad {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
       authoringContributions: {
         field: {
@@ -723,7 +775,7 @@ model UuidNativeBad {
     } as const;
 
     it('rejects optional field-preset call with PSL_PRESET_NOT_OPTIONAL', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Bad {
   id Int @id
   example temporal.exampleField()?
@@ -732,7 +784,7 @@ model UuidNativeBad {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
         authoringContributions: syntheticPresetContributions,
       });
@@ -750,7 +802,7 @@ model UuidNativeBad {
     });
 
     it('rejects field-preset call combined with @default(...) with PSL_PRESET_AND_DEFAULT_CONFLICT', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Bad {
   id Int @id
   example temporal.exampleField() @default(now())
@@ -759,7 +811,7 @@ model UuidNativeBad {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
         authoringContributions: syntheticPresetContributions,
       });
@@ -777,7 +829,7 @@ model UuidNativeBad {
     });
 
     it('rejects field-preset call combined with @id when preset does not contribute id', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Bad {
   id Int @id
   example temporal.exampleField() @id
@@ -786,7 +838,7 @@ model UuidNativeBad {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
         authoringContributions: syntheticPresetContributions,
       });
@@ -804,7 +856,7 @@ model UuidNativeBad {
     });
 
     it('rejects an unknown extension namespace in field-position with PSL_EXTENSION_NAMESPACE_NOT_COMPOSED (AC5c)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Bad {
   id Int @id
   ts weather.updatedAt()
@@ -813,7 +865,7 @@ model UuidNativeBad {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -831,7 +883,7 @@ model UuidNativeBad {
     });
 
     it('rejects extra positional argument to a zero-arg preset (AC5a)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Bad {
   id Int @id
   example temporal.exampleField(123)
@@ -840,7 +892,7 @@ model UuidNativeBad {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
         authoringContributions: syntheticPresetContributions,
       });
@@ -859,7 +911,7 @@ model UuidNativeBad {
     });
 
     it('rejects list-of preset call with PSL_PRESET_NOT_LIST (AC5f)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Bad {
   id Int @id
   example temporal.exampleField()[]
@@ -868,7 +920,7 @@ model UuidNativeBad {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
         authoringContributions: syntheticPresetContributions,
       });
@@ -890,7 +942,7 @@ model UuidNativeBad {
       // default-function parser only accepts bare identifiers. The honest
       // rejection path is "this isn't a valid @default(...) value", not
       // "this generator isn't applicable". Locks in which diagnostic fires.
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Bad {
   id Int @id
   ts DateTime @default(temporal.updatedAt())
@@ -899,7 +951,7 @@ model UuidNativeBad {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -921,7 +973,7 @@ model UuidNativeBad {
       // second one is a parser-level reject. This test locks in the
       // failure mode so a future parser refactor can't silently accept the
       // ambiguous form and let the interpreter pick one.
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Bad {
   id Int @id
   example temporal.updatedAt() temporal.createdAt()
@@ -930,7 +982,7 @@ model UuidNativeBad {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -940,7 +992,7 @@ model UuidNativeBad {
     });
 
     it('rejects an unknown preset name in a registered field namespace with PSL_UNKNOWN_FIELD_PRESET', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Bad {
   id Int @id
   example audit.foo()
@@ -949,7 +1001,7 @@ model UuidNativeBad {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
         authoringContributions: { field: { audit: {} }, type: {} },
       });

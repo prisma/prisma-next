@@ -290,11 +290,11 @@ describe('contract DSL helper vocabulary', () => {
     });
     expect(contract.execution?.mutations.defaults).toEqual([
       {
-        ref: { table: 'audit_entry', column: 'id' },
+        ref: { namespace: 'public', table: 'audit_entry', column: 'id' },
         onCreate: { kind: 'generator', id: 'uuidv4' },
       },
       {
-        ref: { table: 'audit_entry', column: 'updated_at' },
+        ref: { namespace: 'public', table: 'audit_entry', column: 'updated_at' },
         onCreate: { kind: 'generator', id: 'timestampNow' },
         onUpdate: { kind: 'generator', id: 'timestampNow' },
       },
@@ -396,7 +396,7 @@ describe('contract DSL helper vocabulary', () => {
     });
     expect(contract.execution?.mutations.defaults).toEqual([
       {
-        ref: { table: 'short_link', column: 'id' },
+        ref: { namespace: 'public', table: 'short_link', column: 'id' },
         onCreate: { kind: 'generator', id: 'nanoid', params: { size: 16 } },
       },
     ]);

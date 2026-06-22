@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-helpers';
 
 afterAll(() => {
-  vi.doUnmock('../../src/config-loader');
+  vi.doUnmock('@prisma-next/config-loader');
   vi.resetModules();
 });
 
@@ -23,7 +23,7 @@ afterAll(() => {
  */
 
 const mocks = vi.hoisted(() => ({ loadConfig: vi.fn() }));
-vi.mock('../../src/config-loader', () => ({ loadConfig: mocks.loadConfig }));
+vi.mock('@prisma-next/config-loader', () => ({ loadConfig: mocks.loadConfig }));
 
 const TARGET = 'mock';
 const TARGET_FAMILY = 'mock';

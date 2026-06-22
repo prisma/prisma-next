@@ -1,5 +1,4 @@
 import { crossRef } from '@prisma-next/contract/types';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
@@ -13,6 +12,7 @@ import {
   modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  symbolTableInputFromParseArgs,
   testEnumEntityContributions,
 } from './fixtures';
 import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
@@ -46,7 +46,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     });
 
   it('uses composed scalar type descriptors without hardcoded fallback', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
   email String
@@ -55,7 +55,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     });
 
     const result = interpretPslDocumentToSqlContractInternal({
-      document,
+      ...document,
       target: postgresTarget,
       scalarTypeDescriptors: new Map([
         ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
@@ -90,7 +90,7 @@ describe('interpretPslDocumentToSqlContract', () => {
   });
 
   it('does not synthesise capabilities the target did not contribute', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
   email String
@@ -98,7 +98,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ document });
+    const result = interpretPslDocumentToSqlContract({ ...document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -110,7 +110,7 @@ describe('interpretPslDocumentToSqlContract', () => {
   });
 
   it('flows capabilities declared on the target pack through to the contract', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
   email String
@@ -124,7 +124,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     } as const;
 
     const result = interpretPslDocumentToSqlContractInternal({
-      document,
+      ...document,
       target: targetWithCapabilities,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
@@ -141,7 +141,7 @@ describe('interpretPslDocumentToSqlContract', () => {
   });
 
   it('does not derive generated column type without descriptor resolver', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
   slug String @default(slugid())
@@ -150,7 +150,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     });
 
     const result = interpretPslDocumentToSqlContractInternal({
-      document,
+      ...document,
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
@@ -198,7 +198,7 @@ describe('interpretPslDocumentToSqlContract', () => {
   });
 
   it('populates roots from models', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
   email String
@@ -222,7 +222,7 @@ model Comment {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -237,7 +237,7 @@ model Comment {
   });
 
   it('builds sql contract ir from simple psl schema', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
   email String
@@ -247,7 +247,7 @@ model Comment {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -289,7 +289,7 @@ model Comment {
   });
 
   it('emits sql model with no @id and no @@id', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model IdlessThing {
   email String @unique
   token String
@@ -299,7 +299,7 @@ model Comment {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -342,7 +342,7 @@ model Comment {
   });
 
   it('emits composite model id as primary key', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model CompositeThing {
   email String
   token String
@@ -354,7 +354,7 @@ model Comment {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -377,7 +377,7 @@ model Comment {
   });
 
   it('emits mapped composite model id name and columns', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model CompositeThing {
   email String @map("email_address")
   token String @map("api_token")
@@ -390,7 +390,7 @@ model Comment {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -416,7 +416,7 @@ model Comment {
   });
 
   it('maps @@map and @map to storage table and column names', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Team {
   id Int @id @map("team_id")
   @@map("org_team")
@@ -435,7 +435,7 @@ model Member {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -523,9 +523,12 @@ model AuditLog {
   @@map("audit_log")
 }
 `;
-      const document = parsePslDocument({ schema: printed, sourceId: 'schema.prisma' });
+      const document = symbolTableInputFromParseArgs({
+        schema: printed,
+        sourceId: 'schema.prisma',
+      });
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
       expect(result.ok).toBe(true);
@@ -549,9 +552,12 @@ model OrderItem {
   @@map("order_item")
 }
 `;
-      const document = parsePslDocument({ schema: printed, sourceId: 'schema.prisma' });
+      const document = symbolTableInputFromParseArgs({
+        schema: printed,
+        sourceId: 'schema.prisma',
+      });
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
       expect(result.ok).toBe(true);
@@ -576,7 +582,7 @@ model OrderItem {
   });
 
   it('maps model-level composite primary keys to storage columns', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Membership {
   orgId String @map("org_id")
   userId String @map("user_id")
@@ -589,7 +595,7 @@ model OrderItem {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -613,7 +619,7 @@ model OrderItem {
 
   describe('@@index type and options', () => {
     it('lowers @@index([body], type: "bm25", options: { key_field: "id" }) to an IR index node with type and options', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Doc {
   id Int @id
   body String
@@ -623,7 +629,7 @@ model OrderItem {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
         composedExtensionPacks: [testIndexPack.id],
         composedExtensionPackRefs: [testIndexPack],
@@ -655,7 +661,7 @@ model OrderItem {
     });
 
     it('accepts a multi-key options object with string-literal leaves', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Doc {
   id Int @id
   body String
@@ -665,7 +671,7 @@ model OrderItem {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
         composedExtensionPacks: [testIndexPack.id],
         composedExtensionPackRefs: [testIndexPack],
@@ -688,7 +694,7 @@ model OrderItem {
     });
 
     it('rejects a non-string-literal leaf in options (boolean)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Doc {
   id Int @id
   body String
@@ -698,7 +704,7 @@ model OrderItem {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
       expect(result.ok).toBe(false);
@@ -709,7 +715,7 @@ model OrderItem {
     });
 
     it('rejects a non-string-literal leaf in options (number)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Doc {
   id Int @id
   body String
@@ -719,7 +725,7 @@ model OrderItem {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
       expect(result.ok).toBe(false);
@@ -730,7 +736,7 @@ model OrderItem {
     });
 
     it('rejects an options argument with no surrounding type argument', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Doc {
   id Int @id
   body String
@@ -740,7 +746,7 @@ model OrderItem {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
       expect(result.ok).toBe(false);
@@ -753,7 +759,7 @@ model OrderItem {
     });
 
     it('rejects a malformed options object literal', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Doc {
   id Int @id
   body String
@@ -763,7 +769,7 @@ model OrderItem {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
       expect(result.ok).toBe(false);
@@ -774,7 +780,7 @@ model OrderItem {
     });
 
     it('accepts @@index without type or options (existing behaviour unchanged)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Doc {
   id Int @id
   body String
@@ -784,7 +790,7 @@ model OrderItem {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
       expect(result.ok).toBe(true);
@@ -798,7 +804,7 @@ model OrderItem {
 
   describe('per-target namespace resolution', () => {
     it('Postgres leaves implicit top-level declarations on the late-bound default slot (TS/PSL byte parity for single-namespace contracts)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model User {
   id Int @id
 }
@@ -806,7 +812,7 @@ model OrderItem {
         sourceId: 'schema.prisma',
       });
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
       expect(result.ok).toBe(true);
@@ -819,7 +825,7 @@ model OrderItem {
     });
 
     it('Postgres lowers `namespace unbound { … }` to the late-binding sentinel slot', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `namespace unbound {
   model Tenant {
     id Int @id
@@ -829,7 +835,7 @@ model OrderItem {
         sourceId: 'schema.prisma',
       });
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
       expect(result.ok).toBe(true);
@@ -842,7 +848,7 @@ model OrderItem {
     });
 
     it('Postgres lowers named `namespace auth { … }` to its eponymous schema slot', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `namespace auth {
   model User {
     id Int @id
@@ -852,7 +858,7 @@ model OrderItem {
         sourceId: 'schema.prisma',
       });
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
       expect(result.ok).toBe(true);
@@ -866,7 +872,7 @@ model OrderItem {
     });
 
     it('Postgres routes a mixed top-level + multi-namespace document into the right slots', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Post {
   id Int @id
 }
@@ -886,7 +892,7 @@ namespace logs {
         sourceId: 'schema.prisma',
       });
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
       expect(result.ok).toBe(true);

@@ -1,9 +1,9 @@
 import type { Token } from '../../tokenizer';
 import type { AstNode } from '../ast-helpers';
-import { filterChildren, findChildToken, findFirstChild } from '../ast-helpers';
+import { findChildToken, findFirstChild } from '../ast-helpers';
 import type { SyntaxNode } from '../red';
-import { FunctionCallAst } from './expressions';
-import { IdentifierAst } from './identifier';
+import { AttributeArgListAst } from './attributes';
+import { QualifiedNameAst } from './qualified-name';
 
 export class TypeAnnotationAst implements AstNode {
   readonly syntax: SyntaxNode;
@@ -12,48 +12,18 @@ export class TypeAnnotationAst implements AstNode {
     this.syntax = syntax;
   }
 
-  #lastSegment(): IdentifierAst | undefined {
-    let last: IdentifierAst | undefined;
-    for (const segment of filterChildren(this.syntax, IdentifierAst.cast)) {
-      last = segment;
-    }
-    return last;
+  /** The annotation's reference, doubling as the constructor callee when an {@link argList} follows. */
+  name(): QualifiedNameAst | undefined {
+    return findFirstChild(this.syntax, QualifiedNameAst.cast);
   }
 
-  #penultimateSegment(): IdentifierAst | undefined {
-    let last: IdentifierAst | undefined;
-    let penultimate: IdentifierAst | undefined;
-    for (const segment of filterChildren(this.syntax, IdentifierAst.cast)) {
-      penultimate = last;
-      last = segment;
-    }
-    return penultimate;
+  /** Present when the annotation is a constructor (`Vector(1536)`) rather than a plain reference. */
+  argList(): AttributeArgListAst | undefined {
+    return findFirstChild(this.syntax, AttributeArgListAst.cast);
   }
 
-  name(): IdentifierAst | undefined {
-    return this.#lastSegment();
-  }
-
-  colon(): Token | undefined {
-    return findChildToken(this.syntax, 'Colon');
-  }
-
-  dot(): Token | undefined {
-    return findChildToken(this.syntax, 'Dot');
-  }
-
-  spaceName(): IdentifierAst | undefined {
-    if (!this.colon()) return undefined;
-    return findFirstChild(this.syntax, IdentifierAst.cast);
-  }
-
-  namespaceName(): IdentifierAst | undefined {
-    if (!this.dot()) return undefined;
-    return this.#penultimateSegment();
-  }
-
-  constructorCall(): FunctionCallAst | undefined {
-    return findFirstChild(this.syntax, FunctionCallAst.cast);
+  isConstructor(): boolean {
+    return this.argList() !== undefined;
   }
 
   lbracket(): Token | undefined {

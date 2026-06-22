@@ -38,7 +38,10 @@ describe('createContract', () => {
       execution: {
         mutations: {
           defaults: [
-            { ref: { table: 'user', column: 'id' }, onCreate: { kind: 'generator', id: 'uuidv4' } },
+            {
+              ref: { namespace: 'public', table: 'user', column: 'id' },
+              onCreate: { kind: 'generator', id: 'uuidv4' },
+            },
           ],
         },
       },

@@ -13,6 +13,8 @@ import { createDbSchemaCommand } from './commands/db-schema';
 import { createDbSignCommand } from './commands/db-sign';
 import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
+import { createFormatCommand } from './commands/format';
+import { createLspCommand } from './commands/lsp';
 import { createMigrateCommand } from './commands/migrate';
 import { createMigrationCheckCommand } from './commands/migration-check';
 import { createMigrationGraphCommand } from './commands/migration-graph';
@@ -310,6 +312,9 @@ const telemetryCommand = createTelemetryCommand();
 // Top-level init command
 const initCommand = createInitCommand();
 
+const formatCommand = createFormatCommand();
+const lspCommand = createLspCommand();
+
 // Register top-level commands in the order the spec's intended-surface
 // diagram lists them: verbs (init, migrate) first, then subject
 // namespaces (contract, db, migration, ref). The order shows up in
@@ -317,6 +322,8 @@ const initCommand = createInitCommand();
 // matches the order spec.md uses to introduce the surface.
 program.addCommand(initCommand);
 program.addCommand(migrateCommand);
+program.addCommand(formatCommand);
+program.addCommand(lspCommand);
 program.addCommand(contractCommand);
 program.addCommand(dbCommand);
 program.addCommand(migrationCommand);

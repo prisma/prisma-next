@@ -5,7 +5,6 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { countSemanticLines } from '@prisma-next/test-utils/semantic-lines';
@@ -14,6 +13,7 @@ import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
   createTestNamespace,
+  symbolTableInputFromParseArgs,
   testEnumEntityContributions,
 } from './fixtures';
 
@@ -366,13 +366,13 @@ describe('TS and PSL authoring parity', () => {
     readonly authoringContributions: AuthoringContributions;
   }): void {
     const tsContract = target.buildTsContract();
-    const pslDocument = parsePslDocument({
+    const pslDocument = symbolTableInputFromParseArgs({
       schema: timestampParityPslSchema,
       sourceId: 'schema.prisma',
     });
 
     const interpreted = interpretPslDocumentToSqlContract({
-      document: pslDocument,
+      ...pslDocument,
       target: target.targetPack,
       scalarTypeDescriptors: target.scalarTypeDescriptors,
       composedExtensionContracts: new Map(),
@@ -405,7 +405,7 @@ describe('TS and PSL authoring parity', () => {
   });
 
   it('PSL and TS lower the same cross-namespace FK shape to identical contract IR', () => {
-    const pslDocument = parsePslDocument({
+    const pslDocument = symbolTableInputFromParseArgs({
       schema: `namespace auth {
   model User {
     id Int @id
@@ -423,7 +423,7 @@ model Post {
     });
 
     const pslContract = interpretPslDocumentToSqlContract({
-      document: pslDocument,
+      ...pslDocument,
       target: portablePostgresTargetPack,
       scalarTypeDescriptors,
       composedExtensionContracts: new Map(),

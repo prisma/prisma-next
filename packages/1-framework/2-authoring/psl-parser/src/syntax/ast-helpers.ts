@@ -34,3 +34,15 @@ export function* filterChildren<T>(
     if (result !== undefined) yield result;
   }
 }
+
+/**
+ * Raw source text of a CST node, verbatim (quotes and brackets preserved). For
+ * the decoded value of a string literal, decode it instead.
+ */
+export function printSyntax(node: SyntaxNode): string {
+  let text = '';
+  for (const token of node.tokens()) {
+    text += token.text;
+  }
+  return text;
+}

@@ -228,6 +228,43 @@ describe('check-upgrade-coverage — coverage rule (publish style: prev.minor < 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /skills\/upgrade\/prisma-next-upgrade\/upgrades\/0\.6-to-0\.7/);
   });
+
+  it('publish mode: default --prev skips pre-release tags and picks the last stable v[0-9]* tag', () => {
+    // Models the real-world release-bump push: many dev tags live on
+    // intermediate commits, and the bump commit's parent often carries
+    // the latest dev tag. If default --prev resolved to the dev tag,
+    // the diff would shrink to the bump alone — touching every
+    // package.json but no instructions.md — and per-pr-declaration
+    // would fire on a release that legitimately recorded every entry
+    // earlier in the cycle.
+    writePackageJson('0.6.0');
+    writeRepoFile('examples/demo/src/main.ts', 'a\n');
+    commitAll('v0.6.0 release');
+    git('tag', '-a', 'v0.6.0', '-m', 'v0.6.0');
+    // 0.6.x dev cycle: substrate change + matching instructions entry,
+    // both authored mid-cycle.
+    writeRepoFile('examples/demo/src/main.ts', 'b\n');
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.6-to-0.7/instructions.md',
+      '---\nfrom: "0.6"\nto: "0.7"\nchanges: []\n---\n',
+    );
+    writeRepoFile(
+      'skills/extension-author/prisma-next-extension-upgrade/upgrades/0.6-to-0.7/instructions.md',
+      '---\nfrom: "0.6"\nto: "0.7"\nchanges: []\n---\n',
+    );
+    commitAll('feature with upgrade entry');
+    git('tag', '-a', 'v0.6.0-dev.1', '-m', 'v0.6.0-dev.1');
+    // Release bump on top: rewrites every package.json, touches no
+    // instructions.md. The dev tag sits on the parent commit.
+    writePackageJson('0.7.0');
+    commitAll('bump to 0.7.0');
+    const result = runScript(['--mode', 'publish', '--head', 'HEAD']);
+    assert.equal(
+      result.status,
+      0,
+      `expected exit 0 (default --prev should resolve to v0.6.0, not v0.6.0-dev.1); stderr=${result.stderr}`,
+    );
+  });
 });
 
 describe('check-upgrade-coverage — coverage rule (PR style: prev.minor === head.minor)', () => {

@@ -72,7 +72,7 @@
     "storageHash": "sha256:ab8522ed921711d00e2df546a124c1af785827dd4966669387d632699f932b2a"
   },
   "execution": {
-    "executionHash": "sha256:be7281d1c2ce558161258237932f58bce1c6042415816e21b99f32842d54fa23",
+    "executionHash": "sha256:f8153ef67dc9be0c5545d0f241c8ea609f4541d30601ad9e1e66dcd29dbe6548",
     "mutations": {
       "defaults": [
         {
@@ -82,6 +82,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "user"
           }
         }

@@ -32,6 +32,13 @@ describe('prismaContract provider helper', () => {
     tempDirs.length = 0;
   });
 
+  describe('source format discriminator', () => {
+    it('tags the source as PSL', () => {
+      const contract = prismaContract('./src/contract/schema.prisma', baseOptions);
+      expect(contract.source.sourceFormat).toBe('psl');
+    });
+  });
+
   describe('output derivation (TML-2461)', () => {
     it('derives output colocated with schema path when output is not provided', () => {
       const contract = prismaContract('./src/contract/schema.prisma', baseOptions);
@@ -342,6 +349,108 @@ model Post {
     });
   });
 
+  describe('given a syntactically invalid schema', () => {
+    it('surfaces parse() diagnostics via the combined interpret path in one run', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma', baseOptions);
+      const result = await contract.source.load(
+        createPostgresTestContext({ resolvedInputs: [schemaPath] }),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNTERMINATED_BLOCK',
+            sourceId: './schema.prisma',
+            span: expect.objectContaining({
+              start: expect.objectContaining({ line: expect.any(Number) }),
+            }),
+          }),
+        ]),
+      );
+    });
+
+    it('surfaces buildSymbolTable duplicate-declaration diagnostics via the combined path', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+}
+model User {
+  id Int @id
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma', baseOptions);
+      const result = await contract.source.load(
+        createPostgresTestContext({ resolvedInputs: [schemaPath] }),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_DUPLICATE_DECLARATION',
+            sourceId: './schema.prisma',
+          }),
+        ]),
+      );
+    });
+
+    it('surfaces BOTH a symbol-table error and an interpreter error in one combined run', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model Dup {
+  id Int @id
+}
+model Dup {
+  id Int @id
+}
+model Other {
+  id Int @id
+  bad Mystery
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma', baseOptions);
+      const result = await contract.source.load(
+        createPostgresTestContext({ resolvedInputs: [schemaPath] }),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const codes = result.failure.diagnostics.map((d) => d.code);
+      expect(codes).toContain('PSL_DUPLICATE_DECLARATION');
+      expect(codes).toContain('PSL_UNSUPPORTED_FIELD_TYPE');
+    });
+  });
+
   describe('given namespaced extension constructors in schema', () => {
     it('returns diagnostics when extension namespace is unrecognized', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
@@ -508,15 +617,15 @@ model Document {
         mutations: {
           defaults: [
             {
-              ref: { table: 'user', column: 'cuid2' },
+              ref: { namespace: 'public', table: 'user', column: 'cuid2' },
               onCreate: { kind: 'generator', id: 'cuid2' },
             },
             {
-              ref: { table: 'user', column: 'nanoid16' },
+              ref: { namespace: 'public', table: 'user', column: 'nanoid16' },
               onCreate: { kind: 'generator', id: 'nanoid', params: { size: 16 } },
             },
             {
-              ref: { table: 'user', column: 'uuidV7' },
+              ref: { namespace: 'public', table: 'user', column: 'uuidV7' },
               onCreate: { kind: 'generator', id: 'uuidv7' },
             },
           ],

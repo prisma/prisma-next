@@ -13,6 +13,7 @@ export default defineConfig({
   extensionPacks: [],
   contract: {
     source: {
+      sourceFormat: 'typescript',
       load: async () => ({ ok: true, value: contract }),
     },
     output: './contract.json',

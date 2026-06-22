@@ -84,7 +84,7 @@ describe('composed runtime mutation default generators', () => {
           mutations: {
             defaults: [
               {
-                ref: { table: 'user', column: 'id' },
+                ref: { namespace: '__unbound__', table: 'user', column: 'id' },
                 onCreate: { kind: 'generator', id: 'slugid' },
               },
             ],
@@ -94,7 +94,12 @@ describe('composed runtime mutation default generators', () => {
       stack: createStack([extension]),
     });
 
-    const applied = context.applyMutationDefaults({ op: 'create', table: 'user', values: {} });
+    const applied = context.applyMutationDefaults({
+      op: 'create',
+      table: 'user',
+      namespace: '__unbound__',
+      values: {},
+    });
     expect(applied).toEqual([{ column: 'id', value: 'slug-from-pack' }]);
   });
 
@@ -126,7 +131,7 @@ describe('composed runtime mutation default generators', () => {
           mutations: {
             defaults: [
               {
-                ref: { table: 'user', column: 'id' },
+                ref: { namespace: '__unbound__', table: 'user', column: 'id' },
                 onCreate: { kind: 'generator', id: 'slugid' },
               },
             ],
@@ -139,6 +144,7 @@ describe('composed runtime mutation default generators', () => {
     const applied = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
+      namespace: '__unbound__',
       values: { id: 'user-provided-value' },
     });
     expect(applied).toEqual([]);
@@ -200,7 +206,7 @@ describe('composed runtime mutation default generators', () => {
             mutations: {
               defaults: [
                 {
-                  ref: { table: 'user', column: 'id' },
+                  ref: { namespace: '__unbound__', table: 'user', column: 'id' },
                   onCreate: { kind: 'generator', id: 'unknown-generator' },
                 },
               ],
@@ -234,7 +240,7 @@ describe('composed runtime mutation default generators', () => {
             mutations: {
               defaults: [
                 {
-                  ref: { table: 'user', column: 'id' },
+                  ref: { namespace: '__unbound__', table: 'user', column: 'id' },
                   onCreate: { kind: 'generator', id: 'uuidv4' },
                 },
               ],

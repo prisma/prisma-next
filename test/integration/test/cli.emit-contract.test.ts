@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractSourceContext } from '@prisma-next/cli/config-types';
+import { loadConfig } from '@prisma-next/config-loader';
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';

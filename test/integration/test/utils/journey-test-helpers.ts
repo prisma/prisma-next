@@ -43,6 +43,8 @@ import { afterAll, beforeAll } from 'vitest';
 const execFileAsync = promisify(execFile);
 const TSX_BIN = resolve(import.meta.dirname, '../../../../node_modules/.bin/tsx');
 
+// Not exported from the CLI package subpath map.
+import { createFormatCommand } from '../../../../packages/1-framework/3-tooling/cli/src/commands/format';
 import {
   appendImplicitMigrationPlanFrom,
   executeCommand,
@@ -561,6 +563,13 @@ export async function runContractEmitWithConfig(
     configPath,
     ...extraArgs,
   ]);
+}
+
+export async function runFormatWithConfig(
+  testDir: string,
+  configPath: string,
+): Promise<CommandResult> {
+  return runCommandRaw(createFormatCommand(), testDir, ['--config', configPath]);
 }
 
 /**

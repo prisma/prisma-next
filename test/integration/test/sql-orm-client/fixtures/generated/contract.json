@@ -687,8 +687,11 @@
               "roleId": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
                 }
               },
               "userId": {
@@ -735,8 +738,11 @@
               "tagId": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
                 }
               },
               "userId": {
@@ -1120,9 +1126,12 @@
                   "nullable": false
                 },
                 "role_id": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
                 },
                 "user_id": {
                   "codecId": "pg/int4@1",
@@ -1157,9 +1166,12 @@
                   "nullable": true
                 },
                 "tag_id": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
                 },
                 "user_id": {
                   "codecId": "pg/int4@1",
@@ -1245,10 +1257,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:2c53c3686a92367b677d4ff2c3caa1842b19f604632ee51e9bbdfc789d450e37"
+    "storageHash": "sha256:768352538edf69a68f8566fb0e6ff2a48cd932a3d7bfb79f16039efb819ab0ea"
   },
   "execution": {
-    "executionHash": "sha256:8e2e39df5e42d28f74fa7177b910ed570f3c04c4a41b9812c3d13c18b428507a",
+    "executionHash": "sha256:b6740166f10149e86e0e83710d377bb3c9df8aa49d2150770a50d7a76dbc816d",
     "mutations": {
       "defaults": [
         {
@@ -1258,6 +1270,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "roles"
           }
         },
@@ -1268,6 +1281,7 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
             "table": "tags"
           }
         }

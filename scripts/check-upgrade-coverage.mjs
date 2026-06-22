@@ -316,11 +316,25 @@ function resolveDefaultPrev(repoRoot, mode) {
       'check-upgrade-coverage: --mode pr default --prev requires either `origin/main` or `main` to exist; pass --prev <ref> explicitly',
     );
   }
-  // mode publish — fall back to the most recent `v[0-9]*` annotated tag.
-  const tag = tryGit(repoRoot, 'describe', '--abbrev=0', '--tags', '--match', 'v[0-9]*');
+  // mode publish — fall back to the most recent stable `v[0-9]*` tag,
+  // excluding pre-release tags (`v*-dev.N`, `v*-rc.N`, etc.). The
+  // publish-time check compares the full release cycle against the last
+  // shipped version; a dev tag sits on an intermediate commit (often the
+  // bump commit's parent), which would shrink the diff to the bump itself
+  // and trip per-pr-declaration on every package.json the bump rewrites.
+  const tag = tryGit(
+    repoRoot,
+    'describe',
+    '--abbrev=0',
+    '--tags',
+    '--match',
+    'v[0-9]*',
+    '--exclude',
+    '*-*',
+  );
   if (tag) return tag;
   throw new Error(
-    'check-upgrade-coverage: --mode publish default --prev requires a `v[0-9]*` git tag; pass --prev <ref> explicitly',
+    'check-upgrade-coverage: --mode publish default --prev requires a stable `v[0-9]*` git tag (pre-release tags are excluded); pass --prev <ref> explicitly',
   );
 }
 
@@ -531,7 +545,7 @@ export function main(args = argv.slice(2), repoRoot = cwd()) {
         '  --mode    pr (default) or publish; selects the default --prev source',
         '  --head    git ref to inspect (default: HEAD)',
         '  --prev    git ref to compare against (default: origin/main for pr; most',
-        '            recent v[0-9]* tag for publish)',
+        '            recent stable v[0-9]* tag for publish, pre-release tags excluded)',
         '  --json    emit a JSON result envelope on stdout instead of text on stderr',
         '',
       ].join('\n'),
