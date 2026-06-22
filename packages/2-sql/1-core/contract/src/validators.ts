@@ -181,9 +181,8 @@ export function createSqlStorageSchema(
     'types?': type({ '[string]': DocumentScopedStorageTypeSchema }),
     // `__unbound__` is NOT required here: cross-namespace contracts can
     // declare only named namespaces (see cross-namespace FK fixtures). The
-    // `__unbound__` brand on `SqlStorageInput['namespaces']` is kept sound at
-    // construction time by injecting the unbound singleton when absent
-    // (see `validateStorage` / `hydrateSqlStorage`), not by structural require.
+    // unbound slot is injected when absent by `ensureUnboundNamespaceSlot`
+    // in `build-contract.ts`, not enforced here structurally.
     'namespaces?': type({ '[string]': namespaceEntry }),
   }) as Type<unknown>;
 }

@@ -23,7 +23,7 @@ import type {
   ControlMutationDefaults,
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
-import type { Namespace } from '@prisma-next/framework-components/ir';
+
 import { namespacePslExtensionBlocks } from '@prisma-next/framework-components/psl-ast';
 import type {
   ParsePslDocumentResult,
@@ -37,6 +37,7 @@ import type {
 } from '@prisma-next/psl-parser';
 import type {
   SqlModelStorage,
+  SqlNamespace,
   SqlNamespaceInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
@@ -113,8 +114,8 @@ export interface InterpretPslDocumentToSqlContractInput {
    * emits `PSL_UNKNOWN_CROSS_SPACE_TARGET`.
    */
   readonly composedExtensionContracts: ReadonlyMap<string, Contract>;
-  /** Target-supplied factory that materialises a `Namespace` concretion for each namespace coordinate. */
-  readonly createNamespace: (input: SqlNamespaceInput) => Namespace;
+  /** Target-supplied factory that materialises a `SqlNamespace` concretion for each namespace coordinate. */
+  readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespace;
   readonly codecLookup?: CodecLookup;
 }
 

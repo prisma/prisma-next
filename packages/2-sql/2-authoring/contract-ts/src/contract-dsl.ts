@@ -15,8 +15,11 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
-import type { Namespace } from '@prisma-next/framework-components/ir';
-import type { SqlNamespaceInput, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type {
+  SqlNamespace,
+  SqlNamespaceInput,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { NamedConstraintSpec } from './authoring-type-utils';
@@ -1487,7 +1490,7 @@ export type ContractInput<
    */
   readonly namespaces?: readonly string[];
   /**
-   * Target-supplied factory that materialises a `Namespace` concretion
+   * Target-supplied factory that materialises a `SqlNamespace` concretion
    * for a declared namespace coordinate. The SQL family layer is
    * target-agnostic and cannot import concretions like
    * `PostgresSchema` or `SqliteUnboundDatabase`; the factory is the
@@ -1500,7 +1503,7 @@ export type ContractInput<
    * framework `UNBOUND_NAMESPACE_ID` sentinel (always present so the
    * late-bound slot stays available regardless of authoring choices).
    */
-  readonly createNamespace: (input: SqlNamespaceInput) => Namespace;
+  readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespace;
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;

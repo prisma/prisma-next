@@ -1,5 +1,4 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlContractSerializerBase } from './sql-contract-serializer-base';
 
@@ -20,11 +19,5 @@ import { SqlContractSerializerBase } from './sql-contract-serializer-base';
 export class SqlContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor() {
     super(new Map());
-  }
-
-  // Family-level fallback when no target descriptor is wired in. Preserves the
-  // pre-TML-2916 compatibility-shim behaviour for the unbound slot.
-  protected override get defaultNamespaceId(): string {
-    return UNBOUND_NAMESPACE_ID;
   }
 }

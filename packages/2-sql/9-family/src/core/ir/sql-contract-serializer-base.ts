@@ -132,8 +132,6 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     };
   }
 
-  protected abstract get defaultNamespaceId(): string;
-
   protected hydrateSqlNamespaceMap(
     namespaces: Readonly<Record<string, Namespace | Record<string, unknown>>>,
   ): Readonly<Record<string, Namespace>> {

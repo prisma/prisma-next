@@ -4,9 +4,8 @@ import { applySpecifierDefaultControlPolicy } from '@prisma-next/contract/apply-
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import type { Namespace } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type { SqlNamespaceInput } from '@prisma-next/sql-contract/types';
+import type { SqlNamespace, SqlNamespaceInput } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { basename, extname } from 'pathe';
@@ -17,7 +16,7 @@ export interface PrismaContractOptions {
   readonly output?: string;
   readonly target: TargetPackRef<'sql', string>;
   readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
-  readonly createNamespace: (input: SqlNamespaceInput) => Namespace;
+  readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespace;
   readonly defaultControlPolicy?: ControlPolicy;
 }
 

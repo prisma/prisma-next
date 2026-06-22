@@ -7,7 +7,6 @@ import {
   type SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
-import { sqliteTargetDescriptorMeta } from './descriptor-meta';
 import { buildSqliteNamespace } from './sqlite-unbound-database';
 
 /**
@@ -19,10 +18,6 @@ import { buildSqliteNamespace } from './sqlite-unbound-database';
 export class SqliteContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor() {
     super(new Map());
-  }
-
-  protected override get defaultNamespaceId(): string {
-    return sqliteTargetDescriptorMeta.defaultNamespaceId;
   }
 
   protected override hydrateSqlNamespaceEntry(

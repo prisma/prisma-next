@@ -17,9 +17,8 @@ import type {
   DefaultFunctionLoweringContext,
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
-import type { Namespace } from '@prisma-next/framework-components/ir';
 import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
-import type { SqlNamespaceInput } from '@prisma-next/sql-contract/types';
+import type { SqlNamespace, SqlNamespaceInput } from '@prisma-next/sql-contract/types';
 import { type EnumTypeHandle, enumType } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 
@@ -624,14 +623,14 @@ export function buildEnumCapturingFactory(): {
   createNamespace: (
     input: SqlNamespaceInput,
     enumTypes?: Readonly<Record<string, unknown>>,
-  ) => Namespace;
+  ) => SqlNamespace;
   capturedEnumTypes: Record<string, Record<string, unknown>>;
 } {
   const capturedEnumTypes: Record<string, Record<string, unknown>> = {};
   const createNamespace = (
     input: SqlNamespaceInput,
     enumTypes?: Readonly<Record<string, unknown>>,
-  ): Namespace => {
+  ): SqlNamespace => {
     if (enumTypes && Object.keys(enumTypes).length > 0) {
       capturedEnumTypes[input.id] = { ...(capturedEnumTypes[input.id] ?? {}), ...enumTypes };
     }

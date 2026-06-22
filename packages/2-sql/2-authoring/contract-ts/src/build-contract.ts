@@ -307,13 +307,10 @@ function ensureUnboundNamespaceSlot(
     entries: { table: {} },
   };
   const unbound = createNamespace(unboundInput);
-  return blindCast<
-    SqlStorageInput['namespaces'],
-    'createNamespace may return a target namespace concretion; the unbound slot matches SqlNamespace at runtime'
-  >({
+  return {
     [UNBOUND_NAMESPACE_ID]: unbound,
     ...namespaces,
-  });
+  };
 }
 
 export function buildSqlContractFromDefinition(
@@ -722,25 +719,20 @@ export function buildSqlContractFromDefinition(
   }
 
   const { createNamespace } = definition;
-  const namespaces = blindCast<
-    SqlStorageInput['namespaces'],
-    'contract authoring materialises each namespace coordinate from the model set and explicit namespace list'
-  >(
-    Object.fromEntries(
-      [...namespaceCoordinateIds].sort().map((id) => {
-        const valueSetEntries = storageValueSetsByNs[id];
-        const nsInput: SqlNamespaceInput = {
-          id,
-          entries: {
-            table: tablesByNamespace[id] ?? {},
-            ...(valueSetEntries !== undefined && Object.keys(valueSetEntries).length > 0
-              ? { valueSet: valueSetEntries }
-              : {}),
-          },
-        };
-        return [id, createNamespace(nsInput)];
-      }),
-    ),
+  const namespaces: SqlStorageInput['namespaces'] = Object.fromEntries(
+    [...namespaceCoordinateIds].sort().map((id) => {
+      const valueSetEntries = storageValueSetsByNs[id];
+      const nsInput: SqlNamespaceInput = {
+        id,
+        entries: {
+          table: tablesByNamespace[id] ?? {},
+          ...(valueSetEntries !== undefined && Object.keys(valueSetEntries).length > 0
+            ? { valueSet: valueSetEntries }
+            : {}),
+        },
+      };
+      return [id, createNamespace(nsInput)];
+    }),
   );
   const storageWithoutHash = {
     ...(Object.keys(documentTypes).length > 0 ? { types: documentTypes } : {}),
