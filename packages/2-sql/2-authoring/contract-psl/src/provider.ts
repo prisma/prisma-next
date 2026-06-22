@@ -9,12 +9,32 @@ import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { basename, extname } from 'pathe';
 
 import { interpretPslDocumentToSqlContract } from './interpreter';
 import type { ColumnDescriptor } from './psl-column-resolution';
+
+type SqlNamespaceFactory = (input: SqlNamespaceTablesInput) => Namespace;
+
+/**
+ * SQL target packs carry a `createNamespace` factory on their `authoring`
+ * descriptor so the PSL path can populate `SqlStorage.namespaces` (and merge
+ * lowered extension-block entities) without every config re-specifying it. The
+ * framework `AuthoringContributions` type does not declare this SQL-specific
+ * field, so read it through a typed view of the runtime descriptor.
+ */
+function targetCreateNamespace(
+  target: TargetPackRef<'sql', string>,
+): SqlNamespaceFactory | undefined {
+  const authoring = blindCast<
+    { readonly createNamespace?: SqlNamespaceFactory } | undefined,
+    'SQL target authoring carries createNamespace not declared on AuthoringContributions'
+  >(target.authoring);
+  return authoring?.createNamespace;
+}
 
 export interface PrismaContractOptions {
   readonly output?: string;
@@ -143,7 +163,10 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
               : undefined,
           ),
           controlMutationDefaults: context.controlMutationDefaults,
-          ...ifDefined('createNamespace', options.createNamespace),
+          ...ifDefined(
+            'createNamespace',
+            options.createNamespace ?? targetCreateNamespace(options.target),
+          ),
           codecLookup: context.codecLookup,
         });
         if (!interpreted.ok) {

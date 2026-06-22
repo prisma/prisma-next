@@ -2049,12 +2049,9 @@ export function interpretPslDocumentToSqlContract(
   // entities into each namespace's entries before handing off to the factory.
   // The entities map keys are discriminator strings — equal to the entries key
   // by the one-string rule — so they merge directly into entries without
-  // translation.
-  //
-  // Fall back to the target pack's authoring.createNamespace when the caller
-  // does not supply one explicitly — the Postgres target pack contributes it so
-  // the generic PSL provider path works without requiring every call site to
-  // re-specify the factory.
+  // translation. Callers that lower extension entities must supply
+  // createNamespace; the PSL provider sources it from the target pack's
+  // authoring so configs need not re-specify it.
   const innerCreateNamespace = input.createNamespace;
 
   if (namespaceExtensionEntities.size > 0 && innerCreateNamespace === undefined) {
