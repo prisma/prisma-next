@@ -1,8 +1,10 @@
 import type {
   Contract,
   ContractMarkerRecord,
+  ControlPolicy,
   LedgerEntryRecord,
 } from '@prisma-next/contract/types';
+import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import type {
   TargetBoundComponentDescriptor,
   TargetDescriptor,
@@ -15,6 +17,7 @@ import type {
   OperationPreview,
   OperationPreviewCapable,
   PslContractInferCapable,
+  SchemaDiffIssue,
   SchemaViewCapable,
   SignDatabaseResult,
   VerifyDatabaseResult,
@@ -22,6 +25,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import {
   APP_SPACE_ID,
+  dispositionForCategory,
   SchemaTreeNode,
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
@@ -684,8 +688,12 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
       });
-      const schemaDiffIssues =
+      const rawSchemaDiffIssues =
         controlAdapter.collectSchemaDiffIssues?.(contract, options.schema) ?? [];
+      const schemaDiffIssues = filterSchemaDiffIssues(
+        rawSchemaDiffIssues,
+        contract.defaultControlPolicy,
+      );
       if (schemaDiffIssues.length === 0) return sqlResult;
       const totalFails = sqlResult.schema.counts.fail + schemaDiffIssues.length;
       return {
@@ -1008,4 +1016,32 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       };
     },
   };
+}
+
+/**
+ * Filters schema diff issues (from `collectSchemaDiffIssues`) through the
+ * contract's `defaultControlPolicy`. Issues whose outcome maps to a suppressed
+ * category under the effective policy are removed. This mirrors the control-policy
+ * filtering applied by `verifySqlSchema` for table/column-level findings.
+ *
+ * Outcome → category mapping:
+ * - `'extra'`    → `'extraAuxiliary'`    (an extra auxiliary entity, e.g. an RLS policy)
+ * - `'missing'`  → `'declaredMissing'`
+ * - `'mismatch'` → `'declaredIncompatible'`
+ */
+export function filterSchemaDiffIssues(
+  issues: readonly SchemaDiffIssue[],
+  defaultControlPolicy: ControlPolicy | undefined,
+): readonly SchemaDiffIssue[] {
+  if (issues.length === 0) return issues;
+  const policy = effectiveControlPolicy(undefined, defaultControlPolicy);
+  return issues.filter((issue) => {
+    const category =
+      issue.outcome === 'extra'
+        ? ('extraAuxiliary' as const)
+        : issue.outcome === 'missing'
+          ? ('declaredMissing' as const)
+          : ('declaredIncompatible' as const);
+    return dispositionForCategory(policy, category) !== 'suppress';
+  });
 }

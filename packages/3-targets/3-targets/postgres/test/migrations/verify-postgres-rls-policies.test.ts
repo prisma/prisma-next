@@ -10,12 +10,16 @@ import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
 const TABLE_NAME = 'profiles';
 const SCHEMA_NAME = 'public';
 
-function makePolicy(name: string, tableName = TABLE_NAME): PostgresRlsPolicy {
+function makePolicy(
+  name: string,
+  tableName = TABLE_NAME,
+  namespaceId = SCHEMA_NAME,
+): PostgresRlsPolicy {
   return new PostgresRlsPolicy({
     name,
     prefix: name.replace(/_[0-9a-f]{8}$/, ''),
     tableName,
-    namespaceId: SCHEMA_NAME,
+    namespaceId,
     operation: 'select',
     roles: ['authenticated'],
     using: '(auth.uid() = user_id)',
@@ -180,5 +184,75 @@ describe('diffPostgresRlsPolicies', () => {
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ outcome: 'extra' });
+  });
+
+  it('reports extra for policies from namespaces not in the contract expected set', () => {
+    // diffPostgresRlsPolicies diffs against the full introspected policy list.
+    // Control-policy filtering (e.g. suppressing extras under defaultControlPolicy:'external')
+    // is the caller's responsibility, not this function's.
+    const authPolicy = makePolicy('auth_policy_a1b2c3d4', 'users', 'auth');
+    const publicPolicy = makePolicy('profile_owner_read_3486711c', 'profile', 'public');
+
+    const authSchema = new PostgresSchema({
+      id: 'auth',
+      entries: {
+        table: {
+          users: new StorageTable({
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+          }),
+        },
+        policy: { [authPolicy.name]: authPolicy },
+      },
+    });
+
+    const contractOwningOnlyAuth: Contract<SqlStorage> = {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:rls-cross-space-test'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:rls-cross-space-test'),
+        namespaces: { auth: authSchema },
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+
+    const schemaWithBothNamespaces = new PostgresSchemaIR({
+      tables: {
+        users: {
+          name: 'users',
+          columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      pgSchemaName: 'auth',
+      pgVersion: 'unknown',
+      rlsPolicies: [authPolicy, publicPolicy],
+      roles: [],
+      existingSchemas: ['auth', 'public'],
+      nativeEnumTypeNames: [],
+    });
+
+    const issues = diffPostgresRlsPolicies({
+      contract: contractOwningOnlyAuth,
+      schema: schemaWithBothNamespaces,
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      outcome: 'extra',
+      coordinate: expect.objectContaining({ entityName: 'profile_owner_read_3486711c' }),
+    });
   });
 });
