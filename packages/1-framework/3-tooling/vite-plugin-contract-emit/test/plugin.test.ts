@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
-import { loadConfig } from '@prisma-next/cli/config-loader';
 import { disposeEmitQueue, executeContractEmit } from '@prisma-next/cli/control-api';
+import { loadConfig } from '@prisma-next/config-loader';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prismaVitePlugin } from '../src/plugin';
 
@@ -9,7 +9,7 @@ vi.mock('@prisma-next/cli/control-api', () => ({
   disposeEmitQueue: vi.fn(),
 }));
 
-vi.mock('@prisma-next/cli/config-loader', () => ({
+vi.mock('@prisma-next/config-loader', () => ({
   loadConfig: vi.fn(),
 }));
 

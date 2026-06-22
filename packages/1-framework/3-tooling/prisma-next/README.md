@@ -62,7 +62,7 @@ Authors of build integrations, extension packs, and advanced config wiring shoul
 
 - `@prisma-next/cli/config-types` — `defineConfig` and config types
 - `@prisma-next/cli/control-api` — `createControlClient` for programmatic control-plane operations
-- `@prisma-next/cli/config-loader` — `loadConfig`
+- `@prisma-next/config-loader` — `loadConfig`
 - `@prisma-next/cli/commands/*` — individual command factories (`createContractEmitCommand`, `createDbInitCommand`, …)
 
 These subpaths are less stable than the facade packages (`@prisma-next/postgres/config`, `@prisma-next/mongo/config`) — prefer those for application-level config.

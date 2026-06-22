@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import * as configLoader from '@prisma-next/config-loader';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
@@ -18,7 +19,6 @@ import {
 import { executeMigrationGraphCommand } from '../../src/commands/migration-graph';
 import { executeMigrationLogCommand } from '../../src/commands/migration-log';
 import { executeRefSetCommand } from '../../src/commands/ref';
-import * as configLoader from '../../src/config-loader';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
 import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
@@ -32,6 +32,8 @@ const mocks = vi.hoisted(() => ({
   schemaVerify: vi.fn(),
   sign: vi.fn(),
 }));
+
+vi.mock('@prisma-next/config-loader', { spy: true });
 
 vi.mock('@prisma-next/migration-tools/refs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@prisma-next/migration-tools/refs')>();

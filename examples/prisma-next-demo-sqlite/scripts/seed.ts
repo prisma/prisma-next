@@ -5,9 +5,6 @@
  *
  * Run with: pnpm seed
  *
- * Creates 2 users (alice, bob), 3 posts, 3 tags, and junction rows demonstrating
- * the Post ↔ Tag many-to-many relation.
- *
  * Prerequisites:
  * - SQLITE_PATH env var (defaults to ./demo.db)
  * - Database schema applied (run `pnpm emit` then `pnpm db:init`)

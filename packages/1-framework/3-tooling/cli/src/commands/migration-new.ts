@@ -9,6 +9,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { loadConfig } from '@prisma-next/config-loader';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
@@ -25,7 +26,6 @@ import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
-import { loadConfig } from '../config-loader';
 import {
   CliStructuredError,
   errorFileNotFound,

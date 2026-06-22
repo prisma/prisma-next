@@ -56,7 +56,7 @@ vi.mock('../../src/utils/contract-space-aggregate-loader', () => ({
   loadContractSpaceAggregateForCli: mocks.loadContractSpaceAggregateForCli,
 }));
 
-vi.mock('../../src/config-loader', () => ({
+vi.mock('@prisma-next/config-loader', () => ({
   loadConfig: mocks.loadConfig,
 }));
 
@@ -364,7 +364,7 @@ describe('migration plan command', () => {
   // Use `doUnmock` (non-hoisted) here so subsequent files see the real modules.
   afterAll(() => {
     vi.doUnmock('node:fs/promises');
-    vi.doUnmock('../../src/config-loader');
+    vi.doUnmock('@prisma-next/config-loader');
     vi.doUnmock('../../src/utils/command-helpers');
     vi.doUnmock('@prisma-next/migration-tools/refs');
     vi.doUnmock('@prisma-next/migration-tools/io');

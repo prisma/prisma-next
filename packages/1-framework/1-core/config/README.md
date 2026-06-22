@@ -25,7 +25,7 @@ This package owns the shared config contract used by tooling and authoring packa
 
 ## Non-responsibilities
 
-- Config file discovery/loading (`c12`, file I/O) - handled by `@prisma-next/cli`
+- Config file discovery/loading (`c12`, file I/O) - handled by `@prisma-next/config-loader`
 - CLI error envelope formatting and rendering - handled by CLI/errors package error utilities
 - Control-plane migration operations and runtime actions
 
@@ -54,5 +54,5 @@ validateConfig(config);
 Declare `source.inputs` only for source files that are not already covered by the config module
 graph, such as PSL schema paths or TypeScript contract paths passed as strings. Do not include
 emitted artifact paths derived from `contract.output` (for example `contract.json` or the
-colocated `contract.d.ts`); the CLI loader resolves and validates those paths before emit/watch
-commands run. Tooling should always treat the config module graph as watched by default.
+colocated `contract.d.ts`); `@prisma-next/config-loader` resolves and validates those paths
+before emit/watch commands run. Tooling should always treat the config module graph as watched by default.

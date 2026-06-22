@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { loadConfig } from '@prisma-next/config-loader';
 import type {
   SignDatabaseResult,
   VerifyDatabaseSchemaResult,
@@ -8,7 +9,6 @@ import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative, resolve } from 'pathe';
-import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import { ContractValidationError } from '../control-api/errors';
 import {

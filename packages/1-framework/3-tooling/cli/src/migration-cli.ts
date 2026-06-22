@@ -45,6 +45,7 @@
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import type { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
+import { loadConfig } from '@prisma-next/config-loader';
 import {
   CliStructuredError,
   errorMigrationCliInvalidConfigArg,
@@ -57,7 +58,6 @@ import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { buildMigrationArtifacts, type Migration } from '@prisma-next/migration-tools/migration';
 import { Cli, Command, Option, UsageError } from 'clipanion';
 import { dirname, join } from 'pathe';
-import { loadConfig } from './config-loader';
 
 /**
  * Constructor shape accepted by `MigrationCLI.run`. `Migration` subclasses

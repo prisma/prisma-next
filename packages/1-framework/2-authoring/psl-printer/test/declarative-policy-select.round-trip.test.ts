@@ -29,10 +29,23 @@ import {
   extractCodecLookup,
 } from '@prisma-next/framework-components/control';
 import {
-  namespacePslExtensionBlocks,
+  makePslNamespace,
+  makePslNamespaceEntries,
+  type PslDocumentAst,
+  type PslExtensionBlock,
+  type PslModel,
+  type PslSpan,
   UNSPECIFIED_PSL_NAMESPACE_ID,
 } from '@prisma-next/framework-components/psl-ast';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import {
+  type BlockSymbol,
+  buildSymbolTable,
+  findBlockDescriptor,
+  type SymbolTable,
+  validateExtensionBlockFromSymbol,
+} from '@prisma-next/psl-parser';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { describe, expect, it } from 'vitest';
 import { printPslFromAst } from '../src/print-psl';
@@ -41,6 +54,7 @@ import {
   FIXTURE_POLICY_CODEC_ID,
   hydratePolicySelectIrFromJson,
   POLICY_SELECT_DISCRIMINATOR,
+  POLICY_SELECT_KEYWORD,
   PolicySelectIr,
 } from './fixtures/declarative-policy-select-extension';
 
@@ -107,6 +121,88 @@ function getFactory() {
   return output.factory as (block: unknown, ctx: unknown) => PolicySelectIr;
 }
 
+const POLICY_SELECT_DESCRIPTOR = (() => {
+  const descriptor = findBlockDescriptor(assembled.pslBlockDescriptors, POLICY_SELECT_KEYWORD);
+  if (descriptor === undefined) throw new Error('expected a policy_select block descriptor');
+  return descriptor;
+})();
+
+const ZERO_SPAN: PslSpan = {
+  start: { offset: 0, line: 1, column: 1 },
+  end: { offset: 0, line: 1, column: 1 },
+};
+
+interface ParsedPolicySelect {
+  readonly symbolTable: SymbolTable;
+  readonly sourceFile: SourceFile;
+  readonly sourceId: string;
+  readonly blockSymbols: readonly BlockSymbol[];
+}
+
+function parsePolicySelect(schema: string, sourceId = 'r1'): ParsedPolicySelect {
+  const { document, sourceFile } = parse(schema);
+  const { table } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes: [],
+    pslBlockDescriptors: assembled.pslBlockDescriptors,
+  });
+  const blockSymbols = Object.values(table.topLevel.blocks).filter(
+    (block) => block.keyword === POLICY_SELECT_KEYWORD,
+  );
+  return { symbolTable: table, sourceFile, sourceId, blockSymbols };
+}
+
+function onlyBlockSymbol(parsed: ParsedPolicySelect): BlockSymbol {
+  if (parsed.blockSymbols.length !== 1) {
+    throw new Error(`expected one policy_select block, got ${parsed.blockSymbols.length}`);
+  }
+  const block = parsed.blockSymbols[0];
+  if (block === undefined) throw new Error('expected one policy_select block');
+  return block;
+}
+
+function reconstruct(_parsed: ParsedPolicySelect, block: BlockSymbol): PslExtensionBlock {
+  return block.block;
+}
+
+function validate(parsed: ParsedPolicySelect, block: BlockSymbol) {
+  return validateExtensionBlockFromSymbol({
+    block,
+    descriptor: POLICY_SELECT_DESCRIPTOR,
+    symbolTable: parsed.symbolTable,
+    sourceFile: parsed.sourceFile,
+    sourceId: parsed.sourceId,
+    codecLookup,
+  });
+}
+
+function documentForPrinting(
+  symbolTable: SymbolTable,
+  extensionBlock: PslExtensionBlock,
+): PslDocumentAst {
+  const modelStubs: PslModel[] = Object.values(symbolTable.topLevel.models).map((model) => ({
+    kind: 'model',
+    name: model.name,
+    fields: [],
+    attributes: [],
+    span: ZERO_SPAN,
+  }));
+  return {
+    kind: 'document',
+    sourceId: 'print',
+    namespaces: [
+      makePslNamespace({
+        kind: 'namespace',
+        name: UNSPECIFIED_PSL_NAMESPACE_ID,
+        entries: makePslNamespaceEntries(modelStubs, [], [extensionBlock]),
+        span: ZERO_SPAN,
+      }),
+    ],
+    span: ZERO_SPAN,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -124,52 +220,30 @@ policy_select ProfilesSelect {
 }
 `;
 
-    it('parses the block into a uniform PslExtensionBlock with the correct discriminator', () => {
-      const parsed = parsePslDocument({
-        schema: source,
-        sourceId: 'r1',
-        pslBlockDescriptors: assembled.pslBlockDescriptors,
-        codecLookup,
-      });
-
-      expect(parsed.diagnostics).toEqual([]);
-      const ns = parsed.ast.namespaces.find((n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID);
-      const nsExtBlocks = namespacePslExtensionBlocks(ns!);
-      expect(nsExtBlocks).toHaveLength(1);
-      const block = nsExtBlocks[0];
-      expect(block).toMatchObject({
+    it('reconstructs the block into a uniform PslExtensionBlock with the correct discriminator', () => {
+      const parsed = parsePolicySelect(source);
+      const block = onlyBlockSymbol(parsed);
+      expect(validate(parsed, block)).toEqual([]);
+      const reconstructed = reconstruct(parsed, block);
+      expect(reconstructed).toMatchObject({
         kind: POLICY_SELECT_DISCRIMINATOR,
         name: 'ProfilesSelect',
       });
     });
 
     it('validates the block and surfaces no diagnostics for a well-formed block', () => {
-      const parsed = parsePslDocument({
-        schema: source,
-        sourceId: 'r1',
-        pslBlockDescriptors: assembled.pslBlockDescriptors,
-        codecLookup,
-      });
-
-      expect(parsed.ok).toBe(true);
-      expect(parsed.diagnostics).toEqual([]);
+      const parsed = parsePolicySelect(source);
+      const block = onlyBlockSymbol(parsed);
+      expect(validate(parsed, block)).toEqual([]);
     });
 
-    it('lowers the parsed block to a PolicySelectIr via the entityTypes factory', () => {
-      const parsed = parsePslDocument({
-        schema: source,
-        sourceId: 'r1',
-        pslBlockDescriptors: assembled.pslBlockDescriptors,
-        codecLookup,
-      });
-
-      expect(parsed.diagnostics).toEqual([]);
-      const ns = parsed.ast.namespaces.find((n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID);
-      const block = namespacePslExtensionBlocks(ns!)[0];
-      if (!block) throw new Error('expected one extension block');
+    it('lowers the reconstructed block to a PolicySelectIr via the entityTypes factory', () => {
+      const parsed = parsePolicySelect(source);
+      const block = onlyBlockSymbol(parsed);
+      expect(validate(parsed, block)).toEqual([]);
 
       const factory = getFactory();
-      const ir = factory(block, { family: 'fixture', target: 'fixture' });
+      const ir = factory(reconstruct(parsed, block), { family: 'fixture', target: 'fixture' });
 
       expect(ir).toBeInstanceOf(PolicySelectIr);
       expect(Object.isFrozen(ir)).toBe(true);
@@ -183,17 +257,10 @@ policy_select ProfilesSelect {
     });
 
     it('serializes and re-hydrates the IR instance without losing fields', () => {
-      const parsed = parsePslDocument({
-        schema: source,
-        sourceId: 'r1',
-        pslBlockDescriptors: assembled.pslBlockDescriptors,
-        codecLookup,
-      });
-      const ns = parsed.ast.namespaces.find((n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID);
-      const block = namespacePslExtensionBlocks(ns!)[0];
-      if (!block) throw new Error('expected one extension block');
+      const parsed = parsePolicySelect(source);
+      const block = onlyBlockSymbol(parsed);
 
-      const ir = getFactory()(block, { family: 'fixture', target: 'fixture' });
+      const ir = getFactory()(reconstruct(parsed, block), { family: 'fixture', target: 'fixture' });
       const serialized = JSON.stringify(ir);
       const hydrated = hydratePolicySelectIrFromJson(JSON.parse(serialized));
 
@@ -217,19 +284,11 @@ policy_select AdminRead {
 `;
 
     it('lowers the `as` option into the IR instance', () => {
-      const parsed = parsePslDocument({
-        schema: source,
-        sourceId: 'r1',
-        pslBlockDescriptors: assembled.pslBlockDescriptors,
-        codecLookup,
-      });
+      const parsed = parsePolicySelect(source);
+      const block = onlyBlockSymbol(parsed);
+      expect(validate(parsed, block)).toEqual([]);
 
-      expect(parsed.diagnostics).toEqual([]);
-      const ns = parsed.ast.namespaces.find((n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID);
-      const block = namespacePslExtensionBlocks(ns!)[0];
-      if (!block) throw new Error('expected one extension block');
-
-      const ir = getFactory()(block, { family: 'fixture', target: 'fixture' });
+      const ir = getFactory()(reconstruct(parsed, block), { family: 'fixture', target: 'fixture' });
       expect(ir).toBeInstanceOf(PolicySelectIr);
       expect(ir.as).toBe('permissive');
       expect(ir.name).toBe('AdminRead');
@@ -248,15 +307,9 @@ policy_select BadBlock {
 `;
 
     it('surfaces a PSL_EXTENSION_MISSING_REQUIRED_PARAMETER diagnostic', () => {
-      const parsed = parsePslDocument({
-        schema: source,
-        sourceId: 'r1',
-        pslBlockDescriptors: assembled.pslBlockDescriptors,
-        codecLookup,
-      });
-
-      expect(parsed.ok).toBe(false);
-      expect(parsed.diagnostics).toMatchObject([
+      const parsed = parsePolicySelect(source);
+      const block = onlyBlockSymbol(parsed);
+      expect(validate(parsed, block)).toMatchObject([
         {
           code: 'PSL_EXTENSION_MISSING_REQUIRED_PARAMETER',
           message: expect.stringContaining('using'),
@@ -273,15 +326,9 @@ policy_select BadBlock {
 `;
 
     it('surfaces a PSL_EXTENSION_UNRESOLVED_REF diagnostic', () => {
-      const parsed = parsePslDocument({
-        schema: source,
-        sourceId: 'r1',
-        pslBlockDescriptors: assembled.pslBlockDescriptors,
-        codecLookup,
-      });
-
-      expect(parsed.ok).toBe(false);
-      expect(parsed.diagnostics).toMatchObject([
+      const parsed = parsePolicySelect(source);
+      const block = onlyBlockSymbol(parsed);
+      expect(validate(parsed, block)).toMatchObject([
         {
           code: 'PSL_EXTENSION_UNRESOLVED_REF',
           message: expect.stringContaining('NonExistentModel'),
@@ -291,7 +338,7 @@ policy_select BadBlock {
   });
 
   describe('given a block without a codecLookup in the parse call', () => {
-    it('still parses and produces the AST node, but codec validation rejects the value parameter', () => {
+    it('still reconstructs the block node, but codec validation rejects the value parameter', () => {
       const source = `model Post {
   id Int @id
 }
@@ -301,22 +348,23 @@ policy_select NakedParse {
   using  = "auth.uid() = id"
 }
 `;
-      // Without codecLookup the parser falls back to emptyCodecLookup, which
-      // rejects every codec id — so a value parameter always fails validation.
-      const parsed = parsePslDocument({
-        schema: source,
-        sourceId: 'r1',
-        pslBlockDescriptors: assembled.pslBlockDescriptors,
-        // codecLookup intentionally omitted
+      const parsed = parsePolicySelect(source);
+      const block = onlyBlockSymbol(parsed);
+
+      expect(reconstruct(parsed, block)).toMatchObject({
+        kind: POLICY_SELECT_DISCRIMINATOR,
+        name: 'NakedParse',
       });
 
-      // The AST is still built (the parse pass succeeds).
-      const ns = parsed.ast.namespaces.find((n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID);
-      expect(namespacePslExtensionBlocks(ns!)).toHaveLength(1);
-
-      // But validation flags the value parameter as rejected.
-      expect(parsed.ok).toBe(false);
-      expect(parsed.diagnostics[0]).toMatchObject({
+      const diagnostics = validateExtensionBlockFromSymbol({
+        block,
+        descriptor: POLICY_SELECT_DESCRIPTOR,
+        symbolTable: parsed.symbolTable,
+        sourceFile: parsed.sourceFile,
+        sourceId: parsed.sourceId,
+        codecLookup: extractCodecLookup([]),
+      });
+      expect(diagnostics[0]).toMatchObject({
         code: 'PSL_EXTENSION_INVALID_VALUE',
       });
     });
@@ -335,62 +383,35 @@ policy_select ProfilesSelect {
 `;
 
     it('prints the block back to PSL text that contains the keyword and all parameters', () => {
-      const parsed = parsePslDocument({
-        schema: source,
-        sourceId: 'rt1',
-        pslBlockDescriptors: assembled.pslBlockDescriptors,
-        codecLookup,
-      });
+      const parsed = parsePolicySelect(source, 'rt1');
+      const block = onlyBlockSymbol(parsed);
+      expect(validate(parsed, block)).toEqual([]);
 
-      expect(parsed.diagnostics).toEqual([]);
-      const printed = printPslFromAst(parsed.ast, {
-        pslBlockDescriptors: assembled.pslBlockDescriptors,
-        codecLookup,
-      });
+      const printed = printPslFromAst(
+        documentForPrinting(parsed.symbolTable, reconstruct(parsed, block)),
+        { pslBlockDescriptors: assembled.pslBlockDescriptors, codecLookup },
+      );
 
       expect(printed).toContain('policy_select ProfilesSelect {');
       expect(printed).toContain('target = Post');
       expect(printed).toContain('using = "auth.uid() = author_id"');
     });
 
-    it('re-parses the printed PSL and produces an AST-structurally equivalent extension block', () => {
-      const firstParsed = parsePslDocument({
-        schema: source,
-        sourceId: 'rt2',
+    it('re-parses the printed PSL and produces an IR-equivalent extension block', () => {
+      const firstParsed = parsePolicySelect(source, 'rt2');
+      const firstBlock = onlyBlockSymbol(firstParsed);
+      expect(validate(firstParsed, firstBlock)).toEqual([]);
+      const original = reconstruct(firstParsed, firstBlock);
+
+      const printed = printPslFromAst(documentForPrinting(firstParsed.symbolTable, original), {
         pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 
-      expect(firstParsed.diagnostics).toEqual([]);
-
-      const printed = printPslFromAst(firstParsed.ast, {
-        pslBlockDescriptors: assembled.pslBlockDescriptors,
-        codecLookup,
-      });
-
-      const reParsed = parsePslDocument({
-        schema: printed,
-        sourceId: 'rt2-reparse',
-        pslBlockDescriptors: assembled.pslBlockDescriptors,
-        codecLookup,
-      });
-
-      expect(reParsed.diagnostics).toEqual([]);
-
-      const originalNs = firstParsed.ast.namespaces.find(
-        (n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID,
-      );
-      const reParsedNs = reParsed.ast.namespaces.find(
-        (n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID,
-      );
-      const originalExtBlocks = namespacePslExtensionBlocks(originalNs!);
-      const reParsedExtBlocks = namespacePslExtensionBlocks(reParsedNs!);
-      expect(originalExtBlocks).toHaveLength(1);
-      expect(reParsedExtBlocks).toHaveLength(1);
-
-      const original = originalExtBlocks[0];
-      const reParsedBlock = reParsedExtBlocks[0];
-      if (!original || !reParsedBlock) throw new Error('expected one extension block each');
+      const reParsed = parsePolicySelect(printed, 'rt2-reparse');
+      const reParsedBlockSymbol = onlyBlockSymbol(reParsed);
+      expect(validate(reParsed, reParsedBlockSymbol)).toEqual([]);
+      const reParsedBlock = reconstruct(reParsed, reParsedBlockSymbol);
 
       // Semantic equivalence: lower both blocks to their IR and compare. The IR
       // is the contract-bound artifact, so identical IR after print → re-parse is

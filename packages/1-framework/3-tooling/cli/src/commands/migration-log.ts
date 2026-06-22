@@ -1,9 +1,9 @@
+import { loadConfig } from '@prisma-next/config-loader';
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
   CliStructuredError,

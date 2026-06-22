@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { loadConfig } from '@prisma-next/config-loader';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { findLatestMigration, isGraphNode } from '@prisma-next/migration-tools/migration-graph';
@@ -14,7 +15,6 @@ import {
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join } from 'pathe';
-import { loadConfig } from '../config-loader';
 import {
   CliStructuredError,
   errorFileNotFound,

@@ -32,7 +32,7 @@ const mocks = vi.hoisted(() => ({
   readAllMarkers: vi.fn(),
 }));
 
-vi.mock('../../src/config-loader', () => ({ loadConfig: mocks.loadConfig }));
+vi.mock('@prisma-next/config-loader', () => ({ loadConfig: mocks.loadConfig }));
 vi.mock('../../src/control-api/client', () => ({
   createControlClient: mocks.createControlClient,
 }));
@@ -170,7 +170,7 @@ describe('migrate --to verifies against the target bundle contract', () => {
   });
 
   afterAll(() => {
-    vi.doUnmock('../../src/config-loader');
+    vi.doUnmock('@prisma-next/config-loader');
     vi.doUnmock('../../src/control-api/client');
     vi.resetModules();
   });

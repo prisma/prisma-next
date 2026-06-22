@@ -1,5 +1,4 @@
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import { buildSqlNamespace, type SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
@@ -9,6 +8,7 @@ import {
   pgvectorExtensionPack,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  symbolTableInputFromParseArgs,
 } from './fixtures';
 
 const baseInput = {
@@ -19,7 +19,7 @@ const baseInput = {
 
 describe('interpretPslDocumentToSqlContract extensions', () => {
   it('rejects legacy pgvector.column attributes even when the extension is composed', () => {
-    const namedTypeDocument = parsePslDocument({
+    const namedTypeDocument = symbolTableInputFromParseArgs({
       schema: `types {
   Embedding1536 = Bytes @pgvector.column(length: 1536)
 }
@@ -34,7 +34,7 @@ model Document {
 
     const namedTypeResult = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document: namedTypeDocument,
+      ...namedTypeDocument,
       composedExtensionPacks: ['pgvector'],
       authoringContributions: pgvectorAuthoringContributions,
     });
@@ -49,7 +49,7 @@ model Document {
       ]),
     );
 
-    const fieldDocument = parsePslDocument({
+    const fieldDocument = symbolTableInputFromParseArgs({
       schema: `model Document {
   id Int @id
   embedding Bytes @pgvector.column(length: 1536)
@@ -59,7 +59,7 @@ model Document {
     });
     const fieldResult = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document: fieldDocument,
+      ...fieldDocument,
       composedExtensionPacks: ['pgvector'],
       authoringContributions: pgvectorAuthoringContributions,
     });
@@ -76,7 +76,7 @@ model Document {
   });
 
   it('rejects attributes attached to constructor-based named types', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `types {
   Embedding1536 = pgvector.Vector(1536) @db.VarChar(191)
 }
@@ -91,7 +91,7 @@ model Document {
 
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document,
+      ...document,
       composedExtensionPacks: ['pgvector'],
       authoringContributions: pgvectorAuthoringContributions,
     });
@@ -109,7 +109,7 @@ model Document {
   });
 
   it('preserves composed extension pack versions when refs are provided', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `types {
   Embedding1536 = pgvector.Vector(1536)
 }
@@ -124,7 +124,7 @@ model Document {
 
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document,
+      ...document,
       composedExtensionPacks: ['pgvector'],
       composedExtensionPackRefs: [pgvectorExtensionPack],
       authoringContributions: pgvectorAuthoringContributions,
@@ -140,7 +140,7 @@ model Document {
   });
 
   it('parses stringArray arguments whose elements contain commas', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `types {
   Tag = sql.Enum('Tag', ["hello, world", "a,b,c", 'plain'])
 }
@@ -155,7 +155,7 @@ model Post {
 
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document,
+      ...document,
       authoringContributions: {
         type: {
           sql: {
@@ -187,7 +187,7 @@ model Post {
   });
 
   it('instantiates family-owned and extension-owned constructor expressions from shared authoring contributions', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `types {
   ShortName = sql.String(length: 35)
   Embedding1536 = pgvector.Vector(1536)
@@ -204,7 +204,7 @@ model Document {
 
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document,
+      ...document,
       composedExtensionPacks: ['pgvector'],
       authoringContributions: {
         type: {
@@ -255,7 +255,7 @@ model Document {
   });
 
   it('instantiates inline field constructor expressions from shared authoring contributions', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model Document {
   id Int @id
   shortName sql.String(length: 35)
@@ -267,7 +267,7 @@ model Document {
 
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document,
+      ...document,
       composedExtensionPacks: ['pgvector'],
       authoringContributions: {
         type: {
@@ -331,7 +331,7 @@ model Document {
   });
 
   it('instantiates constructor expressions with JS-like object literal arguments', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `types {
   ShortName = sql.String({ length: 35, label: 'short' })
 }
@@ -346,7 +346,7 @@ model Document {
 
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document,
+      ...document,
       authoringContributions: {
         type: {
           sql: {
@@ -420,7 +420,7 @@ model Document {
     const interpretWith = (schema: string) =>
       interpretPslDocumentToSqlContract({
         ...baseInput,
-        document: parsePslDocument({ schema, sourceId: 'schema.prisma' }),
+        ...symbolTableInputFromParseArgs({ schema, sourceId: 'schema.prisma' }),
         authoringContributions: objectArgContributions,
       });
 
@@ -532,31 +532,29 @@ model Doc {
   });
 
   it('throws when extension entities are lowered but no createNamespace factory is available', () => {
-    const targetWithoutCreateNamespace = {
-      ...postgresTarget,
-      authoring: {
-        entityTypes: {
-          test: {
-            kind: 'entity' as const,
-            discriminator: 'test-custom-block',
-            output: {
-              factory: (raw: unknown) => raw,
-            },
-          },
-        },
-        pslBlockDescriptors: {
-          test_block: {
-            kind: 'pslBlock' as const,
-            keyword: 'test_block',
-            discriminator: 'test-custom-block',
-            name: { required: true },
-            parameters: {},
+    const pslBlockDescriptors = {
+      test_block: {
+        kind: 'pslBlock' as const,
+        keyword: 'test_block',
+        discriminator: 'test-custom-block',
+        name: { required: true },
+        parameters: {},
+      },
+    };
+    const authoringContributions = {
+      entityTypes: {
+        test: {
+          kind: 'entity' as const,
+          discriminator: 'test-custom-block',
+          output: {
+            factory: (raw: unknown) => raw,
           },
         },
       },
+      pslBlockDescriptors,
     };
 
-    const document = parsePslDocument({
+    const symbolTableInput = symbolTableInputFromParseArgs({
       schema: `
 namespace public {
   model Foo {
@@ -568,59 +566,52 @@ namespace public {
 }
 `,
       sourceId: 'schema.prisma',
-      pslBlockDescriptors: targetWithoutCreateNamespace.authoring.pslBlockDescriptors,
+      pslBlockDescriptors,
     });
 
     expect(() =>
       interpretPslDocumentToSqlContract({
-        document,
-        target: targetWithoutCreateNamespace,
+        ...symbolTableInput,
+        target: postgresTarget,
         scalarTypeDescriptors: postgresScalarTypeDescriptors,
         composedExtensionContracts: new Map(),
-        authoringContributions: targetWithoutCreateNamespace.authoring,
+        authoringContributions,
       }),
     ).toThrow(/createNamespace/);
   });
 
-  it('routes lowered extension entities to entries[discriminator] when no explicit createNamespace is supplied', () => {
-    // Under the open entries model (ADR 224/225), extension blocks are lowered
-    // into entries[discriminator][name] — the discriminator is the entries key.
-    // The target pack carries createNamespace in its authoring; the interpreter
-    // must pick it up as a fallback so the result namespace receives the entries.
+  it('routes lowered extension entities to entries[discriminator] via explicit createNamespace', () => {
     const capturedEntries: Record<string, Record<string, Record<string, unknown>>> = {};
-
-    const targetWithCreateNamespace = {
-      ...postgresTarget,
-      authoring: {
-        entityTypes: {
-          test: {
-            kind: 'entity' as const,
-            discriminator: 'test-custom-block',
-            output: {
-              factory: (raw: unknown) => raw,
-            },
-          },
-        },
-        pslBlockDescriptors: {
-          test_block: {
-            kind: 'pslBlock' as const,
-            keyword: 'test_block',
-            discriminator: 'test-custom-block',
-            name: { required: true },
-            parameters: {},
-          },
-        },
-        createNamespace: (input: SqlNamespaceTablesInput): Namespace => {
-          capturedEntries[input.id] = {
-            ...(capturedEntries[input.id] ?? {}),
-            ...input.entries,
-          };
-          return buildSqlNamespace(input);
-        },
+    const pslBlockDescriptors = {
+      test_block: {
+        kind: 'pslBlock' as const,
+        keyword: 'test_block',
+        discriminator: 'test-custom-block',
+        name: { required: true },
+        parameters: {},
       },
     };
+    const authoringContributions = {
+      entityTypes: {
+        test: {
+          kind: 'entity' as const,
+          discriminator: 'test-custom-block',
+          output: {
+            factory: (raw: unknown) => raw,
+          },
+        },
+      },
+      pslBlockDescriptors,
+    };
+    const createNamespace = (input: SqlNamespaceTablesInput): Namespace => {
+      capturedEntries[input.id] = {
+        ...(capturedEntries[input.id] ?? {}),
+        ...input.entries,
+      };
+      return buildSqlNamespace(input);
+    };
 
-    const document = parsePslDocument({
+    const symbolTableInput = symbolTableInputFromParseArgs({
       schema: `
 namespace public {
   model Foo {
@@ -632,22 +623,21 @@ namespace public {
 }
 `,
       sourceId: 'schema.prisma',
-      pslBlockDescriptors: targetWithCreateNamespace.authoring.pslBlockDescriptors,
+      pslBlockDescriptors,
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
-      target: targetWithCreateNamespace,
+      ...symbolTableInput,
+      target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
-      authoringContributions: targetWithCreateNamespace.authoring,
+      authoringContributions,
+      createNamespace,
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    // The extension entity must reach capturedEntries under its discriminator key
-    // even though no explicit createNamespace was passed to the interpreter.
     expect(capturedEntries).toMatchObject({
       public: {
         'test-custom-block': {
