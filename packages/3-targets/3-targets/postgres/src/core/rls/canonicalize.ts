@@ -24,7 +24,7 @@ function stripCommentsAndLowercase(sql: string): string {
   let out = '';
   let i = 0;
   while (i < sql.length) {
-    const ch = sql[i]!;
+    const ch = sql.charAt(i);
 
     if (ch === "'") {
       // Single-quoted string literal — copy verbatim (preserving case), handle '' escapes.
@@ -33,7 +33,7 @@ function stripCommentsAndLowercase(sql: string): string {
       out += ch;
       i++;
       while (i < sql.length) {
-        const sc = sql[i]!;
+        const sc = sql.charAt(i);
         out += sc;
         i++;
         if (sc === "'") {
@@ -115,7 +115,7 @@ function hasTopLevelBinaryOperator(inner: string): boolean {
   let depth = 0;
   let i = 0;
   while (i < inner.length) {
-    const ch = inner[i]!;
+    const ch = inner.charAt(i);
 
     if (ch === "'") {
       // Skip string literal — its contents are not operators.
@@ -196,7 +196,7 @@ function stripRedundantCastParens(sql: string): string {
       if (s[i] === '(') {
         // Only treat as a grouping paren (not a function-call paren) if the
         // preceding character is not an identifier char.
-        const prevChar = out.length > 0 ? out[out.length - 1]! : '';
+        const prevChar = out.length > 0 ? out.charAt(out.length - 1) : '';
         const isPrecedingIdentChar = prevChar !== '' && /[a-z0-9_$"]/i.test(prevChar);
         if (!isPrecedingIdentChar) {
           // Find the matching close paren.
@@ -223,7 +223,7 @@ function stripRedundantCastParens(sql: string): string {
           }
         }
       }
-      out += s[i]!;
+      out += s.charAt(i);
       i++;
     }
     s = out;
@@ -242,7 +242,7 @@ function hasTopLevelBooleanOperator(inner: string): boolean {
   let depth = 0;
   let i = 0;
   while (i < inner.length) {
-    const ch = inner[i]!;
+    const ch = inner.charAt(i);
     if (ch === "'") {
       i++;
       while (i < inner.length) {
@@ -302,14 +302,14 @@ function stripTopLevelAndParens(sql: string): string {
     while (i < s.length) {
       // Pass string literals through verbatim — parens inside are data.
       if (s[i] === "'") {
-        out += s[i]!;
+        out += s.charAt(i);
         i++;
         while (i < s.length) {
-          out += s[i]!;
+          out += s.charAt(i);
           if (s[i] === "'") {
             i++;
             if (s[i] === "'") {
-              out += s[i]!;
+              out += s.charAt(i);
               i++;
             } else {
               break;
@@ -322,7 +322,7 @@ function stripTopLevelAndParens(sql: string): string {
       }
 
       if (s[i] === '(') {
-        const prevChar = out.length > 0 ? out[out.length - 1]! : '';
+        const prevChar = out.length > 0 ? out.charAt(out.length - 1) : '';
         const isPrecedingIdentChar = prevChar !== '' && /[a-z0-9_$"]/i.test(prevChar);
         if (!isPrecedingIdentChar) {
           // Find matching close paren, respecting string literals.
@@ -363,7 +363,7 @@ function stripTopLevelAndParens(sql: string): string {
         }
       }
 
-      out += s[i]!;
+      out += s.charAt(i);
       i++;
     }
     s = out.replace(/\s+/g, ' ').trim();
