@@ -115,7 +115,19 @@
       "plane": "migration"
     },
     {
+      "glob": "packages/1-framework/3-tooling/config-loader/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
       "glob": "packages/1-framework/3-tooling/emitter/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/language-server/**",
       "domain": "framework",
       "layer": "tooling",
       "plane": "migration"

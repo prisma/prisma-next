@@ -1,6 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   defineContract,
@@ -16,6 +15,7 @@ import {
   createBuiltinLikeControlMutationDefaults,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  symbolTableInputFromParseArgs,
 } from './fixtures';
 
 const supabaseExtensionPackRef = {
@@ -31,7 +31,7 @@ const int4Column = { codecId: 'pg/int4@1', nativeType: 'int4' } as const;
 describe('PSL ↔ TS namespace parity', () => {
   it('produces structurally equivalent Contract IR from PSL and TS builder for a 2-namespace schema with a cross-namespace FK', () => {
     // PSL authoring
-    const pslDocument = parsePslDocument({
+    const pslDocument = symbolTableInputFromParseArgs({
       schema: `namespace auth {
   model User {
     id Int @id
@@ -51,7 +51,7 @@ namespace public {
     });
 
     const pslResult = interpretPslDocumentToSqlContract({
-      document: pslDocument,
+      ...pslDocument,
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
@@ -162,7 +162,7 @@ namespace public {
     // PSL: supabase:auth.User cross-space reference.
     // With composedExtensionContracts provided, the interpreter resolves tableName = 'users'
     // directly from the extension contract — the same value the TS builder produces.
-    const pslDocument = parsePslDocument({
+    const pslDocument = symbolTableInputFromParseArgs({
       schema: `model Profile {
   id    Int @id
   userId Int
@@ -173,7 +173,7 @@ namespace public {
     });
 
     const pslResult = interpretPslDocumentToSqlContract({
-      document: pslDocument,
+      ...pslDocument,
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
@@ -231,7 +231,7 @@ namespace public {
 
   it('emits PSL_UNKNOWN_CONTRACT_SPACE when the extension contract is absent from composedExtensionContracts', () => {
     // No contract for 'supabase' in the map — the interpreter must fail fast, not fall back to 'user'.
-    const pslDocument = parsePslDocument({
+    const pslDocument = symbolTableInputFromParseArgs({
       schema: `model Profile {
   id    Int @id
   userId Int
@@ -242,7 +242,7 @@ namespace public {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document: pslDocument,
+      ...pslDocument,
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionPacks: ['supabase'],

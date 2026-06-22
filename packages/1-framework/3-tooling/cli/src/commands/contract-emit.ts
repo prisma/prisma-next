@@ -1,10 +1,10 @@
+import { loadConfig } from '@prisma-next/config-loader';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { errorContractConfigMissing } from '@prisma-next/errors/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { dirname, join, relative, resolve } from 'pathe';
-import { loadConfig } from '../config-loader';
 import { executeContractEmit } from '../control-api/operations/contract-emit';
 import type { ContractEmitResult } from '../control-api/types';
 import { CliStructuredError, errorUnexpected } from '../utils/cli-errors';

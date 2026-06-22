@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   close: vi.fn(),
 }));
 
-vi.mock('../../src/config-loader', () => ({
+vi.mock('@prisma-next/config-loader', () => ({
   loadConfig: mocks.loadConfig,
 }));
 
@@ -87,7 +87,7 @@ async function setupFixture(): Promise<{
 
 describe('db update read aggregate --json golden', () => {
   afterAll(() => {
-    vi.doUnmock('../../src/config-loader');
+    vi.doUnmock('@prisma-next/config-loader');
     vi.doUnmock('../../src/control-api/client');
   });
 

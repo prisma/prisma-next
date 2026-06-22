@@ -1,15 +1,18 @@
 import { readFile } from 'node:fs/promises';
-import type { ContractConfig } from '@prisma-next/config/config-types';
+import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import { applySpecifierDefaultControlPolicy } from '@prisma-next/contract/apply-specifier-default-control-policy';
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
+import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { basename, extname } from 'pathe';
+
 import { interpretPslDocumentToSqlContract } from './interpreter';
 import type { ColumnDescriptor } from './psl-column-resolution';
 
@@ -42,6 +45,19 @@ function defaultOutputFromSchemaPath(schemaPath: string): string {
   return `${base}.json`;
 }
 
+function mapParseDiagnostics(
+  diagnostics: readonly ParseDiagnostic[],
+  sourceFile: SourceFile,
+  sourceId: string,
+): ContractSourceDiagnostic[] {
+  return diagnostics.map((diagnostic) => ({
+    code: diagnostic.code,
+    message: diagnostic.message,
+    sourceId,
+    span: rangeToPslSpan(diagnostic.range, sourceFile),
+  }));
+}
+
 function buildColumnDescriptorMap(
   scalarTypeDescriptors: ReadonlyMap<string, string>,
   codecLookup: CodecLookup,
@@ -58,6 +74,7 @@ function buildColumnDescriptorMap(
 export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
   return {
     source: {
+      sourceFormat: 'psl',
       inputs: [schemaPath],
       load: async (context) => {
         const [absoluteSchemaPath] = context.resolvedInputs;
@@ -84,19 +101,31 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           });
         }
 
-        const document = parsePslDocument({
-          schema,
-          sourceId: schemaPath,
-          pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
-        });
-
         const scalarTypeDescriptors = buildColumnDescriptorMap(
           context.scalarTypeDescriptors,
           context.codecLookup,
         );
 
-        const interpreted = interpretPslDocumentToSqlContract({
+        const { document, sourceFile, diagnostics: parseDiagnostics } = parse(schema);
+        const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
           document,
+          sourceFile,
+          scalarTypes: [...context.scalarTypeDescriptors.keys()],
+          pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
+        });
+
+        // Do not short-circuit on provider-level diagnostics; recovered CST can
+        // still produce interpreter diagnostics in the same response.
+        const seedDiagnostics = [
+          ...mapParseDiagnostics(parseDiagnostics, sourceFile, schemaPath),
+          ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),
+        ];
+
+        const interpreted = interpretPslDocumentToSqlContract({
+          symbolTable,
+          sourceFile,
+          sourceId: schemaPath,
+          seedDiagnostics,
           target: options.target,
           authoringContributions: context.authoringContributions,
           scalarTypeDescriptors,

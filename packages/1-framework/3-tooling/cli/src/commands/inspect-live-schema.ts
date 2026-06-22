@@ -1,9 +1,9 @@
+import { loadConfig } from '@prisma-next/config-loader';
 import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
 import type { CoreSchemaView } from '@prisma-next/framework-components/control';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { relative, resolve } from 'pathe';
-import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
   CliStructuredError,

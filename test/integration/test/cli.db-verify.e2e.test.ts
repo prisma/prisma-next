@@ -20,6 +20,8 @@ import {
   withTempDir,
 } from './utils/cli-test-helpers';
 
+vi.mock('@prisma-next/config-loader', { spy: true });
+
 // Fixture subdirectory for db-verify tests
 const fixtureSubdir = 'db-verify';
 
@@ -988,13 +990,13 @@ withTempDir(({ createTempDir }) => {
             // withClient will close the client after this callback returns
           });
 
-          // Now test verify with the no-driver config
-          // Mock loadConfig to return config without driver (bypassing validation)
-          const originalLoadConfig = await import('@prisma-next/cli/config-loader');
+          const originalLoadConfig = await import('@prisma-next/config-loader');
           vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
             family: {
               familyId: 'sql',
-              create: vi.fn(),
+              create: vi.fn().mockReturnValue({
+                deserializeContract: (json: unknown) => json,
+              }),
             },
             target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
             adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },

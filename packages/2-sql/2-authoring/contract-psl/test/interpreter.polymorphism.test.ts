@@ -1,6 +1,5 @@
 import { crossRef } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { SqlModelStorage, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
@@ -13,6 +12,7 @@ import {
   modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  symbolTableInputFromParseArgs,
 } from './fixtures';
 
 describe('interpretPslDocumentToSqlContract — polymorphism', () => {
@@ -32,7 +32,7 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
     });
 
   it('ignores polymorphism collection when the schema has no models', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `types {
   Email = String
 }`,
@@ -40,7 +40,7 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -59,7 +59,7 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
 
   describe('@@discriminator and @@base — happy paths', () => {
     it('emits discriminator on base model', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -77,7 +77,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -91,7 +91,7 @@ model Bug {
     });
 
     it('emits base on variant model', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -109,7 +109,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -122,7 +122,7 @@ model Bug {
     });
 
     it('variant without @@map inherits base table (STI)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -141,7 +141,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -152,7 +152,7 @@ model Bug {
     });
 
     it('variant with @@map gets own table (MTI)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -172,7 +172,7 @@ model Feature {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -183,7 +183,7 @@ model Feature {
     });
 
     it('MTI variant storage table carries the base PK column, primary key, and FK to the base', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -203,7 +203,7 @@ model Feature {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -238,7 +238,7 @@ model Feature {
     });
 
     it('MTI variant FK carries the base namespace when the base lives in a non-default namespace', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `namespace auth {
   model Task {
     id    Int    @id @default(autoincrement())
@@ -260,7 +260,7 @@ model Feature {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -292,7 +292,7 @@ model Feature {
     });
 
     it('variant models contain only their own fields (thin)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -310,7 +310,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -322,7 +322,7 @@ model Bug {
     });
 
     it('assembles multiple variants on the base', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -347,7 +347,7 @@ model Feature {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -366,7 +366,7 @@ model Feature {
     });
 
     it('variants are not included in roots', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -384,7 +384,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -404,7 +404,7 @@ model Bug {
     }
 
     it('materializes an STI variant column onto the base table (nullable in storage)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -423,7 +423,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -449,7 +449,7 @@ model Bug {
     });
 
     it('does not leak the STI variant field onto the base domain model', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -468,7 +468,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -486,7 +486,7 @@ model Bug {
     });
 
     it('keeps the STI variant domain field at its declared (required) nullability', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -505,7 +505,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -517,7 +517,7 @@ model Bug {
     });
 
     it('does not emit an orphan storage table for an STI variant', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -536,7 +536,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -550,7 +550,7 @@ model Bug {
     });
 
     it('materializes columns for two STI variants onto the same base table', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -575,7 +575,7 @@ model Chore {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -589,7 +589,7 @@ model Chore {
     });
 
     it('leaves MTI variants untouched (own table keeps its own columns)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -609,7 +609,7 @@ model Feature {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -623,7 +623,7 @@ model Feature {
     });
 
     it('materializes the STI column and joins the MTI variant in a mixed hierarchy', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -649,7 +649,7 @@ model Feature {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -666,7 +666,7 @@ model Feature {
 
   describe('@@discriminator and @@base — diagnostics', () => {
     it('diagnoses orphaned @@discriminator (no @@base declarations)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -678,7 +678,7 @@ model Feature {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -694,7 +694,7 @@ model Feature {
     });
 
     it('diagnoses orphaned @@base (target model has no @@discriminator)', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -710,7 +710,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -726,7 +726,7 @@ model Bug {
     });
 
     it('diagnoses missing discriminator field on base model', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -743,7 +743,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -759,7 +759,7 @@ model Bug {
     });
 
     it('diagnoses non-String discriminator field', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -777,7 +777,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -794,7 +794,7 @@ model Bug {
     });
 
     it('diagnoses model with both @@discriminator and @@base', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -814,7 +814,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -830,7 +830,7 @@ model Bug {
     });
 
     it('diagnoses @@base targeting non-existent model', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Bug {
   id       Int    @id @default(autoincrement())
   severity String
@@ -841,7 +841,7 @@ model Bug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -857,7 +857,7 @@ model Bug {
     });
 
     it('diagnoses duplicate discriminator values', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -881,7 +881,7 @@ model OtherBug {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
@@ -899,7 +899,7 @@ model OtherBug {
 
   describe('end-to-end: PSL → interpret → domain validation', () => {
     it('emitted polymorphic contract passes domain validation', () => {
-      const document = parsePslDocument({
+      const document = symbolTableInputFromParseArgs({
         schema: `model Task {
   id    Int    @id @default(autoincrement())
   title String
@@ -925,7 +925,7 @@ model Feature {
       });
 
       const result = interpretPslDocumentToSqlContract({
-        document,
+        ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 

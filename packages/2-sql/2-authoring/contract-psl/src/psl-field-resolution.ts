@@ -9,13 +9,12 @@ import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
-import type { PslAttribute, PslField, PslModel } from '@prisma-next/psl-parser';
+import type { FieldSymbol, ModelSymbol, ResolvedAttribute } from '@prisma-next/psl-parser';
 import type { EnumTypeHandle } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   getAttribute,
-  getPositionalArgumentEntry,
   lowerFirst,
   parseConstraintMapArgument,
   parseMapName,
@@ -36,13 +35,21 @@ type LoweredFieldDefault = {
 function lowerEnumDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
-  readonly defaultAttribute: PslAttribute;
+  readonly defaultAttribute: ResolvedAttribute;
   readonly enumHandle: EnumTypeHandle;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): LoweredFieldDefault {
-  const expressionEntry = getPositionalArgumentEntry(input.defaultAttribute);
-  if (!expressionEntry) {
+  const positionalEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'positional');
+  const hasNamedEntries = input.defaultAttribute.args.some((arg) => arg.kind === 'named');
+  const expressionEntry = positionalEntries[0];
+  if (hasNamedEntries || positionalEntries.length !== 1 || expressionEntry === undefined) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
+      message: `Field "${input.modelName}.${input.fieldName}" @default on an enum field expects exactly one positional enum member argument.`,
+      sourceId: input.sourceId,
+      span: input.defaultAttribute.span,
+    });
     return {};
   }
 
@@ -84,9 +91,10 @@ function lowerEnumDefaultForField(input: {
 }
 
 export type ResolvedField = {
-  readonly field: PslField;
+  readonly field: FieldSymbol;
   readonly columnName: string;
   readonly descriptor: ColumnDescriptor;
+  readonly nullable: boolean;
   readonly defaultValue?: ColumnDefault;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly isId: boolean;
@@ -99,7 +107,7 @@ export type ResolvedField = {
 };
 
 export type ModelNameMapping = {
-  readonly model: PslModel;
+  readonly model: ModelSymbol;
   readonly tableName: string;
   readonly fieldColumns: Map<string, string>;
 };
@@ -112,7 +120,7 @@ export type ModelNameMapping = {
  * {@link modelCoordinateKey} rather than the bare model name.
  */
 export type ModelNamespaceEntry = {
-  readonly model: PslModel;
+  readonly model: ModelSymbol;
   readonly namespaceId: string | undefined;
 };
 
@@ -123,7 +131,7 @@ export function modelCoordinateKey(namespaceId: string, modelName: string): stri
 }
 
 export interface CollectResolvedFieldsInput {
-  readonly model: PslModel;
+  readonly model: ModelSymbol;
   readonly mapping: ModelNameMapping;
   readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
@@ -163,7 +171,7 @@ const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
  */
 interface RemovedAttributeRule {
   readonly hint: string;
-  readonly suppressWhen: (field: PslField) => boolean;
+  readonly suppressWhen: (field: FieldSymbol) => boolean;
 }
 
 const REMOVED_ATTRIBUTE_RULES: ReadonlyMap<string, RemovedAttributeRule> = new Map([
@@ -193,8 +201,8 @@ const REMOVED_ATTRIBUTE_RULES: ReadonlyMap<string, RemovedAttributeRule> = new M
 }
 
 function validateFieldAttributes(input: {
-  readonly model: PslModel;
-  readonly field: PslField;
+  readonly model: ModelSymbol;
+  readonly field: FieldSymbol;
   readonly composedExtensions: ReadonlySet<string>;
   readonly authoringContributions: AuthoringContributions | undefined;
   readonly diagnostics: ContractSourceDiagnostic[];
@@ -240,13 +248,13 @@ function validateFieldAttributes(input: {
 }
 
 function extractFieldConstraintNames(input: {
-  readonly model: PslModel;
-  readonly field: PslField;
+  readonly model: ModelSymbol;
+  readonly field: FieldSymbol;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): {
-  readonly idAttribute: PslAttribute | undefined;
-  readonly uniqueAttribute: PslAttribute | undefined;
+  readonly idAttribute: ResolvedAttribute | undefined;
+  readonly uniqueAttribute: ResolvedAttribute | undefined;
   readonly idName: string | undefined;
   readonly uniqueName: string | undefined;
 } {
@@ -292,7 +300,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
   } = input;
   const resolvedFields: ResolvedField[] = [];
 
-  for (const field of model.fields) {
+  for (const field of Object.values(model.fields)) {
     const isModelField = modelNames.has(field.typeName);
 
     if (field.list && isModelField) {
@@ -448,8 +456,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       });
       continue;
     }
-    const fieldUsesNamedType =
-      field.typeRef !== undefined || namedTypeDescriptors.has(field.typeName);
+    const fieldUsesNamedType = namedTypeDescriptors.has(field.typeName);
     if (loweredOnCreate && !fieldUsesNamedType) {
       const generatorDescriptor = generatorDescriptorById.get(loweredOnCreate.id);
       const generatedDescriptor = generatorDescriptor?.resolveGeneratedColumnDescriptor?.({
@@ -502,6 +509,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       field,
       columnName: mappedColumnName,
       descriptor,
+      nullable: presetContributions?.nullable ?? field.optional,
       ...ifDefined('defaultValue', fieldDefaultValue),
       ...ifDefined('executionDefaults', fieldExecutionDefaults),
       isId: isIdField || Boolean(presetContributions?.id),
@@ -535,7 +543,7 @@ export function buildModelMappings(
       span: model.span,
     });
     const fieldColumns = new Map<string, string>();
-    for (const field of model.fields) {
+    for (const field of Object.values(model.fields)) {
       const fieldMapAttribute = getAttribute(field.attributes, 'map');
       const columnName = parseMapName({
         attribute: fieldMapAttribute,

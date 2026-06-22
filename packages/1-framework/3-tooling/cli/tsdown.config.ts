@@ -24,7 +24,6 @@ export default defineConfig({
     'src/commands/migration-list.ts',
     'src/commands/migration-graph.ts',
     'src/commands/migration-check.ts',
-    'src/config-loader.ts',
     'src/migration-cli.ts',
     'src/exports/control-api.ts',
   ],

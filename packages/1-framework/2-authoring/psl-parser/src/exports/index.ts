@@ -1,6 +1,4 @@
 export type {
-  ParsePslDocumentInput,
-  ParsePslDocumentResult,
   PslAttribute,
   PslAttributeArgument,
   PslAttributeNamedArgument,
@@ -38,4 +36,30 @@ export {
   namespacePslExtensionBlocks,
 } from '@prisma-next/framework-components/psl-ast';
 export { getPositionalArgument, parseQuotedStringLiteral } from '../attribute-helpers';
-export { parsePslDocument } from '../parser';
+export { findBlockDescriptor, validateExtensionBlockFromSymbol } from '../extension-block';
+export {
+  keywordPslSpan,
+  nodePslSpan,
+  rangeToPslSpan,
+  readResolvedAttribute,
+  readResolvedAttributes,
+  readResolvedConstructorCall,
+} from '../resolve';
+export type {
+  BlockSymbol,
+  BuildSymbolTableOptions,
+  CompositeTypeSymbol,
+  FieldSymbol,
+  ModelSymbol,
+  NamespaceSymbol,
+  ResolvedAttribute,
+  ResolvedAttributeArg,
+  ResolvedNamedTypeBinding,
+  ResolvedTypeConstructorCall,
+  ScalarSymbol,
+  SymbolTable,
+  SymbolTableResult,
+  TopLevelScope,
+  TypeAliasSymbol,
+} from '../symbol-table';
+export { buildSymbolTable } from '../symbol-table';

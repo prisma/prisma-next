@@ -6,6 +6,10 @@ export type PackageManager = 'pnpm' | 'npm' | 'yarn' | 'bun' | 'deno';
 
 const KNOWN: ReadonlySet<string> = new Set<PackageManager>(['pnpm', 'npm', 'yarn', 'bun', 'deno']);
 
+function isPackageManager(name: string): name is PackageManager {
+  return KNOWN.has(name);
+}
+
 /**
  * Resolves the package manager `init` should drive for `add` / `install`
  * commands. Tries, in order:
@@ -28,12 +32,12 @@ const KNOWN: ReadonlySet<string> = new Set<PackageManager>(['pnpm', 'npm', 'yarn
  */
 export async function detectPackageManager(cwd: string): Promise<PackageManager> {
   const detected = await detect({ cwd });
-  if (detected && KNOWN.has(detected.name)) {
-    return detected.name as PackageManager;
+  if (detected && isPackageManager(detected.name)) {
+    return detected.name;
   }
   const userAgent = getUserAgent();
-  if (userAgent !== null && KNOWN.has(userAgent)) {
-    return userAgent as PackageManager;
+  if (userAgent !== null && isPackageManager(userAgent)) {
+    return userAgent;
   }
   return 'npm';
 }

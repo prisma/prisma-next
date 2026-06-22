@@ -41,7 +41,7 @@
   "types": "./dist/index.d.mts",
   "exports": {
     ".": "./dist/index.mjs",
-    "./parser": "./dist/parser.mjs",
+    "./format": "./dist/format.mjs",
     "./syntax": "./dist/syntax.mjs",
     "./tokenizer": "./dist/tokenizer.mjs",
     "./package.json": "./package.json"

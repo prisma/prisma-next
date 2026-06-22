@@ -35,7 +35,7 @@ The CLI / ControlClient remain source-agnostic and do not import PSL-specific pa
 - **Clearer package boundaries**:
   - `@prisma-next/sql-contract-ts`: TS-first authoring only
   - `@prisma-next/sql-contract-psl`: PSL-first interpretation only
-  - `@prisma-next/psl-parser`: syntax-only parser (AST + diagnostics)
+  - `@prisma-next/psl-parser`: PSL parser plus shared symbol-table resolution (CST + parser diagnostics + target-agnostic symbols)
 
 ### Trade-offs
 
@@ -45,8 +45,8 @@ The CLI / ControlClient remain source-agnostic and do not import PSL-specific pa
 
 ## Implementation notes (non-normative)
 
-- The interpretation package accepts **PSL parser output** (AST + parser diagnostics) and produces `Contract` (e.g. `interpretPslDocumentToSqlContract` in `@prisma-next/sql-contract-psl`).
-- The provider owns parsing: it calls `parsePslDocument({ schema, sourceId })`, then passes the parser output to the interpreter.
+- The interpretation package accepts a **PSL symbol table** (the scope-aware view over the parsed CST, plus parse + symbol-table diagnostics) and produces `Contract` (e.g. `interpretPslDocumentToSqlContract` in `@prisma-next/sql-contract-psl`).
+- The provider owns parsing and shared PSL resolution: it calls `parse(schema)` then `buildSymbolTable({ document, sourceFile, scalarTypes, pslBlockDescriptors })` (from `@prisma-next/psl-parser`), seeds the combined parse + symbol-table diagnostics, and passes the symbol table to the interpreter. `scalarTypes` comes from the target composition context; `pslBlockDescriptors` comes from authoring contributions so descriptor-driven generic/extension blocks are reconstructed once before target interpretation.
 - File paths belong in diagnostics only; canonical artifacts must not embed provenance.
 
 ## Related

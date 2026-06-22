@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { loadConfig } from '@prisma-next/config-loader';
 import type { Contract } from '@prisma-next/contract/types';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { type ContractSpaceMember, requireHeadRef } from '@prisma-next/migration-tools/aggregate';
@@ -11,7 +12,6 @@ import { readRefs } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import { planMemberPath } from '../control-api/operations/migrate';
 import type {

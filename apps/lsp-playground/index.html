@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PSL Playground</title>
+    <style>
+      html, body { margin: 0; height: 100%; font-family: ui-sans-serif, system-ui, sans-serif; }
+      #header {
+        padding: 8px 12px;
+        background: #1e1e2e;
+        color: #cdd6f4;
+        font-size: 13px;
+        border-bottom: 1px solid #313244;
+        display: flex;
+        justify-content: space-between;
+      }
+      #header .path { opacity: 0.7; }
+      #editor { height: calc(100% - 37px); }
+      .cm-editor { height: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="header">
+      <span>PSL Playground — live diagnostics from <code>prisma-next lsp</code></span>
+      <span class="path" id="schema-path"></span>
+    </div>
+    <div id="editor"></div>
+    <script type="module" src="/src/client/main.ts"></script>
+  </body>
+</html>

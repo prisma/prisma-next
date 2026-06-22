@@ -1,0 +1,53 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+
+/** Absolute path to the playground's working directory under the package. */
+export const PLAYGROUND_DIR = join(packageRoot, '.playground');
+
+/**
+ * Writes a default-postgres `prisma-next.config.ts` into {@link PLAYGROUND_DIR}
+ * whose contract source is `absoluteSchemaPath`, and returns the config's path.
+ * This is the "without a config, assume default postgres" path.
+ *
+ * The config lives in `.playground/` (NOT the OS temp dir, NOT the user's
+ * directory) for two reasons: (1) its `@prisma-next/*` imports resolve through
+ * the workspace `node_modules`, and (2) the language server discovers a
+ * document's config by walking up from the document's own path, so the schema
+ * the editor opens must live at or under this directory. Callers therefore
+ * stage the schema into `.playground/` before generating the config.
+ *
+ * The config mirrors the canonical postgres + PSL recipe. The language server
+ * only reads `contract.source.inputs` (it never invokes `load`), so the full
+ * postgres pipeline is wired for fidelity but not exercised for diagnostics.
+ */
+export async function generateDefaultPostgresConfig(absoluteSchemaPath: string): Promise<string> {
+  await mkdir(PLAYGROUND_DIR, { recursive: true });
+  const configPath = join(PLAYGROUND_DIR, 'prisma-next.config.ts');
+  const json = JSON.stringify(absoluteSchemaPath);
+  const contents = `import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresDriver from '@prisma-next/driver-postgres/control';
+import sql from '@prisma-next/family-sql/control';
+import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
+import postgres from '@prisma-next/target-postgres/control';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  driver: postgresDriver,
+  extensionPacks: [],
+  contract: prismaContract(${json}, {
+    output: 'output/contract.json',
+    target: postgres,
+    createNamespace: postgresCreateNamespace,
+  }),
+});
+`;
+  await writeFile(configPath, contents, 'utf8');
+  return configPath;
+}

@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@prisma-next/cli": "workspace:0.14.0",
+    "@prisma-next/config-loader": "workspace:0.14.0",
     "@prisma-next/emitter": "workspace:0.14.0",
     "pathe": "^2.0.3"
   },
