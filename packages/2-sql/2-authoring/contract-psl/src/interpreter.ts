@@ -1136,6 +1136,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       declaringModelName: model.name,
       declaringFieldName: relationAttribute.field.name,
       declaringTableName: tableName,
+      ...ifDefined('declaringNamespaceId', input.modelNamespaceIds.get(model.name)),
       targetModelName: targetMapping.model.name,
       targetTableName: targetMapping.tableName,
       ...ifDefined('targetNamespaceId', targetNamespaceId),
@@ -1935,10 +1936,20 @@ export function interpretPslDocumentToSqlContract(
     }
   }
 
-  const { modelRelations, fkRelationsByPair } = indexFkRelations({ fkRelationMetadata });
+  const { modelRelations, fkRelationsByPair, fkRelationsByDeclaringModel } = indexFkRelations({
+    fkRelationMetadata,
+  });
+  const modelIdColumns = new Map<string, readonly string[]>();
+  for (const modelNode of modelNodes) {
+    if (modelNode.id) {
+      modelIdColumns.set(modelNode.modelName, modelNode.id.columns);
+    }
+  }
   applyBackrelationCandidates({
     backrelationCandidates,
     fkRelationsByPair,
+    fkRelationsByDeclaringModel,
+    modelIdColumns,
     modelRelations,
     diagnostics,
     sourceId,

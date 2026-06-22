@@ -35,7 +35,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:2c53c3686a92367b677d4ff2c3caa1842b19f604632ee51e9bbdfc789d450e37'>;
+  StorageHashBase<'sha256:768352538edf69a68f8566fb0e6ff2a48cd932a3d7bfb79f16039efb819ab0ea'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:b6740166f10149e86e0e83710d377bb3c9df8aa49d2150770a50d7a76dbc816d'>;
 export type ProfileHash =
@@ -104,12 +104,12 @@ export type FieldOutputTypes = {
     };
     readonly UserRole: {
       readonly userId: CodecTypes['pg/int4@1']['output'];
-      readonly roleId: CodecTypes['pg/text@1']['output'];
+      readonly roleId: Char<36>;
       readonly level: CodecTypes['pg/int4@1']['output'];
     };
     readonly UserTag: {
       readonly userId: CodecTypes['pg/int4@1']['output'];
-      readonly tagId: CodecTypes['pg/text@1']['output'];
+      readonly tagId: Char<36>;
       readonly note: CodecTypes['pg/text@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/text@1']['output'];
     };
@@ -167,12 +167,12 @@ export type FieldInputTypes = {
     };
     readonly UserRole: {
       readonly userId: CodecTypes['pg/int4@1']['input'];
-      readonly roleId: CodecTypes['pg/text@1']['input'];
+      readonly roleId: CodecTypes['sql/char@1']['input'];
       readonly level: CodecTypes['pg/int4@1']['input'];
     };
     readonly UserTag: {
       readonly userId: CodecTypes['pg/int4@1']['input'];
-      readonly tagId: CodecTypes['pg/text@1']['input'];
+      readonly tagId: CodecTypes['sql/char@1']['input'];
       readonly note: CodecTypes['pg/text@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/text@1']['input'];
     };
@@ -440,9 +440,10 @@ type ContractBase = Omit<
                   readonly nullable: false;
                 };
                 readonly role_id: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
+                  readonly nativeType: 'character';
+                  readonly codecId: 'sql/char@1';
                   readonly nullable: false;
+                  readonly typeParams: { readonly length: 36 };
                 };
                 readonly level: {
                   readonly nativeType: 'int4';
@@ -463,9 +464,10 @@ type ContractBase = Omit<
                   readonly nullable: false;
                 };
                 readonly tag_id: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
+                  readonly nativeType: 'character';
+                  readonly codecId: 'sql/char@1';
                   readonly nullable: false;
+                  readonly typeParams: { readonly length: 36 };
                 };
                 readonly note: {
                   readonly nativeType: 'text';
@@ -954,7 +956,11 @@ type ContractBase = Omit<
               };
               readonly roleId: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
               };
               readonly level: {
                 readonly nullable: false;
@@ -980,7 +986,11 @@ type ContractBase = Omit<
               };
               readonly tagId: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
               };
               readonly note: {
                 readonly nullable: true;

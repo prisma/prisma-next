@@ -1,4 +1,4 @@
-import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
+import { charColumn, int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import { uuidv4 } from '@prisma-next/ids';
 import { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
 
@@ -20,7 +20,7 @@ const Tag = model('Tag', {
 const UserTag = model('UserTag', {
   fields: {
     userId: field.column(int4Column).column('user_id'),
-    tagId: field.column(textColumn).column('tag_id'),
+    tagId: field.column(charColumn(36)).column('tag_id'),
     created_at: field.generated(uuidv4()),
   },
 })

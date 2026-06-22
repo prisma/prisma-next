@@ -2,7 +2,7 @@
 
 A throwaway dev playground that opens a `.psl` file in a browser
 [CodeMirror 6](https://codemirror.net/) editor wired to the Prisma Next
-language server (`prisma-next lsp --stdio`) for **live PSL diagnostics**.
+language server (`prisma-next lsp --stdio`) for **live PSL diagnostics** and whole-document formatting.
 
 It is a private, unpublished `apps/` package — not part of the framework build
 graph and exempt from `lint:deps` layering.
@@ -23,7 +23,7 @@ psl-playground path/to/schema.psl
 The PSL file is **optional**. With no argument — or a path that does not yet
 exist — the playground opens a writable scratch schema under `.playground/`
 so you can start authoring immediately. Then open the printed
-`http://localhost:5273/` URL; parse diagnostics update live as you edit.
+`http://localhost:5273/` URL; parse diagnostics update live as you edit, and the header's **Format** button sends `textDocument/formatting` to the language server.
 
 Everything (editor + LSP) is served on the single port `5273`.
 
