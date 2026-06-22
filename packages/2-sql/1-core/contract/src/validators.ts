@@ -12,6 +12,7 @@ import {
   type Namespace,
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
 import { composeSqlEntityKinds } from './entity-kinds';
 
