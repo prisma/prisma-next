@@ -432,6 +432,144 @@ model Follow {
     );
   });
 
+  it('lowers two distinct named many-to-many relations between the same pair through separate junctions', () => {
+    const result = interpretSchema(`model User {
+  id Int @id
+  ownedTags Tag[] @relation("owned")
+  watchedTags Tag[] @relation("watched")
+}
+
+model Tag {
+  id Int @id
+  owners User[] @relation("owned")
+  watchers User[] @relation("watched")
+}
+
+model TagOwnership {
+  userId Int
+  tagId Int
+  user User @relation("owned", fields: [userId], references: [id])
+  tag Tag @relation("owned", fields: [tagId], references: [id])
+
+  @@id([userId, tagId])
+}
+
+model TagWatch {
+  userId Int
+  tagId Int
+  user User @relation("watched", fields: [userId], references: [id])
+  tag Tag @relation("watched", fields: [tagId], references: [id])
+
+  @@id([userId, tagId])
+}
+`);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const models = relationsOf(result.value);
+    expect(models['User']?.relations).toEqual({
+      ownedTags: {
+        to: crossRef('Tag', 'public'),
+        cardinality: 'N:M',
+        on: { localFields: ['id'], targetFields: ['userId'] },
+        through: {
+          table: 'tagOwnership',
+          namespaceId: 'public',
+          parentColumns: ['userId'],
+          childColumns: ['tagId'],
+          targetColumns: ['id'],
+        },
+      },
+      watchedTags: {
+        to: crossRef('Tag', 'public'),
+        cardinality: 'N:M',
+        on: { localFields: ['id'], targetFields: ['userId'] },
+        through: {
+          table: 'tagWatch',
+          namespaceId: 'public',
+          parentColumns: ['userId'],
+          childColumns: ['tagId'],
+          targetColumns: ['id'],
+        },
+      },
+    });
+    expect(models['Tag']?.relations).toEqual({
+      owners: {
+        to: crossRef('User', 'public'),
+        cardinality: 'N:M',
+        on: { localFields: ['id'], targetFields: ['tagId'] },
+        through: {
+          table: 'tagOwnership',
+          namespaceId: 'public',
+          parentColumns: ['tagId'],
+          childColumns: ['userId'],
+          targetColumns: ['id'],
+        },
+      },
+      watchers: {
+        to: crossRef('User', 'public'),
+        cardinality: 'N:M',
+        on: { localFields: ['id'], targetFields: ['tagId'] },
+        through: {
+          table: 'tagWatch',
+          namespaceId: 'public',
+          parentColumns: ['tagId'],
+          childColumns: ['userId'],
+          targetColumns: ['id'],
+        },
+      },
+    });
+
+    const envelope = JSON.parse(JSON.stringify(result.value)) as unknown;
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(envelope)).not.toThrow();
+  });
+
+  it('returns diagnostics for two unnamed many-to-many relations between the same pair', () => {
+    const result = interpretSchema(`model User {
+  id Int @id
+  ownedTags Tag[]
+  watchedTags Tag[]
+}
+
+model Tag {
+  id Int @id
+  owners User[]
+  watchers User[]
+}
+
+model TagOwnership {
+  userId Int
+  tagId Int
+  user User @relation(fields: [userId], references: [id])
+  tag Tag @relation(fields: [tagId], references: [id])
+
+  @@id([userId, tagId])
+}
+
+model TagWatch {
+  userId Int
+  tagId Int
+  user User @relation(fields: [userId], references: [id])
+  tag Tag @relation(fields: [tagId], references: [id])
+
+  @@id([userId, tagId])
+}
+`);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
+          message: expect.stringContaining('User.ownedTags'),
+        }),
+      ]),
+    );
+  });
+
   it('keeps the orphaned diagnostic for bare lists without any junction model', () => {
     const result = interpretSchema(`model Post {
   id Int @id
