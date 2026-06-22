@@ -1042,7 +1042,7 @@ function validateRelationThroughConsistency(contract: Contract<SqlStorage>): voi
           qualifiedName,
           modelColumns: through.targetColumns,
           modelColumnsLabel: 'through.targetColumns',
-          ...(targetModelSide ? { model: targetModelSide } : {}),
+          ...ifDefined('model', targetModelSide),
           junctionColumns: through.childColumns,
           junctionColumnsLabel: 'through.childColumns',
           junctionNamespaceId: through.namespaceId,
