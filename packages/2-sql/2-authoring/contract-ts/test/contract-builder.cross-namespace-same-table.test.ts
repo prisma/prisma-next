@@ -143,6 +143,7 @@ describe('same bare table name across non-Postgres default and explicit namespac
     target: sqliteTargetPack,
     namespaces: ['public'],
     models: [unboundUser, publicUserWithSameTable],
+    createNamespace: createTestSqlNamespace,
   });
   const storage = contract.storage as SqlStorage;
 

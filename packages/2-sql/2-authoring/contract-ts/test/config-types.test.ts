@@ -49,7 +49,10 @@ describe('source format discriminator', () => {
   });
 
   it('emptyContract tags the source as TypeScript', () => {
-    const config = emptyContract({ target: postgresTargetPack });
+    const config = emptyContract({
+      target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
+    });
     expect(config.source.sourceFormat).toBe('typescript');
   });
 });

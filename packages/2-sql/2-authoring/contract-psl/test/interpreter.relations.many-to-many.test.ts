@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  createTestNamespace,
   modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
@@ -17,6 +18,7 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
   composedExtensionContracts: new Map(),
+  createNamespace: createTestNamespace,
 } as const;
 
 function interpretSchema(schema: string) {
