@@ -28,7 +28,7 @@
     "codemirror": "^6.0.2",
     "codemirror-languageserver": "^1.20.0",
     "vscode-ws-jsonrpc": "3.5.0",
-    "ws": "^8.18.0"
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:0.14.0",
