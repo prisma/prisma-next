@@ -50,8 +50,8 @@ describe('transaction e2e via sqlite() facade', { timeout: timeouts.databaseOper
     // Schema and seed via the raw DatabaseSync handle before connecting the facade.
     const { rawDb, db } = handle;
     // Deserialize the contract for schema creation (mirrors utils.ts approach).
-    const { SqlContractSerializer } = await import('@prisma-next/family-sql/ir');
-    const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+    const { TestSqlContractSerializer } = await import('@prisma-next/family-sql/test-utils');
+    const contract = new TestSqlContractSerializer().deserializeContract(contractJson) as Contract;
     createSchema(rawDb, contract);
     seedData(rawDb);
     // Connect the facade and warm up the runtime before any transactions.

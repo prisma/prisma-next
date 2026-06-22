@@ -48,6 +48,7 @@ export {
   ForeignKey,
   ForeignKeyReference,
   Index,
+  isMaterializedSqlNamespace,
   isStorageTypeInstance,
   PrimaryKey,
   SqlNamespace,

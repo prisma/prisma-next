@@ -4,13 +4,10 @@ import {
   SqlContractSerializerBase,
   type SqlEntityHydrationFactory,
 } from '@prisma-next/family-sql/ir';
-import {
-  type Namespace,
-  NamespaceBase,
-  UNBOUND_NAMESPACE_ID,
-} from '@prisma-next/framework-components/ir';
+import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   ForeignKey,
+  isMaterializedSqlNamespace,
   PrimaryKey,
   type SqlNamespaceInput,
   SqlStorage,
@@ -176,11 +173,11 @@ describe('PostgresContractSerializer', () => {
         nsId: string,
         raw: Namespace | Record<string, unknown>,
       ): Namespace | SqlNamespaceInput {
-        if (raw instanceof NamespaceBase) {
+        if (isMaterializedSqlNamespace(raw)) {
           return raw;
         }
         const input = super.hydrateSqlNamespaceEntry(nsId, raw);
-        if (input instanceof NamespaceBase) {
+        if (isMaterializedSqlNamespace(input)) {
           return input;
         }
         return postgresCreateNamespace(input as SqlNamespaceInput);

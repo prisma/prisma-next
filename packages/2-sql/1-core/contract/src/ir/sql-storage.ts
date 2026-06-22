@@ -91,6 +91,20 @@ export abstract class SqlNamespace extends NamespaceBase implements SqlNamespace
   abstract qualifyTable(tableName: string): string;
 }
 
+/**
+ * Realm-safe guard for hydrated `SqlNamespace` concretions. Checks
+ * `qualifyTable` structurally instead of `instanceof NamespaceBase`, so it
+ * survives duplicate-module boundaries (e.g. dist e2e where the target and
+ * the family carry separate copies of `@prisma-next/framework-components`).
+ *
+ * Every concrete `SqlNamespace` subclass (`PostgresSchema`, `SqliteDatabase`,
+ * `TestSqlNamespace`, …) implements `qualifyTable`. Raw `SqlNamespaceInput`
+ * objects (`{ id, entries }`) do not.
+ */
+export function isMaterializedSqlNamespace(x: unknown): x is SqlNamespace {
+  return typeof (x as { qualifyTable?: unknown } | null | undefined)?.qualifyTable === 'function';
+}
+
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
   readonly namespaces: Readonly<Record<string, SqlNamespaceShape>>;

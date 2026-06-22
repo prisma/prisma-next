@@ -6,11 +6,11 @@ import {
   type AnyEntityKindDescriptor,
   hydrateNamespaceEntities,
   type Namespace,
-  NamespaceBase,
 } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { composeSqlEntityKinds } from '@prisma-next/sql-contract/entity-kinds';
 import {
+  isMaterializedSqlNamespace,
   type SqlNamespaceInput,
   SqlStorage,
   type SqlStorageInput,
@@ -140,7 +140,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     return Object.fromEntries(
       Object.entries(namespaces).map(([nsId, namespaceEntryRaw]) => {
         const namespaceHydrated = this.hydrateSqlNamespaceEntry(nsId, namespaceEntryRaw);
-        if (!(namespaceHydrated instanceof NamespaceBase)) {
+        if (!isMaterializedSqlNamespace(namespaceHydrated)) {
           throw new Error(
             `Target serializer bug: hydrateSqlNamespaceEntry for namespace "${nsId}" returned a non-NamespaceBase value. Override hydrateSqlNamespaceEntry to produce a target namespace concretion.`,
           );
@@ -154,7 +154,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     nsId: string,
     raw: Namespace | Record<string, unknown>,
   ): Namespace | SqlNamespaceInput {
-    if (raw instanceof NamespaceBase) {
+    if (isMaterializedSqlNamespace(raw)) {
       return raw;
     }
     const rawRecord = isPlainRecord(raw) ? raw : {};
