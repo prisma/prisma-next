@@ -1145,7 +1145,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       const roles = [...new Set(parsePgNameArray(row.roles).map((r) => r.toLowerCase()))].sort();
       const permissive = row.permissive.toUpperCase() === 'PERMISSIVE';
       const hashSuffixMatch = /^(.+)_([0-9a-f]{8})$/.exec(row.policyname);
-      const prefix = hashSuffixMatch ? hashSuffixMatch[1]! : row.policyname;
+      const prefix = hashSuffixMatch?.[1] ?? row.policyname;
       return new PostgresRlsPolicy({
         name: row.policyname,
         prefix,
