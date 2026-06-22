@@ -186,12 +186,13 @@ describe('diffPostgresRlsPolicies', () => {
     expect(issues[0]).toMatchObject({ outcome: 'extra' });
   });
 
-  it('reports extra for policies from namespaces not in the contract expected set', () => {
-    // diffPostgresRlsPolicies diffs against the full introspected policy list.
-    // Control-policy filtering (e.g. suppressing extras under defaultControlPolicy:'external')
-    // is the caller's responsibility, not this function's.
+  it('ignores DB policies in namespaces the contract does not own (cross-space)', () => {
+    // The diff is scoped to namespaces the verified contract owns. A policy in
+    // another space's namespace (e.g. the app's `public.profile` when verifying
+    // the supabase space, which owns only `auth`) is external and must not be
+    // reported as extra.
     const authPolicy = makePolicy('auth_policy_a1b2c3d4', 'users', 'auth');
-    const publicPolicy = makePolicy('profile_owner_read_3486711c', 'profile', 'public');
+    const foreignPublicPolicy = makePolicy('profile_owner_read_3486711c', 'profile', 'public');
 
     const authSchema = new PostgresSchema({
       id: 'auth',
@@ -238,7 +239,7 @@ describe('diffPostgresRlsPolicies', () => {
       },
       pgSchemaName: 'auth',
       pgVersion: 'unknown',
-      rlsPolicies: [authPolicy, publicPolicy],
+      rlsPolicies: [authPolicy, foreignPublicPolicy],
       roles: [],
       existingSchemas: ['auth', 'public'],
       nativeEnumTypeNames: [],
@@ -249,10 +250,70 @@ describe('diffPostgresRlsPolicies', () => {
       schema: schemaWithBothNamespaces,
     });
 
+    // `auth` policy matches; the foreign `public` policy is outside the owned
+    // namespace set and is ignored entirely.
+    expect(issues).toHaveLength(0);
+  });
+
+  it('still reports an extra DB policy that is in an owned namespace', () => {
+    // Scoping must not suppress a genuine extra in a namespace the contract owns.
+    const ownedExtra = makePolicy('auth_extra_99887766', 'users', 'auth');
+
+    const authSchema = new PostgresSchema({
+      id: 'auth',
+      entries: {
+        table: {
+          users: new StorageTable({
+            columns: { id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false } },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+          }),
+        },
+        policy: {},
+      },
+    });
+
+    const contractOwningAuth: Contract<SqlStorage> = {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:rls-owned-extra-test'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:rls-owned-extra-test'),
+        namespaces: { auth: authSchema },
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+
+    const schema = new PostgresSchemaIR({
+      tables: {
+        users: {
+          name: 'users',
+          columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      pgSchemaName: 'auth',
+      pgVersion: 'unknown',
+      rlsPolicies: [ownedExtra],
+      roles: [],
+      existingSchemas: ['auth'],
+      nativeEnumTypeNames: [],
+    });
+
+    const issues = diffPostgresRlsPolicies({ contract: contractOwningAuth, schema });
+
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
       outcome: 'extra',
-      coordinate: expect.objectContaining({ entityName: 'profile_owner_read_3486711c' }),
+      coordinate: expect.objectContaining({ entityName: 'auth_extra_99887766' }),
     });
   });
 });

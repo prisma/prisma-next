@@ -15,6 +15,13 @@ import type { PostgresSchemaIR } from '../postgres-schema-ir';
  * `namespaceId` set during lowering (e.g. `'public'`); the introspected schema
  * carries the resolved DDL schema name. The differ matches purely on coordinate
  * identity; no namespace interpretation happens here.
+ *
+ * The diff is scoped to the namespaces the verified contract owns. The live
+ * schema introspection returns every policy across all DB schemas, but a policy
+ * in a namespace this contract does not declare belongs to another contract
+ * space (or is external) and must not be reported as extra. Without this scope a
+ * space that owns only `auth`/`storage` (e.g. the supabase extension space)
+ * would flag the application space's `public.*` policies as extra during verify.
  */
 export function diffPostgresRlsPolicies(input: {
   readonly contract: Contract<SqlStorage>;
@@ -22,9 +29,13 @@ export function diffPostgresRlsPolicies(input: {
 }): readonly SchemaDiffIssue[] {
   const { contract, schema } = input;
 
+  const ownedNamespaceIds = new Set(Object.keys(contract.storage.namespaces));
+
   const expected = Object.values(contract.storage.namespaces).flatMap((ns) =>
     isPostgresSchema(ns) ? Object.values(ns.policy) : [],
   );
 
-  return diffNodes(expected, schema.rlsPolicies);
+  const actual = schema.rlsPolicies.filter((policy) => ownedNamespaceIds.has(policy.namespaceId));
+
+  return diffNodes(expected, actual);
 }
