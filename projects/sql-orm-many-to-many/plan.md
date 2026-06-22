@@ -69,6 +69,12 @@ Added 2026-06-02 after the runtime core (0–3) shipped: while adding M:N **demo
   - **Hands to:** M:N demonstrated in both demos; dual-mode green.
   - **Focus:** add `Post ↔ Tag` M:N to the PSL source + example modules/CLI/seed/tests; resolve dual-mode (`test:dual-mode` is currently red on the TS leg — fix the TS source or drop it). The dual-mode-drift half is independent of slice 5 and can start first.
 
+- **Slice `07-non-id-unique-junction-targets`** — Linear: [TML-2933](https://linear.app/prisma-company/issue/TML-2933) — **planned** (deferred from slice 5, surfaced in PR #819 review).
+  - **Outcome:** an M:N junction whose target-side FK references a **non-id, non-null `@unique`** key (not the target's `@id`) lowers to `cardinality:'N:M'` + a `through` whose `targetColumns` are the **referenced** key — via both PSL and TS-builder authoring, with `sql-orm-client` runtime parity.
+  - **Builds on:** slice 0's `through` shape; slice 5's PSL junction recognition (this relaxes its `@id`-only constraint).
+  - **Hands to:** full M:N target-key flexibility (junctions need not point at the target's `@id`).
+  - **Focus:** rework `through.targetColumns` derivation to follow the FK's true referenced key in **both** lowering paths — `targetColumnsForJunction` (`contract-ts/src/build-contract.ts`) and `childColumnsInTargetIdOrder`/`findJunctionFkPairs` (`contract-psl/src/psl-relation-resolution.ts`); relax the `PSL_JUNCTION_TARGET_FK_NOT_ID` decline; PG + SQLite runtime parity. Today the PSL path declines (silently-wrong JOIN if relaxed alone), and the TS path derives `targetColumns` from `@id` ignoring which key the FK references.
+
 ### Sequencing (follow-on)
 
-Slice 4 (done) and the **dual-mode-drift half of slice 6** are independent and could have run anytime after the core. Slice 5 (PSL authoring) gates the **M:N-examples half of slice 6**. Note this pushes the project to **7 slices** — past the 1–4 sweet spot; slice 5 in particular is framework-scoped and may be better promoted to its own project at pickup (flagged above).
+Slice 4 (done) and the **dual-mode-drift half of slice 6** are independent and could have run anytime after the core. Slice 5 (PSL authoring) gates the **M:N-examples half of slice 6**. Slice 7 (non-id unique junction targets) builds on slice 5's PSL junction recognition and is independent of slice 6 — it can run anytime after slice 5. Note this pushes the project to **8 slices** — well past the 1–4 sweet spot; slices 5 and 7 are framework-scoped and may be better promoted to their own project at pickup (flagged above).
