@@ -5,7 +5,8 @@ import {
   assembleAuthoringContributions,
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -100,18 +101,20 @@ function buildScalarTypeDescriptors(): ReadonlyMap<
 
 function buildContractFromPsl(psl: string): Contract<SqlStorage> {
   const assembled = assembleAuthoringContributions([postgresTargetDescriptor]);
-  const codecLookup = createPostgresBuiltinCodecLookup();
   const scalarTypeDescriptors = buildScalarTypeDescriptors();
 
-  const document = parsePslDocument({
-    schema: psl,
-    sourceId: 'schema.prisma',
+  const { document, sourceFile } = parse(psl);
+  const { table: symbolTable } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes: [...scalarTypeDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
-    codecLookup,
   });
 
   const result = interpretPslDocumentToSqlContract({
-    document,
+    symbolTable,
+    sourceFile,
+    sourceId: 'schema.prisma',
     target: {
       kind: 'target' as const,
       familyId: 'sql' as const,

@@ -13,12 +13,9 @@
  *     factory chain (no test-side hand-lowering).
  */
 
-import {
-  assembleAuthoringContributions,
-  extractCodecLookup,
-} from '@prisma-next/framework-components/control';
-import { namespacePslExtensionBlocks } from '@prisma-next/framework-components/psl-ast';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { assembleAuthoringContributions } from '@prisma-next/framework-components/control';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -29,15 +26,7 @@ import {
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
 import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
 import { PostgresSchema, postgresCreateNamespace } from '../src/core/postgres-schema';
-import { postgresCodecRegistry } from '../src/core/registry';
 import { computeContentHash } from '../src/core/rls/canonicalize';
-
-const codecLookup = extractCodecLookup([
-  {
-    id: 'postgres-builtin',
-    types: { codecTypes: { codecDescriptors: Array.from(postgresCodecRegistry.values()) } },
-  },
-]);
 
 const assembled = assembleAuthoringContributions([
   {
@@ -104,44 +93,47 @@ namespace public {
 }
 `;
 
-  it('parses the policy_select block without diagnostics', () => {
-    const parsed = parsePslDocument({
-      schema: source,
-      sourceId: 'schema.prisma',
+  function buildInput() {
+    const { document, sourceFile } = parse(source);
+    const { table, diagnostics } = buildSymbolTable({
+      document,
+      sourceFile,
+      scalarTypes: [
+        'String',
+        'Int',
+        'Boolean',
+        'BigInt',
+        'Float',
+        'Decimal',
+        'DateTime',
+        'Json',
+        'Bytes',
+      ],
       pslBlockDescriptors: assembled.pslBlockDescriptors,
-      codecLookup,
     });
+    return { symbolTable: table, sourceFile, diagnostics };
+  }
 
-    expect(parsed.diagnostics).toEqual([]);
-    expect(parsed.ok).toBe(true);
+  it('parses the policy_select block without diagnostics', () => {
+    const { diagnostics } = buildInput();
+    expect(diagnostics).toEqual([]);
   });
 
   it('places the parsed block in the public namespace entries under postgres-rls-policy', () => {
-    const parsed = parsePslDocument({
-      schema: source,
-      sourceId: 'schema.prisma',
-      pslBlockDescriptors: assembled.pslBlockDescriptors,
-      codecLookup,
-    });
-
-    const publicNs = parsed.ast.namespaces.find((ns) => ns.name === 'public');
+    const { symbolTable } = buildInput();
+    const publicNs = symbolTable.topLevel.namespaces['public'];
     expect(publicNs).toBeDefined();
-    const blocks = namespacePslExtensionBlocks(publicNs!);
+    const blocks = Object.values(publicNs!.blocks).map((b) => b.block);
     expect(blocks).toHaveLength(1);
     expect(blocks[0]).toMatchObject({ kind: 'policy', name: 'p_read' });
   });
 
   it('lowers the block to a PostgresRlsPolicy with the expected fields', () => {
-    const parsed = parsePslDocument({
-      schema: source,
-      sourceId: 'schema.prisma',
-      pslBlockDescriptors: assembled.pslBlockDescriptors,
-      codecLookup,
-    });
-
-    const publicNs = parsed.ast.namespaces.find((ns) => ns.name === 'public');
-    const block = namespacePslExtensionBlocks(publicNs!)[0];
-    if (!block) throw new Error('expected one extension block');
+    const { symbolTable } = buildInput();
+    const publicNs = symbolTable.topLevel.namespaces['public'];
+    const blockSymbol = Object.values(publicNs!.blocks)[0];
+    if (!blockSymbol) throw new Error('expected one extension block');
+    const block = blockSymbol.block;
 
     const namespaceId = publicNs!.name;
     const prefix = block.name;
@@ -233,17 +225,20 @@ namespace public {
   ]);
 
   it('lowers a policy_select block to entries.policy without test-side hand-lowering', () => {
-    const document = parsePslDocument({
-      schema: source,
-      sourceId: 'schema.prisma',
+    const { document, sourceFile } = parse(source);
+    const { table: symbolTable, diagnostics } = buildSymbolTable({
+      document,
+      sourceFile,
+      scalarTypes: [...scalarTypeDescriptors.keys()],
       pslBlockDescriptors: assembled.pslBlockDescriptors,
-      codecLookup,
     });
 
-    expect(document.diagnostics).toEqual([]);
+    expect(diagnostics).toEqual([]);
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      symbolTable,
+      sourceFile,
+      sourceId: 'schema.prisma',
       target: postgresTarget,
       scalarTypeDescriptors,
       authoringContributions: assembled,

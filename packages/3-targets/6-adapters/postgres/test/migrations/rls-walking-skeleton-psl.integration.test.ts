@@ -4,7 +4,8 @@ import {
   APP_SPACE_ID,
   assembleAuthoringContributions,
 } from '@prisma-next/framework-components/control';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import {
@@ -68,19 +69,20 @@ function buildScalarTypeDescriptors(): ReadonlyMap<
 
 function buildPslContract() {
   const assembled = assembleAuthoringContributions([postgresTargetDescriptor]);
-
-  const codecLookup = createPostgresBuiltinCodecLookup();
   const scalarTypeDescriptors = buildScalarTypeDescriptors();
 
-  const document = parsePslDocument({
-    schema: PSL,
-    sourceId: 'schema.prisma',
+  const { document, sourceFile } = parse(PSL);
+  const { table: symbolTable } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes: [...scalarTypeDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
-    codecLookup,
   });
 
   return interpretPslDocumentToSqlContract({
-    document,
+    symbolTable,
+    sourceFile,
+    sourceId: 'schema.prisma',
     target: {
       kind: 'target' as const,
       familyId: 'sql' as const,
