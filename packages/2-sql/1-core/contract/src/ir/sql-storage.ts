@@ -107,7 +107,8 @@ export abstract class SqlNamespace extends NamespaceBase implements SqlNamespace
  * objects (`{ id, entries }`) do not.
  */
 export function isMaterializedSqlNamespace(x: unknown): x is SqlNamespace {
-  return isPlainRecord(x) && typeof x['qualifyTable'] === 'function';
+  if (typeof x !== 'object' || x === null || !('qualifyTable' in x)) return false;
+  return typeof x.qualifyTable === 'function';
 }
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
