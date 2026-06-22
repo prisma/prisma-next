@@ -2,7 +2,7 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { lintGutter } from '@codemirror/lint';
 import { EditorState } from '@codemirror/state';
 import { EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
-import { languageServer } from 'codemirror-languageserver';
+import { formatDocument, languageServer } from 'codemirror-languageserver';
 import { documentUri, rootUri, schemaPath, schemaText, wsPath } from './runtime';
 
 const pathEl = document.getElementById('schema-path');
@@ -34,8 +34,12 @@ const parent = document.getElementById('editor');
 if (parent === null) {
   throw new Error('#editor mount point not found');
 }
+const formatButton = document.getElementById('format-document');
+if (!(formatButton instanceof HTMLButtonElement)) {
+  throw new Error('#format-document button not found');
+}
 
-new EditorView({
+const view = new EditorView({
   parent,
   state: EditorState.create({
     doc: schemaText,
@@ -48,4 +52,9 @@ new EditorView({
       ls,
     ],
   }),
+});
+
+formatButton.addEventListener('click', () => {
+  formatDocument(view);
+  view.focus();
 });
