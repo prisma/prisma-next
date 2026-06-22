@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findNearestConfigPathForFile } from '@prisma-next/config-loader';
+import { type FormatOptions, format } from '@prisma-next/psl-parser/format';
 import {
   type Connection,
   type Diagnostic,
@@ -11,6 +12,7 @@ import {
   RegistrationRequest,
   TextDocumentSyncKind,
   TextDocuments,
+  type TextEdit,
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { CONFIG_FILENAME, resolveConfigInputs } from './config-resolution';
@@ -25,6 +27,7 @@ export interface LanguageServer {
 interface ProjectState {
   readonly configPath: string;
   readonly inputs: SchemaInputSet;
+  readonly formatter?: FormatOptions;
 }
 
 export function createServer(connection: Connection): LanguageServer {
@@ -121,7 +124,10 @@ export function createServer(connection: Connection): LanguageServer {
 
   async function loadProject(configPath: string): Promise<ProjectState> {
     const resolution = await resolveConfigInputs(configPath);
-    const project: ProjectState = { configPath, inputs: resolution.inputs };
+    const project: ProjectState =
+      resolution.formatter === undefined
+        ? { configPath, inputs: resolution.inputs }
+        : { configPath, inputs: resolution.inputs, formatter: resolution.formatter };
     projects.set(configPath, project);
     return project;
   }
@@ -164,6 +170,42 @@ export function createServer(connection: Connection): LanguageServer {
     });
   }
 
+  async function formatDocument(uri: string): Promise<TextEdit[]> {
+    const document = documents.get(uri);
+    if (document === undefined) {
+      return [];
+    }
+
+    let project: ProjectState | undefined;
+    try {
+      project = await resolveProjectForDocument(uri);
+    } catch {
+      return [];
+    }
+    if (project === undefined || !project.inputs.includes(uri)) {
+      return [];
+    }
+
+    const source = document.getText();
+    let formatted: string;
+    try {
+      formatted = format(source, project.formatter);
+    } catch {
+      return [];
+    }
+
+    if (formatted === source) {
+      return [];
+    }
+
+    return [
+      {
+        range: { start: { line: 0, character: 0 }, end: document.positionAt(source.length) },
+        newText: formatted,
+      },
+    ];
+  }
+
   connection.onInitialize(async (params): Promise<InitializeResult> => {
     rootPath = resolveRootPath(params.rootUri, params.rootPath);
     watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
@@ -172,6 +214,7 @@ export function createServer(connection: Connection): LanguageServer {
     return {
       capabilities: {
         textDocumentSync: TextDocumentSyncKind.Incremental,
+        documentFormattingProvider: true,
       },
     };
   });
@@ -210,6 +253,8 @@ export function createServer(connection: Connection): LanguageServer {
       await republishOpenDocumentsForConfig(configPath);
     }
   });
+
+  connection.onDocumentFormatting((params) => formatDocument(params.textDocument.uri));
 
   documents.onDidOpen((event) => {
     publishSafely(event.document.uri, event.document.getText());
