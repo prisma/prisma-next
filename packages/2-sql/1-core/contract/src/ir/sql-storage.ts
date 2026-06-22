@@ -1,5 +1,10 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
-import { freezeNode, NamespaceBase, type Storage } from '@prisma-next/framework-components/ir';
+import {
+  freezeNode,
+  isPlainRecord,
+  NamespaceBase,
+  type Storage,
+} from '@prisma-next/framework-components/ir';
 import { SqlNode } from './sql-node';
 import type { StorageTable } from './storage-table';
 import {
@@ -102,7 +107,7 @@ export abstract class SqlNamespace extends NamespaceBase implements SqlNamespace
  * objects (`{ id, entries }`) do not.
  */
 export function isMaterializedSqlNamespace(x: unknown): x is SqlNamespace {
-  return typeof (x as { qualifyTable?: unknown } | null | undefined)?.qualifyTable === 'function';
+  return isPlainRecord(x) && typeof x['qualifyTable'] === 'function';
 }
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
@@ -153,7 +158,7 @@ function normaliseTypeEntry(name: string, entry: SqlStorageTypeEntry): StorageTy
     }
     return toStorageTypeInstance(entry);
   }
-  const rawKind = (entry as { kind?: unknown }).kind;
+  const rawKind = isPlainRecord(entry) ? entry['kind'] : undefined;
   const kindDescription =
     rawKind === undefined
       ? 'missing `kind` discriminator'
