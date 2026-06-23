@@ -2,7 +2,6 @@ import type { DiffableNode } from '@prisma-next/framework-components/control';
 import type { EntityCoordinate } from '@prisma-next/framework-components/ir';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
-import { blindCast } from '@prisma-next/utils/casts';
 
 export type RlsPolicyOperation = 'select' | 'insert' | 'update' | 'delete' | 'all';
 
@@ -79,7 +78,7 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
    * the authored body would produce false mismatches on a clean re-verify.
    */
   isEqualTo(other: DiffableNode): boolean {
-    if (!(other instanceof PostgresRlsPolicy)) {
+    if (!isPostgresRlsPolicy(other)) {
       throw new Error(
         `PostgresRlsPolicy.isEqualTo: expected a PostgresRlsPolicy, got ${other.identity().entityKind}`,
       );
@@ -89,24 +88,14 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
 }
 
 export function isPostgresRlsPolicy(node: DiffableNode | undefined): node is PostgresRlsPolicy {
-  return (
-    node !== undefined &&
-    'kind' in node &&
-    blindCast<
-      { kind: unknown },
-      'kind==="policy" identifies PostgresRlsPolicy on the postgres policy-diff path'
-    >(node).kind === 'policy'
-  );
+  return node !== undefined && 'kind' in node && node.kind === 'policy';
 }
 
 export function assertPostgresRlsPolicy(
   node: DiffableNode | undefined,
 ): asserts node is PostgresRlsPolicy {
   if (!isPostgresRlsPolicy(node)) {
-    const kind =
-      node !== undefined && 'kind' in node
-        ? String(blindCast<{ kind: unknown }, 'extracting kind for diagnostic message'>(node).kind)
-        : typeof node;
+    const kind = node !== undefined && 'kind' in node ? String(node.kind) : typeof node;
     throw new Error(
       `planRlsDiff: expected a PostgresRlsPolicy on the policy-diff path but got ${kind}`,
     );

@@ -1,6 +1,7 @@
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import {
   type SqlAnnotations,
+  type SqlSchemaIR,
   SqlSchemaIRNode,
   SqlTableIR,
   type SqlTableIRInput,
@@ -83,15 +84,16 @@ export class PostgresSchemaIR extends SqlSchemaIRNode {
   }
 }
 
-export function isPostgresSchemaIR(value: unknown): value is PostgresSchemaIR {
-  if (value instanceof PostgresSchemaIR) return true;
-  // projectSchemaToSpace spreads the IR into a plain object ({...schema, tables: pruned}).
-  // The resulting object is not an instance but retains all own properties including
-  // rlsPolicies. Duck-type on that to handle the multi-space verification path.
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'rlsPolicies' in value &&
-    Array.isArray((value as { rlsPolicies: unknown }).rlsPolicies)
-  );
+/**
+ * Structural guard for `PostgresSchemaIR`. Narrows on the postgres-only own
+ * field `rlsPolicies` rather than `instanceof`, because the multi-space verify
+ * path (`projectSchemaToSpace`) spreads the IR into a plain object
+ * (`{ ...schema, tables: pruned }`) that is not an instance but retains every
+ * enumerable own property — including `rlsPolicies`. The family-level
+ * `kind = 'sql-schema-ir'` discriminator does not distinguish Postgres from
+ * generic SQL (both share it) and is non-enumerable (dropped by the spread), so
+ * it is unusable here.
+ */
+export function isPostgresSchemaIR(schema: SqlSchemaIR): schema is PostgresSchemaIR {
+  return 'rlsPolicies' in schema && Array.isArray(schema.rlsPolicies);
 }
