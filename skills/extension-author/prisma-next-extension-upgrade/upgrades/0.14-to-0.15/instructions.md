@@ -22,4 +22,11 @@ changed. No extension-author action. Incidental substrate diff only.
 TML-2794 (M:N slice 5): wires the `mn-psl` integration fixture into the
 `@prisma-next/sql-orm-client` test `emit` script. Test-fixture infrastructure
 only; no extension-author surface change. Incidental substrate diff only.
+
+TML-2868 (Postgres RLS slice 1): adds the additive Postgres row-level-security
+authoring feature. The only `packages/3-extensions/` touches are the re-emitted
+`supabase/src/contract/contract.d.ts` (regeneration picks up the new RLS-capable
+contract shape) and the `supabase/test/supabase-bootstrap.ts` test helper. No
+extension-author API changed — the framework SPI is unchanged and re-emit
+absorbs the contract shape. Incidental substrate diff only.
 -->
