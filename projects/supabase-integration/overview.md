@@ -73,14 +73,20 @@ export const db = supabase<Contract, TypeMaps>({
   jwtSecret: process.env['SUPABASE_JWT_SECRET']!,
 });
 
-// In a request handler:
+// In a request handler — the common pattern is to query your OWN tables
+// (public.*), reference auth.users via an FK, and let auth.uid() in RLS scope
+// the rows. App roles never read auth.* directly:
 //   db.asUser(jwt).sql.from(Profile).select({ ... }).build()
 //   db.asAnon().sql.from(Profile).select({ ... }).build()
 //   db.asServiceRole().sql.from(Profile).update({ ... }).build()
 //
-// Reaching a table in a named namespace (auth.users alongside public.users)
-// goes through the explicit namespace-aware surface:
-//   db.asUser(jwt).sql.auth.users.select({ ... }).build()
+// Reaching a Supabase-internal table (auth.*, storage.*) is an ADMIN path,
+// available only on the service_role-bound db — service_role is the only role
+// with grants on the auth schema over the direct connection (anon/authenticated
+// have none, so auth.* is absent from their type):
+//   db.asServiceRole().sql.auth.users.select({ ... }).build()
+// (Supabase-internal schema can drift across platform upgrades; for user
+// management prefer the GoTrue Admin API. See decisions C15.)
 ```
 
 The TS contract surface is structurally parallel and is described in each constituent project's spec; both PSL and TS lower to the same canonical `contract.json`. Once that JSON exists, the runtime story is identical regardless of which authoring surface produced it.

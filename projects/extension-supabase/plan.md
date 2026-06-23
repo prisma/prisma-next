@@ -67,15 +67,17 @@ Current state of the example:
 
 **Non-blocking follow-on:** enum-typed `auth.*` columns (enums-as-domain-concept project) can attach to this slice or land later.
 
-### Slice D — Explicit `auth.users` namespace query in the example
+### Slice D — `service_role` queries Supabase-internal namespaces via the facade
 
-**Gate:** functionally unblocked (TML-2816 #778 + #803 merged on main). Formal launch gate: explicit-namespace-dsl project close-out.
+**Gate:** none — facade composition, independent of postgres-rls #771. (Reframed from "explicit `auth.users` query off the app db": that doesn't work and isn't meant to — cross-space *querying* off the app db was deliberately not built, and only `service_role` has `auth.*` grants. See decision [C15](../supabase-integration/decisions.md). Slice contract: [`slices/d-service-role-internal-namespaces/spec.md`](slices/d-service-role-internal-namespaces/spec.md).)
 
-**Goal:** the example's `examples/supabase` demonstrates explicit namespace qualification in a query against `auth.users` (e.g. `sql.from('auth.users')` or the ORM equivalent), proving the cross-namespace query surface works end-to-end with the Supabase contract.
+**Goal:** `db.asServiceRole().sql.auth.users` (and `storage.*`) is queryable on the `service_role`-bound db — the admin path — while `asUser`/`asAnon` expose only the app namespaces (`auth.*` absent from their type). The facade composes the extension contract's namespaces into the `service_role` execution context (facade-local; one shared pool).
 
 **DoD tasks:**
-- [ ] Add one handler or integration test that queries `auth.users` by explicit namespace.
-- [ ] Confirm the namespace qualification lower path works in the example's CI test.
+- [ ] `service_role`-bound db exposes `auth`/`storage` namespaces on `.sql`; `asUser`/`asAnon` unchanged (no `auth.*`).
+- [ ] Integration test: `asServiceRole().sql.auth.users` reads a seeded row, emitted SQL targets `"auth"."users"`, and `current_setting('role')` is `service_role`.
+- [ ] Type-level test (against the app contract): `asServiceRole().sql` gains `auth`/`storage`; `asAnon()`/`asUser()` `.sql` do not.
+- [ ] `overview.md` + decision [C15](../supabase-integration/decisions.md) reflect the admin-entrypoint surface (done in this slice).
 
 ### Slice E — Docs + real-Supabase acceptance + close-out
 

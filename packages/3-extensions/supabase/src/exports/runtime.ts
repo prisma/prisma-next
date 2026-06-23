@@ -9,6 +9,7 @@ export type {
   SupabaseOptionsWithContract,
   SupabaseOptionsWithContractJson,
   SupabaseTargetId,
+  WithExtensionNamespaces,
 } from '../runtime/supabase';
 export { default as supabase, InvalidJwtError, SupabaseConfigError } from '../runtime/supabase';
 export type {

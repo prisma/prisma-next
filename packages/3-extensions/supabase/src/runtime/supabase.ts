@@ -32,11 +32,29 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { createRemoteJWKSet, type JWTVerifyResult, jwtVerify } from 'jose';
 import type { Client } from 'pg';
 import { Pool } from 'pg';
+import type { Contract as ExtContract } from '../contract/contract.d';
+import extensionContractJson from '../contract/contract.json' with { type: 'json' };
 import { supabaseRuntimeDescriptor } from './descriptor';
 import type { SupabaseRoleBinding, SupabaseRuntime } from './supabase-runtime';
 import { SupabaseRuntimeImpl } from './supabase-runtime';
 
 export type SupabaseTargetId = 'postgres';
+
+/**
+ * Augments an app contract with the Supabase-internal namespace types (`auth`,
+ * `storage`) from the extension contract. Used exclusively for the
+ * `asServiceRole()` return type — only `service_role` holds grants on those
+ * schemas over a direct Postgres connection.
+ */
+export type WithExtensionNamespaces<TAppContract extends Contract<SqlStorage>> = TAppContract & {
+  readonly storage: TAppContract['storage'] & {
+    readonly namespaces: TAppContract['storage']['namespaces'] &
+      ExtContract['storage']['namespaces'];
+  };
+  readonly domain: TAppContract['domain'] & {
+    readonly namespaces: TAppContract['domain']['namespaces'] & ExtContract['domain']['namespaces'];
+  };
+};
 
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof orm<TContract>>;
 
@@ -76,7 +94,7 @@ export interface SupabaseDb<TContract extends Contract<SqlStorage>> {
   readonly stack: SqlExecutionStackWithDriver<SupabaseTargetId>;
   asUser(jwt: string): Promise<RoleBoundDb<TContract>>;
   asAnon(): RoleBoundDb<TContract>;
-  asServiceRole(): RoleBoundDb<TContract>;
+  asServiceRole(): RoleBoundDb<WithExtensionNamespaces<TContract>>;
   close(): Promise<void>;
   [Symbol.asyncDispose](): Promise<void>;
 }
@@ -197,6 +215,64 @@ function withSupabaseDescriptor(
     : [...packs, supabaseRuntimeDescriptor];
 }
 
+/**
+ * Merges the Supabase-internal namespace data (`auth`, `storage`) from the
+ * extension contract into the app contract's storage and domain sections.
+ * The result is used only for the `service_role` execution context — no
+ * other role has grants on those schemas over a direct Postgres connection.
+ *
+ * Types are merged at the storage level so `typeRef`-based columns in the
+ * extension namespaces (e.g. `Timestamptz`, `Uuid`) resolve correctly
+ * through the contract codec registry.
+ */
+function buildServiceRoleContract<TContract extends Contract<SqlStorage>>(
+  appContract: TContract,
+): WithExtensionNamespaces<TContract> {
+  const extContract = blindCast<
+    ExtContract,
+    'deserializeContract hydrates JSON namespaces into PostgresSchema instances with qualifyTable'
+  >(contractSerializer.deserializeContract(extensionContractJson));
+
+  // Extension namespaces first so the app contract's own namespaces win on
+  // any key collision (e.g. the extension contract carries an empty `public`
+  // that would otherwise shadow the app's `public.profile` table).
+  const mergedStorageNamespaces = {
+    ...extContract.storage.namespaces,
+    ...appContract.storage.namespaces,
+  };
+
+  // Types from the extension fill in any missing entries; app types win on collision.
+  const mergedStorageTypes = {
+    ...extContract.storage.types,
+    ...appContract.storage.types,
+  };
+
+  const mergedDomainNamespaces = {
+    ...extContract.domain.namespaces,
+    ...appContract.domain.namespaces,
+  };
+
+  return blindCast<
+    WithExtensionNamespaces<TContract>,
+    'Structural merge of app and extension contracts; both share the same postgres target and codec set'
+  >({
+    ...appContract,
+    storage: {
+      // Keep the app's storageHash even though the merged namespaces differ: the
+      // read-only marker check matches against the app contract's hash, and only
+      // service_role ever sees this merged contract. Re-hashing here would break
+      // that match — the app's hash is intentional, not stale.
+      ...appContract.storage,
+      namespaces: mergedStorageNamespaces,
+      types: mergedStorageTypes,
+    },
+    domain: {
+      ...appContract.domain,
+      namespaces: mergedDomainNamespaces,
+    },
+  });
+}
+
 export default async function supabase<TContract extends Contract<SqlStorage>>(
   options: SupabaseOptionsWithContract<TContract>,
 ): Promise<SupabaseDb<TContract>>;
@@ -254,18 +330,20 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
     }
   }
 
-  function buildRoleBoundDb(binding: SupabaseRoleBinding): RoleBoundDb<TContract> {
-    const roleSql: Db<TContract> = sql<TContract>({ context, rawCodecInferer });
-    const roleOrm: OrmClient<TContract> = orm({
+  function buildRoleBoundDbWithContext<C extends Contract<SqlStorage>>(
+    binding: SupabaseRoleBinding,
+    roleContext: ExecutionContext<C>,
+    roleRuntime: SupabaseRuntime & SupabaseRuntimeImpl<C>,
+  ): RoleBoundDb<C> {
+    const roleSql: Db<C> = sql<C>({ context: roleContext, rawCodecInferer });
+    const roleOrm: OrmClient<C> = orm({
       runtime: {
         execute(plan) {
-          return runtime.executeWithRole(plan, binding);
+          return roleRuntime.executeWithRole(plan, binding);
         },
-        // connection() returns a role session; this is the enforcement path for ORM scope
-        // operations (mutations, includes) — every statement runs role-bound.
-        connection: () => runtime.openRoleSession(binding),
+        connection: () => roleRuntime.openRoleSession(binding),
       },
-      context,
+      context: roleContext,
     });
 
     return {
@@ -276,13 +354,28 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
         plan: (SqlExecutionPlan<Row> | SqlQueryPlan<Row>) & { readonly _row?: Row },
         execOptions?: RuntimeExecuteOptions,
       ): AsyncIterableResult<Row> {
-        return runtime.executeWithRole<Row>(plan, binding, execOptions);
+        return roleRuntime.executeWithRole<Row>(plan, binding, execOptions);
       },
       transaction<R>(fn: (tx: TransactionContext) => PromiseLike<R>): Promise<R> {
-        return withTransaction({ connection: () => runtime.openRoleSession(binding) }, fn);
+        return withTransaction({ connection: () => roleRuntime.openRoleSession(binding) }, fn);
       },
     };
   }
+
+  function buildRoleBoundDb(binding: SupabaseRoleBinding): RoleBoundDb<TContract> {
+    return buildRoleBoundDbWithContext(binding, context, runtime);
+  }
+
+  const serviceRoleContract = buildServiceRoleContract(contract);
+  const serviceRoleContext = createExecutionContext({ contract: serviceRoleContract, stack });
+  const serviceRoleRuntime: SupabaseRuntime &
+    SupabaseRuntimeImpl<WithExtensionNamespaces<TContract>> = new SupabaseRuntimeImpl({
+    context: serviceRoleContext,
+    adapter: stackInstance.adapter,
+    driver,
+    ...ifDefined('verifyMarker', options.verifyMarker),
+    ...ifDefined('middleware', options.middleware),
+  });
 
   async function closeDb(): Promise<void> {
     if (closed) return;
@@ -313,8 +406,12 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
       return buildRoleBoundDb({ role: 'anon', claims: {} });
     },
 
-    asServiceRole(): RoleBoundDb<TContract> {
-      return buildRoleBoundDb({ role: 'service_role', claims: {} });
+    asServiceRole(): RoleBoundDb<WithExtensionNamespaces<TContract>> {
+      return buildRoleBoundDbWithContext(
+        { role: 'service_role', claims: {} },
+        serviceRoleContext,
+        serviceRoleRuntime,
+      );
     },
 
     close: closeDb,
