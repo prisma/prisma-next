@@ -4,40 +4,14 @@ globs: []
 alwaysApply: true
 ---
 
-# A missing `@prisma-next/*` workspace package is a build/install state issue, not a code bug
+# A missing `@prisma-next/*` package is a build/install state issue, not a code bug
 
-## The error
+A `Cannot find module '@prisma-next/<pkg>'` / `ERR_MODULE_NOT_FOUND` for a workspace package is almost never an import/tsconfig/deps bug. Do not chase it as one.
 
-A build, typecheck, or test fails with, for an **`@prisma-next/*`** package:
+1. **Verify resolvability — a repo-root check lies.** pnpm links workspace packages into the *consumer's* `node_modules`, not repo-root `node_modules/@prisma-next/`. Confirm from the consumer:
+   `node -e "console.log(require.resolve('@prisma-next/<pkg>', { paths: ['packages/<consumer-dir>'] }))"`
+   If it prints a path, the package resolves and the real failure is elsewhere (usually stale dist).
+2. **Stale/missing `dist` (common).** These are tsdown packages whose `exports` point at `dist/`. After changing exported types, or after merge/rebase, run **`pnpm build`** to refresh dist before re-running downstream typecheck/tests.
+3. **Genuinely new dependency (rare).** Run **`pnpm install`** to link it; commit the lockfile change, never hand-edit `pnpm-lock.yaml`.
 
-- `Cannot find module '@prisma-next/<pkg>'` / `Cannot find package '@prisma-next/<pkg>'`
-- `ERR_MODULE_NOT_FOUND` / `MODULE_NOT_FOUND` naming an `@prisma-next/*` package
-
-Do **not** chase it as a code/import bug (don't edit import paths, tsconfig `paths`, or deps).
-
-## First: verify it's actually unresolvable — a shallow check LIES
-
-pnpm links workspace packages into the **consumer's** `node_modules`, **not** the repo-root `node_modules/@prisma-next/`. So `ls node_modules/@prisma-next/<pkg>` at the root is a **false negative** — the link lives at e.g. `packages/<consumer>/node_modules/@prisma-next/<pkg>`. Confirm real resolvability before concluding anything:
-
-```bash
-node -e "console.log(require.resolve('@prisma-next/<pkg>', { paths: ['packages/<consumer-dir>'] }))"
-```
-
-If that prints a path (usually into the package's `dist/`), the package resolves — your "missing" was a bad check; the real failure is elsewhere (often **stale dist**: the consumer rebuilt against an old shape — see below).
-
-## Then: the two real causes + fixes
-
-These are tsdown packages whose `exports` point at `dist/`. A `@prisma-next/*` import fails for one of:
-
-1. **Stale or missing `dist`** (the common one). After changing a package's exported types, or after a merge/rebase, the consumer resolves to a `dist/` that's old or absent. **Fix: `pnpm build`** to refresh `dist` before re-running downstream typecheck/tests. (This is the same "rebuild before testing" discipline; never run a suite against stale `dist`.)
-2. **A genuinely new dependency** the graph gained (rare). **Fix: `pnpm install`** to link it. Never hand-edit `pnpm-lock.yaml` ([no-direct-lockfile-edits](no-direct-lockfile-edits.mdc)); commit any lockfile change install makes.
-
-## After any `git merge` / `rebase` / `checkout` / `pull`
-
-Run **`pnpm install` then `pnpm build`** before building/testing — install links any new packages, build refreshes all `dist`. Do this before declaring any "module not found" or test failure a real regression.
-
-## Don't
-
-- Don't trust a repo-root `node_modules/@prisma-next/<pkg>` check — verify with `require.resolve` from the consumer.
-- Don't edit imports/tsconfig/deps to "find" a workspace module.
-- Don't call a module-not-found (or a test that depends on a rebuilt package) a "real regression" until after a clean `pnpm install` + `pnpm build`.
+After any `git merge`/`rebase`/`checkout`/`pull`, run `pnpm install` then `pnpm build` before declaring any "module not found" or test failure a real regression.
