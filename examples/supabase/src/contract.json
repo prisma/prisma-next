@@ -82,7 +82,7 @@
           "policy": {
             "profile_owner_read": {
               "kind": "policy",
-              "name": "profile_owner_read_3486711c",
+              "name": "profile_owner_read_9f8e536e",
               "namespaceId": "public",
               "operation": "select",
               "permissive": true,
@@ -157,7 +157,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:dd64f4203eb2e83868556b4e35fa836f629f8a2ec0e854a078148a83b50dc880",
+    "storageHash": "sha256:c5012a2809fbe2aff181e2ddab8ae278bd2aae9ee85b1e80395923d3392bf4e4",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",
