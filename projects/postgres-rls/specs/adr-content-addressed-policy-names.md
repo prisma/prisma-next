@@ -49,7 +49,7 @@ CREATE POLICY profiles_update_own_a3f1c8b2 ON profile
   WITH CHECK (user_id = (auth.uid())::uuid);
 ```
 
-When the verifier later introspects `pg_policies`, it finds a row with `policyname = 'profiles_update_own_a3f1c8b2'`. Verification is exact-string identity on the wire name — no body comparison. If the user renames the policy in TS to `profiles_can_update_self`, the suffix is unchanged (the body didn't change), so the verifier sees `(profiles_can_update_self_a3f1c8b2, profiles_update_own_a3f1c8b2)` — same suffix, different prefix — and emits a `rls_policy_renamed` issue. The planner answers with `ALTER POLICY ... RENAME TO …`.
+When the verifier later introspects `pg_policies`, it finds a row with `policyname = 'profiles_update_own_a3f1c8b2'`. Verification is exact-string identity on the wire name — no body comparison. If the user renames the policy in TS to `profiles_can_update_self`, the suffix is unchanged (the body didn't change), so the verifier sees `(profiles_can_update_self_a3f1c8b2, profiles_update_own_a3f1c8b2)` — same suffix, different prefix — and treats it as a rename. The planner answers with `ALTER POLICY ... RENAME TO …`.
 
 ## Why content addressing
 
@@ -83,7 +83,7 @@ Content addressing sidesteps the comparison entirely. The framework normalizes t
 
 The canonical content tuple fed to SHA-256 is:
 
-1. `canonical(using)` — body of the `USING` clause after normalization (whitespace collapse, outer-paren trim, keyword lowercase). Empty if absent.
+1. `canonical(using)` — body of the `USING` clause after normalization (internal whitespace collapse, trim). Empty if absent.
 2. `canonical(withCheck)` — same normalization on the `WITH CHECK` body. Empty if absent.
 3. `sort(roles)` — roles as a sorted, deduplicated list. Role ordering is not semantically meaningful in Postgres; sorting eliminates a class of accidental drift in the IR.
 4. `operation` — closed-set literal (`select | insert | update | delete | all`).
@@ -96,13 +96,12 @@ Excluded inputs:
 
 ### Verifier semantics
 
-The verifier compares declared and introspected policies by full wire name. It produces these issue kinds:
+The verifier compares declared and introspected policies by full wire name. It produces these outcomes through the generic differ:
 
-- **`rls_policy_renamed`** — declared and introspected sides have a policy whose names share a suffix but differ in prefix, and neither full name appears on the other side. Planner emits `ALTER POLICY ... RENAME TO`.
-- **`rls_policy_tampered`** — for each introspected row, recompute `hash(canonical(qual), canonical(with_check), sort(roles), cmd, permissive)` and compare to the suffix carried in `policyname`. A mismatch means someone ran `ALTER POLICY` outside the framework.
-- **`missing_rls_policy`** — declared, not introspected, no rename match. Severity governed by the table's [control policy](../../control-policy/spec.md).
-- **`extra_rls_policy`** — introspected, not declared, no rename match. Severity governed by the table's control policy (managed → error, tolerated → warn, external → ignored, observed → silent).
-- **`rls_not_enabled`** — a policy is declared for a table but `pg_class.relrowsecurity = false`. The planner auto-enables RLS on tables with declared policies, so this only fires on drift.
+- **rename** — declared and introspected sides have a policy whose names share a suffix but differ in prefix, and neither full name appears on the other side. Planner emits `ALTER POLICY ... RENAME TO`. No body inspection.
+- **missing** — declared, not introspected, no rename match. Severity governed by the table's [control policy](../../control-policy/spec.md).
+- **extra** — introspected, not declared, no rename match. Severity governed by the table's control policy (managed → error, tolerated → warn, external → ignored, observed → silent). An out-of-band `ALTER POLICY` body change produces an extra (old wire name) + missing (none, since the new name is unknown) — treated as extra → drop on next migrate, not as a tamper signal.
+- **mismatch on RLS-enabled state** — a policy is declared for a table but `pg_class.relrowsecurity = false`. The planner auto-enables RLS on tables with declared policies, so this only fires on drift.
 
 ### IR shape implications
 
@@ -133,10 +132,10 @@ The same problem class — Postgres re-prints stored bodies — applies to other
 - **Views.** `pg_views.definition` is the printer's output, not the user's text.
 - **Function bodies.** `pg_proc.prosrc` is verbatim, but function bodies typically differ in whitespace and comment placement after a deploy-tool round-trip.
 
-The naming format (`<prefix>_<8 hex SHA-256>`), the normalizer (whitespace, outer parens, keyword casing), and the lowering-time prefix bound are object-kind-agnostic and stay constant across applications. Each object kind only needs to decide:
+The naming format (`<prefix>_<8 hex SHA-256>`), the normalizer (internal whitespace collapse + trim of the authored input), and the lowering-time prefix bound are object-kind-agnostic and stay constant across applications. Each object kind only needs to decide:
 
 - The per-kind hash input tuple (analogous to the RLS list above).
-- The object-kind-specific issue kinds for rename and tamper detection.
+- Whether the rename signal (matching suffix, different prefix) needs a kind-specific planner action (e.g. `ALTER POLICY ... RENAME TO`).
 
 Whether to apply content-addressing to a given object kind is a separate decision per kind. Indexes have the widest DBA-visible surface — DBAs reference index names in `REINDEX`, `DROP INDEX`, query plans, and Postgres error messages — so the "ugly suffix" trade-off is the most prominent there. The cost of plain naming has to outweigh the cost of suffix-visibility before the pattern is worth applying to a new object kind.
 
@@ -155,7 +154,6 @@ The escape hatch we deliberately do *not* build is an intentionally hash-invaria
 - **No false-positive body diffs.** The normalizer-plus-hash *is* the equivalence relation; the verifier never compares bodies for equivalence purposes.
 - **Free rename detection.** Matching suffix with different prefix is a structural signal the planner can act on with `ALTER POLICY ... RENAME TO`.
 - **No planner-runner round-trip.** Unlike read-back-after-CREATE designs, both sides recompute the wire name from the same canonical inputs at lowering and verification time independently.
-- **Cheap tamper detection.** Manual `ALTER POLICY` outside the framework is caught by re-hashing the introspected row and comparing to the suffix in its name.
 
 ### Negative
 
