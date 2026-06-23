@@ -25,181 +25,33 @@ describe('normalizePredicate', () => {
     });
   });
 
-  describe('keyword lowercase', () => {
-    it('lowercases SQL keywords', () => {
-      expect(normalizePredicate('user_id IS NULL')).toBe('user_id is null');
+  describe('minimal normalization preserves the authored form', () => {
+    // Normalization stabilizes only whitespace. The content hash addresses the
+    // authored predicate; we never recompute it from an introspected body, so
+    // case, parens, comments, and casts are kept verbatim (collapsing them would
+    // risk hashing two distinct predicates onto one wire name).
+    it('preserves keyword case', () => {
+      expect(normalizePredicate('user_id IS NULL')).toBe('user_id IS NULL');
     });
 
-    it('lowercases mixed-case keywords', () => {
-      expect(normalizePredicate('a And b Or c')).toBe('a and b or c');
+    it('preserves enclosing parens', () => {
+      expect(normalizePredicate('(a = b)')).toBe('(a = b)');
     });
 
-    it('lowercases keywords in compound expressions', () => {
-      expect(normalizePredicate('auth.uid() = user_id AND deleted_at IS NULL')).toBe(
-        'auth.uid() = user_id and deleted_at is null',
-      );
-    });
-  });
-
-  describe('outer-paren trim', () => {
-    it('trims a single fully-enclosing paren pair', () => {
-      expect(normalizePredicate('(a = b)')).toBe('a = b');
+    it('preserves SQL comments verbatim (after whitespace collapse)', () => {
+      expect(normalizePredicate('a = b -- comment')).toBe('a = b -- comment');
     });
 
-    it('strips parens around non-boolean sub-expressions in AND chains (Postgres reprint canonicalization)', () => {
-      expect(normalizePredicate('(a) AND (b)')).toBe('a and b');
-    });
-
-    it('strips parens around comparison sub-expressions in OR chains', () => {
-      expect(normalizePredicate('(a = 1) OR (b = 2)')).toBe('a = 1 or b = 2');
-    });
-
-    it('preserves parens around boolean sub-expressions: (A OR B) AND C stays intact', () => {
-      expect(normalizePredicate('(a OR b) AND c')).toBe('(a or b) and c');
-    });
-
-    it('trims multiple enclosing layers', () => {
-      expect(normalizePredicate('((a = b))')).toBe('a = b');
-    });
-
-    it('trims outer parens after whitespace collapse', () => {
-      expect(normalizePredicate('( a = b )')).toBe('a = b');
+    it('preserves casts and their aliases', () => {
+      expect(normalizePredicate('x::integer')).toBe('x::integer');
     });
   });
 
-  describe('comment stripping', () => {
-    it('strips line comments', () => {
-      expect(normalizePredicate('a = b -- this is a comment')).toBe('a = b');
-    });
-
-    it('strips line comments mid-expression and retains the rest', () => {
-      expect(normalizePredicate('a = b -- comment\nAND c = d')).toBe('a = b and c = d');
-    });
-
-    it('strips block comments', () => {
-      expect(normalizePredicate('a = /* inline comment */ b')).toBe('a = b');
-    });
-
-    it('strips block comments spanning multiple lines', () => {
-      expect(normalizePredicate('a = b\n/* multi\nline\ncomment */\nAND c = d')).toBe(
-        'a = b and c = d',
-      );
-    });
-  });
-
-  describe('string literals with parens and keywords', () => {
-    it('preserves parens inside string literals — they are data not syntax', () => {
-      const result = normalizePredicate("status = '(active)'");
-      expect(result).toBe("status = '(active)'");
-    });
-
-    it('preserves SQL keywords inside string literals — they are data not syntax', () => {
-      const result = normalizePredicate("label = 'AND OR NOT NULL'");
-      expect(result).toBe("label = 'AND OR NOT NULL'");
-    });
-
-    it('lowercases keywords outside literals while preserving case inside literals', () => {
-      const result = normalizePredicate("WHERE x = 'Admin'");
-      expect(result).toBe("where x = 'Admin'");
-    });
-
-    it('preserves comment-like sequences inside string literals', () => {
-      const result = normalizePredicate("note = 'hello -- world'");
-      expect(result).toBe("note = 'hello -- world'");
-    });
-
-    it('preserves block comment sequences inside string literals', () => {
-      const result = normalizePredicate("note = 'a /* not a comment */ b'");
-      expect(result).toBe("note = 'a /* not a comment */ b'");
-    });
-
-    it('handles escaped single quotes inside string literals (doubled quote)', () => {
-      const result = normalizePredicate("label = 'it''s fine'");
-      expect(result).toBe("label = 'it''s fine'");
-    });
-  });
-
-  describe('determinism across equivalent forms', () => {
-    it('nested parens in sub-expressions produce same result', () => {
-      const a = normalizePredicate('((user_id = auth.uid()))');
-      const b = normalizePredicate('user_id = auth.uid()');
-      expect(a).toBe(b);
-    });
-
+  describe('determinism across whitespace-equivalent forms', () => {
     it('whitespace variants are equivalent', () => {
       const a = normalizePredicate('user_id  =  auth.uid()');
       const b = normalizePredicate('user_id = auth.uid()');
       expect(a).toBe(b);
-    });
-
-    it('keyword casing variants are equivalent', () => {
-      const a = normalizePredicate('a IS NULL AND b IS NOT NULL');
-      const b = normalizePredicate('a is null and b is not null');
-      expect(a).toBe(b);
-    });
-  });
-
-  describe('::text strip on string literals', () => {
-    it("strips ::text from 'x'::text — authored and pg-reprinted forms are equivalent", () => {
-      expect(normalizePredicate("'x'::text")).toBe("'x'");
-    });
-
-    it('preserves string content that contains ::text as data', () => {
-      expect(normalizePredicate("note = 'a::text'")).toBe("note = 'a::text'");
-    });
-
-    it('preserves string content that contains ) as data', () => {
-      expect(normalizePredicate("note = 'a)'")).toBe("note = 'a)'");
-    });
-  });
-
-  describe('cast-paren strip — atomic operands', () => {
-    it('strips parens around a function call: (current_setting(...))::int ≡ current_setting(...)::int', () => {
-      expect(normalizePredicate("(current_setting('k'))::int")).toBe("current_setting('k')::int");
-    });
-
-    it('strips parens around a bare identifier', () => {
-      expect(normalizePredicate('(user_id)::text')).toBe('user_id::text');
-    });
-  });
-
-  describe('cast-paren strip — multi-operand operands are kept', () => {
-    it('keeps parens for OR inside cast: (a OR b)::text ≠ a OR b::text', () => {
-      const withParens = normalizePredicate('(a or b)::text');
-      const withoutParens = normalizePredicate('a or b::text');
-      expect(withParens).not.toBe(withoutParens);
-    });
-
-    it('keeps parens for addition inside cast: (amount + tax)::int = total ≠ amount + tax::int = total', () => {
-      const withParens = normalizePredicate('(amount + tax)::int = total');
-      const withoutParens = normalizePredicate('amount + tax::int = total');
-      expect(withParens).not.toBe(withoutParens);
-    });
-  });
-
-  describe('type-alias normalization', () => {
-    it('::integer collapses to ::int', () => {
-      expect(normalizePredicate('x::integer')).toBe('x::int');
-    });
-
-    it('::boolean collapses to ::bool', () => {
-      expect(normalizePredicate('x::boolean')).toBe('x::bool');
-    });
-
-    it('::bigint collapses to ::int8', () => {
-      expect(normalizePredicate('x::bigint')).toBe('x::int8');
-    });
-
-    it('::character varying collapses to ::varchar', () => {
-      expect(normalizePredicate('x::character varying')).toBe('x::varchar');
-    });
-
-    it('::double precision collapses to ::float8', () => {
-      expect(normalizePredicate('x::double precision')).toBe('x::float8');
-    });
-
-    it('::text and ::varchar remain distinct types', () => {
-      expect(normalizePredicate('x::text')).not.toBe(normalizePredicate('x::varchar'));
     });
   });
 });
@@ -223,22 +75,10 @@ describe('computeContentHash', () => {
     });
   });
 
-  describe('hash determinism across reformatting-equivalent predicates', () => {
+  describe('hash determinism across whitespace-equivalent predicates', () => {
     it('produces the same hash for using with extra whitespace vs collapsed', () => {
       const a = computeContentHash({ ...base, using: 'user_id  =  auth.uid()' });
       const b = computeContentHash({ ...base, using: 'user_id = auth.uid()' });
-      expect(a).toBe(b);
-    });
-
-    it('produces the same hash for using with outer parens vs without', () => {
-      const a = computeContentHash({ ...base, using: '(user_id = auth.uid())' });
-      const b = computeContentHash({ ...base, using: 'user_id = auth.uid()' });
-      expect(a).toBe(b);
-    });
-
-    it('produces the same hash for mixed-case keywords vs lowercase', () => {
-      const a = computeContentHash({ ...base, using: 'deleted_at IS NULL' });
-      const b = computeContentHash({ ...base, using: 'deleted_at is null' });
       expect(a).toBe(b);
     });
 
@@ -257,18 +97,6 @@ describe('computeContentHash', () => {
       });
       expect(a).toBe(b);
     });
-
-    it('line comments stripped — same hash as comment-free form', () => {
-      const a = computeContentHash({ ...base, using: 'user_id = auth.uid() -- allow authed' });
-      const b = computeContentHash({ ...base, using: 'user_id = auth.uid()' });
-      expect(a).toBe(b);
-    });
-
-    it('block comments stripped — same hash as comment-free form', () => {
-      const a = computeContentHash({ ...base, using: '/* check */ user_id = auth.uid()' });
-      const b = computeContentHash({ ...base, using: 'user_id = auth.uid()' });
-      expect(a).toBe(b);
-    });
   });
 
   describe('hash distinctness for semantically different bodies', () => {
@@ -285,6 +113,18 @@ describe('computeContentHash', () => {
     it('different using bodies differ', () => {
       const a = computeContentHash({ ...base, using: 'user_id = auth.uid()' });
       const b = computeContentHash({ ...base, using: 'tenant_id = auth.tenant()' });
+      expect(a).not.toBe(b);
+    });
+
+    it('keyword case is significant (no lowercasing)', () => {
+      const a = computeContentHash({ ...base, using: 'deleted_at IS NULL' });
+      const b = computeContentHash({ ...base, using: 'deleted_at is null' });
+      expect(a).not.toBe(b);
+    });
+
+    it('enclosing parens are significant (no paren stripping)', () => {
+      const a = computeContentHash({ ...base, using: '(user_id = auth.uid())' });
+      const b = computeContentHash({ ...base, using: 'user_id = auth.uid()' });
       expect(a).not.toBe(b);
     });
 
@@ -313,7 +153,7 @@ describe('computeContentHash', () => {
     });
   });
 
-  describe('string literals containing parens and keywords are data', () => {
+  describe('string literals are data', () => {
     it('status with paren content hashes differently from status with plain content', () => {
       const a = computeContentHash({ ...base, using: "status = '(active)'" });
       const b = computeContentHash({ ...base, using: "status = 'active'" });
@@ -323,12 +163,6 @@ describe('computeContentHash', () => {
     it('string literal case is preserved — different case produces different hash', () => {
       const a = computeContentHash({ ...base, using: "label = 'AND'" });
       const b = computeContentHash({ ...base, using: "label = 'and'" });
-      expect(a).not.toBe(b);
-    });
-
-    it('role column with mixed-case value hashes differently from lowercase value', () => {
-      const a = computeContentHash({ ...base, using: "role = 'Admin'" });
-      const b = computeContentHash({ ...base, using: "role = 'admin'" });
       expect(a).not.toBe(b);
     });
   });
