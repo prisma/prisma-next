@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findNearestConfigPathForFile } from '@prisma-next/config-loader';
+import type { SymbolTable } from '@prisma-next/psl-parser';
 import { type FormatOptions, format } from '@prisma-next/psl-parser/format';
 import {
   type Connection,
@@ -17,17 +18,34 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { CONFIG_FILENAME, resolveConfigInputs } from './config-resolution';
 import { ParseDiagnosticSeverity } from './diagnostic-mapping';
-import { computeDocumentDiagnostics } from './document-diagnostics';
+import type { PipelineInputs } from './pipeline';
+import {
+  type CachedDocument,
+  createProjectArtifacts,
+  type ProjectArtifacts,
+} from './project-artifacts';
 import type { SchemaInputSet } from './schema-inputs';
 
 export interface LanguageServer {
   dispose(): void;
+  /**
+   * Exposed for future features (completion, semantic tokens); nothing consumes
+   * them yet.
+   */
+  getDocumentAst(uri: string): CachedDocument | undefined;
+  getProjectSymbolTable(uri: string): SymbolTable | undefined;
 }
 
 interface ProjectState {
   readonly configPath: string;
   readonly inputs: SchemaInputSet;
   readonly formatter?: FormatOptions;
+  /**
+   * Resolved once per config and refreshed by the config-watch path — never
+   * rebuilt per document.
+   */
+  readonly controlStack: PipelineInputs;
+  readonly artifacts: ProjectArtifacts;
 }
 
 export function createServer(connection: Connection): LanguageServer {
@@ -44,7 +62,7 @@ export function createServer(connection: Connection): LanguageServer {
     if (project === undefined) {
       return;
     }
-    const computed = computeDocumentDiagnostics(uri, text, project.inputs);
+    const computed = project.artifacts.update(uri, text, project.inputs, project.controlStack);
     if (computed === null) {
       void connection.sendDiagnostics({ uri, diagnostics: [] });
       return;
@@ -124,10 +142,24 @@ export function createServer(connection: Connection): LanguageServer {
 
   async function loadProject(configPath: string): Promise<ProjectState> {
     const resolution = await resolveConfigInputs(configPath);
+    // Preserve open-document ASTs across config reloads; the project symbol table
+    // refreshes on the next publish against the new stack.
+    const artifacts = projects.get(configPath)?.artifacts ?? createProjectArtifacts();
     const project: ProjectState =
       resolution.formatter === undefined
-        ? { configPath, inputs: resolution.inputs }
-        : { configPath, inputs: resolution.inputs, formatter: resolution.formatter };
+        ? {
+            configPath,
+            inputs: resolution.inputs,
+            controlStack: resolution.controlStack,
+            artifacts,
+          }
+        : {
+            configPath,
+            inputs: resolution.inputs,
+            formatter: resolution.formatter,
+            controlStack: resolution.controlStack,
+            artifacts,
+          };
     projects.set(configPath, project);
     return project;
   }
@@ -263,16 +295,28 @@ export function createServer(connection: Connection): LanguageServer {
     publishSafely(event.document.uri, event.document.getText());
   });
   documents.onDidClose((event) => {
-    void connection.sendDiagnostics({ uri: event.document.uri, diagnostics: [] });
+    const uri = event.document.uri;
+    const configPath = documentConfigPaths.get(uri);
+    if (configPath !== undefined) {
+      projects.get(configPath)?.artifacts.remove(uri);
+    }
+    void connection.sendDiagnostics({ uri, diagnostics: [] });
   });
 
   documents.listen(connection);
   connection.listen();
 
+  function artifactsForDocument(uri: string): ProjectArtifacts | undefined {
+    const configPath = documentConfigPaths.get(uri);
+    return configPath === undefined ? undefined : projects.get(configPath)?.artifacts;
+  }
+
   return {
     dispose: () => {
       connection.dispose();
     },
+    getDocumentAst: (uri) => artifactsForDocument(uri)?.getDocument(uri),
+    getProjectSymbolTable: (uri) => artifactsForDocument(uri)?.getSymbolTable(),
   };
 }
 
