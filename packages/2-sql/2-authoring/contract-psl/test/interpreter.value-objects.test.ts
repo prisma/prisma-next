@@ -1,4 +1,3 @@
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
@@ -9,6 +8,7 @@ import {
   modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  symbolTableInputFromParseArgs,
   valueObjectsOf,
 } from './fixtures';
 
@@ -29,7 +29,7 @@ describe('interpretPslDocumentToSqlContract value objects and list fields', () =
     });
 
   it('emits composite types as valueObjects', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `type Address {
   street String
   city String
@@ -44,7 +44,7 @@ model User {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -63,7 +63,7 @@ model User {
   });
 
   it('preserves the many marker for scalar list fields inside composite types', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `type Address {
   street String
   tags   String[]
@@ -77,7 +77,7 @@ model User {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -95,7 +95,7 @@ model User {
   });
 
   it('emits value object field references with valueObject domain type and JSONB storage', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `type Address {
   street String
   city String
@@ -109,7 +109,7 @@ model User {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -149,7 +149,7 @@ model User {
   });
 
   it('emits scalar list fields with many: true', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
   tags String[]
@@ -158,7 +158,7 @@ model User {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -199,7 +199,7 @@ model User {
   });
 
   it('emits value object list fields with many: true and valueObject domain type', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `type Address {
   street String
   city String
@@ -213,7 +213,7 @@ model User {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -254,7 +254,7 @@ model User {
   });
 
   it('emits nested value object references within composite types', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `type Address {
   street String
   city String
@@ -273,7 +273,7 @@ model Order {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -297,7 +297,7 @@ model Order {
   });
 
   it('omits valueObjects from contract when no composite types exist', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
   name String
@@ -306,7 +306,7 @@ model Order {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 

@@ -41,7 +41,7 @@ const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
 }));
 
-vi.mock('../../src/config-loader', () => ({
+vi.mock('@prisma-next/config-loader', () => ({
   loadConfig: mocks.loadConfig,
 }));
 
@@ -293,7 +293,7 @@ describe('migration tamper detection (tolerant model, per-command class)', () =>
     // The repo-wide vitest config uses `isolate: false`, so the `vi.mock`
     // above leaks into the next test file in the same worker. Unmocking
     // restores `loadConfig` for downstream tests.
-    vi.doUnmock('../../src/config-loader');
+    vi.doUnmock('@prisma-next/config-loader');
     vi.resetModules();
   });
 

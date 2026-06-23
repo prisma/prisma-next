@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
 }));
 
-vi.mock('../../src/config-loader', () => ({
+vi.mock('@prisma-next/config-loader', () => ({
   loadConfig: mocks.loadConfig,
 }));
 
@@ -239,7 +239,7 @@ describe('migrate / migration status — invariant-routing pre-checks', {
   });
 
   afterAll(() => {
-    vi.doUnmock('../../src/config-loader');
+    vi.doUnmock('@prisma-next/config-loader');
     vi.resetModules();
   });
 

@@ -2,13 +2,16 @@ import type {
   DefaultFunctionLoweringContext,
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
 } from '../src/interpreter';
-import { postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
+import {
+  postgresScalarTypeDescriptors,
+  postgresTarget,
+  symbolTableInputFromParseArgs,
+} from './fixtures';
 
 describe('composed mutation default registries', () => {
   const interpretPslDocumentToSqlContract = (
@@ -26,7 +29,7 @@ describe('composed mutation default registries', () => {
     });
 
   it('rejects known default functions when no components contribute handlers', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
   externalId String @default(uuid())
@@ -35,7 +38,7 @@ describe('composed mutation default registries', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ document });
+    const result = interpretPslDocumentToSqlContract({ ...document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -51,7 +54,7 @@ describe('composed mutation default registries', () => {
   });
 
   it('accepts a function contributed through component composition', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
   slug String @default(slugid())
@@ -61,7 +64,7 @@ describe('composed mutation default registries', () => {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: {
         defaultFunctionRegistry: new Map([
           [
@@ -109,7 +112,7 @@ describe('composed mutation default registries', () => {
   });
 
   it('emits applicability diagnostics for incompatible generator codec ids', () => {
-    const document = parsePslDocument({
+    const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id @default(slugid())
 }
@@ -118,7 +121,7 @@ describe('composed mutation default registries', () => {
     });
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       controlMutationDefaults: {
         defaultFunctionRegistry: new Map([
           [

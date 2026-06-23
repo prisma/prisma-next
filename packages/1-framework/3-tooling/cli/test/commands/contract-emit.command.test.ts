@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   executeContractEmitMock: vi.fn(),
 }));
 
-vi.mock('../../src/config-loader', () => ({
+vi.mock('@prisma-next/config-loader', () => ({
   loadConfig: mocks.loadConfigMock,
 }));
 

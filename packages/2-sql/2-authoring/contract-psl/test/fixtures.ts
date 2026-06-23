@@ -1,4 +1,7 @@
-import type { ContractSourceContext } from '@prisma-next/config/config-types';
+import type {
+  ContractSourceContext,
+  ContractSourceDiagnostic,
+} from '@prisma-next/config/config-types';
 import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import {
   domainModelsAtDefaultNamespace,
@@ -8,6 +11,7 @@ import type {
   AuthoringContributions,
   AuthoringEntityContext,
   AuthoringEntityTypeNamespace,
+  AuthoringPslBlockDescriptorNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
@@ -18,6 +22,10 @@ import type {
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
+import type { SymbolTable } from '@prisma-next/psl-parser';
+import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { buildSqlNamespace } from '@prisma-next/sql-contract/types';
 import { type EnumTypeHandle, enumType } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -292,6 +300,56 @@ export const postgresScalarTypeDescriptors = new Map([
   ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
   ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
 ] as const);
+
+export function buildSymbolTableInput(
+  schema: string,
+  options?: {
+    readonly sourceId?: string;
+    readonly scalarTypes?: readonly string[];
+    readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
+  },
+): {
+  symbolTable: SymbolTable;
+  sourceFile: SourceFile;
+  sourceId: string;
+  seedDiagnostics: ContractSourceDiagnostic[];
+} {
+  const sourceId = options?.sourceId ?? 'schema.prisma';
+  const scalarTypes = options?.scalarTypes ?? [...postgresScalarTypeDescriptors.keys()];
+  const pslBlockDescriptors = options?.pslBlockDescriptors ?? {};
+  const { document, sourceFile } = parse(schema);
+  const { table, diagnostics } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes,
+    pslBlockDescriptors,
+  });
+  const seedDiagnostics: ContractSourceDiagnostic[] = diagnostics.map((diagnostic) => ({
+    code: diagnostic.code,
+    message: diagnostic.message,
+    sourceId,
+    span: rangeToPslSpan(diagnostic.range, sourceFile),
+  }));
+  return { symbolTable: table, sourceFile, sourceId, seedDiagnostics };
+}
+
+export function symbolTableInputFromParseArgs(args: {
+  readonly schema: string;
+  readonly sourceId?: string;
+  readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
+}): {
+  symbolTable: SymbolTable;
+  sourceFile: SourceFile;
+  sourceId: string;
+  seedDiagnostics: ContractSourceDiagnostic[];
+} {
+  return buildSymbolTableInput(args.schema, {
+    ...(args.sourceId !== undefined ? { sourceId: args.sourceId } : {}),
+    ...(args.pslBlockDescriptors !== undefined
+      ? { pslBlockDescriptors: args.pslBlockDescriptors }
+      : {}),
+  });
+}
 
 export const sqliteScalarTypeDescriptors = new Map([
   ['String', { codecId: 'sqlite/text@1', nativeType: 'text' }],

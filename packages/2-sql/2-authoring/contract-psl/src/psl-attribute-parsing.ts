@@ -1,9 +1,13 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { ControlPolicy } from '@prisma-next/contract/types';
-import type { PslAttribute, PslSpan } from '@prisma-next/psl-parser';
-import { getPositionalArgument, parseQuotedStringLiteral } from '@prisma-next/psl-parser';
+import type { PslSpan, ResolvedAttribute } from '@prisma-next/psl-parser';
+import { parseQuotedStringLiteral } from '@prisma-next/psl-parser';
 
-export { getPositionalArgument, parseQuotedStringLiteral };
+export { parseQuotedStringLiteral };
+
+export function getPositionalArgument(attribute: ResolvedAttribute, index = 0): string | undefined {
+  return attribute.args.filter((arg) => arg.kind === 'positional')[index]?.value;
+}
 
 export function lowerFirst(value: string): string {
   if (value.length === 0) return value;
@@ -11,13 +15,13 @@ export function lowerFirst(value: string): string {
 }
 
 export function getAttribute(
-  attributes: readonly PslAttribute[] | undefined,
+  attributes: readonly ResolvedAttribute[] | undefined,
   name: string,
-): PslAttribute | undefined {
+): ResolvedAttribute | undefined {
   return attributes?.find((attribute) => attribute.name === name);
 }
 
-export function getNamedArgument(attribute: PslAttribute, name: string): string | undefined {
+export function getNamedArgument(attribute: ResolvedAttribute, name: string): string | undefined {
   const entry = attribute.args.find((arg) => arg.kind === 'named' && arg.name === name);
   if (!entry || entry.kind !== 'named') {
     return undefined;
@@ -26,7 +30,7 @@ export function getNamedArgument(attribute: PslAttribute, name: string): string 
 }
 
 export function getPositionalArgumentEntry(
-  attribute: PslAttribute,
+  attribute: ResolvedAttribute,
   index = 0,
 ): { value: string; span: PslSpan } | undefined {
   const entries = attribute.args.filter((arg) => arg.kind === 'positional');
@@ -63,7 +67,7 @@ export function parseFieldList(value: string): readonly string[] | undefined {
 }
 
 export function parseMapName(input: {
-  readonly attribute: PslAttribute | undefined;
+  readonly attribute: ResolvedAttribute | undefined;
   readonly defaultValue: string;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
@@ -98,7 +102,7 @@ export function parseMapName(input: {
 }
 
 export function parseConstraintMapArgument(input: {
-  readonly attribute: PslAttribute | undefined;
+  readonly attribute: ResolvedAttribute | undefined;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly entityLabel: string;
@@ -128,7 +132,7 @@ export function parseConstraintMapArgument(input: {
   return undefined;
 }
 
-export function getPositionalArguments(attribute: PslAttribute): readonly string[] {
+export function getPositionalArguments(attribute: ResolvedAttribute): readonly string[] {
   return attribute.args
     .filter((arg) => arg.kind === 'positional')
     .map((arg) => (arg.kind === 'positional' ? arg.value : ''));
@@ -276,7 +280,7 @@ export function pushInvalidAttributeArgument(input: {
 }
 
 export function parseOptionalSingleIntegerArgument(input: {
-  readonly attribute: PslAttribute;
+  readonly attribute: ResolvedAttribute;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly entityLabel: string;
@@ -319,7 +323,7 @@ export function parseOptionalSingleIntegerArgument(input: {
 }
 
 export function parseOptionalNumericArguments(input: {
-  readonly attribute: PslAttribute;
+  readonly attribute: ResolvedAttribute;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly entityLabel: string;
@@ -374,7 +378,7 @@ export function parseOptionalNumericArguments(input: {
 }
 
 export function parseAttributeFieldList(input: {
-  readonly attribute: PslAttribute;
+  readonly attribute: ResolvedAttribute;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly code: string;
@@ -426,7 +430,7 @@ function isControlPolicyLiteral(value: string): value is ControlPolicy {
 }
 
 export function parseControlPolicyAttribute(input: {
-  readonly attribute: PslAttribute;
+  readonly attribute: ResolvedAttribute;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): ControlPolicy | undefined {

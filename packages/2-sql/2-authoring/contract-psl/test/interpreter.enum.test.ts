@@ -1,6 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   defineContract,
@@ -18,6 +17,7 @@ import {
   createBuiltinLikeControlMutationDefaults,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  symbolTableInputFromParseArgs,
   testEnumEntityContributions,
 } from './fixtures';
 
@@ -83,13 +83,13 @@ const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults(
 function interpret(schema: string, overrides?: Partial<InterpretPslDocumentToSqlContractInput>) {
   const contributions = overrides?.authoringContributions ?? authoringContributions;
   const descriptors = contributions.pslBlockDescriptors;
-  const document = parsePslDocument({
+  const document = symbolTableInputFromParseArgs({
     schema,
     sourceId: 'schema.prisma',
     ...(descriptors !== undefined ? { pslBlockDescriptors: descriptors } : {}),
   });
   return interpretPslDocumentToSqlContract({
-    document,
+    ...document,
     target: postgresTarget,
     scalarTypeDescriptors: postgresScalarTypeDescriptors,
     composedExtensionContracts: new Map(),
@@ -367,6 +367,47 @@ model Post {
     );
   });
 
+  it('multi-argument enum defaults emit PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT', () => {
+    const result = interpret(`
+enum Priority {
+  @@type("pg/text@1")
+  Low  = "low"
+  High = "high"
+}
+model Post {
+  id Int @id
+  priority Priority @default(Low, High)
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT' }),
+      ]),
+    );
+  });
+
+  it('named-argument enum defaults emit PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT', () => {
+    const result = interpret(`
+enum Priority {
+  @@type("pg/text@1")
+  Low = "low"
+}
+model Post {
+  id Int @id
+  priority Priority @default(value: Low)
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT' }),
+      ]),
+    );
+  });
+
   it('duplicate member values emits diagnostic', () => {
     const result = interpret(`
 enum Priority {
@@ -387,7 +428,7 @@ model Post {
     );
   });
 
-  it('duplicate enum block names: second block silently wins (last-writer wins in entries map)', () => {
+  it('duplicate enum block names are flagged PSL_DUPLICATE_DECLARATION (first-wins)', () => {
     const result = interpret(`
 enum Priority {
   @@type("pg/text@1")
@@ -401,11 +442,11 @@ model Post {
   id Int @id
 }
 `);
-    // The extension-block grammar stores blocks by kind+name in entries; a
-    // second block with the same name overwrites the first without a
-    // diagnostic. The second Priority block (High = "high") wins.
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_DUPLICATE_DECLARATION' })]),
+    );
   });
 
   it('namespaced enum emits not-supported diagnostic', () => {

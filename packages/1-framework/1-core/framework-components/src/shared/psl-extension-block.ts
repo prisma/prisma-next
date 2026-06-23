@@ -108,7 +108,12 @@ export type PslDiagnosticCode =
   /**
    * A `@@`-prefixed block-attribute line inside an extension block has invalid syntax.
    */
-  | 'PSL_INVALID_EXTENSION_BLOCK_ATTRIBUTE';
+  | 'PSL_INVALID_EXTENSION_BLOCK_ATTRIBUTE'
+  /**
+   * Duplicate scopes are top level, namespace body, or block fields; diagnostics
+   * are first-wins and anchored on later name spans.
+   */
+  | 'PSL_DUPLICATE_DECLARATION';
 
 /**
  * Descriptor vocabulary for a single parameter on a declared block.

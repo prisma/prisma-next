@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import * as configLoader from '@prisma-next/config-loader';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
@@ -16,9 +17,10 @@ import {
   executeMigrationStatusCommand,
   type MigrationStatusOptions,
 } from '../../src/commands/migration-status';
-import * as configLoader from '../../src/config-loader';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
+
+vi.mock('@prisma-next/config-loader', { spy: true });
 
 const mocks = vi.hoisted(() => ({
   readAllMarkers: vi.fn(),
@@ -121,7 +123,7 @@ async function writeLinearMigrations(
 describe('migration status --json golden', () => {
   afterAll(() => {
     vi.doUnmock('../../src/control-api/client');
-    vi.doUnmock('../../src/config-loader');
+    vi.doUnmock('@prisma-next/config-loader');
   });
 
   afterEach(async () => {

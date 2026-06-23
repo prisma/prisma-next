@@ -1,6 +1,7 @@
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import {
@@ -22,6 +23,17 @@ const postgresTargetPackRef: TargetPackRef<'sql', 'postgres'> = {
 const postgresScalarTypeDescriptors = new Map([
   ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
 ] as const);
+
+function symbolTableInput(schema: string) {
+  const { document, sourceFile } = parse(schema);
+  const { table } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes: [...postgresScalarTypeDescriptors.keys()],
+    pslBlockDescriptors: {},
+  });
+  return { symbolTable: table, sourceFile, sourceId: 'schema.prisma' };
+}
 
 /**
  * End-to-end demonstration that the FR15 slice-3 + FR16a wiring lines
@@ -45,18 +57,15 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
   // target-specific concretions (PostgresUnboundSchema / PostgresSchema)
   // that carry the assembled tables and dispatch qualifyTable correctly.
   it('`namespace unbound { … }` lowers to PostgresUnboundSchema, whose qualifyTable elides the schema prefix', () => {
-    const document = parsePslDocument({
-      schema: `namespace unbound {
+    const document = symbolTableInput(`namespace unbound {
   model Tenant {
     id Int @id
   }
 }
-`,
-      sourceId: 'schema.prisma',
-    });
+`);
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       target: postgresTargetPackRef,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
@@ -84,18 +93,15 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
   });
 
   it('`namespace auth { … }` lowers to PostgresSchema("auth"), whose qualifyTable emits `"auth"."<table>"`', () => {
-    const document = parsePslDocument({
-      schema: `namespace auth {
+    const document = symbolTableInput(`namespace auth {
   model User {
     id Int @id
   }
 }
-`,
-      sourceId: 'schema.prisma',
-    });
+`);
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       target: postgresTargetPackRef,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
@@ -118,16 +124,13 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
   });
 
   it('top-level (implicit) models lower to the public namespace with schema-qualified DDL', () => {
-    const document = parsePslDocument({
-      schema: `model Post {
+    const document = symbolTableInput(`model Post {
   id Int @id
 }
-`,
-      sourceId: 'schema.prisma',
-    });
+`);
 
     const result = interpretPslDocumentToSqlContract({
-      document,
+      ...document,
       target: postgresTargetPackRef,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),

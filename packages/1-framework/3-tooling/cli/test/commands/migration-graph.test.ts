@@ -27,7 +27,7 @@ const graphMocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
 }));
 
-vi.mock('../../src/config-loader', () => ({
+vi.mock('@prisma-next/config-loader', () => ({
   loadConfig: graphMocks.loadConfig,
 }));
 
@@ -102,7 +102,7 @@ async function setupGraphFixture(): Promise<string> {
 
 describe('migration graph --json envelope', () => {
   afterAll(() => {
-    vi.doUnmock('../../src/config-loader');
+    vi.doUnmock('@prisma-next/config-loader');
   });
 
   afterEach(async () => {

@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   writeRefPaired: vi.fn(),
 }));
 
-vi.mock('../../src/config-loader', () => ({
+vi.mock('@prisma-next/config-loader', () => ({
   loadConfig: mocks.loadConfig,
 }));
 

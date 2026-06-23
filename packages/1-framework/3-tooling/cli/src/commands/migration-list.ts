@@ -1,3 +1,4 @@
+import { loadConfig } from '@prisma-next/config-loader';
 import type {
   ContractSpaceAggregate,
   ContractSpaceMember,
@@ -13,7 +14,6 @@ import {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { loadConfig } from '../config-loader';
 import {
   type CliStructuredError,
   errorInvalidSpaceId,

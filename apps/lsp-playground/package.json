@@ -1,0 +1,45 @@
+{
+  "name": "@prisma-next/lsp-playground",
+  "version": "0.14.0",
+  "private": true,
+  "type": "module",
+  "description": "Private dev playground: opens a PSL file in a browser CodeMirror editor wired to the Prisma Next language server for live diagnostics.",
+  "bin": {
+    "psl-playground": "./bin/psl-playground.mjs"
+  },
+  "scripts": {
+    "start": "tsx src/cli.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "clean": "rm -rf dist coverage .playground"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.18.6",
+    "@codemirror/commands": "^6.8.1",
+    "@codemirror/lint": "^6.8.5",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.38.1",
+    "@prisma-next/adapter-postgres": "workspace:0.14.0",
+    "@prisma-next/driver-postgres": "workspace:0.14.0",
+    "@prisma-next/family-sql": "workspace:0.14.0",
+    "@prisma-next/sql-contract-psl": "workspace:0.14.0",
+    "@prisma-next/target-postgres": "workspace:0.14.0",
+    "codemirror": "^6.0.2",
+    "codemirror-languageserver": "^1.20.0",
+    "vscode-ws-jsonrpc": "3.5.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@prisma-next/cli": "workspace:0.14.0",
+    "@prisma-next/tsconfig": "workspace:0.14.0",
+    "@types/node": "catalog:",
+    "@types/ws": "^8.5.13",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

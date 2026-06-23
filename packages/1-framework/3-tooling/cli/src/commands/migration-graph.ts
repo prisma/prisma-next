@@ -1,9 +1,9 @@
+import { loadConfig } from '@prisma-next/config-loader';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { loadConfig } from '../config-loader';
 import type { CliStructuredError } from '../utils/cli-errors';
 import {
   addGlobalOptions,

@@ -47,7 +47,12 @@ export interface ContractSourceContext {
   readonly resolvedInputs: readonly string[];
 }
 
+/** Lets format-aware tooling avoid file-extension sniffing and opaque loader introspection. */
+export type ContractSourceFormat = 'psl' | 'typescript';
+
 export interface ContractSourceProvider {
+  /** Absent means format-aware tooling must leave the source untouched. */
+  readonly sourceFormat?: ContractSourceFormat;
   readonly inputs?: readonly string[];
   readonly load: (
     context: ContractSourceContext,

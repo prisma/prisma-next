@@ -1,3 +1,4 @@
+import { loadConfig } from '@prisma-next/config-loader';
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
 import type {
   ContractMarkerRecordLike,
@@ -17,7 +18,6 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { dim, yellow } from 'colorette';
 import { Command } from 'commander';
-import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
   CliStructuredError,
