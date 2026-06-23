@@ -2,6 +2,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { PrismaNextConfig } from '@prisma-next/config-loader';
 import * as configLoader from '@prisma-next/config-loader';
 import { errorUnexpected } from '@prisma-next/errors/control';
 import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
@@ -14,10 +15,8 @@ import { resolveConfigInputs, resolveControlStackInputs } from '../src/config-re
 vi.mock('@prisma-next/config-loader', { spy: true });
 vi.mock('@prisma-next/framework-components/control', { spy: true });
 
-type LoadedConfig = Awaited<ReturnType<typeof configLoader.loadConfig>>;
-
-function loadedConfig(sourceFormat: string, inputs: readonly string[]): LoadedConfig {
-  return { contract: { source: { sourceFormat, inputs } } } as unknown as LoadedConfig;
+function loadedConfig(sourceFormat: string, inputs: readonly string[]): PrismaNextConfig {
+  return { contract: { source: { sourceFormat, inputs } } } as unknown as PrismaNextConfig;
 }
 
 function stubStack(

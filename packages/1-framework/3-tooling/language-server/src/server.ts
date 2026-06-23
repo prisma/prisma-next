@@ -62,6 +62,14 @@ export function createServer(connection: Connection): LanguageServer {
     if (project === undefined) {
       return;
     }
+    const currentDocument = documents.get(uri);
+    if (currentDocument === undefined) {
+      documentConfigPaths.delete(uri);
+      return;
+    }
+    if (currentDocument.getText() !== text) {
+      return;
+    }
     const computed = project.artifacts.update(uri, text, project.inputs, project.controlStack);
     if (computed === null) {
       void connection.sendDiagnostics({ uri, diagnostics: [] });
@@ -300,6 +308,7 @@ export function createServer(connection: Connection): LanguageServer {
     if (configPath !== undefined) {
       projects.get(configPath)?.artifacts.remove(uri);
     }
+    documentConfigPaths.delete(uri);
     void connection.sendDiagnostics({ uri, diagnostics: [] });
   });
 

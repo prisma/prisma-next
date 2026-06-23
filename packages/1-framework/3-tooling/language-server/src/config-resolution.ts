@@ -1,12 +1,10 @@
-import { loadConfig } from '@prisma-next/config-loader';
+import { loadConfig, type PrismaNextConfig } from '@prisma-next/config-loader';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { FormatOptions } from '@prisma-next/psl-parser/format';
 import type { PipelineInputs } from './pipeline';
 import { hasPslInputs, resolveSchemaInputs, type SchemaInputSet } from './schema-inputs';
 
 export const CONFIG_FILENAME = 'prisma-next.config.ts';
-
-type LoadedConfig = Awaited<ReturnType<typeof loadConfig>>;
 
 export interface ConfigResolution {
   readonly inputs: SchemaInputSet;
@@ -28,7 +26,7 @@ export async function resolveConfigInputs(configPath: string): Promise<ConfigRes
     : { inputs, formatter: config.formatter, controlStack };
 }
 
-export function resolveControlStackInputs(config: LoadedConfig): PipelineInputs | undefined {
+export function resolveControlStackInputs(config: PrismaNextConfig): PipelineInputs | undefined {
   if (!hasPslInputs(config)) {
     return undefined;
   }

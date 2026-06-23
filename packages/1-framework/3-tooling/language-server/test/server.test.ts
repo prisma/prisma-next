@@ -136,6 +136,7 @@ interface Harness {
     uri: string,
     predicate: (diagnostics: readonly Diagnostic[]) => boolean,
   ) => Promise<readonly Diagnostic[]>;
+  readonly waitForDiagnosticsCount: (uri: string, count: number) => Promise<void>;
   readonly registrations: RegistrationParams[];
   readonly waitForWatchedFilesRegistration: (timeoutMs: number) => Promise<void>;
   readonly waitForWarning: (predicate: (message: string) => boolean) => Promise<string>;
@@ -169,14 +170,33 @@ function startHarness(
 
   const pending = new Map<string, (diagnostics: readonly Diagnostic[]) => void>();
   const latest = new Map<string, readonly Diagnostic[]>();
+  const publishCounts = new Map<string, number>();
   interface PredicateWaiter {
     readonly predicate: (diagnostics: readonly Diagnostic[]) => boolean;
     readonly resolve: (diagnostics: readonly Diagnostic[]) => void;
   }
   const predicateWaiters = new Map<string, PredicateWaiter[]>();
+  interface CountWaiter {
+    readonly count: number;
+    readonly resolve: () => void;
+  }
+  const countWaiters = new Map<string, CountWaiter[]>();
   client.onNotification(PublishDiagnosticsNotification.type, (params) => {
     latest.set(params.uri, params.diagnostics);
+    const publishCount = (publishCounts.get(params.uri) ?? 0) + 1;
+    publishCounts.set(params.uri, publishCount);
     pending.get(params.uri)?.(params.diagnostics);
+    const countQueue = countWaiters.get(params.uri);
+    if (countQueue) {
+      const remaining = countQueue.filter((waiter) => {
+        if (publishCount >= waiter.count) {
+          waiter.resolve();
+          return false;
+        }
+        return true;
+      });
+      countWaiters.set(params.uri, remaining);
+    }
     const queue = predicateWaiters.get(params.uri);
     if (queue) {
       const remaining = queue.filter((waiter) => {
@@ -294,6 +314,16 @@ function startHarness(
         queue.push({ predicate, resolve });
         predicateWaiters.set(uri, queue);
       }),
+    waitForDiagnosticsCount: (uri, count) =>
+      new Promise((resolve) => {
+        if ((publishCounts.get(uri) ?? 0) >= count) {
+          resolve();
+          return;
+        }
+        const queue = countWaiters.get(uri) ?? [];
+        queue.push({ count, resolve });
+        countWaiters.set(uri, queue);
+      }),
     notifyConfigChanged: (uri = configUri) => {
       client.sendNotification(DidChangeWatchedFilesNotification.type, {
         changes: [{ uri, type: FileChangeType.Changed }],
@@ -327,6 +357,14 @@ function requestFormatting(harness: Harness, uri: string): Promise<TextEdit[] | 
     textDocument: { uri },
     options: { tabSize: 2, insertSpaces: true },
   });
+}
+
+function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
+  let resolvePromise: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve;
+  });
+  return { promise, resolve: resolvePromise };
 }
 
 let harness: Harness | undefined;
@@ -1105,6 +1143,58 @@ describe('language server preserved artifacts', { timeout: timeouts.databaseOper
     );
   });
 
+  it('ignores a publish that resolves after the document closes', async () => {
+    const load = deferred<ConfigResolution>();
+    harness = startHarness(async () => load.promise);
+    await harness.initialize();
+
+    openDocument(harness, schemaUri, duplicateModelSource);
+    const closed = harness.waitForDiagnosticsMatching(
+      schemaUri,
+      (diagnostics) => diagnostics.length === 0,
+    );
+    closeDocument(harness, schemaUri);
+    await closed;
+
+    load.resolve(resolutionForInputs([schemaPath]));
+    await requestFormatting(harness, schemaUri);
+
+    expect(harness.latestDiagnostics(schemaUri)).toEqual([]);
+    expect(harness.getDocumentAst(schemaUri)).toBeUndefined();
+    expect(harness.getProjectSymbolTable(schemaUri)).toBeUndefined();
+  });
+
+  it('rediscovers document ownership after close', async () => {
+    const alternateConfigPath = join(root, 'alternate-prisma-next.config.ts');
+    let nearestConfigPath = configPath;
+    harness = startHarness(
+      async (path) => (path === configPath ? resolutionForInputs([schemaPath]) : emptyResolution()),
+      {},
+      async () => nearestConfigPath,
+    );
+    await harness.initialize();
+
+    openDocument(harness, schemaUri, duplicateModelSource);
+    expect((await harness.waitForDiagnostics(schemaUri)).length).toBeGreaterThan(0);
+
+    const closed = harness.waitForDiagnosticsMatching(
+      schemaUri,
+      (diagnostics) => diagnostics.length === 0,
+    );
+    closeDocument(harness, schemaUri);
+    await closed;
+
+    nearestConfigPath = alternateConfigPath;
+    const reopened = harness.waitForDiagnosticsMatching(
+      schemaUri,
+      (diagnostics) => diagnostics.length === 0,
+    );
+    openDocument(harness, schemaUri, duplicateModelSource, 2);
+    await reopened;
+
+    expect(configResolutionMock.resolveConfigInputs).toHaveBeenCalledWith(alternateConfigPath);
+  });
+
   it('drops the cached AST and clears the symbol table when the document closes', async () => {
     harness = startHarness(resolveToSchema);
     await harness.initialize();
@@ -1123,9 +1213,7 @@ describe('language server preserved artifacts', { timeout: timeouts.databaseOper
     expect((await harness.waitForDiagnostics(schemaUri)).length).toBeGreaterThan(0);
     expect(harness.getDocumentAst(schemaUri)).toBeDefined();
     expect(harness.getProjectSymbolTable(schemaUri)).toBeDefined();
-    // Let both open publishes settle so no in-flight publish re-caches the
-    // document after it is dropped.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await harness.waitForDiagnosticsCount(schemaUri, 2);
 
     const closed = harness.waitForDiagnosticsMatching(
       schemaUri,
