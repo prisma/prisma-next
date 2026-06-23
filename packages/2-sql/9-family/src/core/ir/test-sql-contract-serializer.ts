@@ -1,11 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
-import {
-  isMaterializedSqlNamespace,
-  type SqlNamespaceInput,
-  type SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceInput, SqlStorage } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { SqlContractSerializerBase } from './sql-contract-serializer-base';
 
 /**
@@ -22,10 +19,11 @@ export class TestSqlContractSerializer extends SqlContractSerializerBase<Contrac
     nsId: string,
     raw: Namespace | Record<string, unknown>,
   ): Namespace | SqlNamespaceInput {
-    const result = super.hydrateSqlNamespaceEntry(nsId, raw);
-    if (isMaterializedSqlNamespace(result)) {
-      return result;
-    }
-    return createTestSqlNamespace(result as SqlNamespaceInput);
+    return createTestSqlNamespace(
+      blindCast<
+        SqlNamespaceInput,
+        'super.hydrateSqlNamespaceEntry returns SqlNamespaceInput when raw is not materialized'
+      >(super.hydrateSqlNamespaceEntry(nsId, raw)),
+    );
   }
 }

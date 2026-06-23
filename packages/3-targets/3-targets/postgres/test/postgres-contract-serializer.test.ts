@@ -7,7 +7,6 @@ import {
 import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   ForeignKey,
-  isMaterializedSqlNamespace,
   PrimaryKey,
   type SqlNamespaceInput,
   SqlStorage,
@@ -17,6 +16,7 @@ import {
   toStorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { createSqlContract } from '@prisma-next/test-utils';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
 import { postgresCreateNamespace } from '../src/core/postgres-schema';
@@ -169,14 +169,12 @@ describe('PostgresContractSerializer', () => {
         nsId: string,
         raw: Namespace | Record<string, unknown>,
       ): Namespace | SqlNamespaceInput {
-        if (isMaterializedSqlNamespace(raw)) {
-          return raw;
-        }
-        const input = super.hydrateSqlNamespaceEntry(nsId, raw);
-        if (isMaterializedSqlNamespace(input)) {
-          return input;
-        }
-        return postgresCreateNamespace(input as SqlNamespaceInput);
+        return postgresCreateNamespace(
+          blindCast<
+            SqlNamespaceInput,
+            'super.hydrateSqlNamespaceEntry returns SqlNamespaceInput when raw is not materialized'
+          >(super.hydrateSqlNamespaceEntry(nsId, raw)),
+        );
       }
 
       protected override parseSqlContractStructure(_json: unknown): Contract<SqlStorage> {

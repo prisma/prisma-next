@@ -10,11 +10,7 @@ import {
   isAuthoringEntityTypeDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  isMaterializedSqlNamespace,
-  type SqlNamespaceInput,
-  type SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceInput, SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
@@ -73,9 +69,6 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     nsId: string,
     raw: Namespace | Record<string, unknown>,
   ): Namespace | SqlNamespaceInput {
-    if (isMaterializedSqlNamespace(raw)) {
-      return raw;
-    }
     const hydrated = blindCast<
       SqlNamespaceInput,
       'super.hydrateSqlNamespaceEntry returns SqlNamespaceInput when raw is not a materialized SqlNamespace'
