@@ -1,4 +1,5 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
+import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import { freezeNode, type Namespace, type Storage } from '@prisma-next/framework-components/ir';
 import { SqlNode } from './sql-node';
 import type { StorageTable } from './storage-table';
@@ -22,6 +23,36 @@ export type SqlStorageTypeEntry = StorageTypeInstance | StorageTypeInstanceInput
 export interface SqlNamespaceTablesInput {
   readonly id: string;
   readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+}
+
+/**
+ * Target-supplied factory that materializes a `Namespace` from a SQL
+ * `SqlNamespaceTablesInput` (used to populate `SqlStorage.namespaces`).
+ */
+export type SqlNamespaceFactory = (input: SqlNamespaceTablesInput) => Namespace;
+
+/**
+ * SQL-family extension of the framework `AuthoringContributions`. SQL target
+ * packs add a `createNamespace` factory so the PSL/TS authoring paths can
+ * materialize namespaces (and merge lowered extension-block entities) without
+ * each consumer re-specifying it. The factory is SQL-specific, so it lives here
+ * rather than on the framework `AuthoringContributions` base.
+ */
+export interface SqlAuthoringContributions extends AuthoringContributions {
+  readonly createNamespace?: SqlNamespaceFactory;
+}
+
+/**
+ * Narrows framework `AuthoringContributions` to the SQL-family shape by testing
+ * for the SQL-specific `createNamespace` capability.
+ */
+export function isSqlAuthoringContributions(
+  authoring: AuthoringContributions | undefined,
+): authoring is SqlAuthoringContributions {
+  if (authoring === undefined || !Object.hasOwn(authoring, 'createNamespace')) {
+    return false;
+  }
+  return typeof Reflect.get(authoring, 'createNamespace') === 'function';
 }
 
 export interface SqlStorageInput<THash extends string = string> {
