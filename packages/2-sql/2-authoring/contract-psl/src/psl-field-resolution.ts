@@ -445,6 +445,19 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
           })
       : {};
     const loweredOnCreate = loweredDefault.executionDefaults?.onCreate;
+    const loweredFunctionDefault = loweredDefault.defaultValue?.kind === 'function';
+    if (isListField && (loweredOnCreate || loweredFunctionDefault)) {
+      const defaultExpression =
+        defaultAttribute?.args.find((arg) => arg.kind === 'positional')?.value.trim() ??
+        'this function';
+      diagnostics.push({
+        code: 'PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED',
+        message: `Field "${model.name}.${field.name}" is a list and cannot use an execution default ("${defaultExpression}"). Lists have no per-element execution-default semantics; use a literal list @default or remove the default.`,
+        sourceId,
+        span: defaultAttribute?.span ?? field.span,
+      });
+      continue;
+    }
     if (field.optional && loweredOnCreate) {
       const generatorDescription =
         loweredOnCreate.kind === 'generator' ? `"${loweredOnCreate.id}"` : 'for this field';
@@ -474,6 +487,15 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       diagnostics,
     });
     let isIdField = Boolean(idAttribute);
+    if (idAttribute && isListField) {
+      diagnostics.push({
+        code: 'PSL_LIST_ID_UNSUPPORTED',
+        message: `Field "${model.name}.${field.name}" is a list and cannot be a primary key. Remove @id; a list cannot be an identity column.`,
+        sourceId,
+        span: idAttribute.span,
+      });
+      continue;
+    }
     if (idAttribute && field.optional) {
       diagnostics.push({
         code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
