@@ -4,6 +4,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { isPostgresSchema } from '../postgres-schema';
+import { isPostgresSchemaIR } from '../postgres-schema-ir';
 
 /**
  * Resolves the live-database schema name for a given namespace
@@ -23,25 +24,21 @@ function resolveDdlSchemaName(storage: SqlStorage, namespaceId: string): string 
 }
 
 /**
- * Reads the introspected list of schema names from the Postgres-flavoured
- * annotations slot on the schema IR. Defaults to the always-present
- * `public` schema when introspection did not populate the slot — a fresh
- * Postgres database always carries `public` (unless an operator dropped
- * it manually), so any verifier path that runs without an enriched
- * introspection still suppresses the redundant `CREATE SCHEMA "public"`.
+ * Reads the introspected list of schema names from a `PostgresSchemaIR`.
+ * Defaults to the always-present `public` schema when the schema IR is not a
+ * `PostgresSchemaIR` — a fresh Postgres database always carries `public`
+ * (unless an operator dropped it manually), so any verifier path that runs
+ * without an enriched introspection still suppresses the redundant
+ * `CREATE SCHEMA "public"`.
  *
  * Production introspection (`PostgresControlAdapter.introspect`) is the
- * authoritative source: it queries `pg_namespace` and writes every
- * non-system schema into `annotations.pg.existingSchemas`. Tests that
- * want to assert against a richer initial state pass the slot
- * explicitly via the schema IR.
+ * authoritative source: it queries `pg_namespace` and sets `existingSchemas`
+ * on the returned `PostgresSchemaIR`. Tests that want to assert against a
+ * richer initial state construct a `PostgresSchemaIR` explicitly.
  */
 function existingSchemasFromSchema(schema: SqlSchemaIR): readonly string[] {
-  const annotations = (schema as { annotations?: { pg?: { existingSchemas?: unknown } } })
-    .annotations;
-  const slot = annotations?.pg?.existingSchemas;
-  if (Array.isArray(slot)) {
-    return slot.filter((s): s is string => typeof s === 'string');
+  if (isPostgresSchemaIR(schema)) {
+    return schema.existingSchemas;
   }
   return ['public'];
 }

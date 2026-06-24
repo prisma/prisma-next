@@ -48,12 +48,26 @@ import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+import type { PostgresSchema } from '@prisma-next/target-postgres/types';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 import { createDb } from '../src/prisma/db';
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
+
+// Derive the policy wire name from the deserialized contract rather than pinning a literal.
+// The public namespace holds exactly one policy; its `.name` is the content-addressed wire name.
+const _deserializedForConsts = new PostgresContractSerializer().deserializeContract<Contract>(
+  contractJson,
+);
+const _publicNsDeserialized = _deserializedForConsts.storage.namespaces['public'];
+// _publicNs is a PostgresSchema at runtime after deserialization. isPostgresSchema narrows
+// to PostgresSchema, but the intersection with the contract's structural literal type
+// reduces to `never` in TypeScript because both define `kind` with incompatible literals
+// ('schema' vs 'postgres-schema'). We cast through unknown to break the intersection.
+const _publicNsAsSchema = _publicNsDeserialized as unknown as PostgresSchema;
+const POLICY_WIRE_NAME: string = Object.values(_publicNsAsSchema.policy)[0]?.name ?? '';
 
 // Active in CI (test:examples). This asserts the M1 walking-skeleton behaviour only —
 // external-contract migrate/verify + the public.profile round-trip — which is green and
@@ -150,6 +164,18 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
         expect(
           hasProfileCreate,
           `Expected a createTable op for public.profile; got: ${JSON.stringify(opIds)}`,
+        ).toBe(true);
+
+        // The plan must include ENABLE RLS + CREATE POLICY for public.profile.
+        const hasEnableRls = opIds.some((id) => id.startsWith('rowLevelSecurity.public.profile'));
+        expect(
+          hasEnableRls,
+          `Expected ENABLE RLS op for public.profile; got: ${JSON.stringify(opIds)}`,
+        ).toBe(true);
+        const hasCreatePolicy = opIds.some((id) => id.startsWith('rlsPolicy.public.profile.'));
+        expect(
+          hasCreatePolicy,
+          `Expected CREATE POLICY op for profile; got: ${JSON.stringify(opIds)}`,
         ).toBe(true);
 
         // The plan must emit ZERO ops targeting auth or storage schemas.
@@ -344,6 +370,169 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
         expect(afterRows).toHaveLength(0);
       } finally {
         await appDb.close();
+      }
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+});
+
+describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () => {
+  let database: Awaited<ReturnType<typeof createDevDatabase>>;
+  let migrationsDir: string;
+  let client: ReturnType<typeof createControlClient>;
+
+  beforeEach(async () => {
+    database = await createDevDatabase();
+    migrationsDir = await mkdtemp(join(tmpdir(), 'supabase-rls-e2e-'));
+
+    await withClient(database.connectionString, async (pgClient) => {
+      await bootstrapSupabaseShim(pgClient);
+    });
+
+    const space = supabasePack.contractSpace;
+    if (!space) throw new Error('supabasePack must declare a contractSpace');
+    await emitContractSpaceArtefacts(migrationsDir, 'supabase', {
+      contract: space.contractJson,
+      contractDts: '// supabase extension contract space\n',
+      headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
+    });
+
+    client = createControlClient({
+      family: sql,
+      target: postgres,
+      adapter: postgresAdapter,
+      driver: postgresDriver,
+      extensionPacks: [supabasePack],
+    });
+
+    await client.connect(database.connectionString);
+
+    const applyResult = await client.dbInit({
+      contract: contractJson,
+      mode: 'apply',
+      migrationsDir,
+    });
+    if (!applyResult.ok) {
+      throw new Error(
+        `db init apply failed: ${applyResult.failure.summary}\n\n${JSON.stringify(applyResult.failure, null, 2)}`,
+      );
+    }
+  }, timeouts.spinUpPpgDev * 4);
+
+  afterEach(async () => {
+    await client.close();
+    if (database) await database.close();
+    if (migrationsDir) await rm(migrationsDir, { recursive: true, force: true });
+  }, timeouts.spinUpPpgDev);
+
+  it(
+    'A — RLS filters rows under authenticated role + jwt GUC',
+    async () => {
+      const { connectionString } = database;
+      const ownerA = '11111111-1111-1111-1111-111111111111';
+      const ownerB = '22222222-2222-2222-2222-222222222222';
+
+      // Insert two rows as superuser (bypasses RLS).
+      // auth.users rows must exist first because profile.userId is a FK.
+      await withClient(connectionString, async (pgClient) => {
+        const now = new Date().toISOString();
+        await pgClient.query(
+          'INSERT INTO auth.users (id, email, created_at, updated_at) VALUES ($1, $2, $3, $3), ($4, $5, $3, $3)',
+          [ownerA, 'alice@example.com', now, ownerB, 'bob@example.com'],
+        );
+        await pgClient.query(
+          'INSERT INTO public.profile (id, username, "userId") VALUES ($1, $2, $3), ($4, $5, $6)',
+          [
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            'alice',
+            ownerA,
+            'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+            'bob',
+            ownerB,
+          ],
+        );
+        // authenticated role needs SELECT privilege to read the table under RLS.
+        await pgClient.query('GRANT SELECT ON public.profile TO authenticated');
+      });
+
+      // Under SET ROLE authenticated + ownerA jwt, only alice's row is visible.
+      // PostgREST pattern: set the JWT claims GUC as superuser first (session-
+      // level, is_local=false so it persists across statement boundaries), then
+      // switch to the authenticated role for the actual query.
+      await withClient(connectionString, async (pgClient) => {
+        await pgClient.query(
+          `SELECT set_config('request.jwt.claims', '{"sub":"${ownerA}"}', false)`,
+        );
+        await pgClient.query('SET ROLE authenticated');
+
+        const result = await pgClient.query<{
+          id: string;
+          username: string;
+          userId: string;
+        }>('SELECT id, username, "userId" FROM public.profile');
+
+        await pgClient.query('RESET ROLE');
+
+        expect(result.rows).toHaveLength(1);
+        expect(result.rows[0]).toEqual({
+          id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          username: 'alice',
+          userId: ownerA,
+        });
+      });
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  it(
+    'B — out-of-band DROP POLICY makes dbVerify schema result ok:false naming the policy',
+    async () => {
+      const { connectionString } = database;
+
+      // Drop the policy out-of-band as superuser.
+      await withClient(connectionString, async (pgClient) => {
+        await pgClient.query(`DROP POLICY "${POLICY_WIRE_NAME}" ON public.profile`);
+      });
+
+      const deserializedContract = new PostgresContractSerializer().deserializeContract<Contract>(
+        contractJson,
+      );
+      const verifyResult = await client.dbVerify({
+        contract: deserializedContract,
+        migrationsDir,
+        strict: false,
+        skipSchema: false,
+        skipMarker: false,
+      });
+
+      // The operation itself succeeds (connectivity, markers ok); the schema
+      // verification result for the app space carries the policy failure.
+      expect(
+        verifyResult.ok,
+        `dbVerify operation failed unexpectedly: ${!verifyResult.ok ? JSON.stringify(verifyResult.failure) : ''}`,
+      ).toBe(true);
+
+      if (verifyResult.ok) {
+        const appSchemaResult = verifyResult.value.schemaResults.get('app');
+        expect(
+          appSchemaResult,
+          `Expected 'app' space in schemaResults; got keys: ${[...verifyResult.value.schemaResults.keys()].join(', ')}`,
+        ).toBeDefined();
+
+        expect(
+          appSchemaResult?.ok,
+          `Expected app schema result ok:false after DROP POLICY; schemaDiffIssues: ${JSON.stringify(appSchemaResult?.schema.schemaDiffIssues)}`,
+        ).toBe(false);
+
+        const policyIssue = appSchemaResult?.schema.schemaDiffIssues.find(
+          (issue) =>
+            issue.outcome === 'missing' && issue.coordinate.entityName === POLICY_WIRE_NAME,
+        );
+        expect(
+          policyIssue,
+          `Expected missing schemaDiffIssue naming '${POLICY_WIRE_NAME}'; got: ${JSON.stringify(appSchemaResult?.schema.schemaDiffIssues)}`,
+        ).toBeDefined();
+        expect(policyIssue?.outcome).toBe('missing');
       }
     },
     timeouts.spinUpPpgDev * 4,

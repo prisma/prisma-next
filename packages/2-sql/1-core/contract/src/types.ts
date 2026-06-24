@@ -25,8 +25,11 @@ export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
 export {
   isMaterializedSqlNamespace,
+  isSqlAuthoringContributions,
+  type SqlAuthoringContributions,
   SqlNamespace,
   type SqlNamespaceEntries,
+  type SqlNamespaceFactory,
   type SqlNamespaceInput,
   type SqlNamespaceShape,
   SqlStorage,

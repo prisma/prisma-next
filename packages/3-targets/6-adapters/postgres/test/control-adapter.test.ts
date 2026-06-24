@@ -48,16 +48,10 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result).toEqual({
-        tables: {},
-        annotations: {
-          pg: {
-            schema: 'public',
-            version: expect.any(String),
-            existingSchemas: [],
-          },
-        },
-      });
+      expect(result.tables).toEqual({});
+      expect(result.pgSchemaName).toBe('public');
+      expect(result.pgVersion).toEqual(expect.any(String));
+      expect(result.existingSchemas).toEqual([]);
     });
 
     it('issues introspection queries sequentially on the single connection', async () => {
@@ -1136,7 +1130,7 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver, undefined, 'custom_schema');
 
-      expect(result.annotations?.['pg']).toMatchObject({ schema: 'custom_schema' });
+      expect(result.pgSchemaName).toBe('custom_schema');
     });
 
     it(
@@ -1165,7 +1159,7 @@ describe('PostgresControlAdapter', () => {
 
         const result = await adapter.introspect(mockDriver);
 
-        expect(result.annotations?.['pg']).toMatchObject({ version: 'unknown' });
+        expect(result.pgVersion).toBe('unknown');
       },
       timeouts.databaseOperation,
     );
@@ -1192,7 +1186,7 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.annotations?.['pg']).toMatchObject({ version: 'unknown' });
+      expect(result.pgVersion).toBe('unknown');
     });
 
     it('handles table without primary key', async () => {

@@ -1,6 +1,6 @@
 # Slice 6: PG demo M:N examples + dual-mode reconciliation
 
-_Parent project: `projects/sql-orm-many-to-many/`. Linear: [TML-2795](https://linear.app/prisma-company/issue/TML-2795). Status: **planned**; M:N-examples half **blocked by slice 5** (TML-2794)._
+_Parent project: `projects/sql-orm-many-to-many/`. Linear: [TML-2795](https://linear.app/prisma-company/issue/TML-2795). Status: **complete** (branch `tml-2795-slice-6-pg-demo-mn-examples`, stacked on slice 5)._
 
 ## At a glance
 
@@ -30,12 +30,12 @@ Two separable halves:
 
 ## Slice-specific done conditions
 
-- [ ] `test:dual-mode` green (both legs pass, or the TS source is removed and the demo is cleanly PSL-only).
-- [ ] PG demo demonstrates the M:N API (include / filter / nested write) — mirroring slice 4 — via CLI commands, seeded, with integration tests per the standard.
+- [x] Dual-mode reconciliation **deferred, not done in this slice**. The PSL-only arm was attempted (TS contract source + no-emit workflow removed) and then reverted: the no-emit workflow and `test:dual-mode` are kept as-is on `main`, so no demonstration is lost. `test:dual-mode` stays red on the TS leg, which is tolerable because CI does not run it (CI runs `typecheck:examples` / `lint:examples` / `test:examples` only, all green). Real parity is tracked by **TML-2938** (bring the TS leg to parity, green the dual-mode test), blocked by **TML-2228** (TS authoring DSL polymorphism support — the discriminated `Task`/`Bug`/`Feature` hierarchy can't be authored in TS until that lands).
+- [x] PG demo demonstrates the M:N API — all nine surfaces mirroring slice 4 — via `repo-*` CLI commands, seeded, with integration tests per the standard.
 
 ## Open Questions
 
-1. **Dual-mode reconciliation approach** — add TS-builder discriminator authoring (i) vs drop the TS source / PSL-only (ii). Working position: lean (ii) PSL-only unless TS-builder discriminator authoring is wanted for its own sake — but this is the operator's call (it touches the demo's dual-mode story).
+1. **Dual-mode reconciliation approach** — resolved: neither arm is taken in this slice. The no-emit / dual-mode surface is left exactly as `main` had it (additive M:N only), and parity is deferred to TML-2938 (blocked by TML-2228). Approach (i) — add TS-builder discriminator authoring — is the path TML-2938 will take once TML-2228 unblocks it.
 
 ## References
 

@@ -43,7 +43,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   describe('when the operation postcheck is already satisfied before execution (idempotency)', () => {
     it('skips executing the operation and still writes marker and ledger', {

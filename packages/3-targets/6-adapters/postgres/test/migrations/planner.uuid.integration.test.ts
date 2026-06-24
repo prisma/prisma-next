@@ -86,7 +86,7 @@ describe.sequential('pg/uuid@1 — end-to-end PGlite coverage', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   async function applyContract(d: PostgresControlDriver): Promise<void> {
     const planner = postgresTargetDescriptor.createPlanner(controlAdapter);

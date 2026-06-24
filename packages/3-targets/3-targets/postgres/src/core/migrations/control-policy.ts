@@ -21,6 +21,8 @@ import type { PostgresOpFactoryCall } from './op-factory-call';
 const OBJECT_CREATION_FACTORIES: ReadonlySet<string> = new Set<string>([
   'createTable',
   'createSchema',
+  'createRlsPolicy',
+  'enableRowLevelSecurity',
 ]);
 
 function createsNewTopLevelObject(call: PostgresOpFactoryCall): boolean {
@@ -151,6 +153,7 @@ export function resolvePostgresCallControlPolicySubject(
 const POSTGRES_ISSUE_CREATION_FACTORY: Readonly<Record<string, string>> = Object.freeze({
   missing_schema: 'createSchema',
   missing_table: 'createTable',
+  missing_rls_policy: 'createRlsPolicy',
 });
 
 export function resolvePostgresIssueCreationFactoryName(issue: SchemaIssue): string | undefined {

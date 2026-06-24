@@ -17,8 +17,15 @@ Supported capabilities are intentionally narrow: parse diagnostics and whole-doc
    (`TextDocumentSyncKind.Incremental`); the `TextDocuments` manager applies
    incremental edits, and the server re-parses the full current buffer on each
    change.
-3. **Diagnostics** — on `didOpen` / `didChange` of a document whose URI is a configured PSL input, the server runs `@prisma-next/psl-parser`'s `parse()` (the CST path) and publishes the mapped diagnostics via `textDocument/publishDiagnostics`. A clean parse publishes an empty array (clearing markers). Documents that are not configured inputs publish nothing.
+3. **Diagnostics** — on `didOpen` / `didChange` of a document whose URI is a configured PSL input, the server runs `@prisma-next/psl-parser`'s `parse()` (the CST path) and `buildSymbolTable()`, then publishes the merged, mapped diagnostics via `textDocument/publishDiagnostics`. A clean document publishes an empty array (clearing markers). Documents that are not configured inputs publish nothing.
 4. **Formatting** — on `textDocument/formatting`, the server formats the current in-memory document text with `@prisma-next/psl-parser/format` when the document is a configured PSL input. It returns one whole-document edit when the formatted text differs, and returns no edits for missing or closed documents, unconfigured documents, already canonical text, malformed PSL, or invalid formatter options.
+5. **Preserved artifacts** — each project keeps the parse artifacts it produces:
+   the AST per open document (keyed by URI) and one symbol table per project,
+   rebuilt from the open configured input on each edit and dropped when the
+   document closes. They are exposed through `getDocumentAst` /
+   `getProjectSymbolTable` so future features (completion, semantic tokens) read
+   real stages instead of re-parsing. Filling the project table from several
+   inputs — and reading unopened inputs from disk — is deferred cross-file work.
 
 ## Module layout
 
@@ -28,9 +35,10 @@ Supported capabilities are intentionally narrow: parse diagnostics and whole-doc
   adapts the numeric severity to the LSP enum.
 - `schema-inputs.ts` — resolves the schema-input set (`SchemaInputSet`) from a
   config and answers URI membership.
-- `config-resolution.ts` — wraps `loadConfig` and resolves schema inputs plus formatter options for a config. A standalone async function so it can be re-run on a config change without rewiring the server.
-- `document-diagnostics.ts` — `computeDocumentDiagnostics(uri, text, inputs)`,
-  the seam the connection layer calls.
+- `config-resolution.ts` — wraps `loadConfig` and resolves schema inputs, formatter options, and control-stack inputs for a config. A standalone async function so it can be re-run on a config change without rewiring the server.
+- `document-diagnostics.ts` — `computeDocumentDiagnostics(uri, text, inputs, controlStack)`, the pure seam that parses, builds the symbol table, and returns the diagnostics plus the parse artifacts.
+- `project-artifacts.ts` — `createProjectArtifacts()`, the per-project store that
+  preserves the per-URI ASTs and the single project symbol table across edits.
 - `server.ts` — `createServer(connection)` wires diagnostics and whole-document formatting handlers onto an injected connection.
 - `start-server.ts` — `startServer()` creates a stdio connection and starts the server. This is what the CLI delegates to.
 

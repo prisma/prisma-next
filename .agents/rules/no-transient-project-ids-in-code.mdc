@@ -4,64 +4,26 @@ alwaysApply: true
 ---
 # No transient project planning IDs in code
 
-Source code, comments, test names, and identifier strings must **never** reference transient project planning artefacts. Plans and specs are scratch documents that get deleted at project close-out; encoding their identifiers into the code makes the code lie about itself the moment the plan is rewritten or removed.
+Source code, comments, test names, identifier strings, and hash fixtures must **never** reference transient project planning artefacts. Plans/specs are scratch documents deleted at close-out; encoding their IDs makes the code lie the moment the plan is rewritten or removed.
 
-## What counts as a transient ID
+**Transient (forbidden in code)** — anything under `projects/<x>/` or in a plan/spec/review doc:
 
-If it lives under `projects/<project>/` or in a project plan / spec / review document, it is transient. Specifically forbidden in code:
+- Task IDs (`T1.1`, `D7`, `M3.2`), test-case IDs (`TC-1`, `TC18`), AC/FR/NFR IDs (`AC1`, `FR2`, `NFR5`), phase/round/checkpoint IDs (`P3 R2`, `CKPT-2`, `M2 review`)
+- Prose attributions to the plan ("out of scope per the spec", "sub-spec § 4", "deferred per project plan")
+- `projects/<x>/...` paths anywhere in source (incl. JSDoc `@link`s and string literals)
+- Hash fixtures named after IDs (`'sha256:tc12-ext-contract'`)
 
-- **Task IDs**: `T1.1`, `T2.4`, `T3.5`, `T4.1`, `T5.2`, `D7`, `M3.2`
-- **Test-case IDs**: `TC-1`, `TC-18`, `TC18`
-- **Acceptance-criterion / functional-requirement / non-functional-requirement IDs**: `AC1`, `AC11`, `AM12`, `AC-13`, `FR2`, `NFR5`
-- **Phase / round / checkpoint IDs**: `P3 R2`, `R4 design choice`, `CKPT-2`, `M2 review`, `M5 closeout`
-- **Prose attributions to the plan**: "out of scope per the spec", "sub-spec § 4", "sub-spec OQ3", "deferred per project plan", "post-M2 follow-up"
-- **`projects/<x>/...` paths anywhere in source files** (including JSDoc `@link`s and string literals)
-- **Hash fixtures named after IDs**: `'sha256:tc12-ext-contract'`, `'sha256:ac6-fixture'`
-
-## What is allowed
-
-Stable references that survive close-out are fine:
-
-- **Linear ticket IDs**: `TML-2408`, `TML-2506` (these don't disappear)
-- **ADR numbers**: `ADR 211`, `ADR 212`
-- **PR numbers**: `PR #494`
-- **Permanent docs paths**: `docs/architecture docs/...`, `docs/onboarding/...`
-- **Source paths inside the repo's durable layout**: `packages/...`, `test/...`, `examples/...`
-
-## Why
-
-Transient IDs in code:
-
-- **Decay silently.** When the plan is renumbered, regenerated, or deleted at close-out, the comment becomes a dangling reference. Reviewers can't verify the claim because the artefact is gone.
-- **Lose the "why".** "Refresh TC-8 alongside this wiring" tells you nothing six months later. "Per-space verify projects the schema to the space's slice, so the failure cause shifts" tells you everything, regardless of whether TC-8 still exists.
-- **Leak orchestration mechanics into the codebase.** The plan's structure (phases, rounds, checkpoints) is a scaffolding artefact for the maker, not a property of the system. The system's documentation should describe the system.
-- **Are easy to ban, hard to retrofit.** Catching them at write time costs nothing; scrubbing them after merge costs much more (and reviewers tend to wave them through).
+**Allowed (durable):** Linear ticket IDs (`TML-2408`), ADR numbers (`ADR 211`), PR numbers (`PR #494`), permanent doc paths (`docs/...`), durable source paths (`packages/...`, `test/...`, `examples/...`).
 
 ## How to comply
 
-When a comment, test name, or fixture *needs* to explain something the plan currently captures:
+Describe the constraint or behaviour itself, not its plan row. Say "the runner skips ops with already-satisfied postchecks", not "see T3.4's postcheck-skip rule". Test names pin the property (`it('runs both spaces in caller order')`), not the coverage-table row. JSDoc cross-refs point at durable artefacts, never into `projects/`. Name fixtures/constants after their role (`'sha256:mongo-ext-contract'`), not the introducing test-case ID.
 
-1. **Describe the constraint or behaviour itself.** What does this code make true? Why is the alternative wrong? Write the answer.
-2. **Don't attribute the answer to the plan.** Say "the runner skips ops with already-satisfied postchecks", not "see T3.4's postcheck-skip rule".
-3. **For test names**: name the property the test pins, not the row in a coverage table. `it('runs both spaces in caller order')` — not `it('runs both spaces in caller order (TC-7)')`.
-4. **For JSDoc**: if you need a cross-reference, link to a durable artefact (`docs/architecture docs/...`, ADR, sibling source file). Never link into `projects/`.
-5. **For hash fixtures and constants**: name them after the role they play (`'sha256:mongo-ext-contract'`, `EXT_FIXTURE_HASH`), not the test-case ID that introduced them.
-
-## Quick check before committing
-
-Before staging code, scan your `+` diff for these patterns. The check takes seconds:
+Before committing, scan your `+` diff for token-shaped IDs:
 
 ```bash
-git diff --cached -- '*.ts' '*.tsx' '*.js' '*.mjs' \
-  | grep -E '^\+' \
-  | grep -oE '\b(T[0-9]+\.[0-9]+|TC-?[0-9]+|AC-?[0-9]+|FR[0-9]+|NFR[0-9]+|CKPT-[0-9]+|AM[0-9]+|D[0-9]+|M[0-9]+\.[0-9]+|P[0-9]+ R[0-9]+|M[0-9]+ review)\b' \
-  | sort -u
+git diff --cached -- '*.ts' '*.tsx' '*.js' '*.mjs' | grep -E '^\+' \
+  | grep -oE '\b(T[0-9]+\.[0-9]+|TC-?[0-9]+|AC-?[0-9]+|FR[0-9]+|NFR[0-9]+|CKPT-[0-9]+|M[0-9]+\.[0-9]+|P[0-9]+ R[0-9]+)\b' | sort -u
 ```
 
-Output should be empty. If it isn't, rewrite the comment / test name to describe the property in its own words and try again.
-
-Note: the regex catches token-shaped IDs only. Freeform prose attributions to the plan ("per spec", "sub-spec § 4", "sub-spec OQ3", "deferred per project plan", etc.) are equally banned but require a manual scan — no token regex can catch them reliably.
-
-## Companion rule
-
-This rule is a focused companion to the project-workflow guidance in `doc-maintenance.mdc` ("Source-code comments must not reference transient project artefacts"). That rule covers the broader "transient artefact" surface (links from durable docs into `projects/`, prose attributions, etc.); this rule narrows the focus to the specific failure mode of leaving plan IDs inside source code.
+Output should be empty. Freeform prose attributions ("per spec", "deferred per project plan") aren't token-catchable — scan manually. Companion to `doc-maintenance.mdc`, which covers the broader transient-artefact surface; this rule narrows to plan IDs left in source.

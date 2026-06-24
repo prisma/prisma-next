@@ -37,6 +37,12 @@ export class PostCollection extends Collection<Contract, 'Post'> {
   }
 }
 
+export class TagCollection extends Collection<Contract, 'Tag'> {
+  byLabel(label: string) {
+    return this.where({ label });
+  }
+}
+
 export class TaskCollection extends Collection<Contract, 'Task'> {
   bugs() {
     return this.variant('Bug');

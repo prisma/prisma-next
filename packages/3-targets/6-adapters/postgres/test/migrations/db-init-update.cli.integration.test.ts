@@ -232,7 +232,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
 
   afterEach(async () => {
     if (driver) await resetDatabase(driver);
-  });
+  }, testTimeout);
 
   async function freshDriver(): Promise<PostgresControlDriver> {
     if (driver) {

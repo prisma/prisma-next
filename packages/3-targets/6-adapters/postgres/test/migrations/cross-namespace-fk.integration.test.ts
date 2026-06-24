@@ -134,7 +134,7 @@ describe.sequential('AC1 — cross-namespace FK end-to-end (PGlite)', () => {
         planResult.plan.operations,
       )) as SqlMigrationPlanOperation<unknown>[];
       const operationIds = planOps.map((op) => op.id);
-      const createSchemaIdx = operationIds.findIndex((id) => id === 'schema.auth');
+      const createSchemaIdx = operationIds.indexOf('schema.auth');
       expect(createSchemaIdx).toBeGreaterThanOrEqual(0);
 
       const allSql = planOps

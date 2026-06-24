@@ -236,6 +236,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     },
     schema: {
       issues,
+      schemaDiffIssues: [],
       root,
       counts,
     },
