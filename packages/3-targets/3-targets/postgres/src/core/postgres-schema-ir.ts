@@ -3,6 +3,7 @@ import {
   type SqlAnnotations,
   type SqlSchemaIR,
   SqlSchemaIRNode,
+  type SqlSchemaTarget,
   SqlTableIR,
   type SqlTableIRInput,
 } from '@prisma-next/sql-schema-ir/types';
@@ -40,6 +41,7 @@ export interface PostgresSchemaIRInput {
  * Nothing RLS-specific leaks into the sql-family layer.
  */
 export class PostgresSchemaIR extends SqlSchemaIRNode {
+  readonly nodeTarget: SqlSchemaTarget = 'postgres';
   readonly tables: Readonly<Record<string, SqlTableIR>>;
   declare readonly annotations?: SqlAnnotations;
   readonly pgSchemaName: string;
@@ -85,15 +87,15 @@ export class PostgresSchemaIR extends SqlSchemaIRNode {
 }
 
 /**
- * Structural guard for `PostgresSchemaIR`. Narrows on the postgres-only own
- * field `rlsPolicies` rather than `instanceof`, because the multi-space verify
- * path (`projectSchemaToSpace`) spreads the IR into a plain object
- * (`{ ...schema, tables: pruned }`) that is not an instance but retains every
- * enumerable own property — including `rlsPolicies`. The family-level
- * `kind = 'sql-schema-ir'` discriminator does not distinguish Postgres from
- * generic SQL (both share it) and is non-enumerable (dropped by the spread), so
- * it is unusable here.
+ * Structural guard for `PostgresSchemaIR`, narrowing on the `nodeTarget`
+ * discriminant rather than `instanceof`. `nodeTarget` is an enumerable own field
+ * (a plain class-field initializer), so it survives the `{ ...schema, tables }`
+ * spread the multi-space verify path (`projectSchemaToSpace`) produces — that
+ * projected object is not a class instance but retains every enumerable own
+ * property. The family-level `kind = 'sql-schema-ir'` discriminator is unusable
+ * here: it is shared by every SQL schema-IR node and is non-enumerable (dropped
+ * by the spread).
  */
 export function isPostgresSchemaIR(schema: SqlSchemaIR): schema is PostgresSchemaIR {
-  return 'rlsPolicies' in schema && Array.isArray(schema.rlsPolicies);
+  return schema.nodeTarget === 'postgres';
 }
