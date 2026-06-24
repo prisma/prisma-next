@@ -2,7 +2,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { SqlStorage, type SqlStorageTypeEntry } from '../src/ir/sql-storage';
 import { StorageTable } from '../src/ir/storage-table';
-import { createTestSqlNamespace } from '../src/test-support';
+import { createTestSqlNamespace } from './test-support';
 
 /**
  * Pins the strict-deserialization contract for the polymorphic

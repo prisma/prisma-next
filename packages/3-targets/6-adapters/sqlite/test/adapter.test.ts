@@ -1,4 +1,3 @@
-import { TestSqlContractSerializer as SqlContractSerializer } from '@prisma-next/family-sql/test-utils';
 import {
   AggregateExpr,
   AndExpr,
@@ -30,6 +29,7 @@ import {
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { litParams } from '@prisma-next/test-utils/lowered-params';
 import { describe, expect, it } from 'vitest';
+import { TestSqlContractSerializer as SqlContractSerializer } from '../../../../2-sql/9-family/test/test-sql-contract-serializer';
 import { createSqliteAdapter } from '../src/core/adapter';
 import type { SqliteContract } from '../src/core/types';
 

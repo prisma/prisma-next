@@ -2,13 +2,13 @@ import { crossRef } from '@prisma-next/contract/types';
 import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
-  createTestNamespace,
   modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
@@ -41,7 +41,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
       composedExtensionContracts: new Map(),
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
       ...input,
     });
 
@@ -63,7 +63,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       ]),
       composedExtensionContracts: new Map(),
       controlMutationDefaults: builtinControlMutationDefaults,
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(result.ok).toBe(true);
@@ -129,7 +129,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
       composedExtensionContracts: new Map(),
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(result.ok).toBe(true);
@@ -172,7 +172,7 @@ describe('interpretPslDocumentToSqlContract', () => {
         ]),
         generatorDescriptors: [{ id: 'slugid', applicableCodecIds: ['pg/text@1'] }],
       },
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(result.ok).toBe(true);

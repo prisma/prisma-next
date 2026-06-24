@@ -25,10 +25,10 @@ import type { SymbolTable } from '@prisma-next/psl-parser';
 import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
-import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import type { SqlNamespaceBase, SqlNamespaceInput } from '@prisma-next/sql-contract/types';
 import { type EnumTypeHandle, enumType } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 
 function testEnumFactory(
   block: PslExtensionBlock,
@@ -696,5 +696,3 @@ export function buildEnumCapturingFactory(): {
   };
   return { createNamespace, capturedEnumTypes };
 }
-
-export { createTestSqlNamespace as createTestNamespace };

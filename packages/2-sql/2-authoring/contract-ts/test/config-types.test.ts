@@ -7,10 +7,10 @@ import {
   domainModelsAtDefaultNamespace,
 } from '@prisma-next/contract/types';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
-import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { emptyContract, typescriptContract, typescriptContractFromPath } from '../src/config-types';
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {

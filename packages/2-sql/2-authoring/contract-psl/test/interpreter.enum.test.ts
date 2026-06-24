@@ -9,13 +9,13 @@ import {
   model,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract,
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
-  createTestNamespace,
   postgresScalarTypeDescriptors,
   postgresTarget,
   symbolTableInputFromParseArgs,
@@ -97,7 +97,7 @@ function interpret(schema: string, overrides?: Partial<InterpretPslDocumentToSql
     controlMutationDefaults: builtinControlMutationDefaults,
     authoringContributions: contributions,
     codecLookup: testCodecLookup,
-    createNamespace: createTestNamespace,
+    createNamespace: createTestSqlNamespace,
     ...overrides,
   });
 }
@@ -153,7 +153,7 @@ model Post {
       family: sqlFamilyPack,
       target: postgresTargetPack,
       enums: { Priority: PriorityHandle },
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
       models: {
         Post: model('Post', {
           fields: {
@@ -235,7 +235,7 @@ model Post {
       family: sqlFamilyPack,
       target: postgresTargetPack,
       enums: { Priority: PriorityHandle },
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
       models: {
         Post: model('Post', {
           fields: {

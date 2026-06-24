@@ -12,7 +12,6 @@ import {
 } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import {
   applyFkDefaults,
   type ReferentialAction,
@@ -27,6 +26,7 @@ import type {
 } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import type { CodecControlHooks, ExpandNativeTypeInput } from '../src/core/migrations/types';
 
 /**

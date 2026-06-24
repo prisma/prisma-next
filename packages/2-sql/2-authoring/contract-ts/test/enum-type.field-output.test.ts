@@ -1,10 +1,10 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import type {
   ExtractFieldInputTypes,
   ExtractFieldOutputTypes,
 } from '@prisma-next/sql-contract/types';
 import { describe, expectTypeOf, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { defineContract, field, model } from '../src/contract-builder';
 import { enumType, member } from '../src/enum-type';
 

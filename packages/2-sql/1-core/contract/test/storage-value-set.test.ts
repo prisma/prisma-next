@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { StorageColumn } from '../src/ir/storage-column';
 import { StorageTable } from '../src/ir/storage-table';
 import { StorageValueSet } from '../src/ir/storage-value-set';
-import { createTestSqlNamespace } from '../src/test-support';
+import { createTestSqlNamespace } from './test-support';
 
 const baseColumn = { codecId: 'pg/text@1', nativeType: 'text', nullable: false };
 

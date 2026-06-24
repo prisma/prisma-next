@@ -4,14 +4,14 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
-import { composeSqlEntityKinds } from './entity-kinds';
+import { composeSqlEntityKinds } from '../src/entity-kinds';
 import {
   SqlNamespaceBase,
   type SqlNamespaceEntries,
   type SqlNamespaceInput,
-} from './ir/sql-storage';
-import type { StorageTable } from './ir/storage-table';
-import type { StorageValueSet } from './ir/storage-value-set';
+} from '../src/ir/sql-storage';
+import type { StorageTable } from '../src/ir/storage-table';
+import type { StorageValueSet } from '../src/ir/storage-value-set';
 
 /**
  * Minimal concrete `SqlNamespaceBase` for use in `packages/2-sql/**` unit tests.

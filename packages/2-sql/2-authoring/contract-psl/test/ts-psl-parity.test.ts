@@ -9,10 +9,10 @@ import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { countSemanticLines } from '@prisma-next/test-utils/semantic-lines';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
-  createTestNamespace,
   symbolTableInputFromParseArgs,
   testEnumEntityContributions,
 } from './fixtures';
@@ -304,7 +304,7 @@ function buildSqliteTimestampTsContract() {
     {
       family: bareSqlFamilyPack,
       target: sqliteTimestampTargetPack,
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
     },
     ({ field, model }) => ({
       models: {
@@ -326,7 +326,7 @@ function buildPostgresTimestampTsContract() {
     {
       family: bareSqlFamilyPack,
       target: postgresTimestampTargetPack,
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
     },
     ({ field, model }) => ({
       models: {
@@ -378,7 +378,7 @@ describe('TS and PSL authoring parity', () => {
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions: target.authoringContributions,
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(interpreted.ok).toBe(true);
@@ -429,7 +429,7 @@ model Post {
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions,
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(pslContract.ok).toBe(true);
@@ -462,7 +462,7 @@ model Post {
       target: portablePostgresTargetPack,
       namespaces: ['auth'],
       models: { User, Post },
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
     });
 
     const pslStorage = pslContract.value.storage as unknown as SqlStorage;

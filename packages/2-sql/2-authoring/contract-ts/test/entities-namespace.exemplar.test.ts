@@ -4,8 +4,8 @@ import type {
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
 import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
-import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { defineContract } from '../src/contract-builder';
 
 /**

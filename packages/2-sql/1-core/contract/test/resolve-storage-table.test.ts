@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { SqlStorage } from '../src/ir/sql-storage';
 import { StorageTable } from '../src/ir/storage-table';
 import { resolveStorageTable } from '../src/resolve-storage-table';
-import { createTestSqlNamespace } from '../src/test-support';
+import { createTestSqlNamespace } from './test-support';
 
 function tableNamed(_name: string): StorageTable {
   return new StorageTable({

@@ -42,17 +42,16 @@
     "src"
   ],
   "exports": {
-    "./canonicalization-hooks": "./dist/exports/canonicalization-hooks.mjs",
-    "./entity-kinds": "./dist/exports/entity-kinds.mjs",
-    "./factories": "./dist/exports/factories.mjs",
-    "./index-type-validation": "./dist/exports/index-type-validation.mjs",
-    "./index-types": "./dist/exports/index-types.mjs",
-    "./pack-types": "./dist/exports/pack-types.mjs",
-    "./referential-action-sql": "./dist/exports/referential-action-sql.mjs",
-    "./resolve-storage-table": "./dist/exports/resolve-storage-table.mjs",
-    "./types": "./dist/exports/types.mjs",
-    "./validators": "./dist/exports/validators.mjs",
-    "./test-support": "./dist/test-support.mjs",
+    "./canonicalization-hooks": "./dist/canonicalization-hooks.mjs",
+    "./entity-kinds": "./dist/entity-kinds.mjs",
+    "./factories": "./dist/factories.mjs",
+    "./index-type-validation": "./dist/index-type-validation.mjs",
+    "./index-types": "./dist/index-types.mjs",
+    "./pack-types": "./dist/pack-types.mjs",
+    "./referential-action-sql": "./dist/referential-action-sql.mjs",
+    "./resolve-storage-table": "./dist/resolve-storage-table.mjs",
+    "./types": "./dist/types.mjs",
+    "./validators": "./dist/validators.mjs",
     "./package.json": "./package.json"
   },
   "engines": {

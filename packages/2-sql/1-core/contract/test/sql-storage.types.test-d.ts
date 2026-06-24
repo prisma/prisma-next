@@ -2,7 +2,7 @@ import type { StorageHashBase } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { expectTypeOf, test } from 'vitest';
 import { type SqlNamespace, SqlStorage } from '../src/ir/sql-storage';
-import { createTestSqlNamespace } from '../src/test-support';
+import { createTestSqlNamespace } from './test-support';
 
 const publicNs = createTestSqlNamespace({ id: 'public', entries: { table: {} } });
 const unboundNs = createTestSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });

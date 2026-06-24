@@ -20,7 +20,6 @@ import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
-import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import {
   SqlStorage,
   type SqlStorageInput,
@@ -39,6 +38,7 @@ import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational
 import { applicationDomainOf, collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Client } from 'pg';
+import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import { createExecutionContext, createSqlExecutionStack } from '../src/exports';
 import type {
   ExecutionContext,

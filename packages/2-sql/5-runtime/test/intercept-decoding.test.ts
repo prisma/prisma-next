@@ -6,7 +6,6 @@ import {
   type RuntimeDriverInstance,
   type RuntimeExtensionInstance,
 } from '@prisma-next/framework-components/execution';
-import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlDriver, SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import {
@@ -18,6 +17,7 @@ import {
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
+import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import type { SqlMiddleware } from '../src/middleware/sql-middleware';
 import type {
   SqlRuntimeAdapterDescriptor,

@@ -4,7 +4,7 @@ import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { StorageTable } from '../src/ir/storage-table';
 import { StorageValueSet } from '../src/ir/storage-value-set';
-import { createTestSqlNamespace } from '../src/test-support';
+import { createTestSqlNamespace } from './test-support';
 
 const emptyTableInput = {
   columns: {},

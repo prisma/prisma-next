@@ -10,10 +10,10 @@ import {
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
-  createTestNamespace,
   postgresScalarTypeDescriptors,
   postgresTarget,
   symbolTableInputFromParseArgs,
@@ -57,7 +57,7 @@ namespace public {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(pslResult.ok).toBe(true);
@@ -92,7 +92,7 @@ namespace public {
       target: postgresTarget,
       namespaces: ['auth', 'public'] as const,
       models: { User, Post },
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
     });
 
     const pslStorage = pslResult.value.storage as SqlStorage;
@@ -182,7 +182,7 @@ namespace public {
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       composedExtensionPacks: ['supabase'],
       composedExtensionContracts: new Map([['supabase', syntheticExtensionContract]]),
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(pslResult.ok).toBe(true);
@@ -215,7 +215,7 @@ namespace public {
       target: postgresTarget,
       extensionPacks: { supabase: supabaseExtensionPackRef },
       models: { Profile },
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
     });
 
     const pslStorage = pslResult.value.storage as SqlStorage;
@@ -252,7 +252,7 @@ namespace public {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionPacks: ['supabase'],
       composedExtensionContracts: new Map(),
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(result.ok).toBe(false);

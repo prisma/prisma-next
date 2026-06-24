@@ -1,4 +1,3 @@
-import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import {
   SqlStorage,
   type SqlStorage as SqlStorageType,
@@ -6,6 +5,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { codecRefForStorageColumn } from '../src/codec-ref-for-column';
 
 const STORAGE_HASH = blindCast<SqlStorageType['storageHash'], 'test storage hash literal'>(

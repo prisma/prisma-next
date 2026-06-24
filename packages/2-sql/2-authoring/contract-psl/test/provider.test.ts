@@ -4,10 +4,10 @@ import { applySpecifierDefaultControlPolicy } from '@prisma-next/contract/apply-
 import type { Contract } from '@prisma-next/contract/types';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { prismaContract } from '../src/exports/provider';
 import {
   createPostgresTestContext,
-  createTestNamespace,
   modelsOf,
   pgvectorAuthoringContributions,
   pgvectorExtensionPack,
@@ -21,7 +21,7 @@ describe('prismaContract provider helper', () => {
   const tempDirs: string[] = [];
   const baseOptions = {
     target: postgresTarget,
-    createNamespace: createTestNamespace,
+    createNamespace: createTestSqlNamespace,
   } as const;
 
   afterEach(async () => {

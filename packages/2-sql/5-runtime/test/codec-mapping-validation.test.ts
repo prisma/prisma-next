@@ -1,11 +1,11 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
-import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import type { SqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import { validateContractCodecMappings } from '../src/codecs/validation';
 
 function registryWith(...codecIds: string[]): CodecDescriptorRegistry {

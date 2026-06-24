@@ -1,7 +1,18 @@
+import { resolve } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { defineConfig } from 'vitest/config';
 
+const selfSrc = resolve(__dirname, 'src/exports');
+
 export default defineConfig({
+  resolve: {
+    alias: [
+      {
+        find: /^@prisma-next\/sql-contract\/(.+)$/,
+        replacement: `${selfSrc}/$1.ts`,
+      },
+    ],
+  },
   test: {
     globals: true,
     environment: 'node',

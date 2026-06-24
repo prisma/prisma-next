@@ -6,7 +6,6 @@ import {
   type RuntimeDriverInstance,
   type RuntimeExtensionInstance,
 } from '@prisma-next/framework-components/execution';
-import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlDriver, SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import { SelectAst as SelectAstCtor, TableSource } from '@prisma-next/sql-relational-core/ast';
@@ -24,6 +23,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
+import { createTestSqlNamespace } from '../../../2-sql/1-core/contract/test/test-support';
 import type { SupabaseRoleBinding } from '../src/runtime/supabase-runtime';
 import { SupabaseRuntimeImpl } from '../src/runtime/supabase-runtime';
 

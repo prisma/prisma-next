@@ -1,9 +1,8 @@
-import type { Namespace } from '@prisma-next/framework-components/ir';
-import type { SqlNamespaceInput } from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceBase, SqlNamespaceInput } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
-  createTestNamespace,
   documentScopedTypes,
   pgvectorAuthoringContributions,
   pgvectorExtensionPack,
@@ -16,7 +15,7 @@ const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
-  createNamespace: createTestNamespace,
+  createNamespace: createTestSqlNamespace,
 } as const;
 
 describe('interpretPslDocumentToSqlContract extensions', () => {
@@ -533,55 +532,6 @@ model Doc {
     });
   });
 
-  it('throws when extension entities are lowered but no createNamespace factory is available', () => {
-    const pslBlockDescriptors = {
-      test_block: {
-        kind: 'pslBlock' as const,
-        keyword: 'test_block',
-        discriminator: 'test-custom-block',
-        name: { required: true },
-        parameters: {},
-      },
-    };
-    const authoringContributions = {
-      entityTypes: {
-        test: {
-          kind: 'entity' as const,
-          discriminator: 'test-custom-block',
-          output: {
-            factory: (raw: unknown) => raw,
-          },
-        },
-      },
-      pslBlockDescriptors,
-    };
-
-    const symbolTableInput = symbolTableInputFromParseArgs({
-      schema: `
-namespace public {
-  model Foo {
-    id Int @id
-  }
-
-  test_block my_entry {
-  }
-}
-`,
-      sourceId: 'schema.prisma',
-      pslBlockDescriptors,
-    });
-
-    expect(() =>
-      interpretPslDocumentToSqlContract({
-        ...symbolTableInput,
-        target: postgresTarget,
-        scalarTypeDescriptors: postgresScalarTypeDescriptors,
-        composedExtensionContracts: new Map(),
-        authoringContributions,
-      }),
-    ).toThrow(/createNamespace/);
-  });
-
   it('routes lowered extension entities to entries[discriminator] via explicit createNamespace', () => {
     const capturedEntries: Record<string, Record<string, Record<string, unknown>>> = {};
     const pslBlockDescriptors = {
@@ -605,12 +555,12 @@ namespace public {
       },
       pslBlockDescriptors,
     };
-    const createNamespace = (input: SqlNamespaceInput): Namespace => {
+    const createNamespace = (input: SqlNamespaceInput): SqlNamespaceBase => {
       capturedEntries[input.id] = {
         ...(capturedEntries[input.id] ?? {}),
         ...input.entries,
       };
-      return createTestNamespace(input);
+      return createTestSqlNamespace(input);
     };
 
     const symbolTableInput = symbolTableInputFromParseArgs({

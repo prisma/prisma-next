@@ -1,9 +1,9 @@
 import { crossRef } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
-  createTestNamespace,
   documentScopedTypes,
   postgresScalarTypeDescriptors,
   postgresTarget,
@@ -16,7 +16,7 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
   composedExtensionContracts: new Map(),
-  createNamespace: createTestNamespace,
+  createNamespace: createTestSqlNamespace,
 } as const;
 
 describe('interpretPslDocumentToSqlContract types', () => {

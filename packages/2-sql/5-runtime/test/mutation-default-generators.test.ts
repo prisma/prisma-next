@@ -1,8 +1,8 @@
 import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
-import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import {
   createExecutionContext,
   type SqlExecutionStack,

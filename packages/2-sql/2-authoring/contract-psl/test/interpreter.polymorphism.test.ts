@@ -2,13 +2,13 @@ import { crossRef } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { SqlModelStorage, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
-  createTestNamespace,
   documentScopedTypes,
   modelsOf,
   postgresScalarTypeDescriptors,
@@ -29,7 +29,7 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
-      createNamespace: createTestNamespace,
+      createNamespace: createTestSqlNamespace,
       ...input,
     });
 

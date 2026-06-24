@@ -2,7 +2,7 @@ import { coreHash } from '@prisma-next/contract/types';
 import { elementCoordinates, entityAt } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { SqlStorage } from '../src/ir/sql-storage';
-import { createTestSqlNamespace } from '../src/test-support';
+import { createTestSqlNamespace } from './test-support';
 
 const emptyTableInput = {
   columns: {},

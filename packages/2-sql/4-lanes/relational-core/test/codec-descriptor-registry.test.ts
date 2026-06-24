@@ -1,6 +1,5 @@
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import {
   SqlStorage,
   type SqlStorageTypeEntry,
@@ -8,6 +7,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import type { AnyCodecDescriptor } from '../src/ast/codec-types';
 import { buildCodecDescriptorRegistry } from '../src/codec-descriptor-registry';
 

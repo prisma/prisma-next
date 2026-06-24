@@ -1,6 +1,6 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { createComposedAuthoringHelpers } from '../src/composed-authoring-helpers';
 import { field, rel } from '../src/contract-builder';
 import { ContractModelBuilder, ScalarFieldBuilder } from '../src/contract-dsl';

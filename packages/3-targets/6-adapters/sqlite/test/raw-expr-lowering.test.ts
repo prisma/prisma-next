@@ -1,4 +1,3 @@
-import { TestSqlContractSerializer as SqlContractSerializer } from '@prisma-next/family-sql/test-utils';
 import {
   ColumnRef,
   LiteralExpr,
@@ -10,6 +9,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { TestSqlContractSerializer as SqlContractSerializer } from '../../../../2-sql/9-family/test/test-sql-contract-serializer';
 import { renderLoweredSql } from '../src/core/adapter';
 import type { SqliteContract } from '../src/core/types';
 
