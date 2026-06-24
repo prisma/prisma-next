@@ -91,8 +91,8 @@ export type StorageColumnTypes = {
       readonly arch: CodecTypes['pg/text@1']['output'];
       readonly command: CodecTypes['pg/text@1']['output'];
       readonly databaseTarget: CodecTypes['pg/text@1']['output'] | null;
-      readonly extensions: CodecTypes['pg/text@1']['output'];
-      readonly flags: CodecTypes['pg/text@1']['output'];
+      readonly extensions: ReadonlyArray<CodecTypes['pg/text@1']['output']>;
+      readonly flags: ReadonlyArray<CodecTypes['pg/text@1']['output']>;
       readonly id: CodecTypes['pg/int8@1']['output'];
       readonly ingestedAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly installationId: CodecTypes['pg/text@1']['output'];
@@ -112,8 +112,8 @@ export type StorageColumnInputTypes = {
       readonly arch: CodecTypes['pg/text@1']['input'];
       readonly command: CodecTypes['pg/text@1']['input'];
       readonly databaseTarget: CodecTypes['pg/text@1']['input'] | null;
-      readonly extensions: CodecTypes['pg/text@1']['input'];
-      readonly flags: CodecTypes['pg/text@1']['input'];
+      readonly extensions: ReadonlyArray<CodecTypes['pg/text@1']['input']>;
+      readonly flags: ReadonlyArray<CodecTypes['pg/text@1']['input']>;
       readonly id: CodecTypes['pg/int8@1']['input'];
       readonly ingestedAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly installationId: CodecTypes['pg/text@1']['input'];

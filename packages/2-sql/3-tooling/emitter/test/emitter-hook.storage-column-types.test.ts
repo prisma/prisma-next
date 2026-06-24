@@ -691,4 +691,56 @@ describe('StorageColumnTypes', () => {
     expect(storageColumnMatch).not.toBeNull();
     expect(storageColumnMatch![0]).toContain("readonly tags: CodecTypes['pg/jsonb@1']['output']");
   });
+
+  it('wraps StorageColumnTypes/StorageColumnInputTypes in ReadonlyArray for a native many[] column', () => {
+    const contract = createContract({
+      models: {
+        Post: {
+          storage: {
+            table: 'post',
+            fields: { tags: { column: 'tags' }, labels: { column: 'labels' } },
+          },
+          fields: {
+            tags: { nullable: false, many: true, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+            labels: { nullable: true, many: true, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          post: {
+            columns: {
+              tags: { nativeType: 'text', codecId: 'pg/text@1', nullable: false, many: true },
+              labels: { nativeType: 'text', codecId: 'pg/text@1', nullable: true, many: true },
+            },
+            primaryKey: { columns: ['tags'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const dts = generateContractDts(contract, sqlEmission, [], testHashes);
+
+    const outputMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
+    expect(outputMatch).not.toBeNull();
+    expect(outputMatch![0]).toContain(
+      "readonly tags: ReadonlyArray<CodecTypes['pg/text@1']['output']>",
+    );
+    expect(outputMatch![0]).toContain(
+      "readonly labels: ReadonlyArray<CodecTypes['pg/text@1']['output']> | null",
+    );
+
+    const inputMatch = dts.match(/export type StorageColumnInputTypes = ({.+?});/s);
+    expect(inputMatch).not.toBeNull();
+    expect(inputMatch![0]).toContain(
+      "readonly tags: ReadonlyArray<CodecTypes['pg/text@1']['input']>",
+    );
+    expect(inputMatch![0]).toContain(
+      "readonly labels: ReadonlyArray<CodecTypes['pg/text@1']['input']> | null",
+    );
+  });
 });
