@@ -47,11 +47,17 @@ export type FieldOutputTypes = { readonly public: { readonly Note: { readonly id
 export type FieldInputTypes = {
   readonly public: { readonly Note: { readonly id: CodecTypes['sql/char@1']['input'] } };
 };
+export type StorageColumnTypes = { readonly public: { readonly Note: { readonly id: Char<36> } } };
+export type StorageColumnInputTypes = {
+  readonly public: { readonly Note: { readonly id: CodecTypes['sql/char@1']['input'] } };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<

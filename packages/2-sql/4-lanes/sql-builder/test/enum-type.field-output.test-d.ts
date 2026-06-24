@@ -35,11 +35,31 @@ type EnumFieldInputTypes = {
   };
 };
 
+type EnumStorageColumnTypes = {
+  __unbound__: {
+    User: {
+      role: 'user' | 'admin';
+      status: 'active' | 'inactive' | null;
+    };
+  };
+};
+
+type EnumStorageColumnInputTypes = {
+  __unbound__: {
+    User: {
+      role: 'user' | 'admin';
+      status: 'active' | 'inactive' | null;
+    };
+  };
+};
+
 type EnumTypeMaps = TypeMaps<
   EnumCodecTypes,
   Record<string, never>,
   EnumFieldOutputTypes,
-  EnumFieldInputTypes
+  EnumFieldInputTypes,
+  EnumStorageColumnTypes,
+  EnumStorageColumnInputTypes
 >;
 
 type EnumStorage = {
@@ -104,11 +124,7 @@ type EnumContract = ContractWithTypeMaps<EnumContractBase, EnumTypeMaps> & {
 
 type EnumDb = Db<EnumContract>;
 
-// ---------------------------------------------------------------------------
-// The sql-builder's resolvedColumnOutputTypes uses FieldOutputTypes
-// ---------------------------------------------------------------------------
-
-test('sql-builder: column output types for enum fields come from FieldOutputTypes', () => {
+test('sql-builder: column output types for enum fields come from StorageColumnTypes', () => {
   type QC = import('../src/types/table-proxy').ContractToQC<EnumContract, '__unbound__', 'User'>;
   type RoleOutput = QC['resolvedColumnOutputTypes']['role'];
   type StatusOutput = QC['resolvedColumnOutputTypes']['status'];

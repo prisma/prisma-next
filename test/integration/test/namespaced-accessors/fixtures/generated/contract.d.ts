@@ -78,11 +78,49 @@ export type FieldInputTypes = {
     };
   };
 };
+export type StorageColumnTypes = {
+  readonly auth: {
+    readonly users: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly token: CodecTypes['pg/text@1']['output'];
+    };
+  };
+  readonly public: {
+    readonly profile: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly user_id: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly users: {
+      readonly email: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/int4@1']['output'];
+    };
+  };
+};
+export type StorageColumnInputTypes = {
+  readonly auth: {
+    readonly users: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly token: CodecTypes['pg/text@1']['input'];
+    };
+  };
+  readonly public: {
+    readonly profile: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly user_id: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly users: {
+      readonly email: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<

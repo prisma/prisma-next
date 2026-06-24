@@ -735,6 +735,17 @@ type FieldChannelTypes<Definition, Channel extends 'output' | 'input'> = {
   };
 };
 
+type StorageColumnChannelTypes<Definition, Channel extends 'output' | 'input'> = {
+  readonly [Ns in DefaultStorageNamespaceId<Definition>]: {
+    readonly [ModelName in ModelNames<Definition> as BuiltModelTableName<Definition, ModelName>]: {
+      readonly [FieldName in ModelFieldNames<Definition, ModelName> as BuiltModelColumnMappings<
+        Definition,
+        ModelName
+      >[FieldName]['column']]: FieldChannelType<Definition, ModelName, FieldName, Channel>;
+    };
+  };
+};
+
 export type SqlContractResult<Definition> = ContractWithTypeMaps<
   Omit<Contract<BuiltStorage<Definition>>, 'domain'> & {
     readonly target: DefinitionTargetId<Definition>;
@@ -754,6 +765,8 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
     CodecTypesFromDefinition<Definition>,
     Record<string, never>,
     FieldChannelTypes<Definition, 'output'>,
-    FieldChannelTypes<Definition, 'input'>
+    FieldChannelTypes<Definition, 'input'>,
+    StorageColumnChannelTypes<Definition, 'output'>,
+    StorageColumnChannelTypes<Definition, 'input'>
   >
 >;
