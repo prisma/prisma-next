@@ -13,10 +13,6 @@ import type { MongoCollection } from '../src/ir/mongo-collection';
 import type { MongoCollectionOptionsAuthoringInput } from '../src/ir/mongo-collection-options';
 import type { MongoIndexOptionsInput } from '../src/ir/mongo-index-options';
 
-// ---------------------------------------------------------------------------
-// Enum value-union narrowing tests
-// ---------------------------------------------------------------------------
-
 type RoleEnum = {
   readonly codecId: 'mongo/string@1';
   readonly members: readonly [

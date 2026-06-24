@@ -1810,6 +1810,17 @@ function buildContractFromDefinition<
   }
   const hasEnums = Object.keys(builtEnums).length > 0;
 
+  for (const [modelName, modelBuilder] of Object.entries(definition.models ?? {})) {
+    for (const [fieldName, fieldBuilder] of Object.entries(modelBuilder.__fields)) {
+      const handle = (fieldBuilder as AnyFieldBuilder).__enumHandle;
+      if (handle && !(handle.enumName in builtEnums)) {
+        throw new Error(
+          `Model "${modelName}" field "${fieldName}" references enum "${handle.enumName}" which is not declared in defineContract({ enums: { ... } }).`,
+        );
+      }
+    }
+  }
+
   const builtContract = {
     target: definition.target.targetId,
     targetFamily: definition.family.familyId,

@@ -124,19 +124,39 @@ describe('builder accumulation + contract-schema acceptance', () => {
 });
 
 describe('MongoContractSchema — enum validation', () => {
+  const Role = enumType('Role', mongoString, member('User', 'user'), member('Admin', 'admin'));
+  const Account = model('Account', {
+    collection: 'accounts',
+    fields: { _id: field.objectId(), role: field.namedType(Role) },
+  });
+  const baseContract = JSON.parse(
+    JSON.stringify(
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        enums: { Role },
+        models: { Account },
+      }),
+    ),
+  ) as Record<string, unknown>;
+
   it('rejects an enum with empty members array', () => {
     const malformed = {
-      targetFamily: 'mongo',
-      roots: {},
+      ...baseContract,
       domain: {
+        ...(baseContract['domain'] as Record<string, unknown>),
         namespaces: {
-          __unbound__: {
-            models: {},
+          [UNBOUND_NAMESPACE_ID]: {
+            ...((
+              (baseContract['domain'] as Record<string, unknown>)['namespaces'] as Record<
+                string,
+                unknown
+              >
+            )[UNBOUND_NAMESPACE_ID] as Record<string, unknown>),
             enum: { Role: { codecId: 'mongo/string@1', members: [] } },
           },
         },
       },
-      storage: { namespaces: {} },
     };
     const result = MongoContractSchema(malformed);
     expect(result instanceof type.errors).toBe(true);
@@ -158,5 +178,22 @@ describe('enumType() — error cases', () => {
     expect(() =>
       enumType('Status', mongoString, member('Active', 'dup'), member('Inactive', 'dup')),
     ).toThrow('duplicate member value');
+  });
+});
+
+describe('defineContract() — undeclared enum reference', () => {
+  it('throws when a field references an enum not declared in enums', () => {
+    const Role = enumType('Role', mongoString, member('User', 'user'));
+    const Account = model('Account', {
+      collection: 'accounts',
+      fields: { _id: field.objectId(), role: field.namedType(Role) },
+    });
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { Account },
+      }),
+    ).toThrow('references enum "Role" which is not declared');
   });
 });
