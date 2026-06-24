@@ -208,13 +208,15 @@
                   "nullable": true
                 },
                 "extensions": {
-                  "codecId": "pg/jsonb@1",
-                  "nativeType": "jsonb",
+                  "codecId": "pg/text@1",
+                  "many": true,
+                  "nativeType": "text",
                   "nullable": false
                 },
                 "flags": {
-                  "codecId": "pg/jsonb@1",
-                  "nativeType": "jsonb",
+                  "codecId": "pg/text@1",
+                  "many": true,
+                  "nativeType": "text",
                   "nullable": false
                 },
                 "id": {
@@ -292,7 +294,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:be92c3521871ea0d863f15c8889093bd38747d60e97bd1dca404da27d0b13bc7"
+    "storageHash": "sha256:4b58da96bcee8697563d149dd99bc639c62e0760b47a6b860bdfa83e44705f1d"
   },
   "capabilities": {
     "postgres": {
