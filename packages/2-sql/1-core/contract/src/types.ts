@@ -25,8 +25,11 @@ export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
 export {
+  isSqlAuthoringContributions,
+  type SqlAuthoringContributions,
   type SqlNamespace,
   type SqlNamespaceEntries,
+  type SqlNamespaceFactory,
   type SqlNamespaceTablesInput,
   SqlStorage,
   type SqlStorageInput,

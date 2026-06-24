@@ -1,3 +1,5 @@
+import type { SchemaDiffIssue } from './schema-diff';
+
 export const VERIFY_CODE_MARKER_MISSING = 'PN-RUN-3001';
 export const VERIFY_CODE_HASH_MISMATCH = 'PN-RUN-3002';
 export const VERIFY_CODE_TARGET_MISMATCH = 'PN-RUN-3003';
@@ -129,6 +131,7 @@ export interface VerifyDatabaseSchemaResult {
   };
   readonly schema: {
     readonly issues: readonly SchemaIssue[];
+    readonly schemaDiffIssues: readonly SchemaDiffIssue[];
     readonly root: SchemaVerificationNode;
     readonly counts: {
       readonly pass: number;

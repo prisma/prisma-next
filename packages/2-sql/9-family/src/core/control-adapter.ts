@@ -1,9 +1,14 @@
-import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractMarkerRecord,
+  LedgerEntryRecord,
+} from '@prisma-next/contract/types';
 import type {
   ControlAdapterInstance,
   ControlStack,
+  SchemaDiffIssue,
 } from '@prisma-next/framework-components/control';
-import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
+import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   DdlNode,
@@ -187,6 +192,18 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * before comparison with contract native types during schema verification.
    */
   readonly normalizeNativeType?: NativeTypeNormalizer;
+
+  /**
+   * Optional hook for collecting target-specific diff issues during schema
+   * verification. Called after the relational SQL verification pass; returns
+   * generic `SchemaDiffIssue[]` (coordinate + outcome + message — no target
+   * naming) that are folded into `VerifyDatabaseSchemaResult.schema.schemaDiffIssues`
+   * and counted as failures when non-empty.
+   */
+  collectSchemaDiffIssues?(
+    contract: Contract<SqlStorage>,
+    schema: SqlSchemaIR,
+  ): readonly SchemaDiffIssue[];
 
   /**
    * Ordered DDL queries that bootstrap marker/ledger control tables for migration

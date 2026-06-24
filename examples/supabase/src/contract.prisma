@@ -10,4 +10,10 @@ namespace public {
     user     supabase:auth.AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
     @@map("profile")
   }
+
+  policy_select profile_owner_read {
+    target = Profile
+    roles  = [authenticated]
+    using  = "\"userId\"::uuid = auth.uid()"
+  }
 }

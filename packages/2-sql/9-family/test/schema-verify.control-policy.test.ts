@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { filterSchemaDiffIssues } from '../src/core/control-instance';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
 import {
   createContractTable,
@@ -150,5 +151,49 @@ describe('verifySqlSchema control policy', () => {
     expect(result.schema.counts.fail).toBe(0);
     expect(result.schema.counts.warn).toBeGreaterThan(0);
     expect(result.schema.issues.some((i) => i.kind === 'extra_column')).toBe(true);
+  });
+});
+
+describe('filterSchemaDiffIssues', () => {
+  const extraIssue = {
+    coordinate: {
+      plane: 'storage' as const,
+      namespaceId: 'public',
+      entityKind: 'policy',
+      entityName: 'p_abc12345',
+    },
+    outcome: 'extra' as const,
+    message: "extra: policy 'p_abc12345' in namespace 'public'",
+  };
+  const missingIssue = {
+    coordinate: {
+      plane: 'storage' as const,
+      namespaceId: 'public',
+      entityKind: 'policy',
+      entityName: 'p_deadbeef',
+    },
+    outcome: 'missing' as const,
+    message: "missing: policy 'p_deadbeef' in namespace 'public'",
+  };
+
+  it('keeps all issues when defaultControlPolicy is managed', () => {
+    const result = filterSchemaDiffIssues([extraIssue, missingIssue], 'managed');
+    expect(result).toHaveLength(2);
+  });
+
+  it('keeps all issues when defaultControlPolicy is undefined (defaults to managed)', () => {
+    const result = filterSchemaDiffIssues([extraIssue, missingIssue], undefined);
+    expect(result).toHaveLength(2);
+  });
+
+  it('suppresses extra issues under external policy', () => {
+    const result = filterSchemaDiffIssues([extraIssue, missingIssue], 'external');
+    expect(result).toHaveLength(1);
+    expect(result[0]?.outcome).toBe('missing');
+  });
+
+  it('returns empty array unchanged', () => {
+    const result = filterSchemaDiffIssues([], 'external');
+    expect(result).toHaveLength(0);
   });
 });

@@ -46,6 +46,7 @@ describe('defineConfig', () => {
           target: { expected: 'postgres' },
           schema: {
             issues: [],
+            schemaDiffIssues: [],
             root: {
               status: 'pass' as const,
               kind: 'root',

@@ -4,8 +4,11 @@ export {
   type AnyAlterTableAction,
   type AnyPostgresDdlNode,
   PostgresAlterTable,
+  PostgresCreatePolicy,
   PostgresCreateSchema,
   PostgresCreateTable,
   PostgresDdlNode,
   type PostgresDdlVisitor,
+  PostgresDropPolicy,
+  type RlsPolicyOperation,
 } from '../core/ddl/nodes';

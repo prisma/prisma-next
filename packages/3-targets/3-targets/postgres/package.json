@@ -34,6 +34,8 @@
     "pathe": "^2.0.3"
   },
   "devDependencies": {
+    "@prisma-next/psl-parser": "workspace:0.14.0",
+    "@prisma-next/sql-contract-psl": "workspace:0.14.0",
     "@prisma-next/test-utils": "workspace:0.14.0",
     "@prisma-next/tsconfig": "workspace:0.14.0",
     "@prisma-next/tsdown": "workspace:0.14.0",
@@ -78,7 +80,9 @@
     "./planner-target-details": "./dist/planner-target-details.mjs",
     "./render-ops": "./dist/render-ops.mjs",
     "./render-typescript": "./dist/render-typescript.mjs",
+    "./rls-canonicalize": "./dist/rls-canonicalize.mjs",
     "./runtime": "./dist/runtime.mjs",
+    "./schema-ir-annotations": "./dist/schema-ir-annotations.mjs",
     "./sql-utils": "./dist/sql-utils.mjs",
     "./types": "./dist/types.mjs",
     "./package.json": "./package.json"

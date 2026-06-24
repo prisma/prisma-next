@@ -8,13 +8,29 @@ import type { Namespace } from '@prisma-next/framework-components/ir';
 import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
-import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceFactory, SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
+import { isSqlAuthoringContributions } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { basename, extname } from 'pathe';
 
 import { interpretPslDocumentToSqlContract } from './interpreter';
 import type { ColumnDescriptor } from './psl-column-resolution';
+
+/**
+ * SQL target packs carry a `createNamespace` factory on their `authoring`
+ * contributions so the PSL path can populate `SqlStorage.namespaces` (and merge
+ * lowered extension-block entities) without every config re-specifying it. The
+ * factory is SQL-specific, so narrow the framework `AuthoringContributions` to
+ * the SQL-family `SqlAuthoringContributions` before reading it.
+ */
+function targetCreateNamespace(
+  target: TargetPackRef<'sql', string>,
+): SqlNamespaceFactory | undefined {
+  return isSqlAuthoringContributions(target.authoring)
+    ? target.authoring.createNamespace
+    : undefined;
+}
 
 export interface PrismaContractOptions {
   readonly output?: string;
@@ -143,7 +159,10 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
               : undefined,
           ),
           controlMutationDefaults: context.controlMutationDefaults,
-          ...ifDefined('createNamespace', options.createNamespace),
+          ...ifDefined(
+            'createNamespace',
+            options.createNamespace ?? targetCreateNamespace(options.target),
+          ),
           codecLookup: context.codecLookup,
         });
         if (!interpreted.ok) {

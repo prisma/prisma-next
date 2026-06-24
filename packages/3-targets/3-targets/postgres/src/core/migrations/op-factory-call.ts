@@ -40,6 +40,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { columnExistsAst, tableExistsAst } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
+import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import {
@@ -61,6 +62,7 @@ import {
 } from './operations/constraints';
 import { createExtension } from './operations/dependencies';
 import { createIndex, dropIndex } from './operations/indexes';
+import { createRlsPolicy, dropRlsPolicy, enableRowLevelSecurity } from './operations/rls';
 import type { ForeignKeySpec } from './operations/shared';
 import { step, targetDetails } from './operations/shared';
 import { dropTable } from './operations/tables';
@@ -1376,6 +1378,97 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
   }
 }
 
+export class CreatePostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'createRlsPolicy' as const;
+  readonly operationClass = 'additive' as const;
+  readonly schemaName: string;
+  readonly tableName: string;
+  readonly policy: PostgresRlsPolicy;
+  readonly label: string;
+
+  constructor(schemaName: string, tableName: string, policy: PostgresRlsPolicy) {
+    super();
+    this.schemaName = schemaName;
+    this.tableName = tableName;
+    this.policy = policy;
+    this.label = `Create RLS policy "${policy.name}" on "${tableName}"`;
+    this.freeze();
+  }
+
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `CreatePostgresRlsPolicyCall.toOp: a lowerer is required on the Postgres planner path (policy "${this.policy.name}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    return createRlsPolicy(this.schemaName, this.tableName, this.policy, lowerer);
+  }
+
+  renderTypeScript(): string {
+    return `createRlsPolicy(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.policy)})`;
+  }
+}
+
+export class DropPostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'dropRlsPolicy' as const;
+  readonly operationClass = 'destructive' as const;
+  readonly schemaName: string;
+  readonly tableName: string;
+  readonly policyName: string;
+  readonly label: string;
+
+  constructor(schemaName: string, tableName: string, policyName: string) {
+    super();
+    this.schemaName = schemaName;
+    this.tableName = tableName;
+    this.policyName = policyName;
+    this.label = `Drop RLS policy "${policyName}" on "${tableName}"`;
+    this.freeze();
+  }
+
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `DropPostgresRlsPolicyCall.toOp: a lowerer is required on the Postgres planner path (policy "${this.policyName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    return dropRlsPolicy(this.schemaName, this.tableName, this.policyName, lowerer);
+  }
+
+  renderTypeScript(): string {
+    return `dropRlsPolicy(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.policyName)})`;
+  }
+}
+
+export class EnableRowLevelSecurityCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'enableRowLevelSecurity' as const;
+  readonly operationClass = 'additive' as const;
+  readonly schemaName: string;
+  readonly tableName: string;
+  readonly label: string;
+
+  constructor(schemaName: string, tableName: string) {
+    super();
+    this.schemaName = schemaName;
+    this.tableName = tableName;
+    this.label = `Enable row-level security on "${tableName}"`;
+    this.freeze();
+  }
+
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `EnableRowLevelSecurityCall.toOp: a lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    return enableRowLevelSecurity(this.schemaName, this.tableName, lowerer);
+  }
+
+  renderTypeScript(): string {
+    return `enableRowLevelSecurity(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)})`;
+  }
+}
+
 export type PostgresOpFactoryCall =
   | CreateTableCall
   | DropTableCall
@@ -1399,4 +1492,7 @@ export type PostgresOpFactoryCall =
   | RawSqlCall
   | CreateExtensionCall
   | CreateSchemaCall
+  | CreatePostgresRlsPolicyCall
+  | DropPostgresRlsPolicyCall
+  | EnableRowLevelSecurityCall
   | DataTransformCall;

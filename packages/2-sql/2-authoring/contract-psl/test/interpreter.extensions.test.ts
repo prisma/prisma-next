@@ -1,3 +1,5 @@
+import type { Namespace } from '@prisma-next/framework-components/ir';
+import { buildSqlNamespace, type SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
@@ -526,6 +528,122 @@ model Doc {
           expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT' }),
         ]),
       );
+    });
+  });
+
+  it('throws when extension entities are lowered but no createNamespace factory is available', () => {
+    const pslBlockDescriptors = {
+      test_block: {
+        kind: 'pslBlock' as const,
+        keyword: 'test_block',
+        discriminator: 'test-custom-block',
+        name: { required: true },
+        parameters: {},
+      },
+    };
+    const authoringContributions = {
+      entityTypes: {
+        test: {
+          kind: 'entity' as const,
+          discriminator: 'test-custom-block',
+          output: {
+            factory: (raw: unknown) => raw,
+          },
+        },
+      },
+      pslBlockDescriptors,
+    };
+
+    const symbolTableInput = symbolTableInputFromParseArgs({
+      schema: `
+namespace public {
+  model Foo {
+    id Int @id
+  }
+
+  test_block my_entry {
+  }
+}
+`,
+      sourceId: 'schema.prisma',
+      pslBlockDescriptors,
+    });
+
+    expect(() =>
+      interpretPslDocumentToSqlContract({
+        ...symbolTableInput,
+        target: postgresTarget,
+        scalarTypeDescriptors: postgresScalarTypeDescriptors,
+        composedExtensionContracts: new Map(),
+        authoringContributions,
+      }),
+    ).toThrow(/createNamespace/);
+  });
+
+  it('routes lowered extension entities to entries[discriminator] via explicit createNamespace', () => {
+    const capturedEntries: Record<string, Record<string, Record<string, unknown>>> = {};
+    const pslBlockDescriptors = {
+      test_block: {
+        kind: 'pslBlock' as const,
+        keyword: 'test_block',
+        discriminator: 'test-custom-block',
+        name: { required: true },
+        parameters: {},
+      },
+    };
+    const authoringContributions = {
+      entityTypes: {
+        test: {
+          kind: 'entity' as const,
+          discriminator: 'test-custom-block',
+          output: {
+            factory: (raw: unknown) => raw,
+          },
+        },
+      },
+      pslBlockDescriptors,
+    };
+    const createNamespace = (input: SqlNamespaceTablesInput): Namespace => {
+      capturedEntries[input.id] = {
+        ...(capturedEntries[input.id] ?? {}),
+        ...input.entries,
+      };
+      return buildSqlNamespace(input);
+    };
+
+    const symbolTableInput = symbolTableInputFromParseArgs({
+      schema: `
+namespace public {
+  model Foo {
+    id Int @id
+  }
+
+  test_block my_entry {
+  }
+}
+`,
+      sourceId: 'schema.prisma',
+      pslBlockDescriptors,
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...symbolTableInput,
+      target: postgresTarget,
+      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      composedExtensionContracts: new Map(),
+      authoringContributions,
+      createNamespace,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(capturedEntries).toMatchObject({
+      public: {
+        'test-custom-block': {
+          my_entry: expect.objectContaining({ kind: 'test-custom-block' }),
+        },
+      },
     });
   });
 });

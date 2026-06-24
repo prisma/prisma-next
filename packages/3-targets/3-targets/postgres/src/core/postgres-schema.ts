@@ -17,7 +17,15 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresTableSource } from './ast/table-source';
 import { PG_TEXT_CODEC_ID } from './codec-ids';
+import { policyEntityKind, roleEntityKind } from './entity-kinds';
+import type { PostgresRlsPolicy } from './postgres-rls-policy';
+import type { PostgresRole } from './postgres-role';
 import { escapeLiteral } from './sql-utils';
+
+export type PostgresNamespaceEntries = SqlNamespaceEntries & {
+  readonly policy?: Readonly<Record<string, PostgresRlsPolicy>>;
+  readonly role?: Readonly<Record<string, PostgresRole>>;
+};
 
 export interface PostgresSchemaInput {
   readonly id: string;
@@ -50,13 +58,17 @@ export class PostgresSchema extends NamespaceBase {
 
   declare readonly kind: 'schema';
   readonly id: string;
-  readonly entries: SqlNamespaceEntries;
+  readonly entries: PostgresNamespaceEntries;
 
   constructor(input: PostgresSchemaInput) {
     super();
     this.id = input.id;
 
-    const dispatched = hydrateNamespaceEntities(input.entries, composeSqlEntityKinds(), 'carry');
+    const dispatched = hydrateNamespaceEntities(
+      input.entries,
+      composeSqlEntityKinds([policyEntityKind, roleEntityKind]),
+      'carry',
+    );
 
     // Drop an empty valueSet so presence signals non-emptiness.
     const valueSetRaw = dispatched['valueSet'];
@@ -67,8 +79,8 @@ export class PostgresSchema extends NamespaceBase {
 
     this.entries = Object.freeze(
       blindCast<
-        SqlNamespaceEntries,
-        'composeSqlEntityKinds() supplies table→StorageTable and valueSet→StorageValueSet descriptors, so this open-dict result holds exactly the typed members SqlNamespaceEntries declares; the descriptor Map erases those per-kind Node types from the return.'
+        PostgresNamespaceEntries,
+        'composeSqlEntityKinds([policyEntityKind, roleEntityKind]) supplies table→StorageTable, valueSet→StorageValueSet, policy→PostgresRlsPolicy, role→PostgresRole descriptors'
       >(withPresence),
     );
     Object.defineProperty(this, 'kind', {
@@ -86,6 +98,14 @@ export class PostgresSchema extends NamespaceBase {
 
   get valueSet(): Readonly<Record<string, StorageValueSet>> | undefined {
     return this.entries.valueSet;
+  }
+
+  get policy(): Readonly<Record<string, PostgresRlsPolicy>> {
+    return this.entries.policy ?? Object.freeze({});
+  }
+
+  get role(): Readonly<Record<string, PostgresRole>> {
+    return this.entries.role ?? Object.freeze({});
   }
 
   /**

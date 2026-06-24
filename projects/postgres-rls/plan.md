@@ -7,7 +7,7 @@
 
 ## At a glance
 
-Four slices. Slice 1 makes **SELECT policies dependable end-to-end** — full lifecycle (create, change, remove), drift makes `db verify` fail, proven in the Supabase example app. Slice 2 makes **drift handling correct per variation** and introduces the **policy→role traversal** that seeds the dependency graph. Slice 3 extends everything to **the other policy types**. Slice 4 adds the **TypeScript authoring surface** with PSL parity.
+Slice 1 makes **SELECT policies dependable end-to-end** — full lifecycle (create, change, remove), drift makes `db verify` fail, proven in the Supabase example app. Slice 1.5 (`entity-kind-migration-seam`), discovered during slice 1, builds the **generic two-sided derivation seam** so a target-contributed entity kind works on every migration command — notably `migration plan`, which slice 1 defers with a fail-loud stopgap. Slice 2 makes **drift handling correct per variation** and introduces the **policy→role traversal** that seeds the dependency graph. Slice 3 extends everything to **the other policy types**. Slice 4 adds the **TypeScript authoring surface** with PSL parity.
 
 RLS rides the generic schema-diff architecture (unchanged — see § Architecture decisions): generic differ + `{coordinate, outcome}` issues; zero RLS symbols in framework/SQL-family; content-addressed wire names; side-by-side with the untouched legacy relational verifier/planner. The relational port and dependency-aware planner ordering remain independent follow-on projects.
 
@@ -26,12 +26,23 @@ A developer can declare a SELECT policy and **rely on it**: it gets created, edi
 Already landed on the branch: the architecture (generic differ, content-addressed naming + normalizer, introspection, PSL `policy_select` authoring through the production interpreter, create/enable ops, planner diff-wiring, the verify `extensionIssues` channel) and two PGlite e2e spines. **Remaining to slice DoD:**
 
 1. **Fix the build** (review F01): `extensionIssues` made required without updating three constructors (mongo verify, CLI `db-verify`, `combine-schema-results`) — workspace `pnpm typecheck` must be green; add the workspace typecheck to the standing gates.
-2. **Edit replaces, never accumulates** (kills the edit-trap) via the **safe same-prefix rule** (operator decision 2026-06-10, option A): `DropPostgresRlsPolicyCall` + planner logic so creating `<prefix>_<newhash>` drops any existing `<prefix>_<otherhash>` policy on the **same table** that isn't in the contract — only ever touching a policy that shares the user's declared prefix (no external-policy hazard, no name-format heuristic). Route the drop through operation-class gating (review F06); the policy-replace drop is permitted by `db update`'s default policy (it's a security-config replacement, not data loss). **Deferred to slice 2:** removal auto-drop, `DISABLE ROW LEVEL SECURITY` on last-policy-removed, and the `managed`/`external` grading that makes general "extra → drop" safe. In slice 1, *removing* a policy from the contract leaves the DB policy as an `extra` that `db verify` reports (exits non-zero, per item 3) — a loud, safe signal, not an auto-drop.
+2. **Edit replaces, never accumulates** (kills the edit-trap) via **strict content-addressed drop** (F07 withdrawn — same-prefix rule superseded): the generic differ (`diffNodes`) matches on full `EntityCoordinate` identity. A `mismatch` outcome (same prefix, new hash) produces `DropPostgresRlsPolicyCall` + `CreatePostgresRlsPolicyCall`; an `extra` outcome (policy in the DB but not in the contract) produces `DropPostgresRlsPolicyCall`. Both drop calls are gated by the migration operation policy: they are only emitted when `destructive` is in `allowedOperationClasses` (i.e., `db update` with widening/destructive policy, not `db init`). Under additive-only policy (`INIT_ADDITIVE_POLICY`), drop calls are suppressed — only create/enable ops are emitted. **Deferred to slice 2:** `DISABLE ROW LEVEL SECURITY` on last-policy-removed, and `managed`/`external` grading for general extra-drop safety.
 3. **Drift errors out** (resolves F02 as wire-it-now, bluntly): any non-empty `extensionIssues` fails the verify verdict — fold into `ok`/counts at the family assembly and thread through `combineSchemaResults`. Nuanced per-kind severity is slice 2; slice 1's rule is simply *any RLS drift → verify fails with a message naming the policy*.
 4. **Supabase example app e2e**: extend `bootstrapSupabaseShim` with the Postgres roles (`anon`, `authenticated`, `service_role`) and the `auth.uid()` GUC-reading function (verified 2026-06-10: the shim seeds only schemas/tables today; roles are platform-provided in real Supabase, so the shim emulates that — this project never authors or migrates roles); add a SELECT policy to `examples/supabase` `Profile`; e2e proves: migrate → rows filtered under the role → `db verify` clean → drop the policy out-of-band → `db verify` **fails**.
 5. Review follow-ups in scope: F03 (role-name rendering shim hardening or input constraint), F05 (a parsed extension block with no registered factory must not be silently dropped), F07 (`rlsEnabledByTable` keyed by bare table name — cross-schema collision), the structural anti-leak test (assert no RLS tokens in framework/SQL-core, since `lint:deps` can't catch this class).
 
 - **DoD (operator-observable):** declare a SELECT policy in the example app → migrate → only permitted rows visible under the role; edit the predicate → migrate → **exactly one policy active**, with the new predicate (the old version dropped via same-prefix replace); remove it from the contract → `db verify` reports the now-orphaned DB policy as drift (exits non-zero naming it) — auto-drop-on-removal is slice 2; drop/alter it out-of-band → `prisma db verify` exits non-zero naming the policy. Workspace typecheck green; all suites green.
+
+### Slice 1.5 — `entity-kind-migration-seam` · [TML-2931](https://linear.app/prisma-company/issue/TML-2931)
+
+**Status: ⬜ not started.** Design seed: [`specs/extension-migration-participation.md`](specs/extension-migration-participation.md).
+
+Foundational seam, discovered during slice 1. Today a target-contributed entity kind only half-participates in migrations: the live-database derivation is hardcoded per target, and the contract→schema derivation drops target-specific objects entirely. The consequence is that `migration plan` cannot emit RLS at all — slice 1 ships a fail-loud stopgap (it refuses to plan when the contract declares policies). This slice builds the generic seam so a contributed kind works on **every** command.
+
+- **First task: complete the design + ADRs** from the seed doc — the schema IR as the single diff substrate; the diff-engine model (coordinate/identity, equality, nesting, cross-kind dependency ordering); the two-sided **derivation contribution** API (per kind: identity/equality + project-from-contract + project-from-database + planner + dependencies), registered like authoring contributions are.
+- Replace the hardcoded Postgres introspection of policies/roles with a registered **project-from-database**; add **project-from-contract** so a contract-derived schema IR carries policies/roles.
+- Make the planner **provenance-agnostic**: remove the `migration plan` fail-loud stopgap and the `isPostgresSchemaIR` command-awareness; `planRlsDiff` collapses to `diffNodes(from, to)`.
+- **DoD (operator-observable):** `migration plan` on a contract with a SELECT policy emits `CREATE POLICY` in the generated migration; both diff sides are homogeneous schema IRs (no contract fed directly); RLS continues to work on `db init` / `db update` / `db verify`.
 
 ### Slice 2 — `drift-handled-correctly` · [TML-2869](https://linear.app/prisma-company/issue/TML-2869)
 
@@ -40,9 +51,9 @@ Already landed on the branch: the architecture (generic differ, content-addresse
 Every drift variation for a SELECT policy is handled **correctly** (not just "error"), and the schema graph gains its first edge.
 
 - **Removal auto-drop + `managed`/`external` grading** (deferred here from slice 1): a policy removed from the contract is auto-dropped on migrate (not just reported as drift), and `DISABLE ROW LEVEL SECURITY` is emitted when a table's last managed policy is removed — made safe by the table's control policy distinguishing framework-`managed` policies (drop the extra) from `external` ones (leave alone, tolerate). This is what generalizes slice 1's narrow same-prefix replace into correct "extra → drop".
-- **Drift variations, each implemented + e2e-tested:** rename (matching content-hash, different prefix → `ALTER POLICY … RENAME TO`, not drop+create); tamper (out-of-band body change → recomputed hash mismatch → reported as tamper, and a reformat-only change does NOT false-positive); RLS-disabled-with-policies-declared; extra/unmanaged policies (severity via the table's control policy — `managed` fails, `external` tolerates); the blunt slice-1 "any drift errors" rule is refined into per-variation verdicts through the control-policy disposition.
+- **Drift variations, each implemented + e2e-tested:** rename (matching content-hash, different prefix → `ALTER POLICY … RENAME TO`, not drop+create); role traversal (a policy referencing a role absent from `pg_roles` surfaces the missing role); RLS-disabled-with-policies-declared; extra/unmanaged policies (severity via the table's control policy — `managed` fails, `external` tolerates); the blunt slice-1 "any drift errors" rule is refined into per-variation verdicts through the control-policy disposition.
 - **Policy → Role traversal (the dependency-graph seed):** the SchemaIR gains traversal from a top-level RLS policy node to its referent Role node(s). Roles become diffable: a policy referencing a role absent from `pg_roles` is an issue. Issue processing is **leaves-first, then up the tree** — the role leaf's issue surfaces before/along the dependent policy's — establishing the edge model the future dependency-aware planner (follow-on B) builds on.
-- **DoD (operator-observable):** rename a policy prefix → migrate emits a RENAME (verifiable in the plan output); tamper with a policy body in the DB → `db verify` names it as tampered; reformat-only out-of-band change → verify stays clean; reference a role that doesn't exist → verify fails naming the role.
+- **DoD (operator-observable):** rename a policy prefix → migrate emits a RENAME (verifiable in the plan output); reference a role that doesn't exist → verify fails naming the role; extra/unmanaged policies graded by control policy.
 
 ### Slice 3 — `all-policy-types` · [TML-2870](https://linear.app/prisma-company/issue/TML-2870)
 
@@ -66,6 +77,19 @@ A developer can author the same policies in **TypeScript** instead of PSL, with 
 - **TS/PSL parity test:** the same policies authored both ways lower to structurally identical IR with identical wire names.
 - **DoD (operator-observable):** the slice-1 example-app scenario authored in TS instead of PSL behaves identically (filtered rows, lifecycle, drift→verify-fails); the parity test pins identical contracts.
 
+## Management model — locked decision (2026-06-16)
+
+**Default is exclusive management at the table level.**
+
+A table is either `managed` (the contract owns its full policy set) or `external` (the contract does not touch it). There is no per-policy granularity — no "is this policy ours?" flag on individual policies.
+
+Consequences:
+- A policy present in the DB but absent from the contract on a **managed** table is `extra` → dropped on migrate.
+- A policy on an **external** table is never reconciled — the differ skips it entirely; no `extra` issued.
+- The `external` vs `managed` distinction is table-level authoring (on `StorageTable`'s Postgres-target annotation, not on `StorageTable` itself — no SQL-family leak).
+
+The slice-4 resolution: when introspecting for the differ, only collect policies for tables that are `managed`; for `external` tables, the introspected policy set is treated as empty (nothing to diff against). This avoids needing per-policy provenance metadata or a `prismaManaged` flag on the catalog row.
+
 ## Not in this project's plan-of-record (operator cut, 2026-06-10)
 
 - **Cross-space role-ref *validation* / role authoring** — roles are external (platform-provided; shim-seeded in tests); policies reference them by name. The substrate's cross-space pass-through stands; real role-ref validation arrives with slice 2's role traversal only to the extent of "referenced role exists in the DB," not authoring-time cross-space resolution.
@@ -82,4 +106,4 @@ A developer can author the same policies in **TypeScript** instead of PSL, with 
 
 ## Linear sync
 
-TML-2868 → `select-policies-dependable` (re-scoped; PR #771 continues under it). TML-2869 → `drift-handled-correctly`. TML-2870 → `all-policy-types`. [TML-2883](https://linear.app/prisma-company/issue/TML-2883) → `typescript-authoring` (slice 4, re-added 2026-06-10). TML-2871 → canceled (contents split: example-app skeleton → slice 1; role existence → slice 2; cross-space role validation → dropped). Blocking: 2869 blockedBy 2868; 2870 blockedBy 2869; 2883 blockedBy 2870.
+TML-2868 → `select-policies-dependable` (re-scoped; PR #771 continues under it). [TML-2931](https://linear.app/prisma-company/issue/TML-2931) → `entity-kind-migration-seam` (slice 1.5, added 2026-06-18; the generic two-sided derivation seam). TML-2869 → `drift-handled-correctly`. TML-2870 → `all-policy-types`. [TML-2883](https://linear.app/prisma-company/issue/TML-2883) → `typescript-authoring` (slice 4, re-added 2026-06-10). TML-2871 → canceled (contents split: example-app skeleton → slice 1; role existence → slice 2; cross-space role validation → dropped). Blocking: 2931 blockedBy 2868; 2869 blockedBy 2931; 2870 blockedBy 2869; 2883 blockedBy 2870.

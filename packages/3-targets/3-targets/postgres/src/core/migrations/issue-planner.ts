@@ -695,6 +695,8 @@ type CallCategory =
   | 'dep'
   | 'drop'
   | 'table'
+  | 'rlsEnable'
+  | 'rlsPolicy'
   | 'column'
   | 'alter'
   | 'primaryKey'
@@ -724,6 +726,12 @@ function classifyCall(call: PostgresOpFactoryCall): CallCategory {
       return 'unique'; // after uniques, before indexes
     case 'createTable':
       return 'table';
+    case 'enableRowLevelSecurity':
+      return 'rlsEnable';
+    case 'createRlsPolicy':
+      return 'rlsPolicy';
+    case 'dropRlsPolicy':
+      return 'drop';
     case 'addColumn':
       return 'column';
     case 'alterColumnType':
