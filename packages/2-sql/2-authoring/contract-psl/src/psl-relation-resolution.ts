@@ -41,6 +41,14 @@ export type ParsedRelationAttribute = {
    * undefined in this case; the two never co-occur.
    */
   readonly referencesInferred?: true;
+  /**
+   * The junction model named by `through:` on a navigable list field, used to
+   * recognise the many-to-many via that explicit junction. A bare model
+   * identifier (`through: PostTag`); the qualified relation-field form
+   * (`through: PostTag.post`) is a separate member-access grammar and does not
+   * reach the resolver as a dotted value — only its head identifier survives.
+   */
+  readonly through?: string;
   readonly constraintName?: string;
   readonly onDelete?: string;
   readonly onUpdate?: string;
@@ -100,6 +108,12 @@ export type ModelBackrelationCandidate = {
   readonly field: FieldSymbol;
   readonly targetModelName: string;
   readonly relationName?: string;
+  /**
+   * The junction model named by `through:` on the list field. When present,
+   * many-to-many recognition considers only this junction rather than scanning
+   * every junction-shaped model linking the two sides.
+   */
+  readonly through?: string;
 };
 
 type ModelRelationMetadata = RelationNode;
@@ -174,6 +188,7 @@ export function parseRelationAttribute(input: {
       arg.name !== 'name' &&
       arg.name !== 'from' &&
       arg.name !== 'to' &&
+      arg.name !== 'through' &&
       arg.name !== 'fields' &&
       arg.name !== 'references' &&
       arg.name !== 'map' &&
@@ -285,6 +300,14 @@ export function parseRelationAttribute(input: {
     }
   }
 
+  // `through:` names the junction model for a navigable many-to-many list
+  // field. The PSL expression grammar carries only the head identifier of a
+  // member-access value, so a qualified `through: PostTag.post` reaches here as
+  // the bare model name `PostTag` — the qualified disambiguation form is a
+  // separate grammar change, and the bare name is all this slice recognises.
+  const throughRaw = getNamedArgument(input.attribute, 'through');
+  const through = throughRaw ? stripModelQualifier(throughRaw.trim()) : undefined;
+
   const onDeleteArgument = getNamedArgument(input.attribute, 'onDelete');
   const onUpdateArgument = getNamedArgument(input.attribute, 'onUpdate');
 
@@ -293,6 +316,7 @@ export function parseRelationAttribute(input: {
     ...ifDefined('fields', fields),
     ...ifDefined('references', references),
     ...ifDefined('referencesInferred', referencesInferred),
+    ...ifDefined('through', through && through.length > 0 ? through : undefined),
     ...ifDefined('constraintName', constraintName),
     ...ifDefined('onDelete', onDeleteArgument ? unquoteStringLiteral(onDeleteArgument) : undefined),
     ...ifDefined('onUpdate', onUpdateArgument ? unquoteStringLiteral(onUpdateArgument) : undefined),
@@ -476,6 +500,12 @@ function findJunctionFkPairs(input: {
   const pairs: JunctionFkPair[] = [];
   const nearMisses: JunctionNearMiss[] = [];
   for (const [junctionModelName, junctionFks] of input.fkRelationsByDeclaringModel) {
+    // An explicit `through:` names the junction directly: skip every other
+    // junction-shaped model so recognition and near-miss reporting are scoped
+    // to the authored junction. A bare list (no `through:`) scans all of them.
+    if (input.candidate.through !== undefined && junctionModelName !== input.candidate.through) {
+      continue;
+    }
     const idColumns = input.modelIdColumns.get(junctionModelName);
     for (const parentFk of junctionFks) {
       if (parentFk.targetModelName !== input.candidate.modelName) {
