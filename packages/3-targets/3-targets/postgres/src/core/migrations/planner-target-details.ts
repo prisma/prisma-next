@@ -9,7 +9,9 @@ export type OperationClass =
   | 'unique'
   | 'index'
   | 'foreignKey'
-  | 'checkConstraint';
+  | 'checkConstraint'
+  | 'rlsPolicy'
+  | 'rowLevelSecurity';
 
 export interface PostgresPlanTargetDetails {
   readonly schema: string;

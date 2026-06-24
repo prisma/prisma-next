@@ -86,7 +86,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   it('readLedger returns an empty array when the ledger table does not exist', {
     timeout: testTimeout,

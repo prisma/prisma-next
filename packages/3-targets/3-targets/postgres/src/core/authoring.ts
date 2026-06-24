@@ -1,13 +1,94 @@
 import { temporalAuthoringPresets } from '@prisma-next/family-sql/control';
 import type {
+  AuthoringEntityContext,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
+  AuthoringPslBlockDescriptorNamespace,
   AuthoringTypeNamespace,
+  PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
+import { PostgresRlsPolicy } from './postgres-rls-policy';
+import { PostgresRole, type PostgresRoleInput } from './postgres-role';
+import { PostgresRlsPolicySchema, PostgresRoleSchema } from './postgres-validators';
+import { computeContentHash, normalizePredicate } from './rls/canonicalize';
 
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
 
-export const postgresAuthoringEntityTypes = {} as const satisfies AuthoringEntityTypeNamespace;
+export interface RlsPolicyExtensionBlock extends PslExtensionBlock {
+  readonly namespaceId: string;
+}
+
+function readRefParam(block: PslExtensionBlock, key: string): string | undefined {
+  const param = block.parameters[key];
+  return param?.kind === 'ref' ? param.identifier : undefined;
+}
+
+function readValueParam(block: PslExtensionBlock, key: string): string | undefined {
+  const param = block.parameters[key];
+  return param?.kind === 'value' ? param.raw : undefined;
+}
+
+function readListRefParams(block: PslExtensionBlock, key: string): string[] {
+  const param = block.parameters[key];
+  if (param?.kind !== 'list') return [];
+  return param.items.flatMap((item) => (item.kind === 'ref' ? [item.identifier] : []));
+}
+
+function unwrapQuotedString(raw: string): string {
+  if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
+    return raw.slice(1, -1).replace(/\\"/g, '"');
+  }
+  return raw;
+}
+
+function lowerRlsPolicyFromBlock(
+  block: RlsPolicyExtensionBlock,
+  _ctx: AuthoringEntityContext,
+): PostgresRlsPolicy {
+  const prefix = block.name;
+  const targetModelName = readRefParam(block, 'target') ?? '';
+  const tableName = targetModelName.charAt(0).toLowerCase() + targetModelName.slice(1);
+  const roles = [...readListRefParams(block, 'roles')].sort();
+  const using = unwrapQuotedString(readValueParam(block, 'using') ?? '');
+
+  const wireHash = computeContentHash({
+    using: normalizePredicate(using),
+    roles,
+    operation: 'select',
+    permissive: true,
+  });
+  const wireName = `${prefix}_${wireHash}`;
+
+  return new PostgresRlsPolicy({
+    name: wireName,
+    prefix,
+    tableName,
+    namespaceId: block.namespaceId,
+    operation: 'select',
+    roles,
+    using,
+    permissive: true,
+  });
+}
+
+export const postgresAuthoringEntityTypes = {
+  role: {
+    kind: 'entity',
+    discriminator: 'role',
+    validatorSchema: PostgresRoleSchema,
+    output: {
+      factory: (input: PostgresRoleInput): PostgresRole => new PostgresRole(input),
+    },
+  },
+  policy: {
+    kind: 'entity',
+    discriminator: 'policy',
+    validatorSchema: PostgresRlsPolicySchema,
+    output: {
+      factory: lowerRlsPolicyFromBlock,
+    },
+  },
+} as const satisfies AuthoringEntityTypeNamespace;
 
 /**
  * Field presets contributed by the Postgres target pack.
@@ -22,6 +103,39 @@ export const postgresAuthoringEntityTypes = {} as const satisfies AuthoringEntit
  * portability use `uuidString` / `id.uuidv4String` / `id.uuidv7String` from
  * the family pack instead.
  */
+/**
+ * PSL block descriptor for `policy_select`.
+ *
+ * The parser learns the block shape from this descriptor; lowering from
+ * `PslExtensionBlock` to `PostgresRlsPolicy` is wired in the PSL
+ * interpreter (a later dispatch). The `discriminator` matches
+ * `PostgresRlsPolicy.kind` so the parsed block node carries the same
+ * discriminant as the IR class it will lower to.
+ *
+ * The `roles` list uses `scope:'cross-space'` because same-namespace
+ * role ref resolution requires PSL namespace entries keyed by `refKind`
+ * (i.e. `'role'`), which in turn requires the role block discriminator to
+ * equal `'role'`. Aligning discriminator with refKind is tracked for
+ * slice 4 (cross-space roles). Until then cross-space passes validation
+ * unconditionally and the authored role names flow through unchanged.
+ */
+export const postgresAuthoringPslBlockDescriptors = {
+  policy_select: {
+    kind: 'pslBlock',
+    keyword: 'policy_select',
+    discriminator: 'policy',
+    name: { required: true },
+    parameters: {
+      target: { kind: 'ref', refKind: 'model', scope: 'same-namespace', required: true },
+      roles: {
+        kind: 'list',
+        of: { kind: 'ref', refKind: 'role', scope: 'cross-space' },
+      },
+      using: { kind: 'value', codecId: 'pg/text@1', required: true },
+    },
+  },
+} as const satisfies AuthoringPslBlockDescriptorNamespace;
+
 export const postgresAuthoringFieldPresets = {
   text: {
     kind: 'fieldPreset',

@@ -10,15 +10,17 @@ import {
   isAuthoringEntityTypeDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import {
+  type AnyEntityKindDescriptor,
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
-import type { JsonObject } from '@prisma-next/utils/json';
+import type { JsonObject, JsonValue } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
 import { postgresTargetDescriptorMeta } from './descriptor-meta';
+import { policyEntityKind, roleEntityKind } from './entity-kinds';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
@@ -32,7 +34,8 @@ function isAuthoringEntityTypeFactoryOutput(
   return (
     typeof output === 'object' &&
     output !== null &&
-    typeof (output as AuthoringEntityTypeFactoryOutput).factory === 'function'
+    'factory' in output &&
+    typeof output.factory === 'function'
   );
 }
 
@@ -65,9 +68,9 @@ function collectStorageTypesHydrators(
 }
 
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
-  constructor() {
+  constructor(extraPackEntityKinds: readonly AnyEntityKindDescriptor[] = []) {
     const storageTypesHydrators = collectStorageTypesHydrators(postgresAuthoringEntityTypes);
-    super(storageTypesHydrators);
+    super(storageTypesHydrators, [policyEntityKind, roleEntityKind, ...extraPackEntityKinds]);
   }
 
   protected override get defaultNamespaceId(): string {
@@ -87,12 +90,14 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
 
-    const valueSetSlot = entries['valueSet'];
-    const hasValueSets = valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0;
-    const emptyTables = Object.keys(entries['table'] ?? {}).length === 0;
-    if (id === UNBOUND_NAMESPACE_ID && emptyTables && !hasValueSets) {
+    const allSlotsEmpty = Object.values(entries).every(
+      (slot) => slot === undefined || Object.keys(slot).length === 0,
+    );
+    if (id === UNBOUND_NAMESPACE_ID && allSlotsEmpty) {
       return PostgresSchema.unbound;
     }
+    const valueSetSlot = entries['valueSet'];
+    const hasValueSets = valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0;
     return new PostgresSchema({
       id,
       entries: {
@@ -118,7 +123,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
             table: Object.fromEntries(
               Object.entries(ns.entries.table ?? {}).map(([tableName, table]) => [
                 tableName,
-                this.serializeJsonValue(table) as JsonObject,
+                this.serializeJsonObject(table),
               ]),
             ),
           },
@@ -132,30 +137,38 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     if (storage.types !== undefined) {
       const typesOut: Record<string, JsonObject> = {};
       for (const [name, entry] of Object.entries(storage.types)) {
-        typesOut[name] = this.serializeJsonValue(entry) as JsonObject;
+        typesOut[name] = this.serializeJsonObject(entry);
       }
       storageOut['types'] = typesOut;
     }
-    return {
+    return blindCast<
+      JsonObject,
+      'contract minus storage plus a JSON-shaped storageOut is a JsonObject'
+    >({
       ...rest,
       storage: storageOut,
-    } as unknown as JsonObject;
+    });
   }
 
   private serializePostgresNamespace(ns: PostgresSchema, isUnboundSlot: boolean): JsonObject {
     const tablesOut: Record<string, JsonObject> = {};
     for (const [tableName, table] of Object.entries(ns.table)) {
-      tablesOut[tableName] = this.serializeJsonValue(table) as JsonObject;
+      tablesOut[tableName] = this.serializeJsonObject(table);
     }
     const valueSetEntries = ns.valueSet;
     const valueSetOut: Record<string, JsonObject> = {};
     if (valueSetEntries !== undefined) {
       for (const [valueSetName, valueSet] of Object.entries(valueSetEntries)) {
-        valueSetOut[valueSetName] = blindCast<
-          JsonObject,
-          'serializeJsonValue round-trips the value-set node through JSON, yielding a JsonObject'
-        >(this.serializeJsonValue(valueSet));
+        valueSetOut[valueSetName] = this.serializeJsonObject(valueSet);
       }
+    }
+    const roleOut: Record<string, JsonObject> = {};
+    for (const [roleName, role] of Object.entries(ns.role)) {
+      roleOut[roleName] = this.serializeJsonObject(role);
+    }
+    const policyOut: Record<string, JsonObject> = {};
+    for (const [policyName, policy] of Object.entries(ns.policy)) {
+      policyOut[policyName] = this.serializeJsonObject(policy);
     }
     return {
       id: ns.id,
@@ -163,11 +176,22 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       entries: {
         table: tablesOut,
         ...(Object.keys(valueSetOut).length > 0 ? { valueSet: valueSetOut } : {}),
+        ...(Object.keys(roleOut).length > 0 ? { role: roleOut } : {}),
+        ...(Object.keys(policyOut).length > 0 ? { policy: policyOut } : {}),
       },
     };
   }
 
-  private serializeJsonValue(value: unknown): unknown {
-    return JSON.parse(JSON.stringify(value)) as unknown;
+  private serializeJsonObject(value: unknown): JsonObject {
+    return blindCast<
+      JsonObject,
+      'serializeJsonValue round-trips an IR node through JSON, yielding a JsonObject'
+    >(this.serializeJsonValue(value));
+  }
+
+  private serializeJsonValue(value: unknown): JsonValue {
+    return blindCast<JsonValue, 'JSON.parse(JSON.stringify(x)) yields a JsonValue'>(
+      JSON.parse(JSON.stringify(value)),
+    );
   }
 }

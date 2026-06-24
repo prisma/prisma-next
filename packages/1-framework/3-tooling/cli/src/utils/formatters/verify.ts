@@ -539,6 +539,14 @@ export function formatSchemaVerifyOutput(
   });
   lines.push(...treeLines);
 
+  if (result.schema.schemaDiffIssues.length > 0) {
+    lines.push('');
+    lines.push(formatRed('Schema drift:'));
+    for (const issue of result.schema.schemaDiffIssues) {
+      lines.push(`  ${formatRed('✖')} ${issue.message}`);
+    }
+  }
+
   // Add counts and timings in verbose mode
   if (isVerbose(flags, 1)) {
     lines.push(`${formatDimText(`  Total time: ${result.timings.total}ms`)}`);

@@ -79,6 +79,21 @@
     "namespaces": {
       "public": {
         "entries": {
+          "policy": {
+            "profile_owner_read": {
+              "kind": "policy",
+              "name": "profile_owner_read_9f8e536e",
+              "namespaceId": "public",
+              "operation": "select",
+              "permissive": true,
+              "prefix": "profile_owner_read",
+              "roles": [
+                "authenticated"
+              ],
+              "tableName": "profile",
+              "using": "\"userId\"::uuid = auth.uid()"
+            }
+          },
           "table": {
             "profile": {
               "columns": {
@@ -142,7 +157,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:3e726ba9cb41c8296a27aee3fb08f754e202d5bb6a354230234852e386331341",
+    "storageHash": "sha256:c5012a2809fbe2aff181e2ddab8ae278bd2aae9ee85b1e80395923d3392bf4e4",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",

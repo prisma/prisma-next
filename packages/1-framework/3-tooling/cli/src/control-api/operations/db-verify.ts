@@ -272,6 +272,7 @@ function buildSkippedSchemaResult(member: ContractSpaceMember): VerifyDatabaseSc
     target: { expected: contract.target },
     schema: {
       issues: [],
+      schemaDiffIssues: [],
       root: {
         status: 'pass',
         kind: 'skipped',

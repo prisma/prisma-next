@@ -345,6 +345,79 @@ export function extensionExistsAst(extensionName: string): ExtensionExistsCheckB
   };
 }
 
+export interface RlsPolicyExistsCheckBuilder {
+  policyPresent(): SelectAst;
+  policyAbsent(): SelectAst;
+}
+
+/**
+ * Typed RLS-policy existence check over `pg_policies`, with schema, table,
+ * and policy names bound as text parameters (never inlined). The `schema`
+ * coordinate is the resolved live-database schema name (e.g. `'public'`),
+ * compared against `pg_policies.schemaname` as a bound parameter.
+ */
+export function rlsPolicyExistsAst(options: {
+  readonly schema: string;
+  readonly table: string;
+  readonly policyName: string;
+}): RlsPolicyExistsCheckBuilder {
+  const inner = () =>
+    exprSelect()
+      .from(cfTable('pg_policies'))
+      .project('one', cfExpr.lit(1))
+      .where(
+        cfExpr.allOf([
+          cfExpr.identifierRef('schemaname').eqParam(options.schema, PG_TEXT_CODEC_ID),
+          cfExpr.identifierRef('tablename').eqParam(options.table, PG_TEXT_CODEC_ID),
+          cfExpr.identifierRef('policyname').eqParam(options.policyName, PG_TEXT_CODEC_ID),
+        ]),
+      );
+  return {
+    policyPresent: () => exprSelect().project('result', cfExpr.exists(inner())).build(),
+    policyAbsent: () => exprSelect().project('result', cfExpr.notExists(inner())).build(),
+  };
+}
+
+export interface RlsEnabledCheckBuilder {
+  rlsEnabled(): SelectAst;
+  rlsDisabled(): SelectAst;
+}
+
+/**
+ * Typed row-level-security enabled check over `pg_class` joined to
+ * `pg_namespace`, comparing `pg_class.relrowsecurity` against the expected
+ * boolean. Schema and table names are bound as text parameters.
+ */
+export function rlsEnabledAst(schema: string, table: string): RlsEnabledCheckBuilder {
+  const inner = (enabled: boolean) =>
+    exprSelect()
+      .from(cfTable('pg_class', 'c'))
+      .join(
+        cfTable('pg_namespace', 'n'),
+        cfExpr.columnRef('n', 'oid').eqExpr(cfExpr.columnRef('c', 'relnamespace')),
+      )
+      .project('one', cfExpr.lit(1))
+      .where(
+        cfExpr.allOf([
+          cfExpr.columnRef('n', 'nspname').eqParam(schema, PG_TEXT_CODEC_ID),
+          cfExpr.columnRef('c', 'relname').eqParam(table, PG_TEXT_CODEC_ID),
+          enabled
+            ? cfExpr.columnRef('c', 'relrowsecurity')
+            : cfExpr.columnRef('c', 'relrowsecurity').not(),
+        ]),
+      );
+  return {
+    rlsEnabled: () =>
+      exprSelect()
+        .project('result', cfExpr.exists(inner(true)))
+        .build(),
+    rlsDisabled: () =>
+      exprSelect()
+        .project('result', cfExpr.exists(inner(false)))
+        .build(),
+  };
+}
+
 export interface IndexExistsCheckBuilder {
   indexPresent(): SelectAst;
   indexAbsent(): SelectAst;

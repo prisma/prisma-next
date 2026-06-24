@@ -46,7 +46,7 @@ describe.sequential('PostgresControlAdapter marker/ledger writes (end-to-end)', 
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   it('initMarker stamps a readable marker row', { timeout: testTimeout }, async () => {
     await adapter.initMarker(driver!, 'app', {

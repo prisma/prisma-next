@@ -55,7 +55,7 @@ describe.sequential('Schema verification after runner - integration', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   /**
    * Helper to run a successful migration that creates the schema.

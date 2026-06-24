@@ -43,7 +43,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   describe('when the database is empty', () => {
     it('applies an additive plan, creating the schema and writing the marker and ledger', {

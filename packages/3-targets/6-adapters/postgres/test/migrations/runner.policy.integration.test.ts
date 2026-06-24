@@ -42,7 +42,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   describe('when an operation violates the policy (operation class not allowed)', () => {
     it('fails with POLICY_VIOLATION error without executing any operations', {

@@ -217,13 +217,13 @@ export type StorageColumnTypes = {
     readonly tags: { readonly id: Char<36>; readonly name: CodecTypes['pg/text@1']['output'] };
     readonly user_roles: {
       readonly level: CodecTypes['pg/int4@1']['output'];
-      readonly role_id: CodecTypes['pg/text@1']['output'];
+      readonly role_id: Char<36>;
       readonly user_id: CodecTypes['pg/int4@1']['output'];
     };
     readonly user_tags: {
       readonly created_at: CodecTypes['pg/text@1']['output'];
       readonly note: CodecTypes['pg/text@1']['output'] | null;
-      readonly tag_id: CodecTypes['pg/text@1']['output'];
+      readonly tag_id: Char<36>;
       readonly user_id: CodecTypes['pg/int4@1']['output'];
     };
     readonly users: {
@@ -280,13 +280,13 @@ export type StorageColumnInputTypes = {
     };
     readonly user_roles: {
       readonly level: CodecTypes['pg/int4@1']['input'];
-      readonly role_id: CodecTypes['pg/text@1']['input'];
+      readonly role_id: CodecTypes['sql/char@1']['input'];
       readonly user_id: CodecTypes['pg/int4@1']['input'];
     };
     readonly user_tags: {
       readonly created_at: CodecTypes['pg/text@1']['input'];
       readonly note: CodecTypes['pg/text@1']['input'] | null;
-      readonly tag_id: CodecTypes['pg/text@1']['input'];
+      readonly tag_id: CodecTypes['sql/char@1']['input'];
       readonly user_id: CodecTypes['pg/int4@1']['input'];
     };
     readonly users: {

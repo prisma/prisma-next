@@ -81,7 +81,7 @@ export type StorageColumnTypes = {
     readonly tags: { readonly id: Char<36>; readonly name: CodecTypes['pg/text@1']['output'] };
     readonly user_tags: {
       readonly created_at: Char<36>;
-      readonly tag_id: CodecTypes['pg/text@1']['output'];
+      readonly tag_id: Char<36>;
       readonly user_id: CodecTypes['pg/int4@1']['output'];
     };
     readonly users: {
@@ -99,7 +99,7 @@ export type StorageColumnInputTypes = {
     };
     readonly user_tags: {
       readonly created_at: CodecTypes['sql/char@1']['input'];
-      readonly tag_id: CodecTypes['pg/text@1']['input'];
+      readonly tag_id: CodecTypes['sql/char@1']['input'];
       readonly user_id: CodecTypes['pg/int4@1']['input'];
     };
     readonly users: {

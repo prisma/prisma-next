@@ -45,7 +45,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   describe('when an empty plan is executed but the schema does not satisfy the destination contract', () => {
     it('fails with SCHEMA_VERIFY_FAILED error and leaves no marker or ledger writes', {

@@ -17,11 +17,11 @@ import {
 } from '@prisma-next/migration-tools/aggregate';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { buildControlTableBootstrapQueries } from '@prisma-next/target-postgres/contract-free';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
+import { PostgresSchemaIR } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf, createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { createPostgresBuiltinCodecLookup } from '../../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../../src/core/control-adapter';
@@ -61,9 +61,15 @@ export const contract: Contract<SqlStorage> = {
   meta: {},
 };
 
-export const emptySchema: SqlSchemaIR = {
+export const emptySchema = new PostgresSchemaIR({
   tables: {},
-};
+  pgSchemaName: 'public',
+  pgVersion: 'unknown',
+  rlsPolicies: [],
+  roles: [],
+  existingSchemas: ['public'],
+  nativeEnumTypeNames: [],
+});
 
 const controlStack = createControlStack({
   family: sqlFamilyDescriptor,

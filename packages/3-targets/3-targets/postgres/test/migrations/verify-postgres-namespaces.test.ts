@@ -1,11 +1,12 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type SqlStorageInput } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { verifyPostgresNamespacePresence } from '../../src/core/migrations/verify-postgres-namespaces';
 import { PostgresSchema, PostgresUnboundSchema } from '../../src/core/postgres-schema';
+import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
 
 function makeContract(
   namespaceIds: readonly string[],
@@ -41,12 +42,17 @@ function makeContract(
 
 function makeSchema(existingSchemas?: readonly string[]): SqlSchemaIR {
   if (existingSchemas === undefined) {
-    return { tables: {} };
+    return new SqlSchemaIR({ tables: {} });
   }
-  return {
+  return new PostgresSchemaIR({
     tables: {},
-    annotations: { pg: { existingSchemas } },
-  };
+    pgSchemaName: 'public',
+    pgVersion: 'unknown',
+    rlsPolicies: [],
+    roles: [],
+    existingSchemas,
+    nativeEnumTypeNames: [],
+  });
 }
 
 describe('verifyPostgresNamespacePresence', () => {

@@ -190,7 +190,9 @@ export type PslNamespaceEntry = PslModel | PslCompositeType | PslExtensionBlock;
  *
  * Entities are stored canonically (ADR 224) in `entries[kind][name]`, where
  * `kind` is the PSL keyword for built-ins or the block discriminator for
- * extension kinds, e.g. `entries['policy_select']['ReadPosts']`.
+ * extension kinds, e.g. `entries['policy']['ReadPosts']` (the discriminator,
+ * not the PSL keyword — a `policy_select` block lands under `'policy'` per
+ * ADR 225).
  */
 export interface PslNamespace {
   readonly kind: 'namespace';

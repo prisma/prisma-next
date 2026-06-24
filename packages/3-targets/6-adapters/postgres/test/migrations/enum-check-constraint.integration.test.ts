@@ -132,7 +132,7 @@ describe.sequential('enum check-constraint — end-to-end PGlite', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   it('creates table with CHECK constraint for enum-restricted column', {
     timeout: testTimeout,
