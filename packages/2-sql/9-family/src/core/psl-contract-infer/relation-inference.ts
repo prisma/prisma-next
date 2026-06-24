@@ -91,6 +91,7 @@ export function inferRelations(
         optional: isOneToOne,
         list: !isOneToOne,
         relationName,
+        ...(needsRelationName ? { inverseOf: childRelFieldName } : {}),
       };
 
       addRelationField(relationsByTable, parentTableName, backRelField);
