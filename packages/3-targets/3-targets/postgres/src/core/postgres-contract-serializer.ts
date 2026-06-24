@@ -71,7 +71,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
   ): Namespace | SqlNamespaceInput {
     const hydrated = blindCast<
       SqlNamespaceInput,
-      'super.hydrateSqlNamespaceEntry returns SqlNamespaceInput when raw is not a materialized SqlNamespace'
+      'raw is always plain JSON, so super.hydrateSqlNamespaceEntry returns SqlNamespaceInput'
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
 

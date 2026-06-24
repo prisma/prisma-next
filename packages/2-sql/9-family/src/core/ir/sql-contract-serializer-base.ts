@@ -157,16 +157,8 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     nsId: string,
     raw: Record<string, unknown>,
   ): Namespace | SqlNamespaceInput {
-    const isPlain = isPlainRecord(raw);
-    const rawRecord = isPlain
-      ? raw
-      : blindCast<
-          Record<string, unknown>,
-          'JSON.parse(JSON.stringify(...)) strips class methods and produces a plain Record'
-        >(JSON.parse(JSON.stringify(raw)));
-    const id = typeof rawRecord['id'] === 'string' ? rawRecord['id'] : nsId;
-    const spreadInput = { ...rawRecord, id };
-    const parsed = NamespaceRawSchema(spreadInput);
+    const id = typeof raw['id'] === 'string' ? raw['id'] : nsId;
+    const parsed = NamespaceRawSchema({ ...raw, id });
     if (parsed instanceof type.errors) {
       const messages = parsed.map((p: { message: string }) => p.message).join('; ');
       throw new ContractValidationError(`Namespace hydration failed: ${messages}`, 'structural');

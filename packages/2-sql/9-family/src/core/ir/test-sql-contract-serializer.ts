@@ -22,7 +22,7 @@ export class TestSqlContractSerializer extends SqlContractSerializerBase<Contrac
     return createTestSqlNamespace(
       blindCast<
         SqlNamespaceInput,
-        'super.hydrateSqlNamespaceEntry returns SqlNamespaceInput when raw is not materialized'
+        'raw is always plain JSON, so super.hydrateSqlNamespaceEntry returns SqlNamespaceInput'
       >(super.hydrateSqlNamespaceEntry(nsId, raw)),
     );
   }

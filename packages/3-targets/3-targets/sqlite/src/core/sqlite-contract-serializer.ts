@@ -23,7 +23,7 @@ export class SqliteContractSerializer extends SqlContractSerializerBase<Contract
   ): Namespace | SqlNamespaceInput {
     const hydrated = blindCast<
       SqlNamespaceInput,
-      'super.hydrateSqlNamespaceEntry returns SqlNamespaceInput when raw is not a materialized SqlNamespace'
+      'raw is always plain JSON, so super.hydrateSqlNamespaceEntry returns SqlNamespaceInput'
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     return buildSqliteNamespace(hydrated);
   }
