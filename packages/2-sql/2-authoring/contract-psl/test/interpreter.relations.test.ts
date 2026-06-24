@@ -388,7 +388,7 @@ model Post {
     );
   });
 
-  it('returns diagnostics when relation omits required fields argument', () => {
+  it('returns diagnostics when relation omits the required local-fields argument', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
@@ -416,7 +416,8 @@ model Post {
       expect.arrayContaining([
         expect.objectContaining({
           code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-          message: 'Relation field "Post.user" requires fields and references arguments',
+          message:
+            'Relation field "Post.user" requires a from argument naming the local foreign-key field(s)',
         }),
       ]),
     );
