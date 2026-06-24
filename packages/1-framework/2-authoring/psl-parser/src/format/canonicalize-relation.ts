@@ -1,6 +1,7 @@
 import type { GreenElement, GreenNode, GreenToken } from '../syntax/green';
 import { greenNode, greenToken } from '../syntax/green';
 import type { SyntaxKind } from '../syntax/syntax-kind';
+import type { TokenKind } from '../tokenizer';
 
 const RELATION_KEYWORD_RENAMES: ReadonlyMap<string, string> = new Map([
   ['fields', 'from'],
@@ -34,18 +35,23 @@ function rewriteArgList(argList: GreenNode): GreenNode {
   );
 }
 
+/**
+ * Rewrites the key of a single `AttributeArg`. A key exists only when the arg
+ * carries a `Colon`; the key `Identifier` is then the first `Identifier` child,
+ * by the grammar (`Ident Colon value`). The first identifier is the only one
+ * considered, so a bare-identifier value spelled `fields`/`references` in the
+ * value position is carried through untouched.
+ */
 function rewriteArg(arg: GreenNode): GreenNode {
-  let renamed = false;
-  const result = rebuildChildren(arg, (child) => {
-    if (renamed || child.type !== 'node' || child.kind !== 'Identifier') {
+  if (!hasChildToken(arg, 'Colon')) return rebuildChildren(arg, passthrough);
+  let keySeen = false;
+  return rebuildChildren(arg, (child) => {
+    if (keySeen || child.type !== 'node' || child.kind !== 'Identifier') {
       return passthrough(child);
     }
-    const renamedIdentifier = renameKeyIdentifier(child);
-    if (renamedIdentifier === child) return child;
-    renamed = true;
-    return renamedIdentifier;
+    keySeen = true;
+    return renameKeyIdentifier(child);
   });
-  return result;
 }
 
 function renameKeyIdentifier(identifier: GreenNode): GreenNode {
@@ -118,4 +124,12 @@ function firstIdentToken(node: GreenNode | undefined): GreenToken | undefined {
     if (child.type === 'token' && child.kind === 'Ident') return child;
   }
   return undefined;
+}
+
+/** Whether the node has a direct token child of the given kind. */
+function hasChildToken(node: GreenNode, kind: TokenKind): boolean {
+  for (const child of node.children) {
+    if (child.type === 'token' && child.kind === kind) return true;
+  }
+  return false;
 }
