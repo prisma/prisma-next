@@ -14,6 +14,7 @@ import {
   sqliteTarget,
   symbolTableInputFromParseArgs,
 } from './fixtures';
+import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
 
 const baseInput = {
   target: postgresTarget,
@@ -1280,6 +1281,90 @@ describe('interpretPslDocumentToSqlContract list-field constructs', () => {
           },
         },
       },
+    });
+  });
+
+  it('rejects a scalar literal default on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
+  id Int @id
+  tags String[] @default("x")
+}
+`,
+      {
+        code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
+        message:
+          'Field "Post.tags" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.',
+      },
+    );
+  });
+
+  it('rejects a scalar numeric default on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
+  id Int @id
+  scores Int[] @default(5)
+}
+`,
+      {
+        code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
+        message:
+          'Field "Post.scores" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.',
+      },
+    );
+  });
+
+  it('lowers an empty-array default on a list field to a literal empty array', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Post {
+  id Int @id
+  tags String[] @default([])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(storage.namespaces['public']?.entries.table?.['post']?.columns['tags']).toMatchObject({
+      nativeType: 'text',
+      codecId: 'pg/text@1',
+      many: true,
+      default: { kind: 'literal', value: [] },
+    });
+  });
+
+  it('lowers a literal-list default encoding each element against the element codec', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Post {
+  id Int @id
+  tags String[] @default(["a", "b"])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(storage.namespaces['public']?.entries.table?.['post']?.columns['tags']).toMatchObject({
+      many: true,
+      default: { kind: 'literal', value: ['a', 'b'] },
     });
   });
 });

@@ -705,6 +705,85 @@ export function parseDefaultLiteralValue(expression: string): ColumnDefault | un
   return undefined;
 }
 
+/**
+ * Result of parsing a list-field `@default(...)` expression:
+ * - `{ kind: 'array', value }` — an array-literal default (possibly empty)
+ * - `{ kind: 'scalar' }` — a scalar literal where an array was expected
+ * - `undefined` — not a literal at all (e.g. a function call like `now()`),
+ *   so the caller falls through to function-default handling.
+ */
+type ListDefaultParse =
+  | { readonly kind: 'array'; readonly value: readonly (string | number | boolean | null)[] }
+  | { readonly kind: 'scalar' }
+  | undefined;
+
+function splitTopLevelArrayElements(body: string): readonly string[] {
+  const elements: string[] = [];
+  let depth = 0;
+  let quote: string | undefined;
+  let current = '';
+  for (let index = 0; index < body.length; index += 1) {
+    const character = body[index];
+    if (quote !== undefined) {
+      current += character;
+      if (character === '\\' && index + 1 < body.length) {
+        current += body[index + 1];
+        index += 1;
+      } else if (character === quote) {
+        quote = undefined;
+      }
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      current += character;
+      continue;
+    }
+    if (character === '[' || character === '{' || character === '(') depth += 1;
+    if (character === ']' || character === '}' || character === ')') depth -= 1;
+    if (character === ',' && depth === 0) {
+      elements.push(current);
+      current = '';
+      continue;
+    }
+    current += character;
+  }
+  if (current.trim().length > 0) elements.push(current);
+  return elements;
+}
+
+function parseListDefaultLiteralValue(expression: string): ListDefaultParse {
+  const trimmed = expression.trim();
+  if (!trimmed.startsWith('[')) {
+    return parseDefaultLiteralValue(trimmed) ? { kind: 'scalar' } : undefined;
+  }
+  if (!trimmed.endsWith(']')) {
+    return undefined;
+  }
+  const body = trimmed.slice(1, -1).trim();
+  if (body.length === 0) {
+    return { kind: 'array', value: [] };
+  }
+  const elements: (string | number | boolean | null)[] = [];
+  for (const rawElement of splitTopLevelArrayElements(body)) {
+    const parsed = parseDefaultLiteralValue(rawElement.trim());
+    if (!parsed || parsed.kind !== 'literal') {
+      return undefined;
+    }
+    const value = parsed.value;
+    if (
+      typeof value !== 'string' &&
+      typeof value !== 'number' &&
+      typeof value !== 'boolean' &&
+      value !== null
+    ) {
+      return undefined;
+    }
+    elements.push(value);
+  }
+  return { kind: 'array', value: elements };
+}
+
 export function lowerDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
@@ -714,6 +793,7 @@ export function lowerDefaultForField(input: {
   readonly sourceId: string;
   readonly defaultFunctionRegistry: ControlMutationDefaultRegistry;
   readonly diagnostics: ContractSourceDiagnostic[];
+  readonly isList?: boolean;
 }): {
   readonly defaultValue?: ColumnDefault;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
@@ -740,6 +820,24 @@ export function lowerDefaultForField(input: {
       span: input.defaultAttribute.span,
     });
     return {};
+  }
+
+  if (input.isList) {
+    const listParse = parseListDefaultLiteralValue(expressionEntry.value);
+    if (listParse?.kind === 'array') {
+      return { defaultValue: { kind: 'literal', value: [...listParse.value] } };
+    }
+    if (listParse?.kind === 'scalar') {
+      input.diagnostics.push({
+        code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
+        message: `Field "${input.modelName}.${input.fieldName}" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.`,
+        sourceId: input.sourceId,
+        span: input.defaultAttribute.span,
+      });
+      return {};
+    }
+    // Not a literal at all (e.g. a function call) — fall through to the
+    // function-default path, which the list execution-default guard rejects.
   }
 
   const literalDefault = parseDefaultLiteralValue(expressionEntry.value);

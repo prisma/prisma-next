@@ -1622,6 +1622,9 @@ function pgRenderDdlConstraint(constraint: DdlTableConstraint): string {
     }
     return sql;
   }
+  if (constraint.kind === 'check-expression') {
+    return `CONSTRAINT ${quoteIdentifier(constraint.name)} CHECK (${constraint.expression})`;
+  }
   const cols = constraint.columns.map(quoteIdentifier).join(', ');
   if (constraint.name !== undefined) {
     return `CONSTRAINT ${quoteIdentifier(constraint.name)} UNIQUE (${cols})`;

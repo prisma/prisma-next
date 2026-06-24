@@ -168,6 +168,8 @@ function renderDdlConstraintAsTsCall(constraint: DdlTableConstraint): string {
       const nameOpt = constraint.name ? `, { name: ${jsonToTsSource(constraint.name)} }` : '';
       return `unique(${jsonToTsSource(constraint.columns)}${nameOpt})`;
     }
+    case 'check-expression':
+      return `checkExpression(${jsonToTsSource(constraint.name)}, ${jsonToTsSource(constraint.expression)})`;
   }
 }
 
@@ -182,6 +184,7 @@ function constraintImportSymbols(constraints: readonly DdlTableConstraint[] | un
     if (c.kind === 'primary-key') symbols.add('primaryKey');
     else if (c.kind === 'foreign-key') symbols.add('foreignKey');
     else if (c.kind === 'unique') symbols.add('unique');
+    else if (c.kind === 'check-expression') symbols.add('checkExpression');
   }
   return [...symbols];
 }
