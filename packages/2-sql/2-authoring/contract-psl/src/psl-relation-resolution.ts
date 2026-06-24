@@ -1,6 +1,8 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type {
+  ArgType,
+  FieldRefScope,
   FieldSymbol,
   InferAttr,
   InterpretCtx,
@@ -21,11 +23,20 @@ import {
   str,
 } from '@prisma-next/psl-parser';
 import type { FieldAttributeAst, SourceFile } from '@prisma-next/psl-parser/syntax';
+import { ArrayLiteralAst } from '@prisma-next/psl-parser/syntax';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { Result } from '@prisma-next/utils/result';
+import { ok } from '@prisma-next/utils/result';
 
+import {
+  getAttribute,
+  getNamedArgument,
+  getPositionalArgument,
+  parseFieldList,
+} from './psl-attribute-parsing';
 import { checkUncomposedNamespace, reportUncomposedNamespace } from './psl-column-resolution';
 
 export const REFERENTIAL_ACTION_MAP: Record<string, ReferentialAction | undefined> = {
@@ -76,18 +87,52 @@ export function normalizeReferentialAction(actionToken: string): ReferentialActi
   return REFERENTIAL_ACTION_MAP[actionToken];
 }
 
+/**
+ * Accepts a `@relation` directional argument value (`from:`/`to:`): a single
+ * bare field (`from: userId`) or a bracketed list (`from: [a, b]`), normalised
+ * to a field-name array. Delegating each shape to its own combinator keeps the
+ * specific diagnostics (e.g. a nonexistent field) that `oneOf` would collapse
+ * into a generic mismatch message.
+ */
+function fieldRefOrList(scope: FieldRefScope): ArgType<readonly string[]> {
+  const single = fieldRef(scope);
+  const bracketed = list(fieldRef(scope), { nonEmpty: true, unique: true });
+  return {
+    kind: 'fieldRefOrList',
+    label: 'field name or field name[]',
+    parse: (arg, ctx): Result<readonly string[], readonly PslDiagnostic[]> => {
+      if (arg instanceof ArrayLiteralAst) {
+        return bracketed.parse(arg, ctx);
+      }
+      const result = single.parse(arg, ctx);
+      if (!result.ok) {
+        return result;
+      }
+      return ok([result.value]);
+    },
+  };
+}
+
 function relationInvariants(
-  parsed: { readonly fields?: readonly string[]; readonly references?: readonly string[] },
+  parsed: {
+    readonly from?: readonly string[];
+    readonly to?: readonly string[];
+    readonly fields?: readonly string[];
+    readonly references?: readonly string[];
+  },
   ctx: InterpretCtx,
 ): readonly PslDiagnostic[] {
-  const hasFields = parsed.fields !== undefined;
-  const hasReferences = parsed.references !== undefined;
-  // `fields` and `references` must be both set or both absent — a cross-argument rule that per-argument parsing can't enforce.
-  if (hasFields !== hasReferences) {
+  const hasFrom = parsed.from !== undefined || parsed.fields !== undefined;
+  const hasTo = parsed.to !== undefined || parsed.references !== undefined;
+  // `to:` may stand alone only alongside `from:` — a referenced key without
+  // local FK fields is unresolvable, a cross-argument rule that per-argument
+  // parsing can't enforce. `from:` alone is fine (references are inferred from
+  // the target's `@id`).
+  if (hasTo && !hasFrom) {
     return [
       {
-        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
-        message: `Relation field "${ctx.selfModel.name}.${ctx.field?.name ?? ''}" requires fields and references arguments`,
+        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+        message: `Relation field "${ctx.selfModel.name}.${ctx.field?.name ?? ''}" requires a from argument naming the local foreign-key field(s)`,
         sourceId: ctx.sourceId,
         span: relationAttributeSpan(ctx),
       },
@@ -96,10 +141,16 @@ function relationInvariants(
   return [];
 }
 
+// `from:`/`to:` are the canonical local-fields/referenced-key arguments;
+// legacy `fields:`/`references:` are accepted as input aliases that lower to
+// the identical resolved relation. Canonical arguments accept a bare field or
+// a bracketed list; the legacy spellings keep their bracketed-only contract.
 const sqlRelation = fieldAttribute('relation', {
   positional: [{ key: 'name', type: optional(str()) }],
   named: {
     name: optional(str()),
+    from: optional(fieldRefOrList('self')),
+    to: optional(fieldRefOrList('referenced')),
     fields: optional(list(fieldRef('self'), { nonEmpty: true, unique: true })),
     references: optional(list(fieldRef('referenced'), { nonEmpty: true, unique: true })),
     map: optional(str()),
@@ -126,6 +177,28 @@ const sqlRelation = fieldAttribute('relation', {
 });
 
 export type SqlRelationOutput = InferAttr<typeof sqlRelation>;
+
+/**
+ * The interpreted `@relation` attribute with the directional arguments
+ * normalised: `from:` (or legacy `fields:`) lands in `fields`, `to:` (or
+ * legacy `references:`) in `references`, so consumers see one shape whichever
+ * spelling the schema used.
+ */
+export type ParsedSqlRelation = {
+  readonly name?: string;
+  readonly fields?: readonly string[];
+  readonly references?: readonly string[];
+  /**
+   * Set when local FK fields are declared (`from:`/`fields:`) but the
+   * referenced key is omitted (`to:`/`references:` absent). The caller resolves
+   * the referenced columns from the target model's `@id`. `references` stays
+   * undefined in this case; the two never co-occur.
+   */
+  readonly referencesInferred?: true;
+  readonly map?: string;
+  readonly onDelete?: SqlRelationOutput['onDelete'];
+  readonly onUpdate?: SqlRelationOutput['onUpdate'];
+};
 
 function findRelationAttributeNode(field: FieldSymbol): FieldAttributeAst | undefined {
   for (const attribute of field.node.attributes()) {
@@ -186,7 +259,7 @@ export function interpretRelationAttribute(input: {
   readonly sourceFile: SourceFile;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
-}): SqlRelationOutput | undefined {
+}): ParsedSqlRelation | undefined {
   const attributeNode = findRelationAttributeNode(input.field);
   if (attributeNode === undefined) {
     return undefined;
@@ -199,7 +272,47 @@ export function interpretRelationAttribute(input: {
     }
     return undefined;
   }
-  return result.value;
+  const value = result.value;
+  const fields = value.from ?? value.fields;
+  const references = value.to ?? value.references;
+  const referencesInferred: true | undefined =
+    fields !== undefined && references === undefined ? true : undefined;
+  return {
+    ...ifDefined('name', value.name),
+    ...ifDefined('fields', fields),
+    ...ifDefined('references', references),
+    ...ifDefined('referencesInferred', referencesInferred),
+    ...ifDefined('map', value.map),
+    ...ifDefined('onDelete', value.onDelete),
+    ...ifDefined('onUpdate', value.onUpdate),
+  };
+}
+
+/**
+ * Resolves a model's `@id` field names in declaration order — an inline `@id`
+ * on a single field, or a model-level `@@id([...])` list. Returns undefined
+ * when the model declares no identity, which is what makes an omitted `to:`
+ * un-inferable for a relation targeting it.
+ */
+export function resolveTargetIdFieldNames(model: ModelSymbol): readonly string[] | undefined {
+  const blockId = getAttribute(model.attributes, 'id');
+  if (blockId) {
+    const raw = getNamedArgument(blockId, 'fields') ?? getPositionalArgument(blockId);
+    const fields = raw ? parseFieldList(raw) : undefined;
+    if (fields && fields.length > 0) {
+      return fields;
+    }
+    return undefined;
+  }
+
+  const inlineIdFields = Object.values(model.fields).filter((field) =>
+    field.attributes.some((attribute) => attribute.name === 'id'),
+  );
+  if (inlineIdFields.length === 1) {
+    const idField = inlineIdFields[0];
+    return idField ? [idField.name] : undefined;
+  }
+  return undefined;
 }
 
 export function indexFkRelations(input: {
