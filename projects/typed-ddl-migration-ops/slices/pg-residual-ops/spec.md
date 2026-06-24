@@ -16,6 +16,20 @@ Convert the last Postgres migration ops still emitting raw SQL onto the typed `*
 
 - `CreateExtension` (TML-2920). SQLite (TML-2921/2922). Docs (TML-2923).
 - Growing the AST for the data-transform wrapper (HALT instead).
+- **Typed `PostgresTableRef` end-to-end (TML-2927).** This slice keeps the
+  schema/table coordinate as two separate string fields (`schema?: string` +
+  `table: string`) on the contract-free DDL builders and `*Call` IR, and maps
+  the unbound sentinel to `undefined` via the small `bound-schema.ts` helper
+  (`boundSchema(schemaId)`). During review we spiked tightening this — first a
+  `PostgresSchema.schemaForBuilder()` accessor, then a polymorphic
+  `PostgresSchema.qualify(name)` that collapsed the builder/AST shape to a
+  single composed `table` string — and **reverted both** (commits `cadcc53e0`
+  + `a174ecbe7`, recoverable from the merge-base reflog): they were a half-step
+  (string-typed refs end-to-end, the schema IR reconstituted in `*Call.toOp()`
+  just to call `qualify()` once) and the proper fix is its own slice.
+  **Exit condition:** when TML-2927 lands a typed `PostgresTableRef` carried
+  end-to-end, `bound-schema.ts` is deleted and every call site composes the
+  qualified reference through the ref instead of the `boundSchema` string map.
 
 ## Done conditions
 
