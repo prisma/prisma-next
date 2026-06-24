@@ -2,6 +2,38 @@
 
 Trigger-based per `.claude/skills/drive-run-retro/SKILL.md`. Entries land lessons in durable surfaces (canonical skill bodies, project-context READMEs, ADRs); without a landed output the retro is not done.
 
+## 2026-06-16 — Project final retro (close-out)
+
+### Shape of the work
+
+11 slices merged across 13 weeks: foundational AST expansion (1), marker-ops + DDL adoption substrate (2 + 4 + codec-routed defaults), Phase-1 planner adoption across all three targets (5/6/7), the carved-out typed-verification-queries slice, two follow-up tails (un-namespaced PG default, AddColumn op-id + codecRef round-trip). Phase 2 — remaining op-porting across PG/SQLite/Mongo + ADR + subsystem docs — extracted into its own project ("Typed DDL migration ops — complete the conversion") once Phase 1's substrate decisions had settled. Project DoD AC #10 (ADR + subsystem docs) deferred to that project's TML-2923.
+
+### What worked (kept-discipline list, for future projects)
+
+- **"Don't decompose Phase 2 in advance" held.** The plan deliberately refused to slice Phase 2 until Phase-1 substrate was proven on all three targets. When the time came to decompose, the slice boundaries were obvious (PG raw-builder deletion vs CreateExtension entity-kind vs SQLite execute-step conversion vs RecreateTable AST growth vs ADR), and Phase 2 split cleanly into its own project rather than bloating this one. Same discipline that paid off in Slice 4 (which itself split mid-flight from one two-dialect dispatch into PG-first + SQLite-follow-up).
+- **In-slice spikes for load-bearing unknowns** (the visitor/dispatch shape in Slice 1; the AlterTable node shape in Slice 7; the "node implements driver-option interface" feasibility in the Slice 6 rework). Each spike produced a one-page decision artifact that re-triaged into D2; none of those decisions had to be reopened later.
+- **Adapter-owned seam + driver as the dumb transport.** Slice 6's rework pivoted from "runner orchestrates `adapter.lower()` + `driver.execute()`" to "runner calls one adapter method (`executeDdl(driver, command)`)" — same shape the slice-3 marker-ops `#executeControl` used. Future projects: when a runner finds itself gluing lower + dispatch, look for an existing adapter-owned seam pattern instead.
+
+### What needed correction (operator-caught, lessons already landed)
+
+- **The 5 + 10 review thread cycle on #816** (Slice 6). Both rounds were genuine misses on the implementer's part — wrong conversion machinery (toJSON spread), wrong relocation of casts, parallel option types that diverged from mongodb's. The cure was tightening: derive option types via `Pick<>` of mongodb's, have nodes/wire commands `implements` the option interfaces, type the arktype schemas to the shape they validate. Two memory entries landed from this round: [[verify-review-bot-suggestions]] (CodeRabbit's collMod-key-order suggestion broke the command), and the more general "ops.json structure is operator-set; never propose changing it as a fix for an implementation bug."
+- **The subagent context-cap pattern.** Across the slice 6 rework rounds, implementer agents repeatedly died mid-task — investigation later (PR #832's `:agent` test rule + the stall-timeout forensics) confirmed they weren't context-capped; they were terminated by external interrupts during long silent test runs. The corrective pattern landed in memory as [[running-tests-rule]] (capture to `wip/<name>.<ts>.log` once; grep the file) + [[orchestrator-not-implementer]] (don't hand-edit source even for one-liners). Both apply to every future Drive project.
+- **task_41556b53 follow-up discipline.** Two AddColumn correctness gaps were honestly deferred from Slice 7 to a tracked follow-up, then surfaced in #837 as a Phase-2 tail at the right moment (post-#825 once a collision check confirmed they'd block on Phase-2 conversion otherwise). Pattern worth repeating: spawn-task-style follow-ups with concrete file:line citations beat vague "we should also fix X" notes.
+
+### Landing surfaces
+
+All durable lessons already live in `/Users/wmadden/.claude/projects/-Users-wmadden-Projects-prisma-prisma-next/memory/`:
+
+- [[slices-must-be-vertical]], [[verify-through-emit-not-typeof]], [[main-is-green]], [[ci-checks-merge-ref]], [[verify-review-bot-suggestions]], [[orchestrator-not-implementer]], [[running-tests-rule]], [[verify-execution-path-not-just-unit-tests]], [[plane-reference-direction]], [[never-git-stash-for-flips]], [[drive-subagent-continuity]], [[name-rules-and-docs-by-concrete-case]], [[fieldoutputtypes-is-user-facing]], [[no-haiku-for-research]].
+
+The ADR ("DDL as target-contributed query-AST kind + adapter-DDL-lowering seam") + subsystem-doc updates (Adapters & Targets, Migration System) are tracked as **TML-2923** in the new "Typed DDL migration ops" project; that's where the durable doc landing happens.
+
+### Corrective course (none — project closes)
+
+This is the final entry. The project workspace is being deleted in the same close-out PR.
+
+---
+
 ## 2026-06-03 — Slice 2 shipped 3 architectural mistakes; operator caught all 3 at PR review
 
 **Trigger:** operator-flagged surprise (`CHANGES_REQUESTED` on PR #712 after Slice 2 closed SATISFIED through the build loop). Three distinct findings; all three escaped the implementer + subagent reviewer + orchestrator triple-check.
