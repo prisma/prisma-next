@@ -1,7 +1,7 @@
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import type { ExtensionPackRef } from '@prisma-next/framework-components/components';
 import type {
-  SqlNamespace,
+  SqlNamespaceBase,
   SqlNamespaceInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
@@ -37,7 +37,7 @@ type PostgresResult<
       readonly models?: Models;
       readonly extensionPacks?: ExtensionPacks;
       readonly enums?: Enums;
-      readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespace;
+      readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespaceBase;
     }
   >
 >;

@@ -5,7 +5,7 @@ import {
 } from '@prisma-next/framework-components/ir';
 import { tableEntityKind } from '@prisma-next/sql-contract/entity-kinds';
 import {
-  SqlNamespace,
+  SqlNamespaceBase,
   type SqlNamespaceEntries,
   type SqlNamespaceInput,
   type StorageTable,
@@ -24,7 +24,7 @@ const SQLITE_NAMESPACE_KIND = 'sqlite-namespace' as const;
  * `entries.table` and unqualified `qualifyTable()` emission for runtime
  * SQL rendering.
  */
-export class SqliteDatabase extends SqlNamespace {
+export class SqliteDatabase extends SqlNamespaceBase {
   declare readonly kind: string;
 
   readonly id: string;

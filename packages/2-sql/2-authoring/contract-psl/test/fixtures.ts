@@ -26,7 +26,7 @@ import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
-import type { SqlNamespace, SqlNamespaceInput } from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceBase, SqlNamespaceInput } from '@prisma-next/sql-contract/types';
 import { type EnumTypeHandle, enumType } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 
@@ -681,14 +681,14 @@ export function buildEnumCapturingFactory(): {
   createNamespace: (
     input: SqlNamespaceInput,
     enumTypes?: Readonly<Record<string, unknown>>,
-  ) => SqlNamespace;
+  ) => SqlNamespaceBase;
   capturedEnumTypes: Record<string, Record<string, unknown>>;
 } {
   const capturedEnumTypes: Record<string, Record<string, unknown>> = {};
   const createNamespace = (
     input: SqlNamespaceInput,
     enumTypes?: Readonly<Record<string, unknown>>,
-  ): SqlNamespace => {
+  ): SqlNamespaceBase => {
     if (enumTypes && Object.keys(enumTypes).length > 0) {
       capturedEnumTypes[input.id] = { ...(capturedEnumTypes[input.id] ?? {}), ...enumTypes };
     }

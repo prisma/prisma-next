@@ -46,7 +46,7 @@ import {
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import type {
   SqlModelStorage,
-  SqlNamespace,
+  SqlNamespaceBase,
   SqlNamespaceInput,
 } from '@prisma-next/sql-contract/types';
 import {
@@ -125,8 +125,8 @@ export interface InterpretPslDocumentToSqlContractInput {
    * emits `PSL_UNKNOWN_CROSS_SPACE_TARGET`.
    */
   readonly composedExtensionContracts: ReadonlyMap<string, Contract>;
-  /** Target-supplied factory that materialises a `SqlNamespace` concretion for each namespace coordinate. */
-  readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespace;
+  /** Target-supplied factory that materialises a `SqlNamespaceBase` concretion for each namespace coordinate. */
+  readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespaceBase;
   readonly codecLookup?: CodecLookup;
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
 }
@@ -2040,39 +2040,22 @@ export function interpretPslDocumentToSqlContract(
     }
   }
 
-  // Wrap input.createNamespace (if present) to merge lowered extension-block
-  // entities into each namespace's entries before handing off to the factory.
-  // The entities map keys are discriminator strings — equal to the entries key
-  // by the one-string rule — so they merge directly into entries without
-  // translation. Callers that lower extension entities must supply
-  // createNamespace; the PSL provider sources it from the target pack's
-  // authoring so configs need not re-specify it.
-  const innerCreateNamespace = input.createNamespace;
-
-  if (namespaceExtensionEntities.size > 0 && innerCreateNamespace === undefined) {
-    const kinds = [...namespaceExtensionEntities.values()]
-      .flatMap((entities) => Object.keys(entities))
-      .join(', ');
-    throw new Error(
-      `PSL interpreter: extension entities of kind(s) [${kinds}] were lowered but the target supplies no createNamespace factory. ` +
-        'Provide createNamespace on the target authoring object or pass it explicitly to interpretPslDocumentToSqlContract.',
-    );
-  }
-
-  const createNamespaceWithExtensions =
-    innerCreateNamespace !== undefined
-      ? (nsInput: SqlNamespaceInput) => {
-          const entities = namespaceExtensionEntities.get(nsInput.id);
-          if (entities === undefined) {
-            return innerCreateNamespace(nsInput);
-          }
-          const extended: SqlNamespaceInput = {
-            ...nsInput,
-            entries: { ...nsInput.entries, ...entities },
-          };
-          return innerCreateNamespace(extended);
-        }
-      : undefined;
+  // Wrap createNamespace to merge lowered extension-block entities into each
+  // namespace's entries before handing off to the factory. The entities map
+  // keys are discriminator strings — equal to the entries key by the one-string
+  // rule — so they merge directly into entries without translation.
+  const { createNamespace } = input;
+  const createNamespaceWithExtensions = (nsInput: SqlNamespaceInput) => {
+    const entities = namespaceExtensionEntities.get(nsInput.id);
+    if (entities === undefined) {
+      return createNamespace(nsInput);
+    }
+    const extended: SqlNamespaceInput = {
+      ...nsInput,
+      entries: { ...nsInput.entries, ...entities },
+    };
+    return createNamespace(extended);
+  };
 
   const contract = buildSqlContractFromDefinition({
     target: input.target,
@@ -2086,7 +2069,7 @@ export function interpretPslDocumentToSqlContract(
     ),
     ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
     ...(Object.keys(validEnumHandles).length > 0 ? { enums: validEnumHandles } : {}),
-    ...ifDefined('createNamespace', createNamespaceWithExtensions),
+    createNamespace: createNamespaceWithExtensions,
     models: stiColumnModelNodes.map((model) => ({
       ...model,
       ...(modelRelations.has(model.modelName)

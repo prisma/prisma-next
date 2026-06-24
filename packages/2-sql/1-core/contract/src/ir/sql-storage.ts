@@ -64,7 +64,7 @@ export function isSqlAuthoringContributions(
 export interface SqlStorageInput<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
   readonly types?: Record<string, SqlStorageTypeEntry>;
-  readonly namespaces: Readonly<Record<string, SqlNamespace>>;
+  readonly namespaces: Readonly<Record<string, SqlNamespaceBase>>;
 }
 
 /**
@@ -100,15 +100,15 @@ export type SqlNamespaceEntries = Readonly<Record<string, Readonly<Record<string
 };
 
 /**
- * Structural shape for SQL family namespaces. Generated `.d.ts` contract
+ * Structural interface for SQL family namespaces. Generated `.d.ts` contract
  * types satisfy this structurally (no prototype methods). The runtime
- * abstract class `SqlNamespace` extends this.
+ * abstract class `SqlNamespaceBase` extends this.
  *
- * `qualifyTable` is optional here so that JSON-shaped contract types
- * (which carry no methods) are accepted where `SqlNamespaceShape` is
- * required. Hydrated `SqlNamespace` instances always have it.
+ * `qualifyTable` is optional so JSON-shaped contract types (which carry no
+ * methods) are accepted where `SqlNamespace` is required. Hydrated
+ * `SqlNamespaceBase` instances always have it.
  */
-export interface SqlNamespaceShape {
+export interface SqlNamespace {
   readonly kind: string;
   readonly id: string;
   readonly entries: SqlNamespaceEntries;
@@ -116,12 +116,12 @@ export interface SqlNamespaceShape {
 }
 
 /**
- * Abstract SQL family namespace. Target concretions (`PostgresSchema`,
- * `SqliteDatabase`, …) extend this class — it is never instantiated directly.
+ * Abstract SQL family namespace base class. Target concretions (`PostgresSchema`,
+ * `SqliteDatabase`, …) extend this — it is never instantiated directly.
  * `entries` is the open ADR 224 dictionary: `entries[entityKind][entityName]`
  * addresses any entity.
  */
-export abstract class SqlNamespace extends NamespaceBase implements SqlNamespaceShape {
+export abstract class SqlNamespaceBase extends NamespaceBase implements SqlNamespace {
   abstract override readonly id: string;
   abstract override readonly entries: SqlNamespaceEntries;
 
@@ -129,23 +129,23 @@ export abstract class SqlNamespace extends NamespaceBase implements SqlNamespace
 }
 
 /**
- * Realm-safe guard for hydrated `SqlNamespace` concretions. Checks
+ * Realm-safe guard for hydrated `SqlNamespaceBase` concretions. Checks
  * `qualifyTable` structurally instead of `instanceof NamespaceBase`, so it
  * survives duplicate-module boundaries (e.g. dist e2e where the target and
  * the family carry separate copies of `@prisma-next/framework-components`).
  *
- * Every concrete `SqlNamespace` subclass (`PostgresSchema`, `SqliteDatabase`,
+ * Every concrete `SqlNamespaceBase` subclass (`PostgresSchema`, `SqliteDatabase`,
  * `TestSqlNamespace`, …) implements `qualifyTable`. Raw `SqlNamespaceInput`
  * objects (`{ id, entries }`) do not.
  */
-export function isMaterializedSqlNamespace(x: unknown): x is SqlNamespace {
+export function isMaterializedSqlNamespace(x: unknown): x is SqlNamespaceBase {
   if (typeof x !== 'object' || x === null || !('qualifyTable' in x)) return false;
   return typeof x.qualifyTable === 'function';
 }
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
-  readonly namespaces: Readonly<Record<string, SqlNamespaceShape>>;
+  readonly namespaces: Readonly<Record<string, SqlNamespace>>;
   declare readonly types?: Readonly<Record<string, StorageTypeInstance>>;
 
   constructor(input: SqlStorageInput<THash>) {

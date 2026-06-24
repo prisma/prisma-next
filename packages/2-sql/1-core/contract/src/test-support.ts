@@ -5,18 +5,22 @@ import {
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { composeSqlEntityKinds } from './entity-kinds';
-import { SqlNamespace, type SqlNamespaceEntries, type SqlNamespaceInput } from './ir/sql-storage';
+import {
+  SqlNamespaceBase,
+  type SqlNamespaceEntries,
+  type SqlNamespaceInput,
+} from './ir/sql-storage';
 import type { StorageTable } from './ir/storage-table';
 import type { StorageValueSet } from './ir/storage-value-set';
 
 /**
- * Minimal concrete `SqlNamespace` for use in `packages/2-sql/**` unit tests.
+ * Minimal concrete `SqlNamespaceBase` for use in `packages/2-sql/**` unit tests.
  *
  * This is a legitimate target concretion — not a materialised family
  * namespace.  Production code never constructs one; the target-specific
  * concretions (`PostgresSchema`, `SqliteDatabase`) are used in production.
  */
-export class TestSqlNamespace extends SqlNamespace {
+export class TestSqlNamespace extends SqlNamespaceBase {
   declare readonly kind: 'test-sql-namespace';
   readonly id: string;
   readonly entries: SqlNamespaceEntries;
@@ -56,6 +60,6 @@ export class TestSqlNamespace extends SqlNamespace {
   }
 }
 
-export function createTestSqlNamespace(input: SqlNamespaceInput): SqlNamespace {
+export function createTestSqlNamespace(input: SqlNamespaceInput): SqlNamespaceBase {
   return new TestSqlNamespace(input);
 }

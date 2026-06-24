@@ -1,5 +1,5 @@
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, type SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceInput } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
@@ -605,12 +605,12 @@ namespace public {
       },
       pslBlockDescriptors,
     };
-    const createNamespace = (input: SqlNamespaceTablesInput): Namespace => {
+    const createNamespace = (input: SqlNamespaceInput): Namespace => {
       capturedEntries[input.id] = {
         ...(capturedEntries[input.id] ?? {}),
         ...input.entries,
       };
-      return buildSqlNamespace(input);
+      return createTestNamespace(input);
     };
 
     const symbolTableInput = symbolTableInputFromParseArgs({

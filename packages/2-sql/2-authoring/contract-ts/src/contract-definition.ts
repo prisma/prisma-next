@@ -8,7 +8,7 @@ import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/cod
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ReferentialAction,
-  SqlNamespace,
+  SqlNamespaceBase,
   SqlNamespaceInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
@@ -175,8 +175,8 @@ export interface ContractDefinition {
    * `SqlStorage.namespaces` together with `createNamespace`.
    */
   readonly namespaces?: readonly string[];
-  /** Target-supplied factory that materialises a `SqlNamespace` concretion for a declared namespace coordinate. */
-  readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespace;
+  /** Target-supplied factory that materialises a `SqlNamespaceBase` concretion for a declared namespace coordinate. */
+  readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespaceBase;
   readonly models: readonly ModelNode[];
   readonly valueObjects?: readonly ValueObjectNode[];
   /**

@@ -5,7 +5,7 @@ import {
 } from '@prisma-next/framework-components/ir';
 import { composeSqlEntityKinds } from '@prisma-next/sql-contract/entity-kinds';
 import {
-  SqlNamespace,
+  SqlNamespaceBase,
   type SqlNamespaceEntries,
   type SqlNamespaceInput,
   type SqlStorage,
@@ -46,7 +46,7 @@ export interface PostgresSchemaInput {
  * prefix entirely — call sites stay polymorphic and never branch on
  * `id === UNBOUND_NAMESPACE_ID`.
  */
-export class PostgresSchema extends SqlNamespace {
+export class PostgresSchema extends SqlNamespaceBase {
   /**
    * Stable singleton reference for the late-bound slot. Materialised
    * lazily below the singleton subclass declaration so the static

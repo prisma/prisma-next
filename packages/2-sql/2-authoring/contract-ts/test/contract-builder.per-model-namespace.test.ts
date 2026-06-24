@@ -1,6 +1,6 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { createTestSqlNamespace } from '@prisma-next/sql-contract/test-support';
-import type { SqlNamespaceShape } from '@prisma-next/sql-contract/types';
+import type { SqlNamespace } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -53,7 +53,7 @@ describe('per-model `namespace` field (TS builder)', () => {
     // The type-level `tables` for a declared namespace is `{}` to keep
     // `keyof` as `never` (preventing `Db<C>` from collapsing to a string
     // index signature). The runtime value is correct; cast to verify it.
-    const authNs = (contract.storage.namespaces as Record<string, SqlNamespaceShape>)['auth'];
+    const authNs = (contract.storage.namespaces as Record<string, SqlNamespace>)['auth'];
     expect(authNs !== undefined ? authNs.entries.table?.['User'] : undefined).toBeDefined();
   });
 
@@ -68,7 +68,7 @@ describe('per-model `namespace` field (TS builder)', () => {
       },
     });
 
-    const publicNs = (contract.storage.namespaces as Record<string, SqlNamespaceShape>)['public'];
+    const publicNs = (contract.storage.namespaces as Record<string, SqlNamespace>)['public'];
     expect(publicNs !== undefined ? publicNs.entries.table?.['User'] : undefined).toBeDefined();
   });
 
