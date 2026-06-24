@@ -119,7 +119,7 @@
     "execute": [
       {
         "description": "create table \"tag\"",
-        "sql": "CREATE TABLE \"public\".\"tag\" (\n  \"id\" uuid NOT NULL,\n  \"label\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "sql": "CREATE TABLE \"public\".\"tag\" (\n  \"id\" uuid NOT NULL,\n  \"label\" text NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"tag_label_key\" UNIQUE (\"label\")\n)",
         "params": []
       }
     ],

@@ -7,13 +7,14 @@ import {
   MigrationCLI,
   primaryKey,
   rawSql,
+  unique,
 } from '@prisma-next/target-postgres/migration';
 
 export default class M extends Migration {
   override describe() {
     return {
       from: null,
-      to: 'sha256:ede5c1b84cd105676bc676a6984c0a783ae00625814b58b61c36ff2055ea6e82',
+      to: 'sha256:9f49f8f9e51a9cc016f1ec2098ebae9406521a3cc2cf00207adc795078333d8b',
     };
   }
 
@@ -68,7 +69,7 @@ export default class M extends Migration {
         schema: 'public',
         table: 'tag',
         columns: [col('id', 'uuid', { notNull: true }), col('label', 'text', { notNull: true })],
-        constraints: [primaryKey(['id'])],
+        constraints: [primaryKey(['id']), unique(['label'], { name: 'tag_label_key' })],
       }),
       this.createTable({
         schema: 'public',

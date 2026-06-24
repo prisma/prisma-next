@@ -54,7 +54,7 @@ model Post {
 
 model Tag {
   id    Uuid   @id @default(uuid())
-  label String
+  label String @unique
 
   posts Post[]
 
