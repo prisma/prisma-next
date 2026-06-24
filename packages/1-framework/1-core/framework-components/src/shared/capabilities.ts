@@ -9,7 +9,7 @@
 
 import { blindCast } from '@prisma-next/utils/casts';
 
-type CapabilityMatrix = Record<string, Record<string, boolean>>;
+export type CapabilityMatrix = Record<string, Record<string, boolean>>;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
