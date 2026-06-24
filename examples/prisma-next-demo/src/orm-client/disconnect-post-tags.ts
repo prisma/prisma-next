@@ -17,16 +17,11 @@ export async function ormClientDisconnectPostTags(
   runtime: Runtime,
 ) {
   const db = createOrmClient(runtime);
-  const updated = await db.Post.where({ id: toPostId(postId) }).update({
-    tags: (t) => t.disconnect(tagIds.map((id) => ({ id: toTagId(id) }))),
-  });
-  if (!updated) {
-    return null;
-  }
-  return db.Post.select('id', 'title')
+  return db.Post.where({ id: toPostId(postId) })
     .include('tags', (tag) => tag.select('id', 'label').orderBy((t) => t.label.asc()))
-    .where({ id: toPostId(postId) })
-    .first();
+    .update({
+      tags: (t) => t.disconnect(tagIds.map((id) => ({ id: toTagId(id) }))),
+    });
 }
 
 function toPostId(value: string): PostId {
