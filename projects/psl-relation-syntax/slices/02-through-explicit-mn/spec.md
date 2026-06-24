@@ -35,7 +35,7 @@ One outcome — "an explicitly-declared `through: Junction` authors a navigable 
 ## Slice-specific done conditions
 
 - [ ] An M:N authored `tags Tag[] @relation(through: PostTag)` (one-end-declared, bare inverse) lowers to the same `N:M` + `through` contract as the equivalent bare-list form — proven by an equivalence unit test.
-- [ ] `db.orm.<Model>.include(<m2n>)` over a **PSL-`through:`-authored** M:N returns the related rows — PG + SQLite integration, whole-row assertions, ≥1 implicit select (project integration standard).
+- [ ] `db.orm.<Model>.include(<m2n>)` over a **PSL-`through:`-authored** M:N returns the related rows — whole-row assertions, ≥1 implicit select (project integration standard). _Harness: PGlite only — the M:N integration suites have no SQLite adapter path (sibling-established); "PG + SQLite" reduces to PGlite here._
 - [ ] `through:` naming a non-junction model produces an actionable diagnostic (regression test on a declined shape).
 
 ## References
