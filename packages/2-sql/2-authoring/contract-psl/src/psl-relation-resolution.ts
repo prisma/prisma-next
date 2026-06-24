@@ -85,6 +85,13 @@ export type ModelBackrelationCandidate = {
    * self-relations and multiple many-to-many between the same pair of models.
    */
   readonly through?: ParsedThrough;
+  /**
+   * The FK-side relation field named by `inverse:` on a one-to-many back-relation
+   * list field. When present, FK-side matching pins the back-relation to the FK
+   * relation whose declaring field is `inverse`, disambiguating multiple
+   * relations linking the same pair of models.
+   */
+  readonly inverse?: string;
 };
 
 type ModelRelationMetadata = RelationNode;
@@ -192,6 +199,34 @@ function fieldRefOrList(scope: FieldRefScope): ArgType<readonly string[]> {
 }
 
 /**
+ * Reads a bare identifier argument value as a plain name (e.g. `inverse:
+ * editor`, naming an FK-side relation field). Existence is validated
+ * downstream where the named model is known.
+ */
+function bareName(label: string): ArgType<string> {
+  return {
+    kind: 'bareName',
+    label,
+    parse: (arg, ctx): Result<string, readonly PslDiagnostic[]> => {
+      if (arg instanceof IdentifierAst) {
+        const name = arg.name();
+        if (name !== undefined) {
+          return ok(name);
+        }
+      }
+      return notOk([
+        {
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: `Expected a ${label}`,
+          sourceId: ctx.sourceId,
+          span: nodePslSpan(arg.syntax, ctx.sourceFile),
+        },
+      ]);
+    },
+  };
+}
+
+/**
  * Reads the `through:` junction pointer: a bare junction model
  * (`through: PostTag`) or a qualified junction relation field
  * (`through: PostTag.post`), whose field segment pins the parent-side
@@ -266,6 +301,7 @@ const sqlRelation = fieldAttribute('relation', {
     from: optional(fieldRefOrList('self')),
     to: optional(fieldRefOrList('referenced')),
     through: optional(throughRef()),
+    inverse: optional(bareName('relation field name')),
     map: optional(str()),
     onDelete: optional(
       oneOf(
@@ -316,6 +352,14 @@ export type ParsedSqlRelation = {
    * self-relations and multiple many-to-many between the same pair of models.
    */
   readonly through?: ParsedThrough;
+  /**
+   * The FK-side relation field named by `inverse:` on a one-to-many
+   * back-relation list field (`posts Post[] @relation(inverse: editor)` ⇒
+   * `inverse: 'editor'`). A bare relation-field name pinning the owning
+   * foreign-key field, used to disambiguate when multiple relations link the
+   * same pair of models.
+   */
+  readonly inverse?: string;
   readonly map?: string;
   readonly onDelete?: SqlRelationOutput['onDelete'];
   readonly onUpdate?: SqlRelationOutput['onUpdate'];
@@ -431,6 +475,7 @@ export function interpretRelationAttribute(input: {
     ...ifDefined('references', references),
     ...ifDefined('referencesInferred', referencesInferred),
     ...ifDefined('through', value.through),
+    ...ifDefined('inverse', value.inverse),
     ...ifDefined('map', value.map),
     ...ifDefined('onDelete', value.onDelete),
     ...ifDefined('onUpdate', value.onUpdate),
@@ -754,6 +799,25 @@ function manyToManyRelationNode(
   };
 }
 
+function oneToManyRelationNode(
+  candidate: ModelBackrelationCandidate,
+  matched: FkRelationMetadata,
+): ModelRelationMetadata {
+  return {
+    fieldName: candidate.field.name,
+    toModel: matched.declaringModelName,
+    toTable: matched.declaringTableName,
+    ...ifDefined('toNamespaceId', matched.declaringNamespaceId),
+    cardinality: '1:N',
+    on: {
+      parentTable: candidate.tableName,
+      parentColumns: matched.referencedColumns,
+      childTable: matched.declaringTableName,
+      childColumns: matched.localColumns,
+    },
+  };
+}
+
 function relationsForModel(
   modelRelations: Map<string, ModelRelationMetadata[]>,
   modelName: string,
@@ -779,6 +843,38 @@ export function applyBackrelationCandidates(input: {
   for (const candidate of input.backrelationCandidates) {
     const pairKey = fkRelationPairKey(candidate.targetModelName, candidate.modelName);
     const pairMatches = input.fkRelationsByPair.get(pairKey) ?? [];
+
+    // `inverse:` pins a one-to-many back-relation to the FK-side relation whose
+    // declaring field it names, the directional disambiguator across multiple
+    // relations between the same pair of models. A relation field name is unique
+    // within its model, so at most one FK-side relation matches. When `inverse:`
+    // names a field that is not an FK-side relation back to the candidate, report
+    // it rather than letting recognition fall into the generic ambiguity or
+    // junction path.
+    if (candidate.inverse !== undefined) {
+      const inverseMatched = pairMatches.find(
+        (relation) => relation.declaringFieldName === candidate.inverse,
+      );
+      if (!inverseMatched) {
+        input.diagnostics.push({
+          code: 'PSL_INVERSE_FIELD_NOT_FK',
+          message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" pins FK-side relation field "${candidate.inverse}" via inverse: ${candidate.inverse}, but "${candidate.targetModelName}" has no relation field "${candidate.inverse}" with a foreign key back to "${candidate.modelName}". Name an FK-side relation field whose foreign key references "${candidate.modelName}".`,
+          sourceId: input.sourceId,
+          span: candidate.field.span,
+          data: {
+            listField: `${candidate.modelName}.${candidate.field.name}`,
+            targetModel: candidate.targetModelName,
+            inverseField: candidate.inverse,
+          },
+        });
+        continue;
+      }
+      relationsForModel(input.modelRelations, candidate.modelName).push(
+        oneToManyRelationNode(candidate, inverseMatched),
+      );
+      continue;
+    }
+
     const matches = candidate.relationName
       ? pairMatches.filter((relation) => relation.relationName === candidate.relationName)
       : [...pairMatches];
@@ -832,19 +928,9 @@ export function applyBackrelationCandidates(input: {
     const matched = matches[0];
     assertDefined(matched, 'Backrelation matching requires a defined relation match');
 
-    relationsForModel(input.modelRelations, candidate.modelName).push({
-      fieldName: candidate.field.name,
-      toModel: matched.declaringModelName,
-      toTable: matched.declaringTableName,
-      ...ifDefined('toNamespaceId', matched.declaringNamespaceId),
-      cardinality: '1:N',
-      on: {
-        parentTable: candidate.tableName,
-        parentColumns: matched.referencedColumns,
-        childTable: matched.declaringTableName,
-        childColumns: matched.localColumns,
-      },
-    });
+    relationsForModel(input.modelRelations, candidate.modelName).push(
+      oneToManyRelationNode(candidate, matched),
+    );
   }
 }
 
