@@ -1,4 +1,8 @@
 export type {
+  StorageColumnMapAt,
+  StorageColumnTypeAcrossNamespaces,
+} from '../column-type-resolution';
+export type {
   CheckConstraintInput,
   CodecTypesOf,
   ContractWithTypeMaps,
@@ -6,6 +10,8 @@ export type {
   ExtractFieldInputTypes,
   ExtractFieldOutputTypes,
   ExtractQueryOperationTypes,
+  ExtractStorageColumnInputTypes,
+  ExtractStorageColumnTypes,
   ExtractTypeMapsFromContract,
   FieldInputTypesOf,
   FieldOutputTypesOf,
@@ -13,6 +19,8 @@ export type {
   ForeignKeyOptions,
   ForeignKeyReferenceInput,
   IndexInput,
+  NamespacedFieldTypeMap,
+  NamespacedStorageColumnTypeMap,
   PrimaryKeyInput,
   QueryOperationReturn,
   QueryOperationSelfSpec,
@@ -33,6 +41,8 @@ export type {
   SqlStorageInput,
   SqlStorageTypeEntry,
   StorageColumnInput,
+  StorageColumnInputTypesOf,
+  StorageColumnTypesOf,
   StorageTableInput,
   StorageTypeInstance,
   StorageTypeInstanceInput,

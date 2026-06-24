@@ -3,6 +3,7 @@ import type {
   ContractEnum,
   ContractModelBase,
   ContractValueObject,
+  ValueSetRef,
 } from '@prisma-next/contract/types';
 import { DomainNamespaceResolutionError } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
@@ -13,8 +14,8 @@ import type {
 } from '@prisma-next/framework-components/emission';
 import { blindCast } from '@prisma-next/utils/casts';
 import {
+  type DomainEnumLookup,
   deduplicateImports,
-  type EnumValuesResolver,
   generateCodecTypeIntersection,
   generateFieldTypesMapsByNamespace,
   generateHashTypeAliases,
@@ -151,12 +152,16 @@ export function generateContractDts(
         emitter.resolveFieldTypeParams?.(modelName, fieldName, model, contract)
     : undefined;
 
-  const resolveEnumValues: EnumValuesResolver = (ref) =>
-    ref.entityKind === 'enum'
-      ? contract.domain.namespaces[ref.namespaceId]?.enum?.[ref.entityName]?.members.map(
-          (m) => m.value,
-        )
-      : undefined;
+  const domainEnumLookup: DomainEnumLookup = (ref: ValueSetRef) => {
+    if (ref.entityKind !== 'enum') return undefined;
+    const ns = contract.domain.namespaces[ref.namespaceId];
+    if (!ns) return undefined;
+    const enumBlock = blindCast<
+      Record<string, ContractEnum> | undefined,
+      'ns.enum is an optional ContractEnum record in the emitted IR'
+    >(ns.enum);
+    return enumBlock?.[ref.entityName];
+  };
 
   const namespaceModelsForFieldTypes = namespaceEntries.map(
     ([nsId, ns]) => [nsId, ns.models] as const,
@@ -166,8 +171,10 @@ export function generateContractDts(
     namespaceModelsForFieldTypes,
     codecLookup,
     resolveFieldTypeParams,
-    resolveEnumValues,
+    domainEnumLookup,
   );
+
+  const extraTypeExports = emitter.getStorageTypeExports?.(contract, codecLookup);
 
   const contractWrapper = emitter.getContractWrapper('ContractBase', 'TypeMaps');
 
@@ -192,7 +199,7 @@ ${familyTypeAliases}
 ${valueObjectTypeAliases}
 export type FieldOutputTypes = ${fieldTypesMaps.output};
 export type FieldInputTypes = ${fieldTypesMaps.input};
-export type TypeMaps = ${typeMapsExpr};
+${extraTypeExports ? `${extraTypeExports}\n` : ''}export type TypeMaps = ${typeMapsExpr};
 
 type ContractBase = Omit<
   ContractType<${storageType}>,
