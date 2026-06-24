@@ -35,6 +35,7 @@ Uses emitted `contract.json` and `contract.d.ts` files with the Postgres one-lin
   - Type definitions are separate from runtime code
 
 **Setup**:
+
 ```bash
 pnpm emit
 pnpm db:init   # Creates schema + contract marker
@@ -68,6 +69,7 @@ Uses contract directly from TypeScript:
   - Simpler workflow for development
 
 **Usage**:
+
 ```bash
 # No emit step needed - just run the app
 pnpm start:no-emit -- users
