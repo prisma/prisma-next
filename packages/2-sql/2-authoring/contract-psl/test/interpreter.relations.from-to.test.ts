@@ -225,14 +225,12 @@ model Post {
       expect(bare.value).toEqual(bracketed.value);
     });
 
-    // The PSL expression grammar carries no member-access argument value:
-    // `parseIdentifierExpr` consumes only the head identifier, so `to: User.id`
-    // reaches the resolver as the bare field name `User`. The resolver looks for
-    // a column named `User` on the target model `User`, finds none, and rejects
-    // the relation. A later slice teaches the grammar the dotted value and turns
-    // this into the supported `to: Model.column` qualifier.
-    it('rejects a member-access to: value (grammar reads only the head identifier)', () => {
-      const result = interpret(`model User {
+    // A redundant `Model.` qualifier on `to:` (e.g. `to: User.id`) is tolerated:
+    // the member-access grammar carries the dotted value to the resolver, which
+    // strips the qualifying `Model.` to the bare referenced column, so it lowers
+    // identically to the unqualified spelling.
+    it('tolerates a redundant Model. qualifier on to:, lowering it like the bare value', () => {
+      const qualified = interpret(`model User {
   id Int @id
   posts Post[]
 }
@@ -243,17 +241,22 @@ model Post {
   user User @relation(from: userId, to: User.id)
 }
 `);
+      const bare = interpret(`model User {
+  id Int @id
+  posts Post[]
+}
 
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.failure.diagnostics).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: expect.stringContaining('unknown field "User.User"'),
-          }),
-        ]),
-      );
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(from: userId, to: id)
+}
+`);
+
+      expect(qualified.ok).toBe(true);
+      expect(bare.ok).toBe(true);
+      if (!qualified.ok || !bare.ok) return;
+      expect(qualified.value).toEqual(bare.value);
     });
   });
 

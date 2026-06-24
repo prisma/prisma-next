@@ -99,6 +99,7 @@ import {
   indexFkRelations,
   type ModelBackrelationCandidate,
   normalizeReferentialAction,
+  type ParsedThrough,
   parseRelationAttribute,
   resolveTargetIdFieldNames,
   validateNavigationListFieldAttributes,
@@ -516,7 +517,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     });
     const relationAttribute = getAttribute(field.attributes, 'relation');
     let relationName: string | undefined;
-    let through: string | undefined;
+    let through: ParsedThrough | undefined;
     if (relationAttribute) {
       const parsedRelation = parseRelationAttribute({
         attribute: relationAttribute,
