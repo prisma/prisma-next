@@ -1151,6 +1151,12 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
           columnName: resolvedField.columnName,
           descriptor: resolvedField.descriptor,
           nullable: resolvedField.nullable,
+          ...ifDefined(
+            'many',
+            resolvedField.many && resolvedField.valueObjectTypeName === undefined
+              ? (true as const)
+              : undefined,
+          ),
           ...ifDefined('default', resolvedField.defaultValue),
           ...ifDefined('executionDefaults', resolvedField.executionDefaults),
           ...ifDefined('enumTypeHandle', enumHandle),

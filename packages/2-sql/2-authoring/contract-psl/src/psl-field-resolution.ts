@@ -376,7 +376,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
         continue;
       }
       scalarCodecId = resolved.descriptor.codecId;
-      descriptor = scalarTypeDescriptors.get('Json');
+      descriptor = resolved.descriptor;
     } else {
       const resolved = resolveFieldTypeDescriptor(resolveInput);
       if (!resolved.ok) {
