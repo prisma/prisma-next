@@ -143,14 +143,15 @@ export interface FieldBuilder<
   Type extends ContractFieldType = ContractFieldType,
   Nullable extends boolean = boolean,
   Many extends boolean = boolean,
+  Handle extends EnumTypeHandle | undefined = EnumTypeHandle | undefined,
 > {
   readonly __kind: 'field';
   readonly __type: Type;
   readonly __nullable: Nullable;
   readonly __many: Many;
-  readonly __enumHandle?: EnumTypeHandle;
-  optional(): FieldBuilder<Type, true, Many>;
-  many(): FieldBuilder<Type, Nullable, true>;
+  readonly __enumHandle: Handle;
+  optional(): FieldBuilder<Type, true, Many, Handle>;
+  many(): FieldBuilder<Type, Nullable, true, Handle>;
 }
 
 export interface ValueObjectBuilder<
@@ -225,7 +226,12 @@ export interface ModelBuilder<
   ): FieldReference<Name, FieldName>;
 }
 
-type AnyFieldBuilder = FieldBuilder<ContractFieldType, boolean, boolean>;
+type AnyFieldBuilder = FieldBuilder<
+  ContractFieldType,
+  boolean,
+  boolean,
+  EnumTypeHandle | undefined
+>;
 type AnyReferenceRelationBuilder = RelationBuilder<string, '1:1' | '1:N' | 'N:1', RelationOn>;
 type AnyEmbedRelationBuilder = RelationBuilder<string, '1:1' | '1:N', undefined>;
 type AnyRelationBuilder = AnyReferenceRelationBuilder | AnyEmbedRelationBuilder;
@@ -614,37 +620,50 @@ type CodecTypesFromDefinition<Definition> = MongoCodecTypes &
 // The enum value union for a field builder — `EnumTypeHandle['values'][number]`
 // when the builder carries an enum handle, `never` otherwise.
 type BuilderEnumValueUnion<TBuilder> =
-  TBuilder extends FieldBuilder<ContractFieldType, boolean, boolean>
-    ? TBuilder extends { readonly __enumHandle: EnumTypeHandle<string, infer Values> }
+  TBuilder extends FieldBuilder<
+    ContractFieldType,
+    boolean,
+    boolean,
+    infer Handle extends EnumTypeHandle | undefined
+  >
+    ? [Handle] extends [EnumTypeHandle<string, infer Values>]
       ? readonly unknown[] extends Values
         ? never
         : Values[number]
       : never
     : never;
 
-// The base codec/enum/value-object output type for a builder field, before
-// nullable/many modifiers.
-type BuilderBaseOutputType<
+// The base codec/enum/value-object type for a builder field on a given channel,
+// before nullable/many modifiers. Enum fields resolve to the value union on both
+// channels; scalar fields resolve to the codec's channel-specific type.
+type BuilderBaseChannelType<
   TBuilder,
   TValueObjects extends Record<string, AnyValueObjectBuilder>,
-  TCodecTypes extends Record<string, { output: unknown }>,
+  TCodecTypes extends Record<string, { output: unknown; input: unknown }>,
+  Channel extends 'output' | 'input',
 > =
-  TBuilder extends FieldBuilder<infer Type extends ContractFieldType, boolean, boolean>
+  TBuilder extends FieldBuilder<
+    infer Type extends ContractFieldType,
+    boolean,
+    boolean,
+    EnumTypeHandle | undefined
+  >
     ? [BuilderEnumValueUnion<TBuilder>] extends [never]
       ? Type extends {
           readonly kind: 'scalar';
           readonly codecId: infer CId extends keyof TCodecTypes;
         }
-        ? TCodecTypes[CId]['output']
+        ? TCodecTypes[CId][Channel]
         : Type extends { readonly kind: 'valueObject'; readonly name: infer VOName extends string }
           ? VOName extends keyof TValueObjects
             ? {
                 -readonly [K in keyof ExtractValueObjectFields<
                   TValueObjects[VOName]
-                >]: BuilderFieldOutputType<
+                >]: BuilderFieldChannelType<
                   ExtractValueObjectFields<TValueObjects[VOName]>[K],
                   TValueObjects,
-                  TCodecTypes
+                  TCodecTypes,
+                  Channel
                 >;
               }
             : unknown
@@ -655,53 +674,66 @@ type BuilderBaseOutputType<
 type ExtractValueObjectFields<TBuilder> =
   TBuilder extends NamedValueObjectBuilder<string, infer Fields> ? Fields : Record<never, never>;
 
-// The JS output type for one field builder: base type with nullable/many applied.
+// The JS type for one field builder on a given channel, with nullable/many applied.
 // Compose many first (array wrapping), then add nullability. This avoids the
 // TypeScript operator-precedence trap where `A | B extends infer X` infers X
 // only from B, not from `A | B`.
-type BuilderFieldOutputType<
+type BuilderFieldChannelType<
   TBuilder,
   TValueObjects extends Record<string, AnyValueObjectBuilder>,
-  TCodecTypes extends Record<string, { output: unknown }>,
+  TCodecTypes extends Record<string, { output: unknown; input: unknown }>,
+  Channel extends 'output' | 'input',
 > =
   TBuilder extends FieldBuilder<
     ContractFieldType,
     infer Nullable extends boolean,
-    infer Many extends boolean
+    infer Many extends boolean,
+    EnumTypeHandle | undefined
   >
     ?
         | (Many extends true
-            ? BuilderBaseOutputType<TBuilder, TValueObjects, TCodecTypes>[]
-            : BuilderBaseOutputType<TBuilder, TValueObjects, TCodecTypes>)
+            ? BuilderBaseChannelType<TBuilder, TValueObjects, TCodecTypes, Channel>[]
+            : BuilderBaseChannelType<TBuilder, TValueObjects, TCodecTypes, Channel>)
         | (Nullable extends true ? null : never)
     : never;
 
 type ExtractModelFields<TBuilder> =
   TBuilder extends NamedModelBuilder<string, infer Fields> ? Fields : Record<never, never>;
 
-// Precomputed per-model field output type map from the builder definition —
-// mirrors the emitter's FieldOutputTypes but derived from builder handles
-// rather than emitted IR. Nested under UNBOUND_NAMESPACE_ID to match the
-// emitter's namespace-nested shape and satisfy MongoTypeMaps<..., FieldOutputTypes>.
-type FieldOutputTypesFromDefinition<Definition> = {
+type FieldChannelTypesFromDefinition<Definition, Channel extends 'output' | 'input'> = {
   readonly [K in typeof UNBOUND_NAMESPACE_ID]: {
     readonly [ModelKey in keyof DefinitionModels<Definition> as ExtractModelName<
       DefinitionModels<Definition>[ModelKey]
     >]: {
       readonly [FieldName in keyof ExtractModelFields<
         DefinitionModels<Definition>[ModelKey]
-      >]: BuilderFieldOutputType<
+      >]: BuilderFieldChannelType<
         ExtractModelFields<DefinitionModels<Definition>[ModelKey]>[FieldName],
         DefinitionValueObjects<Definition>,
-        CodecTypesFromDefinition<Definition>
+        CodecTypesFromDefinition<Definition>,
+        Channel
       >;
     };
   };
 };
 
+type FieldOutputTypesFromDefinition<Definition> = FieldChannelTypesFromDefinition<
+  Definition,
+  'output'
+>;
+
+type FieldInputTypesFromDefinition<Definition> = FieldChannelTypesFromDefinition<
+  Definition,
+  'input'
+>;
+
 export type MongoContractResult<Definition> = MongoContractWithTypeMaps<
   MongoContractBaseFromDefinition<Definition>,
-  MongoTypeMaps<CodecTypesFromDefinition<Definition>, FieldOutputTypesFromDefinition<Definition>>
+  MongoTypeMaps<
+    CodecTypesFromDefinition<Definition>,
+    FieldOutputTypesFromDefinition<Definition>,
+    FieldInputTypesFromDefinition<Definition>
+  >
 >;
 
 type ExtractEntitiesNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
@@ -839,24 +871,28 @@ function createFieldBuilder<
   Type extends ContractFieldType,
   Nullable extends boolean,
   Many extends boolean,
+  Handle extends EnumTypeHandle | undefined = undefined,
 >(
   spec: FieldBuilderSpec<Type, Nullable, Many>,
-  enumHandle?: EnumTypeHandle,
-): FieldBuilder<Type, Nullable, Many> {
+  enumHandle?: Handle,
+): FieldBuilder<Type, Nullable, Many, Handle> {
   return {
     __kind: 'field',
     __type: spec.type,
     __nullable: spec.nullable,
     __many: spec.many,
-    ...ifDefined('__enumHandle', enumHandle),
+    __enumHandle: blindCast<
+      Handle,
+      'optional param widens to Handle | undefined; Handle defaults to undefined when no enum handle is passed'
+    >(enumHandle),
     optional() {
-      return createFieldBuilder<Type, true, Many>(
+      return createFieldBuilder<Type, true, Many, Handle>(
         { type: spec.type, nullable: true, many: spec.many },
         enumHandle,
       );
     },
     many() {
-      return createFieldBuilder<Type, Nullable, true>(
+      return createFieldBuilder<Type, Nullable, true, Handle>(
         { type: spec.type, nullable: spec.nullable, many: true },
         enumHandle,
       );
