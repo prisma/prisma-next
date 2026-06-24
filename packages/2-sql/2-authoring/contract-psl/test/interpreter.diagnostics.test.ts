@@ -7,6 +7,7 @@ import {
 import {
   createBuiltinLikeControlMutationDefaults,
   documentScopedTypes,
+  modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
   sqliteScalarTypeDescriptors,
@@ -1186,6 +1187,99 @@ namespace auth {
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
+    });
+  });
+});
+
+describe('interpretPslDocumentToSqlContract list-field constructs', () => {
+  it('rejects an execution default now() on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
+  id Int @id
+  tags String[] @default(now())
+}
+`,
+      {
+        code: 'PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED',
+        message:
+          'Field "Post.tags" is a list and cannot use an execution default ("now()"). Lists have no per-element execution-default semantics; use a literal list @default or remove the default.',
+      },
+    );
+  });
+
+  it('rejects an execution default uuid() on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
+  id Int @id
+  tags String[] @default(uuid())
+}
+`,
+      {
+        code: 'PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED',
+        message:
+          'Field "Post.tags" is a list and cannot use an execution default ("uuid()"). Lists have no per-element execution-default semantics; use a literal list @default or remove the default.',
+      },
+    );
+  });
+
+  it('rejects an execution default autoincrement() on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
+  id Int @id
+  tags Int[] @default(autoincrement())
+}
+`,
+      {
+        code: 'PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED',
+        message:
+          'Field "Post.tags" is a list and cannot use an execution default ("autoincrement()"). Lists have no per-element execution-default semantics; use a literal list @default or remove the default.',
+      },
+    );
+  });
+
+  it('rejects @id on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
+  tags String[] @id
+}
+`,
+      {
+        code: 'PSL_LIST_ID_UNSUPPORTED',
+        message:
+          'Field "Post.tags" is a list and cannot be a primary key. Remove @id; a list cannot be an identity column.',
+      },
+    );
+  });
+
+  it('authors a plain scalar list field with no diagnostics', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Post {
+  id Int @id
+  tags String[]
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(modelsOf(result.value)).toMatchObject({
+      Post: {
+        fields: {
+          tags: {
+            nullable: false,
+            type: { kind: 'scalar', codecId: 'pg/text@1' },
+            many: true,
+          },
+        },
+      },
     });
   });
 });
