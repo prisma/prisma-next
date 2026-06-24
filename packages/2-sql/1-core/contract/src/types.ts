@@ -119,12 +119,19 @@ export type CodecTypesOf<T> = [T] extends [never]
  * Dispatch hint identifying the first-argument target of an operation.
  *
  * Used by ORM column helpers to decide whether an operation is reachable on a
- * field. Either names a concrete codec identity or a set of capability traits
- * that the field's codec must carry.
+ * field. Names a concrete codec identity, a set of capability traits the
+ * field's codec must carry, or targets list-typed (`many`) fields. Element
+ * capability gating for list ops travels in `elementTraits`.
  */
 export type QueryOperationSelfSpec =
-  | { readonly codecId: string; readonly traits?: never }
-  | { readonly traits: readonly CodecTrait[]; readonly codecId?: never };
+  | { readonly codecId: string; readonly traits?: never; readonly many?: never }
+  | { readonly traits: readonly CodecTrait[]; readonly codecId?: never; readonly many?: never }
+  | {
+      readonly many: true;
+      readonly elementTraits?: readonly CodecTrait[];
+      readonly codecId?: never;
+      readonly traits?: never;
+    };
 
 /**
  * Structural shape an operation's impl must return: any value carrying a

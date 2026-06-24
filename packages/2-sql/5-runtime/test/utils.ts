@@ -501,3 +501,8 @@ export {
   teardownTestDatabase,
   withClient,
 } from '@prisma-next/test-utils';
+
+// Re-export decode helpers so cross-package tests can exercise the row-decode
+// path (e.g. RUNTIME.DECODE_FAILED for a malformed many-element) without going
+// through the full query round-trip.
+export { buildDecodeContext, decodeRow } from '../src/codecs/decoding';

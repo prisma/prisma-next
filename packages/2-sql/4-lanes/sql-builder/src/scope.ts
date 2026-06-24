@@ -45,7 +45,7 @@ export type StorageTableToScopeTable<T extends StorageTable> = {
   [K in keyof T['columns']]: {
     codecId: T['columns'][K]['codecId'];
     nullable: T['columns'][K]['nullable'];
-  };
+  } & (T['columns'][K] extends { many: true } ? { many: true } : Record<never, never>);
 };
 
 export type MergeScopes<A extends Scope, B extends Scope> = {

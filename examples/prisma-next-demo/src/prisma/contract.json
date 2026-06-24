@@ -1156,7 +1156,8 @@
       "defaultInInsert": true,
       "enums": true,
       "lateral": true,
-      "returning": true
+      "returning": true,
+      "scalarList": true
     }
   },
   "extensionPacks": {

@@ -218,6 +218,7 @@ export function tableToScope(
     fields[colName] = {
       codecId: col.codecId,
       nullable: col.nullable,
+      ...(col.many ? { many: true as const } : {}),
       ...(codec !== undefined ? { codec } : {}),
     };
   }

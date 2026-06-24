@@ -10,6 +10,14 @@ export type ScopeField = {
   codecId: string;
   nullable: boolean;
   /**
+   * Marks a list-typed (scalar-array) field. When `true`, the field is an
+   * array of `codecId`-typed elements; list operations target it and the
+   * element type is `codecId`. Absent/`false` for scalar fields. Carried so
+   * `X` and `X[]` stay distinct at the type level (a list expression is not
+   * assignable to a scalar `CodecExpression` slot).
+   */
+  many?: boolean;
+  /**
    * Optional {@link CodecRef} derived from contract storage at scope construction time. Builder paths that mint column-bound `ParamRef` / `ProjectionItem` nodes stamp this slot onto the AST so encode/decode dispatch resolves through `contractCodecs.forCodecRef`. Leave `undefined` when the scope was built without contract storage (rare — tests, ad-hoc scopes).
    */
   codec?: CodecRef;
@@ -55,12 +63,32 @@ export type CodecValue<
  * - An `Expression` whose codec matches exactly
  * - A raw JS value of the codec's `input` type
  * - `null` when `Nullable` is true
+ *
+ * `many?: never` makes this a *scalar* slot: a list expression (whose
+ * `returnType` carries `many: true`) is rejected here, while scalar
+ * expressions — which carry no `many` key at all — pass unchanged. The
+ * discriminant lives on this operand slot, so scalar expression and scope
+ * types never have to spell out `many: false`.
  */
 export type CodecExpression<
   CodecId extends string,
   Nullable extends boolean,
   CT extends Record<string, { readonly input: unknown }>,
-> = Expression<{ codecId: CodecId; nullable: Nullable }> | CodecValue<CodecId, Nullable, CT>;
+> =
+  | Expression<{ codecId: CodecId; nullable: Nullable; many?: never }>
+  | CodecValue<CodecId, Nullable, CT>;
+
+/**
+ * A list-typed expression: an {@link Expression} whose element codec is
+ * `CodecId` and whose `returnType` carries `many: true`. The element identity
+ * is the codec id, so list operations stay generic over the element type while
+ * tying any element argument back to this list's `CodecId`.
+ */
+export type ScalarListExpression<CodecId extends string, Nullable extends boolean> = Expression<{
+  codecId: CodecId;
+  nullable: Nullable;
+  many: true;
+}>;
 
 /**
  * An expression or literal value targeting any codec whose trait set contains all the required traits.

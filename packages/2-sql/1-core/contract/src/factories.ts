@@ -14,8 +14,18 @@ import {
   UniqueConstraint,
 } from './types';
 
-export function col(nativeType: string, codecId: string, nullable = false): StorageColumn {
-  return new StorageColumn({ nativeType, codecId, nullable });
+export function col(
+  nativeType: string,
+  codecId: string,
+  nullable = false,
+  opts?: { readonly many?: boolean },
+): StorageColumn {
+  return new StorageColumn({
+    nativeType,
+    codecId,
+    nullable,
+    ...(opts?.many !== undefined && { many: opts.many }),
+  });
 }
 
 export function pk(...columns: readonly string[]): PrimaryKey {

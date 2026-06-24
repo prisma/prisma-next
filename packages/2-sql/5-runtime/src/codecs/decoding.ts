@@ -19,6 +19,7 @@ export interface DecodeContext {
   readonly codecs: ReadonlyMap<string, Codec>;
   readonly columnRefs: ReadonlyMap<string, ColumnRef>;
   readonly includeAliases: ReadonlySet<string>;
+  readonly manyAliases: ReadonlySet<string>;
 }
 
 const WIRE_PREVIEW_LIMIT = 100;
@@ -44,6 +45,8 @@ function resolveProjectionCodec(
   return undefined;
 }
 
+const EMPTY_MANY_ALIASES: ReadonlySet<string> = new Set<string>();
+
 export function buildDecodeContext(
   ast: AnyQueryAst,
   contractCodecs: ContractCodecRegistry | undefined,
@@ -55,6 +58,7 @@ export function buildDecodeContext(
       codecs: new Map(),
       columnRefs: new Map(),
       includeAliases: EMPTY_INCLUDE_ALIASES,
+      manyAliases: EMPTY_MANY_ALIASES,
     };
   }
 
@@ -62,6 +66,7 @@ export function buildDecodeContext(
   const codecs = new Map<string, Codec>();
   const columnRefs = new Map<string, ColumnRef>();
   const includeAliases = new Set<string>();
+  const manyAliases = new Set<string>();
 
   for (const item of projection) {
     aliases.push(item.alias);
@@ -69,6 +74,10 @@ export function buildDecodeContext(
     const codec = resolveProjectionCodec(item, contractCodecs);
     if (codec) {
       codecs.set(item.alias, codec);
+    }
+
+    if (item.codec?.many) {
+      manyAliases.add(item.alias);
     }
 
     if (item.expr.kind === 'column-ref') {
@@ -81,7 +90,7 @@ export function buildDecodeContext(
     }
   }
 
-  return { aliases, codecs, columnRefs, includeAliases };
+  return { aliases, codecs, columnRefs, includeAliases, manyAliases };
 }
 
 function previewWireValue(wireValue: unknown): string {
@@ -158,6 +167,8 @@ function decodeIncludeAggregate(alias: string, wireValue: unknown): unknown {
  *
  * The row-level `rowCtx` is repackaged into a per-cell `SqlCodecCallContext` whose `column = { table, name }` is a structural projection of the per-cell `ColumnRef = { table, column }` resolved from the AST-backed `DecodeContext` (the same resolution `wrapDecodeFailure` uses for envelope construction — one resolution per cell, two consumers). Cells the runtime cannot resolve to a single underlying column (aggregate
  * aliases, computed projections without a simple ref) get `column: undefined`, matching the spec contract that the runtime never silently defaults this field.
+ *
+ * For `many`-flagged aliases the driver has already parsed the wire form into a JS array; this function maps the element codec over that array element-by-element, passing `null` elements through unchanged. Element-level failures surface through the existing `RUNTIME.DECODE_FAILED` envelope with the column/codec context from the parent cell.
  */
 async function decodeField(
   alias: string,
@@ -182,6 +193,34 @@ async function decodeField(
   } else {
     const { column: _drop, ...rowCtxWithoutColumn } = rowCtx;
     cellCtx = rowCtxWithoutColumn;
+  }
+
+  if (decodeCtx.manyAliases.has(alias)) {
+    if (!Array.isArray(wireValue)) {
+      wrapDecodeFailure(
+        new TypeError(
+          `expected an array from the driver for many-typed column, got ${typeof wireValue}`,
+        ),
+        alias,
+        ref,
+        codec,
+        wireValue,
+      );
+    }
+    const decoded: unknown[] = [];
+    for (const elem of wireValue) {
+      if (elem === null || elem === undefined) {
+        decoded.push(null);
+        continue;
+      }
+      try {
+        decoded.push(await codec.decode(elem, cellCtx));
+      } catch (error) {
+        if (isRuntimeError(error)) throw error;
+        wrapDecodeFailure(error, alias, ref, codec, elem);
+      }
+    }
+    return decoded;
   }
 
   try {
