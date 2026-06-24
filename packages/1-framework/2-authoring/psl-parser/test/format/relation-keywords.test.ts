@@ -42,6 +42,27 @@ describe('format canonicalises @relation FK keywords', () => {
     expect(format(input)).toContain('@relation(from: userId, to: id)');
   });
 
+  it('leaves a bare value spelled like a rename target in the value position', () => {
+    const input = model('user User @relation(from: references, to: id)');
+    expect(format(input)).toContain('@relation(from: references, to: id)');
+  });
+
+  it.each([
+    ['user User @relation(from: references, to: id)', '@relation(from: references, to: id)'],
+    [
+      'user User @relation(from: userId, to: references)',
+      '@relation(from: userId, to: references)',
+    ],
+    ['user User @relation(from: fields, to: id)', '@relation(from: fields, to: id)'],
+  ])('does not rename a value identifier colliding with a rename target (%s)', (line, expected) => {
+    expect(format(model(line))).toContain(expected);
+  });
+
+  it('migrates the key while preserving a value spelled like a rename target', () => {
+    const input = model('user User @relation(fields: fields, references: references)');
+    expect(format(input)).toContain('@relation(from: fields, to: references)');
+  });
+
   it('leaves the @relation(name:) argument untouched alongside a renamed key', () => {
     const input = model('user User @relation(name: "author", fields: [userId], references: [id])');
     expect(format(input)).toContain('@relation(name: "author", from:[userId], to:[id])');
