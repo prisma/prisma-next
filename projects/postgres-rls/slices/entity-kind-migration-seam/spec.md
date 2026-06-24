@@ -20,44 +20,44 @@ Replace the node interface and the differ. Exact target shapes:
 
 ```ts
 /** A node the differ can descend into. The root implements only this. */
-export interface SchemaTreeRoot {
-  children(): readonly SchemaTreeNode[];
+export interface DiffableRoot {
+  children(): readonly DiffableNode[];
 }
 
 /** A node the differ also aligns and compares. Implemented by target IR nodes. */
-export interface SchemaTreeNode extends SchemaTreeRoot {
+export interface DiffableNode extends DiffableRoot {
   coord(): EntityCoordinate;
-  isEqualTo(other: SchemaTreeNode): boolean;
+  isEqualTo(other: DiffableNode): boolean;
 }
 
 export function diffSchema(
-  expected: SchemaTreeRoot,
-  actual: SchemaTreeRoot,
+  expected: DiffableRoot,
+  actual: DiffableRoot,
 ): readonly SchemaDiffIssue[] {
   return diffChildren(expected.children(), actual.children());
 }
 ```
 
-- `DiffableNode` is renamed to `SchemaTreeNode`; `identity()` is renamed to `coord()`; `children()` is added. `SchemaDiffIssue.expected` / `.actual` retype from `DiffableNode` to `SchemaTreeNode`. Keep `SchemaDiffOutcome`, `stableKey`, `outcomeMessage` exactly as they are.
+- **`DiffableNode` keeps its name** — do NOT rename it (a CLI schema-view class already owns `DiffableNode` with ~33 call sites; that class is out of scope). Its method `identity()` is renamed to `coord()`, `children()` is added, and it now extends the new `DiffableRoot`. `SchemaDiffIssue.expected` / `.actual` stay typed `DiffableNode` (no retype). Keep `SchemaDiffOutcome`, `stableKey`, `outcomeMessage` exactly as they are.
 - `diffChildren` is the per-level core — the existing `diffNodes` body (lines 38–83) with three changes: it is named `diffChildren`, it calls `node.coord()` instead of `node.identity()`, and after the matched-pair `mismatch` check it appends `diffChildren(e.children(), a.children())` (recursion into the matched pair). `missing` and `extra` emit one issue at the node's coordinate and do **not** recurse (the whole subtree is missing/extra). Emission order is preserved: per level, expected-map iteration order (missing/mismatch, each immediately followed by its matched-pair recursion), then actual-map iteration order (extra).
 - For the current node set (all leaves — `children()` returns `[]`), `diffChildren` produces output **identical** to today's `diffNodes`: same issues, same order, same `coordinate`/`outcome`/`message`/`expected`/`actual` fields. This is the behavior-preservation contract.
-- `diffNodes` is removed; `diffSchema`, `SchemaTreeNode`, and `SchemaTreeRoot` are exported in its place from `exports/control.ts`.
+- `diffNodes` is removed; `diffSchema` and the new `DiffableRoot` are exported from `exports/control.ts` (`DiffableNode` is already exported there).
 
 ### Unit B — Postgres leaf nodes: `coord()` + `children()`
 
 Files: `packages/3-targets/3-targets/postgres/src/core/postgres-rls-policy.ts`, `.../postgres-role.ts`. These are the **only** two implementors of the interface (confirmed: `grep DiffableNode` matches only these plus the framework).
 
-- Change `import type { DiffableNode }` → `SchemaTreeNode`; `implements DiffableNode` → `implements SchemaTreeNode`.
+- Keep `import type { DiffableNode }` and `implements DiffableNode` (the interface keeps its name).
 - Rename `identity()` → `coord()` (body unchanged).
-- Add `children(): readonly SchemaTreeNode[] { return []; }` to both (leaves).
-- `isEqualTo(other: DiffableNode)` → `isEqualTo(other: SchemaTreeNode)`; in the error strings, `other.identity().entityKind` → `other.coord().entityKind`.
-- `isPostgresRlsPolicy(node: DiffableNode | undefined)` and `assertPostgresRlsPolicy(...)` retype the param to `SchemaTreeNode | undefined`; bodies unchanged.
+- Add `children(): readonly DiffableNode[] { return []; }` to both (leaves).
+- `isEqualTo(other: DiffableNode)` keeps its signature; in the error strings, `other.identity().entityKind` → `other.coord().entityKind`.
+- `isPostgresRlsPolicy(node: DiffableNode | undefined)` and `assertPostgresRlsPolicy(...)` keep their param type; bodies unchanged.
 
-### Unit C — `PostgresSchemaIR`: implement `SchemaTreeRoot`
+### Unit C — `PostgresSchemaIR`: implement `DiffableRoot`
 
 File: `packages/3-targets/3-targets/postgres/src/core/postgres-schema-ir.ts`.
 
-- Implement `SchemaTreeRoot`: `children(): readonly SchemaTreeNode[] { return this.rlsPolicies; }`. **Roles are not yielded in this slice** (see Scope) — `children()` returns policies only.
+- Implement `DiffableRoot`: `children(): readonly DiffableNode[] { return this.rlsPolicies; }`. **Roles are not yielded in this slice** (see Scope) — `children()` returns policies only.
 - No other change. In particular, **do not** make the `annotations` bag injectable or otherwise touch it: nothing reads the contract-derived IR's annotations (the only reader of schema-IR `annotations` is the introspect→PSL path in `sql-schema-ir-to-psl-ast.ts`, which runs on the introspected IR), so project-from-contract lets the constructor build its default (unread) bag. The annotations bag is being retired in favour of typed fields (TML-2936); this slice does not extend it.
 
 ### Unit D — project-from-contract
@@ -112,8 +112,8 @@ export function diffPostgresRlsPolicies(input: {
   readonly schema: PostgresSchemaIR;
 }): readonly SchemaDiffIssue[] {
   const { contract, schema } = input;
-  const expected: SchemaTreeRoot = { children: () => collectContractRlsPolicies(contract) };
-  const actual: SchemaTreeRoot = { children: () => schema.rlsPolicies }; // full tree — no pre-filter
+  const expected: DiffableRoot = { children: () => collectContractRlsPolicies(contract) };
+  const actual: DiffableRoot = { children: () => schema.rlsPolicies }; // full tree — no pre-filter
   const issues = diffSchema(expected, actual);
 
   // Manage / leave-alone (seed doc point 7), applied to outcomes: an `extra`
@@ -155,7 +155,7 @@ One outcome: a Postgres contract is diffed for RLS the same way on every command
 ## Files touched (complete list)
 
 1. `…/framework-components/src/control/schema-diff.ts` — Unit A.
-2. `…/framework-components/src/exports/control.ts` — re-export `diffSchema`/`SchemaTreeNode`/`SchemaTreeRoot` (drop `diffNodes`).
+2. `…/framework-components/src/exports/control.ts` — export `diffSchema` + `DiffableRoot`, drop `diffNodes` (`DiffableNode` stays exported).
 3. `…/postgres/src/core/postgres-rls-policy.ts`, `…/postgres-role.ts` — Unit B.
 4. `…/postgres/src/core/postgres-schema-ir.ts` — Unit C.
 5. `…/postgres/src/core/migrations/project-postgres-schema-from-contract.ts` — Unit D (new).

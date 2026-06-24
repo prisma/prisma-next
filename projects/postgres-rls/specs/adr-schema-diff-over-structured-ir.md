@@ -11,10 +11,10 @@ A schema diff is computed between two schema IRs of the same shape — an *expec
 The differ **walks the two IRs as a tree.** From the roots down, it pairs up children, descends into each matched pair, and records a difference wherever the two sides disagree. Every node it visits answers three methods:
 
 ```ts
-interface SchemaTreeNode {
+interface DiffableNode {
   coord(): EntityCoordinate;                 // the node's coordinate; the differ pairs peers by it
-  isEqualTo(other: SchemaTreeNode): boolean; // compares a matched pair
-  children(): readonly SchemaTreeNode[];     // the node's children; empty for a leaf
+  isEqualTo(other: DiffableNode): boolean; // compares a matched pair
+  children(): readonly DiffableNode[];     // the node's children; empty for a leaf
 }
 ```
 
