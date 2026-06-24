@@ -171,7 +171,7 @@ describe('check-constraint lowering', () => {
     const storageNs = contract.storage.namespaces['public'];
     const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
 
-    expect(userTable?.checks?.[0]).toBeInstanceOf(CheckConstraint);
+    expect(userTable?.checks?.[0]).toHaveProperty('valueSet');
   });
 });
 

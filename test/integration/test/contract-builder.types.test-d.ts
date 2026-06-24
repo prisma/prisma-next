@@ -10,7 +10,6 @@ import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import arktypeJsonRuntime from '@prisma-next/extension-arktype-json/runtime';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
-import { TestSqlContractSerializer as SqlContractSerializer } from '@prisma-next/family-sql/test-utils';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import {
@@ -28,6 +27,7 @@ import postgresPack from '@prisma-next/target-postgres/pack';
 import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { type as arktype } from 'arktype';
 import { expectTypeOf, test } from 'vitest';
+import { TestSqlContractSerializer as SqlContractSerializer } from '../../../packages/2-sql/9-family/test/test-sql-contract-serializer';
 import type { Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 

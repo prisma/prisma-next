@@ -1,5 +1,5 @@
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { extractCodecTypeImports } from '@prisma-next/family-sql/test-utils';
+import { extractCodecTypeImports } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from '../utils/framework-components';
 

@@ -4,7 +4,10 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadContractFromTs } from '@prisma-next/cli';
 import { emit } from '@prisma-next/emitter/test/utils';
-import { extractCodecTypeImports, extractComponentIds } from '@prisma-next/family-sql/test-utils';
+import {
+  extractCodecTypeImports,
+  extractComponentIds,
+} from '@prisma-next/framework-components/control';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

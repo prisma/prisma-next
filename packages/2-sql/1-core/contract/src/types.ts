@@ -37,7 +37,7 @@ export {
   type SqlStorageTypeEntry,
 } from './ir/sql-storage';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';
-export { StorageTable, type StorageTableInput } from './ir/storage-table';
+export { isStorageTable, StorageTable, type StorageTableInput } from './ir/storage-table';
 export {
   CODEC_INSTANCE_KIND,
   isStorageTypeInstance,
@@ -45,7 +45,11 @@ export {
   type StorageTypeInstanceInput,
   toStorageTypeInstance,
 } from './ir/storage-type-instance';
-export { StorageValueSet, type StorageValueSetInput } from './ir/storage-value-set';
+export {
+  isStorageValueSet,
+  StorageValueSet,
+  type StorageValueSetInput,
+} from './ir/storage-value-set';
 export {
   UniqueConstraint,
   type UniqueConstraintInput,

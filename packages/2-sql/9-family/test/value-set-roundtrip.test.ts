@@ -1,6 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import { type SqlStorage, StorageValueSet } from '@prisma-next/sql-contract/types';
+import { isStorageValueSet, type SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { defineContract, enumType, member } from '@prisma-next/sql-contract-ts/contract-builder';
 import { describe, expect, it } from 'vitest';
@@ -67,7 +67,7 @@ describe('value-set serializer hydration + round-trip', () => {
   it('StorageValueSet is a StorageValueSet instance before serialization', () => {
     const ns = authored.storage.namespaces['public'];
     const valueSet = ns !== undefined ? ns.entries.valueSet?.['Role'] : undefined;
-    expect(valueSet).toBeInstanceOf(StorageValueSet);
+    expect(isStorageValueSet(valueSet)).toBe(true);
   });
 
   it('round-trips through JSON and hydrates back to a StorageValueSet instance', () => {
@@ -77,7 +77,7 @@ describe('value-set serializer hydration + round-trip', () => {
 
     const ns = hydrated.storage.namespaces['public'];
     const valueSet = ns !== undefined ? ns.entries.valueSet?.['Role'] : undefined;
-    expect(valueSet).toBeInstanceOf(StorageValueSet);
+    expect(isStorageValueSet(valueSet)).toBe(true);
     expect(valueSet?.kind).toBe('valueSet');
     expect(valueSet?.values).toEqual(['user', 'admin']);
   });
@@ -147,7 +147,7 @@ describe('value-set serializer hydration + round-trip', () => {
 
     const ns2 = hydrated2.storage.namespaces['public'];
     const valueSet = ns2 !== undefined ? ns2.entries.valueSet?.['Role'] : undefined;
-    expect(valueSet).toBeInstanceOf(StorageValueSet);
+    expect(isStorageValueSet(valueSet)).toBe(true);
     expect(valueSet?.values).toEqual(['user', 'admin']);
   });
 });

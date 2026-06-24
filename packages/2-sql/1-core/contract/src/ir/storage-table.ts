@@ -69,3 +69,8 @@ export class StorageTable extends SqlNode {
     freezeNode(this);
   }
 }
+
+export function isStorageTable(value: unknown): value is StorageTable {
+  if (typeof value !== 'object' || value === null) return false;
+  return 'columns' in value && 'uniques' in value && 'indexes' in value && 'foreignKeys' in value;
+}

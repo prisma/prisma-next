@@ -6,7 +6,10 @@ import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
 import type { EmitStackInput } from '@prisma-next/emitter';
 import { createTestContract, emit } from '@prisma-next/emitter/test/utils';
-import { extractCodecTypeImports, extractComponentIds } from '@prisma-next/family-sql/test-utils';
+import {
+  extractCodecTypeImports,
+  extractComponentIds,
+} from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
@@ -317,7 +320,7 @@ type UserIdColumn = UserColumns['id'];
 
       // Create a comprehensive test file that uses all exported types
       const testFileContent = `import type { Contract, CodecTypes, Namespaces } from './contract';
-import { TestSqlContractSerializer as SqlContractSerializer } from '@prisma-next/family-sql/test-utils';
+import { PostgresContractSerializer as SqlContractSerializer } from '@prisma-next/target-postgres/runtime';
 import contractJson from './contract.json' with { type: 'json' };
 
 // Verify we can validate the contract
@@ -371,9 +374,6 @@ type CodecIntType = CodecTypes['pg/int4@1'];
             ],
             '@prisma-next/family-sql/ir': [
               `${relativeToWorkspace}/packages/2-sql/9-family/dist/ir.d.mts`,
-            ],
-            '@prisma-next/family-sql/test-utils': [
-              `${relativeToWorkspace}/packages/2-sql/9-family/dist/test-utils.d.mts`,
             ],
             '@prisma-next/family-sql/*': [`${relativeToWorkspace}/packages/2-sql/9-family/dist/*`],
             '@prisma-next/adapter-postgres/*': [
