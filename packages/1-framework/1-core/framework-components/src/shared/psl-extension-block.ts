@@ -30,6 +30,12 @@ export type PslDiagnosticCode =
   | 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE'
   | 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE'
   | 'PSL_INVALID_RELATION_ATTRIBUTE'
+  /**
+   * A quoted arrow-path `through:` value that does not parse as the
+   * four-segment `"localKey -> Junction.nearColumn -> Junction.farColumn ->
+   * Target.targetKey"` form.
+   */
+  | 'PSL_ARROW_PATH_MALFORMED'
   | 'PSL_INVALID_REFERENTIAL_ACTION'
   | 'PSL_INVALID_DEFAULT_VALUE'
   | 'PSL_INVALID_ENUM_MEMBER'
