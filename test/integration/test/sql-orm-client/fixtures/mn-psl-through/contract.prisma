@@ -1,0 +1,46 @@
+// Real emitted fixture for the sql-orm-client PSL many-to-many parity tests,
+// authored with the explicit `@relation(through: Junction)` form.
+//
+// It mirrors the `mn-psl` fixture's `User ↔ Tag` many-to-many (through the
+// `user_tags` junction), but spells the navigable M:N with the explicit
+// junction keyword: `tags Tag[] @relation(through: UserTag)` on the `User`
+// end, with a bare backrelation list field `users User[]` on the `Tag` end
+// (D4 unambiguous case — `through:` declared on one end, the inverse inferred
+// via the bare-list convention). The interpreter lowers both ends to a
+// navigable `cardinality: 'N:M'` relation with a populated `through`
+// descriptor — the same contract shape the bare-list `mn-psl` fixture emits —
+// so the M:N ORM `include` drives through a PSL contract authored with the
+// explicit `through:` keyword.
+//
+// Tables intentionally match the base sql-orm-client integration schema
+// (`users` / `tags` / `user_tags`) so the shared seed helpers apply.
+
+model User {
+  id    Int    @id
+  name  String
+  email String @unique
+
+  tags Tag[] @relation(through: UserTag)
+
+  @@map("users")
+}
+
+model Tag {
+  id   String @id
+  name String @unique
+
+  users User[]
+
+  @@map("tags")
+}
+
+model UserTag {
+  userId Int    @map("user_id")
+  tagId  String @map("tag_id")
+
+  user User @relation(fields: [userId], references: [id])
+  tag  Tag  @relation(fields: [tagId], references: [id])
+
+  @@id([userId, tagId])
+  @@map("user_tags")
+}
