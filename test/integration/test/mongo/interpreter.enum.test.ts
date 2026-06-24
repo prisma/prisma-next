@@ -8,7 +8,8 @@ import {
   type InterpretPslDocumentToMongoContractInput,
   interpretPslDocumentToMongoContract,
 } from '@prisma-next/mongo-contract-psl';
-import { parsePslDocument } from '@prisma-next/psl-parser';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -57,17 +58,21 @@ const mongoCodecLookup: CodecLookup = {
 
 function interpret(
   schema: string,
-  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'document'>>,
+  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'symbolTable' | 'sourceFile'>>,
 ) {
   const contributions = overrides?.['authoringContributions'] ?? authoringContributions;
   const descriptors = contributions?.pslBlockDescriptors;
-  const document = parsePslDocument({
-    schema,
-    sourceId: 'test.prisma',
-    ...(descriptors !== undefined ? { pslBlockDescriptors: descriptors } : {}),
+  const { document, sourceFile } = parse(schema);
+  const { table: symbolTable } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
+    pslBlockDescriptors: descriptors ?? {},
   });
   return interpretPslDocumentToMongoContract({
-    document,
+    symbolTable,
+    sourceFile,
+    sourceId: 'test.prisma',
     scalarTypeDescriptors: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
     authoringContributions: contributions,
@@ -77,7 +82,7 @@ function interpret(
 
 function interpretOk(
   schema: string,
-  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'document'>>,
+  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'symbolTable' | 'sourceFile'>>,
 ) {
   const result = interpret(schema, overrides);
   expect(result.ok).toBe(true);

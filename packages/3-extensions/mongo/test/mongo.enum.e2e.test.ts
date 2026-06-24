@@ -99,31 +99,19 @@ describe('mongo enum — end-to-end (replica set)', {
   let replSet: MongoMemoryReplSet;
   let nativeClient: MongoClient;
   let db: MongoFacadeClient<typeof contract>;
-  // The TS-DSL `MongoContractResult` precomputes `FieldOutputTypes` (D8) but
-  // not the input side, so the ORM `where` predicate still narrows `_id` to
-  // `never` for this contract. The runtime is correct — the facade builds
-  // `db.enums` from `domain.namespaces[...].enum` at runtime, and writes flow
-  // through the ORM into MongoDB which enforces the `$jsonSchema.enum`. We
-  // cast the `accounts` collection to a permissive write surface once at the
-  // test boundary so the write payloads remain readable. Follow-up: extend
-  // the precomputed map to FieldInputTypes for a fuller end-to-end narrowing.
-  type AccountInput = {
-    role?: string | null;
-    mood?: string | null;
-    tags?: readonly string[];
-  };
-  type AccountRow = {
-    readonly _id: unknown;
-    readonly role: string;
-    readonly mood: string | null;
-    readonly tags: readonly string[];
-  };
-  type AccountsCollection = {
-    create(data: AccountInput): Promise<AccountRow>;
-    where(predicate: { readonly _id: unknown }): { first(): Promise<AccountRow | null> };
-  };
   const dbName = 'enum_e2e_test';
-  let accounts: AccountsCollection;
+
+  // D10 narrows the ORM *write* input (create) to the enum value union via the
+  // precomputed FieldInputTypes map. The `where` filter still resolves its
+  // per-field type through ExtractMongoCodecTypes, which is `never` for a
+  // TS-DSL contract, so `where({ _id })` narrows `_id` to `never`. Narrowing
+  // `where` needs a separate mechanism (route it through FieldInputTypes too);
+  // until that follow-up lands, cast the read predicate narrowly here.
+  const byId = (id: unknown) =>
+    blindCast<
+      Parameters<typeof db.orm.accounts.where>[0],
+      'where filter narrows scalar fields via ExtractMongoCodecTypes (never for TS-DSL contracts); D10 narrows create input only, where is a noted follow-up'
+    >({ _id: id });
 
   beforeAll(async () => {
     replSet = await MongoMemoryReplSet.create({
@@ -146,10 +134,6 @@ describe('mongo enum — end-to-end (replica set)', {
     // MongoDB layer; reads of db.enums come from the same facade.
     db = mongo({ contract, uri: replSet.getUri(), dbName });
     await db.connect();
-    accounts = blindCast<
-      AccountsCollection,
-      'A03: MongoContractResult precomputes FieldOutputTypes (D8) but not FieldInputTypes; the ORM where-predicate input still narrows scalar fields to never until that follow-up lands'
-    >(db.orm.accounts);
   }, timeouts.spinUpMongoMemoryServer);
 
   afterAll(async () => {
@@ -165,44 +149,46 @@ describe('mongo enum — end-to-end (replica set)', {
 
   describe('out-of-set scalar write is rejected', () => {
     it('rejects an insert with a role value not in the enum', async () => {
-      await expect(accounts.create({ role: 'nope', tags: [] })).rejects.toMatchObject({
-        code: 121,
-      });
+      // 'nope' is not in the value union — bypass TS to test MongoDB's $jsonSchema enforcement.
+      await expect(
+        db.orm.accounts.create({ role: 'nope' as never, mood: null, tags: [] }),
+      ).rejects.toMatchObject({ code: 121 });
     });
 
     it('rejects an insert with a null value on a non-nullable field', async () => {
-      await expect(accounts.create({ role: null, tags: [] })).rejects.toMatchObject({
-        code: 121,
-      });
+      // null is not valid for a non-nullable field — bypass TS to test MongoDB enforcement.
+      await expect(
+        db.orm.accounts.create({ role: null as never, mood: null, tags: [] }),
+      ).rejects.toMatchObject({ code: 121 });
     });
   });
 
   describe('in-set scalar write succeeds', () => {
     it('accepts a valid role value and round-trips it', async () => {
-      const created = await accounts.create({ role: 'user', tags: [] });
+      const created = await db.orm.accounts.create({ role: 'user', mood: null, tags: [] });
       expect(created._id).toBeTruthy();
       expect(created.role).toBe('user');
 
-      const found = await accounts.where({ _id: created._id }).first();
+      const found = await db.orm.accounts.where(byId(created._id)).first();
       expect(found?.role).toBe('user');
     });
   });
 
   describe('nullable scalar enum', () => {
     it('accepts null for a nullable enum field', async () => {
-      const created = await accounts.create({
+      const created = await db.orm.accounts.create({
         role: 'admin',
         mood: null,
         tags: [],
       });
       expect(created._id).toBeTruthy();
 
-      const found = await accounts.where({ _id: created._id }).first();
+      const found = await db.orm.accounts.where(byId(created._id)).first();
       expect(found?.mood).toBeNull();
     });
 
     it('accepts an in-set value for a nullable enum field', async () => {
-      const created = await accounts.create({
+      const created = await db.orm.accounts.create({
         role: 'user',
         mood: 'admin',
         tags: [],
@@ -212,16 +198,18 @@ describe('mongo enum — end-to-end (replica set)', {
     });
 
     it('rejects an out-of-set value on a nullable enum field', async () => {
+      // 'bogus' is not in the value union — bypass TS to test MongoDB enforcement.
       await expect(
-        accounts.create({ role: 'user', mood: 'bogus', tags: [] }),
+        db.orm.accounts.create({ role: 'user', mood: 'bogus' as never, tags: [] }),
       ).rejects.toMatchObject({ code: 121 });
     });
   });
 
   describe('array enum field', () => {
     it('accepts an array of in-set values', async () => {
-      const created = await accounts.create({
+      const created = await db.orm.accounts.create({
         role: 'user',
+        mood: null,
         tags: ['user', 'admin'],
       });
       expect(created._id).toBeTruthy();
@@ -229,14 +217,15 @@ describe('mongo enum — end-to-end (replica set)', {
     });
 
     it('accepts an empty array', async () => {
-      const created = await accounts.create({ role: 'admin', tags: [] });
+      const created = await db.orm.accounts.create({ role: 'admin', mood: null, tags: [] });
       expect(created._id).toBeTruthy();
     });
 
     it('rejects an array containing an out-of-set element', async () => {
-      await expect(accounts.create({ role: 'user', tags: ['bogus'] })).rejects.toMatchObject({
-        code: 121,
-      });
+      // 'bogus' is not in the value union — bypass TS to test MongoDB enforcement.
+      await expect(
+        db.orm.accounts.create({ role: 'user', mood: null, tags: ['bogus' as never] }),
+      ).rejects.toMatchObject({ code: 121 });
     });
   });
 

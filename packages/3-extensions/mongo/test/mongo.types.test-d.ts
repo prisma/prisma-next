@@ -2,7 +2,7 @@ import type { ContractEnumAccessor } from '@prisma-next/contract/enum-accessor';
 import type { ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mongo-contract';
-import type { IncludedRow, NoIncludes } from '@prisma-next/mongo-orm';
+import type { CreateInput, IncludedRow, MongoCollection, NoIncludes } from '@prisma-next/mongo-orm';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../../../2-mongo-family/1-foundation/mongo-contract/test/fixtures/orm-contract';
 import { defineContract, enumType, field, member, model } from '../src/exports/contract-builder';
@@ -155,4 +155,71 @@ test('TS DSL defineContract: namespace enum slot is typed without a cast', () =>
   type RoleEntry = NonNullable<Ns['enum']>['Role'];
   type MemberValue = RoleEntry['members'][number]['value'];
   expectTypeOf<MemberValue>().toEqualTypeOf<'user' | 'admin'>();
+});
+
+// ---------------------------------------------------------------------------
+// R5 / D10: FieldInputTypes precomputed map — enum fields narrow create() input
+// ---------------------------------------------------------------------------
+
+const R5Role = enumType(
+  'R5Role',
+  { codecId: 'mongo/string@1', nativeType: 'string' },
+  member('User', 'user'),
+  member('Admin', 'admin'),
+);
+
+const r5Contract = defineContract({
+  enums: { R5Role },
+  models: {
+    Account: model('Account', {
+      collection: 'accounts',
+      fields: {
+        _id: field.objectId(),
+        role: field.namedType(R5Role),
+        mood: field.namedType(R5Role).optional(),
+        tags: field.namedType(R5Role).many(),
+        moodTags: field.namedType(R5Role).optional().many(),
+      },
+    }),
+  },
+});
+
+type R5CreateInput = CreateInput<typeof r5Contract, 'Account'>;
+
+test('R5: scalar enum input narrows to the value union', () => {
+  expectTypeOf<R5CreateInput['role']>().toEqualTypeOf<'user' | 'admin'>();
+});
+
+test('R5: nullable enum input accepts the value union or null', () => {
+  expectTypeOf<R5CreateInput['mood']>().toEqualTypeOf<'user' | 'admin' | null>();
+});
+
+test('R5: many enum input accepts an array of the value union', () => {
+  expectTypeOf<R5CreateInput['tags']>().toEqualTypeOf<('user' | 'admin')[]>();
+});
+
+test('R5: nullable+many enum input resolves to Base[] | null (precedence)', () => {
+  expectTypeOf<R5CreateInput['moodTags']>().toEqualTypeOf<('user' | 'admin')[] | null>();
+  expectTypeOf<R5CreateInput['moodTags']>().not.toEqualTypeOf<('user' | 'admin' | null)[]>();
+});
+
+test('R5: invalid enum literal is rejected by the create() input field type', () => {
+  // Non-vacuous: targets the `role` field type specifically. 'nope' must not be
+  // assignable to the value union; a valid member must be. If the narrowing
+  // regresses to `string`/codec output, the first assertion starts passing
+  // (wrongly extends) and this test fails.
+  expectTypeOf<'nope'>().not.toExtend<R5CreateInput['role']>();
+  expectTypeOf<'user'>().toExtend<R5CreateInput['role']>();
+});
+
+test('R5: create() accepts an in-union literal, rejects an out-of-union literal', () => {
+  const col = {} as MongoCollection<typeof r5Contract, 'Account'>;
+  col.create({ role: 'user', mood: null, tags: [], moodTags: null });
+  col.create({
+    // @ts-expect-error 'nope' is not in the R5Role value union ('user' | 'admin')
+    role: 'nope',
+    mood: null,
+    tags: [],
+    moodTags: null,
+  });
 });
