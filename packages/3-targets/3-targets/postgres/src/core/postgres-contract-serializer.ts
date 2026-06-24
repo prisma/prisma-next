@@ -67,7 +67,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
 
   protected override hydrateSqlNamespaceEntry(
     nsId: string,
-    raw: Namespace | Record<string, unknown>,
+    raw: Record<string, unknown>,
   ): Namespace | SqlNamespaceInput {
     const hydrated = blindCast<
       SqlNamespaceInput,

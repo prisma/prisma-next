@@ -28,6 +28,7 @@ import {
   VERIFY_CODE_TARGET_MISMATCH,
 } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import { isPlainRecord } from '@prisma-next/framework-components/ir';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
@@ -40,6 +41,7 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlControlAdapter } from './control-adapter';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
@@ -523,12 +525,24 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
   const targetSerializer = (
     target as unknown as {
-      contractSerializer?: { deserializeContract(json: unknown): Contract<SqlStorage> };
+      contractSerializer?: {
+        deserializeContract(json: unknown): Contract<SqlStorage>;
+        serializeContract(contract: Contract<SqlStorage>): unknown;
+      };
     }
   ).contractSerializer;
-  const deserializeWithTargetSerializer = (contractJson: unknown): Contract<SqlStorage> => {
+  const deserializeWithTargetSerializer = (contractOrJson: unknown): Contract<SqlStorage> => {
     const serializer = targetSerializer ?? new SqlContractSerializer();
-    return serializer.deserializeContract(contractJson) as Contract<SqlStorage>;
+    const json =
+      targetSerializer !== undefined && !isPlainRecord(contractOrJson)
+        ? targetSerializer.serializeContract(
+            blindCast<
+              Contract<SqlStorage>,
+              'isPlainRecord returned false, so contractOrJson is a class instance, not raw JSON'
+            >(contractOrJson),
+          )
+        : contractOrJson;
+    return serializer.deserializeContract(json) as Contract<SqlStorage>;
   };
 
   return {

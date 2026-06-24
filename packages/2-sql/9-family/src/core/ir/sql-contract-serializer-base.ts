@@ -117,7 +117,12 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
         'structural',
       );
     }
-    const hydratedNamespaces = this.hydrateSqlNamespaceMap(rawNamespaces);
+    const hydratedNamespaces = this.hydrateSqlNamespaceMap(
+      blindCast<
+        Readonly<Record<string, Record<string, unknown>>>,
+        'parseSqlContractStructure validated raw JSON; namespace entries are plain objects, not SqlNamespace instances.'
+      >(rawNamespaces),
+    );
 
     return {
       ...validated,
@@ -133,7 +138,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   }
 
   protected hydrateSqlNamespaceMap(
-    namespaces: Readonly<Record<string, Namespace | Record<string, unknown>>>,
+    namespaces: Readonly<Record<string, Record<string, unknown>>>,
   ): Readonly<Record<string, Namespace>> {
     return Object.fromEntries(
       Object.entries(namespaces).map(([nsId, namespaceEntryRaw]) => {
@@ -150,14 +155,18 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
 
   protected hydrateSqlNamespaceEntry(
     nsId: string,
-    raw: Namespace | Record<string, unknown>,
+    raw: Record<string, unknown>,
   ): Namespace | SqlNamespaceInput {
-    if (isMaterializedSqlNamespace(raw)) {
-      return raw;
-    }
-    const rawRecord = isPlainRecord(raw) ? raw : {};
+    const isPlain = isPlainRecord(raw);
+    const rawRecord = isPlain
+      ? raw
+      : blindCast<
+          Record<string, unknown>,
+          'JSON.parse(JSON.stringify(...)) strips class methods and produces a plain Record'
+        >(JSON.parse(JSON.stringify(raw)));
     const id = typeof rawRecord['id'] === 'string' ? rawRecord['id'] : nsId;
-    const parsed = NamespaceRawSchema({ ...rawRecord, id });
+    const spreadInput = { ...rawRecord, id };
+    const parsed = NamespaceRawSchema(spreadInput);
     if (parsed instanceof type.errors) {
       const messages = parsed.map((p: { message: string }) => p.message).join('; ');
       throw new ContractValidationError(`Namespace hydration failed: ${messages}`, 'structural');

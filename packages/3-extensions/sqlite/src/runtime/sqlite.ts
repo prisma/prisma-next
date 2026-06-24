@@ -111,11 +111,12 @@ export type SqliteOptions<TContract extends Contract<SqlStorage>> =
 function resolveContract<TContract extends Contract<SqlStorage>>(
   options: SqliteOptions<TContract>,
 ): TContract {
-  const contractInput =
-    'contractJson' in options && options.contractJson !== undefined
-      ? options.contractJson
-      : (options as SqliteOptionsWithContract<TContract>).contract;
-  return new SqlContractSerializer().deserializeContract(contractInput) as TContract;
+  const serializer = new SqlContractSerializer();
+  if ('contractJson' in options && options.contractJson !== undefined) {
+    return serializer.deserializeContract(options.contractJson) as TContract;
+  }
+  const contract = (options as SqliteOptionsWithContract<TContract>).contract;
+  return serializer.deserializeContract(serializer.serializeContract(contract)) as TContract;
 }
 
 export default function sqlite<TContract extends Contract<SqlStorage>>(

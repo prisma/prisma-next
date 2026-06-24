@@ -167,7 +167,7 @@ describe('PostgresContractSerializer', () => {
 
       protected override hydrateSqlNamespaceEntry(
         nsId: string,
-        raw: Namespace | Record<string, unknown>,
+        raw: Record<string, unknown>,
       ): Namespace | SqlNamespaceInput {
         return postgresCreateNamespace(
           blindCast<
