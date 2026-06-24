@@ -277,6 +277,97 @@ describe.sequential('native array columns DDL', () => {
     expect(rows.rows[0]?.tags_default).toEqual([]);
   });
 
+  it('emits a non-null-element CHECK constraint on every array column', {
+    timeout: testTimeout,
+  }, async () => {
+    const contract = buildArrayContract();
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+
+    const planResult = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents,
+      spaceId: APP_SPACE_ID,
+    });
+    if (planResult.kind !== 'success') throw new Error('planner failed');
+
+    await runner.execute({
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: APP_SPACE_ID,
+          plan: planResult.plan,
+          migrationEdges: synthEdges(planResult.plan),
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
+    });
+
+    const checkRows = await driver!.query<{ constraint_name: string; constraintdef: string }>(
+      `SELECT c.conname AS constraint_name, pg_get_constraintdef(c.oid) AS constraintdef
+           FROM pg_catalog.pg_constraint c
+           JOIN pg_catalog.pg_class t ON t.oid = c.conrelid
+           JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
+           WHERE n.nspname = 'public' AND t.relname = 'ArrayTest' AND c.contype = 'c'
+           ORDER BY c.conname`,
+    );
+    const checkNames = checkRows.rows.map((r) => r.constraint_name).sort();
+    expect(checkNames).toEqual(
+      [
+        'ArrayTest_labels_elem_not_null',
+        'ArrayTest_scores_elem_not_null',
+        'ArrayTest_tags_elem_not_null',
+        'ArrayTest_tagsWithDefault_elem_not_null',
+      ].sort(),
+    );
+    expect(checkRows.rows.every((r) => /array_position/i.test(r.constraintdef))).toBe(true);
+  });
+
+  it('rejects an INSERT carrying a NULL array element', {
+    timeout: testTimeout,
+  }, async () => {
+    const contract = buildArrayContract();
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+
+    const planResult = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents,
+      spaceId: APP_SPACE_ID,
+    });
+    if (planResult.kind !== 'success') throw new Error('planner failed');
+
+    await runner.execute({
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: APP_SPACE_ID,
+          plan: planResult.plan,
+          migrationEdges: synthEdges(planResult.plan),
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
+    });
+
+    await expect(
+      driver!.query(
+        `INSERT INTO "ArrayTest" (id, tags, scores) VALUES (1, ARRAY['a', NULL, 'c']::text[], ARRAY[]::integer[])`,
+      ),
+    ).rejects.toThrow();
+  });
+
   it('schema verification passes after migrating array columns', {
     timeout: testTimeout,
   }, async () => {
