@@ -59,7 +59,7 @@ describe('printPsl', () => {
         id     Int    @id
         title  String
         userId Int    @map("user_id")
-        user   User   @relation(fields: [userId], references: [id])
+        user   User   @relation(from: [userId], to: [id])
 
         @@index([userId])
         @@map("post")
@@ -117,7 +117,7 @@ describe('printPsl', () => {
         id     Int     @id
         userId Int     @unique @map("user_id")
         bio    String?
-        user   User    @relation(fields: [userId], references: [id])
+        user   User    @relation(from: [userId], to: [id])
 
         @@map("profile")
       }
@@ -189,7 +189,7 @@ describe('printPsl', () => {
         id        Int     @id
         tenantId  Int     @map("tenant_id")
         accountId Int     @map("account_id")
-        account   Account @relation(fields: [tenantId, accountId], references: [tenantId, id])
+        account   Account @relation(from: [tenantId, accountId], to: [tenantId, id])
 
         @@unique([tenantId, accountId])
         @@map("profile")
@@ -234,7 +234,7 @@ describe('printPsl', () => {
         id        Int        @id
         name      String
         managerId Int?       @map("manager_id")
-        manager   Employee?  @relation(name: "ManagerEmployees", fields: [managerId], references: [id])
+        manager   Employee?  @relation(name: "ManagerEmployees", from: [managerId], to: [id])
         employees Employee[] @relation(name: "ManagerEmployees")
 
         @@map("employee")
@@ -308,8 +308,8 @@ describe('printPsl', () => {
         id          Int  @id
         senderId    Int  @map("sender_id")
         recipientId Int  @map("recipient_id")
-        sender      User @relation(name: "message_sender_fk", fields: [senderId], references: [id], map: "message_sender_fk")
-        recipient   User @relation(name: "message_recipient_fk", fields: [recipientId], references: [id], map: "message_recipient_fk")
+        sender      User @relation(name: "message_sender_fk", from: [senderId], to: [id], map: "message_sender_fk")
+        recipient   User @relation(name: "message_recipient_fk", from: [recipientId], to: [id], map: "message_recipient_fk")
 
         @@map("message")
       }
@@ -385,7 +385,7 @@ describe('printPsl', () => {
         id                Int     @id
         productCategoryId Int     @map("product_category_id")
         productProductId  Int     @map("product_product_id")
-        product           Product @relation(fields: [productCategoryId, productProductId], references: [categoryId, productId])
+        product           Product @relation(from: [productCategoryId, productProductId], to: [categoryId, productId])
 
         @@map("review")
       }
@@ -446,7 +446,7 @@ describe('printPsl', () => {
       model Child {
         id       Int    @id
         parentId Int    @map("parent_id")
-        parent   Parent @relation(fields: [parentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+        parent   Parent @relation(from: [parentId], to: [id], onDelete: Cascade, onUpdate: Cascade)
 
         @@map("child")
       }
@@ -503,7 +503,7 @@ describe('printPsl', () => {
       model Member {
         id     Int  @id
         teamId Int  @map("team_id")
-        team   Team @relation(fields: [teamId], references: [id], map: "member_team_id_fkey")
+        team   Team @relation(from: [teamId], to: [id], map: "member_team_id_fkey")
 
         @@map("member")
       }

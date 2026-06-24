@@ -59,7 +59,7 @@ describe('printPsl', () => {
       model Login {
         id     Int     @id
         _2faId Int     @map("2fa_id")
-        _2fa   Account @relation(fields: [_2faId], references: [id])
+        _2fa   Account @relation(from: [_2faId], to: [id])
 
         @@map("login")
       }
@@ -128,7 +128,7 @@ describe('printPsl', () => {
       model Login {
         id        Int     @id
         accountId Int     @map("account_id")
-        account   Account @relation(fields: [accountId], references: [userId2])
+        account   Account @relation(from: [accountId], to: [userId2])
 
         @@map("login")
       }
