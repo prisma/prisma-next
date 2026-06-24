@@ -48,6 +48,15 @@ export class DropDefaultAction extends AlterTableAction {
   }
 }
 
+/**
+ * The set of ALTER TABLE subactions currently expressible as typed DDL.
+ *
+ * Phase 2 of the typed-ddl-migration-ops project ports the remaining
+ * actions — SetDefault, SetNotNull, DropNotNull, AlterColumnType — from
+ * the raw-SQL builders in `operations/columns.ts`. Until then this union
+ * is intentionally partial; only the ALTER subactions used by the
+ * already-converted ops (AddColumn, DropDefault) appear here.
+ */
 export type AnyAlterTableAction = AddColumnAction | DropDefaultAction;
 
 // ---------------------------------------------------------------------------
