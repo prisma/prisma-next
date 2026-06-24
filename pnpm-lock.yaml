@@ -3253,6 +3253,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:0.14.0
         version: link:../../1-framework/1-core/framework-components
+      '@prisma-next/utils':
+        specifier: workspace:0.14.0
+        version: link:../../1-framework/0-foundation/utils
     devDependencies:
       '@prisma-next/contract':
         specifier: workspace:0.14.0
