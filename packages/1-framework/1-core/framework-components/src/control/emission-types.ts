@@ -11,11 +11,6 @@ export interface ValidationContext {
   readonly extensionIds?: ReadonlyArray<string>;
 }
 
-export interface ResolvedFieldTypeStrings {
-  readonly output: string;
-  readonly input: string;
-}
-
 export interface EmissionSpi {
   readonly id: string;
 
