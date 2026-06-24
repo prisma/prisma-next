@@ -936,10 +936,10 @@ export function instantiateAuthoringEntityType<TOutput = unknown>(
     // contravariant position (see the type's docstring). The runtime
     // delegates input validation to the pack's factory itself, so we
     // forward the supplied input here without a static input contract.
-    const factory = descriptor.output.factory as (
-      input: unknown,
-      ctx: AuthoringEntityContext,
-    ) => TOutput;
+    const factory = blindCast<
+      (input: unknown, ctx: AuthoringEntityContext) => TOutput,
+      'entity factory output is caller-selected via instantiateAuthoringEntityType<TOutput>'
+    >(descriptor.output.factory);
     return factory(input, ctx);
   }
   validateAuthoringHelperArguments(helperPath, descriptor.args, args);

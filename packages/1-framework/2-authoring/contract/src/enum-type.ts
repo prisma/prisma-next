@@ -37,7 +37,7 @@ export function member<const Name extends string, const Value = Name>(
     value: blindCast<
       Value,
       'overload signatures enforce Value=Name when value is omitted; default generic Value=Name makes this safe'
-    >(value ?? name),
+    >(value === undefined ? name : value),
   };
 }
 
