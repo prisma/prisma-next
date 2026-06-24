@@ -1,4 +1,5 @@
 export {
+  checkExpression,
   col,
   type DdlColumnOptions,
   fn,

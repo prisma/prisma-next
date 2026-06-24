@@ -730,6 +730,12 @@ function sqliteRenderDdlConstraint(constraint: DdlTableConstraint): string {
     }
     return sql;
   }
+  if (constraint.kind === 'check-expression') {
+    throw new Error(
+      `SQLite does not support expression CHECK constraints (constraint "${constraint.name}"). ` +
+        'Scalar-array columns and their element-non-null checks are Postgres-only.',
+    );
+  }
   const cols = constraint.columns.map(quoteIdentifier).join(', ');
   if (constraint.name !== undefined) {
     return `CONSTRAINT ${quoteIdentifier(constraint.name)} UNIQUE (${cols})`;

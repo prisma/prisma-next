@@ -463,6 +463,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
             sourceId,
             defaultFunctionRegistry,
             diagnostics,
+            isList: isListField,
           })
       : {};
     const loweredOnCreate = loweredDefault.executionDefaults?.onCreate;
