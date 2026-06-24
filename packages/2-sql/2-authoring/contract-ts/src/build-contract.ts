@@ -234,14 +234,6 @@ function buildStorageColumn(
     };
   }
 
-  if (field.many) {
-    return {
-      nativeType: JSONB_NATIVE_TYPE,
-      codecId: JSONB_CODEC_ID,
-      nullable: field.nullable,
-    };
-  }
-
   const codecId = field.descriptor.codecId;
   const encodedDefault =
     field.default !== undefined
@@ -252,6 +244,7 @@ function buildStorageColumn(
     nativeType: field.descriptor.nativeType,
     codecId,
     nullable: field.nullable,
+    ...(field.many ? { many: true as const } : {}),
     ...ifDefined('typeParams', field.descriptor.typeParams),
     ...ifDefined('default', encodedDefault),
     ...ifDefined('typeRef', field.descriptor.typeRef),
