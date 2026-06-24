@@ -18,6 +18,7 @@ export async function ormClientDisconnectPostTags(
 ) {
   const db = createOrmClient(runtime);
   return db.Post.where({ id: toPostId(postId) })
+    .select('id', 'title')
     .include('tags', (tag) => tag.select('id', 'label').orderBy((t) => t.label.asc()))
     .update({
       tags: (t) => t.disconnect(tagIds.map((id) => ({ id: toTagId(id) }))),
