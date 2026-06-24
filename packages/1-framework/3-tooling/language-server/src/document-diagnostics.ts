@@ -1,19 +1,31 @@
-import { parse } from '@prisma-next/psl-parser/syntax';
-import { type LspDiagnostic, mapParseDiagnostics } from './diagnostic-mapping';
+import type { SymbolTable } from '@prisma-next/psl-parser';
+import type { DocumentAst, SourceFile } from '@prisma-next/psl-parser/syntax';
+import type { LspDiagnostic } from './diagnostic-mapping';
+import { type PipelineInputs, runPipeline } from './pipeline';
 import type { SchemaInputSet } from './schema-inputs';
 
+export interface DocumentDiagnostics {
+  readonly diagnostics: readonly LspDiagnostic[];
+  readonly document: DocumentAst;
+  readonly sourceFile: SourceFile;
+  readonly symbolTable: SymbolTable;
+}
+
 /**
- * `null` (not a configured input) is distinct from `[]` (an input that parsed
- * clean): the caller treats both as "publish no diagnostics", but only the
- * latter is a document we own and keep diagnosing.
+ * `null` (not a configured input) is distinct from a `DocumentDiagnostics` whose
+ * `diagnostics` are `[]` (an input that parsed clean): the caller treats both as
+ * "publish no diagnostics", but only the latter is a document we own and keep
+ * diagnosing.
  */
 export function computeDocumentDiagnostics(
   uri: string,
   text: string,
   inputs: SchemaInputSet,
-): readonly LspDiagnostic[] | null {
+  controlStack: PipelineInputs,
+): DocumentDiagnostics | null {
   if (!inputs.includes(uri)) {
     return null;
   }
-  return mapParseDiagnostics(parse(text).diagnostics);
+  const { document, sourceFile, symbolTable, diagnostics } = runPipeline(text, controlStack);
+  return { diagnostics, document, sourceFile, symbolTable };
 }

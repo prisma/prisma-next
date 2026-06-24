@@ -13,12 +13,14 @@ export interface SchemaInputSet {
   includes(uri: string): boolean;
 }
 
-export function resolveSchemaInputs(config: SchemaInputConfig): SchemaInputSet {
+export function hasPslInputs(config: SchemaInputConfig): boolean {
   const source = config.contract?.source;
-  const uris =
-    source?.sourceFormat === 'psl' && source.inputs
-      ? new Set(source.inputs.map((input) => pathToFileURL(input).toString()))
-      : new Set<string>();
+  return source?.sourceFormat === 'psl' && source.inputs !== undefined;
+}
+
+export function resolveSchemaInputs(config: SchemaInputConfig): SchemaInputSet {
+  const inputs = hasPslInputs(config) ? config.contract?.source.inputs : undefined;
+  const uris = new Set(inputs?.map((input) => pathToFileURL(input).toString()));
 
   return {
     includes: (uri) => uris.has(uri),
