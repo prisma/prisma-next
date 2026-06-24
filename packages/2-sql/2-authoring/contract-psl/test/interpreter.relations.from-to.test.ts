@@ -224,16 +224,11 @@ model Post {
       expect(bare.value).toEqual(bracketed.value);
     });
 
-    // A redundant `Model.` qualifier on `to:` (e.g. `to: Post.id`) is the
-    // spec's tolerated form, but the PSL expression grammar does not parse a
-    // member-access value: `parseIdentifierExpr` consumes only the head `Ident`
-    // and the trailing `.field` is dropped before the resolver sees the
-    // argument (no diagnostic). Accepting the qualifier therefore needs a
-    // grammar change in @prisma-next/psl-parser, which is out of this dispatch's
-    // scope. The resolver's qualifier-stripping is in place for when the
-    // grammar carries the dotted value; this test pins the present boundary so a
-    // future grammar slice has a regression anchor.
-    it('drops a member-access to: value at the grammar layer today (qualifier deferred)', () => {
+    // A redundant `Model.` qualifier on `to:` (e.g. `to: User.id`) is tolerated:
+    // the member-access grammar carries the dotted value to the resolver, which
+    // strips the qualifying `Model.` to the bare referenced column, so it lowers
+    // identically to the unqualified spelling.
+    it('tolerates a redundant Model. qualifier on to:, lowering it like the bare value', () => {
       const qualified = interpret(`model User {
   id Int @id
   posts Post[]
@@ -245,18 +240,22 @@ model Post {
   user User @relation(from: userId, to: User.id)
 }
 `);
+      const bare = interpret(`model User {
+  id Int @id
+  posts Post[]
+}
 
-      // `to: User.id` parses as `to: User`, which names no field on User, so
-      // resolution fails rather than tolerating the qualifier.
-      expect(qualified.ok).toBe(false);
-      if (qualified.ok) return;
-      expect(qualified.failure.diagnostics).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            message: expect.stringContaining('unknown field "User.User"'),
-          }),
-        ]),
-      );
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(from: userId, to: id)
+}
+`);
+
+      expect(qualified.ok).toBe(true);
+      expect(bare.ok).toBe(true);
+      if (!qualified.ok || !bare.ok) return;
+      expect(qualified.value).toEqual(bare.value);
     });
   });
 
