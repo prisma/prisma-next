@@ -27,13 +27,13 @@ import type {
   FieldAttributeAst,
   SourceFile,
 } from '@prisma-next/psl-parser/syntax';
-import { ArrayLiteralAst } from '@prisma-next/psl-parser/syntax';
+import { ArrayLiteralAst, IdentifierAst } from '@prisma-next/psl-parser/syntax';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
-import { ok } from '@prisma-next/utils/result';
+import { notOk, ok } from '@prisma-next/utils/result';
 
 import {
   getAttribute,
@@ -77,6 +77,12 @@ export type ModelBackrelationCandidate = {
   readonly field: FieldSymbol;
   readonly targetModelName: string;
   readonly relationName?: string;
+  /**
+   * The junction model named by `through:` on the list field. When present,
+   * many-to-many recognition considers only this junction rather than scanning
+   * every junction-shaped model linking the two sides.
+   */
+  readonly through?: string;
 };
 
 type ModelRelationMetadata = RelationNode;
@@ -117,6 +123,36 @@ function fieldRefOrList(scope: FieldRefScope): ArgType<readonly string[]> {
   };
 }
 
+/**
+ * Reads a bare model-name identifier argument value (`through: PostTag`). The
+ * expression grammar carries only the head identifier of a member-access
+ * value, so a qualified `through: PostTag.post` reaches this combinator as
+ * the bare model name `PostTag` — the qualified disambiguation form is a
+ * separate grammar change, and the bare name is all this slice recognises.
+ */
+function modelName(): ArgType<string> {
+  return {
+    kind: 'modelName',
+    label: 'model name',
+    parse: (arg, ctx): Result<string, readonly PslDiagnostic[]> => {
+      if (arg instanceof IdentifierAst) {
+        const name = arg.name();
+        if (name !== undefined) {
+          return ok(name);
+        }
+      }
+      return notOk([
+        {
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: 'Expected a model name',
+          sourceId: ctx.sourceId,
+          span: nodePslSpan(arg.syntax, ctx.sourceFile),
+        },
+      ]);
+    },
+  };
+}
+
 function relationInvariants(
   parsed: {
     readonly from?: readonly string[];
@@ -153,6 +189,7 @@ const sqlRelation = fieldAttribute('relation', {
     name: optional(str()),
     from: optional(fieldRefOrList('self')),
     to: optional(fieldRefOrList('referenced')),
+    through: optional(modelName()),
     map: optional(str()),
     onDelete: optional(
       oneOf(
@@ -194,6 +231,14 @@ export type ParsedSqlRelation = {
    * two never co-occur.
    */
   readonly referencesInferred?: true;
+  /**
+   * The junction model named by `through:` on a navigable list field, used to
+   * recognise the many-to-many via that explicit junction. A bare model
+   * identifier (`through: PostTag`); the qualified relation-field form
+   * (`through: PostTag.post`) is a separate member-access grammar and does not
+   * reach the resolver as a dotted value — only its head identifier survives.
+   */
+  readonly through?: string;
   readonly map?: string;
   readonly onDelete?: SqlRelationOutput['onDelete'];
   readonly onUpdate?: SqlRelationOutput['onUpdate'];
@@ -308,6 +353,7 @@ export function interpretRelationAttribute(input: {
     ...ifDefined('fields', fields),
     ...ifDefined('references', references),
     ...ifDefined('referencesInferred', referencesInferred),
+    ...ifDefined('through', value.through),
     ...ifDefined('map', value.map),
     ...ifDefined('onDelete', value.onDelete),
     ...ifDefined('onUpdate', value.onUpdate),
@@ -491,6 +537,12 @@ function findJunctionFkPairs(input: {
   const pairs: JunctionFkPair[] = [];
   const nearMisses: JunctionNearMiss[] = [];
   for (const [junctionModelName, junctionFks] of input.fkRelationsByDeclaringModel) {
+    // An explicit `through:` names the junction directly: skip every other
+    // junction-shaped model so recognition and near-miss reporting are scoped
+    // to the authored junction. A bare list (no `through:`) scans all of them.
+    if (input.candidate.through !== undefined && junctionModelName !== input.candidate.through) {
+      continue;
+    }
     const idColumns = input.modelIdColumns.get(junctionModelName);
     for (const parentFk of junctionFks) {
       if (parentFk.targetModelName !== input.candidate.modelName) {
