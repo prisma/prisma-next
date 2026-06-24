@@ -1,3 +1,4 @@
+import { format } from '@prisma-next/psl-parser/format';
 import { printPsl } from '@prisma-next/psl-printer';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
@@ -6,6 +7,44 @@ import { sqlSchemaIrToPslAst } from '../../../src/core/psl-contract-infer/sql-sc
 function printPslFromSql(schemaIR: SqlSchemaIR): string {
   return printPsl(sqlSchemaIrToPslAst(schemaIR));
 }
+
+const MULTI_FK_BETWEEN_SAME_MODELS: SqlSchemaIR = {
+  tables: {
+    user: {
+      name: 'user',
+      columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+      primaryKey: { columns: ['id'] },
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+    },
+    message: {
+      name: 'message',
+      columns: {
+        id: { name: 'id', nativeType: 'int4', nullable: false },
+        sender_id: { name: 'sender_id', nativeType: 'int4', nullable: false },
+        recipient_id: { name: 'recipient_id', nativeType: 'int4', nullable: false },
+      },
+      primaryKey: { columns: ['id'] },
+      foreignKeys: [
+        {
+          name: 'message_sender_fk',
+          columns: ['sender_id'],
+          referencedTable: 'user',
+          referencedColumns: ['id'],
+        },
+        {
+          name: 'message_recipient_fk',
+          columns: ['recipient_id'],
+          referencedTable: 'user',
+          referencedColumns: ['id'],
+        },
+      ],
+      uniques: [],
+      indexes: [],
+    },
+  },
+};
 
 describe('printPsl', () => {
   it('schema with 1:N relation', () => {
@@ -234,8 +273,8 @@ describe('printPsl', () => {
         id        Int        @id
         name      String
         managerId Int?       @map("manager_id")
-        manager   Employee?  @relation(name: "ManagerEmployees", from: [managerId], to: [id])
-        employees Employee[] @relation(name: "ManagerEmployees")
+        manager   Employee?  @relation(from: [managerId], to: [id])
+        employees Employee[] @relation(inverse: manager)
 
         @@map("employee")
       }
@@ -298,8 +337,8 @@ describe('printPsl', () => {
 
       model User {
         id              Int       @id
-        messages        Message[] @relation(name: "message_sender_fk")
-        messagesMessage Message[] @relation(name: "message_recipient_fk")
+        messages        Message[] @relation(inverse: sender)
+        messagesMessage Message[] @relation(inverse: recipient)
 
         @@map("user")
       }
@@ -308,8 +347,8 @@ describe('printPsl', () => {
         id          Int  @id
         senderId    Int  @map("sender_id")
         recipientId Int  @map("recipient_id")
-        sender      User @relation(name: "message_sender_fk", from: [senderId], to: [id], map: "message_sender_fk")
-        recipient   User @relation(name: "message_recipient_fk", from: [recipientId], to: [id], map: "message_recipient_fk")
+        sender      User @relation(from: [senderId], to: [id], map: "message_sender_fk")
+        recipient   User @relation(from: [recipientId], to: [id], map: "message_recipient_fk")
 
         @@map("message")
       }
@@ -554,5 +593,44 @@ describe('printPsl', () => {
     expect(betaIndex).toBeGreaterThanOrEqual(0);
     expect(alphaIndex).toBeGreaterThanOrEqual(0);
     expect(betaIndex).toBeLessThan(alphaIndex);
+  });
+});
+
+describe('printer retires @relation(name:)', () => {
+  it('emits no @relation(name:) and points the back side with inverse:', () => {
+    const result = printPslFromSql(MULTI_FK_BETWEEN_SAME_MODELS);
+
+    expect(result).not.toContain('@relation(name:');
+    expect(result).toContain('inverse:');
+  });
+
+  it('points each back-relation at the FK-side field it pairs with', () => {
+    const result = printPslFromSql(MULTI_FK_BETWEEN_SAME_MODELS);
+
+    expect(result).toContain('@relation(inverse: sender)');
+    expect(result).toContain('@relation(inverse: recipient)');
+  });
+});
+
+describe('legacy @relation(name:) input survives format unchanged', () => {
+  it('leaves a legacy name: argument untouched (no auto-conversion)', () => {
+    const schema = [
+      'model User {',
+      '  id              Int       @id',
+      '  messages        Message[] @relation(name: "message_sender_fk")',
+      '}',
+      '',
+      'model Message {',
+      '  id       Int  @id',
+      '  senderId Int',
+      '  sender   User @relation(name: "message_sender_fk", from: [senderId], to: [id])',
+      '}',
+      '',
+    ].join('\n');
+
+    const formatted = format(schema);
+
+    expect(formatted).toContain('@relation(name: "message_sender_fk")');
+    expect(formatted).toContain('@relation(name: "message_sender_fk", from:[senderId], to:[id])');
   });
 });

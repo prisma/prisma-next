@@ -47,6 +47,13 @@ export type RelationField = {
   readonly optional: boolean;
   readonly list: boolean;
   readonly relationName?: string | undefined;
+  /**
+   * On the back/list side of a disambiguated relation (multiple FKs between the
+   * same pair of models, or a self-relation), the field name of the FK-side
+   * relation field this end pairs with. The printer emits `inverse: <name>` to
+   * point at it.
+   */
+  readonly inverseOf?: string | undefined;
   readonly fkName?: string | undefined;
   readonly fields?: readonly string[] | undefined;
   readonly references?: readonly string[] | undefined;

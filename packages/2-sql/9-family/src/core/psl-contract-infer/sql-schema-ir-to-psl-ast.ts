@@ -372,9 +372,6 @@ function buildRelationField(
   const args: PslAttributeArgument[] = [];
 
   if (rel.fields && rel.references) {
-    if (rel.relationName) {
-      args.push(namedArg('name', `"${escapePslString(rel.relationName)}"`));
-    }
     args.push(
       namedArg(
         'from',
@@ -402,8 +399,8 @@ function buildRelationField(
     if (rel.fkName) {
       args.push(namedArg('map', `"${escapePslString(rel.fkName)}"`));
     }
-  } else if (rel.relationName) {
-    args.push(namedArg('name', `"${escapePslString(rel.relationName)}"`));
+  } else if (rel.inverseOf) {
+    args.push(namedArg('inverse', rel.inverseOf));
   }
 
   const attrs: PslFieldAttribute[] =
