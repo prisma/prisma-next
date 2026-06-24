@@ -1,10 +1,8 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
-import type { StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import {
-  buildAddColumnSql,
   buildColumnDefaultSql,
   buildColumnTypeSql,
-  buildCreateTableSql,
   renderDefaultLiteral,
 } from '@prisma-next/target-postgres/planner-ddl-builders';
 import { describe, expect, it } from 'vitest';
@@ -151,91 +149,5 @@ describe('renderDefaultLiteral', () => {
   it('renders JSON object without cast for non-json column', () => {
     const result = renderDefaultLiteral({ key: 'val' });
     expect(result).toBe(`'{"key":"val"}'`);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// buildAddColumnSql
-// ---------------------------------------------------------------------------
-
-describe('buildAddColumnSql', () => {
-  it('builds basic ADD COLUMN', () => {
-    const sql = buildAddColumnSql('"public"."user"', 'email', col({ nativeType: 'text' }), noHooks);
-    expect(sql).toBe('ALTER TABLE "public"."user" ADD COLUMN "email" text');
-  });
-
-  it('includes NOT NULL for non-nullable columns', () => {
-    const sql = buildAddColumnSql(
-      '"public"."user"',
-      'email',
-      col({ nativeType: 'text', nullable: false }),
-      noHooks,
-    );
-    expect(sql).toContain('NOT NULL');
-  });
-
-  it('includes temporary default when provided', () => {
-    const sql = buildAddColumnSql(
-      '"public"."user"',
-      'name',
-      col({ nativeType: 'text', nullable: false }),
-      noHooks,
-      "''",
-    );
-    expect(sql).toContain("DEFAULT ''");
-    expect(sql).toContain('NOT NULL');
-  });
-
-  it('prefers column default over temporary default', () => {
-    const sql = buildAddColumnSql(
-      '"public"."user"',
-      'active',
-      col({
-        nativeType: 'bool',
-        nullable: false,
-        default: { kind: 'literal', value: true },
-      }),
-      noHooks,
-      'false',
-    );
-    expect(sql).toContain('DEFAULT true');
-    expect(sql).not.toContain('DEFAULT false');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// buildCreateTableSql
-// ---------------------------------------------------------------------------
-
-describe('buildCreateTableSql', () => {
-  it('builds CREATE TABLE with columns and primary key', () => {
-    const table: StorageTable = {
-      columns: {
-        id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-        name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-      },
-      primaryKey: { columns: ['id'] },
-      uniques: [],
-      foreignKeys: [],
-      indexes: [],
-    };
-    const sql = buildCreateTableSql('"public"."user"', table, noHooks);
-    expect(sql).toContain('CREATE TABLE "public"."user"');
-    expect(sql).toContain('"id" int4 NOT NULL');
-    expect(sql).toContain('"name" text');
-    expect(sql).toContain('PRIMARY KEY ("id")');
-  });
-
-  it('omits PRIMARY KEY when not defined', () => {
-    const table: StorageTable = {
-      columns: {
-        value: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-      },
-      uniques: [],
-      foreignKeys: [],
-      indexes: [],
-    };
-    const sql = buildCreateTableSql('"public"."kv"', table, noHooks);
-    expect(sql).not.toContain('PRIMARY KEY');
   });
 });

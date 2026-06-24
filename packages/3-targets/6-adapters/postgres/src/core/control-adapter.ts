@@ -49,6 +49,7 @@ import {
 import type {
   AddColumnAction,
   AlterTableActionVisitor,
+  DropDefaultAction,
   PostgresAlterTable,
   PostgresCreatePolicy,
   PostgresCreateSchema,
@@ -1638,6 +1639,9 @@ async function pgRenderAlterTable(
     async addColumn(action: AddColumnAction): Promise<string> {
       const colFragment = await pgRenderDdlColumn(action.column, codecLookup);
       return `ADD COLUMN ${colFragment}`;
+    },
+    dropDefault(action: DropDefaultAction): Promise<string> {
+      return Promise.resolve(`ALTER COLUMN ${quoteIdentifier(action.columnName)} DROP DEFAULT`);
     },
   };
   const actionSqls = await Promise.all(node.actions.map((a) => a.accept(actionVisitor)));
