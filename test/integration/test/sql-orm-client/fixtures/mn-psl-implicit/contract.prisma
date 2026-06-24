@@ -1,0 +1,35 @@
+// Real emitted fixture for the sql-orm-client implicit many-to-many parity
+// test — the `Post ↔ Tag` relation authored as two bare navigable list ends
+// with NO junction model.
+//
+// `Post.tags Tag[]` / `Tag.posts Post[]` are both bare (no `@relation(through:)`)
+// and no model links the pair, so the interpreter synthesises a model-less
+// junction table — Prisma's implicit many-to-many. The synthesised junction is
+// named `_PostToTag` (the two terminal model names ordered alphabetically) with
+// foreign-key columns `A` (→ `posts.id`) and `B` (→ `tags.id`) and a composite
+// `(A, B)` identity. Both list ends lower to a navigable `cardinality: 'N:M'`
+// relation with a populated `through` descriptor over `_PostToTag` — the same
+// runtime-consumable shape an authored junction emits — so the M:N ORM
+// `include` drives through a real emitted PSL contract with no authored
+// junction model.
+//
+// The synthesised junction is a physical table only (filtered out of `roots`),
+// so the migration system creates it like any contract storage table.
+
+model Post {
+  id    Int    @id
+  title String
+
+  tags Tag[]
+
+  @@map("posts")
+}
+
+model Tag {
+  id    String @id
+  label String @unique
+
+  posts Post[]
+
+  @@map("tags")
+}
