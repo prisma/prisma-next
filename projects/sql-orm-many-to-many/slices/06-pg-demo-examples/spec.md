@@ -30,12 +30,12 @@ Two separable halves:
 
 ## Slice-specific done conditions
 
-- [x] Dual-mode resolved via the **PSL-only** arm (decision: `wip/unattended-decisions.md` #16–17): TS contract source + no-emit workflow removed; demo suite green (commits `f4483461e`..`84657a77c`).
-- [x] PG demo demonstrates the M:N API — all nine surfaces mirroring slice 4 — via `repo-*` CLI commands, seeded, with 8 integration tests per the standard (commits `12def8961`, `d591575c1`, `9f26fe679`).
+- [x] Dual-mode reconciliation **deferred, not done in this slice**. The PSL-only arm was attempted (TS contract source + no-emit workflow removed) and then reverted: the no-emit workflow and `test:dual-mode` are kept as-is on `main`, so no demonstration is lost. `test:dual-mode` stays red on the TS leg, which is tolerable because CI does not run it (CI runs `typecheck:examples` / `lint:examples` / `test:examples` only, all green). Real parity is tracked by **TML-2938** (bring the TS leg to parity, green the dual-mode test), blocked by **TML-2228** (TS authoring DSL polymorphism support — the discriminated `Task`/`Bug`/`Feature` hierarchy can't be authored in TS until that lands).
+- [x] PG demo demonstrates the M:N API — all nine surfaces mirroring slice 4 — via `repo-*` CLI commands, seeded, with integration tests per the standard.
 
 ## Open Questions
 
-1. **Dual-mode reconciliation approach** — add TS-builder discriminator authoring (i) vs drop the TS source / PSL-only (ii). Working position: lean (ii) PSL-only unless TS-builder discriminator authoring is wanted for its own sake — but this is the operator's call (it touches the demo's dual-mode story).
+1. **Dual-mode reconciliation approach** — resolved: neither arm is taken in this slice. The no-emit / dual-mode surface is left exactly as `main` had it (additive M:N only), and parity is deferred to TML-2938 (blocked by TML-2228). Approach (i) — add TS-builder discriminator authoring — is the path TML-2938 will take once TML-2228 unblocks it.
 
 ## References
 

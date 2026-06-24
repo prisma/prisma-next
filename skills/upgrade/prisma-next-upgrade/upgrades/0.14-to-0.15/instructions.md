@@ -19,8 +19,7 @@ only.
 <!--
 TML-2795: the `prisma-next-demo` example gains a Post<->Tag many-to-many. The demo
 authors the relation in PSL (with a re-baselined `add_post_tags` migration), switches
-its id fields to native uuid storage for M:N parity, drops the standalone TS contract
-source in favour of the PSL-only single-source story, and adds M:N ORM examples, CLI
+its id fields to native uuid storage for M:N parity, and adds M:N ORM examples, CLI
 commands, seed data, and PGlite integration coverage. Demonstrates the many-to-many
 authoring surface that slice 5 (TML-2794) added to the framework; the example diff
 spans `examples/prisma-next-demo/**` only. Additive and opt-in — no existing consumer

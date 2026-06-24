@@ -92,6 +92,7 @@
  * - guardrail-delete           Demo AST lint blocking DELETE without WHERE
  *
  * See also:
+ * - main-no-emit.ts: Same CLI using inline contract (no emission step)
  * - src/app/main.tsx: React browser app for visualizing contract.json
  */
 import 'dotenv/config';
