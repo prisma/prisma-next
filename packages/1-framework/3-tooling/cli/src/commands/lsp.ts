@@ -11,7 +11,9 @@ export function createLspCommand(): Command {
     command,
     'Start the Prisma Next language server',
     'Launches a Language Server Protocol server that publishes PSL parse diagnostics\n' +
-      'for the schema inputs declared in your config (contract.source.inputs).\n' +
+      'and handles whole-document PSL formatting for the schema inputs declared in\n' +
+      'your config (contract.source.inputs). Formatting uses the Prisma Next PSL\n' +
+      'formatter and the formatter block from the project config.\n' +
       'Communicates over stdio; intended to be spawned by an\n' +
       'editor, not run interactively. The server keeps running until the editor client\n' +
       'disconnects.',

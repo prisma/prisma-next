@@ -1,4 +1,9 @@
-import { int4Column, jsonbColumn, textColumn } from '@prisma-next/adapter-postgres/column-types';
+import {
+  charColumn,
+  int4Column,
+  jsonbColumn,
+  textColumn,
+} from '@prisma-next/adapter-postgres/column-types';
 import { vector } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import { uuidv4 } from '@prisma-next/ids';
@@ -67,7 +72,7 @@ const Tag = model('Tag', {
 const UserTag = model('UserTag', {
   fields: {
     userId: field.column(int4Column).column('user_id'),
-    tagId: field.column(textColumn).column('tag_id'),
+    tagId: field.column(charColumn(36)).column('tag_id'),
     note: field.column(textColumn).optional(),
     createdAt: field.column(textColumn).column('created_at').defaultSql('now()'),
   },
@@ -87,7 +92,7 @@ const Role = model('Role', {
 const UserRole = model('UserRole', {
   fields: {
     userId: field.column(int4Column).column('user_id'),
-    roleId: field.column(textColumn).column('role_id'),
+    roleId: field.column(charColumn(36)).column('role_id'),
     level: field.column(int4Column),
   },
 })
