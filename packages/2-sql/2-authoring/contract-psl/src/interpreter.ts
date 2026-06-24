@@ -106,6 +106,7 @@ import {
   interpretRelationAttribute,
   type ModelBackrelationCandidate,
   normalizeReferentialAction,
+  type ParsedThrough,
   resolveTargetIdFieldNames,
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
@@ -564,7 +565,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     });
     const relationAttribute = getAttribute(field.attributes, 'relation');
     let relationName: string | undefined;
-    let through: string | undefined;
+    let through: ParsedThrough | undefined;
     if (relationAttribute) {
       const parsedRelation = interpretRelationAttribute({
         selfModel: model,

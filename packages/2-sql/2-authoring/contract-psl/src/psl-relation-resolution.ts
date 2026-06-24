@@ -13,7 +13,6 @@ import type {
 } from '@prisma-next/psl-parser';
 import {
   fieldAttribute,
-  fieldRef,
   identifier,
   interpretAttribute,
   list,
@@ -24,10 +23,11 @@ import {
 } from '@prisma-next/psl-parser';
 import type {
   AttributeArgAst,
+  ExpressionAst,
   FieldAttributeAst,
   SourceFile,
 } from '@prisma-next/psl-parser/syntax';
-import { ArrayLiteralAst, IdentifierAst } from '@prisma-next/psl-parser/syntax';
+import { ArrayLiteralAst, IdentifierAst, QualifiedNameAst } from '@prisma-next/psl-parser/syntax';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
@@ -78,11 +78,13 @@ export type ModelBackrelationCandidate = {
   readonly targetModelName: string;
   readonly relationName?: string;
   /**
-   * The junction model named by `through:` on the list field. When present,
-   * many-to-many recognition considers only this junction rather than scanning
-   * every junction-shaped model linking the two sides.
+   * The junction named by `through:` on the list field. When present,
+   * many-to-many recognition considers only `junction` rather than scanning
+   * every junction-shaped model linking the two sides; an optional `field` pins
+   * the parent-side junction FK by its relation field, disambiguating
+   * self-relations and multiple many-to-many between the same pair of models.
    */
-  readonly through?: string;
+  readonly through?: ParsedThrough;
 };
 
 type ModelRelationMetadata = RelationNode;
@@ -98,6 +100,72 @@ export function normalizeReferentialAction(actionToken: string): ReferentialActi
 }
 
 /**
+ * The junction named by `through:`. The junction is the head of the value, so
+ * a qualified `through: Follow.follower` splits into `junction: 'Follow'` and
+ * the optional pin `field: 'follower'`.
+ */
+export type ParsedThrough = {
+  readonly junction: string;
+  readonly field?: string;
+};
+
+/**
+ * Extracts the field name from a directional argument element: a bare field
+ * name or a `Model.field` member access, whose redundant model qualifier is
+ * stripped so the qualified spelling lowers identically to the bare one.
+ */
+function directionalFieldName(arg: ExpressionAst): string | undefined {
+  if (arg instanceof IdentifierAst) {
+    return arg.name();
+  }
+  if (arg instanceof QualifiedNameAst) {
+    const path = arg.path();
+    const tail = path[path.length - 1];
+    return tail !== undefined && tail.length > 0 ? tail : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Reads a directional field-argument element (`from:`/`to:` entries): a bare
+ * field name or a qualifier-stripped `Model.field`, existence-checked against
+ * the scope model like the kit's `fieldRef`.
+ */
+function directionalFieldRef(scope: FieldRefScope): ArgType<string> {
+  return {
+    kind: 'directionalFieldRef',
+    label: 'field name',
+    parse: (arg, ctx): Result<string, readonly PslDiagnostic[]> => {
+      const name = directionalFieldName(arg);
+      if (name === undefined) {
+        return notOk([
+          {
+            code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+            message: 'Expected a field name',
+            sourceId: ctx.sourceId,
+            span: nodePslSpan(arg.syntax, ctx.sourceFile),
+          },
+        ]);
+      }
+      const model = scope === 'self' ? ctx.selfModel : ctx.resolveReferencedModel();
+      // A referenced model in another space can't be resolved here; skip the
+      // existence check — it runs where that model is known.
+      if (model !== undefined && !Object.hasOwn(model.fields, name)) {
+        return notOk([
+          {
+            code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+            message: `Field "${name}" does not exist on model "${model.name}"`,
+            sourceId: ctx.sourceId,
+            span: nodePslSpan(arg.syntax, ctx.sourceFile),
+          },
+        ]);
+      }
+      return ok(name);
+    },
+  };
+}
+
+/**
  * Accepts a `@relation` directional argument value (`from:`/`to:`): a single
  * bare field (`from: userId`) or a bracketed list (`from: [a, b]`), normalised
  * to a field-name array. Delegating each shape to its own combinator keeps the
@@ -105,8 +173,8 @@ export function normalizeReferentialAction(actionToken: string): ReferentialActi
  * into a generic mismatch message.
  */
 function fieldRefOrList(scope: FieldRefScope): ArgType<readonly string[]> {
-  const single = fieldRef(scope);
-  const bracketed = list(fieldRef(scope), { nonEmpty: true, unique: true });
+  const single = directionalFieldRef(scope);
+  const bracketed = list(single, { nonEmpty: true, unique: true });
   return {
     kind: 'fieldRefOrList',
     label: 'field name or field name[]',
@@ -124,27 +192,35 @@ function fieldRefOrList(scope: FieldRefScope): ArgType<readonly string[]> {
 }
 
 /**
- * Reads a bare model-name identifier argument value (`through: PostTag`). The
- * expression grammar carries only the head identifier of a member-access
- * value, so a qualified `through: PostTag.post` reaches this combinator as
- * the bare model name `PostTag` — the qualified disambiguation form is a
- * separate grammar change, and the bare name is all this slice recognises.
+ * Reads the `through:` junction pointer: a bare junction model
+ * (`through: PostTag`) or a qualified junction relation field
+ * (`through: PostTag.post`), whose field segment pins the parent-side
+ * junction FK to disambiguate self-relations and multiple many-to-many
+ * between the same pair of models.
  */
-function modelName(): ArgType<string> {
+function throughRef(): ArgType<ParsedThrough> {
   return {
-    kind: 'modelName',
-    label: 'model name',
-    parse: (arg, ctx): Result<string, readonly PslDiagnostic[]> => {
+    kind: 'throughRef',
+    label: 'junction model or Junction.relationField',
+    parse: (arg, ctx): Result<ParsedThrough, readonly PslDiagnostic[]> => {
       if (arg instanceof IdentifierAst) {
-        const name = arg.name();
-        if (name !== undefined) {
-          return ok(name);
+        const junction = arg.name();
+        if (junction !== undefined) {
+          return ok({ junction });
+        }
+      }
+      if (arg instanceof QualifiedNameAst) {
+        const path = arg.path();
+        const junction = path[0];
+        if (junction !== undefined && junction.length > 0) {
+          const field = path.slice(1).join('.');
+          return ok({ junction, ...ifDefined('field', field.length > 0 ? field : undefined) });
         }
       }
       return notOk([
         {
           code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
-          message: 'Expected a model name',
+          message: 'Expected a junction model name',
           sourceId: ctx.sourceId,
           span: nodePslSpan(arg.syntax, ctx.sourceFile),
         },
@@ -189,7 +265,7 @@ const sqlRelation = fieldAttribute('relation', {
     name: optional(str()),
     from: optional(fieldRefOrList('self')),
     to: optional(fieldRefOrList('referenced')),
-    through: optional(modelName()),
+    through: optional(throughRef()),
     map: optional(str()),
     onDelete: optional(
       oneOf(
@@ -232,13 +308,14 @@ export type ParsedSqlRelation = {
    */
   readonly referencesInferred?: true;
   /**
-   * The junction model named by `through:` on a navigable list field, used to
-   * recognise the many-to-many via that explicit junction. A bare model
-   * identifier (`through: PostTag`); the qualified relation-field form
-   * (`through: PostTag.post`) is a separate member-access grammar and does not
-   * reach the resolver as a dotted value — only its head identifier survives.
+   * The junction named by `through:` on a navigable list field, used to
+   * recognise the many-to-many via that explicit junction. `junction` is the
+   * head identifier (`through: PostTag`); `field` is the optional
+   * relation-field segment of the qualified form (`through: PostTag.post` ⇒
+   * `field: 'post'`), which pins the parent-side junction FK to disambiguate
+   * self-relations and multiple many-to-many between the same pair of models.
    */
-  readonly through?: string;
+  readonly through?: ParsedThrough;
   readonly map?: string;
   readonly onDelete?: SqlRelationOutput['onDelete'];
   readonly onUpdate?: SqlRelationOutput['onUpdate'];
@@ -506,10 +583,16 @@ function childColumnsInTargetIdOrder(
  * junction-specific diagnostic that is more actionable than the generic
  * orphaned-backrelation message.
  */
-type JunctionNearMiss = {
-  readonly junctionModelName: string;
-  readonly reason: 'id-not-fk-covering' | 'target-fk-not-id';
-};
+type JunctionNearMiss =
+  | {
+      readonly junctionModelName: string;
+      readonly reason: 'id-not-fk-covering' | 'target-fk-not-id';
+    }
+  | {
+      readonly junctionModelName: string;
+      readonly reason: 'through-field-not-fk';
+      readonly throughField: string;
+    };
 
 /**
  * Finds explicit junction models that connect a bare backrelation list field
@@ -518,12 +601,15 @@ type JunctionNearMiss = {
  * one relation to the candidate's target model (the child side). The child
  * FK must reference exactly the target model's id columns; its junction
  * columns are carried in target-id order on the pair. A relation name on the
- * list field pins the parent-side FK relation, which is how self-referential
- * many-to-many sides are disambiguated.
+ * list field, or a `through: Junction.relationField` pin, fixes the parent-side
+ * FK relation, which is how self-referential many-to-many sides and multiple
+ * many-to-many between the same pair of models are disambiguated.
  *
  * Alongside the recognised pairs, returns junction-shaped near-misses (models
  * that link both sides but were declined) so the caller can emit a
  * junction-specific diagnostic instead of the generic orphaned-list message.
+ * A `through:` pin naming a field that is not a parent-side junction FK back to
+ * the candidate is itself reported as a near-miss.
  */
 function findJunctionFkPairs(input: {
   readonly candidate: ModelBackrelationCandidate;
@@ -534,16 +620,36 @@ function findJunctionFkPairs(input: {
   if (!targetIdColumns || targetIdColumns.length === 0) {
     return { pairs: [], nearMisses: [] };
   }
+  const through = input.candidate.through;
   const pairs: JunctionFkPair[] = [];
   const nearMisses: JunctionNearMiss[] = [];
   for (const [junctionModelName, junctionFks] of input.fkRelationsByDeclaringModel) {
     // An explicit `through:` names the junction directly: skip every other
     // junction-shaped model so recognition and near-miss reporting are scoped
     // to the authored junction. A bare list (no `through:`) scans all of them.
-    if (input.candidate.through !== undefined && junctionModelName !== input.candidate.through) {
+    if (through !== undefined && junctionModelName !== through.junction) {
       continue;
     }
     const idColumns = input.modelIdColumns.get(junctionModelName);
+    // A `through: Junction.relationField` pin names a parent-side junction FK by
+    // its relation field. If the named junction has no such FK back to the
+    // candidate, the pin cannot resolve: record it as an actionable near-miss
+    // rather than letting recognition fall into the generic ambiguity path.
+    if (through?.field !== undefined) {
+      const pinnedParentFkExists = junctionFks.some(
+        (fk) =>
+          fk.targetModelName === input.candidate.modelName &&
+          fk.declaringFieldName === through.field,
+      );
+      if (!pinnedParentFkExists) {
+        nearMisses.push({
+          junctionModelName,
+          reason: 'through-field-not-fk',
+          throughField: through.field,
+        });
+        continue;
+      }
+    }
     for (const parentFk of junctionFks) {
       if (parentFk.targetModelName !== input.candidate.modelName) {
         continue;
@@ -552,6 +658,12 @@ function findJunctionFkPairs(input: {
         input.candidate.relationName !== undefined &&
         parentFk.relationName !== input.candidate.relationName
       ) {
+        continue;
+      }
+      // `through: Junction.relationField` pins the parent-side FK to the
+      // junction relation field named, selecting one leg of a self-relation or
+      // of multiple many-to-many between the same pair of models.
+      if (through?.field !== undefined && parentFk.declaringFieldName !== through.field) {
         continue;
       }
       for (const childFk of junctionFks) {
@@ -590,6 +702,15 @@ function junctionNearMissDiagnostic(
     junctionModel: nearMiss.junctionModelName,
     targetModel: candidate.targetModelName,
   };
+  if (nearMiss.reason === 'through-field-not-fk') {
+    return {
+      code: 'PSL_JUNCTION_THROUGH_FIELD_NOT_FK',
+      message: `Backrelation list field "${listField}" pins junction "${nearMiss.junctionModelName}" relation field "${nearMiss.throughField}" via through: ${nearMiss.junctionModelName}.${nearMiss.throughField}, but "${nearMiss.junctionModelName}" has no relation field "${nearMiss.throughField}" with a foreign key back to "${candidate.modelName}". Name a junction relation field whose foreign key references "${candidate.modelName}".`,
+      sourceId,
+      span: candidate.field.span,
+      data: { ...data, throughField: nearMiss.throughField },
+    };
+  }
   if (nearMiss.reason === 'target-fk-not-id') {
     return {
       code: 'PSL_JUNCTION_TARGET_FK_NOT_ID',
