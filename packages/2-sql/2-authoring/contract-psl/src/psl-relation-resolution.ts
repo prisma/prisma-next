@@ -40,6 +40,26 @@ export type ParsedThrough = {
   readonly field?: string;
 };
 
+/**
+ * The four named segments of an arrow-path `through:`, declaring a many-to-many
+ * over a junction that carries scalar columns + `@@id` but no relation fields:
+ * `through: "<localKey> -> <Junction.nearCol> -> <Junction.farCol> -> <targetKey>"`.
+ * Each junction segment is `Model.column`; the local/target keys are bare field
+ * names on the declaring/target models. The two junction segments name the same
+ * junction model (its near + far foreign-key columns), and recognition builds
+ * the `through` descriptor straight from these columns — the relation-field-based
+ * junction recognition cannot fire when the junction declares no relation fields.
+ */
+export type ArrowPath = {
+  readonly localKey: string;
+  readonly nearJunctionModel: string;
+  readonly nearColumn: string;
+  readonly farJunctionModel: string;
+  readonly farColumn: string;
+  readonly targetModel: string;
+  readonly targetKey: string;
+};
+
 export type ParsedRelationAttribute = {
   readonly fields?: readonly string[];
   readonly references?: readonly string[];
@@ -59,6 +79,14 @@ export type ParsedRelationAttribute = {
    * multiple many-to-many between the same pair of models.
    */
   readonly through?: ParsedThrough;
+  /**
+   * The arrow-path named by a quoted `through:` value carrying `->`. Declares a
+   * many-to-many over a junction with scalar columns + `@@id` but no relation
+   * fields; the `through` descriptor is built from the path-named columns
+   * directly. Mutually exclusive with `through` — a `through:` value is either a
+   * junction name/pin or an arrow path, never both.
+   */
+  readonly arrowPath?: ArrowPath;
   /**
    * The FK-side relation field named by `inverse:` on a one-to-many back-relation
    * list field (`posts Post[] @relation(inverse: editor)` ⇒ `inverse: 'editor'`).
@@ -122,6 +150,66 @@ function parseThroughArgument(raw: string): ParsedThrough | undefined {
   return { junction, ...ifDefined('field', field.length > 0 ? field : undefined) };
 }
 
+/** The arrow-path uses a quoted-string `through:` value carrying the `->` separator. */
+function isArrowPathValue(raw: string): boolean {
+  return unquoteStringLiteral(raw).includes('->');
+}
+
+/**
+ * Parses a four-segment arrow-path `through:` value
+ * (`"localKey -> Junction.nearCol -> Junction.farCol -> Target.targetKey"`) into
+ * its named parts. The middle two segments are `Model.column`; the first and
+ * last are bare keys (a leading `Model.` qualifier on them is tolerated and
+ * dropped, like `from:`/`to:`). Returns undefined on the wrong segment count or
+ * a malformed junction segment, which the caller turns into a diagnostic.
+ */
+function parseArrowPath(raw: string): ArrowPath | undefined {
+  const segments = unquoteStringLiteral(raw)
+    .split('->')
+    .map((segment) => segment.trim());
+  if (segments.length !== 4 || segments.some((segment) => segment.length === 0)) {
+    return undefined;
+  }
+  const [localSegment, nearSegment, farSegment, targetSegment] = segments;
+  if (
+    localSegment === undefined ||
+    nearSegment === undefined ||
+    farSegment === undefined ||
+    targetSegment === undefined
+  ) {
+    return undefined;
+  }
+  const near = splitQualifiedColumn(nearSegment);
+  const far = splitQualifiedColumn(farSegment);
+  const target = splitQualifiedColumn(targetSegment);
+  if (!near || !far || !target) {
+    return undefined;
+  }
+  return {
+    localKey: stripModelQualifier(localSegment),
+    nearJunctionModel: near.model,
+    nearColumn: near.column,
+    farJunctionModel: far.model,
+    farColumn: far.column,
+    targetModel: target.model,
+    targetKey: target.column,
+  };
+}
+
+/** Splits a `Model.column` arrow segment; returns undefined unless both parts are present. */
+function splitQualifiedColumn(segment: string): { model: string; column: string } | undefined {
+  const dotIndex = segment.indexOf('.');
+  if (dotIndex === -1) {
+    return undefined;
+  }
+  const model = segment.slice(0, dotIndex).trim();
+  const column = segment.slice(dotIndex + 1).trim();
+  if (model.length === 0 || column.length === 0 || column.includes('.')) {
+    return undefined;
+  }
+  return { model, column };
+}
+
 export type FkRelationMetadata = {
   readonly declaringModelName: string;
   readonly declaringFieldName: string;
@@ -149,6 +237,14 @@ export type ModelBackrelationCandidate = {
    * self-relations and multiple many-to-many between the same pair of models.
    */
   readonly through?: ParsedThrough;
+  /**
+   * The arrow-path named by a quoted `through:` value carrying `->`. When
+   * present, many-to-many recognition builds the `through` descriptor straight
+   * from the path-named columns rather than scanning relation-field-based
+   * junction foreign keys, which the junction (declaring no relation fields)
+   * does not carry.
+   */
+  readonly arrowPath?: ArrowPath;
   /**
    * The FK-side relation field named by `inverse:` on a one-to-many back-relation
    * list field. When present, FK-side matching pins the back-relation to the FK
@@ -333,13 +429,29 @@ export function parseRelationAttribute(input: {
     }
   }
 
-  // `through:` names the junction for a navigable many-to-many list field. The
-  // junction is the head of the value: a bare `through: PostTag` names the
-  // junction alone, while a qualified `through: PostTag.post` additionally pins
-  // the parent-side junction FK by its relation field. The junction is the
-  // segment before the first `.`; the optional `field` is the segment after.
+  // `through:` names the junction for a navigable many-to-many list field. A
+  // quoted value carrying `->` is the arrow-path form, declaring the M:N over a
+  // junction with no relation fields by naming its columns directly. Otherwise
+  // the junction is the head of a bare value: `through: PostTag` names the
+  // junction alone, `through: PostTag.post` additionally pins the parent-side
+  // junction FK by its relation field.
   const throughRaw = getNamedArgument(input.attribute, 'through');
-  const through = throughRaw ? parseThroughArgument(throughRaw) : undefined;
+  let through: ParsedThrough | undefined;
+  let arrowPath: ArrowPath | undefined;
+  if (throughRaw !== undefined && isArrowPathValue(throughRaw)) {
+    arrowPath = parseArrowPath(throughRaw);
+    if (!arrowPath) {
+      input.diagnostics.push({
+        code: 'PSL_ARROW_PATH_MALFORMED',
+        message: `Relation field "${input.modelName}.${input.fieldName}" has a malformed arrow-path through:; expected "localKey -> Junction.nearColumn -> Junction.farColumn -> Target.targetKey".`,
+        sourceId: input.sourceId,
+        span: input.attribute.span,
+      });
+      return undefined;
+    }
+  } else {
+    through = throughRaw ? parseThroughArgument(throughRaw) : undefined;
+  }
 
   // `inverse:` names the owning FK-side relation field for a one-to-many
   // back-relation: a bare relation-field name (no member-access grammar). It
@@ -356,6 +468,7 @@ export function parseRelationAttribute(input: {
     ...ifDefined('references', references),
     ...ifDefined('referencesInferred', referencesInferred),
     ...ifDefined('through', through),
+    ...ifDefined('arrowPath', arrowPath),
     ...ifDefined('inverse', inverse !== undefined && inverse.length > 0 ? inverse : undefined),
     ...ifDefined('constraintName', constraintName),
     ...ifDefined('onDelete', onDeleteArgument ? unquoteStringLiteral(onDeleteArgument) : undefined),
@@ -674,6 +787,46 @@ function manyToManyRelationNode(
   };
 }
 
+/**
+ * Builds the N:M relation node for one navigable end declared with an arrow
+ * path. The columns are resolved straight from the path's named segments rather
+ * than from junction foreign keys: `parentColumns`/`on.parentColumns` walk the
+ * declaring model's local key, the junction's near column carries the parent
+ * leg of the join, and the far column carries the child leg to the target.
+ * `targetColumns` is filled downstream by the contract assembler from the
+ * target model's id.
+ */
+function arrowPathManyToManyRelationNode(input: {
+  readonly candidate: ModelBackrelationCandidate;
+  readonly targetTableName: string;
+  readonly targetNamespaceId?: string;
+  readonly junctionTableName: string;
+  readonly junctionNamespaceId?: string;
+  readonly localColumns: readonly string[];
+  readonly nearColumn: string;
+  readonly farColumn: string;
+}): ModelRelationMetadata {
+  return {
+    fieldName: input.candidate.field.name,
+    toModel: input.candidate.targetModelName,
+    toTable: input.targetTableName,
+    ...ifDefined('toNamespaceId', input.targetNamespaceId),
+    cardinality: 'N:M',
+    on: {
+      parentTable: input.candidate.tableName,
+      parentColumns: input.localColumns,
+      childTable: input.junctionTableName,
+      childColumns: [input.nearColumn],
+    },
+    through: {
+      table: input.junctionTableName,
+      ...ifDefined('namespaceId', input.junctionNamespaceId),
+      parentColumns: [input.nearColumn],
+      childColumns: [input.farColumn],
+    },
+  };
+}
+
 function oneToManyRelationNode(
   candidate: ModelBackrelationCandidate,
   matched: FkRelationMetadata,
@@ -778,11 +931,180 @@ function synthesizedManyToManyRelationNode(input: {
   };
 }
 
+/**
+ * Resolves an arrow-path `through:` to its N:M relation node by validating the
+ * path against the declared models' columns and building the `through`
+ * descriptor straight from the named columns. The relation-field-based junction
+ * recognition cannot fire here — the junction declares no relation fields — so
+ * this path reads the junction's near/far foreign-key columns by name.
+ *
+ * Validates: the two junction segments name the same declared model; that model
+ * carries both named columns as two distinct columns; the declaring model
+ * carries the local key; the target model is the candidate's target and carries
+ * the target key. Each failure pushes an actionable diagnostic and returns
+ * undefined so the candidate is skipped rather than mis-lowered.
+ */
+function resolveArrowPathManyToMany(input: {
+  readonly candidate: ModelBackrelationCandidate;
+  readonly arrowPath: ArrowPath;
+  readonly modelFieldColumns: ReadonlyMap<string, ReadonlyMap<string, string>>;
+  readonly modelTableNames: ReadonlyMap<string, string>;
+  readonly modelNamespaceIds: ReadonlyMap<string, string>;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+}): ModelRelationMetadata | undefined {
+  const { candidate, arrowPath } = input;
+  const listField = `${candidate.modelName}.${candidate.field.name}`;
+  const span = candidate.field.span;
+
+  // The two junction segments must name one and the same junction model — a
+  // junction is a single table, so near and far columns live on it together.
+  if (arrowPath.nearJunctionModel !== arrowPath.farJunctionModel) {
+    input.diagnostics.push({
+      code: 'PSL_ARROW_PATH_JUNCTION_MISMATCH',
+      message: `Arrow-path through: on "${listField}" names two different junction models "${arrowPath.nearJunctionModel}" and "${arrowPath.farJunctionModel}". Both junction columns must live on the same junction model.`,
+      sourceId: input.sourceId,
+      span,
+      data: {
+        listField,
+        nearJunctionModel: arrowPath.nearJunctionModel,
+        farJunctionModel: arrowPath.farJunctionModel,
+      },
+    });
+    return undefined;
+  }
+  const junctionModel = arrowPath.nearJunctionModel;
+
+  const junctionColumns = input.modelFieldColumns.get(junctionModel);
+  if (!junctionColumns) {
+    input.diagnostics.push({
+      code: 'PSL_ARROW_PATH_JUNCTION_NOT_MODEL',
+      message: `Arrow-path through: on "${listField}" names junction "${junctionModel}", which is not a declared model. Declare a junction model with the near and far columns and an @@id over them.`,
+      sourceId: input.sourceId,
+      span,
+      data: { listField, junctionModel },
+    });
+    return undefined;
+  }
+
+  // The target segment must name the candidate's target model; the contract's
+  // navigable list field already fixes the target by its element type.
+  if (arrowPath.targetModel !== candidate.targetModelName) {
+    input.diagnostics.push({
+      code: 'PSL_ARROW_PATH_TARGET_MISMATCH',
+      message: `Arrow-path through: on "${listField}" names target model "${arrowPath.targetModel}", but the list field's type is "${candidate.targetModelName}". The arrow-path target must match the list field's element type.`,
+      sourceId: input.sourceId,
+      span,
+      data: {
+        listField,
+        arrowTarget: arrowPath.targetModel,
+        fieldTarget: candidate.targetModelName,
+      },
+    });
+    return undefined;
+  }
+
+  const localColumn = resolveArrowColumn({
+    model: candidate.modelName,
+    field: arrowPath.localKey,
+    columns: input.modelFieldColumns.get(candidate.modelName),
+    listField,
+    span,
+    diagnostics: input.diagnostics,
+    sourceId: input.sourceId,
+  });
+  const nearColumn = resolveArrowColumn({
+    model: junctionModel,
+    field: arrowPath.nearColumn,
+    columns: junctionColumns,
+    listField,
+    span,
+    diagnostics: input.diagnostics,
+    sourceId: input.sourceId,
+  });
+  const farColumn = resolveArrowColumn({
+    model: junctionModel,
+    field: arrowPath.farColumn,
+    columns: junctionColumns,
+    listField,
+    span,
+    diagnostics: input.diagnostics,
+    sourceId: input.sourceId,
+  });
+  const targetColumn = resolveArrowColumn({
+    model: candidate.targetModelName,
+    field: arrowPath.targetKey,
+    columns: input.modelFieldColumns.get(candidate.targetModelName),
+    listField,
+    span,
+    diagnostics: input.diagnostics,
+    sourceId: input.sourceId,
+  });
+  if (
+    localColumn === undefined ||
+    nearColumn === undefined ||
+    farColumn === undefined ||
+    targetColumn === undefined
+  ) {
+    return undefined;
+  }
+
+  // The near and far columns must be two distinct junction columns: a junction
+  // joins two sides, and a single shared column cannot carry both legs.
+  if (nearColumn === farColumn) {
+    input.diagnostics.push({
+      code: 'PSL_ARROW_PATH_JUNCTION_MISMATCH',
+      message: `Arrow-path through: on "${listField}" uses the same junction column "${nearColumn}" for both the near and far side. The two junction columns must be distinct.`,
+      sourceId: input.sourceId,
+      span,
+      data: { listField, junctionModel, column: nearColumn },
+    });
+    return undefined;
+  }
+
+  return arrowPathManyToManyRelationNode({
+    candidate,
+    targetTableName:
+      input.modelTableNames.get(candidate.targetModelName) ?? candidate.targetModelName,
+    ...ifDefined('targetNamespaceId', input.modelNamespaceIds.get(candidate.targetModelName)),
+    junctionTableName: input.modelTableNames.get(junctionModel) ?? junctionModel,
+    ...ifDefined('junctionNamespaceId', input.modelNamespaceIds.get(junctionModel)),
+    localColumns: [localColumn],
+    nearColumn,
+    farColumn,
+  });
+}
+
+/** Resolves one arrow-path field name to its storage column, diagnosing an unknown column. */
+function resolveArrowColumn(input: {
+  readonly model: string;
+  readonly field: string;
+  readonly columns: ReadonlyMap<string, string> | undefined;
+  readonly listField: string;
+  readonly span: PslSpan;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+}): string | undefined {
+  const column = input.columns?.get(input.field);
+  if (column === undefined) {
+    input.diagnostics.push({
+      code: 'PSL_ARROW_PATH_COLUMN_NOT_FOUND',
+      message: `Arrow-path through: on "${input.listField}" names "${input.model}.${input.field}", but "${input.model}" has no such field.`,
+      sourceId: input.sourceId,
+      span: input.span,
+      data: { listField: input.listField, model: input.model, field: input.field },
+    });
+    return undefined;
+  }
+  return column;
+}
+
 export function applyBackrelationCandidates(input: {
   readonly backrelationCandidates: readonly ModelBackrelationCandidate[];
   readonly fkRelationsByPair: Map<string, readonly FkRelationMetadata[]>;
   readonly fkRelationsByDeclaringModel: ReadonlyMap<string, readonly FkRelationMetadata[]>;
   readonly modelIdColumns: ReadonlyMap<string, readonly string[]>;
+  readonly modelFieldColumns: ReadonlyMap<string, ReadonlyMap<string, string>>;
   readonly modelTableNames: ReadonlyMap<string, string>;
   readonly modelNamespaceIds: ReadonlyMap<string, string>;
   readonly declaredTableNames: ReadonlySet<string>;
@@ -797,6 +1119,25 @@ export function applyBackrelationCandidates(input: {
   const orphanedEnds: ModelBackrelationCandidate[] = [];
 
   for (const candidate of input.backrelationCandidates) {
+    // An arrow-path `through:` declares the many-to-many over a junction with no
+    // relation fields by naming its columns directly, so it resolves from the
+    // path columns rather than the relation-field-based junction recognition.
+    if (candidate.arrowPath !== undefined) {
+      const arrowRelation = resolveArrowPathManyToMany({
+        candidate,
+        arrowPath: candidate.arrowPath,
+        modelFieldColumns: input.modelFieldColumns,
+        modelTableNames: input.modelTableNames,
+        modelNamespaceIds: input.modelNamespaceIds,
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+      });
+      if (arrowRelation) {
+        relationsForModel(input.modelRelations, candidate.modelName).push(arrowRelation);
+      }
+      continue;
+    }
+
     const pairKey = fkRelationPairKey(candidate.targetModelName, candidate.modelName);
     const pairMatches = input.fkRelationsByPair.get(pairKey) ?? [];
 
