@@ -1,5 +1,7 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import type { CapabilityMatrix } from '../shared/capabilities';
+import { mergeCapabilityMatrices } from '../shared/capabilities';
 import type { Codec } from '../shared/codec';
 import type { AnyCodecDescriptor } from '../shared/codec-descriptor';
 import type { CodecLookup, CodecMeta, CodecRef, CodecRegistry } from '../shared/codec-types';
@@ -62,6 +64,14 @@ export interface ControlStack<
   readonly authoringContributions: AssembledAuthoringContributions;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly controlMutationDefaults: ControlMutationDefaults;
+  /**
+   * Merged capability matrix folded from the `[target, adapter, ...extensionPacks]`
+   * descriptors — the same merge `enrichContract` performs at emit time. Authoring
+   * paths read this to gate features (e.g. scalar lists) before the contract is
+   * produced, so an unsupported construct is rejected with a diagnostic rather than
+   * silently emitted.
+   */
+  readonly capabilities: CapabilityMatrix;
 }
 
 export interface CreateControlStackInput<
@@ -522,5 +532,10 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     authoringContributions: assembleAuthoringContributions(allDescriptors),
     scalarTypeDescriptors,
     controlMutationDefaults: assembleControlMutationDefaults(allDescriptors),
+    capabilities: mergeCapabilityMatrices({}, [
+      target,
+      ...(adapter ? [adapter] : []),
+      ...orderedExtensionPacks,
+    ]),
   };
 }

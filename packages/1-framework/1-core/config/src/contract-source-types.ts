@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { CapabilityMatrix } from '@prisma-next/framework-components/components';
 import type {
   AssembledAuthoringContributions,
   ControlMutationDefaults,
@@ -45,6 +46,13 @@ export interface ContractSourceContext {
   readonly codecLookup: CodecLookup;
   readonly controlMutationDefaults: ControlMutationDefaults;
   readonly resolvedInputs: readonly string[];
+  /**
+   * Merged capability matrix from the control stack's `[target, adapter, ...extensionPacks]`
+   * descriptors — the same merge `enrichContract` performs at emit time. Optional so
+   * non-adapter authoring paths (tests, bespoke providers) may omit it; an absent matrix
+   * means "do not gate". The CLI emit path always populates it.
+   */
+  readonly capabilities?: CapabilityMatrix;
 }
 
 /** Lets format-aware tooling avoid file-extension sniffing and opaque loader introspection. */
