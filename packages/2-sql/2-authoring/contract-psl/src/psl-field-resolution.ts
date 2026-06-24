@@ -5,6 +5,7 @@ import type {
   ExecutionMutationDefaultPhases,
 } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import type { CapabilityMatrix } from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
@@ -147,6 +148,12 @@ export interface CollectResolvedFieldsInput {
   readonly sourceId: string;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
+  /**
+   * Merged adapter capability matrix. When present, a scalar list field whose
+   * target does not report `sql.scalarList` is rejected with
+   * `PSL_SCALAR_LIST_UNSUPPORTED_TARGET`. Absent means "do not gate".
+   */
+  readonly capabilities?: CapabilityMatrix;
 }
 
 const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
@@ -297,6 +304,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     sourceId,
     scalarTypeDescriptors,
     enumHandles,
+    capabilities,
   } = input;
   const resolvedFields: ResolvedField[] = [];
 
@@ -352,6 +360,19 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     if (isValueObjectField) {
       descriptor = scalarTypeDescriptors.get('Json');
     } else if (isListField) {
+      // Scalar lists lower to a native array storage column; gate them on the
+      // adapter-reported `sql.scalarList` capability. An absent matrix means the
+      // authoring path did not thread capabilities (e.g. a bespoke provider), so
+      // do not gate. A present matrix that omits the capability (SQLite) rejects.
+      if (capabilities !== undefined && capabilities['sql']?.['scalarList'] !== true) {
+        diagnostics.push({
+          code: 'PSL_SCALAR_LIST_UNSUPPORTED_TARGET',
+          message: `Field "${model.name}.${field.name}" is a scalar list, but target "${targetId}" does not support scalar lists (the adapter does not report the "scalarList" capability). Remove the list or author it against a target that supports scalar lists.`,
+          sourceId,
+          span: field.span,
+        });
+        continue;
+      }
       const resolved = resolveFieldTypeDescriptor(resolveInput);
       if (!resolved.ok) {
         if (!resolved.alreadyReported) {

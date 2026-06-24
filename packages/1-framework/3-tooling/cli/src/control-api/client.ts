@@ -631,6 +631,7 @@ class ControlClientImpl implements ControlClient {
         codecLookup: stack.codecLookup,
         controlMutationDefaults: stack.controlMutationDefaults,
         resolvedInputs: contractConfig.source.inputs ?? [],
+        capabilities: stack.capabilities,
       };
       const providerResult = await contractConfig.source.load(sourceContext);
       if (!providerResult.ok) {
