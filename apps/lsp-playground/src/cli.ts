@@ -9,7 +9,7 @@ import { generateDefaultPostgresConfig, PLAYGROUND_DIR } from './default-config'
 import { findNearestConfig } from './find-config';
 
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const PORT = 5290;
+const PORT = 5295;
 const LSP_PATH = '/psl';
 
 async function fileExists(path: string): Promise<boolean> {

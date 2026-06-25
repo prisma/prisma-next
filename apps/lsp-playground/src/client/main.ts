@@ -71,12 +71,7 @@ async function main(): Promise<void> {
     },
     userConfiguration: {
       json: JSON.stringify({
-        'workbench.colorTheme': 'Default Dark Modern',
         'editor.wordBasedSuggestions': 'off',
-        'editor.minimap.enabled': false,
-        'editor.folding': true,
-        'editor.foldingStrategy': 'auto',
-        'editor.showFoldingControls': 'always',
       }),
     },
     monacoWorkerFactory: configureWorkerFactory,
@@ -117,6 +112,16 @@ async function main(): Promise<void> {
         text: schemaText,
         uri: fileUri.path,
       },
+    },
+    editorOptions: {
+      theme: 'vs-dark',
+      fontSize: 16,
+      lineHeight: 24,
+      fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", Menlo, Monaco, monospace',
+      minimap: { enabled: false },
+      folding: true,
+      foldingStrategy: 'auto',
+      showFoldingControls: 'always',
     },
     languageDef: {
       languageExtensionConfig: {
