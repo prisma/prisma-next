@@ -29,4 +29,13 @@ authoring feature. The only `packages/3-extensions/` touches are the re-emitted
 contract shape) and the `supabase/test/supabase-bootstrap.ts` test helper. No
 extension-author API changed — the framework SPI is unchanged and re-emit
 absorbs the contract shape. Incidental substrate diff only.
+
+TML-2931 (entity-kind-migration-seam): implements the entity-kind seam for
+schema diffing and provenance-symmetric RLS diff. The `packages/3-extensions/`
+touches are test updates in `pgvector/test/migrations/` (planner fixtures
+converted to `PostgresSchemaIR`) and `pgvector/test/descriptor.test.ts`
+(contract shape updated to remove `__unbound__` namespace and adjust
+`FieldOutputTypes`/`FieldInputTypes` to namespace-keyed form; precheck/postcheck
+SQL assertions updated for parameterised queries). No extension-author API
+changed. Incidental substrate diff only.
 -->
