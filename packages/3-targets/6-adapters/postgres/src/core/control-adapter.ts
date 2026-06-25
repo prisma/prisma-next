@@ -128,7 +128,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   ): readonly SchemaDiffIssue[] {
     if (!isPostgresSchemaIR(schema)) {
       throw new Error(
-        `RLS verification requires a PostgresSchemaIR; got ${(schema as { constructor?: { name?: string } }).constructor?.name ?? typeof schema}`,
+        `Postgres schema diff requires a PostgresSchemaIR; got ${(schema as { constructor?: { name?: string } }).constructor?.name ?? typeof schema}`,
       );
     }
     return diffPostgresSchema({ contract, schema });

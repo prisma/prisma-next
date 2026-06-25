@@ -31,7 +31,7 @@ export interface DiffableNode extends DiffableRoot {
   isEqualTo(other: DiffableNode): boolean;
 }
 
-/** Canonical string key for a coordinate. Uses pipe-separated fields so null bytes cannot appear. */
+/** Canonical string key for a coordinate — the differ keys its alignment maps on this. */
 function stableKey(c: EntityCoordinate): string {
   return `${c.plane}|${c.namespaceId}|${c.entityKind}|${c.entityName}`;
 }
