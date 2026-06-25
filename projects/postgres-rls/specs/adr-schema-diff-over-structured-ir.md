@@ -21,9 +21,11 @@ interface DiffableNode {
 It pairs the children of a matched node by `coord()`, recurses, and emits one issue per disagreement:
 
 ```ts
-const issues: readonly SchemaDiffIssue[] = diffSchema(expected, actual);
+const issues: readonly SchemaDiffIssue[] = diffSchemas(expected, actual);
 // SchemaDiffIssue = { coordinate, outcome }   outcome: 'missing' | 'extra' | 'mismatch'
 ```
+
+`coord()` must be unique among the sibling nodes aligned at a level: the differ keys on it and treats a collision as the same entity (now enforced by a duplicate-key throw). A node kind whose natural key is unique only within its parent — a column, unique only within its table — must fold its parent into the coordinate.
 
 - **missing** — in expected, not in actual.
 - **extra** — in actual, not in expected.
