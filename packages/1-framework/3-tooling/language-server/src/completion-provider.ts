@@ -1,10 +1,20 @@
-import type { NamespaceSymbol, SymbolTable } from '@prisma-next/psl-parser';
+import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
+import {
+  findBlockDescriptor,
+  type NamespaceSymbol,
+  type SymbolTable,
+} from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import { type CompletionItem, CompletionItemKind } from 'vscode-languageserver';
-import type { ModelFieldTypeCompletionContext, PslCompletionContext } from './completion-context';
+import type {
+  GenericBlockParameterCompletionContext,
+  ModelFieldTypeCompletionContext,
+  PslCompletionContext,
+} from './completion-context';
 
 export interface PslCompletionCandidateSource {
   readonly scalarTypes: readonly string[];
+  readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
   readonly symbolTable?: SymbolTable;
 }
 
@@ -48,7 +58,46 @@ export function providePslCompletionItems(
   if (input.context.kind === 'unsupported') {
     return [];
   }
+  if (input.context.kind === 'genericBlockParameter') {
+    return provideGenericBlockParameterCompletionItems(
+      input.context,
+      input.sourceFile,
+      input.candidates,
+    );
+  }
   return provideModelFieldTypeCompletionItems(input.context, input.sourceFile, input.candidates);
+}
+
+function provideGenericBlockParameterCompletionItems(
+  context: GenericBlockParameterCompletionContext,
+  sourceFile: SourceFile,
+  source: PslCompletionCandidateSource,
+): readonly CompletionItem[] {
+  const descriptor = findBlockDescriptor(source.pslBlockDescriptors, context.blockKeyword);
+  if (descriptor === undefined) {
+    return [];
+  }
+
+  const existing = new Set(context.existingParameterNames);
+  const replacementRange = {
+    start: sourceFile.positionAt(context.replacementStartOffset),
+    end: sourceFile.positionAt(context.offset),
+  };
+
+  return Object.keys(descriptor.parameters)
+    .filter((parameterName) => !existing.has(parameterName))
+    .filter((parameterName) => parameterName.startsWith(context.prefix))
+    .map((parameterName, index) => ({
+      label: parameterName,
+      kind: CompletionItemKind.Property,
+      detail: 'Generic block parameter',
+      sortText: genericBlockParameterSortText(index, parameterName),
+      filterText: parameterName,
+      textEdit: {
+        range: replacementRange,
+        newText: parameterName,
+      },
+    }));
 }
 
 function provideModelFieldTypeCompletionItems(
@@ -244,6 +293,10 @@ function sortedUnique(names: readonly string[]): readonly string[] {
 
 function sortText(candidate: ModelTypeCompletionCandidate): string {
   return `${categoryOrder[candidate.category]}:${candidate.label}`;
+}
+
+function genericBlockParameterSortText(index: number, label: string): string {
+  return `${index.toString().padStart(4, '0')}:${label}`;
 }
 
 function compareNames(left: string, right: string): number {

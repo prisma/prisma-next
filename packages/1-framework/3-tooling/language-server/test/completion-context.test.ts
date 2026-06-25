@@ -120,13 +120,28 @@ describe('classifyPslCompletionContext', () => {
     });
   });
 
-  it('returns unsupported inside generic block contexts', () => {
-    expect(classify(['datasource db {', '  provider = |', '}'].join('\n'))).toMatchObject({
-      kind: 'unsupported',
-      reason: 'genericBlock',
+  it('classifies blank generic block parameter positions', () => {
+    expect(classify(['policy UserAccess {', '  |', '}'].join('\n'))).toMatchObject({
+      kind: 'genericBlockParameter',
+      blockKeyword: 'policy',
+      prefix: '',
+      existingParameterNames: [],
     });
+  });
 
-    expect(classify(['generator client {', '  prov|', '}'].join('\n'))).toMatchObject({
+  it('classifies generic block parameter prefixes and records sibling keys', () => {
+    expect(classify(['policy UserAccess {', '  on = User', '  wh|', '}'].join('\n'))).toMatchObject(
+      {
+        kind: 'genericBlockParameter',
+        blockKeyword: 'policy',
+        prefix: 'wh',
+        existingParameterNames: ['on'],
+      },
+    );
+  });
+
+  it('returns unsupported inside generic block parameter values', () => {
+    expect(classify(['datasource db {', '  provider = |', '}'].join('\n'))).toMatchObject({
       kind: 'unsupported',
       reason: 'genericBlock',
     });

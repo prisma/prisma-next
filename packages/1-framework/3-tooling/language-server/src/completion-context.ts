@@ -46,6 +46,15 @@ export interface ModelFieldTypeCompletionContext {
   readonly prefix: TypeNamePrefix;
 }
 
+export interface GenericBlockParameterCompletionContext {
+  readonly kind: 'genericBlockParameter';
+  readonly offset: number;
+  readonly blockKeyword: string;
+  readonly prefix: string;
+  readonly replacementStartOffset: number;
+  readonly existingParameterNames: readonly string[];
+}
+
 export interface UnsupportedPslCompletionContext {
   readonly kind: 'unsupported';
   readonly offset: number;
@@ -53,6 +62,7 @@ export interface UnsupportedPslCompletionContext {
 }
 
 export type PslCompletionContext =
+  | GenericBlockParameterCompletionContext
   | ModelFieldTypeCompletionContext
   | UnsupportedPslCompletionContext;
 
@@ -81,6 +91,16 @@ export function classifyPslCompletionContext(
   const ancestorReason = unsupportedAncestorReason(contextNode);
   if (ancestorReason !== undefined) {
     return unsupported(offset, ancestorReason);
+  }
+
+  const genericBlockContext = classifyGenericBlockParameter({
+    node: contextNode,
+    offset,
+    sourceFile: input.sourceFile,
+    tokenContext,
+  });
+  if (genericBlockContext !== undefined) {
+    return genericBlockContext;
   }
 
   const field = closestAst(contextNode, FieldDeclarationAst.cast);
@@ -169,6 +189,136 @@ function modelFieldType(
   return { kind: 'modelFieldType', offset, fieldName, prefix };
 }
 
+function classifyGenericBlockParameter(input: {
+  readonly node: SyntaxNode | undefined;
+  readonly offset: number;
+  readonly sourceFile: SourceFile;
+  readonly tokenContext: TokenContext;
+}): PslCompletionContext | undefined {
+  const block = closestAst(input.node, GenericBlockDeclarationAst.cast);
+  if (block === undefined) {
+    return undefined;
+  }
+
+  const lbrace = firstTokenOfKind(block.syntax, 'LBrace');
+  if (lbrace === undefined || input.offset < lbrace.offset + lbrace.text.length) {
+    return unsupported(input.offset, 'genericBlock');
+  }
+
+  const rbrace = firstTokenOfKind(block.syntax, 'RBrace');
+  if (rbrace !== undefined && input.offset > rbrace.offset) {
+    return unsupported(input.offset, 'genericBlock');
+  }
+
+  const field = closestAst(input.node, FieldDeclarationAst.cast);
+  if (field !== undefined && containsOffset(field.syntax, input.offset)) {
+    return unsupported(input.offset, 'genericBlock');
+  }
+
+  if (input.tokenContext.previousSignificant?.kind === 'Equals') {
+    return unsupported(input.offset, 'genericBlock');
+  }
+
+  const keyword = block.keyword()?.text;
+  if (keyword === undefined || keyword.length === 0) {
+    return unsupported(input.offset, 'genericBlock');
+  }
+
+  const activePair = activeKeyValuePair(input.node, input.offset);
+  if (activePair !== undefined && isAfterEquals(activePair, input.offset)) {
+    return unsupported(input.offset, 'genericBlock');
+  }
+
+  const prefix = genericBlockParameterPrefix(activePair, input.offset, input.sourceFile.text);
+  if (prefix === undefined) {
+    return unsupported(input.offset, 'genericBlock');
+  }
+
+  return {
+    kind: 'genericBlockParameter',
+    offset: input.offset,
+    blockKeyword: keyword,
+    prefix: prefix.text,
+    replacementStartOffset: prefix.replacementStartOffset,
+    existingParameterNames: existingParameterNames(block, activePair),
+  };
+}
+
+function activeKeyValuePair(
+  node: SyntaxNode | undefined,
+  offset: number,
+): KeyValuePairAst | undefined {
+  const pair = closestAst(node, KeyValuePairAst.cast);
+  if (pair === undefined || !containsOffset(pair.syntax, offset)) {
+    return undefined;
+  }
+  return pair;
+}
+
+function isAfterEquals(pair: KeyValuePairAst, offset: number): boolean {
+  const equals = firstTokenOfKind(pair.syntax, 'Equals');
+  return equals !== undefined && offset > equals.offset;
+}
+
+function genericBlockParameterPrefix(
+  pair: KeyValuePairAst | undefined,
+  offset: number,
+  source: string,
+): { readonly text: string; readonly replacementStartOffset: number } | undefined {
+  if (pair === undefined) {
+    return { text: '', replacementStartOffset: offset };
+  }
+
+  const key = pair.key();
+  if (key === undefined) {
+    return { text: '', replacementStartOffset: offset };
+  }
+
+  const keyStart = key.syntax.offset;
+  const keyEnd = endOffset(key.syntax);
+  if (offset < keyStart) {
+    return { text: '', replacementStartOffset: offset };
+  }
+  if (offset <= keyEnd) {
+    return { text: source.slice(keyStart, offset), replacementStartOffset: keyStart };
+  }
+  const equals = firstTokenOfKind(pair.syntax, 'Equals');
+  if (equals === undefined || offset <= equals.offset) {
+    return { text: source.slice(keyStart, keyEnd), replacementStartOffset: keyStart };
+  }
+  return undefined;
+}
+
+function existingParameterNames(
+  block: GenericBlockDeclarationAst,
+  activePair: KeyValuePairAst | undefined,
+): readonly string[] {
+  const names: string[] = [];
+  for (const entry of block.entries()) {
+    if (activePair !== undefined && sameSpan(entry.syntax, activePair.syntax)) {
+      continue;
+    }
+    const name = entry.key()?.name();
+    if (name !== undefined) {
+      names.push(name);
+    }
+  }
+  return names;
+}
+
+function sameSpan(left: SyntaxNode, right: SyntaxNode): boolean {
+  return left.offset === right.offset && left.textLength === right.textLength;
+}
+
+function firstTokenOfKind(node: SyntaxNode, kind: SyntaxToken['kind']): SyntaxToken | undefined {
+  for (const token of node.tokens()) {
+    if (token.kind === kind) {
+      return token;
+    }
+  }
+  return undefined;
+}
+
 function unsupported(
   offset: number,
   reason: UnsupportedPslCompletionReason,
@@ -190,12 +340,6 @@ function unsupportedAncestorReason(
     closestAst(node, ModelAttributeAst.cast) !== undefined
   ) {
     return 'attribute';
-  }
-  if (
-    closestAst(node, GenericBlockDeclarationAst.cast) !== undefined ||
-    closestAst(node, KeyValuePairAst.cast) !== undefined
-  ) {
-    return 'genericBlock';
   }
   return undefined;
 }
