@@ -18,23 +18,19 @@ import { documentUri, rootUri, schemaPath, schemaText, wsPath } from './runtime'
 
 const LANGUAGE_ID = 'prisma';
 
-// Display schema path in header
 const pathEl = document.getElementById('schema-path');
 if (pathEl !== null) {
   pathEl.textContent = schemaPath;
 }
 
-// Configure Monaco workers for classic mode (no TextMate/extension host)
 function configureWorkerFactory(logger?: ILogger): void {
   const workerLoaders = defineDefaultWorkerLoaders();
-  // Remove workers not needed for classic mode
   workerLoaders['TextMateWorker'] = undefined;
   workerLoaders['extensionHostWorkerMain'] = undefined;
   const config = logger !== undefined ? { workerLoaders, logger } : { workerLoaders };
   useWorkerFactory(config);
 }
 
-// Build WebSocket URL from page origin
 function buildWebSocketUrl(): string {
   const host = `${window.location.host}${wsPath}`;
   // nosemgrep: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket -- localhost dev playground; scheme mirrors page origin
@@ -52,13 +48,11 @@ async function main(): Promise<void> {
     throw new Error('#format-document button not found');
   }
 
-  // Register the schema file in a virtual file system so Monaco can open it
   const fileUri = vscode.Uri.parse(documentUri);
   const fileSystemProvider = new RegisteredFileSystemProvider(false);
   fileSystemProvider.registerFile(new RegisteredMemoryFile(fileUri, schemaText));
   registerFileSystemOverlay(1, fileSystemProvider);
 
-  // Configure monaco-vscode-api (classic mode, no full VS Code extensions)
   const vscodeApiConfig: MonacoVscodeApiConfig = {
     $type: 'classic',
     viewsConfig: {
@@ -77,7 +71,6 @@ async function main(): Promise<void> {
     monacoWorkerFactory: configureWorkerFactory,
   };
 
-  // Configure connection to language server via WebSocket
   const wsUrl = buildWebSocketUrl();
   const languageClientConfig: LanguageClientConfig = {
     languageId: LANGUAGE_ID,
@@ -105,7 +98,6 @@ async function main(): Promise<void> {
     },
   };
 
-  // Configure the editor with the schema content
   const editorAppConfig: EditorAppConfig = {
     codeResources: {
       modified: {
@@ -132,22 +124,17 @@ async function main(): Promise<void> {
     },
   };
 
-  // Start monaco-vscode-api first (must happen once per page lifecycle)
   const apiWrapper = new MonacoVscodeApiWrapper(vscodeApiConfig);
   await apiWrapper.start();
 
-  // Create and start the editor
   const editorApp = new EditorApp(editorAppConfig);
   await editorApp.start(htmlContainer);
 
-  // Create and start the language client
   const languageClientWrapper = new LanguageClientWrapper(languageClientConfig);
   await languageClientWrapper.start();
 
-  // Open the document so the language server sees it
   await vscode.workspace.openTextDocument(fileUri);
 
-  // Wire up the format button to Monaco's format action
   formatButton.addEventListener('click', async () => {
     await vscode.commands.executeCommand('editor.action.formatDocument');
   });
