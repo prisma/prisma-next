@@ -1,3 +1,4 @@
+import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
@@ -5,6 +6,21 @@ import { classifyPslCompletionContext } from '../src/completion-context';
 import { providePslCompletionItems } from '../src/completion-provider';
 
 const scalarTypes = ['String', 'Int', 'Boolean', 'DateTime'] as const;
+
+const pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace = {
+  policy: {
+    kind: 'pslBlock',
+    keyword: 'policy',
+    discriminator: 'fixture-policy',
+    name: { required: true },
+    parameters: {
+      on: { kind: 'ref', refKind: 'model', scope: 'same-space' },
+      where: { kind: 'value', codecId: 'fixture/text@1' },
+      mode: { kind: 'option', values: ['permissive', 'restrictive'] },
+      using: { kind: 'value', codecId: 'fixture/text@1' },
+    },
+  },
+};
 
 const candidateSource = [
   'types {',
@@ -46,7 +62,7 @@ function complete(markedFieldSource: string) {
     document,
     sourceFile,
     scalarTypes,
-    pslBlockDescriptors: {},
+    pslBlockDescriptors,
   });
   const context = classifyPslCompletionContext({
     document,
@@ -58,7 +74,7 @@ function complete(markedFieldSource: string) {
     items: providePslCompletionItems({
       context,
       sourceFile,
-      candidates: { scalarTypes, symbolTable },
+      candidates: { scalarTypes, pslBlockDescriptors, symbolTable },
     }),
     sourceFile,
     cursorOffset,
@@ -148,6 +164,46 @@ describe('providePslCompletionItems', () => {
         newText: 'Profile',
       },
     });
+  });
+
+  it('returns descriptor-backed generic block parameter completions', () => {
+    const { items, sourceFile, cursorOffset } = complete(['policy Rule {', '  |', '}'].join('\n'));
+
+    expect(items.map((item) => item.label)).toEqual(['on', 'where', 'mode', 'using']);
+    expect(items.map((item) => item.detail)).toEqual([
+      'Generic block parameter',
+      'Generic block parameter',
+      'Generic block parameter',
+      'Generic block parameter',
+    ]);
+    expect(items[0]?.textEdit).toEqual({
+      range: {
+        start: sourceFile.positionAt(cursorOffset),
+        end: sourceFile.positionAt(cursorOffset),
+      },
+      newText: 'on',
+    });
+  });
+
+  it('filters descriptor-backed generic block parameters and excludes sibling keys', () => {
+    const { items, sourceFile, cursorOffset } = complete(
+      ['policy Rule {', '  on = User', '  wh|', '}'].join('\n'),
+    );
+
+    expect(items.map((item) => item.label)).toEqual(['where']);
+    expect(items[0]?.textEdit).toEqual({
+      range: {
+        start: sourceFile.positionAt(cursorOffset - 'wh'.length),
+        end: sourceFile.positionAt(cursorOffset),
+      },
+      newText: 'where',
+    });
+  });
+
+  it('returns no generic block parameter completions without a matching descriptor', () => {
+    const { items } = complete(['extension Rule {', '  |', '}'].join('\n'));
+
+    expect(items).toEqual([]);
   });
 
   it('returns an empty list for unsupported classifier contexts', () => {
