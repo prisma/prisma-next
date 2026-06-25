@@ -2,6 +2,7 @@ import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framewor
 import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
+import { CompletionItemKind } from 'vscode-languageserver';
 import { classifyPslCompletionContext } from '../src/completion-context';
 import { providePslCompletionItems } from '../src/completion-provider';
 
@@ -97,9 +98,7 @@ describe('providePslCompletionItems', () => {
       'Address',
       'Email',
       'UserId',
-      'auth.Account',
-      'auth.User',
-      'auth.Profile',
+      'auth.',
     ]);
     expect(items.map((item) => item.detail)).toEqual([
       'Configured scalar type',
@@ -111,9 +110,7 @@ describe('providePslCompletionItems', () => {
       'Composite type',
       'Scalar type',
       'Type alias',
-      'Model in namespace auth',
-      'Model in namespace auth',
-      'Composite type in namespace auth',
+      'Namespace',
     ]);
     expect(items[0]?.textEdit).toEqual({
       range: {
@@ -128,6 +125,41 @@ describe('providePslCompletionItems', () => {
     const { items } = complete(['model Post {', '  reviewer U|', '}'].join('\n'));
 
     expect(items.map((item) => item.label)).toEqual(['User', 'UserId']);
+  });
+
+  it('filters bare namespace prefixes and replaces the typed segment with the namespace qualifier', () => {
+    const { items, sourceFile, cursorOffset } = complete(
+      ['model Post {', '  reviewer a|', '}'].join('\n'),
+    );
+
+    expect(items.map((item) => item.label)).toEqual(['auth.']);
+    expect(items[0]).toMatchObject({
+      kind: CompletionItemKind.Module,
+      detail: 'Namespace',
+      filterText: 'auth.',
+      textEdit: {
+        range: {
+          start: sourceFile.positionAt(cursorOffset - 'a'.length),
+          end: sourceFile.positionAt(cursorOffset),
+        },
+        newText: 'auth.',
+      },
+    });
+  });
+
+  it('returns namespace members after a namespace qualifier', () => {
+    const { items, sourceFile, cursorOffset } = complete(
+      ['model Post {', '  owner auth.|', '}'].join('\n'),
+    );
+
+    expect(items.map((item) => item.label)).toEqual(['Account', 'User', 'Profile']);
+    expect(items[0]?.textEdit).toEqual({
+      range: {
+        start: sourceFile.positionAt(cursorOffset),
+        end: sourceFile.positionAt(cursorOffset),
+      },
+      newText: 'Account',
+    });
   });
 
   it('returns namespace-qualified candidates with replacement metadata for the typed segment', () => {

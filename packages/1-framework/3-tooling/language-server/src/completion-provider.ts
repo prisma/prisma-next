@@ -30,6 +30,7 @@ type ModelTypeCompletionCandidateCategory =
   | 'topLevelCompositeType'
   | 'scalar'
   | 'typeAlias'
+  | 'namespace'
   | 'namespaceModel'
   | 'namespaceCompositeType';
 
@@ -48,8 +49,9 @@ const categoryOrder: Record<ModelTypeCompletionCandidateCategory, number> = {
   topLevelCompositeType: 2,
   scalar: 3,
   typeAlias: 4,
-  namespaceModel: 5,
-  namespaceCompositeType: 6,
+  namespace: 5,
+  namespaceModel: 6,
+  namespaceCompositeType: 7,
 };
 
 export function providePslCompletionItems(
@@ -197,7 +199,7 @@ function allNamespaceCandidates(
   }
   return Object.values(symbolTable.topLevel.namespaces)
     .sort((left, right) => compareNames(left.name, right.name))
-    .flatMap(namespaceCandidatesForBareContext);
+    .map(namespaceQualifierCandidate);
 }
 
 function namespaceCandidates(
@@ -222,25 +224,16 @@ function namespaceCandidates(
   ];
 }
 
-function namespaceCandidatesForBareContext(
-  namespace: NamespaceSymbol,
-): readonly ModelTypeCompletionCandidate[] {
-  return [
-    ...qualifiedNamespaceCandidates(
-      namespace.name,
-      recordNames(namespace.models),
-      'namespaceModel',
-      `Model in namespace ${namespace.name}`,
-      CompletionItemKind.Class,
-    ),
-    ...qualifiedNamespaceCandidates(
-      namespace.name,
-      recordNames(namespace.compositeTypes),
-      'namespaceCompositeType',
-      `Composite type in namespace ${namespace.name}`,
-      CompletionItemKind.Struct,
-    ),
-  ];
+function namespaceQualifierCandidate(namespace: NamespaceSymbol): ModelTypeCompletionCandidate {
+  const qualifier = `${namespace.name}.`;
+  return {
+    category: 'namespace',
+    label: qualifier,
+    insertText: qualifier,
+    filterText: qualifier,
+    detail: 'Namespace',
+    kind: CompletionItemKind.Module,
+  };
 }
 
 function symbolCandidates(
@@ -257,26 +250,6 @@ function symbolCandidates(
     detail,
     kind,
   }));
-}
-
-function qualifiedNamespaceCandidates(
-  namespace: string,
-  names: readonly string[],
-  category: ModelTypeCompletionCandidateCategory,
-  detail: string,
-  kind: CompletionItemKind,
-): readonly ModelTypeCompletionCandidate[] {
-  return names.map((name) => {
-    const qualifiedName = `${namespace}.${name}`;
-    return {
-      category,
-      label: qualifiedName,
-      insertText: qualifiedName,
-      filterText: qualifiedName,
-      detail,
-      kind,
-    };
-  });
 }
 
 function recordNames<T extends { readonly name: string }>(
