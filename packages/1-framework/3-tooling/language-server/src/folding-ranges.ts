@@ -1,9 +1,9 @@
-import type {
-  DocumentAst,
+import {
+  type DocumentAst,
   NamespaceDeclarationAst,
-  NamespaceMemberAst,
-  SourceFile,
-  TypesBlockAst,
+  type NamespaceMemberAst,
+  type SourceFile,
+  type TypesBlockAst,
 } from '@prisma-next/psl-parser/syntax';
 import { type FoldingRange, FoldingRangeKind } from 'vscode-languageserver';
 
@@ -38,9 +38,9 @@ function collectFoldingRanges(
   for (const declaration of document.declarations()) {
     addFoldingRange(declaration, sourceFile, ranges);
 
-    if (declaration.syntax.kind === 'Namespace') {
-      const ns = declaration as NamespaceDeclarationAst;
-      for (const nested of ns.declarations()) {
+    const namespace = NamespaceDeclarationAst.cast(declaration.syntax);
+    if (namespace !== undefined) {
+      for (const nested of namespace.declarations()) {
         addFoldingRange(nested, sourceFile, ranges);
       }
     }
@@ -48,7 +48,7 @@ function collectFoldingRanges(
 }
 
 function addFoldingRange(
-  declaration: Declaration | NamespaceMemberAst,
+  declaration: Declaration,
   sourceFile: SourceFile,
   ranges: FoldingRange[],
 ): void {
