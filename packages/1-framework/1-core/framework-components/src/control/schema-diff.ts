@@ -28,8 +28,33 @@ function stableKey(c: EntityCoordinate): string {
   return `${c.plane}|${c.namespaceId}|${c.entityKind}|${c.entityName}`;
 }
 
+function insertNode(map: Map<string, DiffableNode>, node: DiffableNode): void {
+  const key = stableKey(node.coord());
+  if (map.has(key)) {
+    throw new Error(`diffSchema: duplicate coordinate key among siblings: ${key}`);
+  }
+  map.set(key, node);
+}
+
 function outcomeMessage(outcome: SchemaDiffOutcome, c: EntityCoordinate): string {
   return `${outcome}: ${c.entityKind} '${c.entityName}' in namespace '${c.namespaceId}'`;
+}
+
+/**
+ * Drop `extra` issues whose namespace is not in `ownedNamespaceIds`.
+ *
+ * Use this after `diffSchema` when a live introspection returns every entity
+ * across all DB schemas, but the current contract only owns a subset of them.
+ * `extra` issues in unowned namespaces belong to another contract space and
+ * should be left alone. All other outcomes pass through unchanged.
+ */
+export function dropUnownedExtraIssues(
+  issues: readonly SchemaDiffIssue[],
+  isOwned: (namespaceId: string) => boolean,
+): readonly SchemaDiffIssue[] {
+  return issues.filter(
+    (issue) => issue.outcome !== 'extra' || isOwned(issue.coordinate.namespaceId),
+  );
 }
 
 /**
@@ -56,12 +81,12 @@ function diffChildren(
 ): readonly SchemaDiffIssue[] {
   const expectedMap = new Map<string, DiffableNode>();
   for (const node of expected) {
-    expectedMap.set(stableKey(node.coord()), node);
+    insertNode(expectedMap, node);
   }
 
   const actualMap = new Map<string, DiffableNode>();
   for (const node of actual) {
-    actualMap.set(stableKey(node.coord()), node);
+    insertNode(actualMap, node);
   }
 
   const issues: SchemaDiffIssue[] = [];

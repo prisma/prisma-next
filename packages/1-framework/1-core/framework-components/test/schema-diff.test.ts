@@ -164,6 +164,22 @@ describe('diffSchema', () => {
     expect(outcomes).toEqual(new Set(['missing', 'extra']));
   });
 
+  it('throws when two siblings share the same coordinate in expected', () => {
+    const a = makeNode('public', 'policy', 'dup_name');
+    const b = makeNode('public', 'policy', 'dup_name');
+    expect(() => diffSchema(rootOf([a, b]), rootOf([]))).toThrow(
+      'diffSchema: duplicate coordinate key among siblings',
+    );
+  });
+
+  it('throws when two siblings share the same coordinate in actual', () => {
+    const a = makeNode('public', 'policy', 'dup_name');
+    const b = makeNode('public', 'policy', 'dup_name');
+    expect(() => diffSchema(rootOf([]), rootOf([a, b]))).toThrow(
+      'diffSchema: duplicate coordinate key among siblings',
+    );
+  });
+
   it('descends into a matched pair and reports one issue at the child coordinate (AC-2)', () => {
     // A parent present on both sides whose coord() matches and isEqualTo is true,
     // but whose children differ on one child. diffSchema descends the matched
