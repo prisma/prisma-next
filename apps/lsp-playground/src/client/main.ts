@@ -1,5 +1,5 @@
 import { LogLevel } from '@codingame/monaco-vscode-api';
-import {
+import getFilesServiceOverride, {
   RegisteredFileSystemProvider,
   RegisteredMemoryFile,
   registerFileSystemOverlay,
@@ -61,6 +61,7 @@ async function main(): Promise<void> {
     },
     logLevel: LogLevel.Warning,
     serviceOverrides: {
+      ...getFilesServiceOverride(),
       ...getKeybindingsServiceOverride(),
     },
     userConfiguration: {
