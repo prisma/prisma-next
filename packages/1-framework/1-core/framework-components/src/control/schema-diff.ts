@@ -17,7 +17,15 @@ export interface DiffableRoot {
   children(): readonly DiffableNode[];
 }
 
-/** A node the generic differ also aligns and compares. Implemented by target IR nodes. */
+/**
+ * A node the generic differ also aligns and compares. Implemented by target IR nodes.
+ *
+ * `coord()` must be unique among sibling nodes aligned at the same level — the
+ * differ keys on it and treats a collision as the same entity (now enforced by a
+ * duplicate-key throw). A node kind whose natural key is not globally unique — for
+ * example, a column that is only unique within its table — must fold its parent's
+ * identity into the coordinate.
+ */
 export interface DiffableNode extends DiffableRoot {
   coord(): EntityCoordinate;
   isEqualTo(other: DiffableNode): boolean;
@@ -31,7 +39,7 @@ function stableKey(c: EntityCoordinate): string {
 function insertNode(map: Map<string, DiffableNode>, node: DiffableNode): void {
   const key = stableKey(node.coord());
   if (map.has(key)) {
-    throw new Error(`diffSchema: duplicate coordinate key among siblings: ${key}`);
+    throw new Error(`diffSchemas: duplicate coordinate key among siblings: ${key}`);
   }
   map.set(key, node);
 }
@@ -41,14 +49,15 @@ function outcomeMessage(outcome: SchemaDiffOutcome, c: EntityCoordinate): string
 }
 
 /**
- * Drop `extra` issues whose namespace is not in `ownedNamespaceIds`.
+ * Filter `extra` outcomes whose namespace is not owned by the caller.
  *
- * Use this after `diffSchema` when a live introspection returns every entity
+ * Use this after `diffSchemas` when a live introspection returns every entity
  * across all DB schemas, but the current contract only owns a subset of them.
  * `extra` issues in unowned namespaces belong to another contract space and
- * should be left alone. All other outcomes pass through unchanged.
+ * should be left alone. `missing` and `mismatch` outcomes pass through unchanged
+ * regardless of ownership.
  */
-export function dropUnownedExtraIssues(
+export function filterSchemaIssuesByOwnership(
   issues: readonly SchemaDiffIssue[],
   isOwned: (namespaceId: string) => boolean,
 ): readonly SchemaDiffIssue[] {
@@ -62,7 +71,7 @@ export function dropUnownedExtraIssues(
  * into each matched pair, and record one issue per disagreement. The differ
  * reads only `coord()` / `isEqualTo()` / `children()`, so it names no node type.
  */
-export function diffSchema(
+export function diffSchemas(
   expected: DiffableRoot,
   actual: DiffableRoot,
 ): readonly SchemaDiffIssue[] {

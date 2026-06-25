@@ -1,7 +1,7 @@
 /**
  * Structural invariant: no RLS-specific symbols in packages/1-framework or packages/2-sql.
  *
- * Generic differ utilities (diffSchema, SchemaDiffIssue) are target-agnostic and live in
+ * Generic differ utilities (diffSchemas, SchemaDiffIssue) are target-agnostic and live in
  * packages/1-framework. Postgres RLS types and identifiers live exclusively in packages/3-targets.
  * This test fails if an RLS symbol leaks into a shared layer.
  *

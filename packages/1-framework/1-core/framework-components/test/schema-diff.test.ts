@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DiffableNode, DiffableRoot, SchemaDiffIssue } from '../src/control/schema-diff';
-import { diffSchema } from '../src/control/schema-diff';
+import { diffSchemas } from '../src/control/schema-diff';
 import type { EntityCoordinate } from '../src/ir/storage';
 
 function rootOf(nodes: readonly DiffableNode[]): DiffableRoot {
@@ -35,14 +35,14 @@ function makeNode(
   } as DiffableNode & { _body: string };
 }
 
-describe('diffSchema', () => {
+describe('diffSchemas', () => {
   it('returns empty when expected and actual are both empty', () => {
-    expect(diffSchema(rootOf([]), rootOf([]))).toEqual([]);
+    expect(diffSchemas(rootOf([]), rootOf([]))).toEqual([]);
   });
 
   it('reports missing when an expected node has no match in actual', () => {
     const expected = [makeNode('public', 'policy', 'read_own_abcd1234')];
-    const issues = diffSchema(rootOf(expected), rootOf([]));
+    const issues = diffSchemas(rootOf(expected), rootOf([]));
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
       outcome: 'missing',
@@ -57,7 +57,7 @@ describe('diffSchema', () => {
 
   it('reports extra when an actual node has no match in expected', () => {
     const actual = [makeNode('public', 'policy', 'stale_policy_deadbeef')];
-    const issues = diffSchema(rootOf([]), rootOf(actual));
+    const issues = diffSchemas(rootOf([]), rootOf(actual));
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
       outcome: 'extra',
@@ -73,7 +73,7 @@ describe('diffSchema', () => {
   it('reports mismatch when both sides have the node but isEqualTo returns false', () => {
     const expected = [makeNode('public', 'policy', 'read_own_abcd1234', 'body-v1')];
     const actual = [makeNode('public', 'policy', 'read_own_abcd1234', 'body-v2')];
-    const issues = diffSchema(rootOf(expected), rootOf(actual));
+    const issues = diffSchemas(rootOf(expected), rootOf(actual));
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
       outcome: 'mismatch',
@@ -90,7 +90,7 @@ describe('diffSchema', () => {
     const node = makeNode('public', 'policy', 'read_own_abcd1234', 'same-body');
     const expected = [node];
     const actual = [makeNode('public', 'policy', 'read_own_abcd1234', 'same-body')];
-    const issues = diffSchema(rootOf(expected), rootOf(actual));
+    const issues = diffSchemas(rootOf(expected), rootOf(actual));
     expect(issues).toEqual([]);
   });
 
@@ -105,7 +105,7 @@ describe('diffSchema', () => {
       makeNode('ns', 'widget', 'beta', 'same'),
       makeNode('ns', 'widget', 'delta', 'extra'),
     ];
-    const issues = diffSchema(rootOf(expected), rootOf(actual));
+    const issues = diffSchemas(rootOf(expected), rootOf(actual));
     expect(issues).toHaveLength(3);
     const byName = Object.fromEntries(issues.map((i) => [i.coordinate.entityName, i.outcome]));
     expect(byName).toEqual({ alpha: 'mismatch', gamma: 'missing', delta: 'extra' });
@@ -113,21 +113,21 @@ describe('diffSchema', () => {
 
   it('returns issues for all expected nodes when actual is empty', () => {
     const expected = [makeNode('ns', 'widget', 'zzz'), makeNode('ns', 'widget', 'aaa')];
-    const issues = diffSchema(rootOf(expected), rootOf([]));
+    const issues = diffSchemas(rootOf(expected), rootOf([]));
     const names = new Set(issues.map((i) => i.coordinate.entityName));
     expect(names).toEqual(new Set(['aaa', 'zzz']));
     expect(issues).toHaveLength(2);
   });
 
   it('message field is a non-empty string', () => {
-    const issues = diffSchema(rootOf([makeNode('ns', 'x', 'y')]), rootOf([]));
+    const issues = diffSchemas(rootOf([makeNode('ns', 'x', 'y')]), rootOf([]));
     expect(typeof issues[0]?.message).toBe('string');
     expect((issues[0]?.message.length ?? 0) > 0).toBe(true);
   });
 
   it('missing issue carries expected node ref but no actual', () => {
     const expectedNode = makeNode('public', 'policy', 'read_own_abcd1234');
-    const issues = diffSchema(rootOf([expectedNode]), rootOf([]));
+    const issues = diffSchemas(rootOf([expectedNode]), rootOf([]));
     const issue = issues[0] as SchemaDiffIssue;
     expect(issue.expected).toBe(expectedNode);
     expect(issue.actual).toBeUndefined();
@@ -135,7 +135,7 @@ describe('diffSchema', () => {
 
   it('extra issue carries actual node ref but no expected', () => {
     const actualNode = makeNode('public', 'policy', 'stale_policy_deadbeef');
-    const issues = diffSchema(rootOf([]), rootOf([actualNode]));
+    const issues = diffSchemas(rootOf([]), rootOf([actualNode]));
     const issue = issues[0] as SchemaDiffIssue;
     expect(issue.actual).toBe(actualNode);
     expect(issue.expected).toBeUndefined();
@@ -144,7 +144,7 @@ describe('diffSchema', () => {
   it('mismatch issue carries both expected and actual node refs', () => {
     const expectedNode = makeNode('public', 'policy', 'read_own_abcd1234', 'body-v1');
     const actualNode = makeNode('public', 'policy', 'read_own_abcd1234', 'body-v2');
-    const issues = diffSchema(rootOf([expectedNode]), rootOf([actualNode]));
+    const issues = diffSchemas(rootOf([expectedNode]), rootOf([actualNode]));
     const issue = issues[0] as SchemaDiffIssue;
     expect(issue.expected).toBe(expectedNode);
     expect(issue.actual).toBe(actualNode);
@@ -157,7 +157,7 @@ describe('diffSchema', () => {
     // coordinate stringify must use a separator that cannot appear in any field.
     const nodeA = makeNode('public', 'pol', 'icy');
     const nodeB = makeNode('public', 'policy', 'x');
-    const issues = diffSchema(rootOf([nodeA]), rootOf([nodeB]));
+    const issues = diffSchemas(rootOf([nodeA]), rootOf([nodeB]));
     // Both expected — one missing, one extra
     expect(issues).toHaveLength(2);
     const outcomes = new Set(issues.map((i) => i.outcome));
@@ -167,22 +167,22 @@ describe('diffSchema', () => {
   it('throws when two siblings share the same coordinate in expected', () => {
     const a = makeNode('public', 'policy', 'dup_name');
     const b = makeNode('public', 'policy', 'dup_name');
-    expect(() => diffSchema(rootOf([a, b]), rootOf([]))).toThrow(
-      'diffSchema: duplicate coordinate key among siblings',
+    expect(() => diffSchemas(rootOf([a, b]), rootOf([]))).toThrow(
+      'diffSchemas: duplicate coordinate key among siblings',
     );
   });
 
   it('throws when two siblings share the same coordinate in actual', () => {
     const a = makeNode('public', 'policy', 'dup_name');
     const b = makeNode('public', 'policy', 'dup_name');
-    expect(() => diffSchema(rootOf([]), rootOf([a, b]))).toThrow(
-      'diffSchema: duplicate coordinate key among siblings',
+    expect(() => diffSchemas(rootOf([]), rootOf([a, b]))).toThrow(
+      'diffSchemas: duplicate coordinate key among siblings',
     );
   });
 
   it('descends into a matched pair and reports one issue at the child coordinate (AC-2)', () => {
     // A parent present on both sides whose coord() matches and isEqualTo is true,
-    // but whose children differ on one child. diffSchema descends the matched
+    // but whose children differ on one child. diffSchemas descends the matched
     // pair and reports exactly one issue, at the child's coordinate.
     const expectedChild = makeNode('public', 'column', 'present_child', 'same');
     const actualChild = makeNode('public', 'column', 'present_child', 'same');
@@ -194,7 +194,7 @@ describe('diffSchema', () => {
     ]);
     const actualParent = makeNode('public', 'table', 'parent', 'parent-body', [actualChild]);
 
-    const issues = diffSchema(rootOf([expectedParent]), rootOf([actualParent]));
+    const issues = diffSchemas(rootOf([expectedParent]), rootOf([actualParent]));
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
