@@ -30,8 +30,13 @@
         padding: 3px 8px;
       }
       #format-document:hover { background: #45475a; }
-      #editor { flex: 1; min-height: 0; }
-      .cm-editor { height: 100%; }
+      /* Monaco editor container */
+      #editor {
+        flex: 1;
+        min-height: 0;
+        position: relative;
+        overflow: hidden;
+      }
     </style>
   </head>
   <body>
