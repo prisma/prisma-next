@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
+import { ColumnRef, ProjectionItem, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import { planFromAst } from '@prisma-next/sql-relational-core/plan';
 import sqlite from '@prisma-next/sqlite/runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -138,6 +140,92 @@ describe('transaction e2e via sqlite() facade', { timeout: timeouts.databaseOper
 
     await expect(escaped.rows.toArray()).rejects.toMatchObject({
       code: 'RUNTIME.TRANSACTION_CLOSED',
+    });
+  });
+
+  it('tempTable() materializes a tx.sql subquery and is reusable in FROM and JOIN statements in the same transaction', async () => {
+    const { db } = handle;
+
+    await db.transaction(async (tx) => {
+      const created = await tx.orm.User.create({
+        id: 450,
+        name: 'TempSource',
+        email: 'temp-source@example.com',
+      });
+
+      const source = tx.sql.users
+        .select('id', 'email')
+        .where((f, fns) => fns.eq(f.email, 'temp-source@example.com'));
+
+      const temp = await tx.tempTable({ name: 'tx_users_tmp' }).as(source);
+      const rows = await tx
+        .execute(
+          planFromAst(
+            SelectAst.from(temp.buildAst()).withProjection([
+              ProjectionItem.of('id', ColumnRef.of(temp.name, 'id')),
+              ProjectionItem.of('email', ColumnRef.of(temp.name, 'email')),
+            ]),
+            db.context.contract,
+            'dsl',
+          ),
+        )
+        .toArray();
+
+      const joinedRows = await tx
+        .execute(
+          tx.sql.users
+            .innerJoin(temp, (f, fns) => fns.eq(f['users']!['id'], f['tx_users_tmp']!['id']))
+            .select('name')
+            .build(),
+        )
+        .toArray();
+
+      expect(rows).toEqual([{ id: created.id, email: 'temp-source@example.com' }]);
+      expect(joinedRows).toEqual([{ name: 'TempSource' }]);
+      await temp.drop();
+    });
+  });
+
+  it('tempTable() accepts ORM collection sources directly and is reusable in FROM and JOIN statements', async () => {
+    const { db } = handle;
+
+    await db.transaction(async (tx) => {
+      const created = await tx.orm.User.create({
+        id: 451,
+        name: 'TempOrmSource',
+        email: 'temp-orm-source@example.com',
+      });
+
+      const source = tx.orm.User.select('id', 'email').where({
+        email: 'temp-orm-source@example.com',
+      });
+
+      const temp = await tx.tempTable({ name: 'tx_users_tmp_orm' }).as(source);
+      const rows = await tx
+        .execute(
+          planFromAst(
+            SelectAst.from(temp.buildAst()).withProjection([
+              ProjectionItem.of('id', ColumnRef.of(temp.name, 'id')),
+              ProjectionItem.of('email', ColumnRef.of(temp.name, 'email')),
+            ]),
+            db.context.contract,
+            'dsl',
+          ),
+        )
+        .toArray();
+
+      const joinedRows = await tx
+        .execute(
+          tx.sql.users
+            .innerJoin(temp, (f, fns) => fns.eq(f['users']!['id'], f['tx_users_tmp_orm']!['id']))
+            .select('name')
+            .build(),
+        )
+        .toArray();
+
+      expect(rows).toEqual([{ id: created.id, email: 'temp-orm-source@example.com' }]);
+      expect(joinedRows).toEqual([{ name: 'TempOrmSource' }]);
+      await temp.drop();
     });
   });
 });
