@@ -9,6 +9,9 @@ import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   type ClientCapabilities,
+  type CompletionItem,
+  type CompletionList,
+  CompletionRequest,
   createConnection,
   type Diagnostic,
   DiagnosticSeverity,
@@ -23,6 +26,7 @@ import {
   type InitializeResult,
   LogMessageNotification,
   MessageType,
+  type Position,
   PublishDiagnosticsNotification,
   type Range,
   type RegistrationParams,
@@ -388,6 +392,43 @@ function semanticTokenChunks(tokens: SemanticTokens | null): readonly (readonly 
   return chunks;
 }
 
+function requestCompletion(
+  harness: Harness,
+  uri: string,
+  position: Position,
+): Promise<CompletionItem[] | CompletionList | null> {
+  return harness.client.sendRequest(CompletionRequest.type, {
+    textDocument: { uri },
+    position,
+  });
+}
+
+function completionItems(
+  result: CompletionItem[] | CompletionList | null,
+): readonly CompletionItem[] {
+  if (result === null) {
+    return [];
+  }
+  return Array.isArray(result) ? result : result.items;
+}
+
+function sourceWithCursor(markedSource: string): {
+  readonly source: string;
+  readonly position: Position;
+} {
+  const cursorOffset = markedSource.indexOf('|');
+  if (cursorOffset < 0) {
+    throw new Error('Missing cursor marker');
+  }
+  const prefix = markedSource.slice(0, cursorOffset);
+  const source = `${prefix}${markedSource.slice(cursorOffset + 1)}`;
+  const lines = prefix.split('\n');
+  return {
+    source,
+    position: { line: lines.length - 1, character: (lines[lines.length - 1] ?? '').length },
+  };
+}
+
 function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
   let resolvePromise: (value: T) => void = () => undefined;
   const promise = new Promise<T>((resolve) => {
@@ -409,7 +450,7 @@ afterEach(async () => {
 });
 
 describe('language server', { timeout: timeouts.databaseOperation }, () => {
-  it('answers initialize and advertises text-document features', async () => {
+  it('answers initialize and advertises text-document features plus completion support', async () => {
     harness = startHarness(resolveToSchema);
     const result = await harness.initialize();
     expect(result.capabilities.textDocumentSync).toBeDefined();
@@ -420,6 +461,79 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
       full: true,
       range: true,
     });
+    expect(result.capabilities.completionProvider).toBeDefined();
+  });
+
+  it('returns model field type completions for configured PSL inputs', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor(
+      [
+        'model User {',
+        '  id Int @id',
+        '}',
+        '',
+        'type Address {',
+        '  street String',
+        '}',
+        '',
+        'model Post {',
+        '  id Int @id',
+        '  author |',
+        '}',
+      ].join('\n'),
+    );
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items.map((item) => item.label)).toEqual([
+      'Boolean',
+      'DateTime',
+      'Int',
+      'String',
+      'Post',
+      'User',
+      'Address',
+    ]);
+  });
+
+  it('returns no completion items for unconfigured PSL documents', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const otherUri = pathToFileURL(join(root, 'not-a-schema.psl')).toString();
+    const { source, position } = sourceWithCursor(
+      ['model User {', '  id Int @id', '}', '', 'model Post {', '  author |', '}'].join('\n'),
+    );
+    openDocument(harness, otherUri, source);
+    expect(await harness.waitForDiagnostics(otherUri)).toEqual([]);
+
+    const items = completionItems(await requestCompletion(harness, otherUri, position));
+    expect(items).toEqual([]);
+  });
+
+  it('returns no completion items for ordinary field attribute contexts', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor(['model User {', '  id Int @|', '}'].join('\n'));
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items).toEqual([]);
+  });
+
+  it('returns no completion items for ordinary model attribute contexts', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor(
+      ['model User {', '  id Int @id', '  @@|', '}'].join('\n'),
+    );
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items).toEqual([]);
   });
 
   it('publishes parser diagnostics for an opened configured PSL input', async () => {

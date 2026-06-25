@@ -4,6 +4,7 @@ import { findNearestConfigPathForFile } from '@prisma-next/config-loader';
 import type { SymbolTable } from '@prisma-next/psl-parser';
 import { type FormatOptions, format } from '@prisma-next/psl-parser/format';
 import {
+  type CompletionItem,
   type Connection,
   type Diagnostic,
   DiagnosticSeverity,
@@ -12,6 +13,7 @@ import {
   type InitializeParams,
   type InitializeResult,
   type Range,
+  type Position,
   RegistrationRequest,
   type SemanticTokens,
   TextDocumentSyncKind,
@@ -19,6 +21,8 @@ import {
   type TextEdit,
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
+import { classifyPslCompletionContext } from './completion-context';
+import { providePslCompletionItems } from './completion-provider';
 import { CONFIG_FILENAME, resolveConfigInputs } from './config-resolution';
 import { ParseDiagnosticSeverity } from './diagnostic-mapping';
 import { computeFoldingRanges } from './folding-ranges';
@@ -288,6 +292,49 @@ export function createServer(connection: Connection): LanguageServer {
     return buildSemanticTokens(source, range);
   }
 
+  async function completeDocument(uri: string, position: Position): Promise<CompletionItem[]> {
+    const document = documents.get(uri);
+    if (document === undefined) {
+      return [];
+    }
+
+    let project: ProjectState | undefined;
+    try {
+      project = await resolveProjectForDocument(uri);
+    } catch {
+      return [];
+    }
+    if (project === undefined || !project.inputs.includes(uri)) {
+      return [];
+    }
+
+    const cached = project.artifacts.getDocument(uri);
+    const symbolTable = project.artifacts.getSymbolTable();
+    if (cached === undefined || symbolTable === undefined) {
+      return [];
+    }
+
+    try {
+      const context = classifyPslCompletionContext({
+        document: cached.document,
+        sourceFile: cached.sourceFile,
+        position,
+      });
+      return [
+        ...providePslCompletionItems({
+          context,
+          sourceFile: cached.sourceFile,
+          candidates: {
+            scalarTypes: project.controlStack.scalarTypes,
+            symbolTable,
+          },
+        }),
+      ];
+    } catch {
+      return [];
+    }
+  }
+
   connection.onInitialize(async (params): Promise<InitializeResult> => {
     rootPath = resolveRootPath(params.rootUri, params.rootPath);
     watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
@@ -303,6 +350,7 @@ export function createServer(connection: Connection): LanguageServer {
           full: true,
           range: true,
         },
+        completionProvider: {},
       },
     };
   });
@@ -343,6 +391,7 @@ export function createServer(connection: Connection): LanguageServer {
   });
 
   connection.onDocumentFormatting((params) => formatDocument(params.textDocument.uri));
+  connection.onCompletion((params) => completeDocument(params.textDocument.uri, params.position));
 
   connection.languages.semanticTokens.on((params) =>
     semanticTokensForDocument(params.textDocument.uri),
