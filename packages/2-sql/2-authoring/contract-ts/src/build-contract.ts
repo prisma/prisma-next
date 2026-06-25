@@ -74,9 +74,22 @@ function encodeColumnDefault(
   defaultInput: ColumnDefault,
   codecId: string,
   codecLookup?: CodecLookup,
+  many = false,
 ): ColumnDefault {
   if (defaultInput.kind === 'function') {
     return { kind: 'function', expression: defaultInput.expression };
+  }
+  if (many) {
+    if (!Array.isArray(defaultInput.value)) {
+      throw new Error(
+        `Literal default on a list column must be an array; received ${typeof defaultInput.value}. ` +
+          'A scalar default on a list field must be rejected at the authoring surface.',
+      );
+    }
+    return {
+      kind: 'literal',
+      value: defaultInput.value.map((element) => encodeViaCodec(element, codecId, codecLookup)),
+    };
   }
   return {
     kind: 'literal',
@@ -235,24 +248,17 @@ function buildStorageColumn(
     };
   }
 
-  if (field.many) {
-    return {
-      nativeType: JSONB_NATIVE_TYPE,
-      codecId: JSONB_CODEC_ID,
-      nullable: field.nullable,
-    };
-  }
-
   const codecId = field.descriptor.codecId;
   const encodedDefault =
     field.default !== undefined
-      ? encodeColumnDefault(field.default, codecId, codecLookup)
+      ? encodeColumnDefault(field.default, codecId, codecLookup, field.many === true)
       : undefined;
 
   return {
     nativeType: field.descriptor.nativeType,
     codecId,
     nullable: field.nullable,
+    ...(field.many ? { many: true as const } : {}),
     ...ifDefined('typeParams', field.descriptor.typeParams),
     ...ifDefined('default', encodedDefault),
     ...ifDefined('typeRef', field.descriptor.typeRef),

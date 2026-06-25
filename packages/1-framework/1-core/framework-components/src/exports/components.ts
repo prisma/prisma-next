@@ -1,3 +1,4 @@
+export type { CapabilityMatrix } from '../shared/capabilities';
 export { mergeCapabilityMatrices } from '../shared/capabilities';
 export type {
   AdapterDescriptor,

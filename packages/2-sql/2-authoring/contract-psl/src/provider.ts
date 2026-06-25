@@ -159,6 +159,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
               : undefined,
           ),
           controlMutationDefaults: context.controlMutationDefaults,
+          ...ifDefined('capabilities', context.capabilities),
           ...ifDefined(
             'createNamespace',
             options.createNamespace ?? targetCreateNamespace(options.target),
