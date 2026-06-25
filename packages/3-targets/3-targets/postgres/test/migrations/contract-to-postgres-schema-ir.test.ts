@@ -3,10 +3,8 @@ import { contractToSchemaIR } from '@prisma-next/family-sql/control';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import {
-  collectContractRlsPolicies,
-  contractToPostgresSchemaIR,
-} from '../../src/core/migrations/contract-to-postgres-schema-ir';
+import { collectContractRlsPolicies } from '../../src/core/migrations/collect-contract-postgres-nodes';
+import { contractToPostgresSchemaIR } from '../../src/core/migrations/contract-to-postgres-schema-ir';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { type PostgresContract, PostgresSchema } from '../../src/core/postgres-schema';
 import { isPostgresSchemaIR } from '../../src/core/postgres-schema-ir';
