@@ -4,7 +4,7 @@ import { contractToSchemaIR } from '@prisma-next/family-sql/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresRole } from '../postgres-role';
-import { isPostgresSchema } from '../postgres-schema';
+import { isPostgresSchema, type PostgresContract } from '../postgres-schema';
 import { PostgresSchemaIR } from '../postgres-schema-ir';
 
 /** Project a contract's Postgres RLS policy nodes. The contract carries them as PostgresRlsPolicy instances. */
@@ -26,7 +26,7 @@ function collectContractRoles(contract: Contract<SqlStorage> | null): readonly P
 
 /** The contract-to-postgres-schema-ir derivation: a populated PostgresSchemaIR. */
 export function contractToPostgresSchemaIR(
-  contract: Contract<SqlStorage> | null,
+  contract: PostgresContract | null,
   options: ContractToSchemaIROptions,
 ): PostgresSchemaIR {
   const sqlIr = contractToSchemaIR(contract, options);

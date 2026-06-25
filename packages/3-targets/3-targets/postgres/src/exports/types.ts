@@ -6,6 +6,7 @@ export {
 export { PostgresRole, type PostgresRoleInput } from '../core/postgres-role';
 export {
   isPostgresSchema,
+  type PostgresContract,
   PostgresSchema,
   PostgresUnboundSchema,
   postgresCreateNamespace,

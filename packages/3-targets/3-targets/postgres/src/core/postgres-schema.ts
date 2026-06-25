@@ -1,3 +1,4 @@
+import type { Contract } from '@prisma-next/contract/types';
 import {
   freezeNode,
   hydrateNamespaceEntities,
@@ -12,6 +13,9 @@ import type {
   StorageTable,
   StorageValueSet,
 } from '@prisma-next/sql-contract/types';
+
+export type PostgresContract = Contract<SqlStorage> & { readonly target: 'postgres' };
+
 import { type CfExpr, cfExpr } from '@prisma-next/sql-relational-core/contract-free';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';

@@ -1,4 +1,4 @@
-import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { contractToSchemaIR } from '@prisma-next/family-sql/control';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
@@ -8,7 +8,7 @@ import {
   contractToPostgresSchemaIR,
 } from '../../src/core/migrations/contract-to-postgres-schema-ir';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
-import { PostgresSchema } from '../../src/core/postgres-schema';
+import { type PostgresContract, PostgresSchema } from '../../src/core/postgres-schema';
 import { isPostgresSchemaIR } from '../../src/core/postgres-schema-ir';
 import { postgresRenderDefault } from '../../src/exports/control';
 
@@ -28,7 +28,7 @@ function makePolicy(name: string): PostgresRlsPolicy {
   });
 }
 
-function makeContract(policies: readonly PostgresRlsPolicy[]): Contract<SqlStorage> {
+function makeContract(policies: readonly PostgresRlsPolicy[]): PostgresContract {
   const policyEntries: Record<string, PostgresRlsPolicy> = {};
   for (const p of policies) {
     policyEntries[p.name] = p;
