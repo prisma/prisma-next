@@ -1,0 +1,51 @@
+// Real emitted fixture for the sql-orm-client arrow-path many-to-many parity
+// test — the `Post ↔ Tag` relation authored over a relation-field-less
+// junction via the quoted arrow-path `through:` form.
+//
+// `PostTag` carries the scalar join columns `postId` / `tagId` plus a composite
+// `@@id`, but NO `post` / `tag` relation fields. The slice-2 relation-field
+// junction recognition can't fire (there are no relation fields to walk), so
+// the navigable M:N is declared on the terminal models with the quoted
+// arrow-path that names the join columns directly:
+//
+//   tags  Tag[]  @relation(through: "id -> PostTag.postId -> PostTag.tagId -> Tag.id")
+//   posts Post[] @relation(through: "id -> PostTag.tagId -> PostTag.postId -> Post.id")
+//
+// Path shape: `<localKey> -> <Junction.nearCol> -> <Junction.farCol> -> <targetKey>`.
+// Both ends carry their own mirror-imaged arrow-path (the junction has no
+// relation fields from which to infer an inverse). The resolver builds the
+// `through` descriptor straight from the named columns, lowering both ends to a
+// navigable `cardinality: 'N:M'` relation with a populated `through` descriptor
+// over `post_tags` — the same runtime-consumable shape an authored junction or
+// implicit M:N emits — so the M:N ORM `include` drives through a PSL contract
+// authored with the column-based arrow-path.
+//
+// `@@map` pins the storage tables (`posts` / `tags` / `post_tags`) and columns
+// (`post_id` / `tag_id`) so the integration schema setup and the emitted
+// `through` descriptor agree on names.
+
+model Post {
+  id    Int    @id
+  title String
+
+  tags Tag[] @relation(through: "id -> PostTag.postId -> PostTag.tagId -> Tag.id")
+
+  @@map("posts")
+}
+
+model Tag {
+  id    String @id
+  label String @unique
+
+  posts Post[] @relation(through: "id -> PostTag.tagId -> PostTag.postId -> Post.id")
+
+  @@map("tags")
+}
+
+model PostTag {
+  postId Int    @map("post_id")
+  tagId  String @map("tag_id")
+
+  @@id([postId, tagId])
+  @@map("post_tags")
+}
