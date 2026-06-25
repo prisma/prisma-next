@@ -727,6 +727,7 @@ function resolveModelNode(
       columnName,
       descriptor,
       nullable: fieldState.nullable,
+      ...(fieldState.many === true ? { many: true } : {}),
       ...(fieldState.default ? { default: fieldState.default } : {}),
       ...(fieldState.executionDefaults ? { executionDefaults: fieldState.executionDefaults } : {}),
       ...(enumHandle !== undefined ? { enumTypeHandle: enumHandle } : {}),

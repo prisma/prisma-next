@@ -67,15 +67,16 @@ export function buildColumnTypeSql(
 
   const expanded = expandParameterizedTypeSql(resolved, codecHooks);
   if (expanded !== null) {
-    return expanded;
+    return column.many ? `${expanded}[]` : expanded;
   }
 
   if (column.typeRef) {
-    return quoteIdentifier(resolved.nativeType);
+    const base = quoteIdentifier(resolved.nativeType);
+    return column.many ? `${base}[]` : base;
   }
 
   assertSafeNativeType(resolved.nativeType);
-  return resolved.nativeType;
+  return column.many ? `${resolved.nativeType}[]` : resolved.nativeType;
 }
 
 function expandParameterizedTypeSql(
@@ -141,6 +142,10 @@ export function buildColumnDefaultSql(
 export function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
   const isJsonColumn = column?.nativeType === 'json' || column?.nativeType === 'jsonb';
 
+  if (column?.many && Array.isArray(value)) {
+    return renderArrayLiteralDefault(value);
+  }
+
   if (value instanceof Date) {
     return `'${escapeLiteral(value.toISOString())}'`;
   }
@@ -158,4 +163,12 @@ export function renderDefaultLiteral(value: unknown, column?: StorageColumn): st
     return `'${escapeLiteral(json)}'::${column.nativeType}`;
   }
   return `'${escapeLiteral(json)}'`;
+}
+
+function renderArrayLiteralDefault(elements: unknown[]): string {
+  if (elements.length === 0) {
+    return "'{}'";
+  }
+  const rendered = elements.map((el) => renderDefaultLiteral(el)).join(', ');
+  return `ARRAY[${rendered}]`;
 }

@@ -1,4 +1,4 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault, JsonValue } from '@prisma-next/contract/types';
 
 /**
  * Pre-compiled regex patterns for performance.
@@ -17,6 +17,13 @@ const TRUE_PATTERN = /^true$/i;
 const FALSE_PATTERN = /^false$/i;
 const NUMERIC_PATTERN = /^-?\d+(\.\d+)?$/;
 const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d+\))?)?$/;
+
+/**
+ * Matches a Postgres array literal default of the form `'{...}'::elemtype[]`.
+ * The literal body is captured in group 1; the cast (including `[]`) is optional.
+ * Examples: `'{}'::text[]`, `'{1,2}'::integer[]`, `'{}'`
+ */
+const ARRAY_LITERAL_PATTERN = /^'(\{.*\})'(?:::.+\[\])?$/;
 
 /**
  * Returns the canonical expression for a timestamp default function, or undefined
@@ -52,6 +59,46 @@ function canonicalizeTimestampDefault(expr: string): string | undefined {
 }
 
 /**
+ * Parses a Postgres array literal body (`{...}`) into a JS array of primitives.
+ * Returns undefined if the body cannot be reliably parsed.
+ *
+ * Handles:
+ * - `{}` → `[]`
+ * - `{elem1,elem2,...}` → `[elem1, elem2, ...]` with numeric and string element coercion
+ */
+function parseArrayLiteralBody(body: string): readonly JsonValue[] | undefined {
+  const inner = body.slice(1, -1).trim();
+  if (inner === '') return [];
+  const elements = inner.split(',');
+  const result: JsonValue[] = [];
+  for (const rawEl of elements) {
+    const el = rawEl.trim();
+    if (el.toUpperCase() === 'NULL') {
+      result.push(null);
+      continue;
+    }
+    if (el === 'true') {
+      result.push(true);
+      continue;
+    }
+    if (el === 'false') {
+      result.push(false);
+      continue;
+    }
+    if (NUMERIC_PATTERN.test(el)) {
+      result.push(Number(el));
+      continue;
+    }
+    if (el.startsWith('"') && el.endsWith('"')) {
+      result.push(el.slice(1, -1).replace(/""/g, '"'));
+      continue;
+    }
+    return undefined;
+  }
+  return result;
+}
+
+/**
  * Parses a raw Postgres column default expression into a normalized ColumnDefault.
  * This enables semantic comparison between contract defaults and introspected schema defaults.
  *
@@ -59,7 +106,7 @@ function canonicalizeTimestampDefault(expr: string): string | undefined {
  * keeping the introspection layer focused on faithful data capture.
  *
  * @param rawDefault - Raw default expression from information_schema.columns.column_default
- * @param nativeType - Native column type, used for type-aware parsing (bigint tagging, JSON detection)
+ * @param nativeType - Native column type, used for type-aware parsing (array, bigint, JSON)
  * @returns Normalized ColumnDefault or undefined if the expression cannot be parsed
  */
 export function parsePostgresDefault(
@@ -69,9 +116,20 @@ export function parsePostgresDefault(
   const trimmed = rawDefault.trim();
   const normalizedType = nativeType?.toLowerCase();
   const isBigInt = normalizedType === 'bigint' || normalizedType === 'int8';
+  const isArrayType = normalizedType?.endsWith('[]') ?? false;
 
   if (NEXTVAL_PATTERN.test(trimmed)) {
     return { kind: 'function', expression: 'autoincrement()' };
+  }
+
+  if (isArrayType) {
+    const arrayMatch = trimmed.match(ARRAY_LITERAL_PATTERN);
+    if (arrayMatch?.[1] !== undefined) {
+      const parsed = parseArrayLiteralBody(arrayMatch[1]);
+      if (parsed !== undefined) {
+        return { kind: 'literal', value: parsed };
+      }
+    }
   }
 
   const canonicalTimestamp = canonicalizeTimestampDefault(trimmed);

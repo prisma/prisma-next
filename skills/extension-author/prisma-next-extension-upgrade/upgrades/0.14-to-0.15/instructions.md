@@ -3,7 +3,6 @@ from: "0.14"
 to: "0.15"
 changes: []
 ---
-
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in
 `@prisma-next/sql-orm-client` (nested writes through a junction, the
@@ -54,4 +53,13 @@ SQL was updated to the parenthesized form. Test-only assertion update — no
 extension-author API change. Incidental substrate diff only. (The 0.13 → 0.14
 counterpart entry already records the same change; this entry covers the same
 substrate diff against the post-0.14.0 main.)
+-->
+
+<!--
+TML-2911 (native scalar-array storage machinery): the emitted contracts now carry
+the adapter-reported `scalarList` capability marker and the bumped envelope
+version. The scalar-list machinery threaded through this release is internal — no
+authoring path emits a list storage column yet, so extension contracts and runtime
+behaviour are unchanged. No extension-author API or surface change. Incidental
+substrate diff only.
 -->

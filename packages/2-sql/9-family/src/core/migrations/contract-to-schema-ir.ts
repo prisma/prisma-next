@@ -82,13 +82,14 @@ function convertColumn(
   // typeRef and produces `"vector(1536)"` — making diffs on the same
   // contract falsely report a `type_mismatch`.
   const resolved = resolveColumnTypeMetadata(column, storageTypes);
-  const nativeType = expandNativeType
+  const baseNativeType = expandNativeType
     ? expandNativeType({
         nativeType: resolved.nativeType,
         codecId: resolved.codecId,
         ...ifDefined('typeParams', resolved.typeParams),
       })
     : resolved.nativeType;
+  const nativeType = column.many ? `${baseNativeType}[]` : baseNativeType;
   return {
     name,
     nativeType,
