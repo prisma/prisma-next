@@ -33,7 +33,7 @@ function configureWorkerFactory(logger?: ILogger): void {
 
 function buildWebSocketUrl(): string {
   const host = `${window.location.host}${wsPath}`;
-  // nosemgrep: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket -- localhost dev playground; scheme mirrors page origin
+  // nosemgrep: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket
   return window.location.protocol === 'https:' ? `wss://${host}` : `ws://${host}`;
 }
 

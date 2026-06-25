@@ -1,9 +1,13 @@
 import type {
   DocumentAst,
   NamespaceDeclarationAst,
+  NamespaceMemberAst,
   SourceFile,
+  TypesBlockAst,
 } from '@prisma-next/psl-parser/syntax';
 import { type FoldingRange, FoldingRangeKind } from 'vscode-languageserver';
+
+type Declaration = NamespaceMemberAst | TypesBlockAst | NamespaceDeclarationAst;
 
 /**
  * Computes folding ranges for block declarations in a PSL document.
@@ -32,45 +36,35 @@ function collectFoldingRanges(
   ranges: FoldingRange[],
 ): void {
   for (const declaration of document.declarations()) {
-    const lbrace = declaration.lbrace();
-    const rbrace = declaration.rbrace();
+    addFoldingRange(declaration, sourceFile, ranges);
 
-    if (lbrace !== undefined && rbrace !== undefined) {
-      const startLine = sourceFile.positionAt(lbrace.offset).line;
-      const endLine = sourceFile.positionAt(rbrace.offset).line;
-
-      ranges.push({
-        startLine,
-        endLine,
-        kind: FoldingRangeKind.Region,
-      });
-
-      // Recurse into namespace declarations
-      if (isNamespaceDeclaration(declaration)) {
-        for (const nested of declaration.declarations()) {
-          const nestedLbrace = nested.lbrace();
-          const nestedRbrace = nested.rbrace();
-
-          if (nestedLbrace !== undefined && nestedRbrace !== undefined) {
-            const nestedStartLine = sourceFile.positionAt(nestedLbrace.offset).line;
-            const nestedEndLine = sourceFile.positionAt(nestedRbrace.offset).line;
-
-            ranges.push({
-              startLine: nestedStartLine,
-              endLine: nestedEndLine,
-              kind: FoldingRangeKind.Region,
-            });
-          }
-        }
+    if (declaration.syntax.kind === 'Namespace') {
+      const ns = declaration as NamespaceDeclarationAst;
+      for (const nested of ns.declarations()) {
+        addFoldingRange(nested, sourceFile, ranges);
       }
     }
   }
 }
 
-function isNamespaceDeclaration(declaration: object): declaration is NamespaceDeclarationAst {
-  if (!('syntax' in declaration)) return false;
-  const syntax = declaration.syntax;
-  if (typeof syntax !== 'object' || syntax === null) return false;
-  if (!('kind' in syntax)) return false;
-  return syntax.kind === 'Namespace';
+function addFoldingRange(
+  declaration: Declaration | NamespaceMemberAst,
+  sourceFile: SourceFile,
+  ranges: FoldingRange[],
+): void {
+  const lbrace = declaration.lbrace();
+  const rbrace = declaration.rbrace();
+
+  if (lbrace === undefined || rbrace === undefined) {
+    return;
+  }
+
+  const startLine = sourceFile.positionAt(lbrace.offset).line;
+  const endLine = sourceFile.positionAt(rbrace.offset).line;
+
+  ranges.push({
+    startLine,
+    endLine,
+    kind: FoldingRangeKind.Region,
+  });
 }
