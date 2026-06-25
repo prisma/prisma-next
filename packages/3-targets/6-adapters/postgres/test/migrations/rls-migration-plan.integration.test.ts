@@ -20,8 +20,8 @@ import {
 
 // `migration plan` runs offline (no live database): it derives the schema from
 // the contract via the target's `contractToSchema` hook and plans against it.
-// Post-seam that derivation carries the contract's RLS policies, so the plan
-// emits ENABLE ROW LEVEL SECURITY + CREATE POLICY. The prior fail-loud is gone.
+// That derivation carries the contract's RLS policies, so the plan emits
+// ENABLE ROW LEVEL SECURITY + CREATE POLICY.
 
 const PSL = `
 namespace public {

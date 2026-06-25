@@ -2,7 +2,7 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { diffPostgresRlsPolicies } from '../../src/core/migrations/verify-postgres-rls-policies';
+import { diffPostgresSchema } from '../../src/core/migrations/diff-postgres-schema';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
@@ -89,13 +89,13 @@ function makeSchema(actualPolicies: readonly PostgresRlsPolicy[]): PostgresSchem
   });
 }
 
-describe('diffPostgresRlsPolicies', () => {
+describe('diffPostgresSchema', () => {
   it('emits missing outcome when a contract policy is absent from the DB', () => {
     const policy = makePolicy('read_own_profiles_a1b2c3d4');
     const contract = makeContract([policy]);
     const schema = makeSchema([]);
 
-    const issues = diffPostgresRlsPolicies({ contract, schema });
+    const issues = diffPostgresSchema({ contract, schema });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
@@ -109,7 +109,7 @@ describe('diffPostgresRlsPolicies', () => {
     const contract = makeContract([]);
     const schema = makeSchema([actualPolicy]);
 
-    const issues = diffPostgresRlsPolicies({ contract, schema });
+    const issues = diffPostgresSchema({ contract, schema });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
@@ -134,7 +134,7 @@ describe('diffPostgresRlsPolicies', () => {
       }),
     ]);
 
-    const issues = diffPostgresRlsPolicies({ contract, schema });
+    const issues = diffPostgresSchema({ contract, schema });
 
     expect(issues).toHaveLength(0);
   });
@@ -145,7 +145,7 @@ describe('diffPostgresRlsPolicies', () => {
     const contract = makeContract([newPolicy]);
     const schema = makeSchema([oldPolicy]);
 
-    const issues = diffPostgresRlsPolicies({ contract, schema });
+    const issues = diffPostgresSchema({ contract, schema });
 
     expect(issues).toHaveLength(2);
     const outcomes = issues.map((i) => i.outcome);
@@ -159,7 +159,7 @@ describe('diffPostgresRlsPolicies', () => {
     const contract = makeContract([contractPolicy]);
     const schema = makeSchema([actualPolicy]);
 
-    const issues = diffPostgresRlsPolicies({ contract, schema });
+    const issues = diffPostgresSchema({ contract, schema });
 
     for (const issue of issues) {
       expect(issue.coordinate.namespaceId).toBe(SCHEMA_NAME);
@@ -170,7 +170,7 @@ describe('diffPostgresRlsPolicies', () => {
     const contract = makeContract([]);
     const schema = makeSchema([]);
 
-    const issues = diffPostgresRlsPolicies({ contract, schema });
+    const issues = diffPostgresSchema({ contract, schema });
 
     expect(issues).toHaveLength(0);
   });
@@ -180,7 +180,7 @@ describe('diffPostgresRlsPolicies', () => {
     const contract = makeContract([]);
     const schema = makeSchema([outsidePolicy]);
 
-    const issues = diffPostgresRlsPolicies({ contract, schema });
+    const issues = diffPostgresSchema({ contract, schema });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ outcome: 'extra' });
@@ -245,7 +245,7 @@ describe('diffPostgresRlsPolicies', () => {
       nativeEnumTypeNames: [],
     });
 
-    const issues = diffPostgresRlsPolicies({
+    const issues = diffPostgresSchema({
       contract: contractOwningOnlyAuth,
       schema: schemaWithBothNamespaces,
     });
@@ -308,7 +308,7 @@ describe('diffPostgresRlsPolicies', () => {
       nativeEnumTypeNames: [],
     });
 
-    const issues = diffPostgresRlsPolicies({ contract: contractOwningAuth, schema });
+    const issues = diffPostgresSchema({ contract: contractOwningAuth, schema });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({

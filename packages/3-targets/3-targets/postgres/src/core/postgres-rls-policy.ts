@@ -101,7 +101,7 @@ export function assertPostgresRlsPolicy(
   if (!isPostgresRlsPolicy(node)) {
     const kind = node !== undefined && 'kind' in node ? String(node.kind) : typeof node;
     throw new Error(
-      `planRlsDiff: expected a PostgresRlsPolicy on the policy-diff path but got ${kind}`,
+      `planPostgresSchemaDiff: expected a PostgresRlsPolicy on the policy-diff path but got ${kind}`,
     );
   }
 }

@@ -92,12 +92,10 @@ function createTestContract(
   };
 }
 
-// Post-seam the planner requires a `PostgresSchemaIR` as its "from" schema.
-// This mirrors the production `migration plan` derivation: project the
-// contract's tables, and carry the contract's enum native-type names in
-// `nativeEnumTypeNames` (the `PostgresSchemaIR` field that records which enum
-// types already exist — the signal the enum `planTypeOperations` hook reads to
-// decide whether to emit a `CREATE TYPE`).
+// Carry the contract's enum native-type names in `nativeEnumTypeNames` (the
+// `PostgresSchemaIR` field that records which enum types already exist — the
+// signal the enum `planTypeOperations` hook reads to decide whether to emit a
+// `CREATE TYPE`).
 function contractToSchemaIR(
   contract: Contract<SqlStorage> | null,
   options?: Omit<Parameters<typeof contractToSchemaIRImpl>[1], 'annotationNamespace'>,

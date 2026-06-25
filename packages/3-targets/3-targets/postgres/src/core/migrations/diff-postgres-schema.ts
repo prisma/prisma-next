@@ -1,10 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { DiffableRoot, SchemaDiffIssue } from '@prisma-next/framework-components/control';
-import { diffSchema } from '@prisma-next/framework-components/control';
+import { diffSchema, dropUnownedExtraIssues } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { PostgresSchemaIR } from '../postgres-schema-ir';
-import { collectContractRlsPolicies } from './project-postgres-schema-from-contract';
+import { collectContractRlsPolicies } from './contract-to-postgres-schema-ir';
 
 // Postgres binds the late-bound (`__unbound__`) namespace to the `public`
 // schema, so an unbound contract owns `public` in the live database. Both the
@@ -42,7 +42,7 @@ function resolveNamespaceId(namespaceId: string): string {
  * `storage.namespaces` slot keys), with the late-bound `__unbound__` slot
  * resolved to the Postgres default `public`.
  */
-export function diffPostgresRlsPolicies(input: {
+export function diffPostgresSchema(input: {
   readonly contract: Contract<SqlStorage>;
   readonly schema: PostgresSchemaIR;
 }): readonly SchemaDiffIssue[] {
@@ -52,8 +52,7 @@ export function diffPostgresRlsPolicies(input: {
   const issues = diffSchema(expected, actual);
 
   const owned = new Set(Object.keys(contract.storage.namespaces).map(resolveNamespaceId));
-  return issues.filter(
-    (issue) =>
-      issue.outcome !== 'extra' || owned.has(resolveNamespaceId(issue.coordinate.namespaceId)),
+  return dropUnownedExtraIssues(issues, (namespaceId) =>
+    owned.has(resolveNamespaceId(namespaceId)),
   );
 }

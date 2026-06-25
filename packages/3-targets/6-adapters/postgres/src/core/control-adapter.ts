@@ -59,7 +59,7 @@ import type {
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
-import { diffPostgresRlsPolicies } from '@prisma-next/target-postgres/planner';
+import { diffPostgresSchema } from '@prisma-next/target-postgres/planner';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
   isPostgresSchemaIR,
@@ -131,7 +131,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         `RLS verification requires a PostgresSchemaIR; got ${(schema as { constructor?: { name?: string } }).constructor?.name ?? typeof schema}`,
       );
     }
-    return diffPostgresRlsPolicies({ contract, schema });
+    return diffPostgresSchema({ contract, schema });
   }
 
   bootstrapControlTableQueries(): readonly DdlNode[] {

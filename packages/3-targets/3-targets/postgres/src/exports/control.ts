@@ -8,12 +8,13 @@ import type {
   MigrationRunner,
 } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
+import { contractToPostgresSchemaIR } from '../core/migrations/contract-to-postgres-schema-ir';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
-import { projectPostgresSchemaFromContract } from '../core/migrations/project-postgres-schema-from-contract';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
 import { PostgresContractSerializer } from '../core/postgres-contract-serializer';
 import { PostgresSchemaVerifier } from '../core/postgres-schema-verifier';
@@ -59,7 +60,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
       },
       contractToSchema(contract, frameworkComponents) {
         const expander = buildNativeTypeExpander(frameworkComponents);
-        // Blind cast: the framework SPI signature
+        // The framework SPI signature
         // (`control-migration-types.ts § contractToSchema`) types
         // `contract` as the generic `Contract | null`. Inside the
         // postgres target descriptor we know any contract reaching
@@ -67,14 +68,15 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
         // would have refused to construct a postgres target binding
         // otherwise — so we narrow the generic to
         // `Contract<SqlStorage>` for the lowering call.
-        return projectPostgresSchemaFromContract(
-          contract as unknown as Contract<SqlStorage> | null,
-          {
-            annotationNamespace: 'pg',
-            ...ifDefined('expandNativeType', expander),
-            renderDefault: postgresRenderDefault,
-          },
-        );
+        const sqlContract = blindCast<
+          Contract<SqlStorage> | null,
+          'family resolver guarantees a SQL-family contract before this binding exists'
+        >(contract);
+        return contractToPostgresSchemaIR(sqlContract, {
+          annotationNamespace: 'pg',
+          ...ifDefined('expandNativeType', expander),
+          renderDefault: postgresRenderDefault,
+        });
       },
     },
     create(): ControlTargetInstance<'sql', 'postgres'> {

@@ -5,8 +5,8 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import {
   collectContractRlsPolicies,
-  projectPostgresSchemaFromContract,
-} from '../../src/core/migrations/project-postgres-schema-from-contract';
+  contractToPostgresSchemaIR,
+} from '../../src/core/migrations/contract-to-postgres-schema-ir';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { isPostgresSchemaIR } from '../../src/core/postgres-schema-ir';
@@ -72,12 +72,12 @@ const projectionOptions = {
   renderDefault: postgresRenderDefault,
 } as const;
 
-describe('projectPostgresSchemaFromContract', () => {
+describe('contractToPostgresSchemaIR', () => {
   it('projects a SELECT policy into rlsPolicies and tables matching contractToSchemaIR', () => {
     const policy = makePolicy('read_own_profiles_a1b2c3d4');
     const contract = makeContract([policy]);
 
-    const ir = projectPostgresSchemaFromContract(contract, projectionOptions);
+    const ir = contractToPostgresSchemaIR(contract, projectionOptions);
 
     expect(isPostgresSchemaIR(ir)).toBe(true);
     expect(ir.rlsPolicies).toContainEqual(policy);
@@ -85,7 +85,7 @@ describe('projectPostgresSchemaFromContract', () => {
   });
 
   it('returns no policies for a null contract', () => {
-    const ir = projectPostgresSchemaFromContract(null, projectionOptions);
+    const ir = contractToPostgresSchemaIR(null, projectionOptions);
     expect(ir.rlsPolicies).toEqual([]);
     expect(ir.tables).toEqual({});
     expect(isPostgresSchemaIR(ir)).toBe(true);

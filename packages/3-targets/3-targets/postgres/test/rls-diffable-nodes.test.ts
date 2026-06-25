@@ -87,7 +87,7 @@ describe('PostgresRlsPolicy DiffableNode', () => {
     it('throws with a descriptive message when given a non-policy node', () => {
       const role = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
       expect(() => assertPostgresRlsPolicy(role)).toThrow(
-        /planRlsDiff: expected a PostgresRlsPolicy/,
+        /planPostgresSchemaDiff: expected a PostgresRlsPolicy/,
       );
     });
 

@@ -327,7 +327,7 @@ describe('RLS planner policy edit (missing + extra via generic pipeline)', () =>
   });
 });
 
-// Post-seam, `migration plan` derives a contract-backed PostgresSchemaIR (the
+// `migration plan` derives a contract-backed PostgresSchemaIR (the
 // `contractToSchema` projection) and emits CREATE POLICY through the same diff
-// pipeline as the live paths. The prior fail-loud on a non-PostgresSchemaIR
-// schema is deleted; the `migration plan` e2e proves the emission end-to-end.
+// pipeline as the live paths. A non-PostgresSchemaIR schema is rejected; the
+// `migration plan` e2e proves the emission end-to-end.

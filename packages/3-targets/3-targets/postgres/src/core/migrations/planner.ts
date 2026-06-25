@@ -34,6 +34,7 @@ import {
   resolvePostgresIssueControlPolicySubject,
   resolvePostgresIssueCreationFactoryName,
 } from './control-policy';
+import { diffPostgresSchema } from './diff-postgres-schema';
 import { planIssues } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 import {
@@ -44,7 +45,6 @@ import {
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
 import { verifyPostgresNamespacePresence } from './verify-postgres-namespaces';
-import { diffPostgresRlsPolicies } from './verify-postgres-rls-policies';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -209,7 +209,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // command supplies a `PostgresSchemaIR` here — introspection on the live
     // paths, `contractToSchema` on `migration plan` — so the diff runs the same
     // way on each.
-    const rlsCalls = this.planRlsDiff(options);
+    const rlsCalls = this.planPostgresSchemaDiff(options);
     const rlsPartition = partitionCallsByControlPolicy({
       calls: rlsCalls,
       contract: options.contract,
@@ -267,14 +267,16 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     });
   }
 
-  private planRlsDiff(options: PlannerOptionsWithComponents): readonly PostgresOpFactoryCall[] {
+  private planPostgresSchemaDiff(
+    options: PlannerOptionsWithComponents,
+  ): readonly PostgresOpFactoryCall[] {
     if (!isPostgresSchemaIR(options.schema)) {
-      // Post-seam every command supplies a PostgresSchemaIR (introspection on
-      // the live paths, contractToSchema on `migration plan`), so this is an
-      // unreachable invariant guard, not a per-command branch.
-      throw new Error('planRlsDiff: options.schema must be a PostgresSchemaIR');
+      // Every command supplies a PostgresSchemaIR here — introspection on the
+      // live paths, the contract projection on `migration plan` — so this guard
+      // is unreachable in production.
+      throw new Error('planPostgresSchemaDiff: options.schema must be a PostgresSchemaIR');
     }
-    const diffIssues = diffPostgresRlsPolicies({
+    const diffIssues = diffPostgresSchema({
       contract: options.contract,
       schema: options.schema,
     });
@@ -349,7 +351,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // rather than in the family verifier. Stitch it in here so a single
     // `SchemaIssue[]` flows through `planIssues` and the planner emits
     // CREATE SCHEMA in the dep bucket before any CreateTableCall.
-    // RLS policy drift is handled separately via diffPostgresRlsPolicies → planRlsDiff.
+    // RLS policy drift is handled separately via diffPostgresSchema → planPostgresSchemaDiff.
     const namespaceIssues = verifyPostgresNamespacePresence({
       contract: options.contract,
       schema: options.schema,

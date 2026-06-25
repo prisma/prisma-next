@@ -17,18 +17,15 @@ export function collectContractRlsPolicies(
   );
 }
 
-/** Same, for roles. Used only by the full-IR projection in this slice. */
-export function collectContractRoles(
-  contract: Contract<SqlStorage> | null,
-): readonly PostgresRole[] {
+function collectContractRoles(contract: Contract<SqlStorage> | null): readonly PostgresRole[] {
   if (contract === null) return [];
   return Object.values(contract.storage.namespaces).flatMap((ns) =>
     isPostgresSchema(ns) ? Object.values(ns.role) : [],
   );
 }
 
-/** The project-from-contract derivation: a populated PostgresSchemaIR. */
-export function projectPostgresSchemaFromContract(
+/** The contract-to-postgres-schema-ir derivation: a populated PostgresSchemaIR. */
+export function contractToPostgresSchemaIR(
   contract: Contract<SqlStorage> | null,
   options: ContractToSchemaIROptions,
 ): PostgresSchemaIR {
