@@ -1,5 +1,6 @@
 import { access, copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import * as nodeHttp from 'node:http';
+import { createRequire } from 'node:module';
 import { basename, dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as vite from 'vite';
@@ -8,7 +9,7 @@ import { generateDefaultPostgresConfig, PLAYGROUND_DIR } from './default-config'
 import { findNearestConfig } from './find-config';
 
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const PORT = 5273;
+const PORT = 5295;
 const LSP_PATH = '/psl';
 
 async function fileExists(path: string): Promise<boolean> {
@@ -160,6 +161,35 @@ export const schemaText = ${JSON.stringify(schemaText)};
       hmr: { server: httpServer },
     },
     appType: 'spa',
+    // monaco-languageclient requires specific optimization settings
+    // Based on TypeFox's official vite.config.ts
+    optimizeDeps: {
+      include: [
+        '@codingame/monaco-vscode-files-service-override',
+        'vscode-jsonrpc',
+        'vscode-languageclient/browser',
+        'vscode-languageserver-protocol/browser',
+        'vscode-ws-jsonrpc',
+      ],
+    },
+    resolve: {
+      alias: (() => {
+        // Resolve the absolute paths for proper aliasing
+        const require = createRequire(import.meta.url);
+        // Extension API provides vscode.* namespace (CancellationError, Uri, etc.)
+        const extensionApiPath = require.resolve('@codingame/monaco-vscode-extension-api');
+        return [
+          // vscode/localExtensionHost is imported by monaco-languageclient but no longer exists
+          // in @codingame/monaco-vscode-api@25. Stub it with an empty module.
+          {
+            find: 'vscode/localExtensionHost',
+            replacement: resolve(PACKAGE_ROOT, 'src/stubs/localExtensionHost.ts'),
+          },
+          // Alias vscode to monaco-vscode-extension-api for proper extension API support
+          { find: 'vscode', replacement: extensionApiPath },
+        ];
+      })(),
+    },
   });
   httpServer.on('request', viteServer.middlewares);
 

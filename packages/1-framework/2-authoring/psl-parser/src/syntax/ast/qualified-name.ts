@@ -1,7 +1,6 @@
-import type { Token } from '../../tokenizer';
 import type { AstNode } from '../ast-helpers';
 import { filterChildren, findChildToken, findFirstChild } from '../ast-helpers';
-import { SyntaxNode } from '../red';
+import { SyntaxNode, type SyntaxToken } from '../red';
 import { IdentifierAst } from './identifier';
 
 /** A namespace-qualified name, e.g. `pgvector.Vector` or `supabase:auth.User`. */
@@ -38,11 +37,11 @@ export class QualifiedNameAst implements AstNode {
     return count;
   }
 
-  colon(): Token | undefined {
+  colon(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Colon');
   }
 
-  dot(): Token | undefined {
+  dot(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Dot');
   }
 

@@ -1,7 +1,6 @@
-import type { Token } from '../../tokenizer';
 import type { AstNode } from '../ast-helpers';
 import { filterChildren, findChildToken, findFirstChild } from '../ast-helpers';
-import { SyntaxNode } from '../red';
+import { SyntaxNode, type SyntaxToken } from '../red';
 import { FieldAttributeAst, ModelAttributeAst } from './attributes';
 import type { ExpressionAst } from './expressions';
 import { castExpression } from './expressions';
@@ -53,7 +52,7 @@ export class ModelDeclarationAst implements AstNode {
     this.syntax = syntax;
   }
 
-  keyword(): Token | undefined {
+  keyword(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Ident');
   }
 
@@ -61,11 +60,11 @@ export class ModelDeclarationAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  lbrace(): Token | undefined {
+  lbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LBrace');
   }
 
-  rbrace(): Token | undefined {
+  rbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RBrace');
   }
 
@@ -89,7 +88,7 @@ export class CompositeTypeDeclarationAst implements AstNode {
     this.syntax = syntax;
   }
 
-  keyword(): Token | undefined {
+  keyword(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Ident');
   }
 
@@ -97,11 +96,11 @@ export class CompositeTypeDeclarationAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  lbrace(): Token | undefined {
+  lbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LBrace');
   }
 
-  rbrace(): Token | undefined {
+  rbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RBrace');
   }
 
@@ -127,7 +126,7 @@ export class NamespaceDeclarationAst implements AstNode {
     this.syntax = syntax;
   }
 
-  keyword(): Token | undefined {
+  keyword(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Ident');
   }
 
@@ -135,11 +134,11 @@ export class NamespaceDeclarationAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  lbrace(): Token | undefined {
+  lbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LBrace');
   }
 
-  rbrace(): Token | undefined {
+  rbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RBrace');
   }
 
@@ -159,15 +158,15 @@ export class TypesBlockAst implements AstNode {
     this.syntax = syntax;
   }
 
-  keyword(): Token | undefined {
+  keyword(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Ident');
   }
 
-  lbrace(): Token | undefined {
+  lbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LBrace');
   }
 
-  rbrace(): Token | undefined {
+  rbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RBrace');
   }
 
@@ -187,7 +186,7 @@ export class GenericBlockDeclarationAst implements AstNode {
     this.syntax = syntax;
   }
 
-  keyword(): Token | undefined {
+  keyword(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Ident');
   }
 
@@ -195,11 +194,11 @@ export class GenericBlockDeclarationAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  lbrace(): Token | undefined {
+  lbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LBrace');
   }
 
-  rbrace(): Token | undefined {
+  rbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RBrace');
   }
 
@@ -229,7 +228,7 @@ export class KeyValuePairAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  equals(): Token | undefined {
+  equals(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Equals');
   }
 
@@ -288,7 +287,7 @@ export class NamedTypeDeclarationAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  equals(): Token | undefined {
+  equals(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Equals');
   }
 
