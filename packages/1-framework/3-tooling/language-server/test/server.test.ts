@@ -2,6 +2,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { pathToFileURL } from 'node:url';
+import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
 import { buildSymbolTable, type SymbolTable } from '@prisma-next/psl-parser';
 import type { FormatOptions } from '@prisma-next/psl-parser/format';
 import { type ParseDiagnostic, parse } from '@prisma-next/psl-parser/syntax';
@@ -76,15 +77,30 @@ const formattedPsl = 'model User {\n  id Int\n}\n';
 
 const scalarTypes = ['String', 'Int', 'Boolean', 'DateTime'] as const;
 
+const pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace = {
+  policy: {
+    kind: 'pslBlock',
+    keyword: 'policy',
+    discriminator: 'fixture-policy',
+    name: { required: true },
+    parameters: {
+      on: { kind: 'ref', refKind: 'model', scope: 'same-space' },
+      where: { kind: 'value', codecId: 'fixture/text@1' },
+      mode: { kind: 'option', values: ['permissive', 'restrictive'] },
+    },
+  },
+};
+
 function resolutionForInputs(
   inputs: readonly string[],
   formatter?: FormatOptions,
+  descriptors: AuthoringPslBlockDescriptorNamespace = {},
 ): ConfigResolutionWithFormatter {
   const resolution = {
     inputs: resolveSchemaInputs({
       contract: { source: { sourceFormat: 'psl', inputs } },
     }),
-    controlStack: { scalarTypes: [...scalarTypes], pslBlockDescriptors: {} },
+    controlStack: { scalarTypes: [...scalarTypes], pslBlockDescriptors: descriptors },
   };
   return formatter === undefined ? resolution : { ...resolution, formatter };
 }
@@ -97,6 +113,8 @@ function emptyResolution(): ConfigResolution {
 }
 
 const resolveToSchema: ResolveInputs = async () => resolutionForInputs([schemaPath]);
+const resolveToSchemaWithPslBlockDescriptors: ResolveInputs = async () =>
+  resolutionForInputs([schemaPath], undefined, pslBlockDescriptors);
 
 function resolveToSchemaWithFormatter(formatter: FormatOptions): ResolveInputs {
   return async () => resolutionForInputs([schemaPath], formatter);
@@ -461,6 +479,17 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
       'User',
       'Address',
     ]);
+  });
+
+  it('returns generic block parameter completions for configured PSL descriptors', async () => {
+    harness = startHarness(resolveToSchemaWithPslBlockDescriptors);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor(['policy UserAccess {', '  wh|', '}'].join('\n'));
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items.map((item) => item.label)).toEqual(['where']);
   });
 
   it('returns no completion items for unconfigured PSL documents', async () => {

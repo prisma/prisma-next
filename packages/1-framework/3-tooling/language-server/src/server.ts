@@ -286,6 +286,7 @@ export function createServer(connection: Connection): LanguageServer {
           sourceFile: cached.sourceFile,
           candidates: {
             scalarTypes: project.controlStack.scalarTypes,
+            pslBlockDescriptors: project.controlStack.pslBlockDescriptors,
             symbolTable,
           },
         }),
