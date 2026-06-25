@@ -1,11 +1,11 @@
-import type { Token, TokenKind } from '../tokenizer';
-import { SyntaxNode } from './red';
+import type { TokenKind } from '../tokenizer';
+import { SyntaxNode, type SyntaxToken } from './red';
 
 export interface AstNode {
   readonly syntax: SyntaxNode;
 }
 
-export function findChildToken(node: SyntaxNode, kind: TokenKind): Token | undefined {
+export function findChildToken(node: SyntaxNode, kind: TokenKind): SyntaxToken | undefined {
   for (const child of node.children()) {
     if (!(child instanceof SyntaxNode) && child.kind === kind) {
       return child;

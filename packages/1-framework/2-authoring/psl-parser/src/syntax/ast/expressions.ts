@@ -1,7 +1,6 @@
-import type { Token } from '../../tokenizer';
 import type { AstNode } from '../ast-helpers';
 import { filterChildren, findChildToken, findFirstChild } from '../ast-helpers';
-import { SyntaxNode } from '../red';
+import { SyntaxNode, type SyntaxToken } from '../red';
 import { IdentifierAst } from './identifier';
 import { QualifiedNameAst } from './qualified-name';
 
@@ -32,11 +31,11 @@ export class FunctionCallAst implements AstNode {
     return segments;
   }
 
-  lparen(): Token | undefined {
+  lparen(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LParen');
   }
 
-  rparen(): Token | undefined {
+  rparen(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RParen');
   }
 
@@ -56,11 +55,11 @@ export class ArrayLiteralAst implements AstNode {
     this.syntax = syntax;
   }
 
-  lbracket(): Token | undefined {
+  lbracket(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LBracket');
   }
 
-  rbracket(): Token | undefined {
+  rbracket(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RBracket');
   }
 
@@ -156,7 +155,7 @@ export class StringLiteralExprAst implements AstNode {
     this.syntax = syntax;
   }
 
-  token(): Token | undefined {
+  token(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'StringLiteral');
   }
 
@@ -178,7 +177,7 @@ export class NumberLiteralExprAst implements AstNode {
     this.syntax = syntax;
   }
 
-  token(): Token | undefined {
+  token(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'NumberLiteral');
   }
 
@@ -200,7 +199,7 @@ export class BooleanLiteralExprAst implements AstNode {
     this.syntax = syntax;
   }
 
-  token(): Token | undefined {
+  token(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Ident');
   }
 
@@ -224,11 +223,11 @@ export class ObjectLiteralExprAst implements AstNode {
     this.syntax = syntax;
   }
 
-  lbrace(): Token | undefined {
+  lbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LBrace');
   }
 
-  rbrace(): Token | undefined {
+  rbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RBrace');
   }
 
@@ -279,7 +278,7 @@ export class ObjectFieldAst implements AstNode {
     return undefined;
   }
 
-  colon(): Token | undefined {
+  colon(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Colon');
   }
 
@@ -339,7 +338,7 @@ export class AttributeArgAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  colon(): Token | undefined {
+  colon(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Colon');
   }
 

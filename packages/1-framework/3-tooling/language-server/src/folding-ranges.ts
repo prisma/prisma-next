@@ -2,7 +2,6 @@ import type {
   DocumentAst,
   NamespaceDeclarationAst,
   SourceFile,
-  SyntaxToken,
 } from '@prisma-next/psl-parser/syntax';
 import { type FoldingRange, FoldingRangeKind } from 'vscode-languageserver';
 
@@ -33,8 +32,8 @@ function collectFoldingRanges(
   ranges: FoldingRange[],
 ): void {
   for (const declaration of document.declarations()) {
-    const lbrace = declaration.lbrace() as SyntaxToken | undefined;
-    const rbrace = declaration.rbrace() as SyntaxToken | undefined;
+    const lbrace = declaration.lbrace();
+    const rbrace = declaration.rbrace();
 
     if (lbrace !== undefined && rbrace !== undefined) {
       const startLine = sourceFile.positionAt(lbrace.offset).line;
@@ -49,8 +48,8 @@ function collectFoldingRanges(
       // Recurse into namespace declarations
       if (isNamespaceDeclaration(declaration)) {
         for (const nested of declaration.declarations()) {
-          const nestedLbrace = nested.lbrace() as SyntaxToken | undefined;
-          const nestedRbrace = nested.rbrace() as SyntaxToken | undefined;
+          const nestedLbrace = nested.lbrace();
+          const nestedRbrace = nested.rbrace();
 
           if (nestedLbrace !== undefined && nestedRbrace !== undefined) {
             const nestedStartLine = sourceFile.positionAt(nestedLbrace.offset).line;
@@ -68,12 +67,10 @@ function collectFoldingRanges(
   }
 }
 
-function isNamespaceDeclaration(declaration: unknown): declaration is NamespaceDeclarationAst {
-  return (
-    typeof declaration === 'object' &&
-    declaration !== null &&
-    'syntax' in declaration &&
-    typeof (declaration as { syntax: { kind: string } }).syntax?.kind === 'string' &&
-    (declaration as { syntax: { kind: string } }).syntax.kind === 'Namespace'
-  );
+function isNamespaceDeclaration(declaration: object): declaration is NamespaceDeclarationAst {
+  if (!('syntax' in declaration)) return false;
+  const syntax = declaration.syntax;
+  if (typeof syntax !== 'object' || syntax === null) return false;
+  if (!('kind' in syntax)) return false;
+  return syntax.kind === 'Namespace';
 }
