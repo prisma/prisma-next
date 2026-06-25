@@ -26,7 +26,6 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { assertPostgresRlsPolicy } from '../postgres-rls-policy';
-import { isPostgresSchema } from '../postgres-schema';
 import { isPostgresSchemaIR } from '../postgres-schema-ir';
 import { resolveDdlSchemaForNamespaceStorage } from '../postgres-schema-ir-annotations';
 import {
@@ -206,31 +205,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 
     // Translate RLS diff issues to DDL calls and run through control-policy
     // partition. This runs AFTER the structural planIssues pass so the RLS
-    // calls can refer to tables that may have been created in this plan.
-    //
-    // Fail loud when the contract declares RLS policies but the schema is
-    // contract-derived (migration plan path). Without a live-introspected
-    // PostgresSchemaIR there is no baseline to reconcile against, so
-    // silently emitting no RLS DDL would be wrong. The user must run
-    // `db update` / `db init` against a live database to emit RLS.
-    if (!isPostgresSchemaIR(options.schema)) {
-      const policyNames: string[] = [];
-      for (const ns of Object.values(options.contract.storage.namespaces)) {
-        if (isPostgresSchema(ns)) {
-          for (const [policyName, policy] of Object.entries(ns.policy)) {
-            policyNames.push(`${policy.tableName}.${policyName}`);
-          }
-        }
-      }
-      if (policyNames.length > 0) {
-        return plannerFailure([
-          {
-            kind: 'unsupportedOperation',
-            summary: `migration plan does not yet emit RLS policies (the offline contract→schema derivation cannot carry them). Author RLS via 'db update' / 'db init' against a live database. Tracked for a follow-up slice (extension migration participation seam). Affected policies: ${policyNames.join(', ')}`,
-          },
-        ]);
-      }
-    }
+    // calls can refer to tables that may have been created in this plan. Every
+    // command supplies a `PostgresSchemaIR` here — introspection on the live
+    // paths, `contractToSchema` on `migration plan` — so the diff runs the same
+    // way on each.
     const rlsCalls = this.planRlsDiff(options);
     const rlsPartition = partitionCallsByControlPolicy({
       calls: rlsCalls,
@@ -291,10 +269,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 
   private planRlsDiff(options: PlannerOptionsWithComponents): readonly PostgresOpFactoryCall[] {
     if (!isPostgresSchemaIR(options.schema)) {
-      // Non-PostgresSchemaIR (migration plan path) reaches here only when the
-      // contract declares NO policies — `planSql` already returned a failure
-      // for the has-policies case. This [] is the genuine no-RLS case.
-      return [];
+      // Post-seam every command supplies a PostgresSchemaIR (introspection on
+      // the live paths, contractToSchema on `migration plan`), so this is an
+      // unreachable invariant guard, not a per-command branch.
+      throw new Error('planRlsDiff: options.schema must be a PostgresSchemaIR');
     }
     const diffIssues = diffPostgresRlsPolicies({
       contract: options.contract,

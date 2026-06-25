@@ -17,8 +17,8 @@ import {
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import { PostgresSchemaIR } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
@@ -26,7 +26,15 @@ import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
-const emptySchema: SqlSchemaIR = { tables: {} };
+const emptySchema = new PostgresSchemaIR({
+  tables: {},
+  pgSchemaName: 'public',
+  pgVersion: '',
+  rlsPolicies: [],
+  roles: [],
+  existingSchemas: [],
+  nativeEnumTypeNames: [],
+});
 
 /**
  * Build a contract with a Profile table in the unbound (public) namespace

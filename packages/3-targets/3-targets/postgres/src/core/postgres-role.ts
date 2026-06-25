@@ -33,7 +33,7 @@ export class PostgresRole extends SqlNode implements DiffableNode {
     freezeNode(this);
   }
 
-  identity(): EntityCoordinate {
+  coord(): EntityCoordinate {
     return {
       plane: 'storage',
       namespaceId: this.namespaceId,
@@ -42,10 +42,14 @@ export class PostgresRole extends SqlNode implements DiffableNode {
     };
   }
 
+  children(): readonly DiffableNode[] {
+    return [];
+  }
+
   isEqualTo(other: DiffableNode): boolean {
     if (!(other instanceof PostgresRole)) {
       throw new Error(
-        `PostgresRole.isEqualTo: expected a PostgresRole, got ${other.identity().entityKind}`,
+        `PostgresRole.isEqualTo: expected a PostgresRole, got ${other.coord().entityKind}`,
       );
     }
     return this.name === other.name;

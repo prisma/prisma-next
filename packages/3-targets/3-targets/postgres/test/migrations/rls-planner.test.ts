@@ -17,7 +17,6 @@ import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adap
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
-import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
@@ -328,59 +327,7 @@ describe('RLS planner policy edit (missing + extra via generic pipeline)', () =>
   });
 });
 
-// On the `migration plan` path the planner receives a SqlSchemaIR derived from the
-// "from" contract (not a live-introspected PostgresSchemaIR). RLS policies cannot
-// be correctly reconciled without a live schema, so the planner must fail loudly
-// instead of silently emitting no RLS DDL when the contract declares policies.
-const derivedSchema = new SqlSchemaIR({
-  tables: {
-    [TABLE_NAME]: {
-      name: TABLE_NAME,
-      columns: {
-        id: { name: 'id', nativeType: 'int4', nullable: false },
-        user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
-      },
-      foreignKeys: [],
-      uniques: [],
-      indexes: [],
-    },
-  },
-});
-
-describe('migration plan path (non-PostgresSchemaIR schema)', () => {
-  it('returns unsupportedOperation failure when the contract declares RLS policies', () => {
-    const contract = buildContractWithPolicy();
-    const planner = createPostgresMigrationPlanner(stubLowerer);
-
-    const result = planner.plan({
-      contract,
-      schema: derivedSchema,
-      policy: INIT_ADDITIVE_POLICY,
-      fromContract: null,
-      frameworkComponents: [],
-      spaceId: APP_SPACE_ID,
-    });
-
-    expect(result.kind).toBe('failure');
-    if (result.kind !== 'failure') return;
-    expect(result.conflicts).toHaveLength(1);
-    expect(result.conflicts[0]!.kind).toBe('unsupportedOperation');
-    expect(result.conflicts[0]!.summary).toContain('RLS');
-  });
-
-  it('succeeds when the contract declares no RLS policies', () => {
-    const contractWithNoRls = buildContractWith([]);
-    const planner = createPostgresMigrationPlanner(stubLowerer);
-
-    const result = planner.plan({
-      contract: contractWithNoRls,
-      schema: derivedSchema,
-      policy: INIT_ADDITIVE_POLICY,
-      fromContract: null,
-      frameworkComponents: [],
-      spaceId: APP_SPACE_ID,
-    });
-
-    expect(result.kind).toBe('success');
-  });
-});
+// Post-seam, `migration plan` derives a contract-backed PostgresSchemaIR (the
+// `contractToSchema` projection) and emits CREATE POLICY through the same diff
+// pipeline as the live paths. The prior fail-loud on a non-PostgresSchemaIR
+// schema is deleted; the `migration plan` e2e proves the emission end-to-end.

@@ -1,3 +1,4 @@
+import type { DiffableNode, DiffableRoot } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import {
   type SqlAnnotations,
@@ -40,7 +41,7 @@ export interface PostgresSchemaIRInput {
  *
  * Nothing RLS-specific leaks into the sql-family layer.
  */
-export class PostgresSchemaIR extends SqlSchemaIRNode {
+export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableRoot {
   readonly nodeTarget: SqlSchemaTarget = 'postgres';
   readonly tables: Readonly<Record<string, SqlTableIR>>;
   declare readonly annotations?: SqlAnnotations;
@@ -83,6 +84,10 @@ export class PostgresSchemaIR extends SqlSchemaIRNode {
       },
     };
     freezeNode(this);
+  }
+
+  children(): readonly DiffableNode[] {
+    return this.rlsPolicies;
   }
 }
 

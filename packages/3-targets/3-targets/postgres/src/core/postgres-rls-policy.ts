@@ -60,13 +60,17 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
     freezeNode(this);
   }
 
-  identity(): EntityCoordinate {
+  coord(): EntityCoordinate {
     return {
       plane: 'storage',
       namespaceId: this.namespaceId,
       entityKind: 'policy',
       entityName: this.name,
     };
+  }
+
+  children(): readonly DiffableNode[] {
+    return [];
   }
 
   /**
@@ -80,7 +84,7 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
   isEqualTo(other: DiffableNode): boolean {
     if (!isPostgresRlsPolicy(other)) {
       throw new Error(
-        `PostgresRlsPolicy.isEqualTo: expected a PostgresRlsPolicy, got ${other.identity().entityKind}`,
+        `PostgresRlsPolicy.isEqualTo: expected a PostgresRlsPolicy, got ${other.coord().entityKind}`,
       );
     }
     return this.name === other.name;

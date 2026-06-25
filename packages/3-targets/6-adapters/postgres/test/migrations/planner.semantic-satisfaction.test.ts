@@ -16,8 +16,8 @@ import {
   SqlStorage,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import { PostgresSchemaIR } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
@@ -43,7 +43,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         },
       });
 
-      const schema: SqlSchemaIR = {
+      const schema = new PostgresSchemaIR({
         tables: {
           user: {
             name: 'user',
@@ -57,7 +57,13 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
             indexes: [{ columns: ['email'], unique: true, name: 'user_email_idx' }],
           },
         },
-      };
+        pgSchemaName: 'public',
+        pgVersion: '',
+        rlsPolicies: [],
+        roles: [],
+        existingSchemas: [],
+        nativeEnumTypeNames: [],
+      });
 
       const result = planner.plan({
         contract,
@@ -91,7 +97,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         },
       });
 
-      const schema: SqlSchemaIR = {
+      const schema = new PostgresSchemaIR({
         tables: {
           user: {
             name: 'user',
@@ -105,7 +111,13 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
             indexes: [{ columns: ['email'], unique: true, name: 'user_email_idx' }],
           },
         },
-      };
+        pgSchemaName: 'public',
+        pgVersion: '',
+        rlsPolicies: [],
+        roles: [],
+        existingSchemas: [],
+        nativeEnumTypeNames: [],
+      });
 
       const result = planner.plan({
         contract,
@@ -137,7 +149,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         },
       });
 
-      const schema: SqlSchemaIR = {
+      const schema = new PostgresSchemaIR({
         tables: {
           user: {
             name: 'user',
@@ -151,7 +163,13 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
             indexes: [],
           },
         },
-      };
+        pgSchemaName: 'public',
+        pgVersion: '',
+        rlsPolicies: [],
+        roles: [],
+        existingSchemas: [],
+        nativeEnumTypeNames: [],
+      });
 
       const result = planner.plan({
         contract,
@@ -185,7 +203,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         },
       });
 
-      const schema: SqlSchemaIR = {
+      const schema = new PostgresSchemaIR({
         tables: {
           user: {
             name: 'user',
@@ -199,7 +217,13 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
             indexes: [{ columns: ['email'], unique: false, name: 'user_email_idx' }],
           },
         },
-      };
+        pgSchemaName: 'public',
+        pgVersion: '',
+        rlsPolicies: [],
+        roles: [],
+        existingSchemas: [],
+        nativeEnumTypeNames: [],
+      });
 
       const result = planner.plan({
         contract,

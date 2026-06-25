@@ -27,6 +27,7 @@ import {
 import { postgresRenderDefault } from '@prisma-next/target-postgres/control';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
+import { PostgresSchemaIR } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
@@ -91,11 +92,28 @@ function createTestContract(
   };
 }
 
+// Post-seam the planner requires a `PostgresSchemaIR` as its "from" schema.
+// This mirrors the production `migration plan` derivation: project the
+// contract's tables, and carry the contract's enum native-type names in
+// `nativeEnumTypeNames` (the `PostgresSchemaIR` field that records which enum
+// types already exist — the signal the enum `planTypeOperations` hook reads to
+// decide whether to emit a `CREATE TYPE`).
 function contractToSchemaIR(
   contract: Contract<SqlStorage> | null,
   options?: Omit<Parameters<typeof contractToSchemaIRImpl>[1], 'annotationNamespace'>,
-) {
-  return contractToSchemaIRImpl(contract, { annotationNamespace: 'pg', ...options });
+): PostgresSchemaIR {
+  const sqlIr = contractToSchemaIRImpl(contract, { annotationNamespace: 'pg', ...options });
+  const nativeEnumTypeNames =
+    contract === null ? [] : Object.values(contract.storage.types ?? {}).map((t) => t.nativeType);
+  return new PostgresSchemaIR({
+    tables: sqlIr.tables,
+    pgSchemaName: 'public',
+    pgVersion: '',
+    rlsPolicies: [],
+    roles: [],
+    existingSchemas: [],
+    nativeEnumTypeNames,
+  });
 }
 
 function planFromStorages(
@@ -681,11 +699,12 @@ function createAdapterHooksComponent(): TargetBoundComponentDescriptor<'sql', st
       const values = typeInstance.typeParams?.['values'] as string[] | undefined;
       if (!values || values.length === 0) return { operations: [] };
 
-      const storageTypes = (schema.annotations?.['pg'] as Record<string, unknown> | undefined)?.[
-        'storageTypes'
-      ] as Record<string, unknown> | undefined;
+      // The "enum already exists" signal lives in `nativeEnumTypeNames` on a
+      // `PostgresSchemaIR` (the production-shaped field a real hook reads).
+      const existingEnumTypes =
+        schema instanceof PostgresSchemaIR ? schema.nativeEnumTypeNames : [];
 
-      if (storageTypes?.[typeInstance.nativeType]) {
+      if (existingEnumTypes.includes(typeInstance.nativeType)) {
         return { operations: [] };
       }
 
@@ -930,8 +949,9 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
     expect(opIds.some((id) => id.startsWith('table.'))).toBe(true);
   });
 
-  it('contractToSchemaIR derives annotations from contract storage types', () => {
-    const schemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
+  it('the family contractToSchemaIR derives annotations from contract storage types', () => {
+    const schemaIR = contractToSchemaIRImpl(createDemoContract(DEMO_BASE_STORAGE), {
+      annotationNamespace: 'pg',
       expandNativeType: expandParameterizedNativeType,
       renderDefault: postgresRenderDefault,
     });

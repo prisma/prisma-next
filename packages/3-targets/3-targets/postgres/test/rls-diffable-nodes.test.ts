@@ -19,9 +19,9 @@ describe('PostgresRlsPolicy DiffableNode', () => {
     permissive: true,
   };
 
-  it('identity() returns a storage coordinate with policy entityKind and the wire name', () => {
+  it('coord() returns a storage coordinate with policy entityKind and the wire name', () => {
     const policy = new PostgresRlsPolicy(baseInput);
-    expect(policy.identity()).toEqual({
+    expect(policy.coord()).toEqual({
       plane: 'storage',
       namespaceId: 'public',
       entityKind: 'policy',
@@ -29,9 +29,14 @@ describe('PostgresRlsPolicy DiffableNode', () => {
     });
   });
 
-  it('identity() propagates namespaceId from input', () => {
+  it('coord() propagates namespaceId from input', () => {
     const policy = new PostgresRlsPolicy({ ...baseInput, namespaceId: 'my_schema' });
-    expect(policy.identity().namespaceId).toBe('my_schema');
+    expect(policy.coord().namespaceId).toBe('my_schema');
+  });
+
+  it('children() returns an empty list (leaf node)', () => {
+    const policy = new PostgresRlsPolicy(baseInput);
+    expect(policy.children()).toEqual([]);
   });
 
   it('isEqualTo() returns true for two policies with the same wire name', () => {
@@ -52,10 +57,10 @@ describe('PostgresRlsPolicy DiffableNode', () => {
     expect(() => policy.isEqualTo(notAPolicy)).toThrow();
   });
 
-  it('identity() and isEqualTo() are accessible on frozen instances (defined on prototype)', () => {
+  it('coord() and isEqualTo() are accessible on frozen instances (defined on prototype)', () => {
     const policy = new PostgresRlsPolicy(baseInput);
     expect(Object.isFrozen(policy)).toBe(true);
-    expect(typeof policy.identity).toBe('function');
+    expect(typeof policy.coord).toBe('function');
     expect(typeof policy.isEqualTo).toBe('function');
   });
 
@@ -132,9 +137,9 @@ describe('PostgresRlsPolicy DiffableNode', () => {
 });
 
 describe('PostgresRole DiffableNode', () => {
-  it('identity() returns a storage coordinate with role entityKind and the role name', () => {
+  it('coord() returns a storage coordinate with role entityKind and the role name', () => {
     const role = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
-    expect(role.identity()).toEqual({
+    expect(role.coord()).toEqual({
       plane: 'storage',
       namespaceId: 'public',
       entityKind: 'role',
@@ -142,9 +147,14 @@ describe('PostgresRole DiffableNode', () => {
     });
   });
 
-  it('identity() propagates namespaceId from input', () => {
+  it('coord() propagates namespaceId from input', () => {
     const role = new PostgresRole({ name: 'app_user', namespaceId: 'sentinel_namespace' });
-    expect(role.identity().namespaceId).toBe('sentinel_namespace');
+    expect(role.coord().namespaceId).toBe('sentinel_namespace');
+  });
+
+  it('children() returns an empty list (leaf node)', () => {
+    const role = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
+    expect(role.children()).toEqual([]);
   });
 
   it('isEqualTo() returns true for two roles with the same name', () => {
@@ -173,10 +183,10 @@ describe('PostgresRole DiffableNode', () => {
     expect(() => role.isEqualTo(notARole)).toThrow();
   });
 
-  it('identity() and isEqualTo() are accessible on frozen instances', () => {
+  it('coord() and isEqualTo() are accessible on frozen instances', () => {
     const role = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
     expect(Object.isFrozen(role)).toBe(true);
-    expect(typeof role.identity).toBe('function');
+    expect(typeof role.coord).toBe('function');
     expect(typeof role.isEqualTo).toBe('function');
   });
 });

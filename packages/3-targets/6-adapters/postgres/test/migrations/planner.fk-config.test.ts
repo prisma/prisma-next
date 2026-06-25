@@ -3,8 +3,8 @@ import { contractToSchemaIR, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sq
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import { PostgresSchemaIR } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
@@ -75,9 +75,15 @@ function createFkTestContract(fkConfig: {
   };
 }
 
-const emptySchema: SqlSchemaIR = {
+const emptySchema = new PostgresSchemaIR({
   tables: {},
-};
+  pgSchemaName: 'public',
+  pgVersion: '',
+  rlsPolicies: [],
+  roles: [],
+  existingSchemas: [],
+  nativeEnumTypeNames: [],
+});
 
 const MIGRATION_PLAN_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'],
@@ -225,7 +231,15 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       storageHash: coreHash('sha256:to'),
       includeStateColumn: true,
     });
-    const schema = contractToSchemaIR(fromContract, { annotationNamespace: 'pg' });
+    const schema = new PostgresSchemaIR({
+      tables: contractToSchemaIR(fromContract, { annotationNamespace: 'pg' }).tables,
+      pgSchemaName: 'public',
+      pgVersion: '',
+      rlsPolicies: [],
+      roles: [],
+      existingSchemas: [],
+      nativeEnumTypeNames: [],
+    });
 
     const result = planner.plan({
       contract,

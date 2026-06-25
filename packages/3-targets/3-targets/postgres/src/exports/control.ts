@@ -1,6 +1,6 @@
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import type { SqlControlTargetDescriptor } from '@prisma-next/family-sql/control';
-import { contractToSchemaIR, extractCodecControlHooks } from '@prisma-next/family-sql/control';
+import { extractCodecControlHooks } from '@prisma-next/family-sql/control';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -13,6 +13,7 @@ import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
+import { projectPostgresSchemaFromContract } from '../core/migrations/project-postgres-schema-from-contract';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
 import { PostgresContractSerializer } from '../core/postgres-contract-serializer';
 import { PostgresSchemaVerifier } from '../core/postgres-schema-verifier';
@@ -66,11 +67,14 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
         // would have refused to construct a postgres target binding
         // otherwise — so we narrow the generic to
         // `Contract<SqlStorage>` for the lowering call.
-        return contractToSchemaIR(contract as unknown as Contract<SqlStorage> | null, {
-          annotationNamespace: 'pg',
-          ...ifDefined('expandNativeType', expander),
-          renderDefault: postgresRenderDefault,
-        });
+        return projectPostgresSchemaFromContract(
+          contract as unknown as Contract<SqlStorage> | null,
+          {
+            annotationNamespace: 'pg',
+            ...ifDefined('expandNativeType', expander),
+            renderDefault: postgresRenderDefault,
+          },
+        );
       },
     },
     create(): ControlTargetInstance<'sql', 'postgres'> {

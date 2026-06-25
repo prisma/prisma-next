@@ -1,0 +1,129 @@
+import type { Contract } from '@prisma-next/contract/types';
+import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import {
+  APP_SPACE_ID,
+  assembleAuthoringContributions,
+} from '@prisma-next/framework-components/control';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
+import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import { describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
+import { createPostgresScalarTypeDescriptors } from '../../src/core/control-mutation-defaults';
+import {
+  controlAdapter,
+  frameworkComponents,
+  postgresTargetDescriptor,
+} from './fixtures/runner-fixtures';
+
+// `migration plan` runs offline (no live database): it derives the schema from
+// the contract via the target's `contractToSchema` hook and plans against it.
+// Post-seam that derivation carries the contract's RLS policies, so the plan
+// emits ENABLE ROW LEVEL SECURITY + CREATE POLICY. The prior fail-loud is gone.
+
+const PSL = `
+namespace public {
+  model profile {
+    id       Int @id
+    owner_id Int
+  }
+
+  policy_select p_read {
+    target = profile
+    roles  = [app_user]
+    using  = "owner_id = current_setting('app.uid')::int"
+  }
+}
+`;
+
+function buildScalarTypeDescriptors(): ReadonlyMap<
+  string,
+  { codecId: string; nativeType: string }
+> {
+  const codecIdMap = createPostgresScalarTypeDescriptors();
+  const codecLookup = createPostgresBuiltinCodecLookup();
+  const result = new Map<string, { codecId: string; nativeType: string }>();
+  for (const [typeName, codecId] of codecIdMap) {
+    const nativeType = codecLookup.targetTypesFor(codecId)?.[0];
+    if (nativeType !== undefined) {
+      result.set(typeName, { codecId, nativeType });
+    }
+  }
+  return result;
+}
+
+function buildPslContract() {
+  const assembled = assembleAuthoringContributions([postgresTargetDescriptor]);
+  const scalarTypeDescriptors = buildScalarTypeDescriptors();
+
+  const { document, sourceFile } = parse(PSL);
+  const { table: symbolTable } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes: [...scalarTypeDescriptors.keys()],
+    pslBlockDescriptors: assembled.pslBlockDescriptors,
+  });
+
+  return interpretPslDocumentToSqlContract({
+    symbolTable,
+    sourceFile,
+    sourceId: 'schema.prisma',
+    target: {
+      kind: 'target' as const,
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      id: 'postgres',
+      version: postgresTargetDescriptor.version,
+      capabilities: {},
+      defaultNamespaceId: 'public',
+    },
+    scalarTypeDescriptors,
+    authoringContributions: assembled,
+    composedExtensionContracts: new Map(),
+    createNamespace: postgresCreateNamespace,
+  });
+}
+
+describe('migration plan emits RLS (offline, no live database)', () => {
+  it('derives a PostgresSchemaIR from the contract and plans CREATE POLICY + ENABLE RLS', async () => {
+    const result = buildPslContract();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const contract = result.value as Contract<SqlStorage>;
+
+    // The initial `migration plan` derives the "from" schema from a null
+    // contract (no prior state) — an empty PostgresSchemaIR. The differ then
+    // reports the contract's policy as missing → CREATE POLICY.
+    const fromSchema = postgresTargetDescriptor.migrations.contractToSchema(
+      null,
+      frameworkComponents,
+    );
+    expect(fromSchema).toBeInstanceOf(PostgresSchemaIR);
+    if (!(fromSchema instanceof PostgresSchemaIR)) return;
+    expect(fromSchema.rlsPolicies).toEqual([]);
+
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
+    const planResult = planner.plan({
+      contract,
+      schema: fromSchema,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents,
+      spaceId: APP_SPACE_ID,
+    });
+
+    expect(planResult.kind).toBe('success');
+    if (planResult.kind !== 'success') return;
+
+    const ops = await Promise.all(planResult.plan.operations);
+    const allSql = ops
+      .flatMap((op) => [...op.precheck, ...op.execute, ...op.postcheck])
+      .map((step) => step.sql);
+
+    expect(allSql.some((s) => s.includes('ENABLE ROW LEVEL SECURITY'))).toBe(true);
+    expect(allSql.some((s) => s.includes('CREATE POLICY'))).toBe(true);
+  });
+});

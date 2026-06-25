@@ -13,9 +13,9 @@ import {
   SqlStorage,
   SqlUnboundNamespace,
 } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
+import { PostgresSchemaIR } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
@@ -23,9 +23,15 @@ import pgvectorDescriptor from '../../src/exports/control';
 
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
-const emptySchema: SqlSchemaIR = {
+const emptySchema = new PostgresSchemaIR({
   tables: {},
-};
+  pgSchemaName: 'public',
+  pgVersion: '',
+  rlsPolicies: [],
+  roles: [],
+  existingSchemas: [],
+  nativeEnumTypeNames: [],
+});
 
 describe('PostgresMigrationPlanner - storage types', () => {
   it('plans type operations before table operations', async () => {
