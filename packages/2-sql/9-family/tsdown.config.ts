@@ -9,7 +9,6 @@ export default defineConfig({
     'src/exports/pack.ts',
     'src/exports/runtime.ts',
     'src/exports/verify.ts',
-    'src/exports/test-utils.ts',
     'src/exports/schema-verify.ts',
   ],
 });

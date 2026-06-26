@@ -11,13 +11,9 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  type StorageTableInput,
-} from '@prisma-next/sql-contract/types';
+import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
-import { PostgresSchemaIR } from '@prisma-next/target-postgres/types';
+import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
@@ -244,7 +240,10 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
 });
 
 function createTestContract(tables: Record<string, StorageTableInput> = {}): Contract<SqlStorage> {
-  const unboundNs = buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } });
+  const unboundNs = postgresCreateNamespace({
+    id: UNBOUND_NAMESPACE_ID,
+    entries: { table: tables },
+  });
   return {
     target: 'postgres',
     targetFamily: 'sql',

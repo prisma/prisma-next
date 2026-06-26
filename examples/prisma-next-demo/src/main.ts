@@ -33,6 +33,23 @@
  * - repo-feature-roadmap <targetRelease> [limit]
  *                              Users with a `.variant('Feature')`-narrowed include,
  *                              filtered by the Feature-only `targetRelease` column
+ * - repo-post-tags <postId>    Include a post's tags (N:M read through the junction)
+ * - repo-tag-posts <tagId>     Include a tag's posts (N:M read, reverse direction)
+ * - repo-posts-with-tag-some <label>
+ *                              Posts that have at least one tag matching label
+ * - repo-posts-with-tag-none <label>
+ *                              Posts that have no tag matching label
+ * - repo-posts-with-tag-every <label>
+ *                              Posts where every tag differs from label
+ *                              (includes posts with no tags)
+ * - repo-connect-post-tags <postId> <tagId...>
+ *                              Link existing tags to a post
+ * - repo-disconnect-post-tags <postId> <tagId...>
+ *                              Unlink tags from a post
+ * - repo-create-post-with-tags <id> <userId> <title> <label...>
+ *                              Create post + new tags in one nested mutation
+ * - repo-create-post-connect-tags <id> <userId> <title> <tagId...>
+ *                              Create post + link existing tags in one nested mutation
  * - repo-users-cursor [cursor] [limit]
  *                              Cursor pagination via ORM client
  * - repo-latest-per-kind       DISTINCT ON example via ORM client
@@ -80,7 +97,11 @@
  */
 import 'dotenv/config';
 import { loadAppConfig } from './app-config';
+import { ormClientConnectPostTags } from './orm-client/connect-post-tags';
+import { ormClientCreatePostConnectTags } from './orm-client/create-post-connect-tags';
+import { ormClientCreatePostWithTags } from './orm-client/create-post-with-tags';
 import { ormClientCreateUserWithAddress } from './orm-client/create-user-with-address';
+import { ormClientDisconnectPostTags } from './orm-client/disconnect-post-tags';
 import { ormClientFindSimilarPosts } from './orm-client/find-similar-posts';
 import { ormClientFindUserByEmail } from './orm-client/find-user-by-email';
 import { ormClientFindUserByIdCached } from './orm-client/find-user-by-id-cached';
@@ -89,6 +110,9 @@ import { ormClientGetDashboardUsers } from './orm-client/get-dashboard-users';
 import { ormClientGetFeatureRoadmap } from './orm-client/get-feature-roadmap';
 import { ormClientGetLatestUserPerKind } from './orm-client/get-latest-user-per-kind';
 import { ormClientGetPostFeed } from './orm-client/get-post-feed';
+import { ormClientGetPostTags } from './orm-client/get-post-tags';
+import { ormClientGetPostsByTagFilter } from './orm-client/get-posts-by-tag-filter';
+import { ormClientGetTagPosts } from './orm-client/get-tag-posts';
 import { ormClientGetBugs, ormClientGetFeatures, ormClientGetTasks } from './orm-client/get-tasks';
 import { ormClientGetUserBugTriage } from './orm-client/get-user-bug-triage';
 import { ormClientGetUserInsights } from './orm-client/get-user-insights';
@@ -274,6 +298,86 @@ async function main() {
       const roadmap = await ormClientGetFeatureRoadmap(targetRelease, limit, runtime);
 
       console.log(JSON.stringify(roadmap, null, 2));
+    } else if (cmd === 'repo-post-tags') {
+      const [postId] = args;
+      if (!postId) {
+        console.error('Usage: pnpm start -- repo-post-tags <postId>');
+        process.exit(1);
+      }
+      const result = await ormClientGetPostTags(postId, runtime);
+
+      console.log(JSON.stringify(result, null, 2));
+    } else if (cmd === 'repo-tag-posts') {
+      const [tagId] = args;
+      if (!tagId) {
+        console.error('Usage: pnpm start -- repo-tag-posts <tagId>');
+        process.exit(1);
+      }
+      const result = await ormClientGetTagPosts(tagId, runtime);
+
+      console.log(JSON.stringify(result, null, 2));
+    } else if (
+      cmd === 'repo-posts-with-tag-some' ||
+      cmd === 'repo-posts-with-tag-none' ||
+      cmd === 'repo-posts-with-tag-every'
+    ) {
+      const [label] = args;
+      if (!label) {
+        console.error(`Usage: pnpm start -- ${cmd} <label>`);
+        process.exit(1);
+      }
+      const mode =
+        cmd === 'repo-posts-with-tag-some'
+          ? 'some'
+          : cmd === 'repo-posts-with-tag-none'
+            ? 'none'
+            : 'every';
+      const result = await ormClientGetPostsByTagFilter(mode, label, runtime);
+
+      console.log(JSON.stringify(result, null, 2));
+    } else if (cmd === 'repo-connect-post-tags') {
+      const [postId, ...tagIds] = args;
+      if (!postId || tagIds.length === 0) {
+        console.error('Usage: pnpm start -- repo-connect-post-tags <postId> <tagId...>');
+        process.exit(1);
+      }
+      const result = await ormClientConnectPostTags(postId, tagIds, runtime);
+
+      console.log(JSON.stringify(result, null, 2));
+    } else if (cmd === 'repo-disconnect-post-tags') {
+      const [postId, ...tagIds] = args;
+      if (!postId || tagIds.length === 0) {
+        console.error('Usage: pnpm start -- repo-disconnect-post-tags <postId> <tagId...>');
+        process.exit(1);
+      }
+      const result = await ormClientDisconnectPostTags(postId, tagIds, runtime);
+
+      console.log(JSON.stringify(result, null, 2));
+    } else if (cmd === 'repo-create-post-with-tags') {
+      const [id, userId, title, ...labels] = args;
+      if (!id || !userId || !title || labels.length === 0) {
+        console.error(
+          'Usage: pnpm start -- repo-create-post-with-tags <id> <userId> <title> <label...>',
+        );
+        process.exit(1);
+      }
+      const result = await ormClientCreatePostWithTags(
+        { id, userId, title, tags: labels.map((label) => ({ label })) },
+        runtime,
+      );
+
+      console.log(JSON.stringify(result, null, 2));
+    } else if (cmd === 'repo-create-post-connect-tags') {
+      const [id, userId, title, ...tagIds] = args;
+      if (!id || !userId || !title || tagIds.length === 0) {
+        console.error(
+          'Usage: pnpm start -- repo-create-post-connect-tags <id> <userId> <title> <tagId...>',
+        );
+        process.exit(1);
+      }
+      const result = await ormClientCreatePostConnectTags({ id, userId, title, tagIds }, runtime);
+
+      console.log(JSON.stringify(result, null, 2));
     } else if (cmd === 'repo-upsert-user') {
       const [id, email, kind] = args;
       if (!id || !email || !kind) {
@@ -552,6 +656,13 @@ async function main() {
           'repo-tasks [limit] | repo-bugs [limit] | repo-features [limit] | ' +
           'repo-task-board [limit] | repo-bug-triage [severity] [limit] | ' +
           'repo-feature-roadmap <targetRelease> [limit] | ' +
+          'repo-post-tags <postId> | repo-tag-posts <tagId> | ' +
+          'repo-posts-with-tag-some <label> | repo-posts-with-tag-none <label> | ' +
+          'repo-posts-with-tag-every <label> | ' +
+          'repo-connect-post-tags <postId> <tagId...> | ' +
+          'repo-disconnect-post-tags <postId> <tagId...> | ' +
+          'repo-create-post-with-tags <id> <userId> <title> <label...> | ' +
+          'repo-create-post-connect-tags <id> <userId> <title> <tagId...> | ' +
           'repo-latest-per-kind | repo-user-insights [limit] | repo-kind-breakdown [minUsers] | ' +
           'repo-upsert-user <id> <email> <kind> | repo-create-user-address <id> <email> <kind> | ' +
           'repo-similar-posts <postId> [limit] | repo-search-posts <embedding> <maxDistance> [limit] | ' +

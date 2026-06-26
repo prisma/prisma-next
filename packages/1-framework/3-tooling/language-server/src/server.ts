@@ -8,6 +8,7 @@ import {
   type Diagnostic,
   DiagnosticSeverity,
   DidChangeWatchedFilesNotification,
+  type FoldingRange,
   type InitializeParams,
   type InitializeResult,
   RegistrationRequest,
@@ -18,6 +19,7 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { CONFIG_FILENAME, resolveConfigInputs } from './config-resolution';
 import { ParseDiagnosticSeverity } from './diagnostic-mapping';
+import { computeFoldingRanges } from './folding-ranges';
 import type { PipelineInputs } from './pipeline';
 import {
   type CachedDocument,
@@ -255,6 +257,7 @@ export function createServer(connection: Connection): LanguageServer {
       capabilities: {
         textDocumentSync: TextDocumentSyncKind.Incremental,
         documentFormattingProvider: true,
+        foldingRangeProvider: true,
       },
     };
   });
@@ -295,6 +298,23 @@ export function createServer(connection: Connection): LanguageServer {
   });
 
   connection.onDocumentFormatting((params) => formatDocument(params.textDocument.uri));
+
+  connection.onFoldingRanges(async (params): Promise<FoldingRange[]> => {
+    let project: ProjectState | undefined;
+    try {
+      project = await resolveProjectForDocument(params.textDocument.uri);
+    } catch {
+      return [];
+    }
+    if (project === undefined) {
+      return [];
+    }
+    const cached = project.artifacts.getDocument(params.textDocument.uri);
+    if (cached === undefined) {
+      return [];
+    }
+    return computeFoldingRanges(cached.document, cached.sourceFile);
+  });
 
   documents.onDidOpen((event) => {
     publishSafely(event.document.uri, event.document.getText());

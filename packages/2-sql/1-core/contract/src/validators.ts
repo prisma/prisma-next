@@ -10,13 +10,11 @@ import {
   type AnyEntityKindDescriptor,
   isPlainRecord,
   type Namespace,
-  UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
 import { composeSqlEntityKinds } from './entity-kinds';
-import { buildSqlNamespaceMap } from './ir/build-sql-namespace';
 
 export {
   CheckConstraintSchema,
@@ -32,14 +30,12 @@ export {
   StorageValueSetSchema,
 } from './ir/storage-entry-schemas';
 
-import { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
-import {
-  type SqlModelStorage,
+import type {
+  SqlModelStorage,
   SqlStorage,
-  type SqlStorageInput,
-  type StorageColumn,
-  type StorageTable,
-  type StorageTypeInstanceInput,
+  StorageColumn,
+  StorageTable,
+  StorageTypeInstanceInput,
 } from './types';
 
 const generatorKindSchema = type("'generator'");
@@ -193,9 +189,8 @@ export function createSqlStorageSchema(
     'types?': type({ '[string]': DocumentScopedStorageTypeSchema }),
     // `__unbound__` is NOT required here: cross-namespace contracts can
     // declare only named namespaces (see cross-namespace FK fixtures). The
-    // `__unbound__` brand on `SqlStorageInput['namespaces']` is kept sound at
-    // construction time by injecting the unbound singleton when absent
-    // (see `validateStorage` / `hydrateSqlStorage`), not by structural require.
+    // unbound slot is injected when absent by `ensureUnboundNamespaceSlot`
+    // in `build-contract.ts`, not enforced here structurally.
     'namespaces?': type({ '[string]': namespaceEntry }),
   }) as Type<unknown>;
 }
@@ -369,45 +364,21 @@ export function createSqlContractSchema(
 
 const SqlContractSchema = createSqlContractSchema(DEFAULT_SQL_KINDS);
 
-// NOTE: StorageColumnSchema, StorageTableSchema, and StorageSchema use bare type()
-// instead of type.declare<T>().type() because the ColumnDefault union's value field
-// includes bigint | Date (runtime-only types after decoding) which cannot be expressed
-// in Arktype's JSON validation DSL. The `as SqlStorage` cast in validateStorage() bridges
-// the gap between the JSON-safe Arktype output and the runtime TypeScript type.
-
 /**
- * Validates the structural shape of SqlStorage using Arktype.
+ * Validates the structural shape of SqlStorage using Arktype. Pure
+ * structural check: namespace IR is never materialized here (that needs
+ * a target concretion via the serializer hydration path), so this throws
+ * on invalid input and constructs nothing.
  *
  * @param value - The storage value to validate
- * @returns The validated storage if structure is valid
  * @throws Error if the storage structure is invalid
  */
-export function validateStorage(value: unknown): SqlStorage {
+export function validateStorage(value: unknown): void {
   const result = StorageSchema(value);
   if (result instanceof type.errors) {
     const messages = result.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Storage validation failed: ${messages}`);
   }
-  // Arktype validates the JSON-safe envelope, but the `ColumnDefault`
-  // union carries runtime-only `bigint | Date` that the validation DSL
-  // can't express (see NOTE above), so bridge the validated shape to the
-  // input type. Construction below re-materialises nested IR fields.
-  const validated = blindCast<
-    SqlStorageInput & { readonly namespaces?: SqlStorageInput['namespaces'] },
-    'arktype validated the JSON envelope but its output type is unknown (ColumnDefault carries runtime-only bigint|Date); bridge to the input shape'
-  >(result);
-  const namespaces = buildSqlNamespaceMap(validated.namespaces ?? {});
-  // Compatibility shim: inject the empty unbound singleton when absent so that
-  // production code paths which address __unbound__ for table metadata have a
-  // slot to read or write into. The `SqlStorageInput['namespaces']` type no
-  // longer requires __unbound__, so this is a runtime convenience, not a type
-  // invariant.
-  const unbound = namespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance;
-  return new SqlStorage({
-    storageHash: validated.storageHash,
-    ...ifDefined('types', validated.types),
-    namespaces: { ...namespaces, [UNBOUND_NAMESPACE_ID]: unbound },
-  });
 }
 
 export function validateModel(value: unknown): unknown {

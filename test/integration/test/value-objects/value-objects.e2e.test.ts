@@ -1,7 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
@@ -10,6 +9,7 @@ import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sq
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { TestSqlContractSerializer as SqlContractSerializer } from '../../../../packages/2-sql/9-family/test/test-sql-contract-serializer';
 import { describeWithMongoDB } from '../mongo/setup';
 import { setupTestDatabase } from '../utils';
 import type { Contract as MongoVOContract } from './fixtures/generated/mongo-contract.d';

@@ -16,6 +16,8 @@ log: wip/test-packages.20260615-190441.32317.log
 
 The full output goes to that file. The exit code is written to a sibling `.exit` file (same path with `.log` → `.exit`). Use the path printed by the command — don't guess one. Every run gets its own timestamped path, so history is preserved automatically. Contents of `wip/` are gitignored.
 
+Each `:agent` run has a hard timeout (default 5 minutes, override with `AGENT_CMD_TIMEOUT_SECONDS` — bump it for a legitimately long suite). If the run hangs — e.g. vitest freezes after printing its summary — the child process group is killed and the `.exit` file records `124` rather than blocking forever.
+
 | Command | Purpose |
 |---|---|
 | `pnpm test:packages:agent` | Unit tests for every package |

@@ -77,11 +77,61 @@ export type FieldInputTypes = {
     };
   };
 };
+export type StorageColumnTypes = {
+  readonly __unbound__: {
+    readonly post: {
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
+      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly title: CodecTypes['sqlite/text@1']['output'];
+      readonly userId: CodecTypes['sql/char@1']['output'];
+    };
+    readonly post_tag: {
+      readonly postId: CodecTypes['sql/char@1']['output'];
+      readonly tagId: CodecTypes['sql/char@1']['output'];
+    };
+    readonly tag: {
+      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly label: CodecTypes['sqlite/text@1']['output'];
+    };
+    readonly user: {
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
+      readonly displayName: CodecTypes['sqlite/text@1']['output'];
+      readonly email: CodecTypes['sqlite/text@1']['output'];
+      readonly id: CodecTypes['sql/char@1']['output'];
+    };
+  };
+};
+export type StorageColumnInputTypes = {
+  readonly __unbound__: {
+    readonly post: {
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly title: CodecTypes['sqlite/text@1']['input'];
+      readonly userId: CodecTypes['sql/char@1']['input'];
+    };
+    readonly post_tag: {
+      readonly postId: CodecTypes['sql/char@1']['input'];
+      readonly tagId: CodecTypes['sql/char@1']['input'];
+    };
+    readonly tag: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly label: CodecTypes['sqlite/text@1']['input'];
+    };
+    readonly user: {
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
+      readonly displayName: CodecTypes['sqlite/text@1']['input'];
+      readonly email: CodecTypes['sqlite/text@1']['input'];
+      readonly id: CodecTypes['sql/char@1']['input'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<

@@ -11,6 +11,7 @@ import type { RlsPolicyOperation } from '../rls/canonicalize';
 
 export interface AlterTableActionVisitor<R> {
   addColumn(action: AddColumnAction): R;
+  dropDefault(action: DropDefaultAction): R;
 }
 
 export abstract class AlterTableAction {
@@ -33,7 +34,31 @@ export class AddColumnAction extends AlterTableAction {
   }
 }
 
-export type AnyAlterTableAction = AddColumnAction;
+export class DropDefaultAction extends AlterTableAction {
+  readonly kind = 'drop-default' as const;
+  readonly columnName: string;
+
+  constructor(columnName: string) {
+    super();
+    this.columnName = columnName;
+    Object.freeze(this);
+  }
+
+  override accept<R>(visitor: AlterTableActionVisitor<R>): R {
+    return visitor.dropDefault(this);
+  }
+}
+
+/**
+ * The set of ALTER TABLE subactions currently expressible as typed DDL.
+ *
+ * The remaining actions — SetDefault, SetNotNull, DropNotNull,
+ * AlterColumnType — are still emitted as raw SQL by `operations/columns.ts`
+ * and join this union as they are converted to typed DDL. Until then it is
+ * intentionally partial: only the ALTER subactions used by the
+ * already-converted ops (AddColumn, DropDefault) appear here.
+ */
+export type AnyAlterTableAction = AddColumnAction | DropDefaultAction;
 
 // ---------------------------------------------------------------------------
 // Top-level DDL visitor

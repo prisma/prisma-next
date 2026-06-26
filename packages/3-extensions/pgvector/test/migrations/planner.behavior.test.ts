@@ -15,8 +15,6 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  buildSqlNamespace,
-  buildSqlNamespaceMap,
   SqlStorage,
   type SqlStorageInput,
   type StorageTable,
@@ -25,7 +23,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { buildBuiltinIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
-import { PostgresSchemaIR } from '@prisma-next/target-postgres/types';
+import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
@@ -184,7 +182,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     );
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "name" text DEFAULT '' NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "name" text DEFAULT ('') NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "name" DROP DEFAULT`,
     ]);
 
@@ -202,7 +200,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     });
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "age" int4 DEFAULT 0 NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "age" int4 DEFAULT (0) NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "age" DROP DEFAULT`,
     ]);
   });
@@ -227,7 +225,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     );
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "flags" bit(4) DEFAULT B'0000' NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "flags" bit(4) DEFAULT (B'0000') NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "flags" DROP DEFAULT`,
     ]);
   });
@@ -240,7 +238,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     });
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "tags" text[] DEFAULT '{}' NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "tags" text[] DEFAULT ('{}') NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "tags" DROP DEFAULT`,
     ]);
   });
@@ -253,7 +251,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     });
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "searchDocument" tsvector DEFAULT ''::tsvector NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "searchDocument" tsvector DEFAULT (''::tsvector) NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "searchDocument" DROP DEFAULT`,
     ]);
   });
@@ -266,7 +264,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     });
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "metadata" json DEFAULT '{}'::json NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "metadata" json DEFAULT ('{}'::json) NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "metadata" DROP DEFAULT`,
     ]);
   });
@@ -279,7 +277,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     });
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "opensAt" timetz DEFAULT '00:00:00+00' NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "opensAt" timetz DEFAULT ('00:00:00+00') NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "opensAt" DROP DEFAULT`,
     ]);
   });
@@ -300,7 +298,7 @@ describe('NOT NULL column without default uses temporary default', () => {
       `SELECT NOT EXISTS (SELECT 1 AS "one" FROM ${qualifiedUserTable} LIMIT 1) AS "result"`,
     );
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "embedding" vector(3) DEFAULT '[0,0,0]'::vector NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "embedding" vector(3) DEFAULT ('[0,0,0]'::vector) NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "embedding" DROP DEFAULT`,
     ]);
   });
@@ -331,7 +329,7 @@ describe('NOT NULL column without default uses temporary default', () => {
       `SELECT NOT EXISTS (SELECT 1 AS "one" FROM ${qualifiedUserTable} LIMIT 1) AS "result"`,
     );
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "embedding" vector(3) DEFAULT '[0,0,0]'::vector NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "embedding" vector(3) DEFAULT ('[0,0,0]'::vector) NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "embedding" DROP DEFAULT`,
     ]);
   });
@@ -605,23 +603,19 @@ function createTestContract(
   };
   const storageInput = overrides?.storage ?? {
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+      [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
         id: UNBOUND_NAMESPACE_ID,
         entries: { table: defaultTables },
       }),
     },
   };
   const { storage: _s, ...rest } = overrides ?? {};
-  const namespaces = (
-    storageInput.namespaces
-      ? buildSqlNamespaceMap(storageInput.namespaces)
-      : {
-          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-            id: UNBOUND_NAMESPACE_ID,
-            entries: { table: defaultTables },
-          }),
-        }
-  ) as SqlStorageInput['namespaces'];
+  const namespaces = (storageInput.namespaces ?? {
+    [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: defaultTables },
+    }),
+  }) as SqlStorageInput['namespaces'];
   return {
     target: 'postgres',
     targetFamily: 'sql',
@@ -730,7 +724,7 @@ async function planUserTableOperations(
   const contract = createTestContract({
     storage: {
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {

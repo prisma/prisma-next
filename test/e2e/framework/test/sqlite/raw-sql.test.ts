@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 import { sqliteRawCodecInferer } from '@prisma-next/adapter-sqlite/adapter';
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sql } from '@prisma-next/sql-builder/runtime';
@@ -23,6 +22,7 @@ import { SqliteRuntimeImpl } from '@prisma-next/sqlite/runtime';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { TestSqlContractSerializer as SqlContractSerializer } from '../../../../../packages/2-sql/9-family/test/test-sql-contract-serializer';
 import type { Contract } from './fixtures/generated/contract.d';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

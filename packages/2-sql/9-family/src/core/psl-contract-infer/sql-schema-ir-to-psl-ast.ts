@@ -305,7 +305,7 @@ function buildScalarField(
       name: fieldName,
       typeName: `Unsupported("${escapePslString(resolution.nativeType)}")`,
       optional: column.nullable,
-      list: false,
+      list: column.many === true,
       attributes: attrs,
       span: SYNTHETIC_SPAN,
     };
@@ -354,7 +354,7 @@ function buildScalarField(
     name: fieldName,
     typeName,
     optional: column.nullable,
-    list: false,
+    list: column.many === true,
     attributes,
     span: SYNTHETIC_SPAN,
   };

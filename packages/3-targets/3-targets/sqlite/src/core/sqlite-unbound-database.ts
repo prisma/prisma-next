@@ -1,14 +1,14 @@
 import {
   freezeNode,
   hydrateNamespaceEntities,
-  NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { tableEntityKind } from '@prisma-next/sql-contract/entity-kinds';
-import type {
-  SqlNamespaceEntries,
-  SqlNamespaceTablesInput,
-  StorageTable,
+import {
+  SqlNamespaceBase,
+  type SqlNamespaceEntries,
+  type SqlNamespaceInput,
+  type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 
@@ -24,7 +24,7 @@ const SQLITE_NAMESPACE_KIND = 'sqlite-namespace' as const;
  * `entries.table` and unqualified `qualifyTable()` emission for runtime
  * SQL rendering.
  */
-export class SqliteDatabase extends NamespaceBase {
+export class SqliteDatabase extends SqlNamespaceBase {
   declare readonly kind: string;
 
   readonly id: string;
@@ -94,7 +94,7 @@ export class SqliteUnboundDatabase extends SqliteDatabase {
 }
 
 export function buildSqliteNamespace(
-  input: SqlNamespaceTablesInput,
+  input: SqlNamespaceInput,
 ): SqliteDatabase | SqliteUnboundDatabase {
   if (input.id !== UNBOUND_NAMESPACE_ID) {
     throw new Error(
@@ -121,7 +121,7 @@ export function buildSqliteNamespace(
  * safety net rather than a user-facing surface.
  */
 export function sqliteCreateNamespace(
-  input: SqlNamespaceTablesInput,
+  input: SqlNamespaceInput,
 ): SqliteDatabase | SqliteUnboundDatabase {
   return buildSqliteNamespace(input);
 }

@@ -19,6 +19,7 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../../src/core/adapter';
@@ -52,7 +53,7 @@ function makeTaskContract(): PostgresContract {
   return buildBoundContract(
     sqlFamilyPack,
     postgresPack,
-    { enums: { Priority } },
+    { enums: { Priority }, createNamespace: postgresCreateNamespace },
     ({ field: f, model: m }) => ({
       models: {
         Task: m('Task', {
@@ -72,7 +73,7 @@ function makeTaskNoteContract(): PostgresContract {
   return buildBoundContract(
     sqlFamilyPack,
     postgresPack,
-    { enums: { Priority } },
+    { enums: { Priority }, createNamespace: postgresCreateNamespace },
     ({ field: f, model: m }) => ({
       models: {
         Task: m('Task', {

@@ -138,11 +138,13 @@ const contractSerializer = new PostgresContractSerializer();
 function resolveContract<TContract extends Contract<SqlStorage>>(
   options: SupabaseOptions<TContract>,
 ): TContract {
-  const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
+  const contractJson = hasContractJson(options)
+    ? options.contractJson
+    : contractSerializer.serializeContract(options.contract);
   return blindCast<
     TContract,
     'contractSerializer.deserializeContract returns a validated TContract'
-  >(contractSerializer.deserializeContract(contractInput));
+  >(contractSerializer.deserializeContract(contractJson));
 }
 
 function resolveKeyMaterial<TContract extends Contract<SqlStorage>>(

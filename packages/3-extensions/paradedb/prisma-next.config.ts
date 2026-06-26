@@ -17,6 +17,7 @@ import { defineConfig } from '@prisma-next/cli/config-types';
 import sql from '@prisma-next/family-sql/control';
 import { emptyContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgres from '@prisma-next/target-postgres/control';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 
 export default defineConfig({
   family: sql,
@@ -26,6 +27,7 @@ export default defineConfig({
   contract: emptyContract({
     output: 'src/contract.json',
     target: postgres,
+    createNamespace: postgresCreateNamespace,
   }),
   migrations: {
     dir: 'migrations',

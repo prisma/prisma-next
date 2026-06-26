@@ -1,7 +1,6 @@
-import type { Token } from '../../tokenizer';
 import type { AstNode } from '../ast-helpers';
 import { findChildToken } from '../ast-helpers';
-import type { SyntaxNode } from '../red';
+import type { SyntaxNode, SyntaxToken } from '../red';
 
 export class IdentifierAst implements AstNode {
   readonly syntax: SyntaxNode;
@@ -10,7 +9,7 @@ export class IdentifierAst implements AstNode {
     this.syntax = syntax;
   }
 
-  token(): Token | undefined {
+  token(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Ident');
   }
 

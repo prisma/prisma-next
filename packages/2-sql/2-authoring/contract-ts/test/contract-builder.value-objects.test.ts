@@ -2,6 +2,7 @@ import type { ContractField, ContractValueObject } from '@prisma-next/contract/t
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
 import { modelsOf, valueObjectsOf } from './contract-test-helpers';
 import { unboundTables } from './unbound-tables';
@@ -56,6 +57,7 @@ describe('value objects in contract definition builder', () => {
     const contract = buildSqlContractFromDefinition(
       {
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         models: [
           {
             modelName: 'Invoice',
@@ -119,6 +121,7 @@ describe('value objects in contract definition builder', () => {
   it('emits valueObjects section with scalar fields', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: [
         {
           modelName: 'User',
@@ -177,6 +180,7 @@ describe('value objects in contract definition builder', () => {
   it('emits valueObject domain type for model fields referencing a value object', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: [
         {
           modelName: 'User',
@@ -233,6 +237,7 @@ describe('value objects in contract definition builder', () => {
   it('maps value object fields to JSONB storage columns', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: [
         {
           modelName: 'User',
@@ -280,6 +285,7 @@ describe('value objects in contract definition builder', () => {
   it('emits many: true for value object list fields', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: [
         {
           modelName: 'User',
@@ -332,6 +338,7 @@ describe('value objects in contract definition builder', () => {
   it('emits nested value-object references inside a parent value object', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: [
         {
           modelName: 'Company',
@@ -412,6 +419,7 @@ describe('value objects in contract definition builder', () => {
   it('omits valueObjects from contract when none are defined', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: [
         {
           modelName: 'User',
@@ -435,6 +443,7 @@ describe('value objects in contract definition builder', () => {
   it('maps value object field to correct storage bridge entry', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: [
         {
           modelName: 'User',

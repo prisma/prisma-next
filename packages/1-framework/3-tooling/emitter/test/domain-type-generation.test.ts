@@ -2,14 +2,14 @@ import type {
   ContractField,
   ContractModel,
   ContractValueObject,
-  JsonValue,
-  ValueSetRef,
 } from '@prisma-next/contract/types';
 import { crossRef } from '@prisma-next/contract/types';
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  type DomainEnumLookup,
   deduplicateImports,
   generateBothFieldTypesMaps,
   generateCodecTypeIntersection,
@@ -17,6 +17,7 @@ import {
   generateFieldInputTypesMap,
   generateFieldOutputTypesMap,
   generateFieldResolvedType,
+  generateFieldTypesMapsByNamespace,
   generateHashTypeAliases,
   generateImportLines,
   generateModelFieldsType,
@@ -1161,120 +1162,62 @@ describe('resolveFieldType', () => {
   });
 });
 
-describe('resolveFieldType with enum value-set ref', () => {
-  // A domain field authored via `enumType` carries a `field.valueSet` ref to a domain enum.
-  // The emitter must narrow BOTH read (output) and write (input) sides to the union of the
-  // enum members' rendered values, independent of the underlying codec. This is the emitted
-  // `contract.d.ts` path a real consumer imports — the in-memory `typeof contract` path is
-  // not what ships.
-
-  const priorityRef: ValueSetRef = {
-    plane: 'domain',
-    entityKind: 'enum',
-    namespaceId: 'public',
-    entityName: 'Priority',
-  };
-
-  function enumResolver(
-    values: readonly JsonValue[],
-  ): (ref: ValueSetRef) => readonly JsonValue[] | undefined {
-    return (ref) => (ref.entityName === 'Priority' ? values : undefined);
-  }
-
-  it('narrows output and input to a string-member union', () => {
-    const field: ContractField = {
-      nullable: false,
-      type: { kind: 'scalar', codecId: 'pg/text@1' },
-      valueSet: priorityRef,
-    };
-    const result = resolveFieldType(field, undefined, undefined, enumResolver(['low', 'high']));
-    expect(result.output).toBe("'low' | 'high'");
-    expect(result.input).toBe("'low' | 'high'");
-  });
-
-  it('narrows to a numeric-member union for int-valued enums', () => {
-    const field: ContractField = {
-      nullable: false,
-      type: { kind: 'scalar', codecId: 'pg/int4@1' },
-      valueSet: priorityRef,
-    };
-    const result = resolveFieldType(field, undefined, undefined, enumResolver([1, 10]));
-    expect(result.output).toBe('1 | 10');
-    expect(result.input).toBe('1 | 10');
-  });
-
-  it('appends | null for a nullable enum field', () => {
-    const field: ContractField = {
-      nullable: true,
-      type: { kind: 'scalar', codecId: 'pg/text@1' },
-      valueSet: priorityRef,
-    };
-    const result = resolveFieldType(field, undefined, undefined, enumResolver(['low', 'high']));
-    expect(result.output).toBe("'low' | 'high' | null");
-    expect(result.input).toBe("'low' | 'high' | null");
-  });
-
-  it('falls back to the codec channel when a member value is non-scalar', () => {
-    const field: ContractField = {
-      nullable: false,
-      type: { kind: 'scalar', codecId: 'pg/text@1' },
-      valueSet: priorityRef,
-    };
-    const result = resolveFieldType(field, undefined, undefined, enumResolver([{ nested: 1 }]));
-    expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
-    expect(result.input).toBe("CodecTypes['pg/text@1']['input']");
-  });
-
-  it('falls back to the codec channel when the resolver yields nothing', () => {
-    const field: ContractField = {
-      nullable: false,
-      type: { kind: 'scalar', codecId: 'pg/text@1' },
-      valueSet: { ...priorityRef, entityName: 'Unknown' },
-    };
-    const result = resolveFieldType(field, undefined, undefined, enumResolver(['low', 'high']));
-    expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
-    expect(result.input).toBe("CodecTypes['pg/text@1']['input']");
-  });
-
-  it('leaves non-enum scalar fields on the codec channel', () => {
-    const field: ContractField = {
-      nullable: false,
-      type: { kind: 'scalar', codecId: 'pg/text@1' },
-    };
-    const result = resolveFieldType(field, undefined, undefined, enumResolver(['low', 'high']));
-    expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
-    expect(result.input).toBe("CodecTypes['pg/text@1']['input']");
-  });
-});
-
-describe('generateBothFieldTypesMaps with resolveEnumValues', () => {
-  const priorityRef: ValueSetRef = {
-    plane: 'domain',
-    entityKind: 'enum',
-    namespaceId: 'public',
-    entityName: 'Priority',
-  };
-
-  it('narrows an enum-backed field across both maps', () => {
+describe('generateBothFieldTypesMaps with domainEnumLookup', () => {
+  it('narrows a scalar enum field to its domain-enum members on both sides', () => {
     const models: Record<string, ContractModel> = {
       Post: {
         fields: {
           priority: {
             nullable: false,
             type: { kind: 'scalar', codecId: 'pg/text@1' },
-            valueSet: priorityRef,
+            valueSet: {
+              plane: 'domain',
+              entityKind: 'enum',
+              namespaceId: 'public',
+              entityName: 'Priority',
+            },
+          },
+          title: {
+            nullable: false,
+            type: { kind: 'scalar', codecId: 'pg/text@1' },
           },
         },
         relations: {},
         storage: {},
       },
     };
-    const resolveEnumValues = (ref: ValueSetRef): readonly JsonValue[] | undefined =>
-      ref.entityName === 'Priority' ? ['low', 'high', 'urgent'] : undefined;
-    const result = generateBothFieldTypesMaps(models, undefined, undefined, resolveEnumValues);
+    const domainEnumLookup: DomainEnumLookup = (ref) =>
+      ref.entityName === 'Priority'
+        ? {
+            codecId: 'pg/text@1',
+            members: [
+              { name: 'Low', value: 'low' },
+              { name: 'High', value: 'high' },
+              { name: 'Urgent', value: 'urgent' },
+            ],
+          }
+        : undefined;
+    const result = generateBothFieldTypesMaps(models, undefined, undefined, domainEnumLookup);
     expect(result.output).toContain("readonly priority: 'low' | 'high' | 'urgent'");
     expect(result.input).toContain("readonly priority: 'low' | 'high' | 'urgent'");
-    expect(result.output).not.toContain("CodecTypes['pg/text@1']['output']");
+    expect(result.output).toContain("readonly title: CodecTypes['pg/text@1']['output']");
+  });
+
+  it('falls through to the codec channel for non-enum scalar fields', () => {
+    const models: Record<string, ContractModel> = {
+      Post: {
+        fields: {
+          title: {
+            nullable: false,
+            type: { kind: 'scalar', codecId: 'pg/text@1' },
+          },
+        },
+        relations: {},
+        storage: {},
+      },
+    };
+    const result = generateBothFieldTypesMaps(models, undefined, undefined, () => undefined);
+    expect(result.output).toContain("readonly title: CodecTypes['pg/text@1']['output']");
   });
 });
 
@@ -1338,5 +1281,181 @@ describe('generateBothFieldTypesMaps with resolveFieldTypeParams', () => {
     const result = generateBothFieldTypesMaps(models, lookup, resolveFieldTypeParams);
     expect(result.output).toContain('readonly embedding: Vector<768>');
     expect(result.output).not.toContain('Vector<1536>');
+  });
+});
+
+describe('resolveFieldType domain-enum narrowing edge cases', () => {
+  const priorityRef = {
+    plane: 'domain' as const,
+    namespaceId: 'public',
+    entityKind: 'enum' as const,
+    entityName: 'Priority',
+  };
+
+  it('renders numeric enum members as plain literals', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/int4@1' },
+      valueSet: priorityRef,
+    };
+    const lookup: DomainEnumLookup = () => ({
+      codecId: 'pg/int4@1',
+      members: [
+        { name: 'Low', value: 1 },
+        { name: 'High', value: 10 },
+      ],
+    });
+    const result = resolveFieldType(field, undefined, undefined, lookup);
+    expect(result.output).toBe('1 | 10');
+    expect(result.input).toBe('1 | 10');
+  });
+
+  it('renders boolean enum members as plain literals', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/bool@1' },
+      valueSet: priorityRef,
+    };
+    const lookup: DomainEnumLookup = () => ({
+      codecId: 'pg/bool@1',
+      members: [
+        { name: 'On', value: true },
+        { name: 'Off', value: false },
+      ],
+    });
+    const result = resolveFieldType(field, undefined, undefined, lookup);
+    expect(result.output).toBe('true | false');
+  });
+
+  it('applies nullability on top of the narrowed union', () => {
+    const field: ContractField = {
+      nullable: true,
+      type: { kind: 'scalar', codecId: 'pg/text@1' },
+      valueSet: priorityRef,
+    };
+    const lookup: DomainEnumLookup = () => ({
+      codecId: 'pg/text@1',
+      members: [{ name: 'Low', value: 'low' }],
+    });
+    const result = resolveFieldType(field, undefined, undefined, lookup);
+    expect(result.output).toBe("'low' | null");
+    expect(result.input).toBe("'low' | null");
+  });
+
+  it('falls through to the codec channel when the lookup returns undefined', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/text@1' },
+      valueSet: priorityRef,
+    };
+    const lookup: DomainEnumLookup = () => undefined;
+    const result = resolveFieldType(field, undefined, undefined, lookup);
+    expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
+  });
+
+  it('falls through to the codec channel when the enum has no members', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/text@1' },
+      valueSet: priorityRef,
+    };
+    const lookup: DomainEnumLookup = () => ({ codecId: 'pg/text@1', members: [] });
+    const result = resolveFieldType(field, undefined, undefined, lookup);
+    expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
+  });
+
+  it('falls through to the codec channel when a member value is non-scalar', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/jsonb@1' },
+      valueSet: priorityRef,
+    };
+    const lookup: DomainEnumLookup = () => ({
+      codecId: 'pg/jsonb@1',
+      members: [{ name: 'Obj', value: { nested: 1 } }],
+    });
+    const result = resolveFieldType(field, undefined, undefined, lookup);
+    expect(result.output).toBe("CodecTypes['pg/jsonb@1']['output']");
+  });
+
+  it('does not narrow non-scalar (union) fields even with a valueSet present', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: {
+        kind: 'union',
+        members: [
+          { kind: 'scalar', codecId: 'pg/text@1' },
+          { kind: 'valueObject', name: 'Address' },
+        ],
+      },
+      valueSet: priorityRef,
+    };
+    // The lookup would narrow if the narrowing code ran, so this proves the
+    // non-scalar-kind guard (and not a missing-lookup short-circuit) is what
+    // keeps the union shape intact.
+    const lookup: DomainEnumLookup = () => ({
+      codecId: 'pg/text@1',
+      members: [
+        { name: 'Low', value: 'low' },
+        { name: 'High', value: 'high' },
+      ],
+    });
+    const result = resolveFieldType(field, undefined, undefined, lookup);
+    expect(result.output).toBe("CodecTypes['pg/text@1']['output'] | AddressOutput");
+    expect(result.input).toBe("CodecTypes['pg/text@1']['input'] | AddressInput");
+    expect(result.output).not.toContain("'low'");
+  });
+});
+
+describe('generateFieldTypesMapsByNamespace edge cases', () => {
+  it('returns Record<string, never> when no namespaces are supplied', () => {
+    const result = generateFieldTypesMapsByNamespace([]);
+    expect(result.output).toBe('Record<string, never>');
+    expect(result.input).toBe('Record<string, never>');
+  });
+
+  it('emits Record<string, never> for a model with no fields', () => {
+    const result = generateBothFieldTypesMaps({
+      Empty: { fields: {}, relations: {}, storage: {} },
+    });
+    expect(result.output).toContain('readonly Empty: Record<string, never>');
+    expect(result.input).toContain('readonly Empty: Record<string, never>');
+  });
+
+  it('skips falsy entries in the models map', () => {
+    // The map's value type allows `ContractModelBase`, but a contract that
+    // arrives through JSON deserialization could have a falsy value at a
+    // model slot (corruption / partial parse). The emitter silently skips
+    // those rather than throwing — the `if (!model) continue` guard.
+    const models = blindCast<
+      Record<string, ContractModel>,
+      'test fixture: deliberately constructs a falsy slot to exercise the skip branch'
+    >({
+      Skipped: undefined,
+      Real: {
+        fields: { name: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
+        relations: {},
+        storage: {},
+      },
+    });
+    const result = generateBothFieldTypesMaps(models);
+    expect(result.output).not.toContain('Skipped');
+    expect(result.output).toContain('readonly Real:');
+  });
+});
+
+describe('serializeCrossReference with space', () => {
+  it('includes the space discriminator when the ref carries one', () => {
+    const result = generateRootsType({ user: crossRef('User', 'public', 'authSpace') });
+    expect(result).toContain("readonly space: 'authSpace'");
+  });
+});
+
+describe('generateValueObjectsDescriptorType empty-field branch', () => {
+  it("renders a value object with no fields as 'Record<string, never>'", () => {
+    const result = generateValueObjectsDescriptorType({
+      EmptyVO: { fields: {} },
+    });
+    expect(result).toContain('readonly EmptyVO: { readonly fields: Record<string, never> }');
   });
 });

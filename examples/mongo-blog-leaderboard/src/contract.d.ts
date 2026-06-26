@@ -91,7 +91,7 @@ type ContractBase = Omit<
     readonly namespaces: {
       readonly __unbound__: {
         readonly id: '__unbound__';
-        readonly kind: 'mongo-namespace';
+        readonly kind: 'mongo-database';
         readonly entries: {
           readonly collection: {
             readonly posts: {

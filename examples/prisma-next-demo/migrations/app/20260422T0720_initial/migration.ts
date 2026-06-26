@@ -7,13 +7,14 @@ import {
   MigrationCLI,
   primaryKey,
   rawSql,
+  unique,
 } from '@prisma-next/target-postgres/migration';
 
 export default class M extends Migration {
   override describe() {
     return {
       from: null,
-      to: 'sha256:3db2cb9bd69609a89ee049f99a464cae59bd531db8a646066addebbeeaf8bbc7',
+      to: 'sha256:9f49f8f9e51a9cc016f1ec2098ebae9406521a3cc2cf00207adc795078333d8b',
     };
   }
 
@@ -47,12 +48,41 @@ export default class M extends Migration {
       this.createTable({
         schema: 'public',
         table: 'bug',
-        columns: [col('severity', 'text', { notNull: true }), col('stepsToRepro', 'text')],
+        columns: [
+          col('id', 'uuid', { notNull: true }),
+          col('severity', 'text', { notNull: true }),
+          col('stepsToRepro', 'text'),
+        ],
+        constraints: [primaryKey(['id'])],
       }),
       this.createTable({
         schema: 'public',
         table: 'feature',
-        columns: [col('priority', 'text', { notNull: true }), col('targetRelease', 'text')],
+        columns: [
+          col('id', 'uuid', { notNull: true }),
+          col('priority', 'text', { notNull: true }),
+          col('targetRelease', 'text'),
+        ],
+        constraints: [primaryKey(['id'])],
+      }),
+      this.createTable({
+        schema: 'public',
+        table: 'tag',
+        columns: [col('id', 'uuid', { notNull: true }), col('label', 'text', { notNull: true })],
+        constraints: [primaryKey(['id']), unique(['label'], { name: 'tag_label_key' })],
+      }),
+      this.createTable({
+        schema: 'public',
+        table: 'user',
+        columns: [
+          col('address', 'jsonb'),
+          col('createdAt', 'timestamptz', { notNull: true, default: fn('now()') }),
+          col('displayName', 'text', { notNull: true }),
+          col('email', 'text', { notNull: true }),
+          col('id', 'uuid', { notNull: true }),
+          col('kind', 'text', { notNull: true }),
+        ],
+        constraints: [primaryKey(['id'])],
       }),
       this.createTable({
         schema: 'public',
@@ -60,9 +90,10 @@ export default class M extends Migration {
         columns: [
           col('createdAt', 'timestamptz', { notNull: true, default: fn('now()') }),
           col('embedding', 'vector(1536)'),
-          col('id', 'character(36)', { notNull: true }),
+          col('id', 'uuid', { notNull: true }),
+          col('priority', 'text', { notNull: true, default: lit('low') }),
           col('title', 'text', { notNull: true }),
-          col('userId', 'text', { notNull: true }),
+          col('userId', 'uuid', { notNull: true }),
         ],
         constraints: [primaryKey(['id'])],
       }),
@@ -72,25 +103,22 @@ export default class M extends Migration {
         columns: [
           col('createdAt', 'timestamptz', { notNull: true, default: fn('now()') }),
           col('description', 'text'),
-          col('id', 'character(36)', { notNull: true }),
+          col('id', 'uuid', { notNull: true }),
           col('status', 'text', { notNull: true, default: lit('open') }),
           col('title', 'text', { notNull: true }),
           col('type', 'text', { notNull: true }),
-          col('userId', 'text', { notNull: true }),
+          col('userId', 'uuid', { notNull: true }),
         ],
         constraints: [primaryKey(['id'])],
       }),
       this.createTable({
         schema: 'public',
-        table: 'user',
+        table: 'post_tag',
         columns: [
-          col('address', 'jsonb'),
-          col('createdAt', 'timestamptz', { notNull: true, default: fn('now()') }),
-          col('email', 'text', { notNull: true }),
-          col('id', 'character(36)', { notNull: true }),
-          col('kind', 'text', { notNull: true }),
+          col('postId', 'uuid', { notNull: true }),
+          col('tagId', 'uuid', { notNull: true }),
         ],
-        constraints: [primaryKey(['id'])],
+        constraints: [primaryKey(['postId', 'tagId'])],
       }),
       this.addCheckConstraint({
         schema: 'public',
@@ -98,6 +126,13 @@ export default class M extends Migration {
         constraint: 'user_kind_check',
         column: 'kind',
         values: ['admin', 'user'],
+      }),
+      this.addCheckConstraint({
+        schema: 'public',
+        table: 'post',
+        constraint: 'post_priority_check',
+        column: 'priority',
+        values: ['low', 'high', 'urgent'],
       }),
       this.addForeignKey({
         schema: 'public',
@@ -128,6 +163,56 @@ export default class M extends Migration {
         table: 'task',
         index: 'task_userId_idx',
         columns: ['userId'],
+      }),
+      this.addForeignKey({
+        schema: 'public',
+        table: 'bug',
+        foreignKey: {
+          name: 'bug_id_fkey',
+          columns: ['id'],
+          references: { schema: 'public', table: 'task', columns: ['id'] },
+          onDelete: 'cascade',
+        },
+      }),
+      this.addForeignKey({
+        schema: 'public',
+        table: 'feature',
+        foreignKey: {
+          name: 'feature_id_fkey',
+          columns: ['id'],
+          references: { schema: 'public', table: 'task', columns: ['id'] },
+          onDelete: 'cascade',
+        },
+      }),
+      this.createIndex({
+        schema: 'public',
+        table: 'post_tag',
+        index: 'post_tag_postId_idx',
+        columns: ['postId'],
+      }),
+      this.createIndex({
+        schema: 'public',
+        table: 'post_tag',
+        index: 'post_tag_tagId_idx',
+        columns: ['tagId'],
+      }),
+      this.addForeignKey({
+        schema: 'public',
+        table: 'post_tag',
+        foreignKey: {
+          name: 'post_tag_postId_fkey',
+          columns: ['postId'],
+          references: { schema: 'public', table: 'post', columns: ['id'] },
+        },
+      }),
+      this.addForeignKey({
+        schema: 'public',
+        table: 'post_tag',
+        foreignKey: {
+          name: 'post_tag_tagId_fkey',
+          columns: ['tagId'],
+          references: { schema: 'public', table: 'tag', columns: ['id'] },
+        },
       }),
     ];
   }

@@ -18,10 +18,11 @@ import type {
 } from '@prisma-next/framework-components/control';
 
 import {
+  isStorageTable,
   isStorageTypeInstance,
   type SqlStorage,
   type StorageColumn,
-  StorageTable,
+  type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -298,7 +299,7 @@ function verifySchemaTables(options: {
     const ns = contract.storage.namespaces[namespaceId];
     if (!ns) continue;
     for (const [tableName, contractTableRaw] of Object.entries(ns.entries.table ?? {})) {
-      if (!(contractTableRaw instanceof StorageTable)) {
+      if (!isStorageTable(contractTableRaw)) {
         throw new Error(
           `verifySqlSchema: expected StorageTable at storage.namespaces.${namespaceId}.entries.table.${tableName}`,
         );
@@ -791,8 +792,9 @@ function verifyColumn(options: {
     tableName,
     columnName,
   });
-  const schemaNativeType =
+  const schemaBaseNativeType =
     normalizeNativeType?.(schemaColumn.nativeType) ?? schemaColumn.nativeType;
+  const schemaNativeType = schemaColumn.many ? `${schemaBaseNativeType}[]` : schemaBaseNativeType;
 
   const typesMatch = contractNativeType === schemaNativeType;
 
@@ -1145,19 +1147,20 @@ function renderExpectedNativeType(
     context,
   );
 
+  let baseType: string;
+
   // If no typeParams or codecId, return the base native type
   if (!typeParams || !codecId) {
-    return nativeType;
+    baseType = nativeType;
+  } else {
+    // Try to use the codec's expandNativeType hook if available
+    const hooks = codecHooks.get(codecId);
+    baseType = hooks?.expandNativeType
+      ? hooks.expandNativeType({ nativeType, codecId, typeParams })
+      : nativeType;
   }
 
-  // Try to use the codec's expandNativeType hook if available
-  const hooks = codecHooks.get(codecId);
-  if (hooks?.expandNativeType) {
-    return hooks.expandNativeType({ nativeType, codecId, typeParams });
-  }
-
-  // Fallback: return base native type if no hook is available
-  return nativeType;
+  return contractColumn.many ? `${baseType}[]` : baseType;
 }
 
 function resolveContractColumnTypeMetadata(

@@ -124,11 +124,87 @@ export type FieldInputTypes = {
     };
   };
 };
+export type StorageColumnTypes = {
+  readonly public: {
+    readonly bug: {
+      readonly id: Char<36>;
+      readonly severity: CodecTypes['pg/text@1']['output'];
+      readonly stepsToRepro: CodecTypes['pg/text@1']['output'] | null;
+    };
+    readonly feature: {
+      readonly id: Char<36>;
+      readonly priority: CodecTypes['pg/text@1']['output'];
+      readonly targetRelease: CodecTypes['pg/text@1']['output'] | null;
+    };
+    readonly post: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly id: Char<36>;
+      readonly title: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/text@1']['output'];
+    };
+    readonly task: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly description: CodecTypes['pg/text@1']['output'] | null;
+      readonly id: Char<36>;
+      readonly status: CodecTypes['pg/text@1']['output'];
+      readonly title: CodecTypes['pg/text@1']['output'];
+      readonly type: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/text@1']['output'];
+    };
+    readonly user: {
+      readonly address: CodecTypes['pg/jsonb@1']['output'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly displayName: CodecTypes['pg/text@1']['output'];
+      readonly email: CodecTypes['pg/text@1']['output'];
+      readonly id: Char<36>;
+      readonly kind: 'admin' | 'user';
+    };
+  };
+};
+export type StorageColumnInputTypes = {
+  readonly public: {
+    readonly bug: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly severity: CodecTypes['pg/text@1']['input'];
+      readonly stepsToRepro: CodecTypes['pg/text@1']['input'] | null;
+    };
+    readonly feature: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly priority: CodecTypes['pg/text@1']['input'];
+      readonly targetRelease: CodecTypes['pg/text@1']['input'] | null;
+    };
+    readonly post: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+    };
+    readonly task: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly description: CodecTypes['pg/text@1']['input'] | null;
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly status: CodecTypes['pg/text@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly type: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+    };
+    readonly user: {
+      readonly address: CodecTypes['pg/jsonb@1']['input'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly displayName: CodecTypes['pg/text@1']['input'];
+      readonly email: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly kind: 'admin' | 'user';
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<
@@ -654,6 +730,7 @@ type ContractBase = Omit<
       readonly enums: true;
       readonly lateral: true;
       readonly returning: true;
+      readonly scalarList: true;
     };
   };
   readonly extensionPacks: {};

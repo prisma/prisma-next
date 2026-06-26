@@ -1,15 +1,12 @@
 import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
 import { mergeCapabilityMatrices } from '@prisma-next/framework-components/components';
 import type { RuntimeDriverDescriptor } from '@prisma-next/framework-components/execution';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  SqlUnboundNamespace,
-} from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import {
   createExecutionContext,
   type SqlExecutionStack,
@@ -34,7 +31,9 @@ const testContract: Contract<SqlStorage> = {
   roots: {},
   storage: new SqlStorage({
     storageHash: coreHash('sha256:test'),
-    namespaces: { __unbound__: SqlUnboundNamespace.instance },
+    namespaces: {
+      __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
+    },
   }),
   extensionPacks: {},
   capabilities: {},
@@ -306,7 +305,7 @@ describe('contract/stack validation errors', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         namespaces: {
-          __unbound__: buildSqlNamespace({
+          __unbound__: createTestSqlNamespace({
             id: '__unbound__',
             entries: {
               table: {
@@ -356,7 +355,7 @@ describe('contract/stack validation errors', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         namespaces: {
-          __unbound__: buildSqlNamespace({
+          __unbound__: createTestSqlNamespace({
             id: '__unbound__',
             entries: {
               table: {
@@ -409,7 +408,7 @@ describe('contract/stack validation errors', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         namespaces: {
-          __unbound__: buildSqlNamespace({
+          __unbound__: createTestSqlNamespace({
             id: '__unbound__',
             entries: {
               table: {
@@ -451,7 +450,7 @@ describe('applyMutationDefaults', () => {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
       namespaces: {
-        __unbound__: buildSqlNamespace({
+        __unbound__: createTestSqlNamespace({
           id: '__unbound__',
           entries: {
             table: {
@@ -573,7 +572,7 @@ describe('applyMutationDefaults', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         namespaces: {
-          __unbound__: buildSqlNamespace({
+          __unbound__: createTestSqlNamespace({
             id: '__unbound__',
             entries: {
               table: {
@@ -674,7 +673,7 @@ describe('applyMutationDefaults', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         namespaces: {
-          __unbound__: buildSqlNamespace({
+          __unbound__: createTestSqlNamespace({
             id: '__unbound__',
             entries: {
               table: {
@@ -765,7 +764,7 @@ describe('applyMutationDefaults', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         namespaces: {
-          __unbound__: buildSqlNamespace({
+          __unbound__: createTestSqlNamespace({
             id: '__unbound__',
             entries: {
               table: {

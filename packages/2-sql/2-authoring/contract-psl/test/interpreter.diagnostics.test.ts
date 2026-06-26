@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract,
 } from '../src/interpreter';
-
 import {
   createBuiltinLikeControlMutationDefaults,
   documentScopedTypes,
@@ -18,6 +18,7 @@ const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
+  createNamespace: createTestSqlNamespace,
 } as const;
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
@@ -1083,6 +1084,7 @@ model User {
         composedExtensionContracts: new Map(),
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
+        createNamespace: createTestSqlNamespace,
       });
 
       expect(result.ok).toBe(false);
@@ -1118,6 +1120,7 @@ model User {
         composedExtensionContracts: new Map(),
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
+        createNamespace: createTestSqlNamespace,
       });
 
       expect(result.ok).toBe(false);

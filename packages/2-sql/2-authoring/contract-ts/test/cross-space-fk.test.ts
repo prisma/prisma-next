@@ -11,6 +11,7 @@ import type {
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { defineContract, field, model } from '../src/contract-builder';
 import type { TargetFieldRef } from '../src/contract-dsl';
 import { ContractModelBuilder } from '../src/contract-dsl';
@@ -172,6 +173,7 @@ describe('cross-space FK via constraints.foreignKey in sql()', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       extensionPacks: { supabase: supabasePack },
       models: { Profile },
     });
@@ -200,6 +202,7 @@ describe('cross-space FK via constraints.foreignKey in sql()', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       extensionPacks: { supabase: supabasePack },
       models: { Profile },
     });
@@ -231,6 +234,7 @@ describe('missing-pack fail-fast diagnostic', () => {
       defineContract({
         family: bareFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         // extensionPacks intentionally omitted — 'supabase' is not declared
         models: { Profile },
       }),
@@ -254,6 +258,7 @@ describe('missing-pack fail-fast diagnostic', () => {
       defineContract({
         family: bareFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         models: { Profile },
       }),
     ).toThrow(/extensionPacks/i);
@@ -281,6 +286,7 @@ describe('cascade on cross-space FK (AC4)', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       extensionPacks: { supabase: supabasePack },
       models: { Profile },
     });
@@ -304,6 +310,7 @@ describe('local FK regression (NFR2 / AC9)', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: { User, Post },
     });
 
@@ -353,6 +360,7 @@ describe('F-col: cross-space FK target columns prefer physical column name', () 
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       extensionPacks: { supabase: supabasePack },
       models: { Profile },
     });
@@ -431,6 +439,7 @@ describe('F-compound: normalizeTargetFieldRefInput rejects mixed-space compound 
       defineContract({
         family: bareFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         extensionPacks: { supabase: supabasePack, other_space: otherPack },
         models: { Profile },
       }),

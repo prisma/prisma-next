@@ -6,10 +6,10 @@ import type {
 import type { ForeignKeyDefaultsState } from '@prisma-next/contract-authoring';
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
   ReferentialAction,
-  SqlNamespaceTablesInput,
+  SqlNamespaceBase,
+  SqlNamespaceInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { EnumTypeHandle } from './enum-type';
@@ -175,8 +175,8 @@ export interface ContractDefinition {
    * `SqlStorage.namespaces` together with `createNamespace`.
    */
   readonly namespaces?: readonly string[];
-  /** Target-supplied factory that materialises a `Namespace` concretion for a declared namespace coordinate. */
-  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  /** Target-supplied factory that materialises a `SqlNamespaceBase` concretion for a declared namespace coordinate. */
+  readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespaceBase;
   readonly models: readonly ModelNode[];
   readonly valueObjects?: readonly ValueObjectNode[];
   /**

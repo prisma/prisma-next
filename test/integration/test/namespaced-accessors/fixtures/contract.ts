@@ -3,6 +3,7 @@ import {
   buildSqlContractFromDefinition,
   type ModelNode,
 } from '@prisma-next/postgres/contract-builder';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 
 const idDescriptor = { codecId: 'pg/int4@1', nativeType: 'int4' } as const;
 const textDescriptor = { codecId: 'pg/text@1', nativeType: 'text' } as const;
@@ -86,4 +87,5 @@ export const contract = buildSqlContractFromDefinition({
   target: postgresTargetPack,
   namespaces: ['public', 'auth'],
   models: [publicUser, profile, authUser],
+  createNamespace: postgresCreateNamespace,
 });

@@ -10,6 +10,7 @@ import type { TargetPackRef } from '@prisma-next/framework-components/components
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { emptyContract, typescriptContract, typescriptContractFromPath } from '../src/config-types';
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
@@ -48,7 +49,10 @@ describe('source format discriminator', () => {
   });
 
   it('emptyContract tags the source as TypeScript', () => {
-    const config = emptyContract({ target: postgresTargetPack });
+    const config = emptyContract({
+      target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
+    });
     expect(config.source.sourceFormat).toBe('typescript');
   });
 });
@@ -283,7 +287,10 @@ describe('defaultControlPolicy specifier precedence', () => {
 
 describe('emptyContract', () => {
   it('loads an empty SQL contract for the target', async () => {
-    const config = emptyContract({ target: postgresTargetPack });
+    const config = emptyContract({
+      target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
+    });
     const result = await config.source.load(stubContext);
 
     expect(result.ok).toBe(true);
@@ -306,17 +313,22 @@ describe('emptyContract', () => {
   it('sets output when passed and omits it otherwise', () => {
     const withOutput = emptyContract({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       output: 'src/contract.json',
     });
     expect(withOutput.output).toBe('src/contract.json');
 
-    const withoutOutput = emptyContract({ target: postgresTargetPack });
+    const withoutOutput = emptyContract({
+      target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
+    });
     expect(withoutOutput.output).toBeUndefined();
   });
 
   it('applies defaultControlPolicy from the specifier options bag', async () => {
     const config = emptyContract({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       defaultControlPolicy: 'observed',
     });
     const result = await config.source.load(stubContext);
@@ -327,7 +339,10 @@ describe('emptyContract', () => {
   });
 
   it('omits defaultControlPolicy when the specifier options bag omits it', async () => {
-    const config = emptyContract({ target: postgresTargetPack });
+    const config = emptyContract({
+      target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
+    });
     const result = await config.source.load(stubContext);
 
     expect(result.ok).toBe(true);

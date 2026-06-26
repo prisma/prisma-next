@@ -11,11 +11,14 @@ export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual
  *
  * `typeParams` is `JsonValue`-constrained so the ref survives JSON serialization (relevant for AST-embedded migration ops). Non-parameterized codecs leave `typeParams` undefined; the descriptor's `paramsSchema` validates the value at the JSON boundary.
  *
+ * `many` marks a scalar-array (list-typed) column. When `true`, the encode/decode paths map the element codec over the JS array rather than applying the codec to the whole value. The element codec id is `codecId`; the driver owns the array wire framing (`{…}`) in both directions. Absent for scalar columns.
+ *
  * Family-agnostic by design — both SQL and Mongo AST nodes carry `codec: CodecRef | undefined`, and the resolver is the only dispatch path that survives serialization.
  */
 export interface CodecRef {
   readonly codecId: string;
   readonly typeParams?: JsonValue;
+  readonly many?: boolean;
 }
 
 /**

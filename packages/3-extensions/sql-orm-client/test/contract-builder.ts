@@ -43,6 +43,7 @@ type PostgresResult<
     SqlFamily,
     PostgresPack,
     {
+      readonly createNamespace: typeof postgresCreateNamespace;
       readonly types?: Types;
       readonly models?: Models;
       readonly extensionPacks?: ExtensionPacks;
@@ -61,7 +62,7 @@ type PostgresBaseScaffold<
     Record<never, never>,
     ExtensionPacks
   >,
-  'family' | 'target' | 'types' | 'models' | 'enums'
+  'family' | 'target' | 'types' | 'models' | 'enums' | 'createNamespace'
 >;
 
 type PostgresDefinition<

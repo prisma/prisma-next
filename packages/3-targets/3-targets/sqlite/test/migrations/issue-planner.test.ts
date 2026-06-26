@@ -1,20 +1,17 @@
 import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  type StorageTableInput,
-} from '@prisma-next/sql-contract/types';
+import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
+import { sqliteCreateNamespace } from '../../src/core/sqlite-unbound-database';
 
 function makeContract(
   overrides: { entries: { table: Record<string, StorageTableInput> } } = { entries: { table: {} } },
 ): Contract<SqlStorage> {
-  const unboundNs = buildSqlNamespace({
+  const unboundNs = sqliteCreateNamespace({
     id: UNBOUND_NAMESPACE_ID,
     entries: { table: overrides.entries.table },
   });

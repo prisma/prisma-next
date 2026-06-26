@@ -1,6 +1,12 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import { freezeNode, type Namespace, type Storage } from '@prisma-next/framework-components/ir';
+import {
+  freezeNode,
+  isPlainRecord,
+  type Namespace,
+  NamespaceBase,
+  type Storage,
+} from '@prisma-next/framework-components/ir';
 import { SqlNode } from './sql-node';
 import type { StorageTable } from './storage-table';
 import {
@@ -20,16 +26,16 @@ import type { StorageValueSet } from './storage-value-set';
  */
 export type SqlStorageTypeEntry = StorageTypeInstance | StorageTypeInstanceInput;
 
-export interface SqlNamespaceTablesInput {
+export interface SqlNamespaceInput {
   readonly id: string;
   readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
 /**
  * Target-supplied factory that materializes a `Namespace` from a SQL
- * `SqlNamespaceTablesInput` (used to populate `SqlStorage.namespaces`).
+ * `SqlNamespaceInput` (used to populate `SqlStorage.namespaces`).
  */
-export type SqlNamespaceFactory = (input: SqlNamespaceTablesInput) => Namespace;
+export type SqlNamespaceFactory = (input: SqlNamespaceInput) => Namespace;
 
 /**
  * SQL-family extension of the framework `AuthoringContributions`. SQL target
@@ -58,7 +64,7 @@ export function isSqlAuthoringContributions(
 export interface SqlStorageInput<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
   readonly types?: Record<string, SqlStorageTypeEntry>;
-  readonly namespaces: Readonly<Record<string, SqlNamespace>>;
+  readonly namespaces: Readonly<Record<string, SqlNamespaceBase>>;
 }
 
 /**
@@ -94,22 +100,48 @@ export type SqlNamespaceEntries = Readonly<Record<string, Readonly<Record<string
 };
 
 /**
- * SQL family namespace. `entries` is the open ADR 224 dictionary —
- * `entries[entityKind][entityName]` addresses any entity. Emitted
- * contract literals satisfy this structurally (no prototype getters
- * needed). For typed access to specific kinds, use the class getters
- * on the concretion or `ns.entries.table` / `ns.entries.valueSet` directly.
+ * Structural interface for SQL family namespaces. Generated `.d.ts` contract
+ * types satisfy this structurally (no prototype methods). The runtime
+ * abstract class `SqlNamespaceBase` extends this.
+ *
+ * `qualifyTable` is optional so JSON-shaped contract types (which carry no
+ * methods) are accepted where `SqlNamespace` is required. Hydrated
+ * `SqlNamespaceBase` instances always have it.
  */
-export type SqlNamespace = Namespace & {
+export interface SqlNamespace {
+  readonly kind: string;
+  readonly id: string;
   readonly entries: SqlNamespaceEntries;
-  /**
-   * Render a dialect-qualified table reference for runtime SQL emission.
-   * Present on materialised target concretions (`PostgresSchema`,
-   * `SqliteDatabase`, …) and family placeholders; omitted on emitted
-   * contract structural namespace literals (methods are not serialised).
-   */
   qualifyTable?(tableName: string): string;
-};
+}
+
+/**
+ * Abstract SQL family namespace base class. Target concretions (`PostgresSchema`,
+ * `SqliteDatabase`, …) extend this — it is never instantiated directly.
+ * `entries` is the open ADR 224 dictionary: `entries[entityKind][entityName]`
+ * addresses any entity.
+ */
+export abstract class SqlNamespaceBase extends NamespaceBase implements SqlNamespace {
+  abstract override readonly id: string;
+  abstract override readonly entries: SqlNamespaceEntries;
+
+  abstract qualifyTable(tableName: string): string;
+}
+
+/**
+ * Realm-safe guard for hydrated `SqlNamespaceBase` concretions. Checks
+ * `qualifyTable` structurally instead of `instanceof NamespaceBase`, so it
+ * survives duplicate-module boundaries (e.g. dist e2e where the target and
+ * the family carry separate copies of `@prisma-next/framework-components`).
+ *
+ * Every concrete `SqlNamespaceBase` subclass (`PostgresSchema`, `SqliteDatabase`,
+ * `TestSqlNamespace`, …) implements `qualifyTable`. Raw `SqlNamespaceInput`
+ * objects (`{ id, entries }`) do not.
+ */
+export function isMaterializedSqlNamespace(x: unknown): x is SqlNamespaceBase {
+  if (typeof x !== 'object' || x === null || !('qualifyTable' in x)) return false;
+  return typeof x.qualifyTable === 'function';
+}
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
@@ -159,7 +191,7 @@ function normaliseTypeEntry(name: string, entry: SqlStorageTypeEntry): StorageTy
     }
     return toStorageTypeInstance(entry);
   }
-  const rawKind = (entry as { kind?: unknown }).kind;
+  const rawKind = isPlainRecord(entry) ? entry['kind'] : undefined;
   const kindDescription =
     rawKind === undefined
       ? 'missing `kind` discriminator'

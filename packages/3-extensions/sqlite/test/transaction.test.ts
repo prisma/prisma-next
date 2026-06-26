@@ -1,12 +1,30 @@
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { createContract } from '@prisma-next/test-utils';
+import type { Contract } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
 // No third-party mocks needed: node:sqlite (built-in) drives the real driver.
 
 import sqlite from '../src/runtime/sqlite';
 
-const contract = createContract<SqlStorage>({ target: 'sqlite' });
+const contract: Contract<SqlStorage> = {
+  target: 'sqlite',
+  targetFamily: 'sql',
+  profileHash: profileHash('sha256:sqlite-transaction-test'),
+  domain: applicationDomainOf({ models: {} }),
+  roots: {},
+  storage: new SqlStorage({
+    storageHash: coreHash('sha256:sqlite-transaction-test'),
+    namespaces: {
+      __unbound__: sqliteCreateNamespace({ id: '__unbound__', entries: { table: {} } }),
+    },
+  }),
+  extensionPacks: {},
+  capabilities: {},
+  meta: {},
+};
 
 describe('sqlite transaction()', () => {
   it('transaction() runs the callback and returns its result', async () => {

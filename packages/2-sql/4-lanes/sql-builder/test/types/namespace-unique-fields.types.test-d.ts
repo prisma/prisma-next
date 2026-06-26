@@ -1,7 +1,14 @@
+import type { ContractWithTypeMaps } from '@prisma-next/sql-contract/types';
 import { expectTypeOf, test } from 'vitest';
 import type { Db } from '../../src/exports/types';
 import type { ContractToQC } from '../../src/types/table-proxy';
-import type { Contract } from '../fixtures/generated/contract';
+import type {
+  CodecTypes,
+  Contract,
+  StorageColumnInputTypes,
+  StorageColumnTypes,
+  TypeMaps,
+} from '../fixtures/generated/contract';
 
 /**
  * Regression: the same bare table name in two namespaces, each with a
@@ -19,7 +26,30 @@ import type { Contract } from '../fixtures/generated/contract';
  * and resolves to its own type, while the other namespace's column is absent.
  */
 
-interface TwoNamespaceContract extends Omit<Contract, 'storage'> {
+type TwoNamespaceStorageColumnTypes = StorageColumnTypes & {
+  readonly auth: {
+    readonly users: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly token: CodecTypes['pg/text@1']['output'];
+    };
+  };
+};
+
+type TwoNamespaceStorageColumnInputTypes = StorageColumnInputTypes & {
+  readonly auth: {
+    readonly users: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly token: CodecTypes['pg/text@1']['input'];
+    };
+  };
+};
+
+type TwoNamespaceTypeMaps = TypeMaps & {
+  readonly storageColumnTypes: TwoNamespaceStorageColumnTypes;
+  readonly storageColumnInputTypes: TwoNamespaceStorageColumnInputTypes;
+};
+
+type TwoNamespaceContractBase = Omit<Contract, 'storage'> & {
   readonly storage: Omit<Contract['storage'], 'namespaces'> & {
     readonly namespaces: Contract['storage']['namespaces'] & {
       readonly auth: {
@@ -51,7 +81,9 @@ interface TwoNamespaceContract extends Omit<Contract, 'storage'> {
       };
     };
   };
-}
+};
+
+type TwoNamespaceContract = ContractWithTypeMaps<TwoNamespaceContractBase, TwoNamespaceTypeMaps>;
 
 declare const db: Db<TwoNamespaceContract>;
 

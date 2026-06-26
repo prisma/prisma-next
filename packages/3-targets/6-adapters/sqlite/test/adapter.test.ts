@@ -1,4 +1,3 @@
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   AggregateExpr,
   AndExpr,
@@ -30,6 +29,7 @@ import {
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { litParams } from '@prisma-next/test-utils/lowered-params';
 import { describe, expect, it } from 'vitest';
+import { TestSqlContractSerializer as SqlContractSerializer } from '../../../../2-sql/9-family/test/test-sql-contract-serializer';
 import { createSqliteAdapter } from '../src/core/adapter';
 import type { SqliteContract } from '../src/core/types';
 
@@ -78,6 +78,10 @@ const contract = new SqlContractSerializer().deserializeContract({
 
 describe('SQLite adapter', () => {
   const adapter = createSqliteAdapter();
+
+  it('SQLite adapter does not report sql.scalarList capability', () => {
+    expect(adapter.profile.capabilities['sql']).not.toMatchObject({ scalarList: true });
+  });
 
   describe('SELECT', () => {
     it('renders simple select', () => {

@@ -10,7 +10,6 @@ export interface SqlControlDriverInstance<T extends string = string>
   ): Promise<{ readonly rows: Row[] }>;
 }
 
-export { buildSqlNamespace, buildSqlNamespaceMap } from './ir/build-sql-namespace';
 export { CheckConstraint, type CheckConstraintInput } from './ir/check-constraint';
 export {
   ForeignKey,
@@ -25,19 +24,20 @@ export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
 export {
+  isMaterializedSqlNamespace,
   isSqlAuthoringContributions,
   type SqlAuthoringContributions,
   type SqlNamespace,
+  SqlNamespaceBase,
   type SqlNamespaceEntries,
   type SqlNamespaceFactory,
-  type SqlNamespaceTablesInput,
+  type SqlNamespaceInput,
   SqlStorage,
   type SqlStorageInput,
   type SqlStorageTypeEntry,
 } from './ir/sql-storage';
-export { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';
-export { StorageTable, type StorageTableInput } from './ir/storage-table';
+export { isStorageTable, StorageTable, type StorageTableInput } from './ir/storage-table';
 export {
   CODEC_INSTANCE_KIND,
   isStorageTypeInstance,
@@ -45,7 +45,11 @@ export {
   type StorageTypeInstanceInput,
   toStorageTypeInstance,
 } from './ir/storage-type-instance';
-export { StorageValueSet, type StorageValueSetInput } from './ir/storage-value-set';
+export {
+  isStorageValueSet,
+  StorageValueSet,
+  type StorageValueSetInput,
+} from './ir/storage-value-set';
 export {
   UniqueConstraint,
   type UniqueConstraintInput,
@@ -86,16 +90,25 @@ export function applyFkDefaults(
 // Shared by the output and input field-type maps and their extractors.
 export type NamespacedFieldTypeMap = Record<string, Record<string, Record<string, unknown>>>;
 
+export type NamespacedStorageColumnTypeMap = Record<
+  string,
+  Record<string, Record<string, unknown>>
+>;
+
 export type TypeMaps<
   TCodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
   TQueryOperationTypes extends Record<string, unknown> = Record<string, never>,
   TFieldOutputTypes extends NamespacedFieldTypeMap = Record<string, never>,
   TFieldInputTypes extends NamespacedFieldTypeMap = Record<string, never>,
+  TStorageColumnTypes extends NamespacedStorageColumnTypeMap = Record<string, never>,
+  TStorageColumnInputTypes extends NamespacedStorageColumnTypeMap = Record<string, never>,
 > = {
   readonly codecTypes: TCodecTypes;
   readonly queryOperationTypes: TQueryOperationTypes;
   readonly fieldOutputTypes: TFieldOutputTypes;
   readonly fieldInputTypes: TFieldInputTypes;
+  readonly storageColumnTypes: TStorageColumnTypes;
+  readonly storageColumnInputTypes: TStorageColumnInputTypes;
 };
 
 export type CodecTypesOf<T> = [T] extends [never]
@@ -110,12 +123,19 @@ export type CodecTypesOf<T> = [T] extends [never]
  * Dispatch hint identifying the first-argument target of an operation.
  *
  * Used by ORM column helpers to decide whether an operation is reachable on a
- * field. Either names a concrete codec identity or a set of capability traits
- * that the field's codec must carry.
+ * field. Names a concrete codec identity, a set of capability traits the
+ * field's codec must carry, or targets list-typed (`many`) fields. Element
+ * capability gating for list ops travels in `elementTraits`.
  */
 export type QueryOperationSelfSpec =
-  | { readonly codecId: string; readonly traits?: never }
-  | { readonly traits: readonly CodecTrait[]; readonly codecId?: never };
+  | { readonly codecId: string; readonly traits?: never; readonly many?: never }
+  | { readonly traits: readonly CodecTrait[]; readonly codecId?: never; readonly many?: never }
+  | {
+      readonly many: true;
+      readonly elementTraits?: readonly CodecTrait[];
+      readonly codecId?: never;
+      readonly traits?: never;
+    };
 
 /**
  * Structural shape an operation's impl must return: any value carrying a
@@ -175,10 +195,30 @@ export type FieldInputTypesOf<T> = [T] extends [never]
       : Record<string, never>
     : Record<string, never>;
 
+export type StorageColumnTypesOf<T> = [T] extends [never]
+  ? Record<string, never>
+  : T extends { readonly storageColumnTypes: infer F }
+    ? F extends NamespacedStorageColumnTypeMap
+      ? F
+      : Record<string, never>
+    : Record<string, never>;
+
+export type StorageColumnInputTypesOf<T> = [T] extends [never]
+  ? Record<string, never>
+  : T extends { readonly storageColumnInputTypes: infer F }
+    ? F extends NamespacedStorageColumnTypeMap
+      ? F
+      : Record<string, never>
+    : Record<string, never>;
+
 export type ExtractCodecTypes<T> = CodecTypesOf<ExtractTypeMapsFromContract<T>>;
 export type ExtractQueryOperationTypes<T> = QueryOperationTypesOf<ExtractTypeMapsFromContract<T>>;
 export type ExtractFieldOutputTypes<T> = FieldOutputTypesOf<ExtractTypeMapsFromContract<T>>;
 export type ExtractFieldInputTypes<T> = FieldInputTypesOf<ExtractTypeMapsFromContract<T>>;
+export type ExtractStorageColumnTypes<T> = StorageColumnTypesOf<ExtractTypeMapsFromContract<T>>;
+export type ExtractStorageColumnInputTypes<T> = StorageColumnInputTypesOf<
+  ExtractTypeMapsFromContract<T>
+>;
 
 export type ResolveCodecTypes<TContract, TTypeMaps> = [TTypeMaps] extends [never]
   ? ExtractCodecTypes<TContract>

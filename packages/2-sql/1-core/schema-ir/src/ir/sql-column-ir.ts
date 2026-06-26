@@ -16,6 +16,8 @@ export interface SqlColumnIRInput {
   /** Raw database default expression (e.g. `'hello'::text`, `nextval('seq')`). */
   readonly default?: string;
   readonly annotations?: SqlAnnotations;
+  /** True when the column is a native array (e.g. `text[]`, `int4[]`). The `nativeType` carries the element type only (e.g. `text`, `int4`). */
+  readonly many?: boolean;
 }
 
 /**
@@ -31,6 +33,8 @@ export class SqlColumnIR extends SqlSchemaIRNode {
   readonly nullable: boolean;
   declare readonly default?: string;
   declare readonly annotations?: SqlAnnotations;
+  /** True when the column is a native array (e.g. `text[]`, `int4[]`). The `nativeType` carries the element type only (e.g. `text`, `int4`). */
+  declare readonly many?: boolean;
 
   constructor(input: SqlColumnIRInput) {
     super();
@@ -39,6 +43,7 @@ export class SqlColumnIR extends SqlSchemaIRNode {
     this.nullable = input.nullable;
     if (input.default !== undefined) this.default = input.default;
     if (input.annotations !== undefined) this.annotations = input.annotations;
+    if (input.many !== undefined) this.many = input.many;
     freezeNode(this);
   }
 }

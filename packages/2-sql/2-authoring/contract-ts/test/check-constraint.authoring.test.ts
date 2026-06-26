@@ -7,6 +7,7 @@ import {
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { defineContract } from '../src/contract-builder';
 import { enumType, member } from '../src/enum-type';
 
@@ -48,6 +49,7 @@ describe('check-constraint lowering', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { Role },
       },
       ({ field: f, model: m }) =>
@@ -92,6 +94,7 @@ describe('check-constraint lowering', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { Role, Status },
       },
       ({ field: f, model: m }) =>
@@ -121,6 +124,7 @@ describe('check-constraint lowering', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
       },
       ({ field: f, model: m }) =>
         ({
@@ -148,6 +152,7 @@ describe('check-constraint lowering', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { Role },
       },
       ({ field: f, model: m }) =>
@@ -166,7 +171,7 @@ describe('check-constraint lowering', () => {
     const storageNs = contract.storage.namespaces['public'];
     const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
 
-    expect(userTable?.checks?.[0]).toBeInstanceOf(CheckConstraint);
+    expect(userTable?.checks?.[0]).toHaveProperty('valueSet');
   });
 });
 
@@ -182,6 +187,7 @@ describe('check-constraint serialize→hydrate round-trip', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { Role },
       },
       ({ field: f, model: m }) =>

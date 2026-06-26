@@ -6,6 +6,7 @@ import type {
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { defineContract, field, model } from '../src/contract-builder';
 import { enumType, member } from '../src/enum-type';
 
@@ -51,6 +52,7 @@ const factoryContract = defineContract(
   {
     family: sqlFamilyPack,
     target: postgresTargetPack,
+    createNamespace: createTestSqlNamespace,
   },
   () => ({
     enums: { Role, Status, Priority },
@@ -70,6 +72,7 @@ const factoryContract = defineContract(
 const definitionContract = defineContract({
   family: sqlFamilyPack,
   target: postgresTargetPack,
+  createNamespace: createTestSqlNamespace,
   enums: { Role, Status, Priority },
   models: {
     User: model('User', {
@@ -143,6 +146,7 @@ const mixedContract = defineContract(
   {
     family: sqlFamilyPack,
     target: postgresTargetPack,
+    createNamespace: createTestSqlNamespace,
     enums: { Role },
   },
   () => ({

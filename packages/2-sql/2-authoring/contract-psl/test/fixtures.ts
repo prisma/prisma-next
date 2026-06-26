@@ -21,15 +21,14 @@ import type {
   DefaultFunctionLoweringContext,
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
-import type { Namespace } from '@prisma-next/framework-components/ir';
 import type { SymbolTable } from '@prisma-next/psl-parser';
 import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
-import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
-import { buildSqlNamespace } from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceBase, SqlNamespaceInput } from '@prisma-next/sql-contract/types';
 import { type EnumTypeHandle, enumType } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 
 function testEnumFactory(
   block: PslExtensionBlock,
@@ -680,20 +679,20 @@ export function documentScopedTypes(contract: { readonly storage?: unknown }) {
  */
 export function buildEnumCapturingFactory(): {
   createNamespace: (
-    input: SqlNamespaceTablesInput,
+    input: SqlNamespaceInput,
     enumTypes?: Readonly<Record<string, unknown>>,
-  ) => Namespace;
+  ) => SqlNamespaceBase;
   capturedEnumTypes: Record<string, Record<string, unknown>>;
 } {
   const capturedEnumTypes: Record<string, Record<string, unknown>> = {};
   const createNamespace = (
-    input: SqlNamespaceTablesInput,
+    input: SqlNamespaceInput,
     enumTypes?: Readonly<Record<string, unknown>>,
-  ): Namespace => {
+  ): SqlNamespaceBase => {
     if (enumTypes && Object.keys(enumTypes).length > 0) {
       capturedEnumTypes[input.id] = { ...(capturedEnumTypes[input.id] ?? {}), ...enumTypes };
     }
-    return buildSqlNamespace(input);
+    return createTestSqlNamespace(input);
   };
   return { createNamespace, capturedEnumTypes };
 }

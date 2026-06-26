@@ -1,5 +1,4 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlContractSerializerBase } from './sql-contract-serializer-base';
 
@@ -11,15 +10,14 @@ import { SqlContractSerializerBase } from './sql-contract-serializer-base';
  * codec-typed envelope wire a target-specific subclass with a populated
  * registry (see Postgres). Family-level call sites instantiate this
  * default directly when no target serializer is supplied.
+ *
+ * Because this serializer has no target concretion, deserialization of
+ * contracts that include namespace entries from JSON will throw unless
+ * the caller provides pre-hydrated `NamespaceBase` instances. Production
+ * paths always supply a target-specific serializer.
  */
 export class SqlContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor() {
     super(new Map());
-  }
-
-  // Family-level fallback when no target descriptor is wired in. Preserves the
-  // pre-TML-2916 compatibility-shim behaviour for the unbound slot.
-  protected override get defaultNamespaceId(): string {
-    return UNBOUND_NAMESPACE_ID;
   }
 }
