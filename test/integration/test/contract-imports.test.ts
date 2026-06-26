@@ -220,10 +220,10 @@ type UserIdColumn = UserColumns['id'];
           baseUrl: '.',
           paths: {
             '@prisma-next/sql-contract/types': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/types.d.mts`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/types.d.mts`,
             ],
             '@prisma-next/sql-contract/types/*': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/*`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/*`,
             ],
             '@prisma-next/adapter-postgres/*': [
               `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/*`,
@@ -367,10 +367,10 @@ type CodecIntType = CodecTypes['pg/int4@1'];
               `${relativeToWorkspace}/packages/2-sql/2-authoring/contract-ts/dist/*`,
             ],
             '@prisma-next/sql-contract/types': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/types.d.mts`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/types.d.mts`,
             ],
             '@prisma-next/sql-contract/types/*': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/*`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/*`,
             ],
             '@prisma-next/family-sql/ir': [
               `${relativeToWorkspace}/packages/2-sql/9-family/dist/ir.d.mts`,
@@ -378,6 +378,9 @@ type CodecIntType = CodecTypes['pg/int4@1'];
             '@prisma-next/family-sql/*': [`${relativeToWorkspace}/packages/2-sql/9-family/dist/*`],
             '@prisma-next/adapter-postgres/*': [
               `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/*`,
+            ],
+            '@prisma-next/target-postgres/runtime': [
+              `${relativeToWorkspace}/packages/3-targets/3-targets/postgres/dist/runtime.d.mts`,
             ],
             '@prisma-next/target-postgres/*': [
               `${relativeToWorkspace}/packages/3-targets/3-targets/postgres/dist/*`,
