@@ -20,9 +20,9 @@ import {
 } from 'monaco-languageclient/vscodeApiWrapper';
 import { defineDefaultWorkerLoaders, useWorkerFactory } from 'monaco-languageclient/workerFactory';
 import * as vscode from 'vscode';
-import { documentUri, rootUri, schemaPath, schemaText, wsPath } from './runtime';
 
 const LANGUAGE_ID = 'prisma';
+const RUNTIME_CONFIG_PATH = '/__psl_playground_runtime.json';
 
 const pslSemanticThemeExtension = {
   name: 'prisma-psl-semantic-theme-bridge',
@@ -52,9 +52,41 @@ const pslSemanticThemeExtension = {
 
 registerExtension(pslSemanticThemeExtension, undefined, { system: true });
 
-const pathEl = document.getElementById('schema-path');
-if (pathEl !== null) {
-  pathEl.textContent = schemaPath;
+interface RuntimeConfig {
+  readonly wsPath: string;
+  readonly documentUri: string;
+  readonly rootUri: string;
+  readonly schemaPath: string;
+  readonly schemaText: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isRuntimeConfig(value: unknown): value is RuntimeConfig {
+  return (
+    isRecord(value) &&
+    typeof value['wsPath'] === 'string' &&
+    typeof value['documentUri'] === 'string' &&
+    typeof value['rootUri'] === 'string' &&
+    typeof value['schemaPath'] === 'string' &&
+    typeof value['schemaText'] === 'string'
+  );
+}
+
+async function loadRuntimeConfig(): Promise<RuntimeConfig> {
+  const response = await fetch(RUNTIME_CONFIG_PATH, { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(
+      `Failed to load playground runtime config: ${response.status} ${response.statusText}`,
+    );
+  }
+  const value: unknown = await response.json();
+  if (!isRuntimeConfig(value)) {
+    throw new Error('Invalid playground runtime config');
+  }
+  return value;
 }
 
 function configureWorkerFactory(logger?: ILogger): void {
@@ -64,13 +96,20 @@ function configureWorkerFactory(logger?: ILogger): void {
   useWorkerFactory(config);
 }
 
-function buildWebSocketUrl(): string {
+function buildWebSocketUrl(wsPath: string): string {
   const host = `${window.location.host}${wsPath}`;
   // nosemgrep: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket
   return window.location.protocol === 'https:' ? `wss://${host}` : `ws://${host}`;
 }
 
 async function main(): Promise<void> {
+  const runtimeConfig = await loadRuntimeConfig();
+
+  const pathEl = document.getElementById('schema-path');
+  if (pathEl !== null) {
+    pathEl.textContent = runtimeConfig.schemaPath;
+  }
+
   const htmlContainer = document.getElementById('editor');
   if (htmlContainer === null) {
     throw new Error('#editor mount point not found');
@@ -81,9 +120,9 @@ async function main(): Promise<void> {
     throw new Error('#format-document button not found');
   }
 
-  const fileUri = vscode.Uri.parse(documentUri);
+  const fileUri = vscode.Uri.parse(runtimeConfig.documentUri);
   const fileSystemProvider = new RegisteredFileSystemProvider(false);
-  fileSystemProvider.registerFile(new RegisteredMemoryFile(fileUri, schemaText));
+  fileSystemProvider.registerFile(new RegisteredMemoryFile(fileUri, runtimeConfig.schemaText));
   registerFileSystemOverlay(1, fileSystemProvider);
 
   const vscodeApiConfig: MonacoVscodeApiConfig = {
@@ -111,7 +150,7 @@ async function main(): Promise<void> {
     },
   };
 
-  const wsUrl = buildWebSocketUrl();
+  const wsUrl = buildWebSocketUrl(runtimeConfig.wsPath);
   const languageClientConfig: LanguageClientConfig = {
     languageId: LANGUAGE_ID,
     connection: {
@@ -133,7 +172,7 @@ async function main(): Promise<void> {
       workspaceFolder: {
         index: 0,
         name: 'workspace',
-        uri: vscode.Uri.parse(rootUri),
+        uri: vscode.Uri.parse(runtimeConfig.rootUri),
       },
     },
   };
@@ -141,7 +180,7 @@ async function main(): Promise<void> {
   const editorAppConfig: EditorAppConfig = {
     codeResources: {
       modified: {
-        text: schemaText,
+        text: runtimeConfig.schemaText,
         uri: fileUri.path,
       },
     },
