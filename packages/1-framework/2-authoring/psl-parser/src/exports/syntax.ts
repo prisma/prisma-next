@@ -40,7 +40,16 @@ export { filterChildren, findChildToken, findFirstChild, printSyntax } from '../
 export type { GreenElement, GreenNode, GreenToken } from '../syntax/green';
 export { greenNode, greenToken } from '../syntax/green';
 export { GreenNodeBuilder } from '../syntax/green-builder';
+// Navigation helpers
+export type { Direction } from '../syntax/navigation';
+export {
+  isTrivia,
+  isTriviaKind,
+  nonTriviaSibling,
+  previousNonTriviaToken,
+  skipTriviaToken,
+} from '../syntax/navigation';
 // Red layer
-export type { SyntaxElement, SyntaxToken } from '../syntax/red';
-export { createSyntaxTree, SyntaxNode } from '../syntax/red';
+export type { SyntaxElement } from '../syntax/red';
+export { createSyntaxTree, SyntaxNode, SyntaxToken, TokenAtOffset } from '../syntax/red';
 export type { SyntaxKind } from '../syntax/syntax-kind';
