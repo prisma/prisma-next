@@ -57,7 +57,7 @@ Slice 1 is a hard gate: until `from`/`to` resolve and the formatter/printer emit
 
 The plan lists **5 slices**, above the 1–4 sweet spot (`drive/calibration/sizing.md` flags 5+ as "two projects with one shared umbrella ticket"). The split is real: slices 1–3 deliver the project's named purpose (the directional, point-don't-name vocabulary) and stand alone; slices 4–5 are *additional* M:N boilerplate-elimination forms, and slice 4 reaches into the migration/DDL subsystem — a different blast radius.
 
-**Recommendation:** at slice-3 close, promote slices 4–5 (TML-2943, TML-2944) to a sibling follow-on project ("M:N boilerplate elimination") with an explicit dependency on this project's `through:` foundation. They are planned here for observability and because they are not yet started; reassigning the two issues to a new Linear Project is trivial. The decision is deferred to that checkpoint (operator-authorisation-gated, per `drive-triage-work`); the core stack (1–3) proceeds regardless.
+**Decision (operator, 2026-06-24):** slices 4–5 are **kept in this project** — not promoted. The project delivers all five slices in one branch stack. (The promotion option was surfaced at the core's near-close per the 1–4 sweet-spot flag; the operator chose to keep them here.) S4 and S5 build on slice 2's `through:` foundation (and S5 on S3's member-access grammar); they parallelise after their dependencies.
 
 ## Close-out (required)
 

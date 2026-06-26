@@ -522,6 +522,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     });
     const relationAttribute = getAttribute(field.attributes, 'relation');
     let relationName: string | undefined;
+    let through: string | undefined;
     if (relationAttribute) {
       const parsedRelation = parseRelationAttribute({
         attribute: relationAttribute,
@@ -552,6 +553,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         continue;
       }
       relationName = parsedRelation.relationName;
+      through = parsedRelation.through;
     }
     if (!attributesValid) {
       continue;
@@ -563,6 +565,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       field,
       targetModelName: field.typeName,
       ...ifDefined('relationName', relationName),
+      ...ifDefined('through', through),
     });
   }
 
