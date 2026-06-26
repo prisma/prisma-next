@@ -1,8 +1,8 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import type {
+  AnyMongoTypeMaps,
   MongoContract,
   MongoContractWithTypeMaps,
-  MongoTypeMaps,
   RootModelName,
 } from '@prisma-next/mongo-contract';
 import type { AnyMongoCommand, MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
@@ -21,7 +21,7 @@ import { asMongoContract, type CollectionHandle, createCollectionHandle } from '
  * cannot know what the caller's command yields.
  */
 export interface QueryRoot<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 > {
   from<K extends keyof TContract['roots'] & string>(
     rootName: K,
@@ -30,7 +30,7 @@ export interface QueryRoot<
 }
 
 export function mongoQuery<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 >(options: { contractJson: unknown }): QueryRoot<TContract> {
   const contract = blindCast<
     TContract,

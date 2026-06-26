@@ -140,7 +140,8 @@ type BlogFieldOutputTypes = {
   };
 };
 
-type BlogTypeMaps = MongoTypeMaps<BlogCodecTypes, BlogFieldOutputTypes>;
+type BlogFieldInputTypes = BlogFieldOutputTypes;
+type BlogTypeMaps = MongoTypeMaps<BlogCodecTypes, BlogFieldOutputTypes, BlogFieldInputTypes>;
 
 export type Contract = MongoContractWithTypeMaps<BlogContract, BlogTypeMaps>;
 export type TypeMaps = BlogTypeMaps;

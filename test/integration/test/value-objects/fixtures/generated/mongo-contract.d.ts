@@ -24,7 +24,17 @@ export type FieldOutputTypes = {
     };
   };
 };
-export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes>;
+export type FieldInputTypes = {
+  readonly __unbound__: {
+    readonly Shop: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly name: CodecTypes['mongo/string@1']['output'];
+      readonly location: { street: string; city: string; zip: string };
+      readonly notes: { street: string; city: string; zip: string } | null;
+    };
+  };
+};
+export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>;
 
 type ContractBase = {
   readonly target: 'mongo';

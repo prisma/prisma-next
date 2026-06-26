@@ -85,20 +85,20 @@ export type RootModelName<
   : never;
 
 export type MongoTypeMaps<
-  TCodecTypes extends Record<string, { output: unknown }> = Record<string, { output: unknown }>,
-  TFieldOutputTypes extends Record<string, Record<string, unknown>> = Record<
-    string,
-    Record<string, unknown>
-  >,
-  TFieldInputTypes extends Record<string, Record<string, unknown>> = Record<
-    string,
-    Record<string, unknown>
-  >,
+  TCodecTypes extends Record<string, { output: unknown }>,
+  TFieldOutputTypes extends Record<string, Record<string, unknown>>,
+  TFieldInputTypes extends Record<string, Record<string, unknown>>,
 > = {
   readonly codecTypes: TCodecTypes;
   readonly fieldOutputTypes: TFieldOutputTypes;
   readonly fieldInputTypes: TFieldInputTypes;
 };
+
+export type AnyMongoTypeMaps = MongoTypeMaps<
+  Record<string, { output: unknown }>,
+  Record<string, Record<string, unknown>>,
+  Record<string, Record<string, unknown>>
+>;
 
 export type MongoTypeMapsPhantomKey = '__@prisma-next/mongo-core/typeMaps@__';
 
@@ -152,8 +152,16 @@ export type MongoUnboundFieldInputTypes<T> =
     : never;
 
 export type InferModelRow<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<
+    MongoContract,
+    MongoTypeMaps<
+      Record<string, { output: unknown }>,
+      Record<string, Record<string, unknown>>,
+      Record<string, Record<string, unknown>>
+    >
+  >,
   ModelName extends string & keyof MongoModelsMap<TContract>,
 > = ModelName extends keyof MongoUnboundFieldOutputTypes<TContract>
   ? MongoUnboundFieldOutputTypes<TContract>[ModelName]
-  : { readonly [K in keyof MongoModelsMap<TContract>[ModelName]['fields']]: unknown };
+  : // Only reachable for a contract with no MongoTypeMaps phantom key (e.g. validateContract<MongoContract>).
+    { readonly [K in keyof MongoModelsMap<TContract>[ModelName]['fields']]: unknown };

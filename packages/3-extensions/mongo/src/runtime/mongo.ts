@@ -5,9 +5,9 @@ import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
+  AnyMongoTypeMaps,
   MongoContract,
   MongoContractWithTypeMaps,
-  MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import type { MongoOrmClient, MongoQueryPlan } from '@prisma-next/mongo-orm';
 import { mongoOrm } from '@prisma-next/mongo-orm';
@@ -30,7 +30,7 @@ import {
 
 export type MongoTargetId = 'mongo';
 
-type UnboundEnums<TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>> =
+type UnboundEnums<TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>> =
   NamespacedEnums<TContract>[typeof UNBOUND_NAMESPACE_ID];
 
 function unboundNamespace<T>(builderOutput: { readonly [UNBOUND_NAMESPACE_ID]?: unknown }): T {
@@ -40,7 +40,7 @@ function unboundNamespace<T>(builderOutput: { readonly [UNBOUND_NAMESPACE_ID]?: 
 }
 
 export interface MongoClient<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 > {
   readonly orm: MongoOrmClient<TContract>;
   readonly query: ReturnType<typeof mongoQuery<TContract>>;
@@ -69,7 +69,7 @@ export interface MongoBindingOptions {
 }
 
 export type MongoOptionsWithContract<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 > = MongoBindingOptions &
   MongoOptionsBase & {
     readonly contract: TContract;
@@ -82,7 +82,7 @@ export type MongoOptionsWithContract<
  * the type body — the contract value comes through `contractJson` at runtime.
  */
 export type MongoOptionsWithContractJson<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 > = MongoBindingOptions &
   MongoOptionsBase & {
     readonly contractJson: unknown;
@@ -95,18 +95,18 @@ export type MongoOptionsWithContractJson<
   };
 
 export type MongoOptions<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 > = MongoOptionsWithContract<TContract> | MongoOptionsWithContractJson<TContract>;
 
-function hasContractJson<TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>>(
-  options: MongoOptions<TContract>,
-): options is MongoOptionsWithContractJson<TContract> {
+function hasContractJson<
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
+>(options: MongoOptions<TContract>): options is MongoOptionsWithContractJson<TContract> {
   return 'contractJson' in options;
 }
 
-function resolveContract<TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>>(
-  options: MongoOptions<TContract>,
-): TContract {
+function resolveContract<
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
+>(options: MongoOptions<TContract>): TContract {
   const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
   return new MongoContractSerializer().deserializeContract(contractInput) as TContract;
 }
@@ -120,13 +120,13 @@ function resolveContract<TContract extends MongoContractWithTypeMaps<MongoContra
  * - Emitted: pass `Contract` type explicitly. Example: `mongo<Contract>({ contractJson, url })`
  */
 export default function mongo<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 >(options: MongoOptionsWithContract<TContract>): MongoClient<TContract>;
 export default function mongo<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 >(options: MongoOptionsWithContractJson<TContract>): MongoClient<TContract>;
 export default function mongo<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 >(options: MongoOptions<TContract>): MongoClient<TContract> {
   const contract = resolveContract(options);
   let binding = resolveOptionalMongoBinding(options);

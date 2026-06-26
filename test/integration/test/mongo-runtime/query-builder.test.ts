@@ -7,9 +7,9 @@
 import { crossRef, type NamespaceId } from '@prisma-next/contract/types';
 import mongoFamilyPack from '@prisma-next/family-mongo/pack';
 import type {
+  AnyMongoTypeMaps,
   MongoContract,
   MongoContractWithTypeMaps,
-  MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import { defineContract, field, model, rel } from '@prisma-next/mongo-contract-ts/contract-builder';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
@@ -49,7 +49,7 @@ type TestContract = MongoContract & {
   };
 };
 
-type TContract = MongoContractWithTypeMaps<TestContract, MongoTypeMaps>;
+type TContract = MongoContractWithTypeMaps<TestContract, AnyMongoTypeMaps>;
 type PlanRow<TPlan> = TPlan extends MongoQueryPlan<infer Row> ? Row : never;
 
 const contractJson = {

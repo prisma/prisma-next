@@ -127,9 +127,11 @@ export type DecodeFixtureFieldOutputTypes = {
   };
 };
 
+export type DecodeFixtureFieldInputTypes = DecodeFixtureFieldOutputTypes;
 export type DecodeFixtureTypeMaps = MongoTypeMaps<
   DecodeFixtureCodecTypes,
-  DecodeFixtureFieldOutputTypes
+  DecodeFixtureFieldOutputTypes,
+  DecodeFixtureFieldInputTypes
 >;
 export type TDecodeFixtureContract = MongoContractWithTypeMaps<
   DecodeFixtureContract,

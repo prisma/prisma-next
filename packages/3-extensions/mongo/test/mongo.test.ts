@@ -1,11 +1,11 @@
 import type {
+  AnyMongoTypeMaps,
   MongoContract,
   MongoContractWithTypeMaps,
-  MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-type AnyMongoContract = MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>;
+type AnyMongoContract = MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>;
 
 // Hoisted mocks so they are observable from inside vi.mock() factories.
 const mocks = vi.hoisted(() => ({

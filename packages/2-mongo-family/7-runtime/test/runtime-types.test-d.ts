@@ -69,9 +69,10 @@ type TestFieldOutputTypes = {
   };
 };
 
+type TestFieldInputTypes = TestFieldOutputTypes;
 type TContract = MongoContractWithTypeMaps<
   TestContract,
-  MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes>
+  MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes, TestFieldInputTypes>
 >;
 
 type PlanRow<P extends MongoQueryPlan> = P extends MongoQueryPlan<infer R> ? R : never;
