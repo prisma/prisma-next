@@ -142,6 +142,22 @@ describe('classifyPslCompletionContext', () => {
     });
   });
 
+  it('classifies a contract-space-qualified prefix without a namespace segment', () => {
+    expect(classify(['model Post {', '  external supabase:U|', '}'].join('\n'))).toMatchObject({
+      kind: 'modelFieldType',
+      fieldName: 'external',
+      prefix: { path: ['supabase', 'U'], contractSpace: 'supabase', name: 'U' },
+    });
+  });
+
+  it('truncates the cursor segment at the offset when the cursor sits mid-name', () => {
+    expect(classify(['model Post {', '  owner auth.Use|r', '}'].join('\n'))).toMatchObject({
+      kind: 'modelFieldType',
+      fieldName: 'owner',
+      prefix: { path: ['auth', 'Use'], namespace: 'auth', name: 'Use' },
+    });
+  });
+
   it('returns unsupported in comments and trivia outside type positions', () => {
     expectUnsupported(['model Post {', '  // U|', '  id Int', '}'].join('\n'));
     expectUnsupported(['model Post {', '  |', '  id Int', '}'].join('\n'));

@@ -4,7 +4,9 @@ import {
   type DocumentAst,
   FieldAttributeAst,
   FieldDeclarationAst,
+  filterChildren,
   GenericBlockDeclarationAst,
+  IdentifierAst,
   isTrivia,
   KeyValuePairAst,
   ModelAttributeAst,
@@ -134,7 +136,6 @@ export function classifyPslCompletionContext(
   return classifyModelFieldType({
     field,
     offset,
-    source: input.sourceFile.text,
     replacementStartOffset,
   });
 }
@@ -142,7 +143,6 @@ export function classifyPslCompletionContext(
 function classifyModelFieldType(input: {
   readonly field: FieldDeclarationAst;
   readonly offset: number;
-  readonly source: string;
   readonly replacementStartOffset: number;
 }): PslCompletionContext {
   const fieldName = input.field.name();
@@ -197,7 +197,7 @@ function classifyModelFieldType(input: {
     return unsupported(input.offset);
   }
 
-  const prefix = typeNamePrefix(name, input.offset, input.source);
+  const prefix = typeNamePrefix(name, input.offset);
   if (prefix === undefined) {
     return unsupported(input.offset);
   }
@@ -417,93 +417,103 @@ function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
   );
 }
 
-function typeNamePrefix(
-  name: QualifiedNameAst,
-  offset: number,
-  source: string,
-): TypeNamePrefix | undefined {
-  const end = Math.min(offset, endOffset(name.syntax));
-  const raw = splitQualifiedPrefix(source.slice(name.syntax.offset, end));
-  if (raw.colonCount > 1 || raw.dotCount > 1) {
+/**
+ * Derives the qualified type-name prefix purely from the {@link QualifiedNameAst}
+ * segments and its `:` / `.` separator tokens, relative to the cursor. A
+ * separator counts only when it lies before the cursor, so structure is decided
+ * by what the user has actually typed: in `space:auth.User` the namespace role
+ * appears only once the cursor passes the dot. The single source touch is
+ * slicing the cursor segment's own identifier-token text.
+ */
+function typeNamePrefix(name: QualifiedNameAst, offset: number): TypeNamePrefix | undefined {
+  const cursor = Math.min(offset, endOffset(name.syntax));
+  const segments = Array.from(filterChildren(name.syntax, IdentifierAst.cast));
+
+  const colon = name.colon();
+  const dot = name.dot();
+  const colonOffset = colon !== undefined && colon.offset < cursor ? colon.offset : undefined;
+  const dotOffset = dot !== undefined && dot.offset < cursor ? dot.offset : undefined;
+
+  const contractSpaceSegment =
+    colonOffset === undefined ? undefined : lastSegmentBefore(segments, colonOffset);
+  const namespaceSegment =
+    dotOffset === undefined ? undefined : lastSegmentBetween(segments, colonOffset, dotOffset);
+  const lastSeparatorOffset = dotOffset ?? colonOffset;
+  const nameSegment = firstSegmentAfter(segments, lastSeparatorOffset, cursor);
+
+  const contractSpace = colonOffset === undefined ? undefined : contractSpaceSegment?.name();
+  if (colonOffset !== undefined && (contractSpace === undefined || contractSpace.length === 0)) {
+    return undefined;
+  }
+  const namespace = dotOffset === undefined ? undefined : namespaceSegment?.name();
+  if (dotOffset !== undefined && (namespace === undefined || namespace.length === 0)) {
     return undefined;
   }
 
-  if (raw.colonCount === 0 && raw.dotCount === 0) {
-    const nameSegment = segmentAt(raw.segments, 0);
-    if (nameSegment === undefined) return undefined;
-    return { path: pathFromSegments(raw.segments), name: nameSegment };
-  }
+  const nameText = nameSegment === undefined ? '' : segmentTextBeforeCursor(nameSegment, cursor);
+  const path = [contractSpace, namespace, nameText].filter(
+    (segment): segment is string => segment !== undefined && segment.length > 0,
+  );
 
-  if (raw.colonCount === 0 && raw.dotCount === 1) {
-    const namespace = segmentAt(raw.segments, 0);
-    const nameSegment = segmentAt(raw.segments, 1);
-    if (namespace === undefined || namespace.length === 0 || nameSegment === undefined) {
-      return undefined;
-    }
-    return { path: pathFromSegments(raw.segments), namespace, name: nameSegment };
-  }
-
-  if (raw.colonCount === 1 && raw.dotCount === 0) {
-    const contractSpace = segmentAt(raw.segments, 0);
-    const nameSegment = segmentAt(raw.segments, 1);
-    if (contractSpace === undefined || contractSpace.length === 0 || nameSegment === undefined) {
-      return undefined;
-    }
-    return { path: pathFromSegments(raw.segments), contractSpace, name: nameSegment };
-  }
-
-  const contractSpace = segmentAt(raw.segments, 0);
-  const namespace = segmentAt(raw.segments, 1);
-  const nameSegment = segmentAt(raw.segments, 2);
-  if (
-    contractSpace === undefined ||
-    contractSpace.length === 0 ||
-    namespace === undefined ||
-    namespace.length === 0 ||
-    nameSegment === undefined
-  ) {
-    return undefined;
-  }
   return {
-    path: pathFromSegments(raw.segments),
-    contractSpace,
-    namespace,
-    name: nameSegment,
+    path,
+    name: nameText,
+    ...(contractSpace === undefined ? {} : { contractSpace }),
+    ...(namespace === undefined ? {} : { namespace }),
   };
 }
 
-function splitQualifiedPrefix(text: string): {
-  readonly segments: readonly string[];
-  readonly colonCount: number;
-  readonly dotCount: number;
-} {
-  const segments = [''];
-  let colonCount = 0;
-  let dotCount = 0;
-  for (let index = 0; index < text.length; index++) {
-    const char = text.charAt(index);
-    if (char === ':') {
-      colonCount++;
-      segments.push('');
-      continue;
-    }
-    if (char === '.') {
-      dotCount++;
-      segments.push('');
-      continue;
-    }
-    const lastIndex = segments.length - 1;
-    segments[lastIndex] = `${segments[lastIndex] ?? ''}${char}`;
+/** The last segment that starts strictly before `boundary`. */
+function lastSegmentBefore(
+  segments: readonly IdentifierAst[],
+  boundary: number,
+): IdentifierAst | undefined {
+  let found: IdentifierAst | undefined;
+  for (const segment of segments) {
+    if (segment.syntax.offset >= boundary) break;
+    found = segment;
   }
-  return { segments, colonCount, dotCount };
+  return found;
 }
 
-function pathFromSegments(segments: readonly string[]): readonly string[] {
-  return segments.filter((segment) => segment.length > 0);
+/** The last segment that starts after `lowerBound` (if any) and before `upperBound`. */
+function lastSegmentBetween(
+  segments: readonly IdentifierAst[],
+  lowerBound: number | undefined,
+  upperBound: number,
+): IdentifierAst | undefined {
+  let found: IdentifierAst | undefined;
+  for (const segment of segments) {
+    const start = segment.syntax.offset;
+    if (start >= upperBound) break;
+    if (lowerBound !== undefined && start < lowerBound) continue;
+    found = segment;
+  }
+  return found;
 }
 
-function segmentAt(segments: readonly string[], index: number): string | undefined {
-  return segments[index];
+/** The first segment that starts after `boundary` and before the cursor. */
+function firstSegmentAfter(
+  segments: readonly IdentifierAst[],
+  boundary: number | undefined,
+  cursor: number,
+): IdentifierAst | undefined {
+  for (const segment of segments) {
+    const start = segment.syntax.offset;
+    if (boundary !== undefined && start <= boundary) continue;
+    if (start >= cursor) continue;
+    return segment;
+  }
+  return undefined;
+}
+
+/** The cursor segment's identifier text, truncated at the cursor. */
+function segmentTextBeforeCursor(segment: IdentifierAst, cursor: number): string {
+  const token = segment.token();
+  if (token === undefined) return '';
+  const take = cursor - token.offset;
+  if (take <= 0) return '';
+  return token.text.slice(0, Math.min(take, token.text.length));
 }
 
 function nodeForContext(
