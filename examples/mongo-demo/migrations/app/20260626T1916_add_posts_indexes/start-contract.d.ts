@@ -17,7 +17,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:ecc554e5f2f05ec120f8fef5ddf536286471edd3de11b8a906ba70e71f5e5df3'>;
+  StorageHashBase<'sha256:250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510'>;
@@ -93,23 +93,12 @@ type ContractBase = Omit<
     readonly namespaces: {
       readonly __unbound__: {
         readonly id: '__unbound__';
-        readonly kind: 'mongo-database';
+        readonly kind: 'mongo-namespace';
         readonly entries: {
           readonly collection: {
             readonly posts: {
               readonly kind: 'mongo-collection';
               readonly indexes: readonly [
-                {
-                  readonly kind: 'mongo-index';
-                  readonly keys: readonly [{ readonly field: 'authorId'; readonly direction: 1 }];
-                },
-                {
-                  readonly kind: 'mongo-index';
-                  readonly keys: readonly [
-                    { readonly field: 'createdAt'; readonly direction: -1 },
-                    { readonly field: 'authorId'; readonly direction: 1 },
-                  ];
-                },
                 {
                   readonly kind: 'mongo-index';
                   readonly keys: readonly [{ readonly field: 'summary'; readonly direction: 1 }];
