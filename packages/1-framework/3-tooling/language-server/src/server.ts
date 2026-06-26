@@ -27,6 +27,7 @@ import {
   type ProjectArtifacts,
 } from './project-artifacts';
 import type { SchemaInputSet } from './schema-inputs';
+import { buildSemanticTokens, semanticTokensLegend } from './semantic-tokens';
 
 export interface LanguageServer {
   dispose(): void;
@@ -246,6 +247,58 @@ export function createServer(connection: Connection): LanguageServer {
         newText: formatted,
       },
     ];
+  }
+
+  async function semanticTokensForDocument(uri: string, range?: Range): Promise<SemanticTokens> {
+    const document = documents.get(uri);
+    if (document === undefined) {
+      return emptySemanticTokens();
+    }
+    const text = document.getText();
+    if (text.length > semanticTokenSourceLimit) {
+      return emptySemanticTokens();
+    }
+
+    let current: CurrentProjectDocument | undefined;
+    try {
+      current = await currentProjectDocument(uri, text);
+    } catch {
+      return emptySemanticTokens();
+    }
+    if (current === undefined || !current.project.inputs.includes(uri)) {
+      return emptySemanticTokens();
+    }
+    if (current.text.length > semanticTokenSourceLimit) {
+      return emptySemanticTokens();
+    }
+
+    const computed = current.project.artifacts.update(
+      uri,
+      current.text,
+      current.project.inputs,
+      current.project.controlStack,
+    );
+    if (computed === null) {
+      return emptySemanticTokens();
+    }
+
+    const latestDocument = documents.get(uri);
+    if (latestDocument === undefined || latestDocument.getText() !== current.text) {
+      return emptySemanticTokens();
+    }
+
+    const cached = current.project.artifacts.getDocument(uri);
+    if (cached === undefined) {
+      return emptySemanticTokens();
+    }
+
+    const source = {
+      document: cached.document,
+      sourceFile: cached.sourceFile,
+      symbolTable: current.project.artifacts.getSymbolTable(),
+      scalarTypes: current.project.controlStack.scalarTypes,
+    };
+    return buildSemanticTokens(source, range);
   }
 
   connection.onInitialize(async (params): Promise<InitializeResult> => {

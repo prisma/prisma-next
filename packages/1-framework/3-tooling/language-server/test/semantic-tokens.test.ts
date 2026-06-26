@@ -2,12 +2,14 @@ import { buildSymbolTable, type SymbolTable } from '@prisma-next/psl-parser';
 import { type DocumentAst, parse, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
 import {
-  collectSemanticTokens,
-  collectSemanticTokensInRange,
-  encodeSemanticTokens,
+  buildSemanticTokens,
+  collectSemanticTokenEvents,
+  type PendingSemanticToken,
   type SemanticTokenModifier,
-  type SemanticTokenRange,
+  SemanticTokensBuilder,
   type SemanticTokenType,
+  semanticTokenModifierBits,
+  semanticTokenModifierIndexes,
   semanticTokenModifiers,
   semanticTokensLegend,
   semanticTokenTypes,
@@ -41,19 +43,84 @@ function parseSemanticTokenSource(source: string): ParsedSemanticTokenSource {
   return { document, sourceFile, symbolTable, scalarTypes };
 }
 
-function describeToken(sourceFile: SourceFile, token: SemanticTokenRange): TokenDetails {
-  const start = sourceFile.positionAt(token.startOffset);
+function collectDetails(source: ParsedSemanticTokenSource): readonly TokenDetails[] {
+  return decodeSemanticTokens(source.sourceFile, buildSemanticTokens(source).data);
+}
+
+function decodeSemanticTokens(
+  sourceFile: SourceFile,
+  data: readonly number[],
+): readonly TokenDetails[] {
+  const details: TokenDetails[] = [];
+  let line = 0;
+  let character = 0;
+
+  for (let index = 0; index < data.length; index += 5) {
+    const deltaLine = data[index] ?? 0;
+    const deltaStart = data[index + 1] ?? 0;
+    const length = data[index + 2] ?? 0;
+    const tokenTypeIndex = data[index + 3] ?? 0;
+    const modifierBitset = data[index + 4] ?? 0;
+
+    line += deltaLine;
+    character = deltaLine === 0 ? character + deltaStart : deltaStart;
+    const startOffset = sourceFile.offsetAt({ line, character });
+    details.push({
+      text: sourceFile.text.slice(startOffset, startOffset + length),
+      tokenType: semanticTokenTypeAt(tokenTypeIndex),
+      modifiers: tokenModifiersFromBitset(modifierBitset),
+      line,
+      character,
+    });
+  }
+
+  return details;
+}
+
+function semanticTokenTypeAt(index: number): SemanticTokenType {
+  const tokenType = semanticTokenTypes[index];
+  if (tokenType === undefined) {
+    throw new Error(`Unknown semantic token type index ${index}`);
+  }
+  return tokenType;
+}
+
+function pendingToken(
+  startOffset: number,
+  endOffset: number,
+  tokenType: SemanticTokenType,
+  modifierBitset = 0,
+  splitMultiline = false,
+): PendingSemanticToken {
   return {
-    text: sourceFile.text.slice(token.startOffset, token.endOffset),
-    tokenType: token.tokenType,
-    modifiers: token.modifiers ?? [],
-    line: start.line,
-    character: start.character,
+    startOffset,
+    endOffset,
+    tokenTypeIndex: semanticTokenTypes.indexOf(tokenType),
+    modifierBitset,
+    splitMultiline,
   };
 }
 
-function collectDetails(source: ParsedSemanticTokenSource): readonly TokenDetails[] {
-  return collectSemanticTokens(source).map((token) => describeToken(source.sourceFile, token));
+function encodeWithBuilder(
+  sourceFile: SourceFile,
+  tokens: readonly PendingSemanticToken[],
+): { readonly data: readonly number[] } {
+  const builder = new SemanticTokensBuilder(sourceFile);
+  for (const token of tokens) {
+    builder.add(token);
+  }
+  return builder.build();
+}
+
+function tokenModifiersFromBitset(modifierBitset: number): readonly SemanticTokenModifier[] {
+  const modifiers: SemanticTokenModifier[] = [];
+  if ((modifierBitset & semanticTokenModifierBits.declaration) !== 0) {
+    modifiers.push(semanticTokenModifiers[semanticTokenModifierIndexes.declaration]);
+  }
+  if ((modifierBitset & semanticTokenModifierBits.defaultLibrary) !== 0) {
+    modifiers.push(semanticTokenModifiers[semanticTokenModifierIndexes.defaultLibrary]);
+  }
+  return modifiers;
 }
 
 function findToken(
@@ -190,21 +257,22 @@ describe('semantic token substrate', () => {
     expect(findToken(details, { text: '12.5', tokenType: 'number' })).toBeDefined();
     expect(findToken(details, { text: '30', tokenType: 'number' })).toBeDefined();
     expect(findToken(details, { text: 'true', tokenType: 'keyword' })).toBeDefined();
+    expect(details.filter((token) => token.text === '"invoice_user"')).toHaveLength(1);
+    expect(details.filter((token) => token.text === '12.5')).toHaveLength(1);
   });
 
-  it('filters collected tokens to an intersecting source range', () => {
+  it('filters encoded tokens to an intersecting source range', () => {
     const source = parseSemanticTokenSource(
       ['model User {', '  id Int @id', '}', '', 'type Address {', '  street String', '}'].join(
         '\n',
       ),
     );
 
-    const tokens = collectSemanticTokensInRange(source, {
+    const encoded = buildSemanticTokens(source, {
       start: { line: 0, character: 0 },
       end: { line: 3, character: 0 },
     });
-    const details = tokens.map((token) => describeToken(source.sourceFile, token));
-    const encoded = encodeSemanticTokens(source.sourceFile, tokens);
+    const details = decodeSemanticTokens(source.sourceFile, encoded.data);
 
     expect(details.map((token) => token.text)).toEqual(['model', 'User', 'id', 'Int', '@id']);
     expect(encoded.data.length % 5).toBe(0);
@@ -215,51 +283,49 @@ describe('semantic token substrate', () => {
     }
   });
 
-  it('encodes sorted LSP five-integer token data', () => {
+  it('encodes ordered LSP five-integer token data', () => {
     const sourceFile = new SourceFile('aaa bbb\ncc');
-    const tokens: readonly SemanticTokenRange[] = [
-      { startOffset: 8, endOffset: 10, tokenType: 'type', modifiers: ['defaultLibrary'] },
-      { startOffset: 4, endOffset: 7, tokenType: 'class', modifiers: ['declaration'] },
-      { startOffset: 0, endOffset: 3, tokenType: 'keyword' },
+    const tokens: readonly PendingSemanticToken[] = [
+      pendingToken(0, 3, 'keyword'),
+      pendingToken(4, 7, 'class', semanticTokenModifierBits.declaration),
+      pendingToken(8, 10, 'type', semanticTokenModifierBits.defaultLibrary),
     ];
 
-    expect(encodeSemanticTokens(sourceFile, tokens)).toEqual({
+    expect(encodeWithBuilder(sourceFile, tokens)).toEqual({
       data: [0, 0, 3, 0, 0, 0, 4, 3, 2, 1, 1, 0, 2, 4, 2],
     });
   });
 
-  it('splits multiline ranges before encoding', () => {
+  it('splits multiline text token events before encoding', () => {
     const sourceFile = new SourceFile('aa\nbbb\ncc');
-    const tokens: readonly SemanticTokenRange[] = [
-      { startOffset: 0, endOffset: sourceFile.length, tokenType: 'comment' },
+    const tokens: readonly PendingSemanticToken[] = [
+      pendingToken(0, sourceFile.length, 'string', 0, true),
     ];
 
-    expect(encodeSemanticTokens(sourceFile, tokens)).toEqual({
-      data: [0, 0, 2, 9, 0, 1, 0, 3, 9, 0, 1, 0, 2, 9, 0],
+    expect(encodeWithBuilder(sourceFile, tokens)).toEqual({
+      data: [0, 0, 2, 7, 0, 1, 0, 3, 7, 0, 1, 0, 2, 7, 0],
     });
   });
 
-  it('resolves exact duplicates before encoding', () => {
-    const sourceFile = new SourceFile('aaa');
-    const duplicate: SemanticTokenRange = { startOffset: 0, endOffset: 3, tokenType: 'keyword' };
+  it('does not split multiline structural token events before encoding', () => {
+    const sourceFile = new SourceFile('aa\nbbb\ncc');
+    const tokens: readonly PendingSemanticToken[] = [pendingToken(0, sourceFile.length, 'class')];
 
-    expect(encodeSemanticTokens(sourceFile, [duplicate, duplicate])).toEqual({
-      data: [0, 0, 3, 0, 0],
-    });
+    expect(encodeWithBuilder(sourceFile, tokens)).toEqual({ data: [0, 0, 9, 2, 0] });
   });
 
   it('combines modifier bitsets deterministically', () => {
     const sourceFile = new SourceFile('Scalar');
-    const tokens: readonly SemanticTokenRange[] = [
-      {
-        startOffset: 0,
-        endOffset: 6,
-        tokenType: 'type',
-        modifiers: ['declaration', 'defaultLibrary'],
-      },
+    const tokens: readonly PendingSemanticToken[] = [
+      pendingToken(
+        0,
+        6,
+        'type',
+        semanticTokenModifierBits.declaration | semanticTokenModifierBits.defaultLibrary,
+      ),
     ];
 
-    expect(encodeSemanticTokens(sourceFile, tokens)).toEqual({ data: [0, 0, 6, 4, 3] });
+    expect(encodeWithBuilder(sourceFile, tokens)).toEqual({ data: [0, 0, 6, 4, 3] });
   });
 
   it('returns deterministic output for identical artifacts', () => {
@@ -267,10 +333,8 @@ describe('semantic token substrate', () => {
     const first = parseSemanticTokenSource(sourceText);
     const second = parseSemanticTokenSource(sourceText);
 
-    expect(collectSemanticTokens(first)).toEqual(collectSemanticTokens(second));
-    expect(encodeSemanticTokens(first.sourceFile, collectSemanticTokens(first))).toEqual(
-      encodeSemanticTokens(second.sourceFile, collectSemanticTokens(second)),
-    );
+    expect(collectSemanticTokenEvents(first)).toEqual(collectSemanticTokenEvents(second));
+    expect(buildSemanticTokens(first)).toEqual(buildSemanticTokens(second));
   });
 
   it('recovers semantic tokens from malformed input', () => {
@@ -284,7 +348,7 @@ describe('semantic token substrate', () => {
       ].join('\n'),
     );
 
-    expect(() => collectSemanticTokens(source)).not.toThrow();
+    expect(() => buildSemanticTokens(source)).not.toThrow();
     const details = collectDetails(source);
 
     expect(

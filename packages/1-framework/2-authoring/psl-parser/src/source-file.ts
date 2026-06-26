@@ -1,3 +1,4 @@
+const CARRIAGE_RETURN = 13;
 const LINE_FEED = 10;
 
 export interface Position {
@@ -39,6 +40,30 @@ export class SourceFile {
 
   lineStartOffsets(): readonly number[] {
     return this.#lineStarts;
+  }
+
+  lineStartOffset(line: number): number {
+    if (line <= 0) {
+      return 0;
+    }
+    return this.#lineStarts[line] ?? this.#text.length;
+  }
+
+  lineEndOffset(line: number): number {
+    if (line < 0) {
+      return 0;
+    }
+
+    const nextLineStart = this.#lineStarts[line + 1];
+    if (nextLineStart === undefined) {
+      return this.#text.length;
+    }
+
+    const lineFeedOffset = nextLineStart - 1;
+    const carriageReturnOffset = lineFeedOffset - 1;
+    return this.#text.charCodeAt(carriageReturnOffset) === CARRIAGE_RETURN
+      ? carriageReturnOffset
+      : lineFeedOffset;
   }
 
   positionAt(offset: number): Position {

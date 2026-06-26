@@ -46,6 +46,16 @@ export const semanticTokenModifiers = ['declaration', 'defaultLibrary'] as const
 export type SemanticTokenType = (typeof semanticTokenTypes)[number];
 export type SemanticTokenModifier = (typeof semanticTokenModifiers)[number];
 
+export const semanticTokenModifierIndexes = {
+  declaration: 0,
+  defaultLibrary: 1,
+} as const satisfies Record<SemanticTokenModifier, number>;
+
+export const semanticTokenModifierBits = {
+  declaration: 1 << semanticTokenModifierIndexes.declaration,
+  defaultLibrary: 1 << semanticTokenModifierIndexes.defaultLibrary,
+} as const satisfies Record<SemanticTokenModifier, number>;
+
 export const semanticTokensLegend: SemanticTokensLegend = {
   tokenTypes: [...semanticTokenTypes],
   tokenModifiers: [...semanticTokenModifiers],
@@ -58,11 +68,12 @@ export interface SemanticTokenSource {
   readonly scalarTypes: readonly string[];
 }
 
-export interface SemanticTokenRange {
+export interface PendingSemanticToken {
   readonly startOffset: number;
   readonly endOffset: number;
-  readonly tokenType: SemanticTokenType;
-  readonly modifiers?: readonly SemanticTokenModifier[];
+  readonly tokenTypeIndex: number;
+  readonly modifierBitset: number;
+  readonly splitMultiline: boolean;
 }
 
 type DeclarationAst =
@@ -78,7 +89,7 @@ type TypeReferenceKind = 'class' | 'struct' | 'type';
 
 interface TypeReferenceClassification {
   readonly tokenType: TypeReferenceKind;
-  readonly modifiers?: readonly SemanticTokenModifier[];
+  readonly modifierBitset?: number;
 }
 
 interface IdentifierSegment {
@@ -86,76 +97,114 @@ interface IdentifierSegment {
   readonly text: string;
 }
 
-export function collectSemanticTokens(source: SemanticTokenSource): readonly SemanticTokenRange[] {
-  const tokens: SemanticTokenRange[] = [];
-  collectLexicalTokens(source.document, tokens);
-  collectDeclarations(source, tokens);
-  return resolveSemanticTokenRanges(tokens);
-}
-
-export function collectSemanticTokensInRange(
-  source: SemanticTokenSource,
-  range: Range,
-): readonly SemanticTokenRange[] {
-  const startOffset = source.sourceFile.offsetAt(range.start);
-  const endOffset = source.sourceFile.offsetAt(range.end);
-  const lower = Math.min(startOffset, endOffset);
-  const upper = Math.max(startOffset, endOffset);
-  return collectSemanticTokens(source).filter(
-    (token) => token.startOffset < upper && token.endOffset > lower,
-  );
-}
-
-export function encodeSemanticTokens(
-  sourceFile: SourceFile,
-  tokens: readonly SemanticTokenRange[],
-): SemanticTokens {
-  const normalized = normalizeSemanticTokenRanges(sourceFile, tokens);
-  const data: number[] = [];
-  let previousLine = 0;
-  let previousCharacter = 0;
-  let first = true;
-
-  for (const token of normalized) {
-    const start = sourceFile.positionAt(token.startOffset);
-    const length = token.endOffset - token.startOffset;
-    const deltaLine = first ? start.line : start.line - previousLine;
-    const deltaStart =
-      first || deltaLine !== 0 ? start.character : start.character - previousCharacter;
-    data.push(
-      deltaLine,
-      deltaStart,
-      length,
-      semanticTokenTypes.indexOf(token.tokenType),
-      modifierBitset(token.modifiers),
-    );
-    previousLine = start.line;
-    previousCharacter = start.character;
-    first = false;
+export function buildSemanticTokens(source: SemanticTokenSource, range?: Range): SemanticTokens {
+  const builder = new SemanticTokensBuilder(source.sourceFile, range);
+  for (const token of collectSemanticTokenEvents(source)) {
+    builder.add(token);
   }
-
-  return { data };
+  return builder.build();
 }
 
-function collectLexicalTokens(document: DocumentAst, tokens: SemanticTokenRange[]): void {
-  for (const token of document.syntax.tokens()) {
-    switch (token.kind) {
-      case 'Comment':
-        tokens.push(rangeForToken(token, 'comment'));
-        break;
-      case 'StringLiteral':
-        tokens.push(rangeForToken(token, 'string'));
-        break;
-      case 'NumberLiteral':
-        tokens.push(rangeForToken(token, 'number'));
-        break;
-      default:
-        break;
+export function collectSemanticTokenEvents(
+  source: SemanticTokenSource,
+): readonly PendingSemanticToken[] {
+  const comments = collectCommentTokens(source.document);
+  const tokens: PendingSemanticToken[] = [];
+  collectDeclarations(source, tokens);
+  return mergeSourceOrderedTokens(comments, tokens);
+}
+
+export class SemanticTokensBuilder {
+  readonly #data: number[] = [];
+  readonly #sourceFile: SourceFile;
+  readonly #rangeOffsets: { readonly lower: number; readonly upper: number } | undefined;
+  #previousLine = 0;
+  #previousCharacter = 0;
+  #first = true;
+
+  constructor(sourceFile: SourceFile, range?: Range) {
+    this.#sourceFile = sourceFile;
+    if (range !== undefined) {
+      const startOffset = sourceFile.offsetAt(range.start);
+      const endOffset = sourceFile.offsetAt(range.end);
+      this.#rangeOffsets = {
+        lower: Math.min(startOffset, endOffset),
+        upper: Math.max(startOffset, endOffset),
+      };
     }
   }
+
+  add(token: PendingSemanticToken): void {
+    if (!this.#intersectsRange(token.startOffset, token.endOffset)) {
+      return;
+    }
+
+    if (token.splitMultiline) {
+      this.#addMultilineSplitToken(token);
+      return;
+    }
+
+    this.#encode(token.startOffset, token.endOffset, token.tokenTypeIndex, token.modifierBitset);
+  }
+
+  build(): SemanticTokens {
+    return { data: this.#data };
+  }
+
+  #intersectsRange(startOffset: number, endOffset: number): boolean {
+    const rangeOffsets = this.#rangeOffsets;
+    return (
+      rangeOffsets === undefined ||
+      (startOffset < rangeOffsets.upper && endOffset > rangeOffsets.lower)
+    );
+  }
+
+  #addMultilineSplitToken(token: PendingSemanticToken): void {
+    const start = this.#sourceFile.positionAt(token.startOffset);
+    const end = this.#sourceFile.positionAt(token.endOffset);
+    if (start.line === end.line) {
+      this.#encode(token.startOffset, token.endOffset, token.tokenTypeIndex, token.modifierBitset);
+      return;
+    }
+
+    for (let line = start.line; line <= end.line; line++) {
+      const startOffset =
+        line === start.line ? token.startOffset : this.#sourceFile.lineStartOffset(line);
+      const endOffset = line === end.line ? token.endOffset : this.#sourceFile.lineEndOffset(line);
+      if (endOffset > startOffset) {
+        this.#encode(startOffset, endOffset, token.tokenTypeIndex, token.modifierBitset);
+      }
+    }
+  }
+
+  #encode(
+    startOffset: number,
+    endOffset: number,
+    tokenTypeIndex: number,
+    modifierBitset: number,
+  ): void {
+    const start = this.#sourceFile.positionAt(startOffset);
+    const deltaLine = this.#first ? start.line : start.line - this.#previousLine;
+    const deltaStart =
+      this.#first || deltaLine !== 0 ? start.character : start.character - this.#previousCharacter;
+    this.#data.push(deltaLine, deltaStart, endOffset - startOffset, tokenTypeIndex, modifierBitset);
+    this.#previousLine = start.line;
+    this.#previousCharacter = start.character;
+    this.#first = false;
+  }
 }
 
-function collectDeclarations(source: SemanticTokenSource, tokens: SemanticTokenRange[]): void {
+function collectCommentTokens(document: DocumentAst): readonly PendingSemanticToken[] {
+  const tokens: PendingSemanticToken[] = [];
+  for (const token of document.syntax.tokens()) {
+    if (token.kind === 'Comment') {
+      tokens.push(pendingTokenForToken(token, 'comment'));
+    }
+  }
+  return tokens;
+}
+
+function collectDeclarations(source: SemanticTokenSource, tokens: PendingSemanticToken[]): void {
   for (const declaration of source.document.declarations()) {
     collectDeclaration(declaration, source, tokens, undefined);
   }
@@ -164,12 +213,12 @@ function collectDeclarations(source: SemanticTokenSource, tokens: SemanticTokenR
 function collectDeclaration(
   declaration: DeclarationAst,
   source: SemanticTokenSource,
-  tokens: SemanticTokenRange[],
+  tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
   if (declaration instanceof ModelDeclarationAst) {
     addToken(declaration.keyword(), 'keyword', tokens);
-    addIdentifier(declaration.name(), 'class', tokens, ['declaration']);
+    addIdentifier(declaration.name(), 'class', tokens, semanticTokenModifierBits.declaration);
     collectFields(declaration.fields(), source, tokens, namespace);
     collectAttributes(declaration.attributes(), source, tokens, namespace);
     return;
@@ -177,7 +226,7 @@ function collectDeclaration(
 
   if (declaration instanceof CompositeTypeDeclarationAst) {
     addToken(declaration.keyword(), 'keyword', tokens);
-    addIdentifier(declaration.name(), 'struct', tokens, ['declaration']);
+    addIdentifier(declaration.name(), 'struct', tokens, semanticTokenModifierBits.declaration);
     collectFields(declaration.fields(), source, tokens, namespace);
     collectAttributes(declaration.attributes(), source, tokens, namespace);
     return;
@@ -185,7 +234,7 @@ function collectDeclaration(
 
   if (declaration instanceof NamespaceDeclarationAst) {
     addToken(declaration.keyword(), 'keyword', tokens);
-    addIdentifier(declaration.name(), 'namespace', tokens, ['declaration']);
+    addIdentifier(declaration.name(), 'namespace', tokens, semanticTokenModifierBits.declaration);
     const nestedNamespace = declaration.name()?.name();
     for (const nested of declaration.declarations()) {
       collectDeclaration(nested, source, tokens, nestedNamespace);
@@ -202,7 +251,7 @@ function collectDeclaration(
   }
 
   addToken(declaration.keyword(), 'keyword', tokens);
-  addIdentifier(declaration.name(), 'type', tokens, ['declaration']);
+  addIdentifier(declaration.name(), 'type', tokens, semanticTokenModifierBits.declaration);
   for (const entry of declaration.entries()) {
     addIdentifier(entry.key(), 'property', tokens);
     collectExpression(entry.value(), source, tokens, namespace);
@@ -213,10 +262,10 @@ function collectDeclaration(
 function collectNamedTypeDeclaration(
   declaration: NamedTypeDeclarationAst,
   source: SemanticTokenSource,
-  tokens: SemanticTokenRange[],
+  tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
-  addIdentifier(declaration.name(), 'type', tokens, ['declaration']);
+  addIdentifier(declaration.name(), 'type', tokens, semanticTokenModifierBits.declaration);
   collectTypeAnnotation(declaration.typeAnnotation(), source, tokens, namespace);
   collectAttributes(declaration.attributes(), source, tokens, namespace);
 }
@@ -224,11 +273,11 @@ function collectNamedTypeDeclaration(
 function collectFields(
   fields: Iterable<FieldDeclarationAst>,
   source: SemanticTokenSource,
-  tokens: SemanticTokenRange[],
+  tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
   for (const field of fields) {
-    addIdentifier(field.name(), 'property', tokens, ['declaration']);
+    addIdentifier(field.name(), 'property', tokens, semanticTokenModifierBits.declaration);
     collectTypeAnnotation(field.typeAnnotation(), source, tokens, namespace);
     collectAttributes(field.attributes(), source, tokens, namespace);
   }
@@ -237,7 +286,7 @@ function collectFields(
 function collectTypeAnnotation(
   annotation: TypeAnnotationAst | undefined,
   source: SemanticTokenSource,
-  tokens: SemanticTokenRange[],
+  tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
   if (annotation === undefined) {
@@ -250,7 +299,7 @@ function collectTypeAnnotation(
 function collectAttributes(
   attributes: Iterable<AttributeAst>,
   source: SemanticTokenSource,
-  tokens: SemanticTokenRange[],
+  tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
   for (const attribute of attributes) {
@@ -262,7 +311,7 @@ function collectAttributes(
 function collectDecoratorName(
   name: QualifiedNameAst | undefined,
   sourceText: string,
-  tokens: SemanticTokenRange[],
+  tokens: PendingSemanticToken[],
 ): void {
   if (name === undefined) {
     return;
@@ -276,7 +325,7 @@ function collectDecoratorName(
 function collectAttributeArgList(
   argList: AttributeArgListAst | undefined,
   source: SemanticTokenSource,
-  tokens: SemanticTokenRange[],
+  tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
   if (argList === undefined) {
@@ -290,7 +339,7 @@ function collectAttributeArgList(
 function collectAttributeArg(
   arg: AttributeArgAst,
   source: SemanticTokenSource,
-  tokens: SemanticTokenRange[],
+  tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
   addIdentifier(arg.name(), 'property', tokens);
@@ -300,7 +349,7 @@ function collectAttributeArg(
 function collectExpression(
   expression: ExpressionAst | undefined,
   source: SemanticTokenSource,
-  tokens: SemanticTokenRange[],
+  tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
   if (expression === undefined) {
@@ -351,7 +400,7 @@ function collectExpression(
 function collectIdentifierExpression(
   identifier: IdentifierAst,
   source: SemanticTokenSource,
-  tokens: SemanticTokenRange[],
+  tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
   const text = identifier.name();
@@ -359,13 +408,15 @@ function collectIdentifierExpression(
     return;
   }
   const classification = classifyTypeReference([text], source, namespace);
-  tokens.push(rangeForIdentifier(identifier, classification.tokenType, classification.modifiers));
+  tokens.push(
+    rangeForIdentifier(identifier, classification.tokenType, classification.modifierBitset),
+  );
 }
 
 function collectTypeReference(
   name: QualifiedNameAst | undefined,
   source: SemanticTokenSource,
-  tokens: SemanticTokenRange[],
+  tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
   if (name === undefined) {
@@ -390,7 +441,11 @@ function collectTypeReference(
   }
   const classification = classifyTypeReference(path, source, namespace);
   tokens.push(
-    rangeForIdentifier(finalSegment.identifier, classification.tokenType, classification.modifiers),
+    rangeForIdentifier(
+      finalSegment.identifier,
+      classification.tokenType,
+      classification.modifierBitset,
+    ),
   );
 }
 
@@ -429,7 +484,7 @@ function classifyTypeReference(
       return { tokenType: 'struct' };
     }
     if (Object.hasOwn(table.topLevel.scalars, name)) {
-      return { tokenType: 'type', modifiers: ['defaultLibrary'] };
+      return { tokenType: 'type', modifierBitset: semanticTokenModifierBits.defaultLibrary };
     }
     if (
       Object.hasOwn(table.topLevel.typeAliases, name) ||
@@ -440,7 +495,7 @@ function classifyTypeReference(
   }
 
   if (source.scalarTypes.includes(name)) {
-    return { tokenType: 'type', modifiers: ['defaultLibrary'] };
+    return { tokenType: 'type', modifierBitset: semanticTokenModifierBits.defaultLibrary };
   }
 
   return { tokenType: 'type' };
@@ -464,48 +519,49 @@ function identifierSegments(name: QualifiedNameAst): readonly IdentifierSegment[
 function addIdentifier(
   identifier: IdentifierAst | undefined,
   tokenType: SemanticTokenType,
-  tokens: SemanticTokenRange[],
-  modifiers?: readonly SemanticTokenModifier[],
+  tokens: PendingSemanticToken[],
+  modifierBitset = 0,
 ): void {
   if (identifier === undefined) {
     return;
   }
-  tokens.push(rangeForIdentifier(identifier, tokenType, modifiers));
+  tokens.push(rangeForIdentifier(identifier, tokenType, modifierBitset));
 }
 
 function addToken(
   token: SyntaxToken | undefined,
   tokenType: SemanticTokenType,
-  tokens: SemanticTokenRange[],
-  modifiers?: readonly SemanticTokenModifier[],
+  tokens: PendingSemanticToken[],
+  modifierBitset = 0,
 ): void {
   if (token === undefined) {
     return;
   }
-  tokens.push(rangeForToken(token, tokenType, modifiers));
+  tokens.push(pendingTokenForToken(token, tokenType, modifierBitset));
 }
 
 function rangeForIdentifier(
   identifier: IdentifierAst,
   tokenType: SemanticTokenType,
-  modifiers?: readonly SemanticTokenModifier[],
-): SemanticTokenRange {
+  modifierBitset = 0,
+): PendingSemanticToken {
   const token = identifier.token();
   if (token === undefined) {
-    return {
-      startOffset: identifier.syntax.offset,
-      endOffset: identifier.syntax.offset,
+    return createPendingSemanticToken(
+      identifier.syntax.offset,
+      identifier.syntax.offset,
       tokenType,
-    };
+      modifierBitset,
+    );
   }
-  return rangeForToken(token, tokenType, modifiers);
+  return pendingTokenForToken(token, tokenType, modifierBitset);
 }
 
 function rangeForDecoratorIdentifier(
   identifier: IdentifierAst,
   sourceText: string,
   includePrefix: boolean,
-): SemanticTokenRange {
+): PendingSemanticToken {
   const range = rangeForIdentifier(identifier, 'decorator');
   if (!includePrefix) {
     return range;
@@ -515,141 +571,89 @@ function rangeForDecoratorIdentifier(
   while (startOffset > 0 && sourceText.charAt(startOffset - 1) === '@') {
     startOffset--;
   }
-  return { ...range, startOffset };
-}
-
-function rangeForToken(
-  token: SyntaxToken,
-  tokenType: SemanticTokenType,
-  modifiers?: readonly SemanticTokenModifier[],
-): SemanticTokenRange {
-  const range = {
-    startOffset: token.offset,
-    endOffset: token.offset + token.text.length,
-    tokenType,
-  };
-  return modifiers === undefined || modifiers.length === 0 ? range : { ...range, modifiers };
-}
-
-function normalizeSemanticTokenRanges(
-  sourceFile: SourceFile,
-  tokens: readonly SemanticTokenRange[],
-): readonly SemanticTokenRange[] {
-  const split: SemanticTokenRange[] = [];
-  for (const token of resolveSemanticTokenRanges(tokens)) {
-    const startOffset = clamp(token.startOffset, 0, sourceFile.length);
-    const endOffset = clamp(token.endOffset, 0, sourceFile.length);
-    if (endOffset <= startOffset) {
-      continue;
-    }
-    splitTokenRange(sourceFile, { ...token, startOffset, endOffset }, split);
-  }
-  return resolveSemanticTokenRanges(split);
-}
-
-function splitTokenRange(
-  sourceFile: SourceFile,
-  token: SemanticTokenRange,
-  result: SemanticTokenRange[],
-): void {
-  const start = sourceFile.positionAt(token.startOffset);
-  const end = sourceFile.positionAt(token.endOffset);
-  for (let line = start.line; line <= end.line; line++) {
-    const startOffset = line === start.line ? token.startOffset : lineStartOffset(sourceFile, line);
-    const endOffset = line === end.line ? token.endOffset : lineEndOffset(sourceFile, line);
-    if (endOffset > startOffset) {
-      result.push({ ...token, startOffset, endOffset });
-    }
-  }
-}
-
-function lineStartOffset(sourceFile: SourceFile, line: number): number {
-  return sourceFile.lineStartOffsets()[line] ?? sourceFile.length;
-}
-
-function lineEndOffset(sourceFile: SourceFile, line: number): number {
-  const nextLineStart = sourceFile.lineStartOffsets()[line + 1];
-  if (nextLineStart === undefined) {
-    return sourceFile.length;
-  }
-
-  let end = nextLineStart;
-  while (end > 0) {
-    const character = sourceFile.text.charAt(end - 1);
-    if (character !== '\n' && character !== '\r') {
-      break;
-    }
-    end--;
-  }
-  return end;
-}
-
-function resolveSemanticTokenRanges(
-  tokens: readonly SemanticTokenRange[],
-): readonly SemanticTokenRange[] {
-  const byRange = new Map<string, SemanticTokenRange>();
-  for (const token of tokens) {
-    const key = `${token.startOffset}:${token.endOffset}`;
-    const existing = byRange.get(key);
-    byRange.set(key, existing === undefined ? token : mergeDuplicateToken(existing, token));
-  }
-  return [...byRange.values()].sort(compareSemanticTokenRanges);
-}
-
-function mergeDuplicateToken(
-  existing: SemanticTokenRange,
-  next: SemanticTokenRange,
-): SemanticTokenRange {
-  if (existing.tokenType !== next.tokenType) {
-    return next;
-  }
-
-  const modifiers = mergeModifiers(existing.modifiers, next.modifiers);
-  return modifiers.length === 0 ? existing : { ...existing, modifiers };
-}
-
-function mergeModifiers(
-  left: readonly SemanticTokenModifier[] | undefined,
-  right: readonly SemanticTokenModifier[] | undefined,
-): readonly SemanticTokenModifier[] {
-  const result: SemanticTokenModifier[] = [];
-  for (const modifier of semanticTokenModifiers) {
-    if (left?.includes(modifier) || right?.includes(modifier)) {
-      result.push(modifier);
-    }
-  }
-  return result;
-}
-
-function compareSemanticTokenRanges(left: SemanticTokenRange, right: SemanticTokenRange): number {
-  return (
-    left.startOffset - right.startOffset ||
-    left.endOffset - right.endOffset ||
-    semanticTokenTypes.indexOf(left.tokenType) - semanticTokenTypes.indexOf(right.tokenType) ||
-    modifierBitset(left.modifiers) - modifierBitset(right.modifiers)
+  return createPendingSemanticToken(
+    startOffset,
+    range.endOffset,
+    'decorator',
+    range.modifierBitset,
   );
 }
 
-function modifierBitset(modifiers: readonly SemanticTokenModifier[] | undefined): number {
-  let bitset = 0;
-  if (modifiers === undefined) {
-    return bitset;
-  }
-  for (const modifier of modifiers) {
-    const index = semanticTokenModifiers.indexOf(modifier);
-    if (index >= 0) {
-      bitset |= 1 << index;
-    }
-  }
-  return bitset;
+function pendingTokenForToken(
+  token: SyntaxToken,
+  tokenType: SemanticTokenType,
+  modifierBitset = 0,
+): PendingSemanticToken {
+  return createPendingSemanticToken(
+    token.offset,
+    token.offset + token.text.length,
+    tokenType,
+    modifierBitset,
+  );
 }
 
-function clamp(value: number, min: number, max: number): number {
-  if (value < min) {
-    return min;
+function mergeSourceOrderedTokens(
+  left: readonly PendingSemanticToken[],
+  right: readonly PendingSemanticToken[],
+): readonly PendingSemanticToken[] {
+  const result: PendingSemanticToken[] = [];
+  let leftIndex = 0;
+  let rightIndex = 0;
+
+  while (leftIndex < left.length || rightIndex < right.length) {
+    const leftToken = left[leftIndex];
+    const rightToken = right[rightIndex];
+    if (
+      leftToken !== undefined &&
+      (rightToken === undefined || leftToken.startOffset <= rightToken.startOffset)
+    ) {
+      result.push(leftToken);
+      leftIndex++;
+    } else if (rightToken !== undefined) {
+      result.push(rightToken);
+      rightIndex++;
+    }
   }
-  if (value > max) {
-    return max;
+
+  return result;
+}
+
+function createPendingSemanticToken(
+  startOffset: number,
+  endOffset: number,
+  tokenType: SemanticTokenType,
+  modifierBitset = 0,
+): PendingSemanticToken {
+  return {
+    startOffset,
+    endOffset,
+    tokenTypeIndex: tokenTypeIndex(tokenType),
+    modifierBitset,
+    splitMultiline: tokenType === 'string' || tokenType === 'comment',
+  };
+}
+
+function tokenTypeIndex(tokenType: SemanticTokenType): number {
+  switch (tokenType) {
+    case 'keyword':
+      return 0;
+    case 'namespace':
+      return 1;
+    case 'class':
+      return 2;
+    case 'struct':
+      return 3;
+    case 'type':
+      return 4;
+    case 'property':
+      return 5;
+    case 'decorator':
+      return 6;
+    case 'string':
+      return 7;
+    case 'number':
+      return 8;
+    case 'comment':
+      return 9;
   }
-  return value;
 }
