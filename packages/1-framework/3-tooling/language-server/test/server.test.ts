@@ -537,6 +537,136 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
       },
     ]);
   });
+
+  it('returns full semantic tokens for a configured open PSL input', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    openDocument(harness, schemaUri, 'model User {\n  id Int @id\n}\n');
+    expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
+
+    await expect(requestSemanticTokens(harness, schemaUri)).resolves.toEqual({
+      data: [0, 0, 5, 0, 0, 0, 6, 4, 2, 1, 1, 2, 2, 5, 1, 0, 3, 3, 4, 2, 0, 4, 3, 6, 0],
+    });
+  });
+
+  it('returns range semantic tokens intersecting the requested range', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    openDocument(
+      harness,
+      schemaUri,
+      'model User {\n  id Int @id\n}\n\nmodel Post {\n  id Int @id\n}\n',
+    );
+    expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
+
+    await expect(
+      requestSemanticTokensRange(harness, schemaUri, {
+        start: { line: 0, character: 0 },
+        end: { line: 3, character: 0 },
+      }),
+    ).resolves.toEqual({
+      data: [0, 0, 5, 0, 0, 0, 6, 4, 2, 1, 1, 2, 2, 5, 1, 0, 3, 3, 4, 2, 0, 4, 3, 6, 0],
+    });
+  });
+
+  it('returns empty semantic tokens for unconfigured documents', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const otherUri = pathToFileURL(join(root, 'not-a-schema.psl')).toString();
+    openDocument(harness, otherUri, 'model User {\n  id Int @id\n}\n');
+    expect(await harness.waitForDiagnostics(otherUri)).toEqual([]);
+
+    await expect(requestSemanticTokens(harness, otherUri)).resolves.toEqual({ data: [] });
+  });
+
+  it('returns empty semantic tokens for missing and closed documents', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    await expect(requestSemanticTokens(harness, schemaUri)).resolves.toEqual({ data: [] });
+
+    openDocument(harness, schemaUri, 'model User {\n  id Int @id\n}\n');
+    expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
+    const closed = harness.waitForDiagnosticsMatching(
+      schemaUri,
+      (diagnostics) => diagnostics.length === 0,
+    );
+    closeDocument(harness, schemaUri);
+    expect(await closed).toEqual([]);
+
+    await expect(requestSemanticTokens(harness, schemaUri)).resolves.toEqual({ data: [] });
+  });
+
+  it('returns best-effort semantic tokens for malformed configured inputs', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    openDocument(harness, schemaUri, 'model User {\n  id Int @id\n');
+    expect((await harness.waitForDiagnostics(schemaUri)).length).toBeGreaterThan(0);
+
+    const tokens = await requestSemanticTokens(harness, schemaUri);
+    expect(tokens?.data.length).toBeGreaterThan(0);
+    expect(semanticTokenChunks(tokens).every((chunk) => chunk.length === 5)).toBe(true);
+  });
+
+  it('returns empty semantic tokens when config resolution fails', async () => {
+    harness = startHarness(resolveFails);
+    await harness.initialize();
+    openDocument(harness, schemaUri, 'model User {\n  id Int @id\n}\n');
+    await waitUntil(() => configResolutionMock.resolveConfigInputs.mock.calls.length === 1);
+
+    await expect(requestSemanticTokens(harness, schemaUri)).resolves.toEqual({ data: [] });
+  });
+
+  it('returns empty semantic tokens for oversized configured inputs', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    openDocument(harness, schemaUri, `// ${'x'.repeat(100_000)}`);
+    expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
+
+    await expect(requestSemanticTokens(harness, schemaUri)).resolves.toEqual({ data: [] });
+  });
+
+  it('returns semantic tokens for the current edit', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    openDocument(harness, schemaUri, 'model User {\n  id Int @id\n}\n');
+    expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
+
+    const cleared = harness.waitForDiagnosticsMatching(
+      schemaUri,
+      (diagnostics) => diagnostics.length === 0,
+    );
+    harness.client.sendNotification(DidChangeTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri, version: 2 },
+      contentChanges: [{ text: 'model Invoice {\n  id Int @id\n}\n' }],
+    });
+    await cleared;
+
+    await expect(requestSemanticTokens(harness, schemaUri)).resolves.toEqual({
+      data: [0, 0, 5, 0, 0, 0, 6, 7, 2, 1, 1, 2, 2, 5, 1, 0, 3, 3, 4, 2, 0, 4, 3, 6, 0],
+    });
+  });
+
+  it('returns semantic tokens for the current edit after a delayed project load', async () => {
+    const load = deferred<ConfigResolution>();
+    harness = startHarness(async () => load.promise);
+    await harness.initialize();
+
+    openDocument(harness, schemaUri, 'model User {\n  id Int @id\n}\n');
+    const currentDiagnostics = harness.waitForDiagnosticsMatching(
+      schemaUri,
+      (diagnostics) => diagnostics.length === 0,
+    );
+    harness.client.sendNotification(DidChangeTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri, version: 2 },
+      contentChanges: [{ text: 'model Invoice {\n  id Int @id\n}\n' }],
+    });
+    load.resolve(resolutionForInputs([schemaPath]));
+    await currentDiagnostics;
+
+    await expect(requestSemanticTokens(harness, schemaUri)).resolves.toEqual({
+      data: [0, 0, 5, 0, 0, 0, 6, 7, 2, 1, 1, 2, 2, 5, 1, 0, 3, 3, 4, 2, 0, 4, 3, 6, 0],
+    });
+  });
 });
 
 const duplicateModelSource = [

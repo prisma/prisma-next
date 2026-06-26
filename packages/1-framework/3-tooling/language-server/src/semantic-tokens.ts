@@ -254,20 +254,22 @@ function collectAttributes(
   namespace: string | undefined,
 ): void {
   for (const attribute of attributes) {
-    collectDecoratorName(attribute.name(), tokens);
+    collectDecoratorName(attribute.name(), source.sourceFile.text, tokens);
     collectAttributeArgList(attribute.argList(), source, tokens, namespace);
   }
 }
 
 function collectDecoratorName(
   name: QualifiedNameAst | undefined,
+  sourceText: string,
   tokens: SemanticTokenRange[],
 ): void {
   if (name === undefined) {
     return;
   }
-  for (const segment of identifierSegments(name)) {
-    tokens.push(rangeForIdentifier(segment.identifier, 'decorator'));
+  const segments = identifierSegments(name);
+  for (const [index, segment] of segments.entries()) {
+    tokens.push(rangeForDecoratorIdentifier(segment.identifier, sourceText, index === 0));
   }
 }
 
@@ -497,6 +499,23 @@ function rangeForIdentifier(
     };
   }
   return rangeForToken(token, tokenType, modifiers);
+}
+
+function rangeForDecoratorIdentifier(
+  identifier: IdentifierAst,
+  sourceText: string,
+  includePrefix: boolean,
+): SemanticTokenRange {
+  const range = rangeForIdentifier(identifier, 'decorator');
+  if (!includePrefix) {
+    return range;
+  }
+
+  let startOffset = range.startOffset;
+  while (startOffset > 0 && sourceText.charAt(startOffset - 1) === '@') {
+    startOffset--;
+  }
+  return { ...range, startOffset };
 }
 
 function rangeForToken(

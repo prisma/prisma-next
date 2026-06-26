@@ -171,6 +171,7 @@ export const schemaText = ${JSON.stringify(schemaText)};
         'vscode-languageserver-protocol/browser',
         'vscode-ws-jsonrpc',
       ],
+      exclude: ['@codingame/monaco-vscode-theme-defaults-default-extension'],
     },
     resolve: {
       alias: (() => {

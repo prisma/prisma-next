@@ -48,6 +48,8 @@ Monaco editor + VS Code API shim  --LSP/WebSocket-->  ws bridge  --spawn+stdio--
 
 The playground does not contain a PSL classifier. Semantic highlighting comes from the standard LSP path: the language server advertises `semanticTokensProvider`, `vscode-languageclient` registers Monaco/VS Code document and range semantic-token providers for the `prisma` document selector, and requests flow over the same WebSocket bridge as diagnostics, folding, and formatting.
 
+The client loads Monaco's VS Code theme service with the bundled Default Dark+ theme. A tiny local system extension contributes `semanticTokenScopes` for the `prisma` language so the server's standard semantic token types resolve to the theme's existing TextMate colors; it does not classify PSL or define a custom PSL color palette.
+
 Keep PSL meaning in `@prisma-next/language-server`. If semantic-token traffic is present but colors are not visually distinct in Monaco, prefer the smallest Monaco-side setting or theme adjustment that enables standard semantic highlighting; do not add a playground-local tokenizer, custom token legend, CodeMirror adapter, or duplicate request loop.
 
 ## Manual QA

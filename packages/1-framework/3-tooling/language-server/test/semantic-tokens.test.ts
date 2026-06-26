@@ -183,8 +183,8 @@ describe('semantic token substrate', () => {
     expect(findToken(details, { text: 'target', tokenType: 'property' })).toBeDefined();
     expect(findToken(details, { text: 'mode', tokenType: 'property' })).toBeDefined();
     expect(findToken(details, { text: 'ttl', tokenType: 'property' })).toBeDefined();
-    expect(findToken(details, { text: 'relation', tokenType: 'decorator' })).toBeDefined();
-    expect(findToken(details, { text: 'map', tokenType: 'decorator' })).toBeDefined();
+    expect(findToken(details, { text: '@relation', tokenType: 'decorator' })).toBeDefined();
+    expect(findToken(details, { text: '@@map', tokenType: 'decorator' })).toBeDefined();
     expect(findToken(details, { text: '"invoice_user"', tokenType: 'string' })).toBeDefined();
     expect(findToken(details, { text: '"default"', tokenType: 'string' })).toBeDefined();
     expect(findToken(details, { text: '12.5', tokenType: 'number' })).toBeDefined();
@@ -206,7 +206,7 @@ describe('semantic token substrate', () => {
     const details = tokens.map((token) => describeToken(source.sourceFile, token));
     const encoded = encodeSemanticTokens(source.sourceFile, tokens);
 
-    expect(details.map((token) => token.text)).toEqual(['model', 'User', 'id', 'Int', 'id']);
+    expect(details.map((token) => token.text)).toEqual(['model', 'User', 'id', 'Int', '@id']);
     expect(encoded.data.length % 5).toBe(0);
     for (let index = 0; index < encoded.data.length; index += 5) {
       expect(encoded.data[index]).toBeGreaterThanOrEqual(0);
@@ -294,7 +294,7 @@ describe('semantic token substrate', () => {
     expect(
       findToken(details, { text: 'User', tokenType: 'class', modifiers: ['declaration'] }),
     ).toBeDefined();
-    expect(findToken(details, { text: 'id', tokenType: 'decorator' })).toBeDefined();
+    expect(findToken(details, { text: '@id', tokenType: 'decorator' })).toBeDefined();
     expect(findToken(details, { text: '"anonymous"', tokenType: 'string' })).toBeDefined();
     expect(findToken(details, { text: 'true', tokenType: 'keyword' })).toBeDefined();
   });
