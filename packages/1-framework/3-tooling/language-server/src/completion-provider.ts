@@ -1,12 +1,16 @@
-import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
+import {
+  type AuthoringPslBlockDescriptorNamespace,
+  isAuthoringPslBlockDescriptor,
+} from '@prisma-next/framework-components/authoring';
 import {
   findBlockDescriptor,
   type NamespaceSymbol,
   type SymbolTable,
 } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
-import { type CompletionItem, CompletionItemKind } from 'vscode-languageserver';
+import { type CompletionItem, CompletionItemKind, InsertTextFormat } from 'vscode-languageserver';
 import type {
+  DeclarationKeywordCompletionContext,
   GenericBlockParameterCompletionContext,
   ModelFieldTypeCompletionContext,
   PslCompletionContext,
@@ -22,7 +26,10 @@ export interface ProvidePslCompletionItemsInput {
   readonly context: PslCompletionContext;
   readonly sourceFile: SourceFile;
   readonly candidates: PslCompletionCandidateSource;
+  readonly clientSupportsSnippets: boolean;
 }
+
+type DeclarationKeywordCompletionCandidateCategory = 'native' | 'genericBlock';
 
 type ModelTypeCompletionCandidateCategory =
   | 'configuredScalar'
@@ -33,6 +40,15 @@ type ModelTypeCompletionCandidateCategory =
   | 'namespace'
   | 'namespaceModel'
   | 'namespaceCompositeType';
+
+interface DeclarationKeywordCompletionCandidate {
+  readonly category: DeclarationKeywordCompletionCandidateCategory;
+  readonly label: string;
+  readonly insertText: string;
+  readonly snippetText: string;
+  readonly detail: string;
+  readonly kind: CompletionItemKind;
+}
 
 interface ModelTypeCompletionCandidate {
   readonly category: ModelTypeCompletionCandidateCategory;
@@ -54,11 +70,46 @@ const categoryOrder: Record<ModelTypeCompletionCandidateCategory, number> = {
   namespaceCompositeType: 7,
 };
 
+const declarationKeywordCategoryOrder: Record<
+  DeclarationKeywordCompletionCandidateCategory,
+  number
+> = {
+  native: 0,
+  genericBlock: 1,
+};
+
+const nameSnippetPlaceholder = '$' + '{1:Name}';
+const namespaceSnippetPlaceholder = '$' + '{1:name}';
+
+const documentNativeDeclarationKeywords: readonly DeclarationKeywordCompletionCandidate[] = [
+  nativeDeclarationKeyword('model', 'model ', `model ${nameSnippetPlaceholder} {\n  $0\n}`),
+  nativeDeclarationKeyword('type', 'type ', `type ${nameSnippetPlaceholder} {\n  $0\n}`),
+  nativeDeclarationKeyword('types', 'types ', 'types {\n  $0\n}'),
+  nativeDeclarationKeyword(
+    'namespace',
+    'namespace ',
+    `namespace ${namespaceSnippetPlaceholder} {\n  $0\n}`,
+  ),
+];
+
+const namespaceNativeDeclarationKeywords: readonly DeclarationKeywordCompletionCandidate[] = [
+  nativeDeclarationKeyword('model', 'model ', `model ${nameSnippetPlaceholder} {\n  $0\n}`),
+  nativeDeclarationKeyword('type', 'type ', `type ${nameSnippetPlaceholder} {\n  $0\n}`),
+];
+
 export function providePslCompletionItems(
   input: ProvidePslCompletionItemsInput,
 ): readonly CompletionItem[] {
   if (input.context.kind === 'unsupported') {
     return [];
+  }
+  if (input.context.kind === 'declarationKeyword') {
+    return provideDeclarationKeywordCompletionItems(
+      input.context,
+      input.sourceFile,
+      input.candidates,
+      input.clientSupportsSnippets,
+    );
   }
   if (input.context.kind === 'genericBlockParameter') {
     return provideGenericBlockParameterCompletionItems(
@@ -68,6 +119,98 @@ export function providePslCompletionItems(
     );
   }
   return provideModelFieldTypeCompletionItems(input.context, input.sourceFile, input.candidates);
+}
+
+function provideDeclarationKeywordCompletionItems(
+  context: DeclarationKeywordCompletionContext,
+  sourceFile: SourceFile,
+  source: PslCompletionCandidateSource,
+  clientSupportsSnippets: boolean,
+): readonly CompletionItem[] {
+  const replacementRange = {
+    start: sourceFile.positionAt(context.replacementStartOffset),
+    end: sourceFile.positionAt(context.offset),
+  };
+
+  return declarationKeywordCandidates(context.scope, source)
+    .filter((candidate) => candidate.label.startsWith(context.prefix))
+    .map((candidate) => ({
+      label: candidate.label,
+      kind: candidate.kind,
+      detail: candidate.detail,
+      sortText: declarationKeywordSortText(candidate),
+      filterText: candidate.label,
+      ...(clientSupportsSnippets ? { insertTextFormat: InsertTextFormat.Snippet } : {}),
+      textEdit: {
+        range: replacementRange,
+        newText: clientSupportsSnippets ? candidate.snippetText : candidate.insertText,
+      },
+    }));
+}
+
+function declarationKeywordCandidates(
+  scope: DeclarationKeywordCompletionContext['scope'],
+  source: PslCompletionCandidateSource,
+): readonly DeclarationKeywordCompletionCandidate[] {
+  const nativeCandidates =
+    scope === 'namespace' ? namespaceNativeDeclarationKeywords : documentNativeDeclarationKeywords;
+  return [
+    ...nativeCandidates,
+    ...genericBlockDeclarationKeywordCandidates(source.pslBlockDescriptors),
+  ];
+}
+
+function nativeDeclarationKeyword(
+  label: string,
+  insertText: string,
+  snippetText: string,
+): DeclarationKeywordCompletionCandidate {
+  return {
+    category: 'native',
+    label,
+    insertText,
+    snippetText,
+    detail: 'PSL declaration keyword',
+    kind: CompletionItemKind.Keyword,
+  };
+}
+
+function genericBlockDeclarationKeywordCandidates(
+  descriptors: AuthoringPslBlockDescriptorNamespace,
+): readonly DeclarationKeywordCompletionCandidate[] {
+  return descriptorBlockKeywords(descriptors).map((keyword) => ({
+    category: 'genericBlock',
+    label: keyword,
+    insertText: `${keyword} `,
+    snippetText: `${keyword} ${nameSnippetPlaceholder} {\n  $0\n}`,
+    detail: 'Generic block keyword',
+    kind: CompletionItemKind.Keyword,
+  }));
+}
+
+function descriptorBlockKeywords(
+  descriptors: AuthoringPslBlockDescriptorNamespace,
+): readonly string[] {
+  const keywords: string[] = [];
+  collectDescriptorBlockKeywords(descriptors, keywords);
+  return sortedUnique(keywords);
+}
+
+function collectDescriptorBlockKeywords(
+  descriptors: AuthoringPslBlockDescriptorNamespace,
+  keywords: string[],
+): void {
+  for (const value of Object.values(descriptors)) {
+    if (isAuthoringPslBlockDescriptor(value)) {
+      keywords.push(value.keyword);
+      continue;
+    }
+    collectDescriptorBlockKeywords(value, keywords);
+  }
+}
+
+function declarationKeywordSortText(candidate: DeclarationKeywordCompletionCandidate): string {
+  return `${declarationKeywordCategoryOrder[candidate.category]}:${candidate.label}`;
 }
 
 function provideGenericBlockParameterCompletionItems(

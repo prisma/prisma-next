@@ -67,6 +67,7 @@ export function createServer(connection: Connection): LanguageServer {
   let rootPath = process.cwd();
   let watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
   let supportsWatchedFilesRegistration = false;
+  let clientSupportsSnippets = false;
 
   async function publish(uri: string): Promise<void> {
     const project = await resolveProjectForDocument(uri);
@@ -329,6 +330,7 @@ export function createServer(connection: Connection): LanguageServer {
             pslBlockDescriptors: project.controlStack.pslBlockDescriptors,
             symbolTable,
           },
+          clientSupportsSnippets,
         }),
       ];
     } catch {
@@ -340,6 +342,7 @@ export function createServer(connection: Connection): LanguageServer {
     rootPath = resolveRootPath(params.rootUri, params.rootPath);
     watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
     supportsWatchedFilesRegistration = clientSupportsWatchedFilesRegistration(params);
+    clientSupportsSnippets = clientSupportsCompletionSnippets(params);
 
     return {
       capabilities: {
@@ -351,7 +354,7 @@ export function createServer(connection: Connection): LanguageServer {
           full: true,
           range: true,
         },
-        completionProvider: {},
+        completionProvider: { triggerCharacters: ['.'] },
       },
     };
   });
@@ -470,6 +473,10 @@ function toLspSeverity(severity: number): DiagnosticSeverity {
 
 function clientSupportsWatchedFilesRegistration(params: InitializeParams): boolean {
   return params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration === true;
+}
+
+function clientSupportsCompletionSnippets(params: InitializeParams): boolean {
+  return params.capabilities.textDocument?.completion?.completionItem?.snippetSupport === true;
 }
 
 function resolveRootPath(
