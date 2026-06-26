@@ -1,10 +1,10 @@
 import { domainModelsAtDefaultNamespace, type PlanMeta } from '@prisma-next/contract/types';
 import type {
+  AnyMongoTypeMaps,
   ExtractMongoCodecTypes,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoModelDefinition,
-  MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import type {
   MongoAggAccumulator,
@@ -114,7 +114,7 @@ interface PipelineChainState {
  * `docs/architecture docs/adrs/ADR 201 - State-machine pattern for typed DSL builders.md`.
  */
 export class PipelineChain<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   Shape extends DocShape,
   U extends UpdateEnabled = 'update-ok',
   F extends FindAndModifyEnabled = 'fam-ok',

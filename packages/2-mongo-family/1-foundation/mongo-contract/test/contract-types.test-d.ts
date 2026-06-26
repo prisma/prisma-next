@@ -118,6 +118,17 @@ type ContractWithEnum = MongoContractWithTypeMaps<
           readonly manyNullableRoles: ('user' | 'admin')[] | null;
         };
       };
+    },
+    {
+      readonly __unbound__: {
+        readonly Account: {
+          readonly _id: string;
+          readonly role: 'user' | 'admin';
+          readonly nullableRole: 'user' | 'admin' | null;
+          readonly manyRoles: ('user' | 'admin')[];
+          readonly manyNullableRoles: ('user' | 'admin')[] | null;
+        };
+      };
     }
   >
 >;
@@ -241,6 +252,16 @@ type ContractWithVO = MongoContractWithTypeMaps<
           readonly previousAddresses: { street: string; city: string; zip: string | null }[];
         };
       };
+    },
+    {
+      readonly __unbound__: {
+        readonly User: {
+          readonly _id: string;
+          readonly homeAddress: { street: string; city: string; zip: string | null };
+          readonly workAddress: { street: string; city: string; zip: string | null } | null;
+          readonly previousAddresses: { street: string; city: string; zip: string | null }[];
+        };
+      };
     }
   >
 >;
@@ -271,18 +292,14 @@ test('InferModelRow still handles scalar fields alongside value objects', () => 
   expectTypeOf<UserRow['_id']>().toEqualTypeOf<string>();
 });
 
-test('MongoTypeMaps accepts a fieldOutputTypes parameter', () => {
-  type TM = MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes>;
+test('MongoTypeMaps accepts fieldOutputTypes and fieldInputTypes parameters', () => {
+  type TM = MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes, TestFieldInputTypes>;
   expectTypeOf<TM['fieldOutputTypes']>().toEqualTypeOf<TestFieldOutputTypes>();
-});
-
-test('MongoTypeMaps defaults fieldOutputTypes to Record<string, Record<string, unknown>>', () => {
-  type TM = MongoTypeMaps<TestCodecTypes>;
-  expectTypeOf<TM['fieldOutputTypes']>().toEqualTypeOf<Record<string, Record<string, unknown>>>();
+  expectTypeOf<TM['fieldInputTypes']>().toEqualTypeOf<TestFieldInputTypes>();
 });
 
 test('ExtractMongoFieldOutputTypes extracts fieldOutputTypes from contract', () => {
-  type TM = MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes>;
+  type TM = MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes, TestFieldInputTypes>;
   type C = MongoContractWithTypeMaps<
     {
       readonly target: 'mongo';
@@ -306,16 +323,6 @@ test('ExtractMongoFieldOutputTypes extracts fieldOutputTypes from contract', () 
     TM
   >;
   expectTypeOf<ExtractMongoFieldOutputTypes<C>>().toEqualTypeOf<TestFieldOutputTypes>();
-});
-
-test('MongoTypeMaps accepts a 3rd fieldInputTypes parameter', () => {
-  type TM = MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes, TestFieldInputTypes>;
-  expectTypeOf<TM['fieldInputTypes']>().toEqualTypeOf<TestFieldInputTypes>();
-});
-
-test('MongoTypeMaps defaults fieldInputTypes to Record<string, Record<string, unknown>>', () => {
-  type TM = MongoTypeMaps<TestCodecTypes>;
-  expectTypeOf<TM['fieldInputTypes']>().toEqualTypeOf<Record<string, Record<string, unknown>>>();
 });
 
 test('ExtractMongoFieldInputTypes extracts fieldInputTypes from contract', () => {
@@ -343,13 +350,6 @@ test('ExtractMongoFieldInputTypes extracts fieldInputTypes from contract', () =>
     TM
   >;
   expectTypeOf<ExtractMongoFieldInputTypes<C>>().toEqualTypeOf<TestFieldInputTypes>();
-});
-
-test('MongoTypeMaps with single param compiles', () => {
-  type TM = MongoTypeMaps<TestCodecTypes>;
-  expectTypeOf<TM['codecTypes']>().toEqualTypeOf<TestCodecTypes>();
-  expectTypeOf<TM['fieldOutputTypes']>().toEqualTypeOf<Record<string, Record<string, unknown>>>();
-  expectTypeOf<TM['fieldInputTypes']>().toEqualTypeOf<Record<string, Record<string, unknown>>>();
 });
 
 // The emitter nests `FieldOutputTypes`/`FieldInputTypes` by namespace id; Mongo
@@ -582,6 +582,44 @@ type BigContract = MongoContractWithTypeMaps<
           readonly f32: 'a' | 'b' | 'c';
         };
       };
+    },
+    {
+      readonly __unbound__: {
+        readonly BigModel: {
+          readonly f01: string;
+          readonly f02: 'a' | 'b' | 'c';
+          readonly f03: 'a' | 'b' | 'c' | null;
+          readonly f04: ('a' | 'b' | 'c')[];
+          readonly f05: ('a' | 'b' | 'c')[] | null;
+          readonly f06: string;
+          readonly f07: string | null;
+          readonly f08: 'a' | 'b' | 'c';
+          readonly f09: 'a' | 'b' | 'c' | null;
+          readonly f10: ('a' | 'b' | 'c')[];
+          readonly f11: string;
+          readonly f12: 'a' | 'b' | 'c';
+          readonly f13: 'a' | 'b' | 'c' | null;
+          readonly f14: ('a' | 'b' | 'c')[];
+          readonly f15: ('a' | 'b' | 'c')[] | null;
+          readonly f16: string;
+          readonly f17: string | null;
+          readonly f18: 'a' | 'b' | 'c';
+          readonly f19: 'a' | 'b' | 'c' | null;
+          readonly f20: ('a' | 'b' | 'c')[];
+          readonly f21: string;
+          readonly f22: 'a' | 'b' | 'c';
+          readonly f23: 'a' | 'b' | 'c' | null;
+          readonly f24: ('a' | 'b' | 'c')[];
+          readonly f25: ('a' | 'b' | 'c')[] | null;
+          readonly f26: string;
+          readonly f27: string | null;
+          readonly f28: 'a' | 'b' | 'c';
+          readonly f29: 'a' | 'b' | 'c' | null;
+          readonly f30: ('a' | 'b' | 'c')[];
+          readonly f31: string;
+          readonly f32: 'a' | 'b' | 'c';
+        };
+      };
     }
   >
 >;
@@ -647,6 +685,16 @@ type ContractNoMap = MongoContractWithTypeMaps<
   },
   MongoTypeMaps<
     FallbackCodecTypes,
+    {
+      readonly __unbound__: {
+        readonly Item: {
+          readonly _id: string;
+          readonly name: string;
+          readonly price: number | null;
+          readonly tags: string[];
+        };
+      };
+    },
     {
       readonly __unbound__: {
         readonly Item: {

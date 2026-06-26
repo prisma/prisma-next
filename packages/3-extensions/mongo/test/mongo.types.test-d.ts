@@ -89,9 +89,11 @@ type EnumContract = MongoContractWithTypeMaps<
       readonly storageHash: StorageHashBase<'sha256:enum-facade-storage'>;
     };
   },
-  MongoTypeMaps<{
-    readonly 'mongo/string@1': { readonly input: string; readonly output: string };
-  }>
+  MongoTypeMaps<
+    { readonly 'mongo/string@1': { readonly input: string; readonly output: string } },
+    Record<string, Record<string, unknown>>,
+    Record<string, Record<string, unknown>>
+  >
 >;
 
 declare const enumDb: MongoClient<EnumContract>;

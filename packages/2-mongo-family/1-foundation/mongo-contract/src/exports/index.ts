@@ -4,6 +4,7 @@ export {
   MongoContractSchema,
 } from '../contract-schema';
 export type {
+  AnyMongoTypeMaps,
   ExtractMongoCodecTypes,
   ExtractMongoFieldInputTypes,
   ExtractMongoFieldOutputTypes,
