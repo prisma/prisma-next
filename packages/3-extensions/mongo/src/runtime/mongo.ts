@@ -1,6 +1,8 @@
 import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
+import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contract/enum-accessor';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
   MongoContract,
@@ -17,6 +19,7 @@ import {
   createMongoRuntime,
 } from '@prisma-next/mongo-runtime';
 import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type MongoBinding,
@@ -27,12 +30,22 @@ import {
 
 export type MongoTargetId = 'mongo';
 
+type UnboundEnums<TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>> =
+  NamespacedEnums<TContract>[typeof UNBOUND_NAMESPACE_ID];
+
+function unboundNamespace<T>(builderOutput: { readonly [UNBOUND_NAMESPACE_ID]?: unknown }): T {
+  return blindCast<T, 'the unbound namespace always exists on a mongo builder output'>(
+    builderOutput[UNBOUND_NAMESPACE_ID],
+  );
+}
+
 export interface MongoClient<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
 > {
   readonly orm: MongoOrmClient<TContract>;
   readonly query: ReturnType<typeof mongoQuery<TContract>>;
   readonly contract: TContract;
+  readonly enums: UnboundEnums<TContract>;
   connect(bindingInput?: MongoBindingInput): Promise<MongoRuntime>;
   runtime(): Promise<MongoRuntime>;
   close(): Promise<void>;
@@ -145,7 +158,7 @@ export default function mongo<
     return createMongoRuntime({
       context,
       driver,
-      ...(options.mode !== undefined ? { mode: options.mode } : {}),
+      ...ifDefined('mode', options.mode),
       ...ifDefined('middleware', options.middleware),
     });
   };
@@ -186,10 +199,15 @@ export default function mongo<
     },
   });
 
+  const enums: UnboundEnums<TContract> = unboundNamespace(
+    Object.freeze(buildNamespacedEnums(contract.domain)),
+  );
+
   return {
     orm,
     query,
     contract,
+    enums,
 
     async connect(bindingInput?: MongoBindingInput): Promise<MongoRuntime> {
       if (closed) {

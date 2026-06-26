@@ -12,7 +12,7 @@ export async function createClient(connectionUri: string, dbName: string) {
     middleware: [createCacheMiddleware()],
   });
   const runtime = await db.runtime();
-  return { orm: db.orm, runtime, query: db.query, contract: db.contract };
+  return { orm: db.orm, runtime, query: db.query, contract: db.contract, enums: db.enums };
 }
 
 export type Db = Awaited<ReturnType<typeof createClient>>;

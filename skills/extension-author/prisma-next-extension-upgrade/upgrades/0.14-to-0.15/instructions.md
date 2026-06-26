@@ -61,6 +61,23 @@ authoring feature. The only `packages/3-extensions/` touches are the re-emitted
 contract shape) and the `supabase/test/supabase-bootstrap.ts` test helper. No
 extension-author API changed — the framework SPI is unchanged and re-emit
 absorbs the contract shape. Incidental substrate diff only.
+
+TML-2884 (Mongo enum end-to-end vertical): adds the Mongo domain-enum authoring
+surface. The `packages/3-extensions/mongo/` touches are:
+- New `mongo/src/contract/enum-type.ts` and exports in `mongo/src/exports/contract-builder.ts`
+  (`enumType`, `member`, `EnumTypeHandle`, `EnumMember`) — all net-new exports; nothing
+  existing was changed or removed.
+- `mongo/src/runtime/mongo.ts` gains a `db.enums` facade property — an additive
+  field on `MongoClient`; existing fields are unchanged.
+- `mongo/package.json` gains `@prisma-next/emitter` and `@prisma-next/mongo-emitter`
+  devDependencies for the new e2e test.
+- `packages/3-extensions/sqlite/src/runtime/sqlite.ts` replaces the inline
+  `NamespacedEnums<TContract>[UNBOUND_NAMESPACE_ID]` with the new `UnboundEnumsOf<TContract>`
+  alias — structurally identical; no change to the `SqliteClient.enums` shape.
+The `EnumTypeHandle` brand changed from a `Symbol()` to a string-key phantom (`__prismaNextEnumTypeHandle__`);
+extension authors never construct or assert against the brand directly, so the structural surface
+is unchanged. No extension-author action required — the enum surface is purely additive and
+re-emit absorbs the new contract shape. Incidental substrate diff only.
 -->
 
 <!--

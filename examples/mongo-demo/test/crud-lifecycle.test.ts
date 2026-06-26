@@ -56,6 +56,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
       name: 'Alice',
       email: 'alice@example.com',
       bio: 'Writer',
+      role: 'reader',
       address: null,
     });
 
@@ -91,9 +92,9 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
     const orm = mongoOrm({ contract, executor: runtime });
 
     const created = await orm.users.createAll([
-      { name: 'Alice', email: 'alice@example.com', bio: null, address: null },
-      { name: 'Bob', email: 'bob@example.com', bio: null, address: null },
-      { name: 'Carol', email: 'carol@example.com', bio: null, address: null },
+      { name: 'Alice', email: 'alice@example.com', bio: null, role: 'reader', address: null },
+      { name: 'Bob', email: 'bob@example.com', bio: null, role: 'reader', address: null },
+      { name: 'Carol', email: 'carol@example.com', bio: null, role: 'reader', address: null },
     ]);
 
     expect(created).toHaveLength(3);
@@ -131,8 +132,8 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
     const orm = mongoOrm({ contract, executor: runtime });
 
     const count = await orm.users.createCount([
-      { name: 'Alice', email: 'alice@example.com', bio: null, address: null },
-      { name: 'Bob', email: 'bob@example.com', bio: null, address: null },
+      { name: 'Alice', email: 'alice@example.com', bio: null, role: 'reader', address: null },
+      { name: 'Bob', email: 'bob@example.com', bio: null, role: 'reader', address: null },
     ]);
 
     expect(count).toBe(2);
@@ -145,9 +146,9 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
     const orm = mongoOrm({ contract, executor: runtime });
 
     await orm.users.createAll([
-      { name: 'Alice', email: 'alice@example.com', bio: null, address: null },
-      { name: 'Bob', email: 'bob@example.com', bio: null, address: null },
-      { name: 'Carol', email: 'carol@example.com', bio: 'existing', address: null },
+      { name: 'Alice', email: 'alice@example.com', bio: null, role: 'reader', address: null },
+      { name: 'Bob', email: 'bob@example.com', bio: null, role: 'reader', address: null },
+      { name: 'Carol', email: 'carol@example.com', bio: 'existing', role: 'reader', address: null },
     ]);
 
     const count = await orm.users
@@ -161,9 +162,9 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
     const orm = mongoOrm({ contract, executor: runtime });
 
     await orm.users.createAll([
-      { name: 'Alice', email: 'alice@example.com', bio: null, address: null },
-      { name: 'Bob', email: 'bob@example.com', bio: null, address: null },
-      { name: 'Carol', email: 'carol@example.com', bio: 'keep', address: null },
+      { name: 'Alice', email: 'alice@example.com', bio: null, role: 'reader', address: null },
+      { name: 'Bob', email: 'bob@example.com', bio: null, role: 'reader', address: null },
+      { name: 'Carol', email: 'carol@example.com', bio: 'keep', role: 'reader', address: null },
     ]);
 
     const count = await orm.users.where(MongoFieldFilter.eq('bio', null)).deleteCount();
@@ -179,7 +180,13 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
     const orm = mongoOrm({ contract, executor: runtime });
 
     const result = await orm.users.where(MongoFieldFilter.eq('email', 'new@example.com')).upsert({
-      create: { name: 'New User', email: 'new@example.com', bio: 'New bio', address: null },
+      create: {
+        name: 'New User',
+        email: 'new@example.com',
+        bio: 'New bio',
+        role: 'reader',
+        address: null,
+      },
       update: { name: 'Updated Name' },
     });
 
@@ -204,6 +211,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
       name: 'Alice',
       email: 'alice@example.com',
       bio: null,
+      role: 'reader',
       address,
     });
 
@@ -223,6 +231,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
       name: 'Bob',
       email: 'bob@example.com',
       bio: null,
+      role: 'reader',
       address: null,
     });
 
@@ -241,6 +250,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
       name: 'Carol',
       email: 'carol@example.com',
       bio: null,
+      role: 'reader',
       address: original,
     });
 
@@ -256,10 +266,22 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
   it('upsert updates when match exists', async () => {
     const orm = mongoOrm({ contract, executor: runtime });
 
-    await orm.users.create({ name: 'Alice', email: 'alice@example.com', bio: null, address: null });
+    await orm.users.create({
+      name: 'Alice',
+      email: 'alice@example.com',
+      bio: null,
+      role: 'reader',
+      address: null,
+    });
 
     const result = await orm.users.where(MongoFieldFilter.eq('email', 'alice@example.com')).upsert({
-      create: { name: 'Should Not Insert', email: 'alice@example.com', bio: null, address: null },
+      create: {
+        name: 'Should Not Insert',
+        email: 'alice@example.com',
+        bio: null,
+        role: 'reader',
+        address: null,
+      },
       update: { name: 'Alice Upserted' },
     });
 

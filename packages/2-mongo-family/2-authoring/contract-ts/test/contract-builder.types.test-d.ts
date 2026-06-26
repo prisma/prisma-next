@@ -7,6 +7,7 @@ import type {
 } from '@prisma-next/mongo-contract';
 import { expectTypeOf, test } from 'vitest';
 import { defineContract, field, index, model, valueObject } from '../src/contract-builder';
+import { enumType, member } from '../src/enum-type';
 
 const mongoFamilyPack = {
   kind: 'family',
@@ -209,4 +210,76 @@ test('Mongo option types reject unsupported authoring shapes', () => {
     },
   } satisfies MongoCollectionOptionsAuthoringInput;
   _invalidCollectionOptionValue;
+});
+
+const F11Role = enumType(
+  'F11Role',
+  { codecId: 'mongo/string@1', nativeType: 'string' },
+  member('User', 'user'),
+  member('Admin', 'admin'),
+);
+
+const F11Contract = defineContract({
+  family: mongoFamilyPack,
+  target: mongoTargetPack,
+  enums: { F11Role },
+  models: {
+    F11Account: model('F11Account', {
+      collection: 'f11_accounts',
+      fields: {
+        _id: field.objectId(),
+        scalarField: field.string(),
+        nullableField: field.string().optional(),
+        manyField: field.string().many(),
+        nullableManyField: field.string().optional().many(),
+        role: field.namedType(F11Role),
+        nullableRole: field.namedType(F11Role).optional(),
+        manyRoles: field.namedType(F11Role).many(),
+        manyNullableRoles: field.namedType(F11Role).optional().many(),
+      },
+    }),
+  },
+});
+
+type F11Row = InferModelRow<typeof F11Contract, 'F11Account'>;
+
+test('F11: scalar field resolves to codec base type', () => {
+  expectTypeOf<F11Row['scalarField']>().toEqualTypeOf<string>();
+});
+
+test('F11: nullable field resolves to Base | null', () => {
+  expectTypeOf<F11Row['nullableField']>().toEqualTypeOf<string | null>();
+});
+
+test('F11: many field resolves to Base[]', () => {
+  expectTypeOf<F11Row['manyField']>().toEqualTypeOf<string[]>();
+});
+
+test('F11: nullable+many field resolves to Base[] | null, not (Base | null)[]', () => {
+  // The precedence bug produced (string | null)[]; the fix produces string[] | null.
+  expectTypeOf<F11Row['nullableManyField']>().toEqualTypeOf<string[] | null>();
+  expectTypeOf<F11Row['nullableManyField']>().not.toEqualTypeOf<(string | null)[]>();
+});
+
+test('F11: enum field resolves to value union', () => {
+  expectTypeOf<F11Row['role']>().toEqualTypeOf<'user' | 'admin'>();
+});
+
+test('F11: nullable enum field resolves to value union | null', () => {
+  expectTypeOf<F11Row['nullableRole']>().toEqualTypeOf<'user' | 'admin' | null>();
+});
+
+test('F11: many enum field resolves to value union array', () => {
+  expectTypeOf<F11Row['manyRoles']>().toEqualTypeOf<('user' | 'admin')[]>();
+});
+
+test('F11: nullable+many enum field resolves to value union array | null', () => {
+  expectTypeOf<F11Row['manyNullableRoles']>().toEqualTypeOf<('user' | 'admin')[] | null>();
+});
+
+test('F14: namespace enum slot is typed with literal value preservation', () => {
+  type Ns = (typeof F11Contract)['domain']['namespaces']['__unbound__'];
+  type RoleEntry = NonNullable<Ns['enum']>['F11Role'];
+  type MemberValue = RoleEntry['members'][number]['value'];
+  expectTypeOf<MemberValue>().toEqualTypeOf<'user' | 'admin'>();
 });

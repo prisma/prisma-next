@@ -1,11 +1,4 @@
-import type {
-  Contract,
-  ContractField,
-  ContractModel,
-  ContractValueObject,
-  ContractValueObjectDefinitions,
-  StorageBase,
-} from '@prisma-next/contract/types';
+import type { Contract, ContractModel, StorageBase } from '@prisma-next/contract/types';
 import type { Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { MongoIndexOptionsInput } from './ir/mongo-index-options';
 
@@ -158,66 +151,13 @@ export type MongoUnboundFieldInputTypes<T> =
     ? Inner
     : never;
 
-type ExtractValueObjects<TContract extends Contract> = ContractValueObjectDefinitions<TContract>;
-
-type NormalizeContractFields<TFields> = {
-  [K in keyof TFields]: TFields[K] extends ContractField ? TFields[K] : never;
-};
-
-type ExtractValueObjectFields<
-  TValueObjects extends Record<string, ContractValueObject>,
-  VOName extends keyof TValueObjects,
-> = NormalizeContractFields<TValueObjects[VOName]['fields']>;
-
-type InferFieldBaseType<
-  TFieldType,
-  TValueObjects extends Record<string, ContractValueObject>,
-  TCodecTypes extends Record<string, { output: unknown }>,
-> = TFieldType extends { kind: 'scalar'; codecId: infer CId extends string & keyof TCodecTypes }
-  ? TCodecTypes[CId]['output']
-  : TFieldType extends { kind: 'valueObject'; name: infer VOName extends string }
-    ? VOName extends keyof TValueObjects
-      ? {
-          -readonly [K in keyof ExtractValueObjectFields<TValueObjects, VOName>]: InferFieldType<
-            ExtractValueObjectFields<TValueObjects, VOName>[K],
-            TValueObjects,
-            TCodecTypes
-          >;
-        }
-      : unknown
-    : TFieldType extends {
-          kind: 'union';
-          members: infer TMembers extends ReadonlyArray<unknown>;
-        }
-      ? TMembers[number] extends infer TMember
-        ? InferFieldBaseType<TMember, TValueObjects, TCodecTypes>
-        : unknown
-      : unknown;
-
-type InferFieldType<
-  TField,
-  TValueObjects extends Record<string, ContractValueObject>,
-  TCodecTypes extends Record<string, { output: unknown }>,
-> = TField extends ContractField
-  ? TField extends { many: true }
-    ? TField['nullable'] extends true
-      ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[] | null
-      : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[]
-    : TField['nullable'] extends true
-      ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes> | null
-      : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>
-  : never;
-
 export type InferModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
-  TFields extends Record<string, ContractField> = MongoModelsMap<TContract>[ModelName]['fields'],
-  TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
-  TValueObjects extends Record<string, ContractValueObject> = ExtractValueObjects<TContract>,
-> = {
-  -readonly [FieldName in keyof TFields]: InferFieldType<
-    TFields[FieldName],
-    TValueObjects,
-    TCodecTypes
-  >;
-};
+> = [MongoUnboundFieldOutputTypes<TContract>] extends [never]
+  ? { [K in keyof MongoModelsMap<TContract>[ModelName]['fields']]: unknown }
+  : string extends keyof MongoUnboundFieldOutputTypes<TContract>
+    ? { [K in keyof MongoModelsMap<TContract>[ModelName]['fields']]: unknown }
+    : ModelName extends keyof MongoUnboundFieldOutputTypes<TContract>
+      ? MongoUnboundFieldOutputTypes<TContract>[ModelName]
+      : { [K in keyof MongoModelsMap<TContract>[ModelName]['fields']]: unknown };
