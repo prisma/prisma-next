@@ -7,7 +7,7 @@ import type { SyntaxKind } from './syntax-kind';
  * only), a red token also carries its absolute `offset` within the source and a
  * link back to its `parent` {@link SyntaxNode}, so a cursor anchored on a token
  * can walk outward (parent, previous/next token, siblings) without re-scanning
- * from the document root. Mirrors rust-analyzer's `SyntaxToken`.
+ * from the document root.
  */
 export class SyntaxToken implements Token {
   readonly green: GreenToken;
@@ -60,12 +60,11 @@ export class SyntaxToken implements Token {
 export type SyntaxElement = SyntaxNode | SyntaxToken;
 
 /**
- * The result of {@link SyntaxNode.tokenAtOffset}. Mirrors rust-analyzer's
- * `TokenAtOffset`: an offset can fall outside every token (`none`), strictly
- * inside a single token (`single`), or exactly on the seam between two adjacent
- * tokens (`between`). `leftBiased` / `rightBiased` collapse the seam case to one
- * side; for `single` both return the same token, for `none` both return
- * `undefined`.
+ * The result of {@link SyntaxNode.tokenAtOffset}: an offset can fall outside
+ * every token (`none`), strictly inside a single token (`single`), or exactly on
+ * the seam between two adjacent tokens (`between`). `leftBiased` / `rightBiased`
+ * collapse the seam case to one side; for `single` both return the same token,
+ * for `none` both return `undefined`.
  */
 export class TokenAtOffset {
   readonly #left: SyntaxToken | undefined;
@@ -221,10 +220,10 @@ export class SyntaxNode {
   }
 
   /**
-   * The smallest element fully containing the range `[start, end]`. Mirrors
-   * rust-analyzer's `covering_element`. At a seam (and for empty ranges) the
-   * left-hand element is preferred, matching {@link containsOffset}'s zero-width
-   * rule (`textLength === 0` ⇒ contains only the empty range at `start`).
+   * The smallest element fully containing the range `[start, end]`. At a seam
+   * (and for empty ranges) the left-hand element is preferred, matching
+   * {@link containsOffset}'s zero-width rule (`textLength === 0` ⇒ contains only
+   * the empty range at `start`).
    */
   coveringElement(start: number, end: number): SyntaxElement {
     let result: SyntaxElement = this;

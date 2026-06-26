@@ -88,8 +88,8 @@ export function classifyPslCompletionContext(
     return unsupported(offset);
   }
 
-  // Anchor on the token left of the cursor (rust-analyzer's `original_token`) and
-  // navigate outward via `token.parent` rather than scanning the whole tree.
+  // Anchor on the token left of the cursor and navigate outward via
+  // `token.parent` rather than scanning the whole tree.
   const anchorNode = at.leftBiased()?.parent;
   const previousSignificantNode = tokenContext.previousSignificant?.parent;
   const contextNode = nodeForContext(anchorNode, previousSignificantNode);
@@ -97,8 +97,8 @@ export function classifyPslCompletionContext(
     return unsupported(offset);
   }
 
-  // rust-analyzer's `source_range()`: the edit replaces the identifier under the
-  // cursor, or is empty when the cursor sits in trivia.
+  // The edit replaces the identifier under the cursor, or is empty when the
+  // cursor sits in trivia.
   const replacementStartOffset = sourceRangeStart(tokenContext, offset);
 
   const declarationKeywordContext = classifyDeclarationKeyword({
@@ -547,7 +547,7 @@ function tokenContextAt(at: TokenAtOffset, offset: number): TokenContext {
   return { current, previousSignificant, touching };
 }
 
-/** The identifier token the cursor is editing, if any (rust-analyzer's name ref). */
+/** The identifier token the cursor is editing, if any. */
 function cursorIdentifier(tokenContext: TokenContext, offset: number): SyntaxToken | undefined {
   if (tokenContext.current?.kind === 'Ident') {
     return tokenContext.current;
