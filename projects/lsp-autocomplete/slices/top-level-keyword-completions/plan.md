@@ -22,6 +22,23 @@
   - `pnpm --filter @prisma-next/language-server lint`
   - If parser exports or generated parser declarations are changed: `pnpm --filter @prisma-next/psl-parser build`, then rerun the language-server gates.
 
+### Dispatch 2: review-feedback-and-classifier-navigation
+
+- **Outcome:** PR review feedback is addressed with the completion classifier refactored away from repeated whole-tree traversals and toward existing red-tree / AST navigation primitives.
+- **Builds on:** Dispatch 1's completion classifier, provider, server wiring, tests, and README updates.
+- **Hands to:** A review-cleaner autocomplete implementation where `completion-context.ts` uses existing parser navigation APIs for nearest tokens, siblings, ancestors, and source offsets; stale completion artifacts are refreshed from the current buffer; playground runtime endpoint path parsing is robust against malformed `Host` headers; and tests/validation cover the changed behavior.
+- **Focus:** Inspect the parser red/green node and AST helper APIs before editing; write or adjust tests first where behavior changes; remove unused context fields and helper indirection called out in review; avoid replying to or resolving GitHub review threads; keep completion semantics unchanged except where tests expose stale-buffer or cursor-context bugs.
+- **Completed when:**
+  - Review comments on `completion-context.ts`, `server.ts`, and `apps/lsp-playground/src/cli.ts` are either implemented or explicitly reported as not applicable in the dispatch wrap-up.
+  - `completion-context.ts` no longer does avoidable repeated whole-AST searches for current/previous context when existing node/token navigation APIs can answer the question locally.
+  - Relevant tests cover any stale-buffer completion refresh behavior and classifier behavior preserved by the refactor.
+- **Validation gates:**
+  - `pnpm --filter @prisma-next/language-server test`
+  - `pnpm --filter @prisma-next/language-server typecheck`
+  - `pnpm --filter @prisma-next/language-server lint`
+  - `pnpm --filter @prisma-next/lsp-playground typecheck`
+  - `pnpm --filter @prisma-next/lsp-playground lint`
+
 ## Dispatch-INVEST check
 
 - **Independent:** The dispatch produces a complete reviewable surface on top of the already-landed completion route and does not require a sibling slice to merge concurrently.

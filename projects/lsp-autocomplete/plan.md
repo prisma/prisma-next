@@ -29,9 +29,23 @@ This project is a three-slice stack. Slice 1 lands the completion request path, 
    - **Hands to:** The expanded first autocomplete surface now includes model field type completions, generic block entry/parameter completions, and declaration keyword completions without adding ordinary PSL attribute completions.
    - **Focus:** Declaration-position classification; document-vs-namespace native keyword sets; descriptor-backed generic block keyword suggestions; snippet support derived from LSP initialize capabilities; plain-text fallbacks for non-snippet clients; README and guardrail tests.
 
+4. **Slice `parser-red-tree-navigation`** — Linear: TML-2948 (pending)
+   - **Outcome:** The PSL parser's red tree exposes rust-analyzer-style cursor navigation: navigable tokens (parent + previous/next), `SyntaxNode.tokenAtOffset`, covering-element lookup, and trivia-skipping helpers, exported from `@prisma-next/psl-parser/syntax`.
+   - **Builds on:** The existing red/green tree (`syntax/red.ts`), AST wrappers, and `tokens()`/`children()`/`ancestors()` iteration already present.
+   - **Hands to:** A navigation API the completion classifier (and future hover/go-to-definition) can drive instead of re-scanning the whole document, removing the need for source-text whitespace/line scans.
+   - **Focus:** Make red tokens carry their parent and support previous/next traversal; add offset-query entry points (`tokenAtOffset`, covering element) and non-trivia skip helpers; mirror rust-analyzer idioms (except the fake-identifier completion marker, which we deliberately do not adopt); unit tests in `psl-parser`.
+
+5. **Slice `completion-context-simplification`** — Linear: TML-2949 (pending)
+   - **Outcome:** `completion-context.ts` classifies from a single anchor token via parent/ancestor dispatch with one unified replacement-range helper, deleting the bespoke whole-tree token plumbing (`findCursorContext`, located-element bookkeeping, `tokensBetween`, `lineStartOffsetFromTokens`, `containsOnlyWhitespaceTokens`).
+   - **Builds on:** Slice `parser-red-tree-navigation`'s token-navigation API; the existing completion classifier tests as the behavior guardrail.
+   - **Hands to:** A smaller, rust-analyzer-shaped completion classifier with identical behavior, validated by the existing language-server test suite.
+   - **Focus:** Anchor on `tokenAtOffset(offset).leftBiased()`; classify by the parent/ancestor AST type in one dispatch; derive the edit range once from the anchor token; preserve completion semantics; no fake-identifier reparsing.
+
 ### Parallel groups
 
 None. All slices touch the same language-server completion route and classifier. The generic block and declaration keyword providers are simpler and safer once the model-type slice has established provider dispatch, unsupported-context semantics, and server request wiring.
+
+Slices 4 and 5 are a stack: `completion-context-simplification` builds directly on `parser-red-tree-navigation`'s hand-off and must not start until the navigation API is landed.
 
 ## Dependencies (external)
 
