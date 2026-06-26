@@ -18,19 +18,19 @@ function rootOf(nodes: readonly DiffableNode[]): DiffableNode {
 }
 
 function makeNode(
-  localKey: string,
+  nodeId: string,
   body = '',
   childNodes: readonly DiffableNode[] = [],
 ): DiffableNode {
   return {
     id(): string {
-      return localKey;
+      return nodeId;
     },
     children(): readonly DiffableNode[] {
       return childNodes;
     },
     isEqualTo(other: DiffableNode): boolean {
-      return localKey === other.id() && body === (other as typeof this & { _body?: string })._body;
+      return nodeId === other.id() && body === (other as typeof this & { _body?: string })._body;
     },
     _body: body,
   } as DiffableNode & { _body: string };

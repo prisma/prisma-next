@@ -78,6 +78,23 @@ from either derivation — carries a resolved schema name in `namespaceId`, so
 
 Delete `resolveNamespaceId` from `postgres-schema.ts` (the degraded duplicate). Replace its two uses in `diff-postgres-schema.ts` per the slimming below.
 
+### Known limitation: unbound namespace under a non-default `search_path`
+
+The contract's **unbound** namespace resolves to `'public'` unconditionally at
+derivation (`collectContractRlsPolicies` passes no `schemaIr`, so
+`resolveDdlSchemaForNamespaceStorage` falls back to `'public'`). The introspected
+side carries the live `current_schema()`. When the database's `search_path` does
+**not** put `public` first, those disagree: expected `public/<table>` and actual
+`<other>/<table>` fail to pair, producing a spurious `missing` (the policy is
+re-`CREATE`d on every run) and an `extra` that ownership then drops. This is
+**pre-existing** — the prior flat-key code had the same mismatch (and was worse:
+it also emitted a spurious `DROP`). This change narrows it; it does not fix it.
+A real fix threads the introspected `pgSchemaName` into derivation, which the
+current call shape does not allow — out of scope here. A contract that declares
+the namespace explicitly (a **bound** namespace) is unaffected, since its
+`namespaceId` is the real schema name on both sides. Test 6 covers the
+`public` case only.
+
 ## The differ becomes total (framework)
 
 `packages/1-framework/1-core/framework-components/src/control/schema-diff.ts`.
@@ -129,7 +146,7 @@ export function diffPostgresSchema(
 Body:
 1. `const issues = diffSchemas(expected, actual);`
 2. **Whitelist** to policy-subject issues: keep only issues whose subject node is a policy — `issues.filter(i => isPostgresRlsPolicy(i.expected ?? i.actual))`. This drops the table-node and root-node missing/extra issues. (Widen this predicate when a future strategy owns another node type.)
-3. **Ownership** (drop `extra` policies in namespaces the contract doesn't own): owned namespaces = the set of resolved schema names present in `expected`'s policies. Drop an `extra` issue whose policy's `namespaceId` ∉ owned. `missing`/`mismatch` pass through. Derive `owned` from `expected` — do **not** take the contract as a parameter.
+3. **Ownership** (drop `extra` policies in namespaces the contract doesn't own): owned namespaces = the union of (a) the resolved schema names present in `expected`'s policies and (b) `expected.existingSchemas` — the resolved DDL schema names of **every** namespace the contract declares (populated by `contractToPostgresSchemaIR`). Including (b) means a declared namespace that happens to have no policies still counts as owned, so an `extra` DB policy there is reconciled (dropped from the DB), not ignored as another space's. Drop an `extra` issue whose policy's `namespaceId` ∉ owned. `missing`/`mismatch` pass through. Derive `owned` from `expected` — do **not** take the contract as a parameter.
 
 Move `filterSchemaIssuesByOwnership` **out** of the framework `schema-diff.ts`
 (it is not a diffing concern). Its logic now lives inline in `diffPostgresSchema`

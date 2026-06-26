@@ -297,6 +297,8 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       // are always equal and isEqualTo never returns false.
       if (issue.outcome === 'missing') {
         assertPostgresRlsPolicy(issue.expected);
+        // issue.expected.namespaceId is already the DDL schema name (resolved in collectContractRlsPolicies);
+        // this re-resolution is a no-op as long as PostgresSchema.ddlSchemaName() returns this.id.
         const schemaForTable = resolveDdlSchemaForNamespaceStorage(
           options.contract.storage,
           issue.expected.namespaceId,
