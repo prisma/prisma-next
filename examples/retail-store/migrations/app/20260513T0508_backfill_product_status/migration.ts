@@ -1,6 +1,6 @@
 #!/usr/bin/env -S node
 import { MigrationCLI } from '@prisma-next/cli/migration-cli';
-import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
+import { MongoContractSerializer, MongoContractView } from '@prisma-next/family-mongo/ir';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import {
   AggregateCommand,
@@ -35,8 +35,7 @@ const STORAGE_HASH = endContract.storage.storageHash;
 //
 // The validator is sourced from `end-contract.json` so the op stays in sync
 // with the contract if the chain is ever re-emitted.
-const PRODUCTS_VALIDATOR =
-  endContract.storage.namespaces.__unbound__.entries.collection.products.validator;
+const PRODUCTS_VALIDATOR = MongoContractView.from(endContract).collection.products.validator;
 
 function existingProductsWithoutStatus(): MongoQueryPlan {
   return {
