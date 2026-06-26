@@ -99,10 +99,17 @@ real `current_schema()`. When those differ, the expected `public/<table>` and
 actual `<other>/<table>` table nodes fail to pair: a spurious `missing` (the
 policy is re-`CREATE`d every run) plus an `extra` that ownership drops. This is
 **pre-existing** — the prior flat-key code had the same mismatch and was worse
-(it also emitted a spurious `DROP`); this change narrows it. A real fix threads
-the introspected `pgSchemaName` into the expected-side derivation (the only place
-the runtime schema is known), which the current call shape does not allow — out
-of scope here. Test 6 covers the resolved-`public` case.
+(it also emitted a spurious `DROP`); this change narrows it.
+
+The real fix is an **authoring requirement, not a differ change**: RLS on the
+late-binding `unbound` namespace must require the user to name the schema to bind
+to. That user-supplied name becomes the expected IR's schema; introspection
+produces the actual; the diff compares them, and a genuine mismatch surfaces as
+real drift instead of a silent re-`CREATE`. This keeps both sides independently
+derived — the expected side stays self-contained and never reaches into the live
+database, preserving the ADR's separation. The `'public'` fallback is a
+placeholder for that absent requirement. Out of scope here; do it when
+late-binding RLS becomes a real target. Test 6 covers the resolved-`public` case.
 
 ## The differ becomes total (framework)
 
