@@ -1,7 +1,7 @@
 import type { TokenKind } from '../tokenizer';
 import { type SyntaxElement, SyntaxToken } from './red';
 
-/** Direction of a sibling/token walk. Mirrors rust-analyzer's `Direction`. */
+/** Direction of a sibling/token walk. */
 export type Direction = 'next' | 'prev';
 
 const TRIVIA_KINDS: ReadonlySet<TokenKind> = new Set<TokenKind>([
@@ -22,8 +22,7 @@ export function isTrivia(token: SyntaxToken): boolean {
 
 /**
  * The first non-trivia token at or beyond `token` in `direction`. Returns
- * `token` itself when it is already significant. Mirrors rust-analyzer's
- * `algo::skip_trivia_token`.
+ * `token` itself when it is already significant.
  */
 export function skipTriviaToken(token: SyntaxToken, direction: Direction): SyntaxToken | undefined {
   let current: SyntaxToken | undefined = token;
@@ -35,8 +34,7 @@ export function skipTriviaToken(token: SyntaxToken, direction: Direction): Synta
 
 /**
  * The nearest sibling of `element` (within the same parent) in `direction` that
- * is not a trivia token. Nodes are always significant. Mirrors rust-analyzer's
- * `algo::non_trivia_sibling`.
+ * is not a trivia token. Nodes are always significant.
  */
 export function nonTriviaSibling(
   element: SyntaxElement,
@@ -54,8 +52,7 @@ export function nonTriviaSibling(
 
 /**
  * The nearest significant token strictly before `element` in document order,
- * crossing node boundaries. Mirrors rust-analyzer's
- * `algo::previous_non_trivia_token`.
+ * crossing node boundaries.
  */
 export function previousNonTriviaToken(element: SyntaxElement): SyntaxToken | undefined {
   const start = element instanceof SyntaxToken ? element : element.firstToken;
