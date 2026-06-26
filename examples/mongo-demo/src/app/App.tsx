@@ -99,6 +99,12 @@ export function App() {
               <code>$lookup</code> on <code>authorId</code>
             </li>
             <li>
+              <strong>Enums with $jsonSchema enforcement</strong> — <code>UserRole</code> (
+              <code>admin</code> / <code>author</code> / <code>reader</code>) is authored in PSL,
+              emitted into the contract, and enforced by MongoDB's <code>$jsonSchema</code>{' '}
+              validator; <code>db.enums.UserRole.values</code> exposes the value set at runtime
+            </li>
+            <li>
               <strong>Contract-first types</strong> — All types derived from the emitted{' '}
               <code>contract.d.ts</code>
             </li>
