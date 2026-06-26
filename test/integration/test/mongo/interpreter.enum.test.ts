@@ -12,10 +12,6 @@ import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
 
-// ---------------------------------------------------------------------------
-// Authoring contributions — use the production mongo family descriptors
-// ---------------------------------------------------------------------------
-
 const authoringContributions = {
   entityTypes: mongoFamilyEntityTypes,
   field: {},
@@ -89,10 +85,6 @@ function interpretOk(
   if (!result.ok) throw new Error('Expected ok result');
   return result.value;
 }
-
-// ---------------------------------------------------------------------------
-// PSL → contract round-trip
-// ---------------------------------------------------------------------------
 
 describe('PSL enum lowering', () => {
   it('lowers enum block to domain.namespaces[__unbound__].enum', () => {

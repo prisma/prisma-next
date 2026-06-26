@@ -212,19 +212,6 @@ test('Mongo option types reject unsupported authoring shapes', () => {
   _invalidCollectionOptionValue;
 });
 
-// ---------------------------------------------------------------------------
-// F11: BuilderFieldOutputType nullable+many corner (operator precedence)
-//
-// Prior to the F11 fix, the nullable+many case produced (Base | null)[]
-// (array-of-nullable) due to TS operator precedence (`extends` binds tighter
-// than `|`). The fix composes Many first, then adds nullability, producing
-// Base[] | null. This is the same corner exercised by the runtime asymmetry
-// the slice already documents — the type-level mirror was silently wrong.
-//
-// Also adds the F14 enumType registration so the namespace enum? slot test
-// verifies literal preservation through MongoDomainNamespaceFromDefinition.
-// ---------------------------------------------------------------------------
-
 const F11Role = enumType(
   'F11Role',
   { codecId: 'mongo/string@1', nativeType: 'string' },
@@ -269,10 +256,6 @@ test('F11: nullable+many field resolves to Base[] | null, not (Base | null)[]', 
   expectTypeOf<F11Row['nullableManyField']>().toEqualTypeOf<string[] | null>();
   expectTypeOf<F11Row['nullableManyField']>().not.toEqualTypeOf<(string | null)[]>();
 });
-
-// ---------------------------------------------------------------------------
-// F14: namespace enum? slot carries literal-preserving entries
-// ---------------------------------------------------------------------------
 
 test('F14: namespace enum slot is typed with literal value preservation', () => {
   type Ns = (typeof F11Contract)['domain']['namespaces']['__unbound__'];
