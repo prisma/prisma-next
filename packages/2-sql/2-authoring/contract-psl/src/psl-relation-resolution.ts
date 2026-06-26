@@ -169,6 +169,17 @@ export function fkRelationPairKey(declaringModelName: string, targetModelName: s
   return `${declaringModelName}::${targetModelName}`;
 }
 
+/** Total order on model names for the alphabetical `_<A>To<B>` synthesis. */
+function compareModelNames(left: string, right: string): -1 | 0 | 1 {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
+}
+
 export function normalizeReferentialAction(input: {
   readonly modelName: string;
   readonly fieldName: string;
@@ -727,15 +738,96 @@ function relationsForModel(
   return created;
 }
 
+/**
+ * One side of a synthesised implicit-many-to-many junction: the navigable list
+ * field, the model that declares it, and the model it points at. Two of these
+ * (or one, for a self-referential list) compose into a `SynthesizedJunction`.
+ */
+type ImplicitManyToManyEnd = {
+  readonly candidate: ModelBackrelationCandidate;
+};
+
+/**
+ * An implicit many-to-many junction the interpreter must synthesise: a
+ * model-less junction table linking two models neither of which declares a
+ * foreign key, and no authored junction model links them. The names follow
+ * Prisma's `_<A>To<B>` convention — `modelA`/`modelB` are the two terminal model
+ * names ordered alphabetically, `A`/`B` are the junction's two foreign-key
+ * columns (A references `modelA`'s id, B references `modelB`'s id). `ends`
+ * carries the one or two navigable list fields that resolve to this junction;
+ * a self-referential list contributes a single end.
+ */
+export type SynthesizedJunction = {
+  readonly junctionModelName: string;
+  readonly modelA: string;
+  readonly modelB: string;
+  readonly ends: readonly ImplicitManyToManyEnd[];
+};
+
+/** The junction column referencing each terminal model's id. */
+export const SYNTHESIZED_JUNCTION_COLUMN_A = 'A';
+export const SYNTHESIZED_JUNCTION_COLUMN_B = 'B';
+
+/** Prisma's implicit-many-to-many junction name: `_<ModelA>To<ModelB>`. */
+export function synthesizedJunctionName(modelA: string, modelB: string): string {
+  return `_${modelA}To${modelB}`;
+}
+
+/**
+ * Builds the N:M relation node for one navigable end of a synthesised junction.
+ * `selfColumn` is the junction foreign-key column referencing the declaring
+ * model (A or B); `otherColumn` references the target model. `targetColumns` is
+ * filled downstream by the contract assembler from the target model's id.
+ */
+function synthesizedManyToManyRelationNode(input: {
+  readonly candidate: ModelBackrelationCandidate;
+  readonly targetTableName: string;
+  readonly targetNamespaceId?: string;
+  readonly junctionTableName: string;
+  readonly junctionNamespaceId?: string;
+  readonly localColumns: readonly string[];
+  readonly selfColumn: string;
+  readonly otherColumn: string;
+}): ModelRelationMetadata {
+  return {
+    fieldName: input.candidate.field.name,
+    toModel: input.candidate.targetModelName,
+    toTable: input.targetTableName,
+    ...ifDefined('toNamespaceId', input.targetNamespaceId),
+    cardinality: 'N:M',
+    on: {
+      parentTable: input.candidate.tableName,
+      parentColumns: input.localColumns,
+      childTable: input.junctionTableName,
+      childColumns: [input.selfColumn],
+    },
+    through: {
+      table: input.junctionTableName,
+      ...ifDefined('namespaceId', input.junctionNamespaceId),
+      parentColumns: [input.selfColumn],
+      childColumns: [input.otherColumn],
+    },
+  };
+}
+
 export function applyBackrelationCandidates(input: {
   readonly backrelationCandidates: readonly ModelBackrelationCandidate[];
   readonly fkRelationsByPair: Map<string, readonly FkRelationMetadata[]>;
   readonly fkRelationsByDeclaringModel: ReadonlyMap<string, readonly FkRelationMetadata[]>;
   readonly modelIdColumns: ReadonlyMap<string, readonly string[]>;
+  readonly modelTableNames: ReadonlyMap<string, string>;
+  readonly modelNamespaceIds: ReadonlyMap<string, string>;
+  readonly declaredTableNames: ReadonlySet<string>;
   readonly modelRelations: Map<string, ModelRelationMetadata[]>;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
-}): void {
+}): { readonly synthesizedJunctions: readonly SynthesizedJunction[] } {
+  // Bare-list candidates that found no FK-side match, no authored junction, and
+  // no junction near-miss: implicit-many-to-many candidates resolved after the
+  // main loop, where a mirror end (or a self-referential list) turns the pair
+  // into a synthesised junction and a lone end stays orphaned.
+  const orphanedEnds: ModelBackrelationCandidate[] = [];
+
   for (const candidate of input.backrelationCandidates) {
     const pairKey = fkRelationPairKey(candidate.targetModelName, candidate.modelName);
     const pairMatches = input.fkRelationsByPair.get(pairKey) ?? [];
@@ -802,12 +894,11 @@ export function applyBackrelationCandidates(input: {
         input.diagnostics.push(junctionNearMissDiagnostic(candidate, nearMiss, input.sourceId));
         continue;
       }
-      input.diagnostics.push({
-        code: 'PSL_ORPHANED_BACKRELATION_LIST',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
-        sourceId: input.sourceId,
-        span: candidate.field.span,
-      });
+      // No FK-side match, no authored junction, no near-miss: a bare navigable
+      // list with nothing to bind to. Deferred — a mirror bare list (or a
+      // self-referential list) makes this an implicit many-to-many to
+      // synthesise; a lone end stays orphaned.
+      orphanedEnds.push(candidate);
       continue;
     }
     if (matches.length > 1) {
@@ -828,6 +919,174 @@ export function applyBackrelationCandidates(input: {
       oneToManyRelationNode(candidate, matched),
     );
   }
+
+  return resolveImplicitManyToMany({
+    orphanedEnds,
+    modelIdColumns: input.modelIdColumns,
+    modelTableNames: input.modelTableNames,
+    modelNamespaceIds: input.modelNamespaceIds,
+    declaredTableNames: input.declaredTableNames,
+    modelRelations: input.modelRelations,
+    diagnostics: input.diagnostics,
+    sourceId: input.sourceId,
+  });
+}
+
+/**
+ * Pairs up the bare navigable list fields that found nothing to bind to and
+ * turns each pair (or self-referential list) into a synthesised implicit
+ * many-to-many junction, emitting the N:M relations on both ends. A lone end
+ * with no mirror stays orphaned; a pair whose terminal lacks an `@id`, a pair
+ * with more than one implicit many-to-many between the same models, and a
+ * synthesised name that collides with a real table are each diagnosed.
+ */
+function resolveImplicitManyToMany(input: {
+  readonly orphanedEnds: readonly ModelBackrelationCandidate[];
+  readonly modelIdColumns: ReadonlyMap<string, readonly string[]>;
+  readonly modelTableNames: ReadonlyMap<string, string>;
+  readonly modelNamespaceIds: ReadonlyMap<string, string>;
+  readonly declaredTableNames: ReadonlySet<string>;
+  readonly modelRelations: Map<string, ModelRelationMetadata[]>;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+}): { readonly synthesizedJunctions: readonly SynthesizedJunction[] } {
+  // Group the ends by the unordered pair of models they link. A self-relation
+  // pairs a single end with itself; a two-sided relation pairs the two ends.
+  const endsByPair = new Map<string, ModelBackrelationCandidate[]>();
+  for (const candidate of input.orphanedEnds) {
+    const [first, second] = [candidate.modelName, candidate.targetModelName].sort(
+      compareModelNames,
+    );
+    const pairKey = `${first}::${second}`;
+    const ends = endsByPair.get(pairKey);
+    if (ends) {
+      ends.push(candidate);
+    } else {
+      endsByPair.set(pairKey, [candidate]);
+    }
+  }
+
+  const synthesizedJunctions: SynthesizedJunction[] = [];
+  for (const ends of endsByPair.values()) {
+    const first = ends[0];
+    if (!first) {
+      continue;
+    }
+    const isSelfRelation = first.modelName === first.targetModelName;
+
+    // A lone end with no mirror is genuinely orphaned: there is no second
+    // navigable side to make a many-to-many. A self-referential list is its own
+    // mirror and synthesises from a single end.
+    if (!isSelfRelation && ends.length < 2) {
+      input.diagnostics.push(orphanedBackrelationDiagnostic(first, input.sourceId));
+      continue;
+    }
+    // More than one implicit many-to-many between the same pair of models: the
+    // synthesised `_<A>To<B>` name would collide, and there is no junction model
+    // to disambiguate. A self-relation tolerates a single end (its own mirror);
+    // anything beyond the expected end count is ambiguous.
+    const expectedEndCount = isSelfRelation ? 1 : 2;
+    if (ends.length > expectedEndCount) {
+      for (const end of ends) {
+        input.diagnostics.push({
+          code: 'PSL_IMPLICIT_MN_AMBIGUOUS',
+          message: `Backrelation list field "${end.modelName}.${end.field.name}" is one of multiple implicit many-to-many relations between "${end.modelName}" and "${end.targetModelName}". Name an explicit junction model (or use through:) so each relation has a distinct junction.`,
+          sourceId: input.sourceId,
+          span: end.field.span,
+        });
+      }
+      continue;
+    }
+
+    const [modelA, modelB] = [first.modelName, first.targetModelName].sort(compareModelNames);
+    if (modelA === undefined || modelB === undefined) {
+      continue;
+    }
+    const junctionModelName = synthesizedJunctionName(modelA, modelB);
+
+    // A model named like the synthesised junction already declares a table:
+    // synthesising would clobber it. Report rather than overwrite.
+    if (input.declaredTableNames.has(junctionModelName)) {
+      input.diagnostics.push({
+        code: 'PSL_IMPLICIT_MN_NAME_COLLISION',
+        message: `Implicit many-to-many between "${modelA}" and "${modelB}" would synthesise a junction table "${junctionModelName}", but a table with that name already exists. Rename the conflicting model or declare an explicit junction model.`,
+        sourceId: input.sourceId,
+        span: first.field.span,
+      });
+      continue;
+    }
+
+    // Both terminal models must expose a single-column `@id` to reference: each
+    // synthesised foreign key (A, B) is a single column pointing at it. A
+    // composite or absent id has no single column to reference here (sibling
+    // slice 7 territory), so it is diagnosed rather than synthesised.
+    const idA = input.modelIdColumns.get(modelA);
+    const idB = input.modelIdColumns.get(modelB);
+    const offendingIdModel =
+      idA === undefined || idA.length !== 1
+        ? modelA
+        : idB === undefined || idB.length !== 1
+          ? modelB
+          : undefined;
+    if (offendingIdModel !== undefined || idA === undefined || idB === undefined) {
+      const offending = offendingIdModel ?? modelA;
+      input.diagnostics.push({
+        code: 'PSL_IMPLICIT_MN_TARGET_NO_ID',
+        message: `Implicit many-to-many between "${modelA}" and "${modelB}" cannot synthesise a junction: model "${offending}" must declare a single-column @id to reference. Add a single-column @id to "${offending}", or model the junction explicitly.`,
+        sourceId: input.sourceId,
+        span: first.field.span,
+      });
+      continue;
+    }
+
+    const synthesizedEnds: ImplicitManyToManyEnd[] = [];
+    for (const end of ends) {
+      const localColumns = input.modelIdColumns.get(end.modelName);
+      assertDefined(localColumns, 'implicit many-to-many end must reference an @id-bearing model');
+      // The junction foreign-key column referencing the declaring model: A when
+      // the declaring model is the alphabetically-first, B otherwise.
+      const selfColumn =
+        end.modelName === modelA ? SYNTHESIZED_JUNCTION_COLUMN_A : SYNTHESIZED_JUNCTION_COLUMN_B;
+      const otherColumn =
+        selfColumn === SYNTHESIZED_JUNCTION_COLUMN_A
+          ? SYNTHESIZED_JUNCTION_COLUMN_B
+          : SYNTHESIZED_JUNCTION_COLUMN_A;
+      relationsForModel(input.modelRelations, end.modelName).push(
+        synthesizedManyToManyRelationNode({
+          candidate: end,
+          targetTableName: input.modelTableNames.get(end.targetModelName) ?? end.targetModelName,
+          ...ifDefined('targetNamespaceId', input.modelNamespaceIds.get(end.targetModelName)),
+          junctionTableName: junctionModelName,
+          ...ifDefined('junctionNamespaceId', input.modelNamespaceIds.get(modelA)),
+          localColumns,
+          selfColumn,
+          otherColumn,
+        }),
+      );
+      synthesizedEnds.push({ candidate: end });
+    }
+
+    synthesizedJunctions.push({
+      junctionModelName,
+      modelA,
+      modelB,
+      ends: synthesizedEnds,
+    });
+  }
+
+  return { synthesizedJunctions };
+}
+
+function orphanedBackrelationDiagnostic(
+  candidate: ModelBackrelationCandidate,
+  sourceId: string,
+): ContractSourceDiagnostic {
+  return {
+    code: 'PSL_ORPHANED_BACKRELATION_LIST',
+    message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
+    sourceId,
+    span: candidate.field.span,
+  };
 }
 
 export function validateNavigationListFieldAttributes(input: {
