@@ -1,0 +1,39 @@
+// Real emitted fixture for the self-referential M:N integration parity test.
+//
+// `User.following` / `User.followers` are a self-referential many-to-many
+// relation through the `Follow` junction. The junction holds two N:1 FKs back
+// to `User` (`follower` / `followee`), so a bare `through: Follow` cannot tell
+// which leg is the parent of `following` vs `followers` — it is ambiguous. Each
+// end disambiguates by pointing at the junction relation field that is its
+// parent leg with `@relation(through: Follow.follower)` /
+// `@relation(through: Follow.followee)`.
+//
+// The interpreter lowers each end to a navigable `cardinality: 'N:M'` relation
+// with a populated `through` descriptor whose `parentColumns` / `childColumns`
+// are pinned by the named leg (`following` → parent `follower_id`, child
+// `followee_id`; `followers` mirrored). This is the contract whose runtime
+// drive-ability the self-referential M:N include exercises.
+//
+// Column / table names are pinned with `@map` / `@@map` so the integration
+// test's `create table` DDL is a clean snake_case schema.
+
+model User {
+  id   Int    @id
+  name String
+
+  following User[] @relation(through: Follow.follower)
+  followers User[] @relation(through: Follow.followee)
+
+  @@map("users")
+}
+
+model Follow {
+  followerId Int @map("follower_id")
+  followeeId Int @map("followee_id")
+
+  follower User @relation(from: followerId)
+  followee User @relation(from: followeeId)
+
+  @@id([followerId, followeeId])
+  @@map("follows")
+}

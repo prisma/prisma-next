@@ -313,6 +313,7 @@ export type ExpressionAst =
   | NumberLiteralExprAst
   | BooleanLiteralExprAst
   | ObjectLiteralExprAst
+  | QualifiedNameAst
   | IdentifierAst;
 
 export function castExpression(node: SyntaxNode): ExpressionAst | undefined {
@@ -323,6 +324,7 @@ export function castExpression(node: SyntaxNode): ExpressionAst | undefined {
     NumberLiteralExprAst.cast(node) ??
     BooleanLiteralExprAst.cast(node) ??
     ObjectLiteralExprAst.cast(node) ??
+    QualifiedNameAst.cast(node) ??
     IdentifierAst.cast(node)
   );
 }

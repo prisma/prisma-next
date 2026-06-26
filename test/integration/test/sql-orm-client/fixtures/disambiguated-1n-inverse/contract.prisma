@@ -1,0 +1,39 @@
+// Real emitted fixture for the disambiguated 1:N integration parity test.
+//
+// `User` and `Post` carry TWO relations between the same pair of models:
+// `Post.author` and `Post.editor` are both N:1 foreign keys to `User`. The two
+// `User` back-relations (`authoredPosts` / `editedPosts`) would be ambiguous on
+// their own (which FK does each list field pair with?), so each pins its owning
+// FK by pointing at the relation field with `@relation(inverse: <fkField>)` —
+// the directional replacement for the legacy `@relation(name:)` disambiguator.
+//
+// The interpreter lowers each back-relation to `cardinality: '1:N'` with the
+// correct `on` block (`authoredPosts` → `author_id`, `editedPosts` → `editor_id`),
+// so the ORM `include` over each back-relation returns the rows joined through
+// the FK the `inverse:` pointer named.
+//
+// Column / table names are pinned with `@map` / `@@map` so the integration
+// test's `create table` DDL is a clean snake_case schema.
+
+model User {
+  id    Int    @id
+  name  String
+  email String @unique
+
+  authoredPosts Post[] @relation(inverse: author)
+  editedPosts   Post[] @relation(inverse: editor)
+
+  @@map("users")
+}
+
+model Post {
+  id       Int    @id
+  title    String
+  authorId Int    @map("author_id")
+  editorId Int    @map("editor_id")
+
+  author User @relation(from: authorId)
+  editor User @relation(from: editorId)
+
+  @@map("posts")
+}
