@@ -1,9 +1,8 @@
-import type { EntityCoordinate } from '../ir/storage';
-
 export type SchemaDiffOutcome = 'missing' | 'extra' | 'mismatch';
 
 export interface SchemaDiffIssue {
-  readonly coordinate: EntityCoordinate;
+  /** Path from the root node down to the diffed node, as a sequence of local keys. */
+  readonly path: readonly string[];
   readonly outcome: SchemaDiffOutcome;
   readonly message: string;
   /** The expected (contract-side) node, when available. Absent for `extra` outcomes. */
@@ -16,33 +15,29 @@ export interface SchemaDiffIssue {
  * A node in the schema tree. Every node in the tree — including the database root —
  * implements this interface.
  *
- * `coord()` must be unique among sibling nodes aligned at the same level — the
- * differ keys on it and treats a collision as the same entity (now enforced by a
- * duplicate-key throw). A node kind whose natural key is not globally unique — for
- * example, a column that is only unique within its table — must fold its parent's
- * identity into the coordinate.
+ * `localKey()` must be unique among sibling nodes at the same level — the
+ * differ keys on it and treats a collision as the same entity (enforced by a
+ * duplicate-key throw). The differ accumulates these keys into a path that
+ * stamps every emitted issue. A node that is only unique within its parent
+ * (e.g. a policy unique only within its table) must fold its parent identity
+ * into its local key.
  */
 export interface DiffableNode {
-  coord(): EntityCoordinate;
+  localKey(): string;
   isEqualTo(other: DiffableNode): boolean;
   children(): readonly DiffableNode[];
 }
 
-/** Canonical string key for a coordinate — the differ keys its alignment maps on this. */
-function stableKey(c: EntityCoordinate): string {
-  return `${c.plane}|${c.namespaceId}|${c.entityKind}|${c.entityName}`;
-}
-
 function insertNode(map: Map<string, DiffableNode>, node: DiffableNode): void {
-  const key = stableKey(node.coord());
+  const key = node.localKey();
   if (map.has(key)) {
-    throw new Error(`diffSchemas: duplicate coordinate key among siblings: ${key}`);
+    throw new Error(`diffSchemas: duplicate local key among siblings: ${key}`);
   }
   map.set(key, node);
 }
 
-function outcomeMessage(outcome: SchemaDiffOutcome, c: EntityCoordinate): string {
-  return `${outcome}: ${c.entityKind} '${c.entityName}' in namespace '${c.namespaceId}'`;
+function outcomeMessage(outcome: SchemaDiffOutcome, path: readonly string[]): string {
+  return `${outcome}: ${path.join('/')}`;
 }
 
 /**
@@ -53,13 +48,20 @@ function outcomeMessage(outcome: SchemaDiffOutcome, c: EntityCoordinate): string
  * `extra` issues in unowned namespaces belong to another contract space and
  * should be left alone. `missing` and `mismatch` outcomes pass through unchanged
  * regardless of ownership.
+ *
+ * Because `SchemaDiffIssue` no longer carries a coordinate, ownership must be
+ * determined from the node itself. Pass `getNamespaceId` to extract the
+ * namespace from the node on an `extra` issue.
  */
 export function filterSchemaIssuesByOwnership(
   issues: readonly SchemaDiffIssue[],
   isOwned: (namespaceId: string) => boolean,
+  getNamespaceId: (node: DiffableNode) => string,
 ): readonly SchemaDiffIssue[] {
   return issues.filter(
-    (issue) => issue.outcome !== 'extra' || isOwned(issue.coordinate.namespaceId),
+    (issue) =>
+      issue.outcome !== 'extra' ||
+      (issue.actual !== undefined && isOwned(getNamespaceId(issue.actual))),
   );
 }
 
@@ -74,34 +76,39 @@ export function diffSchemas(
   expected: DiffableNode,
   actual: DiffableNode,
 ): readonly SchemaDiffIssue[] {
-  return diffPair(expected, actual);
+  return diffPair(expected, actual, []);
 }
 
-function diffPair(expected: DiffableNode, actual: DiffableNode): readonly SchemaDiffIssue[] {
+function diffPair(
+  expected: DiffableNode,
+  actual: DiffableNode,
+  parentPath: readonly string[],
+): readonly SchemaDiffIssue[] {
+  const path = [...parentPath, expected.localKey()];
   const issues: SchemaDiffIssue[] = [];
   if (!expected.isEqualTo(actual)) {
-    const coordinate = expected.coord();
     issues.push({
-      coordinate,
+      path,
       outcome: 'mismatch',
-      message: outcomeMessage('mismatch', coordinate),
+      message: outcomeMessage('mismatch', path),
       expected,
       actual,
     });
   }
-  issues.push(...diffChildren(expected.children(), actual.children()));
+  issues.push(...diffChildren(expected.children(), actual.children(), path));
   return issues;
 }
 
 /**
- * Align one level of nodes by coordinate; emit missing/extra/mismatch issues in
+ * Align one level of nodes by local key; emit missing/extra/mismatch issues in
  * input order, and recurse into each matched pair. A `missing` or `extra` node
- * emits a single issue at its coordinate and is not descended (the whole subtree
+ * emits a single issue at its path and is not descended (the whole subtree
  * is missing/extra).
  */
 function diffChildren(
   expected: readonly DiffableNode[],
   actual: readonly DiffableNode[],
+  parentPath: readonly string[],
 ): readonly SchemaDiffIssue[] {
   const expectedMap = new Map<string, DiffableNode>();
   for (const node of expected) {
@@ -117,26 +124,26 @@ function diffChildren(
 
   for (const [key, expectedNode] of expectedMap) {
     const actualNode = actualMap.get(key);
-    const coordinate = expectedNode.coord();
+    const path = [...parentPath, key];
     if (actualNode === undefined) {
       issues.push({
-        coordinate,
+        path,
         outcome: 'missing',
-        message: outcomeMessage('missing', coordinate),
+        message: outcomeMessage('missing', path),
         expected: expectedNode,
       });
     } else {
-      issues.push(...diffPair(expectedNode, actualNode));
+      issues.push(...diffPair(expectedNode, actualNode, parentPath));
     }
   }
 
   for (const [key, actualNode] of actualMap) {
     if (!expectedMap.has(key)) {
-      const coordinate = actualNode.coord();
+      const path = [...parentPath, key];
       issues.push({
-        coordinate,
+        path,
         outcome: 'extra',
-        message: outcomeMessage('extra', coordinate),
+        message: outcomeMessage('extra', path),
         actual: actualNode,
       });
     }

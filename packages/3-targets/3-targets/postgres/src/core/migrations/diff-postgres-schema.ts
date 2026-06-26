@@ -6,6 +6,7 @@ import {
 } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { isPostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresContract } from '../postgres-schema';
 import { resolveNamespaceId } from '../postgres-schema';
 import { PostgresSchemaIR, type PostgresSchemaIRInput } from '../postgres-schema-ir';
@@ -18,7 +19,7 @@ import { contractToPostgresSchemaIR } from './contract-to-postgres-schema-ir';
  * The actual `schema` may arrive as a plain spread object (from
  * `projectSchemaToSpace`) rather than a class instance: prototype methods like
  * `children()` would be missing. Reconstruct it as a real `PostgresSchemaIR` so
- * the diff can call `children()`, `coord()`, and `isEqualTo()` safely.
+ * the diff can call `children()`, `localKey()`, and `isEqualTo()` safely.
  */
 export function diffPostgresSchema(input: {
   readonly contract: Contract<SqlStorage>;
@@ -43,7 +44,9 @@ export function diffPostgresSchema(input: {
   const issues = diffSchemas(expected, actual);
 
   const owned = new Set(Object.keys(contract.storage.namespaces).map(resolveNamespaceId));
-  return filterSchemaIssuesByOwnership(issues, (namespaceId) =>
-    owned.has(resolveNamespaceId(namespaceId)),
+  return filterSchemaIssuesByOwnership(
+    issues,
+    (namespaceId) => owned.has(resolveNamespaceId(namespaceId)),
+    (node) => (isPostgresRlsPolicy(node) ? node.namespaceId : ''),
   );
 }

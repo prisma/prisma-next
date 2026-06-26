@@ -98,10 +98,8 @@ describe('diffPostgresSchema', () => {
     const issues = diffPostgresSchema({ contract, schema });
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({
-      outcome: 'missing',
-      coordinate: expect.objectContaining({ entityName: 'read_own_profiles_a1b2c3d4' }),
-    });
+    expect(issues[0]).toMatchObject({ outcome: 'missing' });
+    expect(issues[0]?.expected).toMatchObject({ name: 'read_own_profiles_a1b2c3d4' });
   });
 
   it('emits extra outcome when a DB policy is absent from the contract', () => {
@@ -112,10 +110,8 @@ describe('diffPostgresSchema', () => {
     const issues = diffPostgresSchema({ contract, schema });
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({
-      outcome: 'extra',
-      coordinate: expect.objectContaining({ entityName: 'read_own_profiles_deadbeef' }),
-    });
+    expect(issues[0]).toMatchObject({ outcome: 'extra' });
+    expect(issues[0]?.actual).toMatchObject({ name: 'read_own_profiles_deadbeef' });
   });
 
   it('emits no issues when contract and DB policy sets match exactly', () => {
@@ -153,7 +149,7 @@ describe('diffPostgresSchema', () => {
     expect(outcomes).toContain('extra');
   });
 
-  it('carries namespaceId on both missing and extra issues via coordinate', () => {
+  it('carries namespaceId on both missing and extra issues via the node', () => {
     const contractPolicy = makePolicy('rp_a1b2c3d4');
     const actualPolicy = makePolicy('rp_deadbeef');
     const contract = makeContract([contractPolicy]);
@@ -162,7 +158,8 @@ describe('diffPostgresSchema', () => {
     const issues = diffPostgresSchema({ contract, schema });
 
     for (const issue of issues) {
-      expect(issue.coordinate.namespaceId).toBe(SCHEMA_NAME);
+      const node = issue.expected ?? issue.actual;
+      expect(node).toMatchObject({ namespaceId: SCHEMA_NAME });
     }
   });
 
@@ -311,9 +308,99 @@ describe('diffPostgresSchema', () => {
     const issues = diffPostgresSchema({ contract: contractOwningAuth, schema });
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({
-      outcome: 'extra',
-      coordinate: expect.objectContaining({ entityName: 'auth_extra_99887766' }),
+    expect(issues[0]).toMatchObject({ outcome: 'extra' });
+    expect(issues[0]?.actual).toMatchObject({ name: 'auth_extra_99887766' });
+  });
+
+  it('regression: same prefix+body on two different tables does not throw (distinct paths)', () => {
+    // The bug: coord() = {namespace, 'policy', wireName} omits the table,
+    // so two tables with identical policy names (same prefix + same body hash)
+    // produced a duplicate-key throw. localKey() = namespace/table/name is unique.
+    const WIRE_NAME = 'read_own_a1b2c3d4';
+    const policyOnProfiles = makePolicy(WIRE_NAME, 'profiles');
+    const policyOnOrders = makePolicy(WIRE_NAME, 'orders');
+
+    const bothTableSchema = new PostgresSchema({
+      id: SCHEMA_NAME,
+      entries: {
+        table: {
+          profiles: new StorageTable({
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+          }),
+          orders: new StorageTable({
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+          }),
+        },
+        policy: {
+          [`profiles/${WIRE_NAME}`]: policyOnProfiles,
+          [`orders/${WIRE_NAME}`]: policyOnOrders,
+        },
+      },
     });
+
+    const contract: Contract<SqlStorage> = {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:rls-two-tables-test'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:rls-two-tables-test'),
+        namespaces: { [SCHEMA_NAME]: bothTableSchema },
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+
+    const schema = new PostgresSchemaIR({
+      tables: {
+        profiles: {
+          name: 'profiles',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+            user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+          },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+        orders: {
+          name: 'orders',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+            user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+          },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      pgSchemaName: SCHEMA_NAME,
+      pgVersion: 'unknown',
+      rlsPolicies: [policyOnProfiles, policyOnOrders],
+      roles: [],
+      existingSchemas: [SCHEMA_NAME],
+      nativeEnumTypeNames: [],
+    });
+
+    // Must not throw; both policies are present so no issues.
+    expect(() => diffPostgresSchema({ contract, schema })).not.toThrow();
+    const issues = diffPostgresSchema({ contract, schema });
+    expect(issues).toHaveLength(0);
   });
 });

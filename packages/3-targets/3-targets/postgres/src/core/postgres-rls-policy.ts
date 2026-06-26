@@ -1,5 +1,4 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
-import type { EntityCoordinate } from '@prisma-next/framework-components/ir';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
 
@@ -60,13 +59,14 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
     freezeNode(this);
   }
 
-  coord(): EntityCoordinate {
-    return {
-      plane: 'storage',
-      namespaceId: this.namespaceId,
-      entityKind: 'policy',
-      entityName: this.name,
-    };
+  /**
+   * Local key for the differ. Includes namespace + table so the key is unique
+   * among all policies across all tables in a database root's children list.
+   * Policy wire names are only unique per-table, so the table is part of the
+   * path identity.
+   */
+  localKey(): string {
+    return `${this.namespaceId}/${this.tableName}/${this.name}`;
   }
 
   children(): readonly DiffableNode[] {
@@ -84,7 +84,7 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
   isEqualTo(other: DiffableNode): boolean {
     if (!isPostgresRlsPolicy(other)) {
       throw new Error(
-        `PostgresRlsPolicy.isEqualTo: expected a PostgresRlsPolicy, got ${other.coord().entityKind}`,
+        `PostgresRlsPolicy.isEqualTo: expected a PostgresRlsPolicy, got ${other.constructor?.name ?? typeof other}`,
       );
     }
     return this.name === other.name;

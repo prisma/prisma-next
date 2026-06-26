@@ -1,5 +1,4 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
-import type { EntityCoordinate } from '@prisma-next/framework-components/ir';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
 
@@ -33,13 +32,9 @@ export class PostgresRole extends SqlNode implements DiffableNode {
     freezeNode(this);
   }
 
-  coord(): EntityCoordinate {
-    return {
-      plane: 'storage',
-      namespaceId: this.namespaceId,
-      entityKind: 'role',
-      entityName: this.name,
-    };
+  /** Roles are cluster-unique; the name alone is sufficient as a local key. */
+  localKey(): string {
+    return this.name;
   }
 
   children(): readonly DiffableNode[] {
@@ -49,7 +44,7 @@ export class PostgresRole extends SqlNode implements DiffableNode {
   isEqualTo(other: DiffableNode): boolean {
     if (!(other instanceof PostgresRole)) {
       throw new Error(
-        `PostgresRole.isEqualTo: expected a PostgresRole, got ${other.coord().entityKind}`,
+        `PostgresRole.isEqualTo: expected a PostgresRole, got ${other.constructor?.name ?? typeof other}`,
       );
     }
     return this.name === other.name;

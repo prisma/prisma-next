@@ -124,7 +124,7 @@ describe('collectSchemaDiffIssues — RLS drift detection', () => {
 
     expect(issues).toHaveLength(1);
     expect(issues[0]?.outcome).toBe('extra');
-    expect(issues[0]?.coordinate.entityName).toBe(WIRE_NAME);
+    expect(issues[0]?.actual).toMatchObject({ name: WIRE_NAME });
   });
 
   it('no contract policy + external DB policy → one extra diff issue', () => {
@@ -135,7 +135,7 @@ describe('collectSchemaDiffIssues — RLS drift detection', () => {
 
     expect(issues).toHaveLength(1);
     expect(issues[0]?.outcome).toBe('extra');
-    expect(issues[0]?.coordinate.entityName).toBe('legacy_admin_policy');
+    expect(issues[0]?.actual).toMatchObject({ name: 'legacy_admin_policy' });
   });
 
   it('matching contract + DB policy → no issues', () => {

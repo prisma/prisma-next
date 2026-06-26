@@ -1,5 +1,4 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
-import type { EntityCoordinate } from '@prisma-next/framework-components/ir';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import {
   type SqlAnnotations,
@@ -87,13 +86,9 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
     freezeNode(this);
   }
 
-  coord(): EntityCoordinate {
-    return {
-      plane: 'storage',
-      namespaceId: '',
-      entityKind: 'database',
-      entityName: this.pgSchemaName,
-    };
+  /** Stable local key for the differ. The schema name identifies this database root. */
+  localKey(): string {
+    return this.pgSchemaName;
   }
 
   // No database-level attributes to compare yet; two database roots from the

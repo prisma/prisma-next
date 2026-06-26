@@ -286,18 +286,16 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const seenEnableTables = new Set<string>();
 
     for (const issue of diffIssues) {
-      const { namespaceId, entityName: policyName } = issue.coordinate;
-      const schemaForTable = resolveDdlSchemaForNamespaceStorage(
-        options.contract.storage,
-        namespaceId,
-        options.schema,
-      );
-
       // 'mismatch' is unreachable for content-addressed policies: the wire name
-      // encodes the body hash, so two policies sharing a coordinate (same name)
+      // encodes the body hash, so two policies sharing a local key (same name)
       // are always equal and isEqualTo never returns false.
       if (issue.outcome === 'missing') {
         assertPostgresRlsPolicy(issue.expected);
+        const schemaForTable = resolveDdlSchemaForNamespaceStorage(
+          options.contract.storage,
+          issue.expected.namespaceId,
+          options.schema,
+        );
         const tableKey = `${schemaForTable}.${issue.expected.tableName}`;
         if (!seenEnableTables.has(tableKey)) {
           seenEnableTables.add(tableKey);
@@ -308,8 +306,13 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         );
       } else if (issue.outcome === 'extra' && allowsDestructive) {
         assertPostgresRlsPolicy(issue.actual);
+        const schemaForTable = resolveDdlSchemaForNamespaceStorage(
+          options.contract.storage,
+          issue.actual.namespaceId,
+          options.schema,
+        );
         calls.push(
-          new DropPostgresRlsPolicyCall(schemaForTable, issue.actual.tableName, policyName),
+          new DropPostgresRlsPolicyCall(schemaForTable, issue.actual.tableName, issue.actual.name),
         );
       }
     }
