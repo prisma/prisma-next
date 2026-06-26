@@ -71,7 +71,7 @@ const pkeyChecks = () =>
 describe('AddPrimaryKeyCall', () => {
   it('lowers typed constraint checks into parameterized pre/postcheck steps', async () => {
     const { lowerer, received } = recordingCheckLowerer();
-    const call = new AddPrimaryKeyCall('public', 'user', 'user_pkey', ['id']);
+    const call = new AddPrimaryKeyCall(publicNs.tableRef('user'), 'user_pkey', ['id']);
     const op = await call.toOp(lowerer);
 
     expect(received).toEqual([pkeyChecks().constraintAbsent(), pkeyChecks().constraintPresent()]);
@@ -91,12 +91,12 @@ describe('AddPrimaryKeyCall', () => {
   });
 
   it('toOp() throws when no lowerer is provided', async () => {
-    const call = new AddPrimaryKeyCall('public', 'user', 'user_pkey', ['id']);
+    const call = new AddPrimaryKeyCall(publicNs.tableRef('user'), 'user_pkey', ['id']);
     await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
   });
 
   it('renderTypeScript() emits this.addPrimaryKey with no facade import', () => {
-    const call = new AddPrimaryKeyCall('public', 'user', 'user_pkey', ['id']);
+    const call = new AddPrimaryKeyCall(publicNs.tableRef('user'), 'user_pkey', ['id']);
     expect(call.renderTypeScript()).toBe(
       'this.addPrimaryKey({ schema: "public", table: "user", constraint: "user_pkey", columns: ["id"] })',
     );
@@ -104,7 +104,8 @@ describe('AddPrimaryKeyCall', () => {
   });
 
   it('renderTypeScript() omits schema for the unbound namespace', () => {
-    const call = new AddPrimaryKeyCall('__unbound__', 'user', 'user_pkey', ['id']);
+    const unboundNs = postgresCreateNamespace({ id: '__unbound__', entries: { table: {} } });
+    const call = new AddPrimaryKeyCall(unboundNs.tableRef('user'), 'user_pkey', ['id']);
     expect(call.renderTypeScript()).toBe(
       'this.addPrimaryKey({ table: "user", constraint: "user_pkey", columns: ["id"] })',
     );
@@ -114,7 +115,7 @@ describe('AddPrimaryKeyCall', () => {
 describe('AddUniqueCall', () => {
   it('lowers typed checks and renders this.addUnique', async () => {
     const { lowerer, received } = recordingCheckLowerer();
-    const call = new AddUniqueCall('public', 'user', 'user_email_key', ['email']);
+    const call = new AddUniqueCall(publicNs.tableRef('user'), 'user_email_key', ['email']);
     const op = await call.toOp(lowerer);
     const checks = () =>
       constraintExistsAst({ constraintName: 'user_email_key', schema: 'public', table: 'user' });
@@ -136,7 +137,8 @@ describe('AddForeignKeyCall', () => {
       columns: ['author_id'],
       references: { schema: 'public', table: 'user', columns: ['id'] },
     };
-    const call = new AddForeignKeyCall('public', 'post', fk);
+    const postNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
+    const call = new AddForeignKeyCall(postNs.tableRef('post'), fk);
     const op = await call.toOp(lowerer);
     const checks = () =>
       constraintExistsAst({ constraintName: 'post_author_fk', schema: 'public', table: 'post' });
@@ -152,10 +154,13 @@ describe('AddForeignKeyCall', () => {
 describe('AddCheckConstraintCall', () => {
   it('lowers typed checks and renders this.addCheckConstraint', async () => {
     const { lowerer, received } = recordingCheckLowerer();
-    const call = new AddCheckConstraintCall('public', 'post', 'post_priority_check', 'priority', [
-      'low',
-      'high',
-    ]);
+    const postNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
+    const call = new AddCheckConstraintCall(
+      postNs.tableRef('post'),
+      'post_priority_check',
+      'priority',
+      ['low', 'high'],
+    );
     const op = await call.toOp(lowerer);
     const checks = () =>
       constraintExistsAst({
@@ -176,7 +181,8 @@ describe('AddCheckConstraintCall', () => {
 describe('DropCheckConstraintCall', () => {
   it('lowers typed checks (present precheck, absent postcheck)', async () => {
     const { lowerer, received } = recordingCheckLowerer();
-    const call = new DropCheckConstraintCall('public', 'post', 'post_priority_check');
+    const postNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
+    const call = new DropCheckConstraintCall(postNs.tableRef('post'), 'post_priority_check');
     const op = await call.toOp(lowerer);
     const checks = () =>
       constraintExistsAst({
@@ -197,7 +203,7 @@ describe('DropCheckConstraintCall', () => {
 describe('DropConstraintCall', () => {
   it('lowers typed checks (present precheck, absent postcheck)', async () => {
     const { lowerer, received } = recordingCheckLowerer();
-    const call = new DropConstraintCall('public', 'user', 'user_email_key');
+    const call = new DropConstraintCall(publicNs.tableRef('user'), 'user_email_key');
     const op = await call.toOp(lowerer);
     const checks = () =>
       constraintExistsAst({ constraintName: 'user_email_key', schema: 'public', table: 'user' });
@@ -208,11 +214,17 @@ describe('DropConstraintCall', () => {
   });
 
   it('renders this.dropConstraint and includes kind only when non-default', () => {
-    expect(new DropConstraintCall('public', 'user', 'user_email_key').renderTypeScript()).toBe(
+    expect(
+      new DropConstraintCall(publicNs.tableRef('user'), 'user_email_key').renderTypeScript(),
+    ).toBe(
       'this.dropConstraint({ schema: "public", table: "user", constraint: "user_email_key" })',
     );
     expect(
-      new DropConstraintCall('public', 'user', 'user_org_fk', 'foreignKey').renderTypeScript(),
+      new DropConstraintCall(
+        publicNs.tableRef('user'),
+        'user_org_fk',
+        'foreignKey',
+      ).renderTypeScript(),
     ).toBe(
       'this.dropConstraint({ schema: "public", table: "user", constraint: "user_org_fk", kind: "foreignKey" })',
     );

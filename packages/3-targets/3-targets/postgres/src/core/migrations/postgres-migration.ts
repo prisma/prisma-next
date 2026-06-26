@@ -159,7 +159,7 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected addPrimaryKey(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly constraint: string;
     readonly columns: readonly string[];
@@ -167,16 +167,19 @@ export abstract class PostgresMigration extends SqlMigration<
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
     return new AddPrimaryKeyCall(
-      options.schema,
-      options.table,
+      ns.tableRef(options.table),
       options.constraint,
       options.columns,
     ).toOp(this.controlAdapter);
   }
 
   protected addUnique(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly constraint: string;
     readonly columns: readonly string[];
@@ -184,29 +187,34 @@ export abstract class PostgresMigration extends SqlMigration<
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new AddUniqueCall(
-      options.schema,
-      options.table,
-      options.constraint,
-      options.columns,
-    ).toOp(this.controlAdapter);
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
+    return new AddUniqueCall(ns.tableRef(options.table), options.constraint, options.columns).toOp(
+      this.controlAdapter,
+    );
   }
 
   protected addForeignKey(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly foreignKey: ForeignKeySpec;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new AddForeignKeyCall(options.schema, options.table, options.foreignKey).toOp(
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
+    return new AddForeignKeyCall(ns.tableRef(options.table), options.foreignKey).toOp(
       this.controlAdapter,
     );
   }
 
   protected addCheckConstraint(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly constraint: string;
     readonly column: string;
@@ -215,9 +223,12 @@ export abstract class PostgresMigration extends SqlMigration<
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
     return new AddCheckConstraintCall(
-      options.schema,
-      options.table,
+      ns.tableRef(options.table),
       options.constraint,
       options.column,
       options.values,
@@ -225,20 +236,24 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected dropCheckConstraint(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly constraint: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new DropCheckConstraintCall(options.schema, options.table, options.constraint).toOp(
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
+    return new DropCheckConstraintCall(ns.tableRef(options.table), options.constraint).toOp(
       this.controlAdapter,
     );
   }
 
   protected dropConstraint(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly constraint: string;
     readonly kind?: 'foreignKey' | 'unique' | 'primaryKey';
@@ -246,39 +261,48 @@ export abstract class PostgresMigration extends SqlMigration<
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
     return new DropConstraintCall(
-      options.schema,
-      options.table,
+      ns.tableRef(options.table),
       options.constraint,
       options.kind ?? 'unique',
     ).toOp(this.controlAdapter);
   }
 
   protected dropTable(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new DropTableCall(options.schema, options.table).toOp(this.controlAdapter);
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
+    return new DropTableCall(ns.tableRef(options.table)).toOp(this.controlAdapter);
   }
 
   protected dropColumn(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly column: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new DropColumnCall(options.schema, options.table, options.column).toOp(
-      this.controlAdapter,
-    );
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
+    return new DropColumnCall(ns.tableRef(options.table), options.column).toOp(this.controlAdapter);
   }
 
   protected alterColumnType(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly column: string;
     readonly options: AlterColumnTypeOptions;
@@ -286,42 +310,51 @@ export abstract class PostgresMigration extends SqlMigration<
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
     return new AlterColumnTypeCall(
-      options.schema,
-      options.table,
+      ns.tableRef(options.table),
       options.column,
       options.options,
     ).toOp(this.controlAdapter);
   }
 
   protected setNotNull(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly column: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new SetNotNullCall(options.schema, options.table, options.column).toOp(
-      this.controlAdapter,
-    );
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
+    return new SetNotNullCall(ns.tableRef(options.table), options.column).toOp(this.controlAdapter);
   }
 
   protected dropNotNull(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly column: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new DropNotNullCall(options.schema, options.table, options.column).toOp(
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
+    return new DropNotNullCall(ns.tableRef(options.table), options.column).toOp(
       this.controlAdapter,
     );
   }
 
   protected setDefault(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly column: string;
     readonly defaultSql: string;
@@ -330,9 +363,12 @@ export abstract class PostgresMigration extends SqlMigration<
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
     return new SetDefaultCall(
-      options.schema,
-      options.table,
+      ns.tableRef(options.table),
       options.column,
       options.defaultSql,
       options.operationClass,
@@ -357,7 +393,7 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected createIndex(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly index: string;
     readonly columns: readonly string[];
@@ -366,9 +402,12 @@ export abstract class PostgresMigration extends SqlMigration<
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
     return new CreateIndexCall(
-      options.schema,
-      options.table,
+      ns.tableRef(options.table),
       options.index,
       options.columns,
       options.extras,
@@ -376,16 +415,18 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected dropIndex(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly index: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new DropIndexCall(options.schema, options.table, options.index).toOp(
-      this.controlAdapter,
-    );
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
+    return new DropIndexCall(ns.tableRef(options.table), options.index).toOp(this.controlAdapter);
   }
 
   protected installExtension(options: {

@@ -94,22 +94,14 @@ export function resolveNamespaceIdForIssue(issue: { readonly namespaceId?: strin
   return issue.namespaceId ?? UNBOUND_NAMESPACE_ID;
 }
 
-/**
- * Resolve the DDL schema name for a namespace coordinate. Postgres-aware
- * namespaces dispatch to their polymorphic `ddlSchemaName` override —
- * named schemas return their own id; the unbound singleton returns
- * `UNBOUND_NAMESPACE_ID`. Legacy single-namespace contracts whose
- * `__unbound__` slot is the framework-default `SqlUnboundNamespace`
- * (rather than the Postgres-aware `PostgresUnboundSchema`) flow the
- * coordinate through unchanged so downstream `qualifyTableName`
- * resolves polymorphically.
- */
 export function resolveDdlSchemaForNamespace(ctx: StrategyContext, namespaceId: string): string {
   const namespace = ctx.toContract.storage.namespaces[namespaceId];
-  if (isPostgresSchema(namespace)) {
-    return namespace.ddlSchemaName(ctx.toContract.storage);
+  if (!isPostgresSchema(namespace)) {
+    throw new Error(
+      `resolveDdlSchemaForNamespace: namespace "${namespaceId}" is not a PostgresSchema`,
+    );
   }
-  return namespaceId;
+  return namespace.ddlSchemaName(ctx.toContract.storage);
 }
 
 // ============================================================================
@@ -237,7 +229,6 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
     const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
     if (!isPostgresSchema(namespaceNode)) continue;
     const tableRef: PostgresTableRef = namespaceNode.tableRef(issue.table);
-    const schemaForTable = resolveDdlSchemaForNamespace(ctx, namespaceId);
     matched.push(issue);
     calls.push(
       new AddColumnCall(tableRef, spec),
@@ -246,7 +237,7 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
         `backfill-${issue.table}-${issue.column}:check`,
         `backfill-${issue.table}-${issue.column}:run`,
       ),
-      new SetNotNullCall(schemaForTable, issue.table, issue.column),
+      new SetNotNullCall(tableRef, issue.column),
     );
   }
 
@@ -290,9 +281,11 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
     if (!isSafeWidening && !dataAllowed) continue;
     matched.push(issue);
     const alterOpts = buildAlterTypeOptions(namespaceId, issue.table, issue.column, ctx);
-    const schemaForTable = resolveDdlSchemaForNamespace(ctx, namespaceId);
+    const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
+    if (!isPostgresSchema(namespaceNode)) continue;
+    const tableRef: PostgresTableRef = namespaceNode.tableRef(issue.table);
     if (isSafeWidening) {
-      calls.push(new AlterColumnTypeCall(schemaForTable, issue.table, issue.column, alterOpts));
+      calls.push(new AlterColumnTypeCall(tableRef, issue.column, alterOpts));
     } else {
       calls.push(
         new DataTransformCall(
@@ -300,7 +293,7 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
           `typechange-${issue.table}-${issue.column}:check`,
           `typechange-${issue.table}-${issue.column}:run`,
         ),
-        new AlterColumnTypeCall(schemaForTable, issue.table, issue.column, alterOpts),
+        new AlterColumnTypeCall(tableRef, issue.column, alterOpts),
       );
     }
   }
@@ -330,15 +323,17 @@ export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ct
     if (!column) continue;
     if (column.nullable === true) continue;
 
+    const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
+    if (!isPostgresSchema(namespaceNode)) continue;
+    const tableRef: PostgresTableRef = namespaceNode.tableRef(issue.table);
     matched.push(issue);
-    const schemaForTable = resolveDdlSchemaForNamespace(ctx, namespaceId);
     calls.push(
       new DataTransformCall(
         `handle-nulls-${issue.table}-${issue.column}`,
         `handle-nulls-${issue.table}-${issue.column}:check`,
         `handle-nulls-${issue.table}-${issue.column}:run`,
       ),
-      new SetNotNullCall(schemaForTable, issue.table, issue.column),
+      new SetNotNullCall(tableRef, issue.column),
     );
   }
 
@@ -405,13 +400,14 @@ export const checkConstraintPlanCallStrategy: CallMigrationStrategy = (issues, c
   const handledIssueKeys = new Set<string>();
 
   for (const [namespaceId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
+    if (!isPostgresSchema(ns)) continue;
     for (const tableName of Object.keys(ns.entries.table ?? {})) {
       const contractChecks = collectContractChecks(ctx.toContract.storage, namespaceId, tableName);
       if (contractChecks.length === 0) continue;
 
       const schemaTable = ctx.schema.tables[tableName];
       const liveChecks = schemaTable?.checks ?? [];
-      const ddlSchema = resolveDdlSchemaForNamespace(ctx, namespaceId);
+      const tableRef = ns.tableRef(tableName);
 
       for (const contractCheck of contractChecks) {
         const liveCheck = liveChecks.find((c) => c.name === contractCheck.name);
@@ -419,8 +415,7 @@ export const checkConstraintPlanCallStrategy: CallMigrationStrategy = (issues, c
         if (!liveCheck) {
           calls.push(
             new AddCheckConstraintCall(
-              ddlSchema,
-              tableName,
+              tableRef,
               contractCheck.name,
               contractCheck.column,
               contractCheck.permittedValues,
@@ -429,10 +424,9 @@ export const checkConstraintPlanCallStrategy: CallMigrationStrategy = (issues, c
           handledIssueKeys.add(issueKey);
         } else if (!checkValueSetsEqual(contractCheck.permittedValues, liveCheck.permittedValues)) {
           calls.push(
-            new DropCheckConstraintCall(ddlSchema, tableName, contractCheck.name),
+            new DropCheckConstraintCall(tableRef, contractCheck.name),
             new AddCheckConstraintCall(
-              ddlSchema,
-              tableName,
+              tableRef,
               contractCheck.name,
               contractCheck.column,
               contractCheck.permittedValues,
@@ -451,7 +445,7 @@ export const checkConstraintPlanCallStrategy: CallMigrationStrategy = (issues, c
         const inContract = contractChecks.some((c) => c.name === liveCheck.name);
         if (!inContract) {
           const issueKey = `${tableName} ${liveCheck.name}`;
-          calls.push(new DropCheckConstraintCall(ddlSchema, tableName, liveCheck.name));
+          calls.push(new DropCheckConstraintCall(tableRef, liveCheck.name));
           handledIssueKeys.add(issueKey);
         }
       }

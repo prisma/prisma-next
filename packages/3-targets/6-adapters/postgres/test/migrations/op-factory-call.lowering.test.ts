@@ -62,30 +62,30 @@ describe('renderOps', () => {
     };
     const calls = [
       new CreateTableCall(publicNs.tableRef('user'), [col('id', 'text', { notNull: true })]),
-      new DropTableCall('public', 'stale'),
+      new DropTableCall(publicNs.tableRef('stale')),
       new AddColumnCall(publicNs.tableRef('user'), col('email', 'text')),
-      new DropColumnCall('public', 'user', 'legacy'),
-      new AlterColumnTypeCall('public', 'user', 'age', {
+      new DropColumnCall(publicNs.tableRef('user'), 'legacy'),
+      new AlterColumnTypeCall(publicNs.tableRef('user'), 'age', {
         qualifiedTargetType: 'integer',
         formatTypeExpected: 'integer',
         rawTargetTypeForLabel: 'integer',
       }),
-      new SetNotNullCall('public', 'user', 'email'),
-      new DropNotNullCall('public', 'user', 'nickname'),
-      new SetDefaultCall('public', 'user', 'created_at', 'DEFAULT now()'),
+      new SetNotNullCall(publicNs.tableRef('user'), 'email'),
+      new DropNotNullCall(publicNs.tableRef('user'), 'nickname'),
+      new SetDefaultCall(publicNs.tableRef('user'), 'created_at', 'DEFAULT now()'),
       new DropDefaultCall(publicNs.tableRef('user'), 'updated_at'),
-      new AddPrimaryKeyCall('public', 'user', 'user_pkey', ['id']),
-      new AddUniqueCall('public', 'user', 'user_email_key', ['email']),
-      new AddForeignKeyCall('public', 'user', {
+      new AddPrimaryKeyCall(publicNs.tableRef('user'), 'user_pkey', ['id']),
+      new AddUniqueCall(publicNs.tableRef('user'), 'user_email_key', ['email']),
+      new AddForeignKeyCall(publicNs.tableRef('user'), {
         name: 'user_org_fk',
         columns: ['org_id'],
         references: { schema: 'public', table: 'org', columns: ['id'] },
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
-      new DropConstraintCall('public', 'user', 'user_email_key'),
-      new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
-      new DropIndexCall('public', 'user', 'stale_idx'),
+      new DropConstraintCall(publicNs.tableRef('user'), 'user_email_key'),
+      new CreateIndexCall(publicNs.tableRef('user'), 'user_email_idx', ['email']),
+      new DropIndexCall(publicNs.tableRef('user'), 'stale_idx'),
       new RawSqlCall(liftedOp),
       new CreateExtensionCall('citext'),
       new CreateSchemaCall('app'),
@@ -223,7 +223,7 @@ describe('renderOps', () => {
 
 describe('TypeScriptRenderablePostgresMigration', () => {
   it('identifies as postgres, derives destination from meta.to, and materializes operations via renderOps', async () => {
-    const calls = [new DropTableCall('public', 'stale')];
+    const calls = [new DropTableCall(publicNs.tableRef('stale'))];
     const migration = new TypeScriptRenderablePostgresMigration(
       calls,
       META,
@@ -241,7 +241,7 @@ describe('TypeScriptRenderablePostgresMigration', () => {
   });
 
   it('renders TypeScript source mirroring renderCallsToTypeScript output', () => {
-    const calls = [new DropTableCall('public', 'stale')];
+    const calls = [new DropTableCall(publicNs.tableRef('stale'))];
     const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
 
     const source = migration.renderTypeScript();

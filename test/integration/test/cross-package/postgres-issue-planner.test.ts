@@ -94,7 +94,7 @@ describe('planIssues', () => {
       expect(result.value.calls).toHaveLength(1);
       expect(result.value.calls[0]).toMatchObject({
         factoryName: 'createTable',
-        tableName: 'user',
+        ref: expect.objectContaining({ name: 'user' }),
         operationClass: 'additive',
       });
     });
@@ -409,7 +409,7 @@ describe('planIssues', () => {
       expect(result.value.calls).toHaveLength(1);
       expect(result.value.calls[0]).toMatchObject({
         factoryName: 'createIndex',
-        tableName: 'doc',
+        ref: expect.objectContaining({ name: 'doc' }),
         indexType: 'gin',
         options: { fastupdate: false },
       });
@@ -460,7 +460,7 @@ describe('planIssues', () => {
       if (!result.ok) throw new Error('expected ok');
       expect(result.value.calls[0]).toMatchObject({
         factoryName: 'createIndex',
-        tableName: 'doc',
+        ref: expect.objectContaining({ name: 'doc' }),
         indexName: 'doc_body_bm25_idx',
         indexType: 'bm25',
         options: { key_field: 'id' },
@@ -505,7 +505,7 @@ describe('planIssues', () => {
       if (!result.ok) throw new Error('expected ok');
       expect(result.value.calls[0]).toMatchObject({
         factoryName: 'createIndex',
-        tableName: 'doc',
+        ref: expect.objectContaining({ name: 'doc' }),
         indexName: 'doc_body_idx',
         indexType: undefined,
         options: undefined,
@@ -846,8 +846,8 @@ describe('planIssues', () => {
       if (!result.ok) throw new Error('expected ok');
       const createTableCall = result.value.calls[0] as CreateTableCall;
       expect(createTableCall.factoryName).toBe('createTable');
-      expect(createTableCall.tableName).toBe('users');
-      expect(createTableCall.schemaName).toBe('tenant_a');
+      expect(createTableCall.ref.name).toBe('users');
+      expect(createTableCall.ref.namespace.id).toBe('tenant_a');
     });
   });
 });

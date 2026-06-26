@@ -133,8 +133,8 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
         [primaryKey(['id'])],
       ),
       new AddColumnCall(publicNs.tableRef('user'), col('nickname', 'text')),
-      new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
-      new DropTableCall('public', 'stale'),
+      new CreateIndexCall(publicNs.tableRef('user'), 'user_email_idx', ['email']),
+      new DropTableCall(publicNs.tableRef('stale')),
     ];
     const migration = new TypeScriptRenderablePostgresMigration(
       calls,

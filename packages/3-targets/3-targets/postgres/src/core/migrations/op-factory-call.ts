@@ -286,33 +286,31 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
 export class DropTableCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dropTable' as const;
   readonly operationClass = 'destructive' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly label: string;
 
-  constructor(schemaName: string, tableName: string) {
+  constructor(ref: PostgresTableRef) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
-    this.label = `Drop table "${tableName}"`;
+    this.ref = ref;
+    this.label = `Drop table "${ref.name}"`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `DropTableCall.toOp: a lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `DropTableCall.toOp: a lowerer is required on the Postgres planner path (table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return dropTable(this.schemaName, this.tableName, lowerer);
+    return dropTable(this.ref.namespace.id, this.ref.name, lowerer);
   }
 
   renderTypeScript(): string {
     const opts: string[] = [];
-    if (this.schemaName !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.schemaName)}`);
+    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
+      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
     }
-    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`table: ${jsonToTsSource(this.ref.name)}`);
     return `this.dropTable({ ${opts.join(', ')} })`;
   }
 
@@ -392,35 +390,33 @@ export class AddColumnCall extends PostgresOpFactoryCallNode {
 export class DropColumnCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dropColumn' as const;
   readonly operationClass = 'destructive' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly columnName: string;
   readonly label: string;
 
-  constructor(schemaName: string, tableName: string, columnName: string) {
+  constructor(ref: PostgresTableRef, columnName: string) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.columnName = columnName;
-    this.label = `Drop column "${columnName}" from "${tableName}"`;
+    this.label = `Drop column "${columnName}" from "${ref.name}"`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `DropColumnCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `DropColumnCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return dropColumn(this.schemaName, this.tableName, this.columnName, lowerer);
+    return dropColumn(this.ref.namespace.id, this.ref.name, this.columnName, lowerer);
   }
 
   renderTypeScript(): string {
     const opts: string[] = [];
-    if (this.schemaName !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.schemaName)}`);
+    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
+      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
     }
-    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`table: ${jsonToTsSource(this.ref.name)}`);
     opts.push(`column: ${jsonToTsSource(this.columnName)}`);
     return `this.dropColumn({ ${opts.join(', ')} })`;
   }
@@ -440,42 +436,41 @@ export interface AlterColumnTypeOptions {
 export class AlterColumnTypeCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'alterColumnType' as const;
   readonly operationClass = 'destructive' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly columnName: string;
   readonly options: AlterColumnTypeOptions;
   readonly label: string;
 
-  constructor(
-    schemaName: string,
-    tableName: string,
-    columnName: string,
-    options: AlterColumnTypeOptions,
-  ) {
+  constructor(ref: PostgresTableRef, columnName: string, options: AlterColumnTypeOptions) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.columnName = columnName;
     this.options = options;
-    this.label = `Alter type of "${tableName}"."${columnName}" to ${options.rawTargetTypeForLabel}`;
+    this.label = `Alter type of "${ref.name}"."${columnName}" to ${options.rawTargetTypeForLabel}`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `AlterColumnTypeCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `AlterColumnTypeCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return alterColumnType(this.schemaName, this.tableName, this.columnName, this.options, lowerer);
+    return alterColumnType(
+      this.ref.namespace.id,
+      this.ref.name,
+      this.columnName,
+      this.options,
+      lowerer,
+    );
   }
 
   renderTypeScript(): string {
     const opts: string[] = [];
-    if (this.schemaName !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.schemaName)}`);
+    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
+      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
     }
-    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`table: ${jsonToTsSource(this.ref.name)}`);
     opts.push(`column: ${jsonToTsSource(this.columnName)}`);
     opts.push(`options: ${jsonToTsSource(this.options)}`);
     return `this.alterColumnType({ ${opts.join(', ')} })`;
@@ -489,35 +484,33 @@ export class AlterColumnTypeCall extends PostgresOpFactoryCallNode {
 export class SetNotNullCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'setNotNull' as const;
   readonly operationClass = 'destructive' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly columnName: string;
   readonly label: string;
 
-  constructor(schemaName: string, tableName: string, columnName: string) {
+  constructor(ref: PostgresTableRef, columnName: string) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.columnName = columnName;
-    this.label = `Set NOT NULL on "${tableName}"."${columnName}"`;
+    this.label = `Set NOT NULL on "${ref.name}"."${columnName}"`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `SetNotNullCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `SetNotNullCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return setNotNull(this.schemaName, this.tableName, this.columnName, lowerer);
+    return setNotNull(this.ref.namespace.id, this.ref.name, this.columnName, lowerer);
   }
 
   renderTypeScript(): string {
     const opts: string[] = [];
-    if (this.schemaName !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.schemaName)}`);
+    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
+      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
     }
-    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`table: ${jsonToTsSource(this.ref.name)}`);
     opts.push(`column: ${jsonToTsSource(this.columnName)}`);
     return `this.setNotNull({ ${opts.join(', ')} })`;
   }
@@ -530,35 +523,33 @@ export class SetNotNullCall extends PostgresOpFactoryCallNode {
 export class DropNotNullCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dropNotNull' as const;
   readonly operationClass = 'widening' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly columnName: string;
   readonly label: string;
 
-  constructor(schemaName: string, tableName: string, columnName: string) {
+  constructor(ref: PostgresTableRef, columnName: string) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.columnName = columnName;
-    this.label = `Drop NOT NULL on "${tableName}"."${columnName}"`;
+    this.label = `Drop NOT NULL on "${ref.name}"."${columnName}"`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `DropNotNullCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `DropNotNullCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return dropNotNull(this.schemaName, this.tableName, this.columnName, lowerer);
+    return dropNotNull(this.ref.namespace.id, this.ref.name, this.columnName, lowerer);
   }
 
   renderTypeScript(): string {
     const opts: string[] = [];
-    if (this.schemaName !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.schemaName)}`);
+    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
+      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
     }
-    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`table: ${jsonToTsSource(this.ref.name)}`);
     opts.push(`column: ${jsonToTsSource(this.columnName)}`);
     return `this.dropNotNull({ ${opts.join(', ')} })`;
   }
@@ -571,38 +562,35 @@ export class DropNotNullCall extends PostgresOpFactoryCallNode {
 export class SetDefaultCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'setDefault' as const;
   readonly operationClass: 'additive' | 'widening';
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly columnName: string;
   readonly defaultSql: string;
   readonly label: string;
 
   constructor(
-    schemaName: string,
-    tableName: string,
+    ref: PostgresTableRef,
     columnName: string,
     defaultSql: string,
     operationClass: 'additive' | 'widening' = 'additive',
   ) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.columnName = columnName;
     this.defaultSql = defaultSql;
     this.operationClass = operationClass;
-    this.label = `Set default on "${tableName}"."${columnName}"`;
+    this.label = `Set default on "${ref.name}"."${columnName}"`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `SetDefaultCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `SetDefaultCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
     return setDefault(
-      this.schemaName,
-      this.tableName,
+      this.ref.namespace.id,
+      this.ref.name,
       this.columnName,
       this.defaultSql,
       lowerer,
@@ -612,10 +600,10 @@ export class SetDefaultCall extends PostgresOpFactoryCallNode {
 
   renderTypeScript(): string {
     const opts: string[] = [];
-    if (this.schemaName !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.schemaName)}`);
+    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
+      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
     }
-    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`table: ${jsonToTsSource(this.ref.name)}`);
     opts.push(`column: ${jsonToTsSource(this.columnName)}`);
     opts.push(`defaultSql: ${jsonToTsSource(this.defaultSql)}`);
     if (this.operationClass !== 'additive') {
@@ -785,16 +773,12 @@ export class AddNotNullColumnWithTempDefaultCall extends PostgresOpFactoryCallNo
 // Constraints
 // ============================================================================
 
-function constraintCallOptions(
-  schemaName: string,
-  tableName: string,
-  constraintName: string,
-): string {
+function constraintCallOptions(ref: PostgresTableRef, constraintName: string): string {
   const opts: string[] = [];
-  if (schemaName !== UNBOUND_NAMESPACE_ID) {
-    opts.push(`schema: ${jsonToTsSource(schemaName)}`);
+  if (ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
+    opts.push(`schema: ${jsonToTsSource(ref.namespace.id)}`);
   }
-  opts.push(`table: ${jsonToTsSource(tableName)}`);
+  opts.push(`table: ${jsonToTsSource(ref.name)}`);
   opts.push(`constraint: ${jsonToTsSource(constraintName)}`);
   return opts.join(', ');
 }
@@ -802,36 +786,29 @@ function constraintCallOptions(
 export class AddPrimaryKeyCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'addPrimaryKey' as const;
   readonly operationClass = 'additive' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly constraintName: string;
   readonly columns: readonly string[];
   readonly label: string;
 
-  constructor(
-    schemaName: string,
-    tableName: string,
-    constraintName: string,
-    columns: readonly string[],
-  ) {
+  constructor(ref: PostgresTableRef, constraintName: string, columns: readonly string[]) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.constraintName = constraintName;
     this.columns = columns;
-    this.label = `Add primary key on "${tableName}"`;
+    this.label = `Add primary key on "${ref.name}"`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `AddPrimaryKeyCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `AddPrimaryKeyCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
     return addPrimaryKey(
-      this.schemaName,
-      this.tableName,
+      this.ref.namespace.id,
+      this.ref.name,
       this.constraintName,
       this.columns,
       lowerer,
@@ -839,7 +816,7 @@ export class AddPrimaryKeyCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `this.addPrimaryKey({ ${constraintCallOptions(this.schemaName, this.tableName, this.constraintName)}, columns: ${jsonToTsSource(this.columns)} })`;
+    return `this.addPrimaryKey({ ${constraintCallOptions(this.ref, this.constraintName)}, columns: ${jsonToTsSource(this.columns)} })`;
   }
 
   override importRequirements(): readonly ImportRequirement[] {
@@ -850,38 +827,37 @@ export class AddPrimaryKeyCall extends PostgresOpFactoryCallNode {
 export class AddUniqueCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'addUnique' as const;
   readonly operationClass = 'additive' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly constraintName: string;
   readonly columns: readonly string[];
   readonly label: string;
 
-  constructor(
-    schemaName: string,
-    tableName: string,
-    constraintName: string,
-    columns: readonly string[],
-  ) {
+  constructor(ref: PostgresTableRef, constraintName: string, columns: readonly string[]) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.constraintName = constraintName;
     this.columns = columns;
-    this.label = `Add unique constraint on "${tableName}" (${columns.join(', ')})`;
+    this.label = `Add unique constraint on "${ref.name}" (${columns.join(', ')})`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `AddUniqueCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `AddUniqueCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return addUnique(this.schemaName, this.tableName, this.constraintName, this.columns, lowerer);
+    return addUnique(
+      this.ref.namespace.id,
+      this.ref.name,
+      this.constraintName,
+      this.columns,
+      lowerer,
+    );
   }
 
   renderTypeScript(): string {
-    return `this.addUnique({ ${constraintCallOptions(this.schemaName, this.tableName, this.constraintName)}, columns: ${jsonToTsSource(this.columns)} })`;
+    return `this.addUnique({ ${constraintCallOptions(this.ref, this.constraintName)}, columns: ${jsonToTsSource(this.columns)} })`;
   }
 
   override importRequirements(): readonly ImportRequirement[] {
@@ -892,35 +868,33 @@ export class AddUniqueCall extends PostgresOpFactoryCallNode {
 export class AddForeignKeyCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'addForeignKey' as const;
   readonly operationClass = 'additive' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly fk: ForeignKeySpec;
   readonly label: string;
 
-  constructor(schemaName: string, tableName: string, fk: ForeignKeySpec) {
+  constructor(ref: PostgresTableRef, fk: ForeignKeySpec) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.fk = fk;
-    this.label = `Add foreign key "${fk.name}" on "${tableName}"`;
+    this.label = `Add foreign key "${fk.name}" on "${ref.name}"`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `AddForeignKeyCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.fk.name}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `AddForeignKeyCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.fk.name}" on table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return addForeignKey(this.schemaName, this.tableName, this.fk, lowerer);
+    return addForeignKey(this.ref.namespace.id, this.ref.name, this.fk, lowerer);
   }
 
   renderTypeScript(): string {
     const opts: string[] = [];
-    if (this.schemaName !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.schemaName)}`);
+    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
+      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
     }
-    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`table: ${jsonToTsSource(this.ref.name)}`);
     opts.push(`foreignKey: ${jsonToTsSource(this.fk)}`);
     return `this.addForeignKey({ ${opts.join(', ')} })`;
   }
@@ -933,38 +907,41 @@ export class AddForeignKeyCall extends PostgresOpFactoryCallNode {
 export class DropConstraintCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dropConstraint' as const;
   readonly operationClass = 'destructive' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly constraintName: string;
   readonly kind: 'foreignKey' | 'unique' | 'primaryKey';
   readonly label: string;
 
   constructor(
-    schemaName: string,
-    tableName: string,
+    ref: PostgresTableRef,
     constraintName: string,
     kind: 'foreignKey' | 'unique' | 'primaryKey' = 'unique',
   ) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.constraintName = constraintName;
     this.kind = kind;
-    this.label = `Drop constraint "${constraintName}" on "${tableName}"`;
+    this.label = `Drop constraint "${constraintName}" on "${ref.name}"`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `DropConstraintCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `DropConstraintCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return dropConstraint(this.schemaName, this.tableName, this.constraintName, lowerer, this.kind);
+    return dropConstraint(
+      this.ref.namespace.id,
+      this.ref.name,
+      this.constraintName,
+      lowerer,
+      this.kind,
+    );
   }
 
   renderTypeScript(): string {
-    const opts = [constraintCallOptions(this.schemaName, this.tableName, this.constraintName)];
+    const opts = [constraintCallOptions(this.ref, this.constraintName)];
     if (this.kind !== 'unique') {
       opts.push(`kind: ${jsonToTsSource(this.kind)}`);
     }
@@ -979,39 +956,36 @@ export class DropConstraintCall extends PostgresOpFactoryCallNode {
 export class AddCheckConstraintCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'addCheckConstraint' as const;
   readonly operationClass = 'additive' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly constraintName: string;
   readonly column: string;
   readonly values: readonly string[];
   readonly label: string;
 
   constructor(
-    schemaName: string,
-    tableName: string,
+    ref: PostgresTableRef,
     constraintName: string,
     column: string,
     values: readonly string[],
   ) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.constraintName = constraintName;
     this.column = column;
     this.values = values;
-    this.label = `Add check constraint "${constraintName}" on "${tableName}"."${column}"`;
+    this.label = `Add check constraint "${constraintName}" on "${ref.name}"."${column}"`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `AddCheckConstraintCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `AddCheckConstraintCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
     return addCheckConstraint(
-      this.schemaName,
-      this.tableName,
+      this.ref.namespace.id,
+      this.ref.name,
       this.constraintName,
       this.column,
       this.values,
@@ -1020,7 +994,7 @@ export class AddCheckConstraintCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `this.addCheckConstraint({ ${constraintCallOptions(this.schemaName, this.tableName, this.constraintName)}, column: ${jsonToTsSource(this.column)}, values: ${jsonToTsSource(this.values)} })`;
+    return `this.addCheckConstraint({ ${constraintCallOptions(this.ref, this.constraintName)}, column: ${jsonToTsSource(this.column)}, values: ${jsonToTsSource(this.values)} })`;
   }
 
   override importRequirements(): readonly ImportRequirement[] {
@@ -1031,31 +1005,29 @@ export class AddCheckConstraintCall extends PostgresOpFactoryCallNode {
 export class DropCheckConstraintCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dropCheckConstraint' as const;
   readonly operationClass = 'destructive' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly constraintName: string;
   readonly label: string;
 
-  constructor(schemaName: string, tableName: string, constraintName: string) {
+  constructor(ref: PostgresTableRef, constraintName: string) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.constraintName = constraintName;
-    this.label = `Drop check constraint "${constraintName}" on "${tableName}"`;
+    this.label = `Drop check constraint "${constraintName}" on "${ref.name}"`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `DropCheckConstraintCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `DropCheckConstraintCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return dropCheckConstraint(this.schemaName, this.tableName, this.constraintName, lowerer);
+    return dropCheckConstraint(this.ref.namespace.id, this.ref.name, this.constraintName, lowerer);
   }
 
   renderTypeScript(): string {
-    return `this.dropCheckConstraint({ ${constraintCallOptions(this.schemaName, this.tableName, this.constraintName)} })`;
+    return `this.dropCheckConstraint({ ${constraintCallOptions(this.ref, this.constraintName)} })`;
   }
 
   override importRequirements(): readonly ImportRequirement[] {
@@ -1070,8 +1042,7 @@ export class DropCheckConstraintCall extends PostgresOpFactoryCallNode {
 export class CreateIndexCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'createIndex' as const;
   readonly operationClass = 'additive' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly indexName: string;
   readonly columns: readonly string[];
   // Named indexType (not typeName): `locationForCall` in issue-planner.ts reads
@@ -1081,35 +1052,33 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
   readonly label: string;
 
   constructor(
-    schemaName: string,
-    tableName: string,
+    ref: PostgresTableRef,
     indexName: string,
     columns: readonly string[],
     extras?: { readonly type?: string; readonly options?: Record<string, unknown> },
   ) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.indexName = indexName;
     this.columns = columns;
     this.indexType = extras?.type;
     this.options = extras?.options;
-    this.label = `Create index "${indexName}" on "${tableName}"`;
+    this.label = `Create index "${indexName}" on "${ref.name}"`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `CreateIndexCall.toOp: a lowerer is required on the Postgres planner path (index "${this.indexName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `CreateIndexCall.toOp: a lowerer is required on the Postgres planner path (index "${this.indexName}" on table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
     const extras: { type?: string; options?: Record<string, unknown> } = {};
     if (this.indexType !== undefined) extras.type = this.indexType;
     if (this.options !== undefined) extras.options = this.options;
     return createIndex(
-      this.schemaName,
-      this.tableName,
+      this.ref.namespace.id,
+      this.ref.name,
       this.indexName,
       this.columns,
       lowerer,
@@ -1119,10 +1088,10 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
 
   renderTypeScript(): string {
     const opts: string[] = [];
-    if (this.schemaName !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.schemaName)}`);
+    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
+      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
     }
-    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`table: ${jsonToTsSource(this.ref.name)}`);
     opts.push(`index: ${jsonToTsSource(this.indexName)}`);
     opts.push(`columns: ${jsonToTsSource(this.columns)}`);
     if (this.indexType !== undefined || this.options !== undefined) {
@@ -1142,15 +1111,13 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
 export class DropIndexCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dropIndex' as const;
   readonly operationClass = 'destructive' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly indexName: string;
   readonly label: string;
 
-  constructor(schemaName: string, tableName: string, indexName: string) {
+  constructor(ref: PostgresTableRef, indexName: string) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.indexName = indexName;
     this.label = `Drop index "${indexName}"`;
     this.freeze();
@@ -1159,18 +1126,18 @@ export class DropIndexCall extends PostgresOpFactoryCallNode {
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `DropIndexCall.toOp: a lowerer is required on the Postgres planner path (index "${this.indexName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `DropIndexCall.toOp: a lowerer is required on the Postgres planner path (index "${this.indexName}" on table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return dropIndex(this.schemaName, this.tableName, this.indexName, lowerer);
+    return dropIndex(this.ref.namespace.id, this.ref.name, this.indexName, lowerer);
   }
 
   renderTypeScript(): string {
     const opts: string[] = [];
-    if (this.schemaName !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.schemaName)}`);
+    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
+      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
     }
-    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`table: ${jsonToTsSource(this.ref.name)}`);
     opts.push(`index: ${jsonToTsSource(this.indexName)}`);
     return `this.dropIndex({ ${opts.join(', ')} })`;
   }

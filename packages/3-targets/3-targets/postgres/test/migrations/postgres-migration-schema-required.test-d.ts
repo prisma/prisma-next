@@ -1,18 +1,15 @@
 /**
- * Negative type tests pinning that `schema` is REQUIRED on the Postgres
- * `Migration` methods where it is required (dropTable, etc.), and that
- * `schema` is OPTIONAL on methods that default to the unbound namespace
- * (createTable, addColumn, dropDefault).
+ * Type tests pinning that `schema` is optional on all Postgres Migration
+ * methods — omitting it defaults to the unbound namespace.
  *
- * The methods are `protected`, so the calls live inside a subclass body where
- * they are reachable.
+ * The methods are `protected`, so the calls live inside a subclass body.
  */
 
 import { col } from '@prisma-next/sql-relational-core/contract-free';
 import { test } from 'vitest';
 import { PostgresMigration } from '../../src/core/migrations/postgres-migration';
 
-class SchemaRequiredProbe extends PostgresMigration {
+class SchemaOptionalProbe extends PostgresMigration {
   override describe() {
     return { from: null, to: 'sha256:0' };
   }
@@ -24,17 +21,11 @@ class SchemaRequiredProbe extends PostgresMigration {
       this.addColumn({ schema: 'public', table: 'user', column: col('email', 'text') }),
       this.addColumn({ table: 'user', column: col('email', 'text') }),
       this.dropTable({ schema: 'public', table: 'stale' }),
-    ];
-  }
-
-  missingSchema() {
-    return [
-      // @ts-expect-error schema is required on Postgres Migration methods (no search_path-relative default)
       this.dropTable({ table: 'stale' }),
     ];
   }
 }
 
-test('schema is optional on addColumn/dropDefault, required on dropTable', () => {
-  void SchemaRequiredProbe;
+test('schema is optional on all Postgres Migration methods', () => {
+  void SchemaOptionalProbe;
 });

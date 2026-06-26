@@ -31,7 +31,8 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
-import { isPostgresSchema } from '../postgres-schema';
+import type { PostgresTableRef } from '../entity-ref';
+import { isPostgresSchema, postgresCreateNamespace } from '../postgres-schema';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -216,16 +217,25 @@ function mapIssueToCall(
   ctx: StrategyContext,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
   const { schemaName, codecHooks, storageTypes } = ctx;
-  // Per-table effective schema. `extra_table` issues intentionally
-  // omit `namespaceId` — the live DB carries a table that
-  // is not claimed by any contract namespace, so there is no contract
-  // coordinate to project from. Those issues fall back to the planner's
-  // global `ctx.schemaName`; every other issue dispatches through the
-  // resolved namespace's polymorphic `ddlSchemaName`.
-  const tableSchema = (issue: SchemaIssue): string => {
-    if (issue.kind === 'extra_table') return schemaName;
-    if (!('table' in issue) || !issue.table) return schemaName;
-    return resolveDdlSchemaForNamespace(ctx, resolveNamespaceIdForIssue(issue));
+  // Per-table ref. `extra_table` issues intentionally omit `namespaceId` — the
+  // live DB carries a table not claimed by any contract namespace. Those fall
+  // back to a synthetic namespace built from the planner's global `ctx.schemaName`.
+  // Every other issue resolves the namespace node from the contract.
+  const tableRef = (issue: SchemaIssue): PostgresTableRef => {
+    if (!('table' in issue) || typeof issue.table !== 'string') {
+      throw new Error(`mapIssueToCall: issue kind "${issue.kind}" carries no table`);
+    }
+    if (issue.kind === 'extra_table') {
+      return postgresCreateNamespace({ id: schemaName, entries: { table: {} } }).tableRef(
+        issue.table,
+      );
+    }
+    const namespaceId = resolveNamespaceIdForIssue(issue);
+    const ns = ctx.toContract.storage.namespaces[namespaceId];
+    if (!isPostgresSchema(ns)) {
+      throw new Error(`mapIssueToCall: namespace "${namespaceId}" is not a PostgresSchema`);
+    }
+    return ns.tableRef(issue.table);
   };
 
   switch (issue.kind) {
@@ -264,7 +274,6 @@ function mapIssueToCall(
         );
       }
       const tableRef = namespaceNode.tableRef(issue.table);
-      const schemaForTable = namespaceNode.id;
       const ddlColumns: DdlColumn[] = Object.entries(contractTable.columns).map(([name, column]) =>
         toDdlColumn(name, column, codecHooks, storageTypes),
       );
@@ -283,9 +292,7 @@ function mapIssueToCall(
         const extras: { type?: string; options?: Record<string, unknown> } = {};
         if (index.type !== undefined) extras.type = index.type;
         if (index.options !== undefined) extras.options = index.options;
-        calls.push(
-          new CreateIndexCall(schemaForTable, issue.table, indexName, [...index.columns], extras),
-        );
+        calls.push(new CreateIndexCall(tableRef, indexName, [...index.columns], extras));
       }
       const explicitIndexColumnSets = new Set(
         contractTable.indexes.map((idx) => idx.columns.join(',')),
@@ -304,20 +311,16 @@ function mapIssueToCall(
             ...(fk.onDelete !== undefined && { onDelete: fk.onDelete }),
             ...(fk.onUpdate !== undefined && { onUpdate: fk.onUpdate }),
           };
-          calls.push(new AddForeignKeyCall(schemaForTable, issue.table, fkSpec));
+          calls.push(new AddForeignKeyCall(tableRef, fkSpec));
         }
         if (fk.index && !explicitIndexColumnSets.has(fk.source.columns.join(','))) {
           const indexName = `${issue.table}_${fk.source.columns.join('_')}_idx`;
-          calls.push(
-            new CreateIndexCall(schemaForTable, issue.table, indexName, [...fk.source.columns]),
-          );
+          calls.push(new CreateIndexCall(tableRef, indexName, [...fk.source.columns]));
         }
       }
       for (const unique of contractTable.uniques) {
         const constraintName = unique.name ?? `${issue.table}_${unique.columns.join('_')}_key`;
-        calls.push(
-          new AddUniqueCall(schemaForTable, issue.table, constraintName, [...unique.columns]),
-        );
+        calls.push(new AddUniqueCall(tableRef, constraintName, [...unique.columns]));
       }
       return ok(calls);
     }
@@ -376,27 +379,27 @@ function mapIssueToCall(
         }
         const defaultSql = buildColumnDefaultSql(column.default, column);
         if (!defaultSql) return ok([]);
-        return ok([new SetDefaultCall(tableSchema(issue), issue.table, issue.column, defaultSql)]);
+        return ok([new SetDefaultCall(tableRef(issue), issue.column, defaultSql)]);
       }
 
     case 'extra_table':
       if (!issue.table)
         return notOk(issueConflict('unsupportedOperation', 'Extra table issue has no table name'));
-      return ok([new DropTableCall(tableSchema(issue), issue.table)]);
+      return ok([new DropTableCall(tableRef(issue))]);
 
     case 'extra_column':
       if (!issue.table || !issue.column)
         return notOk(
           issueConflict('unsupportedOperation', 'Extra column issue has no table/column name'),
         );
-      return ok([new DropColumnCall(tableSchema(issue), issue.table, issue.column)]);
+      return ok([new DropColumnCall(tableRef(issue), issue.column)]);
 
     case 'extra_index':
       if (!issue.table || !issue.indexOrConstraint)
         return notOk(
           issueConflict('unsupportedOperation', 'Extra index issue has no table/index name'),
         );
-      return ok([new DropIndexCall(tableSchema(issue), issue.table, issue.indexOrConstraint)]);
+      return ok([new DropIndexCall(tableRef(issue), issue.indexOrConstraint)]);
 
     case 'extra_unique_constraint':
     case 'extra_foreign_key':
@@ -427,14 +430,7 @@ function mapIssueToCall(
         extra_foreign_key: 'foreignKey' as const,
         extra_primary_key: 'primaryKey' as const,
       };
-      return ok([
-        new DropConstraintCall(
-          tableSchema(issue),
-          issue.table,
-          constraintName,
-          kindMap[issue.kind],
-        ),
-      ]);
+      return ok([new DropConstraintCall(tableRef(issue), constraintName, kindMap[issue.kind])]);
     }
 
     case 'extra_default':
@@ -442,19 +438,7 @@ function mapIssueToCall(
         return notOk(
           issueConflict('unsupportedOperation', 'Extra default issue has no table/column name'),
         );
-      {
-        const namespaceId = resolveNamespaceIdForIssue(issue);
-        const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
-        if (!isPostgresSchema(namespaceNode)) {
-          return notOk(
-            issueConflict(
-              'unsupportedOperation',
-              `Namespace "${namespaceId}" is not a PostgresSchema`,
-            ),
-          );
-        }
-        return ok([new DropDefaultCall(namespaceNode.tableRef(issue.table), issue.column)]);
-      }
+      return ok([new DropDefaultCall(tableRef(issue), issue.column)]);
 
     case 'nullability_mismatch': {
       if (!issue.table || !issue.column)
@@ -472,11 +456,11 @@ function mapIssueToCall(
             `Column "${issue.table}"."${issue.column}" not found in destination contract`,
           ),
         );
-      const schemaForTable = tableSchema(issue);
+      const ref = tableRef(issue);
       return ok(
         column.nullable
-          ? [new DropNotNullCall(schemaForTable, issue.table, issue.column)]
-          : [new SetNotNullCall(schemaForTable, issue.table, issue.column)],
+          ? [new DropNotNullCall(ref, issue.column)]
+          : [new SetNotNullCall(ref, issue.column)],
       );
     }
 
@@ -500,7 +484,7 @@ function mapIssueToCall(
         const qualifiedTargetType = buildColumnTypeSql(column, hooksMap, typesMap, false);
         const formatTypeExpected = buildExpectedFormatType(column, hooksMap, typesMap);
         return ok([
-          new AlterColumnTypeCall(tableSchema(issue), issue.table, issue.column, {
+          new AlterColumnTypeCall(tableRef(issue), issue.column, {
             qualifiedTargetType,
             formatTypeExpected,
             rawTargetTypeForLabel: qualifiedTargetType,
@@ -521,9 +505,7 @@ function mapIssueToCall(
         if (!column?.default) return ok([]);
         const defaultSql = buildColumnDefaultSql(column.default, column);
         if (!defaultSql) return ok([]);
-        return ok([
-          new SetDefaultCall(tableSchema(issue), issue.table, issue.column, defaultSql, 'widening'),
-        ]);
+        return ok([new SetDefaultCall(tableRef(issue), issue.column, defaultSql, 'widening')]);
       }
 
     case 'primary_key_mismatch':
@@ -537,9 +519,7 @@ function mapIssueToCall(
             issueConflict('indexIncompatible', `No primary key in contract for "${issue.table}"`),
           );
         const constraintName = pk.name ?? `${issue.table}_pkey`;
-        return ok([
-          new AddPrimaryKeyCall(tableSchema(issue), issue.table, constraintName, pk.columns),
-        ]);
+        return ok([new AddPrimaryKeyCall(tableRef(issue), constraintName, pk.columns)]);
       }
       return notOk(
         issueConflict(
@@ -557,7 +537,7 @@ function mapIssueToCall(
       if (isMissing(issue) && issue.expected) {
         const columns = issue.expected.split(', ');
         const constraintName = `${issue.table}_${columns.join('_')}_key`;
-        return ok([new AddUniqueCall(tableSchema(issue), issue.table, constraintName, columns)]);
+        return ok([new AddUniqueCall(tableRef(issue), constraintName, columns)]);
       }
       return notOk(
         issueConflict(
@@ -584,9 +564,7 @@ function mapIssueToCall(
         const extras: { type?: string; options?: Record<string, unknown> } = {};
         if (contractIndex?.type !== undefined) extras.type = contractIndex.type;
         if (contractIndex?.options !== undefined) extras.options = contractIndex.options;
-        return ok([
-          new CreateIndexCall(tableSchema(issue), issue.table, indexName, columns, extras),
-        ]);
+        return ok([new CreateIndexCall(tableRef(issue), indexName, columns, extras)]);
       }
       return notOk(
         issueConflict(
@@ -633,9 +611,7 @@ function mapIssueToCall(
         return notOk(
           issueConflict('unsupportedOperation', 'Check removed issue has no table/constraint name'),
         );
-      return ok([
-        new DropCheckConstraintCall(tableSchema(issue), issue.table, issue.indexOrConstraint),
-      ]);
+      return ok([new DropCheckConstraintCall(tableRef(issue), issue.indexOrConstraint)]);
     }
 
     case 'foreign_key_mismatch':
@@ -662,7 +638,7 @@ function mapIssueToCall(
               ...(fk.onDelete !== undefined && { onDelete: fk.onDelete }),
               ...(fk.onUpdate !== undefined && { onUpdate: fk.onUpdate }),
             };
-            return ok([new AddForeignKeyCall(tableSchema(issue), issue.table, fkSpec)]);
+            return ok([new AddForeignKeyCall(tableRef(issue), fkSpec)]);
           }
           return notOk(
             issueConflict(

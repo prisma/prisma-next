@@ -6,21 +6,12 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { isPostgresSchema } from '../postgres-schema';
 import { isPostgresSchemaIR } from '../postgres-schema-ir';
 
-/**
- * Resolves the live-database schema name for a given namespace
- * coordinate. Mirrors `resolveDdlSchemaForNamespace` in
- * `planner-strategies.ts` so the verifier's projection and the
- * planner's projection always agree — Postgres-aware namespaces (the
- * production path) dispatch to `ddlSchemaName(storage)`, and bare
- * object payloads (used by some tests) fall back to the coordinate
- * itself.
- */
 function resolveDdlSchemaName(storage: SqlStorage, namespaceId: string): string {
   const namespace = storage.namespaces[namespaceId];
-  if (isPostgresSchema(namespace)) {
-    return namespace.ddlSchemaName(storage);
+  if (!isPostgresSchema(namespace)) {
+    throw new Error(`resolveDdlSchemaName: namespace "${namespaceId}" is not a PostgresSchema`);
   }
-  return namespaceId;
+  return namespace.ddlSchemaName(storage);
 }
 
 /**
