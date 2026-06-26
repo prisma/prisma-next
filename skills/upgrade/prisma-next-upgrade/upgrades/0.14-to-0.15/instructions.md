@@ -82,6 +82,18 @@ the primary `db.asServiceRole().sql`/`.orm` surface (plus `asUser`/`asAnon`) is
 unchanged. No user action. Incidental substrate diff only.
 -->
 
+<!--
+TML-2892 (PR #879): the `Migration` base now takes the migration's start/end
+contract JSON as typed inputs and derives `describe()` from their `storage.storageHash`,
+and generated migrations use `Migration<Start, End>` with `endContractJson`/
+`startContractJson` fields instead of hand-written from/to hashes; the base exposes
+typed `this.startContract`/`this.endContract` ContractViews for the (hand-authored)
+data-transform case. Every example `migration.ts` is regenerated to this shape; the
+`operations` bodies are preserved verbatim, so `ops.json`/`migration.json` and every
+emitted contract are byte-identical. No consumer action — re-scaffold via
+`migration plan` picks up the new shape. Incidental substrate diff only.
+-->
+
 # Upgrade 0.14 → 0.15
 
 No consumer-facing action is required for this transition.
