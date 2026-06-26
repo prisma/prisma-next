@@ -50,6 +50,19 @@ purely `.d.ts` regeneration (the new `StorageColumnTypes` block added; observabl
 types unchanged). No consumer action required. Incidental substrate diff only.
 -->
 
+<!--
+TML-2892 (PR #879): adds the `ContractView` migration-author accessor — a net-new,
+additive public API for reaching contract entities by name with the default
+namespace unwrapped (`MongoContractView`/`SqliteContractView` expose `.collection`/
+`.table`; `PostgresContractView` is schema-qualified as `cv.<schema>.table.<name>`).
+The `examples/retail-store/**` diff repoints the two migrations and one migration
+test off the raw internal coordinate
+(`storage.namespaces.__unbound__.entries.collection`) onto `ContractView` purely to
+demonstrate the new accessor. The old raw path still resolves and still type-checks,
+so no consumer is forced to migrate; adopting `ContractView` is optional. No consumer
+action required. Incidental substrate diff only.
+-->
+
 # Upgrade 0.14 → 0.15
 
 No consumer-facing action is required for this transition.
