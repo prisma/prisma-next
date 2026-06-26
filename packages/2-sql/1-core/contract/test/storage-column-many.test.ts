@@ -11,6 +11,7 @@ function unboundTables(tables: Record<string, unknown>) {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
+        kind: 'test-sql-namespace',
         entries: { table: tables },
       },
     },
@@ -126,6 +127,7 @@ describe('StorageColumn many', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
+            kind: 'test-sql-namespace',
             entries: {
               table: {
                 post: {
@@ -150,6 +152,7 @@ describe('StorageColumn many', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
+            kind: 'test-sql-namespace',
             entries: {
               table: {
                 post: {

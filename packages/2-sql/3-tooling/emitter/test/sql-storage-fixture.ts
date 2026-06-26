@@ -30,8 +30,16 @@ export function normalizeRootSqlStorage(
       let changed = false;
       const lifted = Object.fromEntries(
         Object.entries(namespaces as Record<string, Record<string, unknown>>).map(([id, ns]) => {
-          if (ns === null || typeof ns !== 'object' || Array.isArray(ns) || 'entries' in ns) {
+          if (ns === null || typeof ns !== 'object' || Array.isArray(ns)) {
             return [id, ns];
+          }
+          if ('entries' in ns) {
+            if (typeof ns.kind === 'string') {
+              return [id, ns];
+            }
+            changed = true;
+            const nsId = typeof ns.id === 'string' ? ns.id : id;
+            return [id, { ...ns, id: nsId, kind: 'test-sql-namespace' }];
           }
           if ('tables' in ns) {
             changed = true;
