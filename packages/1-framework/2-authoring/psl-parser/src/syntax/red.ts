@@ -1,17 +1,109 @@
-import type { Token } from '../tokenizer';
-import type { GreenElement, GreenNode } from './green';
+import type { Token, TokenKind } from '../tokenizer';
+import type { GreenElement, GreenNode, GreenToken } from './green';
 import type { SyntaxKind } from './syntax-kind';
 
 /**
  * A token in the red tree. Unlike the green-layer {@link Token} (kind + text
- * only), a red token also carries its absolute `offset` within the source,
- * computed lazily as the tree is walked.
+ * only), a red token also carries its absolute `offset` within the source and a
+ * link back to its `parent` {@link SyntaxNode}, so a cursor anchored on a token
+ * can walk outward (parent, previous/next token, siblings) without re-scanning
+ * from the document root. Mirrors rust-analyzer's `SyntaxToken`.
  */
-export interface SyntaxToken extends Token {
+export class SyntaxToken implements Token {
+  readonly green: GreenToken;
+  readonly kind: TokenKind;
+  readonly text: string;
   readonly offset: number;
+  readonly parent: SyntaxNode;
+
+  constructor(green: GreenToken, offset: number, parent: SyntaxNode) {
+    this.green = green;
+    this.kind = green.kind;
+    this.text = green.text;
+    this.offset = offset;
+    this.parent = parent;
+  }
+
+  get textLength(): number {
+    return this.text.length;
+  }
+
+  /** The sibling element immediately after this token within its parent. */
+  get nextSiblingOrToken(): SyntaxElement | undefined {
+    return siblingAfter(this.parent, this.green, this.offset);
+  }
+
+  /** The sibling element immediately before this token within its parent. */
+  get prevSiblingOrToken(): SyntaxElement | undefined {
+    return siblingBefore(this.parent, this.green, this.offset);
+  }
+
+  /** The next token in document order, crossing node boundaries. */
+  get nextToken(): SyntaxToken | undefined {
+    for (let el = climbingNext(this); el !== undefined; el = climbingNext(el)) {
+      const token = firstToken(el);
+      if (token !== undefined) return token;
+    }
+    return undefined;
+  }
+
+  /** The previous token in document order, crossing node boundaries. */
+  get prevToken(): SyntaxToken | undefined {
+    for (let el = climbingPrev(this); el !== undefined; el = climbingPrev(el)) {
+      const token = lastToken(el);
+      if (token !== undefined) return token;
+    }
+    return undefined;
+  }
 }
 
 export type SyntaxElement = SyntaxNode | SyntaxToken;
+
+/**
+ * The result of {@link SyntaxNode.tokenAtOffset}. Mirrors rust-analyzer's
+ * `TokenAtOffset`: an offset can fall outside every token (`none`), strictly
+ * inside a single token (`single`), or exactly on the seam between two adjacent
+ * tokens (`between`). `leftBiased` / `rightBiased` collapse the seam case to one
+ * side; for `single` both return the same token, for `none` both return
+ * `undefined`.
+ */
+export class TokenAtOffset {
+  readonly #left: SyntaxToken | undefined;
+  readonly #right: SyntaxToken | undefined;
+
+  private constructor(left: SyntaxToken | undefined, right: SyntaxToken | undefined) {
+    this.#left = left;
+    this.#right = right;
+  }
+
+  static none(): TokenAtOffset {
+    return new TokenAtOffset(undefined, undefined);
+  }
+
+  static single(token: SyntaxToken): TokenAtOffset {
+    return new TokenAtOffset(token, token);
+  }
+
+  static between(left: SyntaxToken, right: SyntaxToken): TokenAtOffset {
+    return new TokenAtOffset(left, right);
+  }
+
+  get isEmpty(): boolean {
+    return this.#left === undefined && this.#right === undefined;
+  }
+
+  get isBetween(): boolean {
+    return this.#left !== undefined && this.#right !== undefined && this.#left !== this.#right;
+  }
+
+  leftBiased(): SyntaxToken | undefined {
+    return this.#left;
+  }
+
+  rightBiased(): SyntaxToken | undefined {
+    return this.#right;
+  }
+}
 
 export class SyntaxNode {
   readonly green: GreenNode;
@@ -44,36 +136,32 @@ export class SyntaxNode {
 
   get nextSibling(): SyntaxElement | undefined {
     if (!this.parent) return undefined;
-    const siblings = this.parent.green.children;
-    let offset = this.parent.offset;
-    let found = false;
-    for (const child of siblings) {
-      if (found) {
-        return wrapElement(child, offset, this.parent);
-      }
-      const childLen = elementTextLength(child);
-      if (child.type === 'node' && offset === this.offset && child === this.green) {
-        found = true;
-      }
-      offset += childLen;
-    }
-    return undefined;
+    return siblingAfter(this.parent, this.green, this.offset);
   }
 
   get prevSibling(): SyntaxElement | undefined {
     if (!this.parent) return undefined;
-    const siblings = this.parent.green.children;
-    let offset = this.parent.offset;
-    let prev: { green: GreenElement; offset: number } | undefined;
-    for (const child of siblings) {
-      if (child.type === 'node' && offset === this.offset && child === this.green) {
-        if (!prev) return undefined;
-        return wrapElement(prev.green, prev.offset, this.parent);
-      }
-      prev = { green: child, offset };
-      offset += elementTextLength(child);
-    }
-    return undefined;
+    return siblingBefore(this.parent, this.green, this.offset);
+  }
+
+  /** The sibling element immediately after this node within its parent. */
+  get nextSiblingOrToken(): SyntaxElement | undefined {
+    return this.nextSibling;
+  }
+
+  /** The sibling element immediately before this node within its parent. */
+  get prevSiblingOrToken(): SyntaxElement | undefined {
+    return this.prevSibling;
+  }
+
+  /** The first token in this subtree (depth-first), or `undefined` if empty. */
+  get firstToken(): SyntaxToken | undefined {
+    return firstToken(this);
+  }
+
+  /** The last token in this subtree (depth-first), or `undefined` if empty. */
+  get lastToken(): SyntaxToken | undefined {
+    return lastToken(this);
   }
 
   *children(): Iterable<SyntaxElement> {
@@ -116,9 +204,41 @@ export class SyntaxNode {
 
   *tokens(): Iterable<SyntaxToken> {
     for (const el of this.descendants()) {
-      if (!(el instanceof SyntaxNode)) {
+      if (el instanceof SyntaxToken) {
         yield el;
       }
+    }
+  }
+
+  /**
+   * The token(s) at `offset`. The between-two-tokens case (offset exactly on a
+   * token seam) is represented explicitly so callers can left/right bias.
+   * Consistent with the zero-width containment rule used by {@link containsOffset}:
+   * empty children are never the token at an offset.
+   */
+  tokenAtOffset(offset: number): TokenAtOffset {
+    return tokenAtOffsetOf(this, offset);
+  }
+
+  /**
+   * The smallest element fully containing the range `[start, end]`. Mirrors
+   * rust-analyzer's `covering_element`. At a seam (and for empty ranges) the
+   * left-hand element is preferred, matching {@link containsOffset}'s zero-width
+   * rule (`textLength === 0` ⇒ contains only the empty range at `start`).
+   */
+  coveringElement(start: number, end: number): SyntaxElement {
+    let result: SyntaxElement = this;
+    for (;;) {
+      if (result instanceof SyntaxToken) return result;
+      let next: SyntaxElement | undefined;
+      for (const child of result.children()) {
+        if (containsRange(child, start, end)) {
+          next = child;
+          break;
+        }
+      }
+      if (next === undefined) return result;
+      result = next;
     }
   }
 }
@@ -127,10 +247,136 @@ function elementTextLength(el: GreenElement): number {
   return el.type === 'token' ? el.text.length : el.textLength;
 }
 
+function elementLength(el: SyntaxElement): number {
+  return el instanceof SyntaxToken ? el.text.length : el.textLength;
+}
+
+/**
+ * Whether `el` contains `offset`. A zero-width element contains only the empty
+ * position at its start (`textLength === 0` ⇒ `offset === start`); otherwise the
+ * span is inclusive on both ends so a seam offset touches both neighbours.
+ */
+function containsOffset(el: SyntaxElement, offset: number): boolean {
+  const start = el.offset;
+  const len = elementLength(el);
+  return len === 0 ? offset === start : offset >= start && offset <= start + len;
+}
+
+function containsRange(el: SyntaxElement, start: number, end: number): boolean {
+  const elStart = el.offset;
+  const len = elementLength(el);
+  if (len === 0) return start === elStart && end === elStart;
+  return elStart <= start && end <= elStart + len;
+}
+
+function tokenAtOffsetOf(el: SyntaxElement, offset: number): TokenAtOffset {
+  if (el instanceof SyntaxToken) {
+    return TokenAtOffset.single(el);
+  }
+  let left: SyntaxElement | undefined;
+  let right: SyntaxElement | undefined;
+  for (const child of el.children()) {
+    if (elementLength(child) === 0) continue;
+    if (!containsOffset(child, offset)) continue;
+    if (left === undefined) {
+      left = child;
+    } else {
+      right = child;
+      break;
+    }
+  }
+  if (left === undefined) return TokenAtOffset.none();
+  if (right === undefined) return tokenAtOffsetOf(left, offset);
+  const leftToken = tokenAtOffsetOf(left, offset).rightBiased();
+  const rightToken = tokenAtOffsetOf(right, offset).leftBiased();
+  if (leftToken !== undefined && rightToken !== undefined) {
+    return TokenAtOffset.between(leftToken, rightToken);
+  }
+  if (leftToken !== undefined) return TokenAtOffset.single(leftToken);
+  if (rightToken !== undefined) return TokenAtOffset.single(rightToken);
+  return TokenAtOffset.none();
+}
+
+function firstToken(el: SyntaxElement): SyntaxToken | undefined {
+  if (el instanceof SyntaxToken) return el;
+  for (const child of el.children()) {
+    const token = firstToken(child);
+    if (token !== undefined) return token;
+  }
+  return undefined;
+}
+
+function lastToken(el: SyntaxElement): SyntaxToken | undefined {
+  if (el instanceof SyntaxToken) return el;
+  const children = Array.from(el.children());
+  for (let i = children.length - 1; i >= 0; i--) {
+    const child = children[i];
+    if (child !== undefined) {
+      const token = lastToken(child);
+      if (token !== undefined) return token;
+    }
+  }
+  return undefined;
+}
+
+function siblingAfter(
+  parent: SyntaxNode,
+  green: GreenElement,
+  offset: number,
+): SyntaxElement | undefined {
+  let cursor = parent.offset;
+  let found = false;
+  for (const child of parent.green.children) {
+    if (found) return wrapElement(child, cursor, parent);
+    if (child === green && cursor === offset) found = true;
+    cursor += elementTextLength(child);
+  }
+  return undefined;
+}
+
+function siblingBefore(
+  parent: SyntaxNode,
+  green: GreenElement,
+  offset: number,
+): SyntaxElement | undefined {
+  let cursor = parent.offset;
+  let prev: { green: GreenElement; offset: number } | undefined;
+  for (const child of parent.green.children) {
+    if (child === green && cursor === offset) {
+      if (prev === undefined) return undefined;
+      return wrapElement(prev.green, prev.offset, parent);
+    }
+    prev = { green: child, offset: cursor };
+    cursor += elementTextLength(child);
+  }
+  return undefined;
+}
+
+function climbingNext(el: SyntaxElement): SyntaxElement | undefined {
+  let current: SyntaxElement = el;
+  for (;;) {
+    const parent = current.parent;
+    if (parent === undefined) return undefined;
+    const sibling = siblingAfter(parent, current.green, current.offset);
+    if (sibling !== undefined) return sibling;
+    current = parent;
+  }
+}
+
+function climbingPrev(el: SyntaxElement): SyntaxElement | undefined {
+  let current: SyntaxElement = el;
+  for (;;) {
+    const parent = current.parent;
+    if (parent === undefined) return undefined;
+    const sibling = siblingBefore(parent, current.green, current.offset);
+    if (sibling !== undefined) return sibling;
+    current = parent;
+  }
+}
+
 function wrapElement(green: GreenElement, offset: number, parent: SyntaxNode): SyntaxElement {
   if (green.type === 'token') {
-    const token: SyntaxToken = { kind: green.kind, text: green.text, offset };
-    return token;
+    return new SyntaxToken(green, offset, parent);
   }
   return new SyntaxNode(green, offset, parent);
 }
