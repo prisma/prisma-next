@@ -1,45 +1,48 @@
 # @prisma-next/language-server
 
-> **Internal package.** This package is an implementation detail of [`prisma-next`](https://www.npmjs.com/package/prisma-next)
-> and is published only to support its runtime. Its API is unstable and may change
-> without notice. Do not depend on this package directly; install `prisma-next` instead.
+> **Internal package.** This package is an implementation detail of [`prisma-next`](https://www.npmjs.com/package/prisma-next) and is published only to support its runtime. Its API is unstable and may change without notice. Do not depend on this package directly; install `prisma-next` instead.
 
-The Prisma Next language server. It speaks the Language Server Protocol over stdio and supports PSL parse diagnostics plus whole-document PSL formatting for the schema inputs declared in a project's `prisma-next.config.ts`. It is launched by the `prisma-next lsp` subcommand, so the editor features come from the project's own `@prisma-next` version (version-matched by construction).
+The Prisma Next language server speaks the Language Server Protocol over stdio for PSL schema inputs declared in a project's `prisma-next.config.ts`. It is launched by the `prisma-next lsp` subcommand, so editor features come from the project's own `@prisma-next` version and stay version-matched by construction.
 
 ## Scope
 
-Supported capabilities are intentionally narrow: parse diagnostics and whole-document formatting for configured PSL inputs. Formatting is only available for documents listed in `contract.source.inputs`, uses `@prisma-next/psl-parser/format`, and applies formatter options from the project's Prisma config `formatter` block. Hover, completion, navigation, range formatting, on-type formatting, and editor-extension work are out of scope. A server process can manage multiple projects under the workspace root, keyed by the config file each open document belongs to.
+Supported capabilities are intentionally narrow: parse diagnostics, whole-document formatting, folding ranges, and full/range semantic tokens for configured PSL inputs. Formatting is only available for documents listed in `contract.source.inputs`, uses `@prisma-next/psl-parser/format`, and applies formatter options from the project's Prisma config `formatter` block. Semantic tokens use the standard LSP token taxonomy advertised by the server; they do not introduce Prisma-specific token names or a second parser. Hover, completion, navigation, range formatting, on-type formatting, semantic-token delta requests, and editor-extension work are out of scope. A server process can manage multiple projects under the workspace root, keyed by the config file each open document belongs to.
+
+## Responsibilities
+
+- Resolve workspace/project configuration for open PSL documents and keep managed projects aligned with config-file changes.
+- Publish parse diagnostics and serve whole-document formatting, folding ranges, and full/range semantic tokens for configured PSL inputs.
+- Preserve parser artifacts per project so editor features share the same AST, source-file, and symbol-table lifecycle instead of reparsing through feature-specific paths.
+- Fail safely for unsupported documents, missing or closed buffers, config-load failures, malformed inputs, and oversized semantic-token requests.
+
+## Dependencies
+
+- `@prisma-next/config-loader` — discovers nearest config files and loads project configuration.
+- `@prisma-next/psl-parser` — parses PSL, builds symbol tables, exposes syntax artifacts, and formats PSL text.
+- `@prisma-next/framework-components` — supplies control-stack input types used when resolving project configuration.
+- `@prisma-next/errors` and `@prisma-next/utils` — shared framework utilities used by parsing/config plumbing.
+- `vscode-languageserver` and `vscode-languageserver-textdocument` — LSP connection, request/notification types, semantic-token/folding/formatting types, and incremental document management.
 
 ## How it works
 
-1. **`initialize`** — resolves the workspace root from the client's `rootUri` and registers config-file watching when the client supports it. Configs are loaded when matching documents open or when watched config files change. If a config cannot be loaded, the server does not manage that project.
-2. **Document sync** — text-document sync is **incremental**
-   (`TextDocumentSyncKind.Incremental`); the `TextDocuments` manager applies
-   incremental edits, and the server re-parses the full current buffer on each
-   change.
+1. **`initialize`** — resolves the workspace root from the client's `rootUri` and registers config-file watching when the client supports it. The server advertises incremental text sync, whole-document formatting, folding ranges, and `semanticTokensProvider` with a stable standard-only legend, `full: true`, and `range: true`. Configs are loaded when matching documents open or when watched config files change. If a config cannot be loaded, the server does not manage that project.
+2. **Document sync** — text-document sync is **incremental** (`TextDocumentSyncKind.Incremental`); the `TextDocuments` manager applies incremental edits, and the server re-parses the full current buffer on each change.
 3. **Diagnostics** — on `didOpen` / `didChange` of a document whose URI is a configured PSL input, the server runs `@prisma-next/psl-parser`'s `parse()` (the CST path) and `buildSymbolTable()`, then publishes the merged, mapped diagnostics via `textDocument/publishDiagnostics`. A clean document publishes an empty array (clearing markers). Documents that are not configured inputs publish nothing.
 4. **Formatting** — on `textDocument/formatting`, the server formats the current in-memory document text with `@prisma-next/psl-parser/format` when the document is a configured PSL input. It returns one whole-document edit when the formatted text differs, and returns no edits for missing or closed documents, unconfigured documents, already canonical text, malformed PSL, or invalid formatter options.
-5. **Preserved artifacts** — each project keeps the parse artifacts it produces:
-   the AST per open document (keyed by URI) and one symbol table per project,
-   rebuilt from the open configured input on each edit and dropped when the
-   document closes. They are exposed through `getDocumentAst` /
-   `getProjectSymbolTable` so future features (completion, semantic tokens) read
-   real stages instead of re-parsing. Filling the project table from several
-   inputs — and reading unopened inputs from disk — is deferred cross-file work.
+5. **Folding ranges** — on `textDocument/foldingRange`, the server reads the preserved document AST for the configured input and returns foldable declaration/block ranges. Missing, unconfigured, or not-yet-parsed documents return an empty result.
+6. **Semantic tokens** — on `textDocument/semanticTokens/full` and `textDocument/semanticTokens/range`, the server reads the current preserved `DocumentAst`, `SourceFile`, project `SymbolTable`, and control-stack scalar types from the same `ProjectArtifacts` lifecycle used by diagnostics. It classifies PSL keywords, declaration names, field/property names, type references, attributes, strings, numbers, booleans, and comments into standard token types/modifiers, then encodes them as LSP five-integer relative semantic-token data. The range request filters to intersecting tokens before encoding. Unconfigured, missing, closed, config-resolution-failed, oversized, or stale documents return `{ data: [] }` instead of throwing or reparsing through a semantic-token-specific path. Malformed PSL returns best-effort tokens from parser recovery when artifacts are available.
+7. **Preserved artifacts** — each project keeps the parse artifacts it produces: the AST per open document (keyed by URI) and one symbol table per project, rebuilt from the open configured input on each edit and dropped when the document closes. Diagnostics populate these artifacts, and folding/semantic-token handlers read them instead of constructing independent parse/token caches. They are exposed through `getDocumentAst` / `getProjectSymbolTable` for future features. Filling the project table from several inputs — and reading unopened inputs from disk — is deferred cross-file work.
 
 ## Module layout
 
-- `diagnostic-mapping.ts` — pure `ParseDiagnostic[] → LspDiagnostic[]` mapping.
-  Free of any `vscode-languageserver` import; it returns plain shape objects
-  (ranges pass through unchanged) so it stays reusable. The connection layer
-  adapts the numeric severity to the LSP enum.
-- `schema-inputs.ts` — resolves the schema-input set (`SchemaInputSet`) from a
-  config and answers URI membership.
+- `diagnostic-mapping.ts` — pure `ParseDiagnostic[] → LspDiagnostic[]` mapping. Free of any `vscode-languageserver` import; it returns plain shape objects (ranges pass through unchanged) so it stays reusable. The connection layer adapts the numeric severity to the LSP enum.
+- `schema-inputs.ts` — resolves the schema-input set (`SchemaInputSet`) from a config and answers URI membership.
 - `config-resolution.ts` — wraps `loadConfig` and resolves schema inputs, formatter options, and control-stack inputs for a config. A standalone async function so it can be re-run on a config change without rewiring the server.
 - `document-diagnostics.ts` — `computeDocumentDiagnostics(uri, text, inputs, controlStack)`, the pure seam that parses, builds the symbol table, and returns the diagnostics plus the parse artifacts.
-- `project-artifacts.ts` — `createProjectArtifacts()`, the per-project store that
-  preserves the per-URI ASTs and the single project symbol table across edits.
-- `server.ts` — `createServer(connection)` wires diagnostics and whole-document formatting handlers onto an injected connection.
+- `project-artifacts.ts` — `createProjectArtifacts()`, the per-project store that preserves the per-URI ASTs and the single project symbol table across edits.
+- `folding-ranges.ts` — pure AST-to-LSP folding-range computation for declaration/block bodies.
+- `semantic-tokens.ts` — pure PSL semantic-token collection, range filtering, multiline normalization, duplicate resolution, modifier bitset encoding, and LSP semantic-token data encoding.
+- `server.ts` — `createServer(connection)` wires diagnostics, whole-document formatting, folding ranges, semantic-token handlers, config watching, and project-artifact access onto an injected connection.
 - `start-server.ts` — `startServer()` creates a stdio connection and starts the server. This is what the CLI delegates to.
 
 ## Package Location
