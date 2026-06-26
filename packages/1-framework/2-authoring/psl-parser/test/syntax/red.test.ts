@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { GreenNodeBuilder } from '../../src/syntax/green-builder';
-import { createSyntaxTree, SyntaxNode } from '../../src/syntax/red';
+import { createSyntaxTree, SyntaxNode, SyntaxToken } from '../../src/syntax/red';
+import type { SyntaxKind } from '../../src/syntax/syntax-kind';
+
+/** Source rendered by {@link buildSampleTree}, with token offsets used below. */
+const SAMPLE_SOURCE = 'model User {\n  id Int @id\n}';
+
+function firstNodeOfKind(root: SyntaxNode, kind: SyntaxKind): SyntaxNode {
+  for (const el of root.descendants()) {
+    if (el instanceof SyntaxNode && el.kind === kind) return el;
+  }
+  throw new Error(`no ${kind} node in tree`);
+}
 
 /** Builds a tree for: model User {\n  id Int @id\n} */
 function buildSampleTree() {
@@ -207,6 +218,168 @@ describe('SyntaxNode.ancestors', () => {
     const root = createSyntaxTree(buildSampleTree());
     const ancestors = Array.from(root.ancestors());
     expect(ancestors).toHaveLength(0);
+  });
+});
+
+describe('SyntaxToken navigation', () => {
+  it('exposes the parent node', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const intToken = root.tokenAtOffset(19).leftBiased();
+    expect(intToken).toBeInstanceOf(SyntaxToken);
+    expect(intToken?.text).toBe('Int');
+    expect(intToken?.parent.kind).toBe('TypeAnnotation');
+  });
+
+  it('walks nextToken across node boundaries in document order', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const expected = Array.from(root.tokens());
+
+    const walked: SyntaxToken[] = [];
+    let token = root.firstToken;
+    while (token !== undefined) {
+      walked.push(token);
+      token = token.nextToken;
+    }
+
+    expect(walked.map((t) => t.text)).toEqual(expected.map((t) => t.text));
+    expect(walked.map((t) => t.offset)).toEqual(expected.map((t) => t.offset));
+  });
+
+  it('walks prevToken back to the first token', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const expected = Array.from(root.tokens()).reverse();
+
+    const walked: SyntaxToken[] = [];
+    let token = root.lastToken;
+    while (token !== undefined) {
+      walked.push(token);
+      token = token.prevToken;
+    }
+
+    expect(walked.map((t) => t.text)).toEqual(expected.map((t) => t.text));
+  });
+
+  it('returns undefined past the tree edges', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    expect(root.firstToken?.prevToken).toBeUndefined();
+    expect(root.lastToken?.nextToken).toBeUndefined();
+  });
+
+  it('navigates sibling-or-token within a node', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const field = firstNodeOfKind(root, 'FieldDeclaration');
+    const name = field.firstChild;
+    expect(name).toBeInstanceOf(SyntaxNode);
+    const afterName = name?.nextSiblingOrToken;
+    expect(afterName).toBeInstanceOf(SyntaxToken);
+    if (afterName instanceof SyntaxToken) {
+      expect(afterName.kind).toBe('Whitespace');
+      const back = afterName.prevSiblingOrToken;
+      expect(back).toBeInstanceOf(SyntaxNode);
+      if (back instanceof SyntaxNode) {
+        expect(back.kind).toBe('Identifier');
+        expect(back.offset).toBe(name?.offset);
+      }
+    }
+  });
+});
+
+describe('SyntaxNode.tokenAtOffset', () => {
+  it('returns a single token for an offset strictly inside it', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const at = root.tokenAtOffset(19);
+    expect(at.isBetween).toBe(false);
+    expect(at.isEmpty).toBe(false);
+    expect(at.leftBiased()?.text).toBe('Int');
+    expect(at.rightBiased()).toBe(at.leftBiased());
+  });
+
+  it('represents the between-two-tokens seam with left/right bias', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    // offset 5 sits exactly on the seam between `model` and the following space.
+    const at = root.tokenAtOffset(5);
+    expect(at.isBetween).toBe(true);
+    expect(at.leftBiased()?.text).toBe('model');
+    expect(at.leftBiased()?.kind).toBe('Ident');
+    expect(at.rightBiased()?.kind).toBe('Whitespace');
+  });
+
+  it('left-biases to the final significant token at EOF', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const at = root.tokenAtOffset(SAMPLE_SOURCE.length);
+    expect(at.leftBiased()?.kind).toBe('RBrace');
+    expect(at.leftBiased()?.text).toBe('}');
+  });
+
+  it('returns none for an offset outside the tree', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const at = root.tokenAtOffset(SAMPLE_SOURCE.length + 50);
+    expect(at.isEmpty).toBe(true);
+    expect(at.leftBiased()).toBeUndefined();
+    expect(at.rightBiased()).toBeUndefined();
+  });
+
+  it('skips a zero-width node sitting on the seam', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('Document');
+    b.startNode('Identifier');
+    b.token('Ident', 'A');
+    b.finishNode();
+    b.startNode('TypeAnnotation'); // empty, zero-width at offset 1
+    b.finishNode();
+    b.startNode('Identifier');
+    b.token('Ident', 'B');
+    b.finishNode();
+    const root = createSyntaxTree(b.finishNode());
+
+    const at = root.tokenAtOffset(1);
+    expect(at.isBetween).toBe(true);
+    expect(at.leftBiased()?.text).toBe('A');
+    expect(at.rightBiased()?.text).toBe('B');
+  });
+
+  it('returns none for an empty document', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('Document');
+    const root = createSyntaxTree(b.finishNode());
+    expect(root.tokenAtOffset(0).isEmpty).toBe(true);
+  });
+});
+
+describe('SyntaxNode.coveringElement', () => {
+  it('descends to the smallest element covering a range', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    // `Int` token spans [18, 21).
+    const covering = root.coveringElement(18, 21);
+    expect(covering).toBeInstanceOf(SyntaxToken);
+    if (covering instanceof SyntaxToken) {
+      expect(covering.text).toBe('Int');
+    }
+  });
+
+  it('left-biases an empty range at a seam', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('Document');
+    b.startNode('Identifier');
+    b.token('Ident', 'A');
+    b.finishNode();
+    b.startNode('Identifier');
+    b.token('Ident', 'B');
+    b.finishNode();
+    const root = createSyntaxTree(b.finishNode());
+
+    const covering = root.coveringElement(1, 1);
+    expect(covering).toBeInstanceOf(SyntaxToken);
+    if (covering instanceof SyntaxToken) {
+      expect(covering.text).toBe('A');
+    }
+  });
+
+  it('returns the root when no child covers the range', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('Document');
+    const root = createSyntaxTree(b.finishNode());
+    expect(root.coveringElement(0, 0)).toBe(root);
   });
 });
 
