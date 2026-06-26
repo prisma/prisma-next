@@ -5,16 +5,18 @@ import {
   FieldAttributeAst,
   FieldDeclarationAst,
   GenericBlockDeclarationAst,
+  isTrivia,
   KeyValuePairAst,
   ModelAttributeAst,
   ModelDeclarationAst,
   NamespaceDeclarationAst,
   type Position,
+  previousNonTriviaToken,
   type QualifiedNameAst,
   type SourceFile,
   type SyntaxNode,
   type SyntaxToken,
-  TypeAnnotationAst,
+  type TokenAtOffset,
   TypesBlockAst,
 } from '@prisma-next/psl-parser/syntax';
 
@@ -23,17 +25,6 @@ export interface ClassifyPslCompletionContextInput {
   readonly sourceFile: SourceFile;
   readonly position: Position;
 }
-
-export type UnsupportedPslCompletionReason =
-  | 'attribute'
-  | 'attributeArgument'
-  | 'comment'
-  | 'constructorArgument'
-  | 'fieldName'
-  | 'genericBlock'
-  | 'invalidQualifiedType'
-  | 'notTypePrefix'
-  | 'outsideModelField';
 
 export interface TypeNamePrefix {
   readonly path: readonly string[];
@@ -47,6 +38,7 @@ export interface ModelFieldTypeCompletionContext {
   readonly offset: number;
   readonly fieldName: string;
   readonly prefix: TypeNamePrefix;
+  readonly replacementStartOffset: number;
 }
 
 export interface GenericBlockParameterCompletionContext {
@@ -71,7 +63,6 @@ export interface DeclarationKeywordCompletionContext {
 export interface UnsupportedPslCompletionContext {
   readonly kind: 'unsupported';
   readonly offset: number;
-  readonly reason: UnsupportedPslCompletionReason;
 }
 
 export type PslCompletionContext =
@@ -81,37 +72,41 @@ export type PslCompletionContext =
   | UnsupportedPslCompletionContext;
 
 interface TokenContext {
-  readonly current?: SyntaxToken;
-  readonly previous?: SyntaxToken;
-  readonly previousSignificant?: SyntaxToken;
-  readonly touching?: SyntaxToken;
+  readonly current: SyntaxToken | undefined;
+  readonly previousSignificant: SyntaxToken | undefined;
+  readonly touching: SyntaxToken | undefined;
 }
 
 export function classifyPslCompletionContext(
   input: ClassifyPslCompletionContextInput,
 ): PslCompletionContext {
+  const root = input.document.syntax;
   const offset = input.sourceFile.offsetAt(input.position);
-  const tokenContext = findTokenContext(input.document.syntax, offset);
+  const at = root.tokenAtOffset(offset);
+  const tokenContext = tokenContextAt(at, offset);
   if (tokenContext.current?.kind === 'Comment' || tokenContext.touching?.kind === 'Comment') {
-    return unsupported(offset, 'comment');
+    return unsupported(offset);
   }
 
-  const node = findDeepestNodeAtOffset(input.document.syntax, offset);
-  const previousNode =
-    tokenContext.previousSignificant === undefined
-      ? undefined
-      : findDeepestNodeAtOffset(input.document.syntax, tokenContext.previousSignificant.offset);
-  const contextNode = nodeForContext(node, previousNode);
-  const ancestorReason = unsupportedAncestorReason(contextNode);
-  if (ancestorReason !== undefined) {
-    return unsupported(offset, ancestorReason);
+  // Anchor on the token left of the cursor (rust-analyzer's `original_token`) and
+  // navigate outward via `token.parent` rather than scanning the whole tree.
+  const anchorNode = at.leftBiased()?.parent;
+  const previousSignificantNode = tokenContext.previousSignificant?.parent;
+  const contextNode = nodeForContext(anchorNode, previousSignificantNode);
+  if (hasUnsupportedAncestor(contextNode)) {
+    return unsupported(offset);
   }
+
+  // rust-analyzer's `source_range()`: the edit replaces the identifier under the
+  // cursor, or is empty when the cursor sits in trivia.
+  const replacementStartOffset = sourceRangeStart(tokenContext, offset);
 
   const declarationKeywordContext = classifyDeclarationKeyword({
     node: contextNode,
     offset,
-    sourceFile: input.sourceFile,
+    source: input.sourceFile.text,
     tokenContext,
+    replacementStartOffset,
   });
   if (declarationKeywordContext !== undefined) {
     return declarationKeywordContext;
@@ -120,8 +115,9 @@ export function classifyPslCompletionContext(
   const genericBlockContext = classifyGenericBlockParameter({
     node: contextNode,
     offset,
-    sourceFile: input.sourceFile,
+    source: input.sourceFile.text,
     tokenContext,
+    replacementStartOffset,
   });
   if (genericBlockContext !== undefined) {
     return genericBlockContext;
@@ -129,95 +125,101 @@ export function classifyPslCompletionContext(
 
   const field = closestAst(contextNode, FieldDeclarationAst.cast);
   if (field === undefined) {
-    return unsupported(offset, 'outsideModelField');
+    return unsupported(offset);
   }
   if (closestAst(field.syntax, ModelDeclarationAst.cast) === undefined) {
-    return unsupported(offset, 'outsideModelField');
+    return unsupported(offset);
   }
 
   return classifyModelFieldType({
     field,
     offset,
-    sourceFile: input.sourceFile,
+    source: input.sourceFile.text,
+    replacementStartOffset,
   });
 }
 
 function classifyModelFieldType(input: {
   readonly field: FieldDeclarationAst;
   readonly offset: number;
-  readonly sourceFile: SourceFile;
+  readonly source: string;
+  readonly replacementStartOffset: number;
 }): PslCompletionContext {
   const fieldName = input.field.name();
   const fieldNameText = fieldName?.name();
   if (fieldName === undefined || fieldNameText === undefined) {
-    return unsupported(input.offset, 'outsideModelField');
+    return unsupported(input.offset);
   }
 
   const fieldNameStart = fieldName.syntax.offset;
   const fieldNameEnd = endOffset(fieldName.syntax);
   if (input.offset >= fieldNameStart && input.offset <= fieldNameEnd) {
-    return unsupported(input.offset, 'fieldName');
+    return unsupported(input.offset);
   }
 
   const typeAnnotation = input.field.typeAnnotation();
   if (typeAnnotation === undefined) {
-    return unsupported(input.offset, 'outsideModelField');
+    return unsupported(input.offset);
   }
 
   const typeStart = typeAnnotation.syntax.offset;
   const typeEnd = endOffset(typeAnnotation.syntax);
   if (typeAnnotation.syntax.textLength === 0) {
+    const fieldNameToken = fieldName.syntax.lastToken;
     if (
+      fieldNameToken !== undefined &&
       input.offset > fieldNameEnd &&
       input.offset <= typeStart &&
-      hasOnlyHorizontalWhitespace(input.sourceFile.text, fieldNameEnd, input.offset)
+      onlyWhitespaceBetween(fieldNameToken, input.offset)
     ) {
-      return modelFieldType(input.offset, fieldNameText, { path: [], name: '' });
+      return modelFieldType(input.offset, fieldNameText, { path: [], name: '' }, input.offset);
     }
-    return unsupported(input.offset, 'notTypePrefix');
+    return unsupported(input.offset);
   }
 
   if (input.offset < typeStart || input.offset > typeEnd) {
-    return unsupported(input.offset, 'notTypePrefix');
+    return unsupported(input.offset);
   }
 
   const constructorArgList = typeAnnotation.argList();
   if (constructorArgList !== undefined && containsOffset(constructorArgList.syntax, input.offset)) {
-    return unsupported(input.offset, 'constructorArgument');
+    return unsupported(input.offset);
   }
 
   const name = typeAnnotation.name();
   if (name === undefined) {
-    return unsupported(input.offset, 'notTypePrefix');
+    return unsupported(input.offset);
   }
   if (!containsOffset(name.syntax, input.offset)) {
-    return unsupported(input.offset, 'notTypePrefix');
+    return unsupported(input.offset);
   }
   if (name.isOverQualified()) {
-    return unsupported(input.offset, 'invalidQualifiedType');
+    return unsupported(input.offset);
   }
 
-  const prefix = typeNamePrefix(name, input.offset, input.sourceFile.text);
+  const prefix = typeNamePrefix(name, input.offset, input.source);
   if (prefix === undefined) {
-    return unsupported(input.offset, 'invalidQualifiedType');
+    return unsupported(input.offset);
   }
 
-  return modelFieldType(input.offset, fieldNameText, prefix);
+  return modelFieldType(input.offset, fieldNameText, prefix, input.replacementStartOffset);
 }
 
 function modelFieldType(
   offset: number,
   fieldName: string,
   prefix: TypeNamePrefix,
+  replacementStartOffset: number,
 ): ModelFieldTypeCompletionContext {
-  return { kind: 'modelFieldType', offset, fieldName, prefix };
+  return { kind: 'modelFieldType', offset, fieldName, prefix, replacementStartOffset };
 }
 
 function classifyDeclarationKeyword(input: {
   readonly node: SyntaxNode | undefined;
   readonly offset: number;
-  readonly sourceFile: SourceFile;
+  readonly source: string;
   readonly tokenContext: TokenContext;
+  readonly replacementStartOffset: number;
 }): DeclarationKeywordCompletionContext | undefined {
   if (isInsideNonDeclarationKeywordBody(input.node, input.offset)) {
     return undefined;
@@ -225,14 +227,9 @@ function classifyDeclarationKeyword(input: {
 
   const namespace = closestAst(input.node, NamespaceDeclarationAst.cast);
   const scope = namespaceBodyContainsOffset(namespace, input.offset) ? 'namespace' : 'document';
-  const anchorOffset = scope === 'namespace' ? namespace?.lbrace()?.offset : undefined;
-  const prefix = declarationKeywordPrefix({
-    offset: input.offset,
-    source: input.sourceFile.text,
-    tokenContext: input.tokenContext,
-    ...(anchorOffset === undefined ? {} : { anchorOffset }),
-  });
-  if (prefix === undefined) {
+
+  const prefixToken = cursorIdentifier(input.tokenContext, input.offset);
+  if (!declarationKeywordAllowed(prefixToken, namespace, input)) {
     return undefined;
   }
 
@@ -240,9 +237,36 @@ function classifyDeclarationKeyword(input: {
     kind: 'declarationKeyword',
     offset: input.offset,
     scope,
-    prefix: prefix.text,
-    replacementStartOffset: prefix.replacementStartOffset,
+    prefix: input.source.slice(input.replacementStartOffset, input.offset),
+    replacementStartOffset: input.replacementStartOffset,
   };
+}
+
+/**
+ * A declaration keyword may be completed only when nothing but whitespace
+ * precedes the cursor on its line — i.e. the previous significant token is on an
+ * earlier line, is absent, or is the enclosing namespace's opening brace.
+ */
+function declarationKeywordAllowed(
+  prefixToken: SyntaxToken | undefined,
+  namespace: NamespaceDeclarationAst | undefined,
+  input: { readonly offset: number; readonly tokenContext: TokenContext },
+): boolean {
+  const previous =
+    prefixToken !== undefined
+      ? previousNonTriviaToken(prefixToken)
+      : input.tokenContext.previousSignificant;
+  if (previous === undefined) {
+    return true;
+  }
+
+  const start = prefixToken?.offset ?? input.offset;
+  if (newlineBetween(previous, start)) {
+    return true;
+  }
+
+  const lbrace = namespace?.lbrace();
+  return lbrace !== undefined && lbrace.offset === previous.offset;
 }
 
 function isInsideNonDeclarationKeywordBody(node: SyntaxNode | undefined, offset: number): boolean {
@@ -293,114 +317,53 @@ function namespaceBodyContainsOffset(
   return offset >= bodyStart && offset <= bodyEnd;
 }
 
-function declarationKeywordPrefix(input: {
-  readonly offset: number;
-  readonly source: string;
-  readonly tokenContext: TokenContext;
-  readonly anchorOffset?: number;
-}): { readonly text: string; readonly replacementStartOffset: number } | undefined {
-  const token = declarationPrefixToken(input.tokenContext, input.offset);
-  const start = token?.offset ?? input.offset;
-  if (!hasOnlyHorizontalWhitespace(input.source, declarationPrefixAllowedStart(input), start)) {
-    return undefined;
-  }
-  if (token === undefined) {
-    return { text: '', replacementStartOffset: input.offset };
-  }
-  return {
-    text: input.source.slice(token.offset, input.offset),
-    replacementStartOffset: token.offset,
-  };
-}
-
-function declarationPrefixToken(
-  tokenContext: TokenContext,
-  offset: number,
-): SyntaxToken | undefined {
-  if (tokenContext.current?.kind === 'Ident') {
-    return tokenContext.current;
-  }
-  if (tokenContext.touching?.kind === 'Ident') {
-    return tokenContext.touching;
-  }
-  if (
-    tokenContext.previousSignificant?.kind === 'Ident' &&
-    tokenContext.previousSignificant.offset + tokenContext.previousSignificant.text.length ===
-      offset
-  ) {
-    return tokenContext.previousSignificant;
-  }
-  return undefined;
-}
-
-function declarationPrefixAllowedStart(input: {
-  readonly offset: number;
-  readonly source: string;
-  readonly anchorOffset?: number;
-}): number {
-  const lineStart = lineStartOffset(input.source, input.offset);
-  if (input.anchorOffset === undefined || input.anchorOffset < lineStart) {
-    return lineStart;
-  }
-  return input.anchorOffset + 1;
-}
-
-function lineStartOffset(source: string, offset: number): number {
-  const previousNewline = source.lastIndexOf('\n', Math.max(0, offset - 1));
-  return previousNewline < 0 ? 0 : previousNewline + 1;
-}
-
 function classifyGenericBlockParameter(input: {
   readonly node: SyntaxNode | undefined;
   readonly offset: number;
-  readonly sourceFile: SourceFile;
+  readonly source: string;
   readonly tokenContext: TokenContext;
+  readonly replacementStartOffset: number;
 }): PslCompletionContext | undefined {
   const block = closestAst(input.node, GenericBlockDeclarationAst.cast);
   if (block === undefined) {
     return undefined;
   }
 
-  const lbrace = firstTokenOfKind(block.syntax, 'LBrace');
+  const lbrace = block.lbrace();
   if (lbrace === undefined || input.offset < lbrace.offset + lbrace.text.length) {
-    return unsupported(input.offset, 'genericBlock');
+    return unsupported(input.offset);
   }
 
-  const rbrace = firstTokenOfKind(block.syntax, 'RBrace');
+  const rbrace = block.rbrace();
   if (rbrace !== undefined && input.offset > rbrace.offset) {
-    return unsupported(input.offset, 'genericBlock');
+    return unsupported(input.offset);
   }
 
   const field = closestAst(input.node, FieldDeclarationAst.cast);
   if (field !== undefined && containsOffset(field.syntax, input.offset)) {
-    return unsupported(input.offset, 'genericBlock');
+    return unsupported(input.offset);
   }
 
   if (input.tokenContext.previousSignificant?.kind === 'Equals') {
-    return unsupported(input.offset, 'genericBlock');
+    return unsupported(input.offset);
   }
 
   const keyword = block.keyword()?.text;
   if (keyword === undefined || keyword.length === 0) {
-    return unsupported(input.offset, 'genericBlock');
+    return unsupported(input.offset);
   }
 
   const activePair = activeKeyValuePair(input.node, input.offset);
   if (activePair !== undefined && isAfterEquals(activePair, input.offset)) {
-    return unsupported(input.offset, 'genericBlock');
-  }
-
-  const prefix = genericBlockParameterPrefix(activePair, input.offset, input.sourceFile.text);
-  if (prefix === undefined) {
-    return unsupported(input.offset, 'genericBlock');
+    return unsupported(input.offset);
   }
 
   return {
     kind: 'genericBlockParameter',
     offset: input.offset,
     blockKeyword: keyword,
-    prefix: prefix.text,
-    replacementStartOffset: prefix.replacementStartOffset,
+    prefix: input.source.slice(input.replacementStartOffset, input.offset),
+    replacementStartOffset: input.replacementStartOffset,
     existingParameterNames: existingParameterNames(block, activePair),
   };
 }
@@ -417,37 +380,8 @@ function activeKeyValuePair(
 }
 
 function isAfterEquals(pair: KeyValuePairAst, offset: number): boolean {
-  const equals = firstTokenOfKind(pair.syntax, 'Equals');
+  const equals = pair.equals();
   return equals !== undefined && offset > equals.offset;
-}
-
-function genericBlockParameterPrefix(
-  pair: KeyValuePairAst | undefined,
-  offset: number,
-  source: string,
-): { readonly text: string; readonly replacementStartOffset: number } | undefined {
-  if (pair === undefined) {
-    return { text: '', replacementStartOffset: offset };
-  }
-
-  const key = pair.key();
-  if (key === undefined) {
-    return { text: '', replacementStartOffset: offset };
-  }
-
-  const keyStart = key.syntax.offset;
-  const keyEnd = endOffset(key.syntax);
-  if (offset < keyStart) {
-    return { text: '', replacementStartOffset: offset };
-  }
-  if (offset <= keyEnd) {
-    return { text: source.slice(keyStart, offset), replacementStartOffset: keyStart };
-  }
-  const equals = firstTokenOfKind(pair.syntax, 'Equals');
-  if (equals === undefined || offset <= equals.offset) {
-    return { text: source.slice(keyStart, keyEnd), replacementStartOffset: keyStart };
-  }
-  return undefined;
 }
 
 function existingParameterNames(
@@ -471,38 +405,16 @@ function sameSpan(left: SyntaxNode, right: SyntaxNode): boolean {
   return left.offset === right.offset && left.textLength === right.textLength;
 }
 
-function firstTokenOfKind(node: SyntaxNode, kind: SyntaxToken['kind']): SyntaxToken | undefined {
-  for (const token of node.tokens()) {
-    if (token.kind === kind) {
-      return token;
-    }
-  }
-  return undefined;
+function unsupported(offset: number): UnsupportedPslCompletionContext {
+  return { kind: 'unsupported', offset };
 }
 
-function unsupported(
-  offset: number,
-  reason: UnsupportedPslCompletionReason,
-): UnsupportedPslCompletionContext {
-  return { kind: 'unsupported', offset, reason };
-}
-
-function unsupportedAncestorReason(
-  node: SyntaxNode | undefined,
-): UnsupportedPslCompletionReason | undefined {
-  const argList = closestAst(node, AttributeArgListAst.cast);
-  if (argList !== undefined) {
-    return closestAst(argList.syntax, TypeAnnotationAst.cast) === undefined
-      ? 'attributeArgument'
-      : 'constructorArgument';
-  }
-  if (
+function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
+  return (
+    closestAst(node, AttributeArgListAst.cast) !== undefined ||
     closestAst(node, FieldAttributeAst.cast) !== undefined ||
     closestAst(node, ModelAttributeAst.cast) !== undefined
-  ) {
-    return 'attribute';
-  }
-  return undefined;
+  );
 }
 
 function typeNamePrefix(
@@ -608,74 +520,72 @@ function closestAst<T>(
   node: SyntaxNode | undefined,
   cast: (node: SyntaxNode) => T | undefined,
 ): T | undefined {
-  for (let current = node; current !== undefined; current = current.parent) {
-    const result = cast(current);
+  if (node === undefined) {
+    return undefined;
+  }
+  const current = cast(node);
+  if (current !== undefined) {
+    return current;
+  }
+  for (const ancestor of node.ancestors()) {
+    const result = cast(ancestor);
     if (result !== undefined) return result;
   }
   return undefined;
 }
 
-function findDeepestNodeAtOffset(node: SyntaxNode, offset: number): SyntaxNode | undefined {
-  if (!containsOffset(node, offset)) {
-    return undefined;
-  }
-  let deepest = node;
-  for (const child of node.childNodes()) {
-    const childMatch = findDeepestNodeAtOffset(child, offset);
-    if (childMatch !== undefined) {
-      deepest = childMatch;
-    }
-  }
-  return deepest;
-}
-
-function findTokenContext(root: SyntaxNode, offset: number): TokenContext {
-  let current: SyntaxToken | undefined;
-  let previous: SyntaxToken | undefined;
+function tokenContextAt(at: TokenAtOffset, offset: number): TokenContext {
+  const left = at.leftBiased();
+  const right = at.rightBiased();
+  const current = right !== undefined && offset < tokenEndOffset(right) ? right : undefined;
+  const touching = left !== undefined && tokenEndOffset(left) === offset ? left : undefined;
   let previousSignificant: SyntaxToken | undefined;
-  let touching: SyntaxToken | undefined;
-
-  for (const token of root.tokens()) {
-    const tokenEnd = token.offset + token.text.length;
-    if (offset >= token.offset && offset < tokenEnd) {
-      current = token;
-    }
-    if (offset > token.offset && offset <= tokenEnd) {
-      touching = token;
-    }
-    if (tokenEnd <= offset) {
-      previous = token;
-      if (!isTrivia(token)) {
-        previousSignificant = token;
-      }
-      continue;
-    }
-    if (token.offset > offset) {
-      break;
-    }
+  if (left !== undefined) {
+    previousSignificant =
+      tokenEndOffset(left) <= offset && !isTrivia(left) ? left : previousNonTriviaToken(left);
   }
-
-  return tokenContext({ current, previous, previousSignificant, touching });
+  return { current, previousSignificant, touching };
 }
 
-function tokenContext(input: {
-  readonly current: SyntaxToken | undefined;
-  readonly previous: SyntaxToken | undefined;
-  readonly previousSignificant: SyntaxToken | undefined;
-  readonly touching: SyntaxToken | undefined;
-}): TokenContext {
-  return {
-    ...(input.current === undefined ? {} : { current: input.current }),
-    ...(input.previous === undefined ? {} : { previous: input.previous }),
-    ...(input.previousSignificant === undefined
-      ? {}
-      : { previousSignificant: input.previousSignificant }),
-    ...(input.touching === undefined ? {} : { touching: input.touching }),
-  };
+/** The identifier token the cursor is editing, if any (rust-analyzer's name ref). */
+function cursorIdentifier(tokenContext: TokenContext, offset: number): SyntaxToken | undefined {
+  if (tokenContext.current?.kind === 'Ident') {
+    return tokenContext.current;
+  }
+  if (tokenContext.touching?.kind === 'Ident') {
+    return tokenContext.touching;
+  }
+  const previous = tokenContext.previousSignificant;
+  if (previous?.kind === 'Ident' && tokenEndOffset(previous) === offset) {
+    return previous;
+  }
+  return undefined;
 }
 
-function isTrivia(token: SyntaxToken): boolean {
-  return token.kind === 'Whitespace' || token.kind === 'Newline' || token.kind === 'Comment';
+function sourceRangeStart(tokenContext: TokenContext, offset: number): number {
+  return cursorIdentifier(tokenContext, offset)?.offset ?? offset;
+}
+
+/** Whether a newline trivia token separates `from` from `toOffset`. */
+function newlineBetween(from: SyntaxToken, toOffset: number): boolean {
+  for (let token = from.nextToken; token !== undefined && token.offset < toOffset; ) {
+    if (token.kind === 'Newline') {
+      return true;
+    }
+    token = token.nextToken;
+  }
+  return false;
+}
+
+/** Whether only whitespace trivia tokens lie between `from` and `toOffset`. */
+function onlyWhitespaceBetween(from: SyntaxToken, toOffset: number): boolean {
+  for (let token = from.nextToken; token !== undefined && token.offset < toOffset; ) {
+    if (token.kind !== 'Whitespace') {
+      return false;
+    }
+    token = token.nextToken;
+  }
+  return true;
 }
 
 function containsOffset(node: SyntaxNode, offset: number): boolean {
@@ -688,15 +598,6 @@ function endOffset(node: SyntaxNode): number {
   return node.offset + node.textLength;
 }
 
-function hasOnlyHorizontalWhitespace(source: string, start: number, end: number): boolean {
-  if (end < start) {
-    return false;
-  }
-  for (let index = start; index < end; index++) {
-    const char = source.charAt(index);
-    if (char !== ' ' && char !== '\t') {
-      return false;
-    }
-  }
-  return true;
+function tokenEndOffset(token: SyntaxToken): number {
+  return token.offset + token.text.length;
 }

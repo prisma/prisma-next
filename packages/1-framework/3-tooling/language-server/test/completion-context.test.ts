@@ -15,6 +15,10 @@ function classify(markedSource: string): ReturnType<typeof classifyPslCompletion
   });
 }
 
+function expectUnsupported(markedSource: string): void {
+  expect(classify(markedSource)).toMatchObject({ kind: 'unsupported' });
+}
+
 describe('classifyPslCompletionContext', () => {
   it('classifies blank document-level declaration keyword positions', () => {
     const context = classify('|');
@@ -38,6 +42,10 @@ describe('classifyPslCompletionContext', () => {
       replacementStartOffset: 0,
       offset: 2,
     });
+  });
+
+  it('does not classify declaration keyword prefixes after other tokens on the same line', () => {
+    expectUnsupported('model User {} mo|');
   });
 
   it('classifies blank namespace-body declaration keyword positions', () => {
@@ -68,6 +76,14 @@ describe('classifyPslCompletionContext', () => {
       fieldName: 'author',
       prefix: { path: [], name: '' },
     });
+  });
+
+  it('does not treat the next indented line as a blank model field type position', () => {
+    expectUnsupported(['model Post {', '  author', '  |', '}'].join('\n'));
+  });
+
+  it('does not treat a comment after the field name as a blank model field type position', () => {
+    expectUnsupported(['model Post {', '  author // |', '}'].join('\n'));
   });
 
   it('classifies a partial bare model field type prefix', () => {
@@ -127,41 +143,18 @@ describe('classifyPslCompletionContext', () => {
   });
 
   it('returns unsupported in comments and trivia outside type positions', () => {
-    expect(classify(['model Post {', '  // U|', '  id Int', '}'].join('\n'))).toMatchObject({
-      kind: 'unsupported',
-      reason: 'comment',
-    });
-
-    expect(classify(['model Post {', '  |', '  id Int', '}'].join('\n'))).toMatchObject({
-      kind: 'unsupported',
-      reason: 'outsideModelField',
-    });
+    expectUnsupported(['model Post {', '  // U|', '  id Int', '}'].join('\n'));
+    expectUnsupported(['model Post {', '  |', '  id Int', '}'].join('\n'));
   });
 
   it('returns unsupported for ordinary field and block attributes', () => {
-    expect(classify(['model Post {', '  id Int @|', '}'].join('\n'))).toMatchObject({
-      kind: 'unsupported',
-      reason: 'attribute',
-    });
-
-    expect(classify(['model Post {', '  id Int', '  @@|', '}'].join('\n'))).toMatchObject({
-      kind: 'unsupported',
-      reason: 'attribute',
-    });
+    expectUnsupported(['model Post {', '  id Int @|', '}'].join('\n'));
+    expectUnsupported(['model Post {', '  id Int', '  @@|', '}'].join('\n'));
   });
 
   it('returns unsupported inside attribute arguments', () => {
-    expect(classify(['model Post {', '  id Int @default(|)', '}'].join('\n'))).toMatchObject({
-      kind: 'unsupported',
-      reason: 'attributeArgument',
-    });
-
-    expect(
-      classify(['model Post {', '  authorId Int @relation(fields: [|])', '}'].join('\n')),
-    ).toMatchObject({
-      kind: 'unsupported',
-      reason: 'attributeArgument',
-    });
+    expectUnsupported(['model Post {', '  id Int @default(|)', '}'].join('\n'));
+    expectUnsupported(['model Post {', '  authorId Int @relation(fields: [|])', '}'].join('\n'));
   });
 
   it('classifies blank generic block parameter positions', () => {
@@ -185,40 +178,35 @@ describe('classifyPslCompletionContext', () => {
   });
 
   it('returns unsupported inside generic block parameter values', () => {
-    expect(classify(['datasource db {', '  provider = |', '}'].join('\n'))).toMatchObject({
-      kind: 'unsupported',
-      reason: 'genericBlock',
+    expectUnsupported(['datasource db {', '  provider = |', '}'].join('\n'));
+  });
+
+  it('classifies the gap before = as a generic block parameter with an empty source range', () => {
+    const context = classify(['datasource db {', '  url |= "x"', '}'].join('\n'));
+
+    expect(context).toMatchObject({
+      kind: 'genericBlockParameter',
+      blockKeyword: 'datasource',
+      prefix: '',
     });
+    // rust-analyzer `source_range()` shape: the cursor sits in whitespace, so the
+    // edit range is empty at the cursor rather than synthesising the `url` key.
+    if (context.kind === 'genericBlockParameter') {
+      expect(context.replacementStartOffset).toBe(context.offset);
+    }
   });
 
   it('returns unsupported inside type constructor arguments', () => {
-    expect(classify(['model Embedding {', '  vector Vector(|)', '}'].join('\n'))).toMatchObject({
-      kind: 'unsupported',
-      reason: 'constructorArgument',
-    });
+    expectUnsupported(['model Embedding {', '  vector Vector(|)', '}'].join('\n'));
   });
 
   it('returns unsupported outside model field type prefixes', () => {
-    expect(classify(['model Post {', '  |id Int', '}'].join('\n'))).toMatchObject({
-      kind: 'unsupported',
-      reason: 'fieldName',
-    });
-
-    expect(classify(['model Post {', '  id Int |', '}'].join('\n'))).toMatchObject({
-      kind: 'unsupported',
-      reason: 'notTypePrefix',
-    });
+    expectUnsupported(['model Post {', '  |id Int', '}'].join('\n'));
+    expectUnsupported(['model Post {', '  id Int |', '}'].join('\n'));
   });
 
   it('returns unsupported for invalid over-qualified names', () => {
-    expect(classify(['model Post {', '  owner auth.domain.U|', '}'].join('\n'))).toMatchObject({
-      kind: 'unsupported',
-      reason: 'invalidQualifiedType',
-    });
-
-    expect(classify(['model Post {', '  owner supabase:auth:U|', '}'].join('\n'))).toMatchObject({
-      kind: 'unsupported',
-      reason: 'invalidQualifiedType',
-    });
+    expectUnsupported(['model Post {', '  owner auth.domain.U|', '}'].join('\n'));
+    expectUnsupported(['model Post {', '  owner supabase:auth:U|', '}'].join('\n'));
   });
 });
