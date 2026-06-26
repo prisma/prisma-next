@@ -39,6 +39,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonValue } from '@prisma-next/utils/json';
+import type { PostgresTableRef } from '../entity-ref';
 import { isPostgresSchema } from '../postgres-schema';
 import {
   AddCheckConstraintCall,
@@ -232,11 +233,14 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
     if (!column) continue;
     if (column.nullable === true || column.default !== undefined) continue;
 
-    matched.push(issue);
     const spec = buildColumnSpec(namespaceId, issue.table, issue.column, ctx, { nullable: true });
+    const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
+    if (!isPostgresSchema(namespaceNode)) continue;
+    const tableRef: PostgresTableRef = namespaceNode.tableRef(issue.table);
     const schemaForTable = resolveDdlSchemaForNamespace(ctx, namespaceId);
+    matched.push(issue);
     calls.push(
-      new AddColumnCall(schemaForTable, issue.table, spec),
+      new AddColumnCall(tableRef, spec),
       new DataTransformCall(
         `backfill-${issue.table}-${issue.column}`,
         `backfill-${issue.table}-${issue.column}:check`,
@@ -581,15 +585,16 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
         columnName: issue.column,
       });
 
-    matched.push(issue);
+    const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
+    if (!isPostgresSchema(namespaceNode)) continue;
+    const tableRef: PostgresTableRef = namespaceNode.tableRef(issue.table);
 
-    const schemaForTable = resolveDdlSchemaForNamespace(ctx, namespaceId);
+    matched.push(issue);
 
     if (canUseSharedTempDefault && temporaryDefault !== null) {
       calls.push(
         new AddNotNullColumnWithTempDefaultCall({
-          schemaName: schemaForTable,
-          tableName: issue.table,
+          ref: tableRef,
           columnName: issue.column,
           column,
           codecHooks: mutableCodecHooks,
@@ -602,8 +607,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
 
     calls.push(
       new AddNotNullColumnDirectCall(
-        schemaForTable,
-        issue.table,
+        tableRef,
         issue.column,
         buildColumnSpec(namespaceId, issue.table, issue.column, ctx),
       ),

@@ -65,8 +65,7 @@ export function dropDefaultAction(columnName: string): DropDefaultAction {
  * See {@link addColumnAction} / {@link dropDefaultAction} for building actions.
  */
 export function alterTable(options: {
-  readonly table: string;
-  readonly schema?: string;
+  readonly ref: PostgresTableRef;
   readonly actions: readonly AnyAlterTableAction[];
 }): PostgresAlterTable {
   return new PostgresAlterTable(options);

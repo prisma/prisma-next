@@ -231,7 +231,7 @@ describe('AddNotNullColumnDirectCall', () => {
   it('lowers a typed AlterTable DDL node for the ADD COLUMN execute step', async () => {
     const { lowerer, received } = recordingCheckLowerer();
     const column = col('name', 'text', { notNull: true });
-    const call = new AddNotNullColumnDirectCall('public', 'user', 'name', column);
+    const call = new AddNotNullColumnDirectCall(publicNs.tableRef('user'), 'name', column);
     const op = await call.toOp(lowerer);
 
     expect(isAlterTableNode(received[0])).toBe(true);
@@ -246,8 +246,7 @@ describe('AddNotNullColumnDirectCall', () => {
 
   it('toOp() throws when no lowerer is provided', async () => {
     const call = new AddNotNullColumnDirectCall(
-      'public',
-      'user',
+      publicNs.tableRef('user'),
       'name',
       col('name', 'text', { notNull: true }),
     );
@@ -260,8 +259,7 @@ describe('AddNotNullColumnWithTempDefaultCall', () => {
     const { lowerer, received } = recordingCheckLowerer();
     const storageColumn = { nativeType: 'text', codecId: 'pg/text@1', nullable: false } as const;
     const call = new AddNotNullColumnWithTempDefaultCall({
-      schemaName: 'public',
-      tableName: 'user',
+      ref: publicNs.tableRef('user'),
       columnName: 'name',
       column: storageColumn,
       codecHooks: new Map(),
@@ -283,8 +281,7 @@ describe('AddNotNullColumnWithTempDefaultCall', () => {
 
   it('toOp() throws when no lowerer is provided', async () => {
     const call = new AddNotNullColumnWithTempDefaultCall({
-      schemaName: 'public',
-      tableName: 'user',
+      ref: publicNs.tableRef('user'),
       columnName: 'name',
       column: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
       codecHooks: new Map(),

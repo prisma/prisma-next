@@ -1659,9 +1659,7 @@ async function pgRenderAlterTable(
   node: PostgresAlterTable,
   codecLookup: CodecLookup,
 ): Promise<SqlExecuteRequest> {
-  const tableRef = node.schema
-    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`
-    : quoteIdentifier(node.table);
+  const tableRef = node.ref.qualified();
   const actionVisitor: AlterTableActionVisitor<Promise<string>> = {
     async addColumn(action: AddColumnAction): Promise<string> {
       const colFragment = await pgRenderDdlColumn(action.column, codecLookup);

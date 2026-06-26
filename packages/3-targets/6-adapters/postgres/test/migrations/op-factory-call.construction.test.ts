@@ -109,7 +109,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
   });
 
   it('AddColumnCall freezes, labels from column+table, requires a lowerer', async () => {
-    const call = new AddColumnCall('public', 'user', col('email', 'text'));
+    const call = new AddColumnCall(publicNs.tableRef('user'), col('email', 'text'));
 
     expect(Object.isFrozen(call)).toBe(true);
     expect(call.factoryName).toBe('addColumn');
@@ -119,7 +119,10 @@ describe('Postgres call classes - construction + toOp parity', () => {
   });
 
   it('AddColumnCall.toOp produces ALTER TABLE … ADD COLUMN SQL (byte-parity)', async () => {
-    const call = new AddColumnCall('public', 'user', col('email', 'text', { notNull: true }));
+    const call = new AddColumnCall(
+      publicNs.tableRef('user'),
+      col('email', 'text', { notNull: true }),
+    );
     const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe('ALTER TABLE "public"."user" ADD COLUMN "email" text NOT NULL');
     expect(op.id).toBe('column.public.user.email');
@@ -131,14 +134,15 @@ describe('Postgres call classes - construction + toOp parity', () => {
   });
 
   it('AddColumnCall.toOp with __unbound__ schema produces an unqualified table name', async () => {
-    const call = new AddColumnCall('__unbound__', 'item', col('score', 'int'));
+    const call = new AddColumnCall(unboundNs.tableRef('item'), col('score', 'int'));
     const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe('ALTER TABLE "item" ADD COLUMN "score" int');
   });
 
   it('AddColumnCall.toOp: identical table+column in different schemas produce distinct op ids', async () => {
-    const callPublic = new AddColumnCall('public', 'user', col('email', 'text'));
-    const callAudit = new AddColumnCall('audit', 'user', col('email', 'text'));
+    const auditNs = postgresCreateNamespace({ id: 'audit', entries: { table: {} } });
+    const callPublic = new AddColumnCall(publicNs.tableRef('user'), col('email', 'text'));
+    const callAudit = new AddColumnCall(auditNs.tableRef('user'), col('email', 'text'));
     const opPublic = await callPublic.toOp(testAdapter);
     const opAudit = await callAudit.toOp(testAdapter);
     expect(opPublic.id).toBe('column.public.user.email');

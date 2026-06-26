@@ -63,7 +63,7 @@ describe('renderOps', () => {
     const calls = [
       new CreateTableCall(publicNs.tableRef('user'), [col('id', 'text', { notNull: true })]),
       new DropTableCall('public', 'stale'),
-      new AddColumnCall('public', 'user', col('email', 'text')),
+      new AddColumnCall(publicNs.tableRef('user'), col('email', 'text')),
       new DropColumnCall('public', 'user', 'legacy'),
       new AlterColumnTypeCall('public', 'user', 'age', {
         qualifiedTargetType: 'integer',
@@ -73,7 +73,7 @@ describe('renderOps', () => {
       new SetNotNullCall('public', 'user', 'email'),
       new DropNotNullCall('public', 'user', 'nickname'),
       new SetDefaultCall('public', 'user', 'created_at', 'DEFAULT now()'),
-      new DropDefaultCall('public', 'user', 'updated_at'),
+      new DropDefaultCall(publicNs.tableRef('user'), 'updated_at'),
       new AddPrimaryKeyCall('public', 'user', 'user_pkey', ['id']),
       new AddUniqueCall('public', 'user', 'user_email_key', ['email']),
       new AddForeignKeyCall('public', 'user', {

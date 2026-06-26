@@ -339,10 +339,18 @@ function mapIssueToCall(
               `Column "${issue.table}"."${issue.column}" not in destination contract`,
             ),
           );
+        const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
+        if (!isPostgresSchema(namespaceNode)) {
+          return notOk(
+            issueConflict(
+              'unsupportedOperation',
+              `Namespace "${namespaceId}" is not a PostgresSchema`,
+            ),
+          );
+        }
         return ok([
           new AddColumnCall(
-            tableSchema(issue),
-            issue.table,
+            namespaceNode.tableRef(issue.table),
             toDdlColumn(issue.column, column, codecHooks, storageTypes),
           ),
         ]);
@@ -434,7 +442,19 @@ function mapIssueToCall(
         return notOk(
           issueConflict('unsupportedOperation', 'Extra default issue has no table/column name'),
         );
-      return ok([new DropDefaultCall(tableSchema(issue), issue.table, issue.column)]);
+      {
+        const namespaceId = resolveNamespaceIdForIssue(issue);
+        const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
+        if (!isPostgresSchema(namespaceNode)) {
+          return notOk(
+            issueConflict(
+              'unsupportedOperation',
+              `Namespace "${namespaceId}" is not a PostgresSchema`,
+            ),
+          );
+        }
+        return ok([new DropDefaultCall(namespaceNode.tableRef(issue.table), issue.column)]);
+      }
 
     case 'nullability_mismatch': {
       if (!issue.table || !issue.column)

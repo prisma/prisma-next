@@ -144,16 +144,18 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected addColumn(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly column: DdlColumn;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new AddColumnCall(options.schema, options.table, options.column).toOp(
-      this.controlAdapter,
-    );
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
+    return new AddColumnCall(ns.tableRef(options.table), options.column).toOp(this.controlAdapter);
   }
 
   protected addPrimaryKey(options: {
@@ -338,14 +340,18 @@ export abstract class PostgresMigration extends SqlMigration<
   }
 
   protected dropDefault(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly column: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    return new DropDefaultCall(options.schema, options.table, options.column).toOp(
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
+    return new DropDefaultCall(ns.tableRef(options.table), options.column).toOp(
       this.controlAdapter,
     );
   }

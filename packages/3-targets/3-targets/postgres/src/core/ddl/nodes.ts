@@ -132,18 +132,15 @@ export class PostgresCreateSchema extends PostgresDdlNode {
 
 export class PostgresAlterTable extends PostgresDdlNode {
   readonly kind = 'alter-table' as const;
-  readonly table: string;
-  readonly schema: string | undefined;
+  readonly ref: PostgresTableRef;
   readonly actions: ReadonlyArray<AnyAlterTableAction>;
 
   constructor(options: {
-    readonly table: string;
-    readonly schema?: string;
+    readonly ref: PostgresTableRef;
     readonly actions: readonly AnyAlterTableAction[];
   }) {
     super();
-    this.table = options.table;
-    this.schema = options.schema;
+    this.ref = options.ref;
     this.actions = Object.freeze([...options.actions]);
     this.freeze();
   }

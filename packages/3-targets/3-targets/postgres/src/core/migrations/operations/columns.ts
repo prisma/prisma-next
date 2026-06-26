@@ -1,6 +1,5 @@
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type { DdlColumn } from '@prisma-next/sql-relational-core/ast';
-import { ifDefined } from '@prisma-next/utils/defined';
 import {
   columnDefaultAst,
   columnExistsAst,
@@ -10,8 +9,8 @@ import {
   tableIsEmptyAst,
 } from '../../../contract-free/checks';
 import * as contractFreeDdl from '../../../contract-free/ddl';
+import type { PostgresTableRef } from '../../entity-ref';
 import { quoteIdentifier } from '../../sql-utils';
-import { boundSchema } from '../bound-schema';
 import { qualifyTableName } from '../planner-sql-checks';
 import { type Op, step, targetDetails } from './shared';
 
@@ -241,11 +240,12 @@ export async function setDefault(
 }
 
 export async function dropDefault(
-  schemaName: string,
-  tableName: string,
+  ref: PostgresTableRef,
   columnName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
+  const schemaName = ref.namespace.id;
+  const tableName = ref.name;
   const { present } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
@@ -253,8 +253,7 @@ export async function dropDefault(
   });
   const dropDefaultExec = await lowerer.lowerToExecuteRequest(
     contractFreeDdl.alterTable({
-      ...ifDefined('schema', boundSchema(schemaName)),
-      table: tableName,
+      ref,
       actions: [contractFreeDdl.dropDefaultAction(columnName)],
     }),
   );
@@ -281,16 +280,16 @@ export async function dropDefault(
  * adapter; postchecks assert the column exists and is NOT NULL.
  */
 export async function addNotNullColumnDirect(
-  schemaName: string,
-  tableName: string,
+  ref: PostgresTableRef,
   column: DdlColumn,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
+  const schemaName = ref.namespace.id;
+  const tableName = ref.name;
   const columnName = column.name;
   const addColumn = await lowerer.lowerToExecuteRequest(
     contractFreeDdl.alterTable({
-      ...ifDefined('schema', boundSchema(schemaName)),
-      table: tableName,
+      ref,
       actions: [contractFreeDdl.addColumnAction(column)],
     }),
   );

@@ -167,7 +167,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   });
 
   it('AddColumnCall emits this.addColumn({...}) and imports col', () => {
-    const call = new AddColumnCall('public', 'user', col('email', 'text'));
+    const call = new AddColumnCall(publicNs.tableRef('user'), col('email', 'text'));
     expect(call.renderTypeScript()).toBe(
       'this.addColumn({ schema: "public", table: "user", column: col("email", "text") })',
     );
@@ -179,14 +179,13 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   it('AddColumnCall includes codecRef in the rendered col() call when present', () => {
     const codecRef = { codecId: 'pg/uuid@1' };
     const column = col('id', 'uuid', { codecRef });
-    const call = new AddColumnCall('public', 'user', column);
+    const call = new AddColumnCall(publicNs.tableRef('user'), column);
     expect(call.renderTypeScript()).toBe(
       'this.addColumn({ schema: "public", table: "user", column: col("id", "uuid", { codecRef: { codecId: "pg/uuid@1" } }) })',
     );
 
     const callWithTypeParams = new AddColumnCall(
-      'public',
-      'user',
+      publicNs.tableRef('user'),
       col('data', 'jsonb', { codecRef: { codecId: 'pg/json@1', typeParams: { schema: 'v1' } } }),
     );
     expect(callWithTypeParams.renderTypeScript()).toContain(
@@ -207,7 +206,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   });
 
   it('AddColumnCall without codecRef renders col() with no codecRef property', () => {
-    const call = new AddColumnCall('public', 'user', col('score', 'integer'));
+    const call = new AddColumnCall(publicNs.tableRef('user'), col('score', 'integer'));
     expect(call.renderTypeScript()).not.toContain('codecRef');
   });
 
@@ -250,12 +249,14 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     expect(new DropNotNullCall('public', 'user', 'nickname').renderTypeScript()).toBe(
       'this.dropNotNull({ schema: "public", table: "user", column: "nickname" })',
     );
-    expect(new DropDefaultCall('public', 'user', 'updated_at').renderTypeScript()).toBe(
+    expect(new DropDefaultCall(publicNs.tableRef('user'), 'updated_at').renderTypeScript()).toBe(
       'this.dropDefault({ schema: "public", table: "user", column: "updated_at" })',
     );
     expect(new SetNotNullCall('public', 'user', 'email').importRequirements()).toEqual([]);
     expect(new DropNotNullCall('public', 'user', 'nickname').importRequirements()).toEqual([]);
-    expect(new DropDefaultCall('public', 'user', 'updated_at').importRequirements()).toEqual([]);
+    expect(
+      new DropDefaultCall(publicNs.tableRef('user'), 'updated_at').importRequirements(),
+    ).toEqual([]);
   });
 
   it('AddPrimaryKeyCall / AddUniqueCall emit this.X({schema, table, constraint, columns})', () => {
@@ -365,7 +366,7 @@ describe('renderCallsToTypeScript', () => {
     const calls = [
       new CreateTableCall(publicNs.tableRef('user'), [col('id', 'text', { notNull: true })]),
       new DropTableCall('public', 'old_user'),
-      new AddColumnCall('public', 'user', col('email', 'text')),
+      new AddColumnCall(publicNs.tableRef('user'), col('email', 'text')),
       new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
     ];
 
