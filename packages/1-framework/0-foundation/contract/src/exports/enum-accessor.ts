@@ -5,11 +5,9 @@ export type {
   EnumValues,
   NamespacedEnums,
   NamespaceEnumAccessors,
-  UnboundEnumsOf,
 } from '../enum-accessor';
 export {
   buildEnumsMapForNamespace,
   buildNamespacedEnums,
-  buildUnboundEnums,
   createEnumAccessor,
 } from '../enum-accessor';
