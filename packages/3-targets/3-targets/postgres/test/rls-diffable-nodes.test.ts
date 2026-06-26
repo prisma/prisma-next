@@ -19,18 +19,18 @@ describe('PostgresRlsPolicy DiffableNode', () => {
     permissive: true,
   };
 
-  it('localKey() includes namespace, table, and wire name', () => {
+  it('id() includes namespace, table, and wire name', () => {
     const policy = new PostgresRlsPolicy(baseInput);
-    expect(policy.localKey()).toBe('public/profiles/read_own_profiles_a1b2c3d4');
+    expect(policy.id()).toBe('public/profiles/read_own_profiles_a1b2c3d4');
   });
 
-  it('localKey() propagates namespaceId and tableName from input', () => {
+  it('id() propagates namespaceId and tableName from input', () => {
     const policy = new PostgresRlsPolicy({
       ...baseInput,
       namespaceId: 'my_schema',
       tableName: 'orders',
     });
-    expect(policy.localKey()).toBe('my_schema/orders/read_own_profiles_a1b2c3d4');
+    expect(policy.id()).toBe('my_schema/orders/read_own_profiles_a1b2c3d4');
   });
 
   it('children() returns an empty list (leaf node)', () => {
@@ -56,17 +56,17 @@ describe('PostgresRlsPolicy DiffableNode', () => {
     expect(() => policy.isEqualTo(notAPolicy)).toThrow();
   });
 
-  it('localKey() and isEqualTo() are accessible on frozen instances (defined on prototype)', () => {
+  it('id() and isEqualTo() are accessible on frozen instances (defined on prototype)', () => {
     const policy = new PostgresRlsPolicy(baseInput);
     expect(Object.isFrozen(policy)).toBe(true);
-    expect(typeof policy.localKey).toBe('function');
+    expect(typeof policy.id).toBe('function');
     expect(typeof policy.isEqualTo).toBe('function');
   });
 
-  it('two policies on different tables with the same wire name have distinct local keys', () => {
+  it('two policies on different tables with the same wire name have distinct ids', () => {
     const policyOnProfiles = new PostgresRlsPolicy({ ...baseInput, tableName: 'profiles' });
     const policyOnOrders = new PostgresRlsPolicy({ ...baseInput, tableName: 'orders' });
-    expect(policyOnProfiles.localKey()).not.toBe(policyOnOrders.localKey());
+    expect(policyOnProfiles.id()).not.toBe(policyOnOrders.id());
   });
 
   describe('isPostgresRlsPolicy guard', () => {
@@ -136,14 +136,14 @@ describe('PostgresRlsPolicy DiffableNode', () => {
 });
 
 describe('PostgresRole DiffableNode', () => {
-  it('localKey() returns the role name (roles are cluster-unique)', () => {
+  it('id() returns the role name (roles are cluster-unique)', () => {
     const role = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
-    expect(role.localKey()).toBe('app_user');
+    expect(role.id()).toBe('app_user');
   });
 
-  it('localKey() propagates the role name from input', () => {
+  it('id() propagates the role name from input', () => {
     const role = new PostgresRole({ name: 'anon', namespaceId: 'sentinel_namespace' });
-    expect(role.localKey()).toBe('anon');
+    expect(role.id()).toBe('anon');
   });
 
   it('children() returns an empty list (leaf node)', () => {
@@ -177,10 +177,10 @@ describe('PostgresRole DiffableNode', () => {
     expect(() => role.isEqualTo(notARole)).toThrow();
   });
 
-  it('localKey() and isEqualTo() are accessible on frozen instances', () => {
+  it('id() and isEqualTo() are accessible on frozen instances', () => {
     const role = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
     expect(Object.isFrozen(role)).toBe(true);
-    expect(typeof role.localKey).toBe('function');
+    expect(typeof role.id).toBe('function');
     expect(typeof role.isEqualTo).toBe('function');
   });
 });

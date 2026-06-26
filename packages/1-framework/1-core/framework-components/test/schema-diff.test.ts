@@ -5,7 +5,7 @@ import { diffSchemas } from '../src/control/schema-diff';
 /** A synthetic root node whose `isEqualTo` is always true — used to wrap flat node lists. */
 function rootOf(nodes: readonly DiffableNode[]): DiffableNode {
   return {
-    localKey(): string {
+    id(): string {
       return 'root';
     },
     isEqualTo(): boolean {
@@ -23,16 +23,14 @@ function makeNode(
   childNodes: readonly DiffableNode[] = [],
 ): DiffableNode {
   return {
-    localKey(): string {
+    id(): string {
       return localKey;
     },
     children(): readonly DiffableNode[] {
       return childNodes;
     },
     isEqualTo(other: DiffableNode): boolean {
-      return (
-        localKey === other.localKey() && body === (other as typeof this & { _body?: string })._body
-      );
+      return localKey === other.id() && body === (other as typeof this & { _body?: string })._body;
     },
     _body: body,
   } as DiffableNode & { _body: string };
@@ -152,24 +150,24 @@ describe('diffSchemas', () => {
     expect(outcomes).toEqual(new Set(['missing', 'extra']));
   });
 
-  it('throws when two siblings share the same local key in expected', () => {
+  it('throws when two siblings share the same id in expected', () => {
     const a = makeNode('public/policy/dup_name');
     const b = makeNode('public/policy/dup_name');
     expect(() => diffSchemas(rootOf([a, b]), rootOf([]))).toThrow(
-      'diffSchemas: duplicate local key among siblings',
+      'diffSchemas: duplicate id among siblings',
     );
   });
 
-  it('throws when two siblings share the same local key in actual', () => {
+  it('throws when two siblings share the same id in actual', () => {
     const a = makeNode('public/policy/dup_name');
     const b = makeNode('public/policy/dup_name');
     expect(() => diffSchemas(rootOf([]), rootOf([a, b]))).toThrow(
-      'diffSchemas: duplicate local key among siblings',
+      'diffSchemas: duplicate id among siblings',
     );
   });
 
   it('descends into a matched pair and reports one issue at the child path (AC-2)', () => {
-    // A parent present on both sides whose localKey() matches and isEqualTo is true,
+    // A parent present on both sides whose id() matches and isEqualTo is true,
     // but whose children differ on one child. diffSchemas descends the matched
     // pair and reports exactly one issue, at the child's path.
     const expectedChild = makeNode('present_child', 'same');
@@ -190,7 +188,7 @@ describe('diffSchemas', () => {
 
   it('emits mismatch at node path AND child-level issues when diffing two nodes directly', () => {
     // Proves diffSchemas compares the given nodes themselves, not just their children.
-    // tableA and tableB share the same localKey but isEqualTo is false (different body).
+    // tableA and tableB share the same id() but isEqualTo is false (different body).
     // Their children also differ (one column only on tableA).
     const onlyInA = makeNode('only_in_a', 'col');
     const shared = makeNode('shared_col', 'same');

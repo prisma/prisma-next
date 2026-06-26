@@ -315,7 +315,7 @@ describe('diffPostgresSchema', () => {
   it('regression: same prefix+body on two different tables does not throw (distinct paths)', () => {
     // The bug: coord() = {namespace, 'policy', wireName} omits the table,
     // so two tables with identical policy names (same prefix + same body hash)
-    // produced a duplicate-key throw. localKey() = namespace/table/name is unique.
+    // produced a duplicate id throw. id() = namespace/table/name is unique.
     const WIRE_NAME = 'read_own_a1b2c3d4';
     const policyOnProfiles = makePolicy(WIRE_NAME, 'profiles');
     const policyOnOrders = makePolicy(WIRE_NAME, 'orders');

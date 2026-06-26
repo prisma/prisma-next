@@ -32,8 +32,8 @@ export class PostgresRole extends SqlNode implements DiffableNode {
     freezeNode(this);
   }
 
-  /** Roles are cluster-unique; the name alone is sufficient as a local key. */
-  localKey(): string {
+  /** Roles are cluster-unique; the name alone is sufficient as the id. */
+  id(): string {
     return this.name;
   }
 

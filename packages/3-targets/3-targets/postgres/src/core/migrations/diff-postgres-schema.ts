@@ -19,7 +19,7 @@ import { contractToPostgresSchemaIR } from './contract-to-postgres-schema-ir';
  * The actual `schema` may arrive as a plain spread object (from
  * `projectSchemaToSpace`) rather than a class instance: prototype methods like
  * `children()` would be missing. Reconstruct it as a real `PostgresSchemaIR` so
- * the diff can call `children()`, `localKey()`, and `isEqualTo()` safely.
+ * the diff can call `children()`, `id()`, and `isEqualTo()` safely.
  */
 export function diffPostgresSchema(input: {
   readonly contract: Contract<SqlStorage>;

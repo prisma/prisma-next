@@ -86,8 +86,8 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
     freezeNode(this);
   }
 
-  /** Stable local key for the differ. The schema name identifies this database root. */
-  localKey(): string {
+  /** Stable id for the differ. The schema name identifies this database root. */
+  id(): string {
     return this.pgSchemaName;
   }
 

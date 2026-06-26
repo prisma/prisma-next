@@ -15,23 +15,23 @@ export interface SchemaDiffIssue {
  * A node in the schema tree. Every node in the tree — including the database root —
  * implements this interface.
  *
- * `localKey()` must be unique among sibling nodes at the same level — the
+ * `id()` must be unique among sibling nodes at the same level — the
  * differ keys on it and treats a collision as the same entity (enforced by a
- * duplicate-key throw). The differ accumulates these keys into a path that
+ * duplicate-id throw). The differ accumulates these ids into a path that
  * stamps every emitted issue. A node that is only unique within its parent
  * (e.g. a policy unique only within its table) must fold its parent identity
- * into its local key.
+ * into its id.
  */
 export interface DiffableNode {
-  localKey(): string;
+  id(): string;
   isEqualTo(other: DiffableNode): boolean;
   children(): readonly DiffableNode[];
 }
 
 function insertNode(map: Map<string, DiffableNode>, node: DiffableNode): void {
-  const key = node.localKey();
+  const key = node.id();
   if (map.has(key)) {
-    throw new Error(`diffSchemas: duplicate local key among siblings: ${key}`);
+    throw new Error(`diffSchemas: duplicate id among siblings: ${key}`);
   }
   map.set(key, node);
 }
@@ -84,7 +84,7 @@ function diffPair(
   actual: DiffableNode,
   parentPath: readonly string[],
 ): readonly SchemaDiffIssue[] {
-  const path = [...parentPath, expected.localKey()];
+  const path = [...parentPath, expected.id()];
   const issues: SchemaDiffIssue[] = [];
   if (!expected.isEqualTo(actual)) {
     issues.push({
