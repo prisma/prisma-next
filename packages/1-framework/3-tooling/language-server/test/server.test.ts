@@ -522,6 +522,28 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
     ]);
   });
 
+  it('refreshes completion artifacts from the current buffer before classifying', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const initial = ['model Post {', '  author |', '}'].join('\n');
+    const updated = sourceWithCursor(
+      ['model User {', '  id Int @id', '}', '', 'model Post {', '  author U|', '}'].join('\n'),
+    );
+    openDocument(harness, schemaUri, initial);
+    await harness.waitForDiagnostics(schemaUri);
+    await harness.waitForDiagnosticsCount(schemaUri, 2);
+
+    const republished = harness.waitForDiagnosticsCount(schemaUri, 3);
+    harness.client.sendNotification(DidChangeTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri, version: 2 },
+      contentChanges: [{ text: updated.source }],
+    });
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, updated.position));
+    expect(items.map((item) => item.label)).toEqual(['User']);
+    await republished;
+  });
+
   it('returns generic block parameter completions for configured PSL descriptors', async () => {
     harness = startHarness(resolveToSchemaWithPslBlockDescriptors);
     await harness.initialize();
