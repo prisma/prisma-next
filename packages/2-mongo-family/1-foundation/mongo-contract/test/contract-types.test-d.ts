@@ -595,3 +595,65 @@ test('InferModelRow on a 32-field model compiles without excessive depth error',
   expectTypeOf<Row['f05']>().toEqualTypeOf<('a' | 'b' | 'c')[] | null>();
   expectTypeOf<Row['f32']>().toEqualTypeOf<'a' | 'b' | 'c'>();
 });
+
+// Contract with codec types but NO precomputed fieldOutputTypes map.
+// InferModelRow must resolve scalar fields via the codec lookup, not unknown.
+type FallbackCodecTypes = {
+  readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
+  readonly 'mongo/string@1': { readonly input: string; readonly output: string };
+  readonly 'mongo/double@1': { readonly input: number; readonly output: number };
+};
+
+type ContractNoMap = MongoContractWithTypeMaps<
+  {
+    readonly target: 'mongo';
+    readonly targetFamily: 'mongo';
+    readonly profileHash: ProfileHashBase<'sha256:no-map'>;
+    readonly capabilities: Record<string, never>;
+    readonly extensionPacks: Record<string, never>;
+    readonly meta: Record<string, never>;
+    readonly roots: Record<string, never>;
+    readonly domain: {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly models: {
+            readonly Item: {
+              readonly relations: Record<string, never>;
+              readonly storage: { readonly collection: 'items' };
+              readonly fields: {
+                readonly _id: ScalarField<'mongo/objectId@1'>;
+                readonly name: ScalarField<'mongo/string@1'>;
+                readonly price: ScalarField<'mongo/double@1', true>;
+                readonly tags: {
+                  readonly nullable: false;
+                  readonly many: true;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+              };
+            };
+          };
+          readonly valueObjects: Record<string, never>;
+        };
+      };
+    };
+    readonly storage: {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly id: '__unbound__';
+          readonly kind: 'mongo-namespace';
+          readonly entries: { readonly collection: Record<string, never> };
+        };
+      };
+      readonly storageHash: StorageHashBase<'sha256:no-map-storage'>;
+    };
+  },
+  MongoTypeMaps<FallbackCodecTypes>
+>;
+
+test('InferModelRow without precomputed map resolves scalars via codec output', () => {
+  type Row = InferModelRow<ContractNoMap, 'Item'>;
+  expectTypeOf<Row['_id']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['name']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['price']>().toEqualTypeOf<number | null>();
+  expectTypeOf<Row['tags']>().toEqualTypeOf<string[]>();
+});

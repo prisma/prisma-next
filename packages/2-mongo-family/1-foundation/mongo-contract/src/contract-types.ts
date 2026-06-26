@@ -151,13 +151,78 @@ export type MongoUnboundFieldInputTypes<T> =
     ? Inner
     : never;
 
+// Base (modifier-free) type of a field in the codec-output fallback. Scalars
+// resolve through the supplied codec-output map; value-object fields recurse
+// into the `valueObjects` registry so nested documents keep their shape;
+// anything else (unions, unresolvable codecs) is best-effort `unknown`. Enum
+// narrowing is NOT done here — that refinement lives in the precomputed map.
+type InferFieldFallbackBase<
+  TValueObjects extends Record<string, { readonly fields: Record<string, unknown> }>,
+  TCodecTypes extends Record<string, { output: unknown }>,
+  TFieldType,
+> = TFieldType extends { readonly kind: 'scalar'; readonly codecId: infer CId extends string }
+  ? CId extends keyof TCodecTypes
+    ? TCodecTypes[CId]['output']
+    : unknown
+  : TFieldType extends { readonly kind: 'valueObject'; readonly name: infer VOName extends string }
+    ? VOName extends keyof TValueObjects
+      ? {
+          -readonly [K in keyof TValueObjects[VOName]['fields']]: InferFieldFallback<
+            TValueObjects,
+            TCodecTypes,
+            TValueObjects[VOName]['fields'][K]
+          >;
+        }
+      : unknown
+    : unknown;
+
+type ApplyFieldModifiers<TField, TBase> = TField extends { readonly many: true }
+  ? TField extends { readonly nullable: true }
+    ? TBase[] | null
+    : TBase[]
+  : TField extends { readonly nullable: true }
+    ? TBase | null
+    : TBase;
+
+type InferFieldFallback<
+  TValueObjects extends Record<string, { readonly fields: Record<string, unknown> }>,
+  TCodecTypes extends Record<string, { output: unknown }>,
+  TField,
+> = TField extends { readonly type: infer FieldType }
+  ? ApplyFieldModifiers<TField, InferFieldFallbackBase<TValueObjects, TCodecTypes, FieldType>>
+  : unknown;
+
+type MongoValueObjectsMap<TContract extends MongoContract> =
+  TContract['domain']['namespaces'][typeof UNBOUND_NAMESPACE_ID] extends {
+    readonly valueObjects: infer VOs extends Record<
+      string,
+      { readonly fields: Record<string, unknown> }
+    >;
+  }
+    ? VOs
+    : Record<string, never>;
+
 export type InferModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
+  TFields extends Record<string, unknown> = MongoModelsMap<TContract>[ModelName]['fields'],
+  TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
+  TValueObjects extends Record<
+    string,
+    { readonly fields: Record<string, unknown> }
+  > = MongoValueObjectsMap<TContract>,
 > = [MongoUnboundFieldOutputTypes<TContract>] extends [never]
-  ? { [K in keyof MongoModelsMap<TContract>[ModelName]['fields']]: unknown }
+  ? FallbackModelRow<TFields, TCodecTypes, TValueObjects>
   : string extends keyof MongoUnboundFieldOutputTypes<TContract>
-    ? { [K in keyof MongoModelsMap<TContract>[ModelName]['fields']]: unknown }
+    ? FallbackModelRow<TFields, TCodecTypes, TValueObjects>
     : ModelName extends keyof MongoUnboundFieldOutputTypes<TContract>
       ? MongoUnboundFieldOutputTypes<TContract>[ModelName]
-      : { [K in keyof MongoModelsMap<TContract>[ModelName]['fields']]: unknown };
+      : FallbackModelRow<TFields, TCodecTypes, TValueObjects>;
+
+type FallbackModelRow<
+  TFields extends Record<string, unknown>,
+  TCodecTypes extends Record<string, { output: unknown }>,
+  TValueObjects extends Record<string, { readonly fields: Record<string, unknown> }>,
+> = {
+  -readonly [K in keyof TFields]: InferFieldFallback<TValueObjects, TCodecTypes, TFields[K]>;
+};
