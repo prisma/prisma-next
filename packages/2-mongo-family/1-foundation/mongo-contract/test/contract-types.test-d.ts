@@ -103,10 +103,23 @@ type ContractWithEnum = MongoContractWithTypeMaps<
       readonly storageHash: StorageHashBase<'sha256:enum-test-storage'>;
     };
   },
-  MongoTypeMaps<{
-    readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
-    readonly 'mongo/string@1': { readonly input: string; readonly output: string };
-  }>
+  MongoTypeMaps<
+    {
+      readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
+      readonly 'mongo/string@1': { readonly input: string; readonly output: string };
+    },
+    {
+      readonly __unbound__: {
+        readonly Account: {
+          readonly _id: string;
+          readonly role: 'user' | 'admin';
+          readonly nullableRole: 'user' | 'admin' | null;
+          readonly manyRoles: ('user' | 'admin')[];
+          readonly manyNullableRoles: ('user' | 'admin')[] | null;
+        };
+      };
+    }
+  >
 >;
 
 test('enum-typed field narrows to the literal value union', () => {
@@ -147,8 +160,6 @@ type TestFieldOutputTypes = {
 type TestFieldInputTypes = {
   readonly User: { readonly age: number };
 };
-
-type TestTypeMaps = MongoTypeMaps<TestCodecTypes>;
 
 type ContractWithVO = MongoContractWithTypeMaps<
   {
@@ -219,7 +230,19 @@ type ContractWithVO = MongoContractWithTypeMaps<
       readonly storageHash: StorageHashBase<'sha256:test-storage'>;
     };
   },
-  TestTypeMaps
+  MongoTypeMaps<
+    TestCodecTypes,
+    {
+      readonly __unbound__: {
+        readonly User: {
+          readonly _id: string;
+          readonly homeAddress: { street: string; city: string; zip: string | null };
+          readonly workAddress: { street: string; city: string; zip: string | null } | null;
+          readonly previousAddresses: { street: string; city: string; zip: string | null }[];
+        };
+      };
+    }
+  >
 >;
 
 type ExpectedAddress = {
@@ -517,10 +540,50 @@ type BigContract = MongoContractWithTypeMaps<
       readonly storageHash: StorageHashBase<'sha256:stress-storage'>;
     };
   },
-  MongoTypeMaps<{
-    readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
-    readonly 'mongo/string@1': { readonly input: string; readonly output: string };
-  }>
+  MongoTypeMaps<
+    {
+      readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
+      readonly 'mongo/string@1': { readonly input: string; readonly output: string };
+    },
+    {
+      readonly __unbound__: {
+        readonly BigModel: {
+          readonly f01: string;
+          readonly f02: 'a' | 'b' | 'c';
+          readonly f03: 'a' | 'b' | 'c' | null;
+          readonly f04: ('a' | 'b' | 'c')[];
+          readonly f05: ('a' | 'b' | 'c')[] | null;
+          readonly f06: string;
+          readonly f07: string | null;
+          readonly f08: 'a' | 'b' | 'c';
+          readonly f09: 'a' | 'b' | 'c' | null;
+          readonly f10: ('a' | 'b' | 'c')[];
+          readonly f11: string;
+          readonly f12: 'a' | 'b' | 'c';
+          readonly f13: 'a' | 'b' | 'c' | null;
+          readonly f14: ('a' | 'b' | 'c')[];
+          readonly f15: ('a' | 'b' | 'c')[] | null;
+          readonly f16: string;
+          readonly f17: string | null;
+          readonly f18: 'a' | 'b' | 'c';
+          readonly f19: 'a' | 'b' | 'c' | null;
+          readonly f20: ('a' | 'b' | 'c')[];
+          readonly f21: string;
+          readonly f22: 'a' | 'b' | 'c';
+          readonly f23: 'a' | 'b' | 'c' | null;
+          readonly f24: ('a' | 'b' | 'c')[];
+          readonly f25: ('a' | 'b' | 'c')[] | null;
+          readonly f26: string;
+          readonly f27: string | null;
+          readonly f28: 'a' | 'b' | 'c';
+          readonly f29: 'a' | 'b' | 'c' | null;
+          readonly f30: ('a' | 'b' | 'c')[];
+          readonly f31: string;
+          readonly f32: 'a' | 'b' | 'c';
+        };
+      };
+    }
+  >
 >;
 
 test('InferModelRow on a 32-field model compiles without excessive depth error', () => {
