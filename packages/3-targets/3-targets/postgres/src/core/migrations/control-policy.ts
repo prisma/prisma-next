@@ -85,6 +85,9 @@ interface PostgresCallFields {
 }
 
 function postgresCallFields(call: PostgresOpFactoryCall): PostgresCallFields {
+  // Relies on the RLS-policy and field-event Calls still exposing `schemaName`/`tableName`
+  // as string fields. When those Calls convert to entity refs, this probe must be updated
+  // to read `call.ref` instead.
   return {
     ...ifDefined('schemaName', 'schemaName' in call ? call.schemaName : undefined),
     ...ifDefined('tableName', 'tableName' in call ? call.tableName : undefined),

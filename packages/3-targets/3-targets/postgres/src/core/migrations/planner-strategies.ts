@@ -40,7 +40,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonValue } from '@prisma-next/utils/json';
 import type { PostgresTableRef } from '../entity-ref';
-import { isPostgresSchema } from '../postgres-schema';
+import { isPostgresSchema, type PostgresSchema } from '../postgres-schema';
 import {
   AddCheckConstraintCall,
   AddColumnCall,
@@ -94,14 +94,17 @@ export function resolveNamespaceIdForIssue(issue: { readonly namespaceId?: strin
   return issue.namespaceId ?? UNBOUND_NAMESPACE_ID;
 }
 
+/** Resolves a namespace id to its DDL schema name for CREATE SCHEMA (the only remaining consumer). */
 export function resolveDdlSchemaForNamespace(ctx: StrategyContext, namespaceId: string): string {
   const namespace = ctx.toContract.storage.namespaces[namespaceId];
-  if (!isPostgresSchema(namespace)) {
-    throw new Error(
-      `resolveDdlSchemaForNamespace: namespace "${namespaceId}" is not a PostgresSchema`,
-    );
-  }
+  assertPostgresSchema(namespace, namespaceId);
   return namespace.ddlSchemaName(ctx.toContract.storage);
+}
+
+function assertPostgresSchema(ns: unknown, namespaceId: string): asserts ns is PostgresSchema {
+  if (!isPostgresSchema(ns)) {
+    throw new Error(`namespace "${namespaceId}" is not a PostgresSchema`);
+  }
 }
 
 // ============================================================================
@@ -227,7 +230,7 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
 
     const spec = buildColumnSpec(namespaceId, issue.table, issue.column, ctx, { nullable: true });
     const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
-    if (!isPostgresSchema(namespaceNode)) continue;
+    assertPostgresSchema(namespaceNode, namespaceId);
     const tableRef: PostgresTableRef = namespaceNode.tableRef(issue.table);
     matched.push(issue);
     calls.push(
@@ -282,7 +285,7 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
     matched.push(issue);
     const alterOpts = buildAlterTypeOptions(namespaceId, issue.table, issue.column, ctx);
     const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
-    if (!isPostgresSchema(namespaceNode)) continue;
+    assertPostgresSchema(namespaceNode, namespaceId);
     const tableRef: PostgresTableRef = namespaceNode.tableRef(issue.table);
     if (isSafeWidening) {
       calls.push(new AlterColumnTypeCall(tableRef, issue.column, alterOpts));
@@ -324,7 +327,7 @@ export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ct
     if (column.nullable === true) continue;
 
     const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
-    if (!isPostgresSchema(namespaceNode)) continue;
+    assertPostgresSchema(namespaceNode, namespaceId);
     const tableRef: PostgresTableRef = namespaceNode.tableRef(issue.table);
     matched.push(issue);
     calls.push(
@@ -580,7 +583,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
       });
 
     const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
-    if (!isPostgresSchema(namespaceNode)) continue;
+    assertPostgresSchema(namespaceNode, namespaceId);
     const tableRef: PostgresTableRef = namespaceNode.tableRef(issue.table);
 
     matched.push(issue);

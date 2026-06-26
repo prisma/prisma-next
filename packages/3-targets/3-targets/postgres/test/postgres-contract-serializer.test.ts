@@ -29,6 +29,7 @@ import { PostgresRole } from '../src/core/postgres-role';
 import {
   isPostgresSchema,
   PostgresSchema,
+  PostgresUnboundSchema,
   postgresCreateNamespace,
 } from '../src/core/postgres-schema';
 import postgresTargetDescriptor from '../src/exports/control';
@@ -574,7 +575,7 @@ describe('role + policy round-trip', () => {
     const roundTripped = serializer.deserializeContract(JSON.parse(JSON.stringify(json)));
 
     const ns = roundTripped.storage.namespaces[UNBOUND_NAMESPACE_ID]!;
-    expect(ns).toBeInstanceOf(PostgresSchema);
+    expect(ns).toBeInstanceOf(PostgresUnboundSchema);
     if (!isPostgresSchema(ns)) throw new Error('expected PostgresSchema');
     expect(ns.quoteTable('Doc')).toBe('"Doc"');
     expect(ns.quoteTable('Doc')).not.toContain('__unbound__');
