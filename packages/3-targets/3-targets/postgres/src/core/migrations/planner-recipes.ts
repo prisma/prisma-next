@@ -9,13 +9,13 @@ import {
   columnNullabilityAst,
 } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
-import type { PostgresTableRef } from '../entity-ref';
+import type { PostgresEntityRef } from '../entity-ref';
 import { step } from './operations/shared';
 import { buildColumnTypeSql } from './planner-ddl-builders';
 import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
 
 export function buildAddColumnOperationIdentity(
-  ref: PostgresTableRef,
+  ref: PostgresEntityRef,
   columnName: string,
 ): Pick<
   SqlMigrationPlanOperation<PostgresPlanTargetDetails>,
@@ -35,7 +35,7 @@ export function buildAddColumnOperationIdentity(
 }
 
 export async function buildAddNotNullColumnWithTemporaryDefaultOperation(options: {
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly columnName: string;
   readonly column: StorageColumn;
   readonly codecHooks: Map<string, CodecControlHooks>;

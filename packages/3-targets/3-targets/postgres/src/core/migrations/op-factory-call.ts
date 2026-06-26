@@ -40,7 +40,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { columnExistsAst, tableExistsAst } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
-import type { PostgresTableRef } from '../entity-ref';
+import type { PostgresEntityRef } from '../entity-ref';
 import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
@@ -198,13 +198,13 @@ function defaultImportSymbols(columns: readonly DdlColumn[]): string[] {
 export class CreateTableCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'createTable' as const;
   readonly operationClass = 'additive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly columns: readonly DdlColumn[];
   readonly constraints: readonly DdlTableConstraint[] | undefined;
   readonly label: string;
 
   constructor(
-    ref: PostgresTableRef,
+    ref: PostgresEntityRef,
     columns: readonly DdlColumn[],
     constraints?: readonly DdlTableConstraint[],
   ) {
@@ -286,10 +286,10 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
 export class DropTableCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dropTable' as const;
   readonly operationClass = 'destructive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly label: string;
 
-  constructor(ref: PostgresTableRef) {
+  constructor(ref: PostgresEntityRef) {
     super();
     this.ref = ref;
     this.label = `Drop table "${ref.name}"`;
@@ -326,11 +326,11 @@ export class DropTableCall extends PostgresOpFactoryCallNode {
 export class AddColumnCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'addColumn' as const;
   readonly operationClass = 'additive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly column: DdlColumn;
   readonly label: string;
 
-  constructor(ref: PostgresTableRef, column: DdlColumn) {
+  constructor(ref: PostgresEntityRef, column: DdlColumn) {
     super();
     this.ref = ref;
     this.column = column;
@@ -390,11 +390,11 @@ export class AddColumnCall extends PostgresOpFactoryCallNode {
 export class DropColumnCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dropColumn' as const;
   readonly operationClass = 'destructive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly columnName: string;
   readonly label: string;
 
-  constructor(ref: PostgresTableRef, columnName: string) {
+  constructor(ref: PostgresEntityRef, columnName: string) {
     super();
     this.ref = ref;
     this.columnName = columnName;
@@ -436,12 +436,12 @@ export interface AlterColumnTypeOptions {
 export class AlterColumnTypeCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'alterColumnType' as const;
   readonly operationClass = 'destructive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly columnName: string;
   readonly options: AlterColumnTypeOptions;
   readonly label: string;
 
-  constructor(ref: PostgresTableRef, columnName: string, options: AlterColumnTypeOptions) {
+  constructor(ref: PostgresEntityRef, columnName: string, options: AlterColumnTypeOptions) {
     super();
     this.ref = ref;
     this.columnName = columnName;
@@ -484,11 +484,11 @@ export class AlterColumnTypeCall extends PostgresOpFactoryCallNode {
 export class SetNotNullCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'setNotNull' as const;
   readonly operationClass = 'destructive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly columnName: string;
   readonly label: string;
 
-  constructor(ref: PostgresTableRef, columnName: string) {
+  constructor(ref: PostgresEntityRef, columnName: string) {
     super();
     this.ref = ref;
     this.columnName = columnName;
@@ -523,11 +523,11 @@ export class SetNotNullCall extends PostgresOpFactoryCallNode {
 export class DropNotNullCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dropNotNull' as const;
   readonly operationClass = 'widening' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly columnName: string;
   readonly label: string;
 
-  constructor(ref: PostgresTableRef, columnName: string) {
+  constructor(ref: PostgresEntityRef, columnName: string) {
     super();
     this.ref = ref;
     this.columnName = columnName;
@@ -562,13 +562,13 @@ export class DropNotNullCall extends PostgresOpFactoryCallNode {
 export class SetDefaultCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'setDefault' as const;
   readonly operationClass: 'additive' | 'widening';
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly columnName: string;
   readonly defaultSql: string;
   readonly label: string;
 
   constructor(
-    ref: PostgresTableRef,
+    ref: PostgresEntityRef,
     columnName: string,
     defaultSql: string,
     operationClass: 'additive' | 'widening' = 'additive',
@@ -620,11 +620,11 @@ export class SetDefaultCall extends PostgresOpFactoryCallNode {
 export class DropDefaultCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dropDefault' as const;
   readonly operationClass = 'destructive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly columnName: string;
   readonly label: string;
 
-  constructor(ref: PostgresTableRef, columnName: string) {
+  constructor(ref: PostgresEntityRef, columnName: string) {
     super();
     this.ref = ref;
     this.columnName = columnName;
@@ -671,12 +671,12 @@ export class DropDefaultCall extends PostgresOpFactoryCallNode {
 export class AddNotNullColumnDirectCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'rawSql' as const;
   readonly operationClass = 'additive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly columnName: string;
   readonly column: DdlColumn;
   readonly label: string;
 
-  constructor(ref: PostgresTableRef, columnName: string, column: DdlColumn) {
+  constructor(ref: PostgresEntityRef, columnName: string, column: DdlColumn) {
     super();
     this.ref = ref;
     this.columnName = columnName;
@@ -716,7 +716,7 @@ export class AddNotNullColumnDirectCall extends PostgresOpFactoryCallNode {
 export class AddNotNullColumnWithTempDefaultCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'rawSql' as const;
   readonly operationClass = 'additive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly columnName: string;
   readonly column: StorageColumn;
   readonly codecHooks: Map<string, CodecControlHooks>;
@@ -725,7 +725,7 @@ export class AddNotNullColumnWithTempDefaultCall extends PostgresOpFactoryCallNo
   readonly label: string;
 
   constructor(options: {
-    readonly ref: PostgresTableRef;
+    readonly ref: PostgresEntityRef;
     readonly columnName: string;
     readonly column: StorageColumn;
     readonly codecHooks: Map<string, CodecControlHooks>;
@@ -773,7 +773,7 @@ export class AddNotNullColumnWithTempDefaultCall extends PostgresOpFactoryCallNo
 // Constraints
 // ============================================================================
 
-function constraintCallOptions(ref: PostgresTableRef, constraintName: string): string {
+function constraintCallOptions(ref: PostgresEntityRef, constraintName: string): string {
   const opts: string[] = [];
   if (ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
     opts.push(`schema: ${jsonToTsSource(ref.namespace.id)}`);
@@ -786,12 +786,12 @@ function constraintCallOptions(ref: PostgresTableRef, constraintName: string): s
 export class AddPrimaryKeyCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'addPrimaryKey' as const;
   readonly operationClass = 'additive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly constraintName: string;
   readonly columns: readonly string[];
   readonly label: string;
 
-  constructor(ref: PostgresTableRef, constraintName: string, columns: readonly string[]) {
+  constructor(ref: PostgresEntityRef, constraintName: string, columns: readonly string[]) {
     super();
     this.ref = ref;
     this.constraintName = constraintName;
@@ -827,12 +827,12 @@ export class AddPrimaryKeyCall extends PostgresOpFactoryCallNode {
 export class AddUniqueCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'addUnique' as const;
   readonly operationClass = 'additive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly constraintName: string;
   readonly columns: readonly string[];
   readonly label: string;
 
-  constructor(ref: PostgresTableRef, constraintName: string, columns: readonly string[]) {
+  constructor(ref: PostgresEntityRef, constraintName: string, columns: readonly string[]) {
     super();
     this.ref = ref;
     this.constraintName = constraintName;
@@ -868,11 +868,11 @@ export class AddUniqueCall extends PostgresOpFactoryCallNode {
 export class AddForeignKeyCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'addForeignKey' as const;
   readonly operationClass = 'additive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly fk: ForeignKeySpec;
   readonly label: string;
 
-  constructor(ref: PostgresTableRef, fk: ForeignKeySpec) {
+  constructor(ref: PostgresEntityRef, fk: ForeignKeySpec) {
     super();
     this.ref = ref;
     this.fk = fk;
@@ -907,13 +907,13 @@ export class AddForeignKeyCall extends PostgresOpFactoryCallNode {
 export class DropConstraintCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dropConstraint' as const;
   readonly operationClass = 'destructive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly constraintName: string;
   readonly kind: 'foreignKey' | 'unique' | 'primaryKey';
   readonly label: string;
 
   constructor(
-    ref: PostgresTableRef,
+    ref: PostgresEntityRef,
     constraintName: string,
     kind: 'foreignKey' | 'unique' | 'primaryKey' = 'unique',
   ) {
@@ -956,14 +956,14 @@ export class DropConstraintCall extends PostgresOpFactoryCallNode {
 export class AddCheckConstraintCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'addCheckConstraint' as const;
   readonly operationClass = 'additive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly constraintName: string;
   readonly column: string;
   readonly values: readonly string[];
   readonly label: string;
 
   constructor(
-    ref: PostgresTableRef,
+    ref: PostgresEntityRef,
     constraintName: string,
     column: string,
     values: readonly string[],
@@ -1005,11 +1005,11 @@ export class AddCheckConstraintCall extends PostgresOpFactoryCallNode {
 export class DropCheckConstraintCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dropCheckConstraint' as const;
   readonly operationClass = 'destructive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly constraintName: string;
   readonly label: string;
 
-  constructor(ref: PostgresTableRef, constraintName: string) {
+  constructor(ref: PostgresEntityRef, constraintName: string) {
     super();
     this.ref = ref;
     this.constraintName = constraintName;
@@ -1042,7 +1042,7 @@ export class DropCheckConstraintCall extends PostgresOpFactoryCallNode {
 export class CreateIndexCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'createIndex' as const;
   readonly operationClass = 'additive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly indexName: string;
   readonly columns: readonly string[];
   // Named indexType (not typeName): `locationForCall` in issue-planner.ts reads
@@ -1052,7 +1052,7 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
   readonly label: string;
 
   constructor(
-    ref: PostgresTableRef,
+    ref: PostgresEntityRef,
     indexName: string,
     columns: readonly string[],
     extras?: { readonly type?: string; readonly options?: Record<string, unknown> },
@@ -1111,11 +1111,11 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
 export class DropIndexCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dropIndex' as const;
   readonly operationClass = 'destructive' as const;
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly indexName: string;
   readonly label: string;
 
-  constructor(ref: PostgresTableRef, indexName: string) {
+  constructor(ref: PostgresEntityRef, indexName: string) {
     super();
     this.ref = ref;
     this.indexName = indexName;

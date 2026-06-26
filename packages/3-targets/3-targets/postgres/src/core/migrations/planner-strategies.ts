@@ -39,7 +39,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonValue } from '@prisma-next/utils/json';
-import type { PostgresTableRef } from '../entity-ref';
+import type { PostgresEntityRef } from '../entity-ref';
 import { isPostgresSchema, type PostgresSchema } from '../postgres-schema';
 import {
   AddCheckConstraintCall,
@@ -231,7 +231,7 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
     const spec = buildColumnSpec(namespaceId, issue.table, issue.column, ctx, { nullable: true });
     const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
     assertPostgresSchema(namespaceNode, namespaceId);
-    const tableRef: PostgresTableRef = namespaceNode.tableRef(issue.table);
+    const tableRef: PostgresEntityRef = namespaceNode.tableRef(issue.table);
     matched.push(issue);
     calls.push(
       new AddColumnCall(tableRef, spec),
@@ -286,7 +286,7 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
     const alterOpts = buildAlterTypeOptions(namespaceId, issue.table, issue.column, ctx);
     const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
     assertPostgresSchema(namespaceNode, namespaceId);
-    const tableRef: PostgresTableRef = namespaceNode.tableRef(issue.table);
+    const tableRef: PostgresEntityRef = namespaceNode.tableRef(issue.table);
     if (isSafeWidening) {
       calls.push(new AlterColumnTypeCall(tableRef, issue.column, alterOpts));
     } else {
@@ -328,7 +328,7 @@ export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ct
 
     const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
     assertPostgresSchema(namespaceNode, namespaceId);
-    const tableRef: PostgresTableRef = namespaceNode.tableRef(issue.table);
+    const tableRef: PostgresEntityRef = namespaceNode.tableRef(issue.table);
     matched.push(issue);
     calls.push(
       new DataTransformCall(
@@ -584,7 +584,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
 
     const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
     assertPostgresSchema(namespaceNode, namespaceId);
-    const tableRef: PostgresTableRef = namespaceNode.tableRef(issue.table);
+    const tableRef: PostgresEntityRef = namespaceNode.tableRef(issue.table);
 
     matched.push(issue);
 

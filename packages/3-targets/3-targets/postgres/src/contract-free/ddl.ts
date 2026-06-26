@@ -10,7 +10,7 @@ import {
   PostgresDropPolicy,
   type RlsPolicyOperation,
 } from '../core/ddl/nodes';
-import type { PostgresTableRef } from '../core/entity-ref';
+import type { PostgresEntityRef } from '../core/entity-ref';
 
 /**
  * Build a Postgres `CREATE TABLE` query node.
@@ -24,7 +24,7 @@ import type { PostgresTableRef } from '../core/entity-ref';
  * single-quote-escaped by the renderer.
  */
 export function createTable(options: {
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly ifNotExists?: boolean;
   readonly columns: readonly DdlColumn[];
   readonly constraints?: readonly DdlTableConstraint[];
@@ -65,7 +65,7 @@ export function dropDefaultAction(columnName: string): DropDefaultAction {
  * See {@link addColumnAction} / {@link dropDefaultAction} for building actions.
  */
 export function alterTable(options: {
-  readonly ref: PostgresTableRef;
+  readonly ref: PostgresEntityRef;
   readonly actions: readonly AnyAlterTableAction[];
 }): PostgresAlterTable {
   return new PostgresAlterTable(options);

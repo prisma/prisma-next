@@ -31,7 +31,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
-import type { PostgresTableRef } from '../entity-ref';
+import type { PostgresEntityRef } from '../entity-ref';
 import { isPostgresSchema, postgresCreateNamespace } from '../postgres-schema';
 import {
   AddColumnCall,
@@ -221,7 +221,7 @@ function mapIssueToCall(
   // live DB carries a table not claimed by any contract namespace. Those fall
   // back to a synthetic namespace built from the planner's global `ctx.schemaName`.
   // Every other issue resolves the namespace node from the contract.
-  const tableRef = (issue: SchemaIssue): PostgresTableRef => {
+  const tableRef = (issue: SchemaIssue): PostgresEntityRef => {
     if (!('table' in issue) || typeof issue.table !== 'string') {
       throw new Error(`mapIssueToCall: issue kind "${issue.kind}" carries no table`);
     }

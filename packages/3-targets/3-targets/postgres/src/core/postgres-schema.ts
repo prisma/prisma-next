@@ -18,7 +18,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresTableSource } from './ast/table-source';
 import { PG_TEXT_CODEC_ID } from './codec-ids';
 import { policyEntityKind, roleEntityKind } from './entity-kinds';
-import { PostgresColumnRef, PostgresTableRef } from './entity-ref';
+import { PostgresEntityRef } from './entity-ref';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
 import type { PostgresRole } from './postgres-role';
 import { escapeLiteral, quoteIdentifier } from './sql-utils';
@@ -132,19 +132,15 @@ export class PostgresSchema extends SqlNamespaceBase {
    * Qualify a table name using `quoteIdentifier` semantics, escaping embedded
    * `"` characters. Bound schemas render `"<schema>"."<table>"`; the unbound
    * subclass overrides this to render just `"<table>"`. Used by
-   * `PostgresTableRef.qualified()` to satisfy the byte-parity contract with
+   * `PostgresEntityRef.qualified()` to satisfy the byte-parity contract with
    * the renderer.
    */
   quoteTable(tableName: string): string {
     return `${quoteIdentifier(this.id)}.${quoteIdentifier(tableName)}`;
   }
 
-  tableRef(name: string): PostgresTableRef {
-    return new PostgresTableRef({ namespace: this, name });
-  }
-
-  columnRef(table: string, column: string): PostgresColumnRef {
-    return new PostgresColumnRef({ table: this.tableRef(table), column });
+  tableRef(name: string): PostgresEntityRef {
+    return new PostgresEntityRef({ namespace: this, name });
   }
 
   /**

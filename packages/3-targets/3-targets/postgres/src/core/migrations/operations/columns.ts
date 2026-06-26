@@ -9,7 +9,7 @@ import {
   tableIsEmptyAst,
 } from '../../../contract-free/checks';
 import * as contractFreeDdl from '../../../contract-free/ddl';
-import type { PostgresTableRef } from '../../entity-ref';
+import type { PostgresEntityRef } from '../../entity-ref';
 import { quoteIdentifier } from '../../sql-utils';
 import { qualifyTableName } from '../planner-sql-checks';
 import { type Op, step, targetDetails } from './shared';
@@ -240,7 +240,7 @@ export async function setDefault(
 }
 
 export async function dropDefault(
-  ref: PostgresTableRef,
+  ref: PostgresEntityRef,
   columnName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
@@ -280,7 +280,7 @@ export async function dropDefault(
  * adapter; postchecks assert the column exists and is NOT NULL.
  */
 export async function addNotNullColumnDirect(
-  ref: PostgresTableRef,
+  ref: PostgresEntityRef,
   column: DdlColumn,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
