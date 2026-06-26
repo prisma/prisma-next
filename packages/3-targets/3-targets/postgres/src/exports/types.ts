@@ -12,8 +12,14 @@ export {
   postgresCreateNamespace,
 } from '../core/postgres-schema';
 export {
+  ensurePostgresSchemaIR,
   isPostgresSchemaIR,
   PostgresSchemaIR,
   type PostgresSchemaIRInput,
 } from '../core/postgres-schema-ir';
+export {
+  isPostgresTableNode,
+  PostgresTableNode,
+  type PostgresTableNodeInput,
+} from '../core/postgres-table-node';
 export type { PostgresColumnDefault } from '../core/types';

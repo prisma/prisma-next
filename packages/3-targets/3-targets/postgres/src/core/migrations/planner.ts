@@ -26,8 +26,10 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { assertPostgresRlsPolicy } from '../postgres-rls-policy';
-import { isPostgresSchemaIR } from '../postgres-schema-ir';
+import type { PostgresContract } from '../postgres-schema';
+import { ensurePostgresSchemaIR, isPostgresSchemaIR } from '../postgres-schema-ir';
 import { resolveDdlSchemaForNamespaceStorage } from '../postgres-schema-ir-annotations';
+import { contractToPostgresSchemaIR } from './contract-to-postgres-schema-ir';
 import {
   formatPostgresControlPolicySubjectLabel,
   resolvePostgresCallControlPolicySubject,
@@ -276,10 +278,14 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       // is unreachable in production.
       throw new Error('planPostgresSchemaDiff: options.schema must be a PostgresSchemaIR');
     }
-    const diffIssues = diffPostgresSchema({
-      contract: options.contract,
-      schema: options.schema,
-    });
+    const expected = contractToPostgresSchemaIR(
+      blindCast<PostgresContract, 'planPostgresSchemaDiff is only called with a postgres contract'>(
+        options.contract,
+      ),
+      { annotationNamespace: 'pg' },
+    );
+    const actual = ensurePostgresSchemaIR(options.schema);
+    const diffIssues = diffPostgresSchema(expected, actual);
 
     const allowsDestructive = options.policy.allowedOperationClasses.includes('destructive');
     const calls: PostgresOpFactoryCall[] = [];

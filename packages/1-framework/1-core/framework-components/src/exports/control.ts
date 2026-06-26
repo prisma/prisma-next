@@ -106,7 +106,7 @@ export type {
   SchemaDiffIssue,
   SchemaDiffOutcome,
 } from '../control/schema-diff';
-export { diffSchemas, filterSchemaIssuesByOwnership } from '../control/schema-diff';
+export { diffSchemas } from '../control/schema-diff';
 export type {
   SchemaVerifier,
   SchemaVerifyOptions,

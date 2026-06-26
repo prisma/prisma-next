@@ -36,22 +36,32 @@ const stubLowerer: ExecuteRequestLowerer = {
 
 const TABLE_NAME = 'profiles';
 const SCHEMA_NAME = UNBOUND_NAMESPACE_ID;
+const RESOLVED_SCHEMA = 'public';
 
 function makePolicy(
   name: string,
   tableName = TABLE_NAME,
   using = '(auth.uid() = user_id)',
+  namespaceId: string = SCHEMA_NAME,
 ): PostgresRlsPolicy {
   return new PostgresRlsPolicy({
     name,
     prefix: name.replace(/_[0-9a-f]{8}$/, ''),
     tableName,
-    namespaceId: SCHEMA_NAME,
+    namespaceId,
     operation: 'select',
     roles: ['authenticated'],
     using,
     permissive: true,
   });
+}
+
+function makeActualPolicy(
+  name: string,
+  tableName = TABLE_NAME,
+  using = '(auth.uid() = user_id)',
+): PostgresRlsPolicy {
+  return makePolicy(name, tableName, using, RESOLVED_SCHEMA);
 }
 
 function buildContractWithPolicy(
@@ -228,7 +238,7 @@ describe('RLS planner diff-wiring', () => {
     const contract = buildContractWithPolicy();
     const planner = createPostgresMigrationPlanner(stubLowerer);
 
-    const existingPolicy = makePolicy('read_own_profiles_a1b2c3d4');
+    const existingPolicy = makeActualPolicy('read_own_profiles_a1b2c3d4');
     const schema = schemaWith([existingPolicy]);
 
     const result = planner.plan({
@@ -279,7 +289,7 @@ describe('RLS planner policy edit (missing + extra via generic pipeline)', () =>
     const contract = buildContractWith([newPolicy]);
     const planner = createPostgresMigrationPlanner(stubLowerer);
 
-    const oldPolicy = makePolicy('p_read_00000000', TABLE_NAME, '(auth.uid() = old_user_id)');
+    const oldPolicy = makeActualPolicy('p_read_00000000', TABLE_NAME, '(auth.uid() = old_user_id)');
     const schema = schemaWith([oldPolicy]);
 
     const result = planner.plan({
@@ -305,7 +315,7 @@ describe('RLS planner policy edit (missing + extra via generic pipeline)', () =>
     const contract = buildContractWith([newPolicy]);
     const planner = createPostgresMigrationPlanner(stubLowerer);
 
-    const oldPolicy = makePolicy('p_read_00000000', TABLE_NAME, '(auth.uid() = old_user_id)');
+    const oldPolicy = makeActualPolicy('p_read_00000000', TABLE_NAME, '(auth.uid() = old_user_id)');
     const schema = schemaWith([oldPolicy]);
 
     const result = planner.plan({

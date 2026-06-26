@@ -203,4 +203,41 @@ describe('diffSchemas', () => {
     expect(byKey['users']).toBe('mismatch');
     expect(byKey['only_in_a']).toBe('missing');
   });
+
+  it('total descent: missing subtree emits one issue per node in the subtree', () => {
+    const grandchildA = makeNode('grandchild_a', 'leaf');
+    const grandchildB = makeNode('grandchild_b', 'leaf');
+    const child = makeNode('child', 'body', [grandchildA, grandchildB]);
+
+    const issues = diffSchemas(rootOf([child]), rootOf([]));
+
+    expect(issues).toHaveLength(3);
+    const paths = issues.map((i) => i.path.join('/'));
+    expect(paths).toContain('root/child');
+    expect(paths).toContain('root/child/grandchild_a');
+    expect(paths).toContain('root/child/grandchild_b');
+    expect(issues.every((i) => i.outcome === 'missing')).toBe(true);
+  });
+
+  it('total descent: extra subtree emits one issue per node in the subtree', () => {
+    const grandchildA = makeNode('grandchild_a', 'leaf');
+    const grandchildB = makeNode('grandchild_b', 'leaf');
+    const child = makeNode('child', 'body', [grandchildA, grandchildB]);
+
+    const issues = diffSchemas(rootOf([]), rootOf([child]));
+
+    expect(issues).toHaveLength(3);
+    const paths = issues.map((i) => i.path.join('/'));
+    expect(paths).toContain('root/child');
+    expect(paths).toContain('root/child/grandchild_a');
+    expect(paths).toContain('root/child/grandchild_b');
+    expect(issues.every((i) => i.outcome === 'extra')).toBe(true);
+  });
+
+  it('missing leaf still emits exactly one issue (behavior-preserving)', () => {
+    const leaf = makeNode('lone_leaf', 'data');
+    const issues = diffSchemas(rootOf([leaf]), rootOf([]));
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ outcome: 'missing', path: ['root', 'lone_leaf'] });
+  });
 });

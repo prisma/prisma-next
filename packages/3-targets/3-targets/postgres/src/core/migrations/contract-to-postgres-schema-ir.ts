@@ -1,7 +1,9 @@
 import type { ContractToSchemaIROptions } from '@prisma-next/family-sql/control';
 import { contractToSchemaIR } from '@prisma-next/family-sql/control';
 import type { PostgresContract } from '../postgres-schema';
+import { isPostgresSchema } from '../postgres-schema';
 import { PostgresSchemaIR } from '../postgres-schema-ir';
+import { resolveDdlSchemaForNamespaceStorage } from '../postgres-schema-ir-annotations';
 import {
   collectContractRlsPolicies,
   collectContractRoles,
@@ -13,13 +15,19 @@ export function contractToPostgresSchemaIR(
   options: ContractToSchemaIROptions,
 ): PostgresSchemaIR {
   const sqlIr = contractToSchemaIR(contract, options);
+  const ownedSchemas =
+    contract === null
+      ? []
+      : Object.values(contract.storage.namespaces)
+          .filter((ns) => isPostgresSchema(ns))
+          .map((ns) => resolveDdlSchemaForNamespaceStorage(contract.storage, ns.id));
   return new PostgresSchemaIR({
     tables: sqlIr.tables,
     rlsPolicies: collectContractRlsPolicies(contract),
     roles: collectContractRoles(contract),
     pgSchemaName: 'public',
     pgVersion: '',
-    existingSchemas: [],
+    existingSchemas: ownedSchemas,
     nativeEnumTypeNames: [],
   });
 }

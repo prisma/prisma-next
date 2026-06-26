@@ -59,13 +59,8 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
     freezeNode(this);
   }
 
-  /**
-   * Id for the differ. Includes namespace + table so the id is unique among all
-   * policies across all tables in a database root's children list. Policy wire
-   * names are only unique per-table, so the table is part of the path identity.
-   */
   id(): string {
-    return `${this.namespaceId}/${this.tableName}/${this.name}`;
+    return this.name;
   }
 
   children(): readonly DiffableNode[] {

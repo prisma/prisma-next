@@ -8,8 +8,10 @@ import {
   SqlTableIR,
   type SqlTableIRInput,
 } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
 import type { PostgresRole } from './postgres-role';
+import { PostgresTableNode } from './postgres-table-node';
 
 export interface PostgresSchemaIRInput {
   readonly tables: Record<string, SqlTableIR | SqlTableIRInput>;
@@ -98,7 +100,25 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
   }
 
   children(): readonly DiffableNode[] {
-    return this.rlsPolicies;
+    const groups = new Map<string, PostgresRlsPolicy[]>();
+    const keyOrder: string[] = [];
+    for (const policy of this.rlsPolicies) {
+      const key = `${policy.namespaceId}/${policy.tableName}`;
+      if (!groups.has(key)) {
+        groups.set(key, []);
+        keyOrder.push(key);
+      }
+      groups.get(key)!.push(policy);
+    }
+    return keyOrder.map((key) => {
+      const policies = groups.get(key)!;
+      const first = policies[0]!;
+      return new PostgresTableNode({
+        schemaName: first.namespaceId,
+        tableName: first.tableName,
+        policies,
+      });
+    });
   }
 }
 
@@ -114,4 +134,19 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
  */
 export function isPostgresSchemaIR(schema: SqlSchemaIR): schema is PostgresSchemaIR {
   return schema.nodeTarget === 'postgres';
+}
+
+/**
+ * Returns `schema` as-is when it is a real `PostgresSchemaIR` instance, or
+ * reconstructs one when `projectSchemaToSpace` has spread the class into a
+ * plain object (losing prototype methods).
+ */
+export function ensurePostgresSchemaIR(schema: PostgresSchemaIR): PostgresSchemaIR {
+  if (schema instanceof PostgresSchemaIR) return schema;
+  return new PostgresSchemaIR(
+    blindCast<
+      PostgresSchemaIRInput,
+      'spread objects from projectSchemaToSpace preserve all own-enumerable fields'
+    >(schema),
+  );
 }

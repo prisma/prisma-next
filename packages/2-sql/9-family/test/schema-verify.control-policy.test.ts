@@ -156,24 +156,14 @@ describe('verifySqlSchema control policy', () => {
 
 describe('filterSchemaDiffIssues', () => {
   const extraIssue = {
-    coordinate: {
-      plane: 'storage' as const,
-      namespaceId: 'public',
-      entityKind: 'policy',
-      entityName: 'p_abc12345',
-    },
+    path: ['public', 'profiles', 'p_abc12345'],
     outcome: 'extra' as const,
-    message: "extra: policy 'p_abc12345' in namespace 'public'",
+    message: 'extra: public/profiles/p_abc12345',
   };
   const missingIssue = {
-    coordinate: {
-      plane: 'storage' as const,
-      namespaceId: 'public',
-      entityKind: 'policy',
-      entityName: 'p_deadbeef',
-    },
+    path: ['public', 'profiles', 'p_deadbeef'],
     outcome: 'missing' as const,
-    message: "missing: policy 'p_deadbeef' in namespace 'public'",
+    message: 'missing: public/profiles/p_deadbeef',
   };
 
   it('keeps all issues when defaultControlPolicy is managed', () => {

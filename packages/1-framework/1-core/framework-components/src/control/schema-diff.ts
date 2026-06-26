@@ -15,12 +15,10 @@ export interface SchemaDiffIssue {
  * A node in the schema tree. Every node in the tree — including the database root —
  * implements this interface.
  *
- * `id()` must be unique among sibling nodes at the same level — the
- * differ keys on it and treats a collision as the same entity (enforced by a
- * duplicate-id throw). The differ accumulates these ids into a path that
- * stamps every emitted issue. A node that is only unique within its parent
- * (e.g. a policy unique only within its table) must fold its parent identity
- * into its id.
+ * `id()` must be unique among sibling nodes at the same level — the differ keys
+ * on it and treats a collision as the same entity (enforced by a duplicate-id
+ * throw). The differ accumulates these ids into a path that stamps every emitted
+ * issue.
  */
 export interface DiffableNode {
   id(): string;
@@ -40,37 +38,32 @@ function outcomeMessage(outcome: SchemaDiffOutcome, path: readonly string[]): st
   return `${outcome}: ${path.join('/')}`;
 }
 
-/**
- * Filter `extra` outcomes whose namespace is not owned by the caller.
- *
- * Use this after `diffSchemas` when a live introspection returns every entity
- * across all DB schemas, but the current contract only owns a subset of them.
- * `extra` issues in unowned namespaces belong to another contract space and
- * should be left alone. `missing` and `mismatch` outcomes pass through unchanged
- * regardless of ownership.
- *
- * Because `SchemaDiffIssue` no longer carries a coordinate, ownership must be
- * determined from the node itself. Pass `getNamespaceId` to extract the
- * namespace from the node on an `extra` issue.
- */
-export function filterSchemaIssuesByOwnership(
-  issues: readonly SchemaDiffIssue[],
-  isOwned: (namespaceId: string) => boolean,
-  getNamespaceId: (node: DiffableNode) => string,
-): readonly SchemaDiffIssue[] {
-  return issues.filter(
-    (issue) =>
-      issue.outcome !== 'extra' ||
-      (issue.actual !== undefined && isOwned(getNamespaceId(issue.actual))),
-  );
+function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): SchemaDiffIssue[] {
+  const path = [...parentPath, node.id()];
+  const issues: SchemaDiffIssue[] = [
+    { path, outcome: 'missing', message: outcomeMessage('missing', path), expected: node },
+  ];
+  for (const child of node.children()) issues.push(...emitMissingSubtree(child, path));
+  return issues;
+}
+
+function emitExtraSubtree(node: DiffableNode, parentPath: readonly string[]): SchemaDiffIssue[] {
+  const path = [...parentPath, node.id()];
+  const issues: SchemaDiffIssue[] = [
+    { path, outcome: 'extra', message: outcomeMessage('extra', path), actual: node },
+  ];
+  for (const child of node.children()) issues.push(...emitExtraSubtree(child, path));
+  return issues;
 }
 
 /**
- * Compare two corresponding nodes and recurse into their children.
+ * Diff two schema trees starting from their roots.
  *
- * Emits a `mismatch` if `expected.isEqualTo(actual)` is false, then descends
- * into both nodes' children regardless. The differ reads only the three
- * `DiffableNode` methods, so it names no node type.
+ * The differ is **total**: every node-level difference is reported. An unmatched
+ * non-leaf node emits its own issue and descends, emitting an issue for every
+ * node in the missing/extra subtree. Coalescing a parent change over its
+ * children is the planner's responsibility. Ownership filtering (dropping `extra`
+ * issues in namespaces a contract doesn't own) is the caller's responsibility.
  */
 export function diffSchemas(
   expected: DiffableNode,
@@ -100,10 +93,11 @@ function diffPair(
 }
 
 /**
- * Align one level of nodes by local key; emit missing/extra/mismatch issues in
- * input order, and recurse into each matched pair. A `missing` or `extra` node
- * emits a single issue at its path and is not descended (the whole subtree
- * is missing/extra).
+ * Align one level of nodes by id; emit issues in input order and recurse.
+ *
+ * A missing node emits one issue for itself and one for every node in its
+ * subtree (total descent). Same for extra nodes. A matched pair recurses via
+ * `diffPair`.
  */
 function diffChildren(
   expected: readonly DiffableNode[],
@@ -124,14 +118,8 @@ function diffChildren(
 
   for (const [key, expectedNode] of expectedMap) {
     const actualNode = actualMap.get(key);
-    const path = [...parentPath, key];
     if (actualNode === undefined) {
-      issues.push({
-        path,
-        outcome: 'missing',
-        message: outcomeMessage('missing', path),
-        expected: expectedNode,
-      });
+      issues.push(...emitMissingSubtree(expectedNode, parentPath));
     } else {
       issues.push(...diffPair(expectedNode, actualNode, parentPath));
     }
@@ -139,13 +127,7 @@ function diffChildren(
 
   for (const [key, actualNode] of actualMap) {
     if (!expectedMap.has(key)) {
-      const path = [...parentPath, key];
-      issues.push({
-        path,
-        outcome: 'extra',
-        message: outcomeMessage('extra', path),
-        actual: actualNode,
-      });
+      issues.push(...emitExtraSubtree(actualNode, parentPath));
     }
   }
 

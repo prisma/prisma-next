@@ -284,14 +284,3 @@ export function postgresCreateNamespace(input: SqlNamespaceTablesInput): Postgre
   }
   return new PostgresSchema(schemaInput);
 }
-
-/**
- * Resolve a namespace id to its Postgres schema name, binding the late-bound
- * `UNBOUND_NAMESPACE_ID` sentinel to the `public` default. Use this where a
- * namespace id is compared against the literal `'public'` string. Do NOT use it
- * where the schema name must come from an introspected `pgSchemaName` instead of
- * the literal `'public'` — that resolution is different.
- */
-export function resolveNamespaceId(namespaceId: string): string {
-  return namespaceId === UNBOUND_NAMESPACE_ID ? 'public' : namespaceId;
-}

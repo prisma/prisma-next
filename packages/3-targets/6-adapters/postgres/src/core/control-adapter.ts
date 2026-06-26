@@ -59,9 +59,13 @@ import type {
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
-import { diffPostgresSchema } from '@prisma-next/target-postgres/planner';
+import {
+  contractToPostgresSchemaIR,
+  diffPostgresSchema,
+} from '@prisma-next/target-postgres/planner';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
+  ensurePostgresSchemaIR,
   isPostgresSchemaIR,
   PostgresRlsPolicy,
   PostgresRole,
@@ -131,7 +135,15 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         `Postgres schema diff requires a PostgresSchemaIR; got ${(schema as { constructor?: { name?: string } }).constructor?.name ?? typeof schema}`,
       );
     }
-    return diffPostgresSchema({ contract, schema });
+    const expected = contractToPostgresSchemaIR(
+      blindCast<
+        PostgresContract,
+        'collectSchemaDiffIssues is only called with a postgres contract'
+      >(contract),
+      { annotationNamespace: 'pg' },
+    );
+    const actual = ensurePostgresSchemaIR(schema);
+    return diffPostgresSchema(expected, actual);
   }
 
   bootstrapControlTableQueries(): readonly DdlNode[] {

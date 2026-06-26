@@ -526,7 +526,7 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
 
         const policyIssue = appSchemaResult?.schema.schemaDiffIssues.find(
           (issue) =>
-            issue.outcome === 'missing' && issue.coordinate.entityName === POLICY_WIRE_NAME,
+            issue.outcome === 'missing' && issue.path[issue.path.length - 1] === POLICY_WIRE_NAME,
         );
         expect(
           policyIssue,
