@@ -100,25 +100,18 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
   }
 
   children(): readonly DiffableNode[] {
-    const groups = new Map<string, PostgresRlsPolicy[]>();
-    const keyOrder: string[] = [];
+    type Group = { schemaName: string; tableName: string; policies: PostgresRlsPolicy[] };
+    const byKey = new Map<string, Group>();
     for (const policy of this.rlsPolicies) {
       const key = `${policy.namespaceId}/${policy.tableName}`;
-      if (!groups.has(key)) {
-        groups.set(key, []);
-        keyOrder.push(key);
+      let group = byKey.get(key);
+      if (group === undefined) {
+        group = { schemaName: policy.namespaceId, tableName: policy.tableName, policies: [] };
+        byKey.set(key, group);
       }
-      groups.get(key)!.push(policy);
+      group.policies.push(policy);
     }
-    return keyOrder.map((key) => {
-      const policies = groups.get(key)!;
-      const first = policies[0]!;
-      return new PostgresTableNode({
-        schemaName: first.namespaceId,
-        tableName: first.tableName,
-        policies,
-      });
-    });
+    return [...byKey.values()].map((g) => new PostgresTableNode(g));
   }
 }
 
