@@ -1,5 +1,6 @@
 import {
   AttributeArgListAst,
+  CompositeTypeDeclarationAst,
   type DocumentAst,
   FieldAttributeAst,
   FieldDeclarationAst,
@@ -7,12 +8,14 @@ import {
   KeyValuePairAst,
   ModelAttributeAst,
   ModelDeclarationAst,
+  NamespaceDeclarationAst,
   type Position,
   type QualifiedNameAst,
   type SourceFile,
   type SyntaxNode,
   type SyntaxToken,
   TypeAnnotationAst,
+  TypesBlockAst,
 } from '@prisma-next/psl-parser/syntax';
 
 export interface ClassifyPslCompletionContextInput {
@@ -55,6 +58,16 @@ export interface GenericBlockParameterCompletionContext {
   readonly existingParameterNames: readonly string[];
 }
 
+export type DeclarationKeywordCompletionScope = 'document' | 'namespace';
+
+export interface DeclarationKeywordCompletionContext {
+  readonly kind: 'declarationKeyword';
+  readonly offset: number;
+  readonly scope: DeclarationKeywordCompletionScope;
+  readonly prefix: string;
+  readonly replacementStartOffset: number;
+}
+
 export interface UnsupportedPslCompletionContext {
   readonly kind: 'unsupported';
   readonly offset: number;
@@ -62,6 +75,7 @@ export interface UnsupportedPslCompletionContext {
 }
 
 export type PslCompletionContext =
+  | DeclarationKeywordCompletionContext
   | GenericBlockParameterCompletionContext
   | ModelFieldTypeCompletionContext
   | UnsupportedPslCompletionContext;
@@ -91,6 +105,16 @@ export function classifyPslCompletionContext(
   const ancestorReason = unsupportedAncestorReason(contextNode);
   if (ancestorReason !== undefined) {
     return unsupported(offset, ancestorReason);
+  }
+
+  const declarationKeywordContext = classifyDeclarationKeyword({
+    node: contextNode,
+    offset,
+    sourceFile: input.sourceFile,
+    tokenContext,
+  });
+  if (declarationKeywordContext !== undefined) {
+    return declarationKeywordContext;
   }
 
   const genericBlockContext = classifyGenericBlockParameter({
@@ -187,6 +211,143 @@ function modelFieldType(
   prefix: TypeNamePrefix,
 ): ModelFieldTypeCompletionContext {
   return { kind: 'modelFieldType', offset, fieldName, prefix };
+}
+
+function classifyDeclarationKeyword(input: {
+  readonly node: SyntaxNode | undefined;
+  readonly offset: number;
+  readonly sourceFile: SourceFile;
+  readonly tokenContext: TokenContext;
+}): DeclarationKeywordCompletionContext | undefined {
+  if (isInsideNonDeclarationKeywordBody(input.node, input.offset)) {
+    return undefined;
+  }
+
+  const namespace = closestAst(input.node, NamespaceDeclarationAst.cast);
+  const scope = namespaceBodyContainsOffset(namespace, input.offset) ? 'namespace' : 'document';
+  const anchorOffset = scope === 'namespace' ? namespace?.lbrace()?.offset : undefined;
+  const prefix = declarationKeywordPrefix({
+    offset: input.offset,
+    source: input.sourceFile.text,
+    tokenContext: input.tokenContext,
+    ...(anchorOffset === undefined ? {} : { anchorOffset }),
+  });
+  if (prefix === undefined) {
+    return undefined;
+  }
+
+  return {
+    kind: 'declarationKeyword',
+    offset: input.offset,
+    scope,
+    prefix: prefix.text,
+    replacementStartOffset: prefix.replacementStartOffset,
+  };
+}
+
+function isInsideNonDeclarationKeywordBody(node: SyntaxNode | undefined, offset: number): boolean {
+  return (
+    declarationBodyContainsOffset(closestAst(node, ModelDeclarationAst.cast), offset) ||
+    declarationBodyContainsOffset(closestAst(node, CompositeTypeDeclarationAst.cast), offset) ||
+    declarationBodyContainsOffset(closestAst(node, TypesBlockAst.cast), offset) ||
+    declarationBodyContainsOffset(closestAst(node, GenericBlockDeclarationAst.cast), offset)
+  );
+}
+
+function declarationBodyContainsOffset(
+  declaration:
+    | CompositeTypeDeclarationAst
+    | GenericBlockDeclarationAst
+    | ModelDeclarationAst
+    | TypesBlockAst
+    | undefined,
+  offset: number,
+): boolean {
+  if (declaration === undefined) {
+    return false;
+  }
+  const lbrace = declaration.lbrace();
+  if (lbrace === undefined) {
+    return false;
+  }
+  const bodyStart = lbrace.offset + lbrace.text.length;
+  const rbrace = declaration.rbrace();
+  const bodyEnd = rbrace?.offset ?? endOffset(declaration.syntax);
+  return offset >= bodyStart && offset <= bodyEnd;
+}
+
+function namespaceBodyContainsOffset(
+  namespace: NamespaceDeclarationAst | undefined,
+  offset: number,
+): boolean {
+  if (namespace === undefined) {
+    return false;
+  }
+  const lbrace = namespace.lbrace();
+  if (lbrace === undefined) {
+    return false;
+  }
+  const bodyStart = lbrace.offset + lbrace.text.length;
+  const rbrace = namespace.rbrace();
+  const bodyEnd = rbrace?.offset ?? endOffset(namespace.syntax);
+  return offset >= bodyStart && offset <= bodyEnd;
+}
+
+function declarationKeywordPrefix(input: {
+  readonly offset: number;
+  readonly source: string;
+  readonly tokenContext: TokenContext;
+  readonly anchorOffset?: number;
+}): { readonly text: string; readonly replacementStartOffset: number } | undefined {
+  const token = declarationPrefixToken(input.tokenContext, input.offset);
+  const start = token?.offset ?? input.offset;
+  if (!hasOnlyHorizontalWhitespace(input.source, declarationPrefixAllowedStart(input), start)) {
+    return undefined;
+  }
+  if (token === undefined) {
+    return { text: '', replacementStartOffset: input.offset };
+  }
+  return {
+    text: input.source.slice(token.offset, input.offset),
+    replacementStartOffset: token.offset,
+  };
+}
+
+function declarationPrefixToken(
+  tokenContext: TokenContext,
+  offset: number,
+): SyntaxToken | undefined {
+  if (tokenContext.current?.kind === 'Ident') {
+    return tokenContext.current;
+  }
+  if (tokenContext.touching?.kind === 'Ident') {
+    return tokenContext.touching;
+  }
+  if (
+    tokenContext.previousSignificant?.kind === 'Ident' &&
+    tokenContext.previousSignificant.offset + tokenContext.previousSignificant.text.length ===
+      offset
+  ) {
+    return tokenContext.previousSignificant;
+  }
+  return undefined;
+}
+
+function declarationPrefixAllowedStart(input: {
+  readonly offset: number;
+  readonly source: string;
+  readonly anchorOffset?: number;
+}): number {
+  const lineStart = lineStartOffset(input.source, input.offset);
+  if (input.anchorOffset === undefined || input.anchorOffset < lineStart) {
+    return lineStart;
+  }
+  return input.anchorOffset + 1;
+}
+
+function lineStartOffset(source: string, offset: number): number {
+  const previousNewline = source.lastIndexOf('\n', Math.max(0, offset - 1));
+  return previousNewline < 0 ? 0 : previousNewline + 1;
 }
 
 function classifyGenericBlockParameter(input: {
@@ -528,7 +689,7 @@ function endOffset(node: SyntaxNode): number {
 }
 
 function hasOnlyHorizontalWhitespace(source: string, start: number, end: number): boolean {
-  if (end <= start) {
+  if (end < start) {
     return false;
   }
   for (let index = start; index < end; index++) {

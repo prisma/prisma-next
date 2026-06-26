@@ -2,11 +2,12 @@ import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framewor
 import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
-import { CompletionItemKind } from 'vscode-languageserver';
+import { CompletionItemKind, InsertTextFormat } from 'vscode-languageserver';
 import { classifyPslCompletionContext } from '../src/completion-context';
 import { providePslCompletionItems } from '../src/completion-provider';
 
 const scalarTypes = ['String', 'Int', 'Boolean', 'DateTime'] as const;
+const nameSnippetPlaceholder = '$' + '{1:Name}';
 
 const pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace = {
   policy: {
@@ -19,6 +20,17 @@ const pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace = {
       where: { kind: 'value', codecId: 'fixture/text@1' },
       mode: { kind: 'option', values: ['permissive', 'restrictive'] },
       using: { kind: 'value', codecId: 'fixture/text@1' },
+    },
+  },
+  access: {
+    audit: {
+      kind: 'pslBlock',
+      keyword: 'audit',
+      discriminator: 'fixture-audit',
+      name: { required: true },
+      parameters: {
+        on: { kind: 'ref', refKind: 'model', scope: 'same-space' },
+      },
     },
   },
 };
@@ -53,7 +65,10 @@ const candidateSource = [
   '}',
 ].join('\n');
 
-function complete(markedFieldSource: string) {
+function complete(
+  markedFieldSource: string,
+  options: { readonly clientSupportsSnippets?: boolean } = {},
+) {
   const markedSource = `${candidateSource}\n${markedFieldSource}`;
   const cursorOffset = markedSource.indexOf('|');
   expect(cursorOffset).toBeGreaterThanOrEqual(0);
@@ -76,6 +91,7 @@ function complete(markedFieldSource: string) {
       context,
       sourceFile,
       candidates: { scalarTypes, pslBlockDescriptors, symbolTable },
+      clientSupportsSnippets: options.clientSupportsSnippets === true,
     }),
     sourceFile,
     cursorOffset,
@@ -83,6 +99,85 @@ function complete(markedFieldSource: string) {
 }
 
 describe('providePslCompletionItems', () => {
+  it('returns document-level declaration keyword candidates with stable plain-text edits', () => {
+    const { items, sourceFile, cursorOffset } = complete('|');
+
+    expect(items.map((item) => item.label)).toEqual([
+      'model',
+      'type',
+      'types',
+      'namespace',
+      'audit',
+      'policy',
+    ]);
+    expect(items.map((item) => item.detail)).toEqual([
+      'PSL declaration keyword',
+      'PSL declaration keyword',
+      'PSL declaration keyword',
+      'PSL declaration keyword',
+      'Generic block keyword',
+      'Generic block keyword',
+    ]);
+    expect(items[0]).toMatchObject({
+      kind: CompletionItemKind.Keyword,
+      filterText: 'model',
+      textEdit: {
+        range: {
+          start: sourceFile.positionAt(cursorOffset),
+          end: sourceFile.positionAt(cursorOffset),
+        },
+        newText: 'model ',
+      },
+    });
+    expect(items[0]?.insertTextFormat).toBeUndefined();
+  });
+
+  it('filters document-level declaration keyword prefixes and replaces the typed segment', () => {
+    const { items, sourceFile, cursorOffset } = complete('mo|');
+
+    expect(items.map((item) => item.label)).toEqual(['model']);
+    expect(items[0]?.textEdit).toEqual({
+      range: {
+        start: sourceFile.positionAt(cursorOffset - 'mo'.length),
+        end: sourceFile.positionAt(cursorOffset),
+      },
+      newText: 'model ',
+    });
+  });
+
+  it('returns namespace-body declaration keywords without document-only native keywords', () => {
+    const { items } = complete(['namespace feature {', '  |', '}'].join('\n'));
+
+    expect(items.map((item) => item.label)).toEqual(['model', 'type', 'audit', 'policy']);
+    expect(items.map((item) => item.label)).not.toContain('types');
+    expect(items.map((item) => item.label)).not.toContain('namespace');
+  });
+
+  it('filters namespace-body declaration keyword prefixes', () => {
+    const { items } = complete(['namespace feature {', '  po|', '}'].join('\n'));
+
+    expect(items.map((item) => item.label)).toEqual(['policy']);
+  });
+
+  it('returns snippet declaration keyword edits only when the client supports snippets', () => {
+    const { items } = complete('|', { clientSupportsSnippets: true });
+
+    expect(items.find((item) => item.label === 'model')).toMatchObject({
+      insertTextFormat: InsertTextFormat.Snippet,
+      textEdit: { newText: `model ${nameSnippetPlaceholder} {\n  $0\n}` },
+    });
+    expect(items.find((item) => item.label === 'policy')).toMatchObject({
+      insertTextFormat: InsertTextFormat.Snippet,
+      textEdit: { newText: `policy ${nameSnippetPlaceholder} {\n  $0\n}` },
+    });
+  });
+
+  it('returns an empty list for ordinary model attribute contexts', () => {
+    const { items } = complete(['model Post {', '  id Int', '  @@|', '}'].join('\n'));
+
+    expect(items).toEqual([]);
+  });
+
   it('returns stable bare model field type completion candidates', () => {
     const { items, sourceFile, cursorOffset } = complete(
       ['model Post {', '  author |', '}'].join('\n'),
