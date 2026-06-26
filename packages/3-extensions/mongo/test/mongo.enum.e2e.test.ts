@@ -12,10 +12,6 @@ import { afterAll, beforeAll, describe, expect, expectTypeOf, it } from 'vitest'
 import { defineContract, enumType, field, member, model } from '../src/exports/contract-builder';
 import mongo, { type MongoClient as MongoFacadeClient } from '../src/runtime/mongo';
 
-// ---------------------------------------------------------------------------
-// Contract authoring — TS DSL
-// ---------------------------------------------------------------------------
-
 const Role = enumType(
   'Role',
   { codecId: 'mongo/string@1', nativeType: 'string' },
@@ -47,10 +43,6 @@ const contract = defineContract({
   enums: { Role, Status },
   models: { Account },
 });
-
-// ---------------------------------------------------------------------------
-// Codec lookup for validator derivation
-// ---------------------------------------------------------------------------
 
 const mongoTargetTypes: Record<string, readonly string[]> = {
   'mongo/string@1': ['string'],
@@ -88,10 +80,6 @@ const ACCOUNT_VALIDATOR = deriveJsonSchema(
     'enum member values are JsonValue-compatible at runtime; namespace enum? slot types values as a union not JsonValue'
   >(ns?.enum),
 );
-
-// ---------------------------------------------------------------------------
-// MMS harness
-// ---------------------------------------------------------------------------
 
 describe('mongo enum — end-to-end (replica set)', {
   timeout: timeouts.spinUpMongoMemoryServer,
@@ -141,11 +129,6 @@ describe('mongo enum — end-to-end (replica set)', {
     await nativeClient?.close();
     await replSet?.stop();
   }, timeouts.spinUpMongoMemoryServer);
-
-  // -------------------------------------------------------------------------
-  // Part A: Author → Enforce (validator rejection / acceptance) via the
-  // ORM client — proves the codec layer + validator wire-up end-to-end.
-  // -------------------------------------------------------------------------
 
   describe('out-of-set scalar write is rejected', () => {
     it('rejects an insert with a role value not in the enum', async () => {
@@ -229,10 +212,6 @@ describe('mongo enum — end-to-end (replica set)', {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Part A: Read — db.enums assertions via the same mongo() facade.
-  // -------------------------------------------------------------------------
-
   describe('db.enums via mongo() facade', () => {
     it('exposes the enum accessor at db.enums.Role without namespace key', () => {
       expect(db.enums['Role']).toBeDefined();
@@ -287,10 +266,6 @@ describe('mongo enum — end-to-end (replica set)', {
     });
   });
 });
-
-// ---------------------------------------------------------------------------
-// Part B: emit-then-consume type test (non-vacuous)
-// ---------------------------------------------------------------------------
 
 describe('emit-then-consume: value-union narrowing through the emitted contract.d.ts', () => {
   const mongoCodecImports = [

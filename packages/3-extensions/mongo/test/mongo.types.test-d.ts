@@ -52,10 +52,6 @@ test('db.orm key set matches the emitted roots (lowercased plurals only)', () =>
   expectTypeOf<OrmKeys>().toEqualTypeOf<'tasks' | 'users'>();
 });
 
-// ---------------------------------------------------------------------------
-// db.enums type tests
-// ---------------------------------------------------------------------------
-
 type RoleEnum = {
   readonly codecId: 'mongo/string@1';
   readonly members: readonly [
@@ -115,10 +111,6 @@ test('db.enums.Role.members.User is the literal "user"', () => {
   expectTypeOf<(typeof enumDb)['enums']['Role']['members']['User']>().toEqualTypeOf<'user'>();
 });
 
-// ---------------------------------------------------------------------------
-// A03: TS DSL defineContract path exposes typed db.enums (no cast required)
-// ---------------------------------------------------------------------------
-
 const Role = enumType(
   'Role',
   { codecId: 'mongo/string@1', nativeType: 'string' },
@@ -144,10 +136,6 @@ test('TS DSL defineContract: db.enums.Role.members.User resolves to "user" liter
   expectTypeOf<(typeof dslDb)['enums']['Role']['members']['User']>().toEqualTypeOf<'user'>();
 });
 
-// ---------------------------------------------------------------------------
-// F14: TS DSL contract carries a typed namespace enum? slot (no cast required)
-// ---------------------------------------------------------------------------
-
 test('TS DSL defineContract: namespace enum slot is typed without a cast', () => {
   // MongoDomainNamespaceFromDefinition now includes enum?, so reading the
   // entries from a built contract doesn't need a RuntimeNs cast.
@@ -156,10 +144,6 @@ test('TS DSL defineContract: namespace enum slot is typed without a cast', () =>
   type MemberValue = RoleEntry['members'][number]['value'];
   expectTypeOf<MemberValue>().toEqualTypeOf<'user' | 'admin'>();
 });
-
-// ---------------------------------------------------------------------------
-// R5 / D10: FieldInputTypes precomputed map — enum fields narrow create() input
-// ---------------------------------------------------------------------------
 
 const R5Role = enumType(
   'R5Role',

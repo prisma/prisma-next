@@ -404,13 +404,6 @@ test('Mongo option input types reject unsupported keys', () => {
   _invalidCollectionOptions;
 });
 
-// ---------------------------------------------------------------------------
-// Stress test: a model with 32 fields (mix of enum, scalar, nullable, many)
-// must not trigger "Type instantiation is excessively deep" when InferModelRow
-// is evaluated. If the current recursive InferFieldType hits the depth limit,
-// this test-d compile fails with TS2589.
-// ---------------------------------------------------------------------------
-
 type ScalarField<CId extends string, Nullable extends boolean = false> = {
   readonly nullable: Nullable;
   readonly type: { readonly kind: 'scalar'; readonly codecId: CId };

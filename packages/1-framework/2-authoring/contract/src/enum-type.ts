@@ -1,10 +1,6 @@
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import { blindCast } from '@prisma-next/utils/casts';
 
-// ---------------------------------------------------------------------------
-// EnumMember — a single member declaration with literal type preservation
-// ---------------------------------------------------------------------------
-
 /**
  * A single enum member produced by `member()`. The `Name` and `Value` generics
  * are preserved as literal types so `enumType()` can carry the ordered value
@@ -41,10 +37,6 @@ export function member<const Name extends string, const Value = Name>(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Internal types for inferring the literal tuple from the members spread
-// ---------------------------------------------------------------------------
-
 type MembersToValues<Members extends readonly EnumMember<string, unknown>[]> = {
   readonly [K in keyof Members]: Members[K] extends EnumMember<string, infer V> ? V : never;
 };
@@ -57,10 +49,6 @@ type MembersAccessorMap<Members extends readonly EnumMember<string, unknown>[]> 
   readonly [M in Members[number] as M['name']]: M['value'];
 };
 
-// ---------------------------------------------------------------------------
-// EnumTypeHandle — the authoring handle returned by enumType()
-// ---------------------------------------------------------------------------
-
 // String-key brand rather than unique symbol: tsdown inlines a fresh unique
 // symbol into each extension's .d.mts when the source package is transitive,
 // breaking nominal type identity across chunk boundaries. A string constant
@@ -68,20 +56,7 @@ type MembersAccessorMap<Members extends readonly EnumMember<string, unknown>[]> 
 // Mirrors the FILTER_EXPR_BRAND pattern in mongo-query-ast/filter-expressions.ts.
 export const ENUM_TYPE_HANDLE_BRAND = '__prismaNextEnumTypeHandle__';
 
-/**
- * Authoring handle returned by `enumType()`. Carries:
- *
- * - The ordered literal value tuple (`.values`) and name tuple (`.names`)
- *   so downstream type-tests can assert literal preservation.
- * - A namespaced member accessor map (`.members`) to avoid collisions with
- *   `.values` / `.has` / `.nameOf` / `.ordinalOf`.
- * - Runtime helpers `.has()`, `.nameOf()`, `.ordinalOf()`.
- * - Internal metadata (`enumName`, `codecId`, `nativeType`,
- *   `enumMembers`) for the lowering pipeline.
- *
- * The type is generic over the ordered value tuple so callers that assign
- * `const Role = enumType(...)` retain the literal tuple on `.values`.
- */
+/** Authoring handle returned by `enumType()`. Generic over the ordered value tuple so `const Role = enumType(...)` retains literal types. */
 export interface EnumTypeHandle<
   Name extends string = string,
   Values extends readonly unknown[] = readonly unknown[],
@@ -124,10 +99,6 @@ export interface EnumTypeHandle<
   /** Returns the zero-based declaration index of a value, or `-1` if not found. */
   ordinalOf(v: Values[number]): number;
 }
-
-// ---------------------------------------------------------------------------
-// enumType()
-// ---------------------------------------------------------------------------
 
 /**
  * A codec typemap: codecId → `{ input, output }`, the same shape the query
