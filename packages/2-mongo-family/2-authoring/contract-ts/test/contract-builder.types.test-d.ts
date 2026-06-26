@@ -232,6 +232,10 @@ const F11Contract = defineContract({
         nullableField: field.string().optional(),
         manyField: field.string().many(),
         nullableManyField: field.string().optional().many(),
+        role: field.namedType(F11Role),
+        nullableRole: field.namedType(F11Role).optional(),
+        manyRoles: field.namedType(F11Role).many(),
+        manyNullableRoles: field.namedType(F11Role).optional().many(),
       },
     }),
   },
@@ -255,6 +259,22 @@ test('F11: nullable+many field resolves to Base[] | null, not (Base | null)[]', 
   // The precedence bug produced (string | null)[]; the fix produces string[] | null.
   expectTypeOf<F11Row['nullableManyField']>().toEqualTypeOf<string[] | null>();
   expectTypeOf<F11Row['nullableManyField']>().not.toEqualTypeOf<(string | null)[]>();
+});
+
+test('F11: enum field resolves to value union', () => {
+  expectTypeOf<F11Row['role']>().toEqualTypeOf<'user' | 'admin'>();
+});
+
+test('F11: nullable enum field resolves to value union | null', () => {
+  expectTypeOf<F11Row['nullableRole']>().toEqualTypeOf<'user' | 'admin' | null>();
+});
+
+test('F11: many enum field resolves to value union array', () => {
+  expectTypeOf<F11Row['manyRoles']>().toEqualTypeOf<('user' | 'admin')[]>();
+});
+
+test('F11: nullable+many enum field resolves to value union array | null', () => {
+  expectTypeOf<F11Row['manyNullableRoles']>().toEqualTypeOf<('user' | 'admin')[] | null>();
 });
 
 test('F14: namespace enum slot is typed with literal value preservation', () => {
