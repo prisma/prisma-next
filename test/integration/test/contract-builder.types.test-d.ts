@@ -9,7 +9,6 @@ import {
 import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import arktypeJsonRuntime from '@prisma-next/extension-arktype-json/runtime';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
@@ -25,8 +24,10 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import type { JsonValue } from '@prisma-next/target-postgres/codec-types';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { type as arktype } from 'arktype';
 import { expectTypeOf, test } from 'vitest';
+import { TestSqlContractSerializer as SqlContractSerializer } from '../../../packages/2-sql/9-family/test/test-sql-contract-serializer';
 import type { Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
@@ -42,6 +43,7 @@ test('builder contract types match fixture contract types', () => {
   const builderContract = defineContract({
     family: sqlFamilyPack,
     target: postgresPack,
+    createNamespace: postgresCreateNamespace,
     storageHash: 'sha256:test-core',
     models: {
       User: model('User', {
@@ -76,6 +78,7 @@ test('ResultType inference works identically to fixture contract', () => {
   const builderContract = defineContract({
     family: sqlFamilyPack,
     target: postgresPack,
+    createNamespace: postgresCreateNamespace,
     storageHash: 'sha256:test-core',
     models: {
       User: model('User', {
@@ -147,6 +150,7 @@ test('refined object contract preserves downstream model token inference', () =>
   const contract = defineContract({
     family: sqlFamilyPack,
     target: postgresPack,
+    createNamespace: postgresCreateNamespace,
     storageHash: 'sha256:test-refined',
     models: {
       User,
@@ -196,6 +200,7 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
     {
       family: sqlFamilyPack,
       target: postgresPack,
+      createNamespace: postgresCreateNamespace,
       extensionPacks: {
         pgvector: pgvectorPack,
       },
@@ -267,6 +272,7 @@ test('integrated callback authoring hides extension namespaces when packs are ab
     {
       family: sqlFamilyPack,
       target: postgresPack,
+      createNamespace: postgresCreateNamespace,
     },
     ({ type }) => {
       if (typecheckOnly) {
@@ -286,6 +292,7 @@ test('local field and belongsTo sql overlays stay typed', () => {
     {
       family: sqlFamilyPack,
       target: postgresPack,
+      createNamespace: postgresCreateNamespace,
     },
     ({ field }) => {
       const User = model('User', {
@@ -335,6 +342,7 @@ test('explicit generated id helpers stay typed', () => {
     {
       family: sqlFamilyPack,
       target: postgresPack,
+      createNamespace: postgresCreateNamespace,
     },
     ({ field }) => {
       const ShortLink = model('ShortLink', {
@@ -376,6 +384,7 @@ test('codec type inference via type option', () => {
   const contract = defineContract({
     family: sqlFamilyPack,
     target: postgresPack,
+    createNamespace: postgresCreateNamespace,
     models: {
       User: model('User', {
         fields: {
@@ -412,6 +421,7 @@ test('contract structure type matches Contract', () => {
   const contract = defineContract({
     family: sqlFamilyPack,
     target: postgresPack,
+    createNamespace: postgresCreateNamespace,
     models: {
       User: model('User', {
         fields: {
@@ -440,6 +450,7 @@ test('arktypeJson and jsonbColumn currently resolve to never in no-emit type pat
   const contract = defineContract({
     family: sqlFamilyPack,
     target: postgresPack,
+    createNamespace: postgresCreateNamespace,
     models: {
       Event: model('Event', {
         fields: {
@@ -532,6 +543,7 @@ const PriorityInt = enumType('PriorityInt', int4Column, member('Low', 1), member
 const enumContract = defineContract({
   family: sqlFamilyPack,
   target: postgresPack,
+  createNamespace: postgresCreateNamespace,
   storageHash: 'sha256:test-enum',
   enums: { Role, Status, PriorityInt },
   models: {

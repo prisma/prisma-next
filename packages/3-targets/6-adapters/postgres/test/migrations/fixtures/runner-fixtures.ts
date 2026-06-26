@@ -15,13 +15,13 @@ import {
   type AggregateMigrationEdgeRef,
   buildSynthMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import { buildControlTableBootstrapQueries } from '@prisma-next/target-postgres/contract-free';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
-import { PostgresSchemaIR } from '@prisma-next/target-postgres/types';
+import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf, createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { createPostgresBuiltinCodecLookup } from '../../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../../src/core/control-adapter';
@@ -35,7 +35,7 @@ export const contract: Contract<SqlStorage> = {
   storage: new SqlStorage({
     storageHash: coreHash('sha256:contract'),
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+      [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
         id: UNBOUND_NAMESPACE_ID,
         entries: {
           table: {

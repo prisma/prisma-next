@@ -3,6 +3,7 @@ import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { ForeignKey, SqlModelStorage, SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
@@ -100,6 +101,7 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
   composedExtensionContracts: new Map(),
+  createNamespace: createTestSqlNamespace,
 } as const;
 
 describe('un-namespaced PG model defaults to public namespace (TML-2916)', () => {

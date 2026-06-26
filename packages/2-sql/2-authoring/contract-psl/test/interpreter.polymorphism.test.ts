@@ -2,6 +2,7 @@ import { crossRef } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { SqlModelStorage, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
@@ -20,7 +21,7 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
   const interpretPslDocumentToSqlContract = (
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
-      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts'
+      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts' | 'createNamespace'
     > &
       Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
@@ -28,6 +29,7 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
+      createNamespace: createTestSqlNamespace,
       ...input,
     });
 

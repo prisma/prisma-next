@@ -5,7 +5,6 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
@@ -14,7 +13,9 @@ import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/
 import { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { TestSqlContractSerializer as SqlContractSerializer } from '../../../packages/2-sql/9-family/test/test-sql-contract-serializer';
 import type { Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
@@ -23,6 +24,7 @@ describe('builder integration', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
       target: postgresPack,
+      createNamespace: postgresCreateNamespace,
       storageHash: 'sha256:test-core',
       models: {
         User: model('User', {
@@ -130,6 +132,7 @@ describe('builder integration', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
       target: postgresPack,
+      createNamespace: postgresCreateNamespace,
       storageHash: 'sha256:test-core',
       models: {
         User: model('User', {
@@ -150,6 +153,7 @@ describe('builder integration', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
       target: postgresPack,
+      createNamespace: postgresCreateNamespace,
       storageHash: 'sha256:test-core',
       models: {
         User: model('User', {
@@ -192,6 +196,7 @@ describe('builder integration', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
       target: postgresPack,
+      createNamespace: postgresCreateNamespace,
       storageHash: 'sha256:test-core',
       models: {
         User: model('User', {
@@ -237,6 +242,7 @@ describe('builder integration', () => {
     const builderContract = defineContract({
       family: sqlFamilyPack,
       target: postgresPack,
+      createNamespace: postgresCreateNamespace,
       storageHash: 'sha256:test-core',
       models: {
         User: model('User', {
@@ -318,6 +324,7 @@ describe('builder integration', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
       target: postgresPack,
+      createNamespace: postgresCreateNamespace,
       models: {
         User: model('User', {
           fields: {
@@ -347,6 +354,7 @@ describe('builder integration', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
       target: postgresPack,
+      createNamespace: postgresCreateNamespace,
       models: {
         User: model('User', {
           fields: {
@@ -389,6 +397,7 @@ describe('builder integration', () => {
       const contract = defineContract({
         family: sqlFamilyPack,
         target: postgresPack,
+        createNamespace: postgresCreateNamespace,
         storageHash: 'sha256:test-core',
         models: { User, Post },
       });
@@ -461,6 +470,7 @@ describe('builder integration', () => {
       const contract = defineContract({
         family: sqlFamilyPack,
         target: postgresPack,
+        createNamespace: postgresCreateNamespace,
         storageHash: 'sha256:test-core',
         models: { User, Role, UserRole },
       });

@@ -1,10 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
 import {
-  buildSqlNamespace,
   SqlStorage,
   type SqlStorage as SqlStorageType,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import {
@@ -42,11 +42,11 @@ function twoNamespaceSameTableName(): Contract<SqlStorageType> {
     new SqlStorage({
       storageHash: STORAGE_HASH,
       namespaces: {
-        public: buildSqlNamespace({
+        public: postgresCreateNamespace({
           id: 'public',
           entries: { table: { users: usersTable('email_addr') } },
         }),
-        auth: buildSqlNamespace({
+        auth: postgresCreateNamespace({
           id: 'auth',
           entries: { table: { users: usersTable('token_col') } },
         }),
@@ -81,7 +81,7 @@ describe('storage-resolution coordinate-aware lookups', () => {
       new SqlStorage({
         storageHash: STORAGE_HASH,
         namespaces: {
-          public: buildSqlNamespace({
+          public: postgresCreateNamespace({
             id: 'public',
             entries: { table: { users: usersTable('email_addr') } },
           }),

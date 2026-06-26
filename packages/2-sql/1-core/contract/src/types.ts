@@ -10,7 +10,6 @@ export interface SqlControlDriverInstance<T extends string = string>
   ): Promise<{ readonly rows: Row[] }>;
 }
 
-export { buildSqlNamespace, buildSqlNamespaceMap } from './ir/build-sql-namespace';
 export { CheckConstraint, type CheckConstraintInput } from './ir/check-constraint';
 export {
   ForeignKey,
@@ -25,19 +24,20 @@ export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
 export {
+  isMaterializedSqlNamespace,
   isSqlAuthoringContributions,
   type SqlAuthoringContributions,
   type SqlNamespace,
+  SqlNamespaceBase,
   type SqlNamespaceEntries,
   type SqlNamespaceFactory,
-  type SqlNamespaceTablesInput,
+  type SqlNamespaceInput,
   SqlStorage,
   type SqlStorageInput,
   type SqlStorageTypeEntry,
 } from './ir/sql-storage';
-export { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';
-export { StorageTable, type StorageTableInput } from './ir/storage-table';
+export { isStorageTable, StorageTable, type StorageTableInput } from './ir/storage-table';
 export {
   CODEC_INSTANCE_KIND,
   isStorageTypeInstance,
@@ -45,7 +45,11 @@ export {
   type StorageTypeInstanceInput,
   toStorageTypeInstance,
 } from './ir/storage-type-instance';
-export { StorageValueSet, type StorageValueSetInput } from './ir/storage-value-set';
+export {
+  isStorageValueSet,
+  StorageValueSet,
+  type StorageValueSetInput,
+} from './ir/storage-value-set';
 export {
   UniqueConstraint,
   type UniqueConstraintInput,

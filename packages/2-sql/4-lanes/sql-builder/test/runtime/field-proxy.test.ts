@@ -1,8 +1,9 @@
 import { coreHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
+import { SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
 import { ColumnRef, IdentifierRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../../1-core/contract/test/test-support';
 import { tableToScope } from '../../src/runtime/builder-base';
 import { ExpressionImpl } from '../../src/runtime/expression-impl';
 import { createFieldProxy } from '../../src/runtime/field-proxy';
@@ -76,7 +77,7 @@ describe('createFieldProxy', () => {
     const storage = new SqlStorage({
       storageHash: coreHash('sha256:h'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: { Post: table },

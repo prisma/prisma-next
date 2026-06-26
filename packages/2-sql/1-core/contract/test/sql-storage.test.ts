@@ -1,8 +1,8 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
-import { buildSqlNamespace } from '../src/ir/build-sql-namespace';
 import { SqlStorage, type SqlStorageTypeEntry } from '../src/ir/sql-storage';
 import { StorageTable } from '../src/ir/storage-table';
+import { createTestSqlNamespace } from './test-support';
 
 /**
  * Pins the strict-deserialization contract for the polymorphic
@@ -23,7 +23,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
     foreignKeys: [],
   });
 
-  const unboundWithUsers = buildSqlNamespace({
+  const unboundWithUsers = createTestSqlNamespace({
     id: UNBOUND_NAMESPACE_ID,
     entries: { table: { users: baseTable } },
   });

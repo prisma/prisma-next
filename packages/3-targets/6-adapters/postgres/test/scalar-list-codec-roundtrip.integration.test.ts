@@ -17,7 +17,7 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import postgresRuntimeDriverDescriptor from '@prisma-next/driver-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   BinaryExpr,
   ColumnRef,
@@ -47,6 +47,7 @@ import {
   withClient,
 } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../../2-sql/1-core/contract/test/test-support';
 import postgresRuntimeAdapterDescriptorFull from '../src/exports/runtime';
 import { defineTestCodec } from './test-codec';
 
@@ -68,7 +69,7 @@ function buildListContract(): Contract<SqlStorage> {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:scalar-list-codec-roundtrip'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {

@@ -2,7 +2,6 @@ import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  buildSqlNamespace,
   CheckConstraint,
   SqlStorage,
   StorageTable,
@@ -14,6 +13,7 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 import { checkConstraintPlanCallStrategy } from '../../src/core/migrations/planner-strategies';
+import { postgresCreateNamespace } from '../../src/core/postgres-schema';
 
 const VALUE_SET_NAME = 'Status_values';
 const CHECK_NAME = 'user_status_check';
@@ -31,7 +31,7 @@ function makeValueSetRef() {
 }
 
 function makeContractWithCheck(values: readonly string[]): Contract<SqlStorage> {
-  const ns = buildSqlNamespace({
+  const ns = postgresCreateNamespace({
     id: UNBOUND_NAMESPACE_ID,
     entries: {
       table: {
@@ -78,7 +78,7 @@ function makeContractWithCheck(values: readonly string[]): Contract<SqlStorage> 
 }
 
 function makeContractWithoutCheck(): Contract<SqlStorage> {
-  const ns = buildSqlNamespace({
+  const ns = postgresCreateNamespace({
     id: UNBOUND_NAMESPACE_ID,
     entries: {
       table: {

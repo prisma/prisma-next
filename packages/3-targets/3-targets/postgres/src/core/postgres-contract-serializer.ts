@@ -12,14 +12,12 @@ import {
 import {
   type AnyEntityKindDescriptor,
   type Namespace,
-  NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceInput, SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject, JsonValue } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
-import { postgresTargetDescriptorMeta } from './descriptor-meta';
 import { policyEntityKind, roleEntityKind } from './entity-kinds';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
@@ -73,20 +71,13 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     super(storageTypesHydrators, [policyEntityKind, roleEntityKind, ...extraPackEntityKinds]);
   }
 
-  protected override get defaultNamespaceId(): string {
-    return postgresTargetDescriptorMeta.defaultNamespaceId;
-  }
-
   protected override hydrateSqlNamespaceEntry(
     nsId: string,
-    raw: Namespace | Record<string, unknown>,
-  ): Namespace | SqlNamespaceTablesInput {
-    if (raw instanceof NamespaceBase) {
-      return raw;
-    }
+    raw: Record<string, unknown>,
+  ): Namespace | SqlNamespaceInput {
     const hydrated = blindCast<
-      SqlNamespaceTablesInput,
-      'super.hydrateSqlNamespaceEntry returns SqlNamespaceTablesInput when raw is not a NamespaceBase'
+      SqlNamespaceInput,
+      'raw is always plain JSON, so super.hydrateSqlNamespaceEntry returns SqlNamespaceInput'
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
 

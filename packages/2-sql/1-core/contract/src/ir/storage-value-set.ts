@@ -41,3 +41,8 @@ export class StorageValueSet extends SqlNode {
     freezeNode(this);
   }
 }
+
+export function isStorageValueSet(value: unknown): value is StorageValueSet {
+  if (typeof value !== 'object' || value === null) return false;
+  return 'kind' in value && value.kind === 'valueSet' && 'values' in value;
+}

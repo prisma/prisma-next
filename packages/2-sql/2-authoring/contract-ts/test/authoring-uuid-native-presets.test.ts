@@ -1,6 +1,7 @@
 import type { AuthoringFieldNamespace } from '@prisma-next/framework-components/authoring';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { createComposedAuthoringHelpers } from '../src/composed-authoring-helpers';
 import { defineContract } from '../src/contract-builder';
 import { unboundTables } from './unbound-tables';
@@ -134,7 +135,11 @@ describe('uuid native presets', () => {
   describe('emit-then-consume', () => {
     it('uuidNative emits pg/uuid@1 with nativeType uuid in contract JSON', () => {
       const contract = defineContract(
-        { family: makeFamilyPack(), target: makePostgresPack() },
+        {
+          family: makeFamilyPack(),
+          target: makePostgresPack(),
+          createNamespace: createTestSqlNamespace,
+        },
         ({ field, model }) => ({
           models: {
             Widget: model('Widget', {
@@ -155,7 +160,11 @@ describe('uuid native presets', () => {
 
     it('id.uuidv4Native emits pg/uuid@1 with uuidv4 onCreate generator in contract JSON', () => {
       const contract = defineContract(
-        { family: makeFamilyPack(), target: makePostgresPack() },
+        {
+          family: makeFamilyPack(),
+          target: makePostgresPack(),
+          createNamespace: createTestSqlNamespace,
+        },
         ({ field, model }) => ({
           models: {
             Widget: model('Widget', {
@@ -180,7 +189,11 @@ describe('uuid native presets', () => {
 
     it('id.uuidv7Native emits pg/uuid@1 with uuidv7 onCreate generator in contract JSON', () => {
       const contract = defineContract(
-        { family: makeFamilyPack(), target: makePostgresPack() },
+        {
+          family: makeFamilyPack(),
+          target: makePostgresPack(),
+          createNamespace: createTestSqlNamespace,
+        },
         ({ field, model }) => ({
           models: {
             Widget: model('Widget', {

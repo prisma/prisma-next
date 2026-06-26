@@ -4,10 +4,11 @@ import {
   type CheckConstraint,
   type ForeignKey,
   type Index,
+  isStorageTable,
   isStorageTypeInstance,
   type SqlStorage,
   type StorageColumn,
-  StorageTable,
+  type StorageTable,
   type StorageTypeInstance,
   type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
@@ -304,7 +305,7 @@ export function detectDestructiveChanges(
 
     for (const tableName of Object.keys(fromTables)) {
       const toTableRaw = toNs?.entries.table?.[tableName];
-      if (!(toTableRaw instanceof StorageTable)) {
+      if (!isStorageTable(toTableRaw)) {
         conflicts.push({
           kind: 'tableRemoved',
           summary: `Table "${tableName}" was removed`,
@@ -314,7 +315,7 @@ export function detectDestructiveChanges(
       const toTable = toTableRaw;
 
       const fromTableRaw = fromTables[tableName];
-      if (!(fromTableRaw instanceof StorageTable)) continue;
+      if (!isStorageTable(fromTableRaw)) continue;
       const fromTable = fromTableRaw;
 
       for (const columnName of Object.keys(fromTable.columns)) {
@@ -378,7 +379,7 @@ export function contractToSchemaIR(
   const tables: Record<string, SqlTableIR> = {};
   for (const ns of Object.values(storage.namespaces)) {
     for (const [tableName, tableDefRaw] of Object.entries(ns.entries.table ?? {})) {
-      if (!(tableDefRaw instanceof StorageTable)) {
+      if (!isStorageTable(tableDefRaw)) {
         throw new Error(
           `contractToSchemaIR: expected StorageTable at namespaces.${ns.id}.entries.table.${tableName}`,
         );

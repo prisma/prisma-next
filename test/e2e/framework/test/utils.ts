@@ -12,7 +12,6 @@ import arktypeJsonRuntime from '@prisma-next/extension-arktype-json/runtime';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import sql from '@prisma-next/family-sql/control';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
@@ -23,6 +22,7 @@ import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/t
 import postgres from '@prisma-next/target-postgres/control';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
+import { TestSqlContractSerializer as SqlContractSerializer } from '../../../../packages/2-sql/9-family/test/test-sql-contract-serializer';
 
 const execFileAsync = promisify(execFile);
 

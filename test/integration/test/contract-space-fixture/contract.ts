@@ -2,7 +2,8 @@ import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { TEST_BOX_TABLE } from './constants';
 
 const TARGET = 'postgres' as const;
@@ -68,7 +69,7 @@ export const testContractSpaceContract: Contract<SqlStorage> = {
   storage: new SqlStorage({
     storageHash: coreHash(TEST_HEAD_HASH),
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace(storageBody.namespaces[UNBOUND_NAMESPACE_ID]),
+      [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace(storageBody.namespaces[UNBOUND_NAMESPACE_ID]),
     },
   }),
 };

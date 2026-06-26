@@ -10,6 +10,7 @@ import {
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
@@ -56,6 +57,7 @@ namespace public {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(pslResult.ok).toBe(true);
@@ -90,6 +92,7 @@ namespace public {
       target: postgresTarget,
       namespaces: ['auth', 'public'] as const,
       models: { User, Post },
+      createNamespace: createTestSqlNamespace,
     });
 
     const pslStorage = pslResult.value.storage as SqlStorage;
@@ -179,6 +182,7 @@ namespace public {
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       composedExtensionPacks: ['supabase'],
       composedExtensionContracts: new Map([['supabase', syntheticExtensionContract]]),
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(pslResult.ok).toBe(true);
@@ -211,6 +215,7 @@ namespace public {
       target: postgresTarget,
       extensionPacks: { supabase: supabaseExtensionPackRef },
       models: { Profile },
+      createNamespace: createTestSqlNamespace,
     });
 
     const pslStorage = pslResult.value.storage as SqlStorage;
@@ -247,6 +252,7 @@ namespace public {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionPacks: ['supabase'],
       composedExtensionContracts: new Map(),
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(result.ok).toBe(false);

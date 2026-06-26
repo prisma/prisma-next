@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
@@ -19,7 +20,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
   const interpretPslDocumentToSqlContract = (
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
-      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts'
+      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts' | 'createNamespace'
     > &
       Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
@@ -27,6 +28,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
+      createNamespace: createTestSqlNamespace,
       ...input,
     });
   it('lowers supported default functions into execution and storage contract shapes', () => {
@@ -495,6 +497,7 @@ model UuidNativeBad {
       composedExtensionContracts: new Map(),
       controlMutationDefaults: builtinControlMutationDefaults,
       authoringContributions: sqliteTemporalContributions,
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(result.ok).toBe(true);

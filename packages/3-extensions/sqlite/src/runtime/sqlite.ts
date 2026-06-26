@@ -3,7 +3,6 @@ import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contrac
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqliteBinding } from '@prisma-next/driver-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
@@ -31,7 +30,9 @@ import {
   createSqlExecutionStack,
   withTransaction,
 } from '@prisma-next/sql-runtime';
-import sqliteTarget from '@prisma-next/target-sqlite/runtime';
+import sqliteTarget, {
+  SqliteContractSerializer as SqlContractSerializer,
+} from '@prisma-next/target-sqlite/runtime';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';
@@ -110,11 +111,12 @@ export type SqliteOptions<TContract extends Contract<SqlStorage>> =
 function resolveContract<TContract extends Contract<SqlStorage>>(
   options: SqliteOptions<TContract>,
 ): TContract {
-  const contractInput =
-    'contractJson' in options && options.contractJson !== undefined
-      ? options.contractJson
-      : (options as SqliteOptionsWithContract<TContract>).contract;
-  return new SqlContractSerializer().deserializeContract(contractInput) as TContract;
+  const serializer = new SqlContractSerializer();
+  if ('contractJson' in options && options.contractJson !== undefined) {
+    return serializer.deserializeContract(options.contractJson) as TContract;
+  }
+  const contract = (options as SqliteOptionsWithContract<TContract>).contract;
+  return serializer.deserializeContract(serializer.serializeContract(contract)) as TContract;
 }
 
 export default function sqlite<TContract extends Contract<SqlStorage>>(

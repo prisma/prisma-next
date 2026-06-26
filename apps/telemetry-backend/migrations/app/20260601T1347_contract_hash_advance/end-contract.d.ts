@@ -94,7 +94,7 @@ type ContractBase = Omit<
       readonly namespaces: {
         readonly public: {
           readonly id: 'public';
-          readonly kind: 'sql-namespace';
+          readonly kind: 'postgres-schema';
           readonly tables: {
             readonly telemetry_event: {
               columns: {

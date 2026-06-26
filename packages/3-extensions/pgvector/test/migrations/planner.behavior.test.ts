@@ -15,8 +15,6 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  buildSqlNamespace,
-  buildSqlNamespaceMap,
   SqlStorage,
   type SqlStorageInput,
   type StorageTable,
@@ -25,6 +23,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { buildBuiltinIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
@@ -586,23 +585,19 @@ function createTestContract(
   };
   const storageInput = overrides?.storage ?? {
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+      [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
         id: UNBOUND_NAMESPACE_ID,
         entries: { table: defaultTables },
       }),
     },
   };
   const { storage: _s, ...rest } = overrides ?? {};
-  const namespaces = (
-    storageInput.namespaces
-      ? buildSqlNamespaceMap(storageInput.namespaces)
-      : {
-          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-            id: UNBOUND_NAMESPACE_ID,
-            entries: { table: defaultTables },
-          }),
-        }
-  ) as SqlStorageInput['namespaces'];
+  const namespaces = (storageInput.namespaces ?? {
+    [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: defaultTables },
+    }),
+  }) as SqlStorageInput['namespaces'];
   return {
     target: 'postgres',
     targetFamily: 'sql',
@@ -711,7 +706,7 @@ async function planUserTableOperations(
   const contract = createTestContract({
     storage: {
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {

@@ -5,6 +5,7 @@ import type {
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { defineContract, rel } from '../src/contract-builder';
 import { modelsOf } from './contract-test-helpers';
 import { documentScopedTypes } from './cross-ref-helpers';
@@ -225,6 +226,7 @@ describe('contract DSL helper vocabulary', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
       },
       ({ field, model }) => ({
         models: {
@@ -309,6 +311,7 @@ describe('contract DSL helper vocabulary', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
       },
       ({ field }) => {
         const textState = field.text().build();
@@ -366,6 +369,7 @@ describe('contract DSL helper vocabulary', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
       },
       ({ field, model }) => ({
         models: {
@@ -403,6 +407,7 @@ describe('contract DSL helper vocabulary', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
       },
       ({ field, model }) => ({
         types: roleTypes,
@@ -434,6 +439,7 @@ describe('contract DSL helper vocabulary', () => {
           {
             family: sqlFamilyPack,
             target: postgresTargetPack,
+            createNamespace: createTestSqlNamespace,
           },
           ({ field, model }) => ({
             types: roleTypes,
@@ -457,6 +463,7 @@ describe('contract DSL helper vocabulary', () => {
           {
             family: sqlFamilyPack,
             target: postgresTargetPack,
+            createNamespace: createTestSqlNamespace,
           },
           ({ field, model }) => {
             const User = model('User', {
@@ -497,6 +504,7 @@ describe('contract DSL helper vocabulary', () => {
           {
             family: sqlFamilyPack,
             target: postgresTargetPack,
+            createNamespace: createTestSqlNamespace,
           },
           ({ field, model }) => {
             const User = model('User', {
@@ -535,6 +543,7 @@ describe('contract DSL helper vocabulary', () => {
         {
           family: sqlFamilyPack,
           target: postgresTargetPack,
+          createNamespace: createTestSqlNamespace,
         },
         ({ field, model }) => ({
           types: roleTypes,
@@ -557,6 +566,7 @@ describe('contract DSL helper vocabulary', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
       },
       ({ type, field, model }) => {
         const types = {
@@ -596,6 +606,7 @@ describe('contract DSL helper vocabulary', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
       },
       ({ field, model }) => ({
         models: {
@@ -642,6 +653,7 @@ describe('contract DSL helper vocabulary', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         extensionPacks: {
           pgvector: pgvectorExtensionPack,
         },
@@ -734,6 +746,7 @@ describe('contract DSL helper vocabulary', () => {
         {
           family: sqlFamilyPack,
           target: postgresTargetPack,
+          createNamespace: createTestSqlNamespace,
           extensionPacks: {
             conflictingPack,
           },
@@ -777,6 +790,7 @@ describe('contract DSL helper vocabulary', () => {
           {
             family: sqlFamilyPack,
             target: postgresTargetPack,
+            createNamespace: createTestSqlNamespace,
             extensionPacks: {
               maliciousPack,
             },

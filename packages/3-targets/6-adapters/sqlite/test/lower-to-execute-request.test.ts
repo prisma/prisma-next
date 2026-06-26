@@ -10,15 +10,12 @@ import {
 } from '@prisma-next/framework-components/codec';
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  type StorageTableInput,
-} from '@prisma-next/sql-contract/types';
+import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
 import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
 import { jsonText, sqliteTable, text } from '@prisma-next/target-sqlite/contract-free';
+import { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import { SqliteCreateTable } from '@prisma-next/target-sqlite/ddl';
 import { createContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -298,7 +295,7 @@ function buildExtContractAndTable() {
     label: { codecId: EXT_CODEC_ID, nativeType: 'TEXT', nullable: false },
     name: { codecId: 'sqlite/text@1', nativeType: 'TEXT', nullable: true },
   };
-  const ns = buildSqlNamespace({
+  const ns = sqliteCreateNamespace({
     id: UNBOUND_NAMESPACE_ID,
     entries: {
       table: {

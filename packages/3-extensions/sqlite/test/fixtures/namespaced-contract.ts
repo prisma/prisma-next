@@ -37,7 +37,7 @@ type Storage = {
   readonly namespaces: {
     readonly __unbound__: {
       readonly id: '__unbound__';
-      readonly kind: 'sql-namespace';
+      readonly kind: 'sqlite-namespace';
       readonly entries: {
         readonly table: {
           readonly users: {

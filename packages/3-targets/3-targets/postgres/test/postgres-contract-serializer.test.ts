@@ -6,11 +6,13 @@ import {
 } from '@prisma-next/family-sql/ir';
 import {
   type AnyEntityKindDescriptor,
+  type Namespace,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import {
   ForeignKey,
   PrimaryKey,
+  type SqlNamespaceInput,
   SqlStorage,
   StorageColumn,
   StorageTable,
@@ -18,12 +20,13 @@ import {
   toStorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { createSqlContract } from '@prisma-next/test-utils';
+import { blindCast } from '@prisma-next/utils/casts';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
 import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
 import { PostgresRole } from '../src/core/postgres-role';
-import { PostgresSchema } from '../src/core/postgres-schema';
+import { PostgresSchema, postgresCreateNamespace } from '../src/core/postgres-schema';
 import postgresTargetDescriptor from '../src/exports/control';
 
 function makeValidContractJson() {
@@ -169,8 +172,16 @@ describe('PostgresContractSerializer', () => {
         super(registry);
       }
 
-      protected override get defaultNamespaceId(): string {
-        return UNBOUND_NAMESPACE_ID;
+      protected override hydrateSqlNamespaceEntry(
+        nsId: string,
+        raw: Record<string, unknown>,
+      ): Namespace | SqlNamespaceInput {
+        return postgresCreateNamespace(
+          blindCast<
+            SqlNamespaceInput,
+            'super.hydrateSqlNamespaceEntry returns SqlNamespaceInput when raw is not materialized'
+          >(super.hydrateSqlNamespaceEntry(nsId, raw)),
+        );
       }
 
       protected override parseSqlContractStructure(_json: unknown): Contract<SqlStorage> {

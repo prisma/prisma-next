@@ -3,7 +3,6 @@ import { profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  buildSqlNamespace,
   CheckConstraint,
   SqlStorage,
   StorageTable,
@@ -12,6 +11,7 @@ import {
 import { SqlCheckConstraintIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import { classifySqlVerifierIssueKind } from '../src/core/schema-verify/verifier-disposition';
 import { verifyCheckConstraints } from '../src/core/schema-verify/verify-helpers';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
@@ -200,7 +200,7 @@ describe('verifySqlSchema — check constraints', () => {
     values: readonly string[],
   ) {
     const valueSetName = `${tableName}_${column}_values`;
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
         table: {
@@ -305,7 +305,7 @@ describe('verifySqlSchema — check constraints', () => {
     // CHECK must be flagged as check_removed. The old guard
     // `if (contractTable.checks && contractTable.checks.length > 0)` skipped
     // verifyCheckConstraints entirely in this case, so the issue was never emitted.
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
         table: {
@@ -365,7 +365,7 @@ describe('verifySqlSchema — check constraints', () => {
     // co-emits the value-set alongside the check; this case indicates a
     // broken emitter — it must error consistently instead of silently
     // resolving to an empty set.
-    const ns = buildSqlNamespace({
+    const ns = createTestSqlNamespace({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
         table: {

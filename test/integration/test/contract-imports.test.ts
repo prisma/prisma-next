@@ -6,7 +6,10 @@ import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
 import type { EmitStackInput } from '@prisma-next/emitter';
 import { createTestContract, emit } from '@prisma-next/emitter/test/utils';
-import { extractCodecTypeImports, extractComponentIds } from '@prisma-next/family-sql/test-utils';
+import {
+  extractCodecTypeImports,
+  extractComponentIds,
+} from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
@@ -114,6 +117,7 @@ describe('contract.d.ts imports resolution', () => {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
+              kind: 'schema' as const,
               entries: {
                 table: {
                   user: {
@@ -131,17 +135,17 @@ describe('contract.d.ts imports resolution', () => {
                     indexes: [],
                     foreignKeys: [],
                   },
-                },
-                post: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                    userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                  post: {
+                    columns: {
+                      id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                      title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                      userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                    },
+                    primaryKey: { columns: ['id'] },
+                    uniques: [],
+                    indexes: [],
+                    foreignKeys: [],
                   },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
                 },
               },
             },
@@ -272,6 +276,7 @@ type UserIdColumn = UserColumns['id'];
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
+              kind: 'schema' as const,
               entries: {
                 table: {
                   user: {
@@ -315,7 +320,7 @@ type UserIdColumn = UserColumns['id'];
 
       // Create a comprehensive test file that uses all exported types
       const testFileContent = `import type { Contract, CodecTypes, Namespaces } from './contract';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { PostgresContractSerializer as SqlContractSerializer } from '@prisma-next/target-postgres/runtime';
 import contractJson from './contract.json' with { type: 'json' };
 
 // Verify we can validate the contract
@@ -373,6 +378,9 @@ type CodecIntType = CodecTypes['pg/int4@1'];
             '@prisma-next/family-sql/*': [`${relativeToWorkspace}/packages/2-sql/9-family/dist/*`],
             '@prisma-next/adapter-postgres/*': [
               `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/*`,
+            ],
+            '@prisma-next/target-postgres/runtime': [
+              `${relativeToWorkspace}/packages/3-targets/3-targets/postgres/dist/runtime.d.mts`,
             ],
             '@prisma-next/target-postgres/*': [
               `${relativeToWorkspace}/packages/3-targets/3-targets/postgres/dist/*`,

@@ -1,5 +1,4 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
@@ -33,6 +32,7 @@ import {
 import { PostgresSchema } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { TestSqlContractSerializer as SqlContractSerializer } from '../../../../2-sql/9-family/test/test-sql-contract-serializer';
 import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
 

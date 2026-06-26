@@ -32,9 +32,10 @@ import { coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import {
   applicationDomainOf,
   createDevDatabase,
@@ -57,7 +58,7 @@ function buildAppContract(): Contract<SqlStorage> {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:supabase-classification-test-app'),
       namespaces: {
-        public: buildSqlNamespace({
+        public: postgresCreateNamespace({
           id: 'public',
           entries: {
             table: {

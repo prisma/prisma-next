@@ -137,8 +137,13 @@ describe('emit parity fixtures', () => {
         const enrichedTs = enrichContract(tsProviderResultFirst.value, frameworkComponents);
         const enrichedPsl = enrichContract(pslProviderResultFirst.value, frameworkComponents);
 
-        const normalizedTs = familyInstance.deserializeContract(enrichedTs);
-        const normalizedPsl = familyInstance.deserializeContract(enrichedPsl);
+        const { contractSerializer } = tsConfig.target;
+        const normalizedTs = familyInstance.deserializeContract(
+          contractSerializer.serializeContract(enrichedTs),
+        );
+        const normalizedPsl = familyInstance.deserializeContract(
+          contractSerializer.serializeContract(enrichedPsl),
+        );
         expect(normalizedTs).toEqual(normalizedPsl);
 
         const tsEmitFirst = await emit(

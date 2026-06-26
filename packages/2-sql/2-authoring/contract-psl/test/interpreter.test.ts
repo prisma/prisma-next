@@ -2,6 +2,7 @@ import { crossRef } from '@prisma-next/contract/types';
 import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
@@ -31,7 +32,7 @@ describe('interpretPslDocumentToSqlContract', () => {
   const interpretPslDocumentToSqlContract = (
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
-      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts'
+      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts' | 'createNamespace'
     > &
       Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
@@ -40,6 +41,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
       composedExtensionContracts: new Map(),
+      createNamespace: createTestSqlNamespace,
       ...input,
     });
 
@@ -61,6 +63,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       ]),
       composedExtensionContracts: new Map(),
       controlMutationDefaults: builtinControlMutationDefaults,
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(result.ok).toBe(true);
@@ -126,6 +129,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
       composedExtensionContracts: new Map(),
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(result.ok).toBe(true);
@@ -168,6 +172,7 @@ describe('interpretPslDocumentToSqlContract', () => {
         ]),
         generatorDescriptors: [{ id: 'slugid', applicableCodecIds: ['pg/text@1'] }],
       },
+      createNamespace: createTestSqlNamespace,
     });
 
     expect(result.ok).toBe(true);

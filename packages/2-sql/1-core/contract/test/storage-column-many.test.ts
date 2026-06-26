@@ -11,6 +11,7 @@ function unboundTables(tables: Record<string, unknown>) {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
+        kind: 'test-sql-namespace',
         entries: { table: tables },
       },
     },
@@ -36,10 +37,10 @@ describe('StorageColumn many', () => {
       const serialized = JSON.stringify(s);
       const parsed = JSON.parse(serialized) as unknown;
 
-      const validated = validateStorage(parsed);
-      const tagsColumn = validated.namespaces[UNBOUND_NAMESPACE_ID]?.entries.table['post']?.columns[
-        'tags'
-      ] as StorageColumn | undefined;
+      validateStorage(parsed);
+      const tagsColumn = (parsed as SqlStorage).namespaces[UNBOUND_NAMESPACE_ID]?.entries.table[
+        'post'
+      ]?.columns['tags'] as StorageColumn | undefined;
 
       expect(tagsColumn).toBeDefined();
       expect(tagsColumn).toEqual({
@@ -67,9 +68,10 @@ describe('StorageColumn many', () => {
       const serialized = JSON.stringify(s);
       const parsed = JSON.parse(serialized) as unknown;
 
-      const validated = validateStorage(parsed);
-      const titleColumn = validated.namespaces[UNBOUND_NAMESPACE_ID]?.entries.table['post']
-        ?.columns['title'] as StorageColumn | undefined;
+      validateStorage(parsed);
+      const titleColumn = (parsed as SqlStorage).namespaces[UNBOUND_NAMESPACE_ID]?.entries.table[
+        'post'
+      ]?.columns['title'] as StorageColumn | undefined;
 
       expect(titleColumn).toBeDefined();
       expect(titleColumn).not.toHaveProperty('many');
@@ -126,6 +128,7 @@ describe('StorageColumn many', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
+            kind: 'test-sql-namespace',
             entries: {
               table: {
                 post: {
@@ -150,6 +153,7 @@ describe('StorageColumn many', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
+            kind: 'test-sql-namespace',
             entries: {
               table: {
                 post: {

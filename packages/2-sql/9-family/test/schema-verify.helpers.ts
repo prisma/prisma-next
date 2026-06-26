@@ -14,7 +14,6 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyFkDefaults,
-  buildSqlNamespace,
   type ReferentialAction,
   SqlStorage,
   StorageTable,
@@ -27,6 +26,7 @@ import type {
 } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import type { CodecControlHooks, ExpandNativeTypeInput } from '../src/core/migrations/types';
 
 /**
@@ -45,7 +45,10 @@ export function createTestContract(
     defaultControlPolicy?: ControlPolicy;
   },
 ): Contract<SqlStorage> {
-  const namespace = buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } });
+  const namespace = createTestSqlNamespace({
+    id: UNBOUND_NAMESPACE_ID,
+    entries: { table: tables },
+  });
   return {
     target: 'postgres',
     targetFamily: 'sql',
