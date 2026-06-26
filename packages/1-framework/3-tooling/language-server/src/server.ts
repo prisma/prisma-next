@@ -4,6 +4,7 @@ import { findNearestConfigPathForFile } from '@prisma-next/config-loader';
 import type { SymbolTable } from '@prisma-next/psl-parser';
 import { type FormatOptions, format } from '@prisma-next/psl-parser/format';
 import {
+  type CompletionItem,
   type Connection,
   type Diagnostic,
   DiagnosticSeverity,
@@ -11,12 +12,15 @@ import {
   type FoldingRange,
   type InitializeParams,
   type InitializeResult,
+  type Position,
   RegistrationRequest,
   TextDocumentSyncKind,
   TextDocuments,
   type TextEdit,
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
+import { classifyPslCompletionContext } from './completion-context';
+import { providePslCompletionItems } from './completion-provider';
 import { CONFIG_FILENAME, resolveConfigInputs } from './config-resolution';
 import { ParseDiagnosticSeverity } from './diagnostic-mapping';
 import { computeFoldingRanges } from './folding-ranges';
@@ -58,6 +62,7 @@ export function createServer(connection: Connection): LanguageServer {
   let rootPath = process.cwd();
   let watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
   let supportsWatchedFilesRegistration = false;
+  let clientSupportsSnippets = false;
 
   async function publish(uri: string, text: string): Promise<void> {
     const project = await resolveProjectForDocument(uri);
@@ -248,16 +253,79 @@ export function createServer(connection: Connection): LanguageServer {
     ];
   }
 
+  async function completeDocument(uri: string, position: Position): Promise<CompletionItem[]> {
+    const document = documents.get(uri);
+    if (document === undefined) {
+      return [];
+    }
+
+    let project: ProjectState | undefined;
+    try {
+      project = await resolveProjectForDocument(uri);
+    } catch {
+      return [];
+    }
+    if (project === undefined || !project.inputs.includes(uri)) {
+      return [];
+    }
+
+    const cached = currentDocumentArtifact(project, uri, document.getText());
+    const symbolTable = project.artifacts.getSymbolTable();
+    if (cached === undefined || symbolTable === undefined) {
+      return [];
+    }
+
+    try {
+      const context = classifyPslCompletionContext({
+        document: cached.document,
+        sourceFile: cached.sourceFile,
+        position,
+      });
+      return [
+        ...providePslCompletionItems({
+          context,
+          sourceFile: cached.sourceFile,
+          candidates: {
+            scalarTypes: project.controlStack.scalarTypes,
+            pslBlockDescriptors: project.controlStack.pslBlockDescriptors,
+            symbolTable,
+          },
+          clientSupportsSnippets,
+        }),
+      ];
+    } catch {
+      return [];
+    }
+  }
+
+  function currentDocumentArtifact(
+    project: ProjectState,
+    uri: string,
+    text: string,
+  ): CachedDocument | undefined {
+    const cached = project.artifacts.getDocument(uri);
+    if (cached?.sourceFile.text === text) {
+      return cached;
+    }
+
+    if (project.artifacts.update(uri, text, project.inputs, project.controlStack) === null) {
+      return undefined;
+    }
+    return project.artifacts.getDocument(uri);
+  }
+
   connection.onInitialize(async (params): Promise<InitializeResult> => {
     rootPath = resolveRootPath(params.rootUri, params.rootPath);
     watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
     supportsWatchedFilesRegistration = clientSupportsWatchedFilesRegistration(params);
+    clientSupportsSnippets = clientSupportsCompletionSnippets(params);
 
     return {
       capabilities: {
         textDocumentSync: TextDocumentSyncKind.Incremental,
         documentFormattingProvider: true,
         foldingRangeProvider: true,
+        completionProvider: { triggerCharacters: ['.'] },
       },
     };
   });
@@ -298,6 +366,7 @@ export function createServer(connection: Connection): LanguageServer {
   });
 
   connection.onDocumentFormatting((params) => formatDocument(params.textDocument.uri));
+  connection.onCompletion((params) => completeDocument(params.textDocument.uri, params.position));
 
   connection.onFoldingRanges(async (params): Promise<FoldingRange[]> => {
     let project: ProjectState | undefined;
@@ -364,6 +433,10 @@ function toLspSeverity(severity: number): DiagnosticSeverity {
 
 function clientSupportsWatchedFilesRegistration(params: InitializeParams): boolean {
   return params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration === true;
+}
+
+function clientSupportsCompletionSnippets(params: InitializeParams): boolean {
+  return params.capabilities.textDocument?.completion?.completionItem?.snippetSupport === true;
 }
 
 function resolveRootPath(
