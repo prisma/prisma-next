@@ -78,22 +78,31 @@ from either derivation — carries a resolved schema name in `namespaceId`, so
 
 Delete `resolveNamespaceId` from `postgres-schema.ts` (the degraded duplicate). Replace its two uses in `diff-postgres-schema.ts` per the slimming below.
 
-### Known limitation: unbound namespace under a non-default `search_path`
+### Known limitation: the late-binding (`unbound`) namespace under a non-default `current_schema()`
 
-The contract's **unbound** namespace resolves to `'public'` unconditionally at
-derivation (`collectContractRlsPolicies` passes no `schemaIr`, so
-`resolveDdlSchemaForNamespaceStorage` falls back to `'public'`). The introspected
-side carries the live `current_schema()`. When the database's `search_path` does
-**not** put `public` first, those disagree: expected `public/<table>` and actual
-`<other>/<table>` fail to pair, producing a spurious `missing` (the policy is
-re-`CREATE`d on every run) and an `extra` that ownership then drops. This is
-**pre-existing** — the prior flat-key code had the same mismatch (and was worse:
-it also emitted a spurious `DROP`). This change narrows it; it does not fix it.
-A real fix threads the introspected `pgSchemaName` into derivation, which the
-current call shape does not allow — out of scope here. A contract that declares
-the namespace explicitly (a **bound** namespace) is unaffected, since its
-`namespaceId` is the real schema name on both sides. Test 6 covers the
-`public` case only.
+This affects **only** a Postgres contract that explicitly opts into the
+late-binding `unbound` namespace (the `unbound` keyword), and only when the
+connection's `current_schema()` is not `public`. It is **not** the common case:
+per [ADR 223](../../../../docs/architecture%20docs/adrs/ADR%20223%20-%20Target-owned%20default%20namespace.md),
+a Postgres model with no `namespace { }` block is stamped into the **`public`**
+namespace (the target's `defaultNamespaceId`) — a bound namespace that diffs
+correctly regardless of `search_path`. `unbound` is a deliberate Postgres opt-in
+for late binding; SQLite/Mongo use `__unbound__` as their default, but neither
+has RLS.
+
+The gap is partly inherent to late binding: the schema is intentionally unfixed
+at authoring and resolved to the connection's schema at runtime, so the contract
+side cannot know it. At derivation `collectContractRlsPolicies` resolves
+`__unbound__` to `'public'` (no `schemaIr` passed to
+`resolveDdlSchemaForNamespaceStorage`), while the introspected side carries the
+real `current_schema()`. When those differ, the expected `public/<table>` and
+actual `<other>/<table>` table nodes fail to pair: a spurious `missing` (the
+policy is re-`CREATE`d every run) plus an `extra` that ownership drops. This is
+**pre-existing** — the prior flat-key code had the same mismatch and was worse
+(it also emitted a spurious `DROP`); this change narrows it. A real fix threads
+the introspected `pgSchemaName` into the expected-side derivation (the only place
+the runtime schema is known), which the current call shape does not allow — out
+of scope here. Test 6 covers the resolved-`public` case.
 
 ## The differ becomes total (framework)
 
