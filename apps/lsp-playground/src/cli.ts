@@ -12,6 +12,7 @@ const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PORT = 5295;
 const LSP_PATH = '/psl';
 const RUNTIME_CONFIG_PATH = '/__psl_playground_runtime.json';
+const REQUEST_URL_BASE = 'http://localhost/';
 
 interface RuntimeConfig {
   readonly wsPath: string;
@@ -19,6 +20,17 @@ interface RuntimeConfig {
   readonly rootUri: string;
   readonly schemaPath: string;
   readonly schemaText: string;
+}
+
+function requestPathname(requestUrl: string | undefined): string | undefined {
+  if (requestUrl === undefined) {
+    return undefined;
+  }
+  try {
+    return new URL(requestUrl, REQUEST_URL_BASE).pathname;
+  } catch {
+    return undefined;
+  }
 }
 
 async function fileExists(path: string): Promise<boolean> {
@@ -194,9 +206,12 @@ async function main(): Promise<void> {
   httpServer.on(
     'request',
     (request: nodeHttp.IncomingMessage, response: nodeHttp.ServerResponse) => {
-      const baseUrl = `http://${request.headers.host ?? 'localhost'}/`;
-      const requestPath =
-        request.url !== undefined ? new URL(request.url, baseUrl).pathname : undefined;
+      const requestPath = requestPathname(request.url);
+      if (requestPath === undefined) {
+        response.statusCode = 400;
+        response.end('Bad Request');
+        return;
+      }
       if (requestPath === RUNTIME_CONFIG_PATH) {
         if (request.method !== 'GET' && request.method !== 'HEAD') {
           response.statusCode = 405;

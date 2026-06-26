@@ -269,7 +269,7 @@ export function createServer(connection: Connection): LanguageServer {
       return [];
     }
 
-    const cached = project.artifacts.getDocument(uri);
+    const cached = currentDocumentArtifact(project, uri, document.getText());
     const symbolTable = project.artifacts.getSymbolTable();
     if (cached === undefined || symbolTable === undefined) {
       return [];
@@ -296,6 +296,22 @@ export function createServer(connection: Connection): LanguageServer {
     } catch {
       return [];
     }
+  }
+
+  function currentDocumentArtifact(
+    project: ProjectState,
+    uri: string,
+    text: string,
+  ): CachedDocument | undefined {
+    const cached = project.artifacts.getDocument(uri);
+    if (cached?.sourceFile.text === text) {
+      return cached;
+    }
+
+    if (project.artifacts.update(uri, text, project.inputs, project.controlStack) === null) {
+      return undefined;
+    }
+    return project.artifacts.getDocument(uri);
   }
 
   connection.onInitialize(async (params): Promise<InitializeResult> => {
