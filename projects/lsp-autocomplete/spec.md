@@ -24,6 +24,8 @@ datasource db {
 
 Inside a generic block, completion suggests descriptor-backed block entries/parameters for that block kind. In this spec, “generic block attributes” means the key/value-style generic block members represented by `GenericBlockDeclaration` / `KeyValuePairAst` and extension-block descriptors. Ordinary PSL `@` / `@@` field/model attributes are deliberately out of scope for this part.
 
+At declaration positions, completion suggests top-level PSL block keywords and descriptor-backed generic block keywords. Document top level includes `model`, `type`, `types`, and `namespace`; namespace bodies include only namespace-valid declaration keywords such as `model`, `type`, and descriptor-backed generic block keywords. Completion items support snippet-capable clients while retaining plain-text fallbacks for clients that do not advertise snippet support.
+
 The intended shape is:
 
 ```text
@@ -68,8 +70,8 @@ No contract or adapter impact is expected. This project changes editor tooling b
 - Provider routing is explicit. Completion providers should not independently rediscover syntactic context.
 - Completion is available only for configured PSL inputs, matching the current diagnostics/formatting ownership rules.
 - Diagnostics and formatting behavior remain unchanged while completion is added.
-- The first provider set is limited to model field type completions, including namespace-qualified type positions, and generic block entry/parameter completions.
-- Ordinary PSL `@` / `@@` attribute contexts must not accidentally receive the new generic block or model type suggestions.
+- The first provider set is limited to model field type completions, including namespace-qualified type positions, generic block entry/parameter completions, and declaration keyword completions at document top level and inside namespace bodies.
+- Ordinary PSL `@` / `@@` attribute contexts must not accidentally receive the new generic block, model type, or declaration keyword suggestions.
 - Tests are written before or alongside implementation changes.
 
 ## Transitional-shape constraints
@@ -86,8 +88,9 @@ No contract or adapter impact is expected. This project changes editor tooling b
 - [ ] The language server advertises completion support for configured PSL inputs without changing diagnostics or formatting behavior.
 - [ ] Model field type positions complete configured scalar types plus visible model, composite type, scalar, and type-alias symbols from the current project symbol table, including namespace-qualified and contract-space-qualified type prefixes.
 - [ ] Generic block entry/parameter positions complete descriptor-backed keys or values for the current `GenericBlockDeclaration` where descriptor data is available.
+- [ ] Document top-level and namespace-body declaration positions complete scope-appropriate native PSL block keywords plus descriptor-backed generic block keywords, with snippet-capable and plain-text client behavior covered.
 - [ ] Ordinary PSL `@` / `@@` field/model attribute contexts return no scoped suggestions from this project’s providers.
-- [ ] Cursor-context classification has focused tests for blank model bodies, field-name prefixes, bare and namespace-qualified field-type positions, generic block blank lines, generic block partial keys, comments/trivia, and unsupported contexts.
+- [ ] Cursor-context classification has focused tests for blank model bodies, field-name prefixes, bare and namespace-qualified field-type positions, generic block blank lines, generic block partial keys, declaration keyword positions at document top level and inside namespace bodies, comments/trivia, and unsupported contexts.
 - [ ] LSP/server tests cover completion requests against an open configured PSL document.
 - [ ] Package documentation or README notes the supported completion scope and explicitly names the out-of-scope attribute surfaces.
 - [ ] Validation gates for touched packages pass, including typecheck, lint, and relevant package tests.
