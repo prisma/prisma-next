@@ -1,35 +1,15 @@
 import { MigrationCLI } from '@prisma-next/cli/migration-cli';
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { setValidation } from '@prisma-next/target-mongo/migration';
+import type { Contract } from './end-contract';
+import endContractJson from './end-contract.json' with { type: 'json' };
 
-const USERS_SCHEMA = {
-  additionalProperties: false,
-  bsonType: 'object',
-  properties: {
-    _id: { bsonType: 'objectId' },
-    address: {
-      oneOf: [
-        { bsonType: 'null' },
-        {
-          additionalProperties: false,
-          bsonType: 'object',
-          properties: {
-            city: { bsonType: 'string' },
-            country: { bsonType: 'string' },
-            street: { bsonType: 'string' },
-            zip: { bsonType: ['null', 'string'] },
-          },
-          required: ['city', 'country', 'street'],
-        },
-      ],
-    },
-    bio: { bsonType: ['null', 'string'] },
-    email: { bsonType: 'string' },
-    name: { bsonType: 'string' },
-    role: { bsonType: 'string', enum: ['admin', 'author', 'reader'] },
-  },
-  required: ['_id', 'email', 'name', 'role'],
-} as const;
+const endContract = new MongoContractSerializer().deserializeContract<Contract>(endContractJson);
+
+// Sourced from the contract snapshot so this stays in sync if the chain is re-emitted.
+const USERS_VALIDATOR =
+  endContract.storage.namespaces.__unbound__.entries.collection.users.validator;
 
 class AddUserRoleEnum extends Migration {
   override describe() {
@@ -41,9 +21,9 @@ class AddUserRoleEnum extends Migration {
 
   override get operations() {
     return [
-      setValidation('users', USERS_SCHEMA, {
-        validationLevel: 'strict',
-        validationAction: 'error',
+      setValidation('users', USERS_VALIDATOR.jsonSchema, {
+        validationLevel: USERS_VALIDATOR.validationLevel,
+        validationAction: USERS_VALIDATOR.validationAction,
       }),
     ];
   }
