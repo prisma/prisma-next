@@ -9,13 +9,22 @@ export type ProfileHash =
   ProfileHashBase<'sha256:vo-test-profile-hash'>;
 
 export type CodecTypes = MongoCodecTypes;
-export type OperationTypes = Record<string, never>;
 export type Location = {
   readonly street: CodecTypes['mongo/string@1']['output'];
   readonly city: CodecTypes['mongo/string@1']['output'];
   readonly zip: CodecTypes['mongo/string@1']['output'];
 };
-export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes>;
+export type FieldOutputTypes = {
+  readonly __unbound__: {
+    readonly Shop: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly name: CodecTypes['mongo/string@1']['output'];
+      readonly location: { street: string; city: string; zip: string };
+      readonly notes: { street: string; city: string; zip: string } | null;
+    };
+  };
+};
+export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes>;
 
 type ContractBase = {
   readonly target: 'mongo';

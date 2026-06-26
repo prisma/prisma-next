@@ -20,7 +20,18 @@ type TestCodecTypes = {
   readonly 'mongo/string@1': { readonly input: string; readonly output: string };
 };
 
-type TestTypeMaps = MongoTypeMaps<TestCodecTypes>;
+type TestFieldOutputTypes = {
+  readonly __unbound__: {
+    readonly User: {
+      readonly _id: string;
+      readonly name: string;
+      readonly contactInfo: { phone: string; website: string | null } | null;
+      readonly tags: string[];
+    };
+  };
+};
+
+type TestTypeMaps = MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes, TestFieldOutputTypes>;
 
 type VOContract = MongoContractWithTypeMaps<
   {
@@ -144,20 +155,24 @@ test('update input accepts null for nullable value object field', () => {
 // --- Contracts with FieldOutputTypes / FieldInputTypes ---
 
 type FieldOutputTypesForUser = {
-  readonly User: {
-    readonly _id: string;
-    readonly name: string;
-    readonly contactInfo: { phone: string; website: string | null } | null;
-    readonly tags: string[];
+  readonly __unbound__: {
+    readonly User: {
+      readonly _id: string;
+      readonly name: string;
+      readonly contactInfo: { phone: string; website: string | null } | null;
+      readonly tags: string[];
+    };
   };
 };
 
 type FieldInputTypesForUser = {
-  readonly User: {
-    readonly _id: string;
-    readonly name: string;
-    readonly contactInfo: { phone: string; website: string | null } | null;
-    readonly tags: string[];
+  readonly __unbound__: {
+    readonly User: {
+      readonly _id: string;
+      readonly name: string;
+      readonly contactInfo: { phone: string; website: string | null } | null;
+      readonly tags: string[];
+    };
   };
 };
 
@@ -243,7 +258,7 @@ test('DefaultModelRow resolves to primitives when FieldOutputTypes is present', 
   expectTypeOf<Row['contactInfo']>().toEqualTypeOf<ContactInfoShape | null>();
 });
 
-test('DefaultModelRow falls back to InferModelRow when FieldOutputTypes is absent', () => {
+test('DefaultModelRow resolves via InferModelRow from the precomputed field output map', () => {
   type Row = DefaultModelRow<VOContract, 'User'>;
   expectTypeOf<Row['_id']>().toEqualTypeOf<string>();
   expectTypeOf<Row['name']>().toEqualTypeOf<string>();
@@ -263,29 +278,33 @@ type ExtCodecTypes = {
 };
 
 type ExtFieldOutputTypes = {
-  readonly Task: {
-    readonly _id: string;
-    readonly title: string;
-    readonly type: string;
-    readonly assigneeId: string;
+  readonly __unbound__: {
+    readonly Task: {
+      readonly _id: string;
+      readonly title: string;
+      readonly type: string;
+      readonly assigneeId: string;
+    };
+    readonly Bug: { readonly severity: string };
+    readonly Feature: { readonly priority: string };
+    readonly User: { readonly _id: string; readonly name: string };
+    readonly Comment: { readonly _id: string; readonly text: string };
   };
-  readonly Bug: { readonly severity: string };
-  readonly Feature: { readonly priority: string };
-  readonly User: { readonly _id: string; readonly name: string };
-  readonly Comment: { readonly _id: string; readonly text: string };
 };
 
 type ExtFieldInputTypes = {
-  readonly Task: {
-    readonly _id: string;
-    readonly title: string;
-    readonly type: string;
-    readonly assigneeId: string;
+  readonly __unbound__: {
+    readonly Task: {
+      readonly _id: string;
+      readonly title: string;
+      readonly type: string;
+      readonly assigneeId: string;
+    };
+    readonly Bug: { readonly severity: string };
+    readonly Feature: { readonly priority: string };
+    readonly User: { readonly _id: string; readonly name: string };
+    readonly Comment: { readonly _id: string; readonly text: string };
   };
-  readonly Bug: { readonly severity: string };
-  readonly Feature: { readonly priority: string };
-  readonly User: { readonly _id: string; readonly name: string };
-  readonly Comment: { readonly _id: string; readonly text: string };
 };
 
 type ExtTypeMaps = MongoTypeMaps<ExtCodecTypes, ExtFieldOutputTypes, ExtFieldInputTypes>;

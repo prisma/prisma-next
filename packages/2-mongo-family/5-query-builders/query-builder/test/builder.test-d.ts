@@ -11,12 +11,12 @@ const contractJson = {} as unknown;
 type PlanRow<P extends MongoQueryPlan> = P extends MongoQueryPlan<infer R> ? R : never;
 
 type OrderRow = {
-  _id: string;
-  status: string;
-  amount: number;
-  customerId: string;
-  notes: string | null;
-  tags: string[];
+  readonly _id: string;
+  readonly status: string;
+  readonly amount: number;
+  readonly customerId: string;
+  readonly notes: string | null;
+  readonly tags: string[];
 };
 
 describe('builder shape tests', () => {
@@ -194,12 +194,12 @@ describe('resolved row types', () => {
       }))
       .build();
     expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<{
-      _id: string;
-      status: string;
-      amount: number;
-      customerId: string;
-      notes: string | null;
-      tags: string[];
+      readonly _id: string;
+      readonly status: string;
+      readonly amount: number;
+      readonly customerId: string;
+      readonly notes: string | null;
+      readonly tags: string[];
       fullName: string;
       doubled: number;
     }>();
@@ -286,17 +286,17 @@ describe('resolved row types', () => {
       )
       .build();
     expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<{
-      _id: string;
-      status: string;
-      amount: number;
-      customerId: string;
-      notes: string | null;
-      tags: string[];
+      readonly _id: string;
+      readonly status: string;
+      readonly amount: number;
+      readonly customerId: string;
+      readonly notes: string | null;
+      readonly tags: string[];
       customer: Array<{
-        _id: string;
-        firstName: string;
-        lastName: string;
-        email: string;
+        readonly _id: string;
+        readonly firstName: string;
+        readonly lastName: string;
+        readonly email: string;
       }>;
     }>();
   });
@@ -314,28 +314,28 @@ describe('resolved row types', () => {
       )
       .build();
     expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<{
-      _id: string;
-      status: string;
-      amount: number;
-      customerId: string;
-      notes: string | null;
-      tags: string[];
+      readonly _id: string;
+      readonly status: string;
+      readonly amount: number;
+      readonly customerId: string;
+      readonly notes: string | null;
+      readonly tags: string[];
       customer: Array<{
-        _id: string;
-        name: string;
-        address: {
+        readonly _id: string;
+        readonly name: string;
+        readonly address: {
           street: string;
           city: string;
           zip: string | null;
           geo: { lat: number; lng: number };
         };
-        workAddress: {
+        readonly workAddress: {
           street: string;
           city: string;
           zip: string | null;
           geo: { lat: number; lng: number };
         } | null;
-        stats: { visits: number; lastSeen: Date | null };
+        readonly stats: { visits: number; lastSeen: Date | null };
       }>;
     }>();
   });
@@ -343,21 +343,21 @@ describe('resolved row types', () => {
   it('entry-point query resolves value-object fields recursively (model-origin brand)', () => {
     const plan = mongoQuery<TContract>({ contractJson }).from('customers').build();
     expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<{
-      _id: string;
-      name: string;
-      address: {
+      readonly _id: string;
+      readonly name: string;
+      readonly address: {
         street: string;
         city: string;
         zip: string | null;
         geo: { lat: number; lng: number };
       };
-      workAddress: {
+      readonly workAddress: {
         street: string;
         city: string;
         zip: string | null;
         geo: { lat: number; lng: number };
       } | null;
-      stats: { visits: number; lastSeen: Date | null };
+      readonly stats: { visits: number; lastSeen: Date | null };
     }>();
   });
 
@@ -369,21 +369,21 @@ describe('resolved row types', () => {
       }))
       .build();
     expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<{
-      _id: string;
-      name: string;
-      address: {
+      readonly _id: string;
+      readonly name: string;
+      readonly address: {
         street: string;
         city: string;
         zip: string | null;
         geo: { lat: number; lng: number };
       };
-      workAddress: {
+      readonly workAddress: {
         street: string;
         city: string;
         zip: string | null;
         geo: { lat: number; lng: number };
       } | null;
-      stats: { visits: number; lastSeen: Date | null };
+      readonly stats: { visits: number; lastSeen: Date | null };
       upperName: string;
     }>();
   });

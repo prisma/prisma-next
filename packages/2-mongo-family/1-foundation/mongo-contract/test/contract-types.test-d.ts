@@ -596,8 +596,6 @@ test('InferModelRow on a 32-field model compiles without excessive depth error',
   expectTypeOf<Row['f32']>().toEqualTypeOf<'a' | 'b' | 'c'>();
 });
 
-// Contract with codec types but NO precomputed fieldOutputTypes map.
-// InferModelRow must resolve scalar fields via the codec lookup, not unknown.
 type FallbackCodecTypes = {
   readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
   readonly 'mongo/string@1': { readonly input: string; readonly output: string };
@@ -647,10 +645,22 @@ type ContractNoMap = MongoContractWithTypeMaps<
       readonly storageHash: StorageHashBase<'sha256:no-map-storage'>;
     };
   },
-  MongoTypeMaps<FallbackCodecTypes>
+  MongoTypeMaps<
+    FallbackCodecTypes,
+    {
+      readonly __unbound__: {
+        readonly Item: {
+          readonly _id: string;
+          readonly name: string;
+          readonly price: number | null;
+          readonly tags: string[];
+        };
+      };
+    }
+  >
 >;
 
-test('InferModelRow without precomputed map resolves scalars via codec output', () => {
+test('InferModelRow resolves scalars from the precomputed field output map', () => {
   type Row = InferModelRow<ContractNoMap, 'Item'>;
   expectTypeOf<Row['_id']>().toEqualTypeOf<string>();
   expectTypeOf<Row['name']>().toEqualTypeOf<string>();

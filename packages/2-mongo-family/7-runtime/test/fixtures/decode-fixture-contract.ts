@@ -110,7 +110,27 @@ export type DecodeFixtureCodecTypes = {
   readonly 'mongo/vector@1': { readonly output: readonly number[] };
 };
 
-export type DecodeFixtureTypeMaps = MongoTypeMaps<DecodeFixtureCodecTypes>;
+export type DecodeFixtureFieldOutputTypes = {
+  readonly __unbound__: {
+    readonly User: {
+      readonly _id: string;
+      readonly name: string;
+      readonly email: string;
+      readonly createdAt: Date;
+      readonly embeddings: readonly number[];
+    };
+    readonly Post: {
+      readonly _id: string;
+      readonly title: string;
+      readonly userId: string;
+    };
+  };
+};
+
+export type DecodeFixtureTypeMaps = MongoTypeMaps<
+  DecodeFixtureCodecTypes,
+  DecodeFixtureFieldOutputTypes
+>;
 export type TDecodeFixtureContract = MongoContractWithTypeMaps<
   DecodeFixtureContract,
   DecodeFixtureTypeMaps
