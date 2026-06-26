@@ -25,6 +25,7 @@ import {
   InitializedNotification,
   InitializeRequest,
   type InitializeResult,
+  InsertTextFormat,
   LogMessageNotification,
   MessageType,
   type Position,
@@ -76,6 +77,7 @@ const unformattedPsl = 'model User {\nid Int\n}';
 const formattedPsl = 'model User {\n  id Int\n}\n';
 
 const scalarTypes = ['String', 'Int', 'Boolean', 'DateTime'] as const;
+const nameSnippetPlaceholder = '$' + '{1:Name}';
 
 const pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace = {
   policy: {
@@ -148,6 +150,10 @@ function parseAndSymbolTableDiagnostics(source: string): {
 
 const watchedFilesCapabilities: ClientCapabilities = {
   workspace: { didChangeWatchedFiles: { dynamicRegistration: true } },
+};
+
+const snippetCompletionCapabilities: ClientCapabilities = {
+  textDocument: { completion: { completionItem: { snippetSupport: true } } },
 };
 
 interface Harness {
@@ -444,7 +450,7 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
     const result = await harness.initialize();
     expect(result.capabilities.textDocumentSync).toBeDefined();
     expect(result.capabilities.documentFormattingProvider).toBe(true);
-    expect(result.capabilities.completionProvider).toBeDefined();
+    expect(result.capabilities.completionProvider).toEqual({ triggerCharacters: ['.'] });
   });
 
   it('returns model field type completions for configured PSL inputs', async () => {
@@ -490,6 +496,58 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
 
     const items = completionItems(await requestCompletion(harness, schemaUri, position));
     expect(items.map((item) => item.label)).toEqual(['where']);
+  });
+
+  it('returns declaration keyword completions with plain-text edits by default', async () => {
+    harness = startHarness(resolveToSchemaWithPslBlockDescriptors);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor('|');
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items.map((item) => item.label)).toEqual([
+      'model',
+      'type',
+      'types',
+      'namespace',
+      'policy',
+    ]);
+    expect(items.find((item) => item.label === 'model')).toMatchObject({
+      textEdit: { newText: 'model ' },
+    });
+    expect(items.find((item) => item.label === 'model')?.insertTextFormat).toBeUndefined();
+  });
+
+  it('returns declaration keyword snippets when the client supports snippets', async () => {
+    harness = startHarness(resolveToSchemaWithPslBlockDescriptors, snippetCompletionCapabilities);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor('|');
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items.find((item) => item.label === 'model')).toMatchObject({
+      insertTextFormat: InsertTextFormat.Snippet,
+      textEdit: { newText: `model ${nameSnippetPlaceholder} {\n  $0\n}` },
+    });
+    expect(items.find((item) => item.label === 'policy')).toMatchObject({
+      insertTextFormat: InsertTextFormat.Snippet,
+      textEdit: { newText: `policy ${nameSnippetPlaceholder} {\n  $0\n}` },
+    });
+  });
+
+  it('returns namespace-body declaration keywords without document-only keywords', async () => {
+    harness = startHarness(resolveToSchemaWithPslBlockDescriptors);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor(['namespace feature {', '  |', '}'].join('\n'));
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items.map((item) => item.label)).toEqual(['model', 'type', 'policy']);
+    expect(items.map((item) => item.label)).not.toContain('types');
+    expect(items.map((item) => item.label)).not.toContain('namespace');
   });
 
   it('returns no completion items for unconfigured PSL documents', async () => {

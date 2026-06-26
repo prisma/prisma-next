@@ -16,6 +16,50 @@ function classify(markedSource: string): ReturnType<typeof classifyPslCompletion
 }
 
 describe('classifyPslCompletionContext', () => {
+  it('classifies blank document-level declaration keyword positions', () => {
+    const context = classify('|');
+
+    expect(context).toMatchObject({
+      kind: 'declarationKeyword',
+      scope: 'document',
+      prefix: '',
+      replacementStartOffset: 0,
+      offset: 0,
+    });
+  });
+
+  it('classifies partial document-level declaration keyword prefixes', () => {
+    const context = classify('mo|');
+
+    expect(context).toMatchObject({
+      kind: 'declarationKeyword',
+      scope: 'document',
+      prefix: 'mo',
+      replacementStartOffset: 0,
+      offset: 2,
+    });
+  });
+
+  it('classifies blank namespace-body declaration keyword positions', () => {
+    const context = classify(['namespace auth {', '  |', '}'].join('\n'));
+
+    expect(context).toMatchObject({
+      kind: 'declarationKeyword',
+      scope: 'namespace',
+      prefix: '',
+    });
+  });
+
+  it('classifies partial namespace-body declaration keyword prefixes', () => {
+    const context = classify(['namespace auth {', '  ty|', '}'].join('\n'));
+
+    expect(context).toMatchObject({
+      kind: 'declarationKeyword',
+      scope: 'namespace',
+      prefix: 'ty',
+    });
+  });
+
   it('classifies a blank model field type position', () => {
     const context = classify(['model Post {', '  author |', '}'].join('\n'));
 
