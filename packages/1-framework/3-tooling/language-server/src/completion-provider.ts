@@ -251,7 +251,7 @@ function provideModelFieldTypeCompletionItems(
   source: PslCompletionCandidateSource,
 ): readonly CompletionItem[] {
   const replacementRange = {
-    start: sourceFile.positionAt(context.offset - context.prefix.name.length),
+    start: sourceFile.positionAt(context.replacementStartOffset),
     end: sourceFile.positionAt(context.offset),
   };
 
