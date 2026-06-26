@@ -24,8 +24,10 @@ import {
   LogMessageNotification,
   MessageType,
   PublishDiagnosticsNotification,
+  type Range,
   type RegistrationParams,
   RegistrationRequest,
+  type SemanticTokens,
   StreamMessageReader,
   StreamMessageWriter,
   type TextEdit,
@@ -33,6 +35,7 @@ import {
 import type { ConfigResolution } from '../src/config-resolution';
 import type { CachedDocument } from '../src/project-artifacts';
 import { resolveSchemaInputs } from '../src/schema-inputs';
+import { semanticTokensLegend } from '../src/semantic-tokens';
 import { createServer } from '../src/server';
 
 type ResolveInputs = (configPath: string) => Promise<ConfigResolution>;
@@ -359,6 +362,32 @@ function requestFormatting(harness: Harness, uri: string): Promise<TextEdit[] | 
   });
 }
 
+function requestSemanticTokens(harness: Harness, uri: string): Promise<SemanticTokens | null> {
+  return harness.client.sendRequest('textDocument/semanticTokens/full', {
+    textDocument: { uri },
+  });
+}
+
+function requestSemanticTokensRange(
+  harness: Harness,
+  uri: string,
+  range: Range,
+): Promise<SemanticTokens | null> {
+  return harness.client.sendRequest('textDocument/semanticTokens/range', {
+    textDocument: { uri },
+    range,
+  });
+}
+
+function semanticTokenChunks(tokens: SemanticTokens | null): readonly (readonly number[])[] {
+  const data = tokens?.data ?? [];
+  const chunks: number[][] = [];
+  for (let index = 0; index < data.length; index += 5) {
+    chunks.push(data.slice(index, index + 5));
+  }
+  return chunks;
+}
+
 function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
   let resolvePromise: (value: T) => void = () => undefined;
   const promise = new Promise<T>((resolve) => {
@@ -380,11 +409,17 @@ afterEach(async () => {
 });
 
 describe('language server', { timeout: timeouts.databaseOperation }, () => {
-  it('answers initialize and advertises text-document sync', async () => {
+  it('answers initialize and advertises text-document features', async () => {
     harness = startHarness(resolveToSchema);
     const result = await harness.initialize();
     expect(result.capabilities.textDocumentSync).toBeDefined();
     expect(result.capabilities.documentFormattingProvider).toBe(true);
+    expect(result.capabilities.foldingRangeProvider).toBe(true);
+    expect(result.capabilities.semanticTokensProvider).toEqual({
+      legend: semanticTokensLegend,
+      full: true,
+      range: true,
+    });
   });
 
   it('publishes parser diagnostics for an opened configured PSL input', async () => {

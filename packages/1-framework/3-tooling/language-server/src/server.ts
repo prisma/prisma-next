@@ -11,7 +11,9 @@ import {
   type FoldingRange,
   type InitializeParams,
   type InitializeResult,
+  type Range,
   RegistrationRequest,
+  type SemanticTokens,
   TextDocumentSyncKind,
   TextDocuments,
   type TextEdit,
@@ -52,6 +54,7 @@ interface ProjectState {
 }
 
 const semanticTokenSourceLimit = 100_000;
+
 export function createServer(connection: Connection): LanguageServer {
   const documents = new TextDocuments(TextDocument);
   const projects = new Map<string, ProjectState>();
@@ -94,7 +97,11 @@ export function createServer(connection: Connection): LanguageServer {
   async function resolveProjectForDocument(uri: string): Promise<ProjectState | undefined> {
     const knownConfigPath = documentConfigPaths.get(uri);
     if (knownConfigPath !== undefined) {
-      return resolveProject(knownConfigPath);
+      const project = await resolveProjectIfLoadable(knownConfigPath);
+      if (project === undefined) {
+        documentConfigPaths.delete(uri);
+      }
+      return project;
     }
 
     const filePath = filePathFromUri(uri);
@@ -262,12 +269,7 @@ export function createServer(connection: Connection): LanguageServer {
       return emptySemanticTokens();
     }
 
-    let project: ProjectState | undefined;
-    try {
-      project = await resolveProjectForDocument(uri);
-    } catch {
-      return emptySemanticTokens();
-    }
+    const project = await resolveProjectForDocument(uri);
     if (project === undefined) {
       return emptySemanticTokens();
     }
@@ -296,6 +298,11 @@ export function createServer(connection: Connection): LanguageServer {
         textDocumentSync: TextDocumentSyncKind.Incremental,
         documentFormattingProvider: true,
         foldingRangeProvider: true,
+        semanticTokensProvider: {
+          legend: semanticTokensLegend,
+          full: true,
+          range: true,
+        },
       },
     };
   });
@@ -336,6 +343,13 @@ export function createServer(connection: Connection): LanguageServer {
   });
 
   connection.onDocumentFormatting((params) => formatDocument(params.textDocument.uri));
+
+  connection.languages.semanticTokens.on((params) =>
+    semanticTokensForDocument(params.textDocument.uri),
+  );
+  connection.languages.semanticTokens.onRange((params) =>
+    semanticTokensForDocument(params.textDocument.uri, params.range),
+  );
 
   connection.onFoldingRanges(async (params): Promise<FoldingRange[]> => {
     let project: ProjectState | undefined;
@@ -385,6 +399,10 @@ export function createServer(connection: Connection): LanguageServer {
     getDocumentAst: (uri) => artifactsForDocument(uri)?.getDocument(uri),
     getProjectSymbolTable: (uri) => artifactsForDocument(uri)?.getSymbolTable(),
   };
+}
+
+function emptySemanticTokens(): SemanticTokens {
+  return { data: [] };
 }
 
 function toLspSeverity(severity: number): DiagnosticSeverity {
