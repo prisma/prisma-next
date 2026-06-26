@@ -259,44 +259,26 @@ export function createServer(connection: Connection): LanguageServer {
       return emptySemanticTokens();
     }
 
-    let current: CurrentProjectDocument | undefined;
+    let project: ProjectState | undefined;
     try {
-      current = await currentProjectDocument(uri, text);
+      project = await resolveProjectForDocument(uri);
     } catch {
       return emptySemanticTokens();
     }
-    if (current === undefined || !current.project.inputs.includes(uri)) {
-      return emptySemanticTokens();
-    }
-    if (current.text.length > semanticTokenSourceLimit) {
+    if (project === undefined) {
       return emptySemanticTokens();
     }
 
-    const computed = current.project.artifacts.update(
-      uri,
-      current.text,
-      current.project.inputs,
-      current.project.controlStack,
-    );
-    if (computed === null) {
-      return emptySemanticTokens();
-    }
-
-    const latestDocument = documents.get(uri);
-    if (latestDocument === undefined || latestDocument.getText() !== current.text) {
-      return emptySemanticTokens();
-    }
-
-    const cached = current.project.artifacts.getDocument(uri);
-    if (cached === undefined) {
+    const cached = project.artifacts.getDocument(uri);
+    if (cached === undefined || cached.text !== text) {
       return emptySemanticTokens();
     }
 
     const source = {
       document: cached.document,
       sourceFile: cached.sourceFile,
-      symbolTable: current.project.artifacts.getSymbolTable(),
-      scalarTypes: current.project.controlStack.scalarTypes,
+      symbolTable: project.artifacts.getSymbolTable(),
+      scalarTypes: project.controlStack.scalarTypes,
     };
     return buildSemanticTokens(source, range);
   }

@@ -3,17 +3,18 @@ import {
   ArrayLiteralAst,
   type AttributeArgAst,
   type AttributeArgListAst,
+  type AttributeAst,
+  type BlockMemberAst,
   BooleanLiteralExprAst,
   CompositeTypeDeclarationAst,
+  type DeclarationAst,
   type DocumentAst,
   type ExpressionAst,
-  type FieldAttributeAst,
-  type FieldDeclarationAst,
+  FieldDeclarationAst,
   FunctionCallAst,
   filterChildren,
-  type GenericBlockDeclarationAst,
+  type GenericBlockMemberAst,
   IdentifierAst,
-  type ModelAttributeAst,
   ModelDeclarationAst,
   type NamedTypeDeclarationAst,
   NamespaceDeclarationAst,
@@ -26,25 +27,45 @@ import {
   type TypeAnnotationAst,
   TypesBlockAst,
 } from '@prisma-next/psl-parser/syntax';
-import type { Range, SemanticTokens, SemanticTokensLegend } from 'vscode-languageserver';
+import {
+  type Range,
+  SemanticTokenModifiers,
+  type SemanticTokens,
+  type SemanticTokensLegend,
+  SemanticTokenTypes,
+} from 'vscode-languageserver';
 
-export const semanticTokenTypes = [
-  'keyword',
-  'namespace',
-  'class',
-  'struct',
-  'type',
-  'property',
-  'decorator',
-  'string',
-  'number',
-  'comment',
-] as const;
+export type SemanticTokenType =
+  | 'keyword'
+  | 'namespace'
+  | 'class'
+  | 'struct'
+  | 'type'
+  | 'property'
+  | 'decorator'
+  | 'string'
+  | 'number'
+  | 'comment';
 
-export const semanticTokenModifiers = ['declaration', 'defaultLibrary'] as const;
+export type SemanticTokenModifier = 'declaration' | 'defaultLibrary';
 
-export type SemanticTokenType = (typeof semanticTokenTypes)[number];
-export type SemanticTokenModifier = (typeof semanticTokenModifiers)[number];
+export const semanticTokenTypes: readonly SemanticTokenType[] = [
+  SemanticTokenTypes.keyword,
+  SemanticTokenTypes.namespace,
+  SemanticTokenTypes.class,
+  SemanticTokenTypes.struct,
+  SemanticTokenTypes.type,
+  SemanticTokenTypes.property,
+  SemanticTokenTypes.decorator,
+  SemanticTokenTypes.string,
+  SemanticTokenTypes.number,
+  SemanticTokenTypes.comment,
+];
+
+export const semanticTokenModifiers = [
+  SemanticTokenModifiers.declaration,
+  SemanticTokenModifiers.defaultLibrary,
+] as const satisfies readonly SemanticTokenModifier[];
 
 export const semanticTokenModifierIndexes = {
   declaration: 0,
@@ -76,15 +97,6 @@ export interface PendingSemanticToken {
   readonly splitMultiline: boolean;
 }
 
-type DeclarationAst =
-  | ModelDeclarationAst
-  | CompositeTypeDeclarationAst
-  | NamespaceDeclarationAst
-  | TypesBlockAst
-  | GenericBlockDeclarationAst;
-
-type AttributeAst = FieldAttributeAst | ModelAttributeAst;
-
 type TypeReferenceKind = 'class' | 'struct' | 'type';
 
 interface TypeReferenceClassification {
@@ -95,6 +107,10 @@ interface TypeReferenceClassification {
 interface IdentifierSegment {
   readonly identifier: IdentifierAst;
   readonly text: string;
+}
+
+interface ExpressionContext {
+  readonly bareIdentifierTokenType?: SemanticTokenType;
 }
 
 export function buildSemanticTokens(source: SemanticTokenSource, range?: Range): SemanticTokens {
@@ -171,7 +187,7 @@ export class SemanticTokensBuilder {
       const startOffset =
         line === start.line ? token.startOffset : this.#sourceFile.lineStartOffset(line);
       const endOffset = line === end.line ? token.endOffset : this.#sourceFile.lineEndOffset(line);
-      if (endOffset > startOffset) {
+      if (endOffset > startOffset && this.#intersectsRange(startOffset, endOffset)) {
         this.#encode(startOffset, endOffset, token.tokenTypeIndex, token.modifierBitset);
       }
     }
@@ -219,16 +235,14 @@ function collectDeclaration(
   if (declaration instanceof ModelDeclarationAst) {
     addToken(declaration.keyword(), 'keyword', tokens);
     addIdentifier(declaration.name(), 'class', tokens, semanticTokenModifierBits.declaration);
-    collectFields(declaration.fields(), source, tokens, namespace);
-    collectAttributes(declaration.attributes(), source, tokens, namespace);
+    collectBlockMembers(declaration.members(), source, tokens, namespace);
     return;
   }
 
   if (declaration instanceof CompositeTypeDeclarationAst) {
     addToken(declaration.keyword(), 'keyword', tokens);
     addIdentifier(declaration.name(), 'struct', tokens, semanticTokenModifierBits.declaration);
-    collectFields(declaration.fields(), source, tokens, namespace);
-    collectAttributes(declaration.attributes(), source, tokens, namespace);
+    collectBlockMembers(declaration.members(), source, tokens, namespace);
     return;
   }
 
@@ -252,11 +266,7 @@ function collectDeclaration(
 
   addToken(declaration.keyword(), 'keyword', tokens);
   addIdentifier(declaration.name(), 'type', tokens, semanticTokenModifierBits.declaration);
-  for (const entry of declaration.entries()) {
-    addIdentifier(entry.key(), 'property', tokens);
-    collectExpression(entry.value(), source, tokens, namespace);
-  }
-  collectAttributes(declaration.attributes(), source, tokens, namespace);
+  collectGenericBlockMembers(declaration.members(), source, tokens, namespace);
 }
 
 function collectNamedTypeDeclaration(
@@ -270,17 +280,46 @@ function collectNamedTypeDeclaration(
   collectAttributes(declaration.attributes(), source, tokens, namespace);
 }
 
-function collectFields(
-  fields: Iterable<FieldDeclarationAst>,
+function collectGenericBlockMembers(
+  members: Iterable<GenericBlockMemberAst>,
   source: SemanticTokenSource,
   tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
-  for (const field of fields) {
-    addIdentifier(field.name(), 'property', tokens, semanticTokenModifierBits.declaration);
-    collectTypeAnnotation(field.typeAnnotation(), source, tokens, namespace);
-    collectAttributes(field.attributes(), source, tokens, namespace);
+  for (const member of members) {
+    if ('key' in member) {
+      addIdentifier(member.key(), 'property', tokens);
+      collectExpression(member.value(), source, tokens, namespace);
+      continue;
+    }
+    collectAttribute(member, source, tokens, namespace);
   }
+}
+
+function collectBlockMembers(
+  members: Iterable<BlockMemberAst>,
+  source: SemanticTokenSource,
+  tokens: PendingSemanticToken[],
+  namespace: string | undefined,
+): void {
+  for (const member of members) {
+    if (member instanceof FieldDeclarationAst) {
+      collectField(member, source, tokens, namespace);
+      continue;
+    }
+    collectAttribute(member, source, tokens, namespace);
+  }
+}
+
+function collectField(
+  field: FieldDeclarationAst,
+  source: SemanticTokenSource,
+  tokens: PendingSemanticToken[],
+  namespace: string | undefined,
+): void {
+  addIdentifier(field.name(), 'property', tokens, semanticTokenModifierBits.declaration);
+  collectTypeAnnotation(field.typeAnnotation(), source, tokens, namespace);
+  collectAttributes(field.attributes(), source, tokens, namespace);
 }
 
 function collectTypeAnnotation(
@@ -303,9 +342,18 @@ function collectAttributes(
   namespace: string | undefined,
 ): void {
   for (const attribute of attributes) {
-    collectDecoratorName(attribute.name(), source.sourceFile.text, tokens);
-    collectAttributeArgList(attribute.argList(), source, tokens, namespace);
+    collectAttribute(attribute, source, tokens, namespace);
   }
+}
+
+function collectAttribute(
+  attribute: AttributeAst,
+  source: SemanticTokenSource,
+  tokens: PendingSemanticToken[],
+  namespace: string | undefined,
+): void {
+  collectDecoratorName(attribute.name(), source.sourceFile.text, tokens);
+  collectAttributeArgList(attribute.argList(), source, tokens, namespace);
 }
 
 function collectDecoratorName(
@@ -342,8 +390,9 @@ function collectAttributeArg(
   tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
-  addIdentifier(arg.name(), 'property', tokens);
-  collectExpression(arg.value(), source, tokens, namespace);
+  const name = arg.name();
+  addIdentifier(name, 'property', tokens);
+  collectExpression(arg.value(), source, tokens, namespace, expressionContextForAttributeArg(name));
 }
 
 function collectExpression(
@@ -351,6 +400,7 @@ function collectExpression(
   source: SemanticTokenSource,
   tokens: PendingSemanticToken[],
   namespace: string | undefined,
+  context: ExpressionContext = {},
 ): void {
   if (expression === undefined) {
     return;
@@ -381,7 +431,7 @@ function collectExpression(
 
   if (expression instanceof ArrayLiteralAst) {
     for (const element of expression.elements()) {
-      collectExpression(element, source, tokens, namespace);
+      collectExpression(element, source, tokens, namespace, context);
     }
     return;
   }
@@ -394,7 +444,7 @@ function collectExpression(
     return;
   }
 
-  collectIdentifierExpression(expression, source, tokens, namespace);
+  collectIdentifierExpression(expression, source, tokens, namespace, context);
 }
 
 function collectIdentifierExpression(
@@ -402,15 +452,28 @@ function collectIdentifierExpression(
   source: SemanticTokenSource,
   tokens: PendingSemanticToken[],
   namespace: string | undefined,
+  context: ExpressionContext,
 ): void {
   const text = identifier.name();
   if (text === undefined) {
+    return;
+  }
+  const bareIdentifierTokenType = context.bareIdentifierTokenType;
+  if (bareIdentifierTokenType !== undefined) {
+    tokens.push(rangeForIdentifier(identifier, bareIdentifierTokenType));
     return;
   }
   const classification = classifyTypeReference([text], source, namespace);
   tokens.push(
     rangeForIdentifier(identifier, classification.tokenType, classification.modifierBitset),
   );
+}
+
+function expressionContextForAttributeArg(name: IdentifierAst | undefined): ExpressionContext {
+  const argName = name?.name();
+  return argName === 'fields' || argName === 'references'
+    ? { bareIdentifierTokenType: 'property' }
+    : {};
 }
 
 function collectTypeReference(
@@ -634,26 +697,5 @@ function createPendingSemanticToken(
 }
 
 function tokenTypeIndex(tokenType: SemanticTokenType): number {
-  switch (tokenType) {
-    case 'keyword':
-      return 0;
-    case 'namespace':
-      return 1;
-    case 'class':
-      return 2;
-    case 'struct':
-      return 3;
-    case 'type':
-      return 4;
-    case 'property':
-      return 5;
-    case 'decorator':
-      return 6;
-    case 'string':
-      return 7;
-    case 'number':
-      return 8;
-    case 'comment':
-      return 9;
-  }
+  return semanticTokenTypes.indexOf(tokenType);
 }

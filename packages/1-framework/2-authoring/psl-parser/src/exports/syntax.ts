@@ -7,7 +7,13 @@ export {
   FieldAttributeAst,
   ModelAttributeAst,
 } from '../syntax/ast/attributes';
-export type { NamespaceMemberAst } from '../syntax/ast/declarations';
+export type {
+  AttributeAst,
+  BlockMemberAst,
+  DeclarationAst,
+  GenericBlockMemberAst,
+  NamespaceMemberAst,
+} from '../syntax/ast/declarations';
 export {
   CompositeTypeDeclarationAst,
   DocumentAst,

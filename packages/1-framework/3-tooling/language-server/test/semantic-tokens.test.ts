@@ -104,8 +104,12 @@ function pendingToken(
 function encodeWithBuilder(
   sourceFile: SourceFile,
   tokens: readonly PendingSemanticToken[],
+  range?: {
+    readonly start: { readonly line: number; readonly character: number };
+    readonly end: { readonly line: number; readonly character: number };
+  },
 ): { readonly data: readonly number[] } {
-  const builder = new SemanticTokensBuilder(sourceFile);
+  const builder = new SemanticTokensBuilder(sourceFile, range);
   for (const token of tokens) {
     builder.add(token);
   }
@@ -261,6 +265,59 @@ describe('semantic token substrate', () => {
     expect(details.filter((token) => token.text === '12.5')).toHaveLength(1);
   });
 
+  it('classifies relation field-list identifiers as properties', () => {
+    const source = parseSemanticTokenSource(
+      [
+        'model Post {',
+        '  authorId Int',
+        '  author User @relation(fields: [authorId], references: [id])',
+        '}',
+        '',
+        'model User {',
+        '  id Int @id',
+        '}',
+      ].join('\n'),
+    );
+
+    const details = collectDetails(source);
+
+    expect(
+      details.filter((token) => token.text === 'authorId' && token.tokenType === 'property'),
+    ).toHaveLength(2);
+    expect(
+      details.filter((token) => token.text === 'id' && token.tokenType === 'property'),
+    ).toHaveLength(2);
+    expect(
+      details.find((token) => token.text === 'authorId' && token.tokenType === 'type'),
+    ).toBeUndefined();
+    expect(
+      details.find((token) => token.text === 'id' && token.tokenType === 'type'),
+    ).toBeUndefined();
+  });
+
+  it('preserves source order when block attributes precede fields', () => {
+    const source = parseSemanticTokenSource(
+      ['model User {', '  @@map("users")', '  id Int @id', '}'].join('\n'),
+    );
+
+    const encoded = buildSemanticTokens(source);
+    const details = decodeSemanticTokens(source.sourceFile, encoded.data);
+
+    expect(details.map((token) => token.text)).toEqual([
+      'model',
+      'User',
+      '@@map',
+      '"users"',
+      'id',
+      'Int',
+      '@id',
+    ]);
+    for (let index = 0; index < encoded.data.length; index += 5) {
+      expect(encoded.data[index]).toBeGreaterThanOrEqual(0);
+      expect(encoded.data[index + 1]).toBeGreaterThanOrEqual(0);
+    }
+  });
+
   it('filters encoded tokens to an intersecting source range', () => {
     const source = parseSemanticTokenSource(
       ['model User {', '  id Int @id', '}', '', 'type Address {', '  street String', '}'].join(
@@ -305,6 +362,20 @@ describe('semantic token substrate', () => {
     expect(encodeWithBuilder(sourceFile, tokens)).toEqual({
       data: [0, 0, 2, 7, 0, 1, 0, 3, 7, 0, 1, 0, 2, 7, 0],
     });
+  });
+
+  it('filters split multiline text token segments to the requested range', () => {
+    const sourceFile = new SourceFile('aa\nbbb\ncc');
+    const tokens: readonly PendingSemanticToken[] = [
+      pendingToken(0, sourceFile.length, 'string', 0, true),
+    ];
+
+    expect(
+      encodeWithBuilder(sourceFile, tokens, {
+        start: { line: 1, character: 0 },
+        end: { line: 2, character: 0 },
+      }),
+    ).toEqual({ data: [1, 0, 3, 7, 0] });
   });
 
   it('does not split multiline structural token events before encoding', () => {
