@@ -59,11 +59,24 @@ type TestCodecTypes = {
   readonly 'mongo/double@1': { readonly output: number };
 };
 
-type TContract = MongoContractWithTypeMaps<TestContract, MongoTypeMaps<TestCodecTypes>>;
+type TestFieldOutputTypes = {
+  readonly __unbound__: {
+    readonly Order: {
+      readonly _id: string;
+      readonly status: string;
+      readonly amount: number;
+    };
+  };
+};
+
+type TContract = MongoContractWithTypeMaps<
+  TestContract,
+  MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes>
+>;
 
 type PlanRow<P extends MongoQueryPlan> = P extends MongoQueryPlan<infer R> ? R : never;
 
-type OrderRow = { _id: string; status: string; amount: number };
+type OrderRow = { readonly _id: string; readonly status: string; readonly amount: number };
 
 describe('runtime type safety', () => {
   it('execute() returns AsyncIterableResult<Row> where Row matches build() row type', () => {
