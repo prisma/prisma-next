@@ -26,7 +26,11 @@ import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
 import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
 import { PostgresRole } from '../src/core/postgres-role';
-import { PostgresSchema, postgresCreateNamespace } from '../src/core/postgres-schema';
+import {
+  isPostgresSchema,
+  PostgresSchema,
+  postgresCreateNamespace,
+} from '../src/core/postgres-schema';
 import postgresTargetDescriptor from '../src/exports/control';
 
 function makeValidContractJson() {
@@ -540,6 +544,40 @@ describe('role + policy round-trip', () => {
       withCheck: 'user_id = current_user_id()',
       permissive: false,
     });
+  });
+
+  it('non-empty unbound namespace hydrates as PostgresUnboundSchema and renders unqualified DDL', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = createSqlContract({
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {
+                Doc: {
+                  columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const contract = serializer.deserializeContract(input);
+    const json = serializer.serializeContract(contract);
+    const roundTripped = serializer.deserializeContract(JSON.parse(JSON.stringify(json)));
+
+    const ns = roundTripped.storage.namespaces[UNBOUND_NAMESPACE_ID]!;
+    expect(ns).toBeInstanceOf(PostgresSchema);
+    if (!isPostgresSchema(ns)) throw new Error('expected PostgresSchema');
+    expect(ns.quoteTable('Doc')).toBe('"Doc"');
+    expect(ns.quoteTable('Doc')).not.toContain('__unbound__');
   });
 
   it('rejects a malformed policy entry (missing permissive)', () => {

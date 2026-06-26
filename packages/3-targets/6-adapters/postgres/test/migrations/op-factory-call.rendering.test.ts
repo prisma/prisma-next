@@ -37,7 +37,11 @@ import {
   SetNotNullCall,
 } from '@prisma-next/target-postgres/op-factory-call';
 import { renderCallsToTypeScript } from '@prisma-next/target-postgres/render-typescript';
+import { PostgresSchema, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
+
+const publicNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
+const unboundNs = PostgresSchema.unbound;
 
 const META = { from: 'sha256:from', to: 'sha256:to' } as const;
 
@@ -113,7 +117,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   };
 
   it('CreateTableCall emits this.createTable({...}) with col() columns; omits constraints when absent', () => {
-    const withoutConstraints = new CreateTableCall('public', 'user', [
+    const withoutConstraints = new CreateTableCall(publicNs.tableRef('user'), [
       col('id', 'text', { notNull: true }),
     ]);
     expect(withoutConstraints.renderTypeScript()).toBe(
@@ -124,8 +128,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     ]);
 
     const withPk = new CreateTableCall(
-      'public',
-      'user',
+      publicNs.tableRef('user'),
       [col('id', 'text', { notNull: true })],
       [primaryKey(['id'])],
     );
@@ -139,14 +142,16 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   });
 
   it('CreateTableCall omits schema option when schema is __unbound__', () => {
-    const call = new CreateTableCall('__unbound__', 'item', [col('id', 'text', { notNull: true })]);
+    const call = new CreateTableCall(unboundNs.tableRef('item'), [
+      col('id', 'text', { notNull: true }),
+    ]);
     expect(call.renderTypeScript()).toBe(
       'this.createTable({ table: "item", columns: [col("id", "text", { notNull: true })] })',
     );
   });
 
   it('CreateTableCall includes lit() and fn() imports when columns have defaults', () => {
-    const call = new CreateTableCall('public', 'user', [
+    const call = new CreateTableCall(publicNs.tableRef('user'), [
       col('id', 'integer', { notNull: true, default: lit(0) }),
     ]);
     expect(call.importRequirements()).toEqual([
@@ -358,7 +363,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
 describe('renderCallsToTypeScript', () => {
   it('deduplicates + sorts imports across a mixed call list and keeps the base Migration import', () => {
     const calls = [
-      new CreateTableCall('public', 'user', [col('id', 'text', { notNull: true })]),
+      new CreateTableCall(publicNs.tableRef('user'), [col('id', 'text', { notNull: true })]),
       new DropTableCall('public', 'old_user'),
       new AddColumnCall('public', 'user', col('email', 'text')),
       new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
@@ -419,13 +424,12 @@ describe('renderCallsToTypeScript', () => {
 
   it('renders CreateTableCall as this.createTable({...}) with col() columns in the scaffold', () => {
     const calls = [
-      new CreateTableCall('public', 'bug', [
+      new CreateTableCall(publicNs.tableRef('bug'), [
         col('severity', 'text', { notNull: true }),
         col('stepsToRepro', 'text'),
       ]),
       new CreateTableCall(
-        'public',
-        'item',
+        publicNs.tableRef('item'),
         [col('tenant_id', 'uuid', { notNull: true }), col('id', 'uuid', { notNull: true })],
         [primaryKey(['tenant_id', 'id'])],
       ),

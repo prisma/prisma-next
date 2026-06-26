@@ -19,7 +19,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject, JsonValue } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
 import { policyEntityKind, roleEntityKind } from './entity-kinds';
-import { isPostgresSchema, PostgresSchema } from './postgres-schema';
+import { isPostgresSchema, PostgresSchema, PostgresUnboundSchema } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
   family: 'sql',
@@ -89,14 +89,18 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     }
     const valueSetSlot = entries['valueSet'];
     const hasValueSets = valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0;
-    return new PostgresSchema({
+    const schemaInput = {
       id,
       entries: {
         ...entries,
         table: entries['table'] ?? {},
         ...(hasValueSets ? { valueSet: valueSetSlot } : {}),
       },
-    });
+    };
+    if (id === UNBOUND_NAMESPACE_ID) {
+      return new PostgresUnboundSchema(schemaInput);
+    }
+    return new PostgresSchema(schemaInput);
   }
 
   override serializeContract(contract: Contract<SqlStorage>): JsonObject {

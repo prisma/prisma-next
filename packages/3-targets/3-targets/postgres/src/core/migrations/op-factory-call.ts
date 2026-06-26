@@ -40,6 +40,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { columnExistsAst, tableExistsAst } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
+import type { PostgresTableRef } from '../entity-ref';
 import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
@@ -198,42 +199,38 @@ function defaultImportSymbols(columns: readonly DdlColumn[]): string[] {
 export class CreateTableCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'createTable' as const;
   readonly operationClass = 'additive' as const;
-  readonly schemaName: string;
-  readonly tableName: string;
+  readonly ref: PostgresTableRef;
   readonly columns: readonly DdlColumn[];
   readonly constraints: readonly DdlTableConstraint[] | undefined;
   readonly label: string;
 
   constructor(
-    schemaName: string,
-    tableName: string,
+    ref: PostgresTableRef,
     columns: readonly DdlColumn[],
     constraints?: readonly DdlTableConstraint[],
   ) {
     super();
-    this.schemaName = schemaName;
-    this.tableName = tableName;
+    this.ref = ref;
     this.columns = Object.freeze([...columns]);
     this.constraints = constraints ? Object.freeze([...constraints]) : undefined;
-    this.label = `Create table "${tableName}"`;
+    this.label = `Create table "${ref.name}"`;
     this.freeze();
   }
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
-        `CreateTableCall.toOp: a DDL lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        `CreateTableCall.toOp: a DDL lowerer is required on the Postgres planner path (table "${this.ref.name}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
     const ddlNode = contractFreeDdl.createTable({
-      ...ifDefined('schema', boundSchema(this.schemaName)),
-      table: this.tableName,
+      ref: this.ref,
       columns: this.columns,
       ...ifDefined('constraints', this.constraints),
     });
     const statement = await lowerer.lowerToExecuteRequest(ddlNode);
-    const schemaName = this.schemaName;
-    const tableName = this.tableName;
+    const schemaName = this.ref.namespace.id;
+    const tableName = this.ref.name;
     const checks = tableExistsAst(schemaName, tableName);
     const absent = await lowerer.lowerToExecuteRequest(checks.tableAbsent());
     const present = await lowerer.lowerToExecuteRequest(checks.tablePresent());
@@ -262,10 +259,10 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
       : undefined;
 
     const opts: string[] = [];
-    if (this.schemaName !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.schemaName)}`);
+    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
+      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
     }
-    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`table: ${jsonToTsSource(this.ref.name)}`);
     opts.push(`columns: [${columnsList}]`);
     if (constraintsList) opts.push(`constraints: [${constraintsList}]`);
 

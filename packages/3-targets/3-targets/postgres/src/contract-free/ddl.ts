@@ -10,6 +10,7 @@ import {
   PostgresDropPolicy,
   type RlsPolicyOperation,
 } from '../core/ddl/nodes';
+import type { PostgresTableRef } from '../core/entity-ref';
 
 /**
  * Build a Postgres `CREATE TABLE` query node.
@@ -18,16 +19,12 @@ import {
  * unique constraints — use the {@link PrimaryKeyConstraint}, {@link ForeignKeyConstraint},
  * and {@link UniqueConstraint} classes from `@prisma-next/sql-relational-core/ast`.
  *
- * Precondition: identifiers (`table`, `schema`, column names/types) are
- * emitted to SQL verbatim — they are not quoted or escaped, so callers must
- * pass pre-trusted values (e.g. fixed control-plane identifiers). String-literal
- * default values, by contrast, are single-quote-escaped (embedded `'` doubled)
- * by the renderer. Identifier quoting for untrusted identifiers is added when
- * the migration planner adopts this lowering path.
+ * `ref.qualified()` produces the table identifier in SQL; identifiers are
+ * quoted via `quoteIdentifier` semantics. String-literal default values are
+ * single-quote-escaped by the renderer.
  */
 export function createTable(options: {
-  readonly table: string;
-  readonly schema?: string;
+  readonly ref: PostgresTableRef;
   readonly ifNotExists?: boolean;
   readonly columns: readonly DdlColumn[];
   readonly constraints?: readonly DdlTableConstraint[];

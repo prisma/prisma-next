@@ -3,9 +3,11 @@ import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control'
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { Migration as SqlMigration } from '@prisma-next/family-sql/migration';
 import type { ControlStack } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import { errorPostgresMigrationStackMissing } from '../errors';
+import { postgresCreateNamespace } from '../postgres-schema';
 import {
   AddCheckConstraintCall,
   AddColumnCall,
@@ -106,7 +108,7 @@ export abstract class PostgresMigration extends SqlMigration<
    * Throws if no adapter is present (i.e. migration instantiated without a stack).
    */
   protected createTable(options: {
-    readonly schema: string;
+    readonly schema?: string;
     readonly table: string;
     readonly ifNotExists?: boolean;
     readonly columns: readonly DdlColumn[];
@@ -115,9 +117,12 @@ export abstract class PostgresMigration extends SqlMigration<
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
+    const ns = postgresCreateNamespace({
+      id: options.schema ?? UNBOUND_NAMESPACE_ID,
+      entries: { table: {} },
+    });
     return new CreateTableCall(
-      options.schema,
-      options.table,
+      ns.tableRef(options.table),
       options.columns,
       options.constraints,
     ).toOp(this.controlAdapter);

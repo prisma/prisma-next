@@ -1,4 +1,10 @@
 export {
+  PostgresColumnRef,
+  PostgresEntityRef,
+  type PostgresEntityRefVisitor,
+  PostgresTableRef,
+} from '../core/entity-ref';
+export {
   PostgresRlsPolicy,
   type PostgresRlsPolicyInput,
   type RlsPolicyOperation,

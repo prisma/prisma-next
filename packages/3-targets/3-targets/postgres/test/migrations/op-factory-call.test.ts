@@ -17,6 +17,7 @@ import {
   DropCheckConstraintCall,
   DropConstraintCall,
 } from '../../src/core/migrations/op-factory-call';
+import { postgresCreateNamespace } from '../../src/exports/types';
 
 function recordingCheckLowerer(): { lowerer: ExecuteRequestLowerer; received: unknown[] } {
   const received: unknown[] = [];
@@ -33,10 +34,14 @@ function recordingCheckLowerer(): { lowerer: ExecuteRequestLowerer; received: un
   return { lowerer, received };
 }
 
+const publicNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
+
 describe('CreateTableCall', () => {
   it('lowers typed to_regclass checks into parameterized pre/postcheck steps', async () => {
     const { lowerer, received } = recordingCheckLowerer();
-    const call = new CreateTableCall('public', 'user', [col('id', 'integer', { notNull: true })]);
+    const call = new CreateTableCall(publicNs.tableRef('user'), [
+      col('id', 'integer', { notNull: true }),
+    ]);
     const op = await call.toOp(lowerer);
 
     expect(received.slice(1)).toEqual([
@@ -55,7 +60,7 @@ describe('CreateTableCall', () => {
   });
 
   it('toOp() throws when no lowerer is provided', async () => {
-    const call = new CreateTableCall('public', 'user', [col('id', 'integer')]);
+    const call = new CreateTableCall(publicNs.tableRef('user'), [col('id', 'integer')]);
     await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
   });
 });

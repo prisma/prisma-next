@@ -1634,9 +1634,7 @@ async function pgRenderCreateTable(
   codecLookup: CodecLookup,
 ): Promise<SqlExecuteRequest> {
   const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
-  const tableRef = node.schema
-    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`
-    : quoteIdentifier(node.table);
+  const tableRef = node.ref.qualified();
   const columnDefs = await Promise.all(
     node.columns.map((col) => pgRenderDdlColumn(col, codecLookup)),
   );

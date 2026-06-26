@@ -1,6 +1,7 @@
 import { col, lit } from '@prisma-next/sql-relational-core/contract-free';
 import { describe, expect, it } from 'vitest';
 import { createSchema, createTable } from '../../src/exports/contract-free';
+import { postgresCreateNamespace } from '../../src/exports/types';
 
 describe('postgres contract-free ddl', () => {
   it('createSchema returns a frozen create-schema node', () => {
@@ -12,15 +13,15 @@ describe('postgres contract-free ddl', () => {
   });
 
   it('createTable returns a frozen create-table node', () => {
+    const ns = postgresCreateNamespace({ id: 'prisma_contract', entries: { table: {} } });
     const node = createTable({
-      schema: 'prisma_contract',
-      table: 'marker',
+      ref: ns.tableRef('marker'),
       ifNotExists: true,
       columns: [col('space', 'text', { notNull: true, primaryKey: true, default: lit('app') })],
     });
     expect(node.kind).toBe('create-table');
-    expect(node.table).toBe('marker');
-    expect(node.schema).toBe('prisma_contract');
+    expect(node.ref.name).toBe('marker');
+    expect(node.ref.namespace.id).toBe('prisma_contract');
     expect(node.columns).toHaveLength(1);
     expect(Object.isFrozen(node)).toBe(true);
     expect(Object.isFrozen(node.columns)).toBe(true);

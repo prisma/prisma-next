@@ -39,6 +39,7 @@ import {
 } from '@prisma-next/target-postgres/op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from '@prisma-next/target-postgres/planner-produced-postgres-migration';
 import { renderOps } from '@prisma-next/target-postgres/render-ops';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
@@ -46,6 +47,7 @@ import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 const META = { from: 'sha256:from', to: 'sha256:to' } as const;
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+const publicNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
 
 describe('renderOps', () => {
   it('lowers each variant via its pure factory, pinning id/operationClass/target.details', async () => {
@@ -59,7 +61,7 @@ describe('renderOps', () => {
       postcheck: [],
     };
     const calls = [
-      new CreateTableCall('public', 'user', [col('id', 'text', { notNull: true })]),
+      new CreateTableCall(publicNs.tableRef('user'), [col('id', 'text', { notNull: true })]),
       new DropTableCall('public', 'stale'),
       new AddColumnCall('public', 'user', col('email', 'text')),
       new DropColumnCall('public', 'user', 'legacy'),

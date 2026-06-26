@@ -31,6 +31,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
+import { isPostgresSchema } from '../postgres-schema';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -253,7 +254,17 @@ function mapIssueToCall(
           ),
         );
       }
-      const schemaForTable = tableSchema(issue);
+      const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
+      if (!isPostgresSchema(namespaceNode)) {
+        return notOk(
+          issueConflict(
+            'unsupportedOperation',
+            `Namespace "${namespaceId}" is not a PostgresSchema`,
+          ),
+        );
+      }
+      const tableRef = namespaceNode.tableRef(issue.table);
+      const schemaForTable = namespaceNode.id;
       const ddlColumns: DdlColumn[] = Object.entries(contractTable.columns).map(([name, column]) =>
         toDdlColumn(name, column, codecHooks, storageTypes),
       );
@@ -265,7 +276,7 @@ function mapIssueToCall(
           ]
         : undefined;
       const calls: PostgresOpFactoryCall[] = [
-        new CreateTableCall(schemaForTable, issue.table, ddlColumns, ddlConstraints),
+        new CreateTableCall(tableRef, ddlColumns, ddlConstraints),
       ];
       for (const index of contractTable.indexes) {
         const indexName = index.name ?? `${issue.table}_${index.columns.join('_')}_idx`;
