@@ -12,13 +12,9 @@ export interface SchemaDiffIssue {
   readonly actual?: DiffableNode;
 }
 
-/** A node the differ can descend into. The root implements only this. */
-export interface DiffableRoot {
-  children(): readonly DiffableNode[];
-}
-
 /**
- * A node the generic differ also aligns and compares. Implemented by target IR nodes.
+ * A node in the schema tree. Every node in the tree — including the database root —
+ * implements this interface.
  *
  * `coord()` must be unique among sibling nodes aligned at the same level — the
  * differ keys on it and treats a collision as the same entity (now enforced by a
@@ -26,9 +22,10 @@ export interface DiffableRoot {
  * example, a column that is only unique within its table — must fold its parent's
  * identity into the coordinate.
  */
-export interface DiffableNode extends DiffableRoot {
+export interface DiffableNode {
   coord(): EntityCoordinate;
   isEqualTo(other: DiffableNode): boolean;
+  children(): readonly DiffableNode[];
 }
 
 /** Canonical string key for a coordinate — the differ keys its alignment maps on this. */
@@ -67,15 +64,33 @@ export function filterSchemaIssuesByOwnership(
 }
 
 /**
- * Walk two schema trees from their roots: pair children by coordinate, descend
- * into each matched pair, and record one issue per disagreement. The differ
- * reads only `coord()` / `isEqualTo()` / `children()`, so it names no node type.
+ * Compare two corresponding nodes and recurse into their children.
+ *
+ * Emits a `mismatch` if `expected.isEqualTo(actual)` is false, then descends
+ * into both nodes' children regardless. The differ reads only the three
+ * `DiffableNode` methods, so it names no node type.
  */
 export function diffSchemas(
-  expected: DiffableRoot,
-  actual: DiffableRoot,
+  expected: DiffableNode,
+  actual: DiffableNode,
 ): readonly SchemaDiffIssue[] {
-  return diffChildren(expected.children(), actual.children());
+  return diffPair(expected, actual);
+}
+
+function diffPair(expected: DiffableNode, actual: DiffableNode): readonly SchemaDiffIssue[] {
+  const issues: SchemaDiffIssue[] = [];
+  if (!expected.isEqualTo(actual)) {
+    const coordinate = expected.coord();
+    issues.push({
+      coordinate,
+      outcome: 'mismatch',
+      message: outcomeMessage('mismatch', coordinate),
+      expected,
+      actual,
+    });
+  }
+  issues.push(...diffChildren(expected.children(), actual.children()));
+  return issues;
 }
 
 /**
@@ -111,16 +126,7 @@ function diffChildren(
         expected: expectedNode,
       });
     } else {
-      if (!expectedNode.isEqualTo(actualNode)) {
-        issues.push({
-          coordinate,
-          outcome: 'mismatch',
-          message: outcomeMessage('mismatch', coordinate),
-          expected: expectedNode,
-          actual: actualNode,
-        });
-      }
-      issues.push(...diffChildren(expectedNode.children(), actualNode.children()));
+      issues.push(...diffPair(expectedNode, actualNode));
     }
   }
 

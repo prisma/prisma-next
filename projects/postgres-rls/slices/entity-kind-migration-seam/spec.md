@@ -14,34 +14,30 @@ Five change units, A–E. Each is independently committable and is the dispatch 
 
 ### Unit A — Framework: the tree-walking differ
 
-File: `packages/1-framework/1-core/framework-components/src/control/schema-diff.ts` (currently the flat `diffNodes`, lines 16–84). Re-export: `packages/1-framework/1-core/framework-components/src/exports/control.ts:105`.
+File: `packages/1-framework/1-core/framework-components/src/control/schema-diff.ts`. Re-export: `packages/1-framework/1-core/framework-components/src/exports/control.ts`.
 
-Replace the node interface and the differ. Exact target shapes:
+The differ takes two `DiffableNode`s — one on each side — compares them as a pair, then recurses into their children.
 
 ```ts
-/** A node the differ can descend into. The root implements only this. */
-export interface DiffableRoot {
+export interface DiffableNode {
+  coord(): EntityCoordinate;
+  isEqualTo(other: DiffableNode): boolean;
   children(): readonly DiffableNode[];
 }
 
-/** A node the differ also aligns and compares. Implemented by target IR nodes. */
-export interface DiffableNode extends DiffableRoot {
-  coord(): EntityCoordinate;
-  isEqualTo(other: DiffableNode): boolean;
-}
-
 export function diffSchemas(
-  expected: DiffableRoot,
-  actual: DiffableRoot,
+  expected: DiffableNode,
+  actual: DiffableNode,
 ): readonly SchemaDiffIssue[] {
-  return diffChildren(expected.children(), actual.children());
+  return diffPair(expected, actual);
 }
 ```
 
-- **`DiffableNode` keeps its name** — do NOT rename it (a CLI schema-view class already owns `DiffableNode` with ~33 call sites; that class is out of scope). Its method `identity()` is renamed to `coord()`, `children()` is added, and it now extends the new `DiffableRoot`. `SchemaDiffIssue.expected` / `.actual` stay typed `DiffableNode` (no retype). Keep `SchemaDiffOutcome`, `stableKey`, `outcomeMessage` exactly as they are.
-- `diffChildren` is the per-level core — the existing `diffNodes` body (lines 38–83) with three changes: it is named `diffChildren`, it calls `node.coord()` instead of `node.identity()`, and after the matched-pair `mismatch` check it appends `diffChildren(e.children(), a.children())` (recursion into the matched pair). `missing` and `extra` emit one issue at the node's coordinate and do **not** recurse (the whole subtree is missing/extra). Emission order is preserved: per level, expected-map iteration order (missing/mismatch, each immediately followed by its matched-pair recursion), then actual-map iteration order (extra).
-- For the current node set (all leaves — `children()` returns `[]`), `diffChildren` produces output **identical** to today's `diffNodes`: same issues, same order, same `coordinate`/`outcome`/`message`/`expected`/`actual` fields. This is the behavior-preservation contract.
-- `diffNodes` is removed; `diffSchemas` and the new `DiffableRoot` are exported from `exports/control.ts` (`DiffableNode` is already exported there).
+`diffPair(e, a)`: if `!e.isEqualTo(a)` → push a `mismatch` at `e.coord()`; then push `...diffChildren(e.children(), a.children())`. `diffSchemas(left, right)` = `diffPair(left, right)`.
+
+`diffChildren(expected, actual)` is the per-level aligner: align by `coord()`, emit `missing`/`extra` (no recursion into absent subtrees), for each matched pair call `diffPair(e, a)`. Emission order is preserved: expected-map iteration order (missing/mismatch + child recursion), then actual-map iteration order (extra).
+
+`DiffableRoot` is removed. `diffSchemas` is exported; `DiffableRoot` is no longer exported. `DiffableNode` stays exported.
 
 ### Unit B — Postgres leaf nodes: `coord()` + `children()`
 
@@ -53,12 +49,17 @@ Files: `packages/3-targets/3-targets/postgres/src/core/postgres-rls-policy.ts`, 
 - `isEqualTo(other: DiffableNode)` keeps its signature; in the error strings, `other.identity().entityKind` → `other.coord().entityKind`.
 - `isPostgresRlsPolicy(node: DiffableNode | undefined)` and `assertPostgresRlsPolicy(...)` keep their param type; bodies unchanged.
 
-### Unit C — `PostgresSchemaIR`: implement `DiffableRoot`
+### Unit C — `PostgresSchemaIR`: implement `DiffableNode`
 
 File: `packages/3-targets/3-targets/postgres/src/core/postgres-schema-ir.ts`.
 
-- Implement `DiffableRoot`: `children(): readonly DiffableNode[] { return this.rlsPolicies; }`. **Roles are not yielded in this slice** (see Scope) — `children()` returns policies only.
-- No other change. In particular, **do not** make the `annotations` bag injectable or otherwise touch it: nothing reads the contract-derived IR's annotations (the only reader of schema-IR `annotations` is the introspect→PSL path in `sql-schema-ir-to-psl-ast.ts`, which runs on the introspected IR), so project-from-contract lets the constructor build its default (unread) bag. The annotations bag is being retired in favour of typed fields (TML-2936); this slice does not extend it.
+Implement `DiffableNode` (not `DiffableRoot`):
+
+- `coord()` — returns `{ plane: 'storage', namespaceId: '', entityKind: 'database', entityName: this.pgSchemaName }`. This is the database root coordinate. It is never emitted as a diff issue because `isEqualTo` is always true.
+- `isEqualTo(_other)` — returns `true`. No database-level attributes to compare yet; two database roots are structurally identical at this level.
+- `children()` — returns `this.rlsPolicies`. **Roles are not yielded in this slice** (see Scope).
+
+No other change. In particular, do not touch the `annotations` bag: nothing reads the contract-derived IR's annotations (the only reader is the introspect→PSL path), so project-from-contract lets the constructor build its default (unread) bag. The bag is being retired in favour of typed fields (TML-2936).
 
 ### Unit D — project-from-contract
 
@@ -102,35 +103,32 @@ export function projectPostgresSchemaFromContract(
 
 Wire the hook: `packages/3-targets/3-targets/postgres/src/exports/control.ts:59` `contractToSchema` returns `projectPostgresSchemaFromContract(contract as …, { annotationNamespace: 'pg', …ifDefined('expandNativeType', expander), renderDefault: postgresRenderDefault })` — the same options object it passes today, now routed through the projection. Keep the existing contract-narrowing blind cast.
 
-### Unit E — diff call sites: project + scope, drop the command branches
+### Unit E — diff call sites: real IR nodes on both sides
 
-File: `packages/3-targets/3-targets/postgres/src/core/migrations/verify-postgres-rls-policies.ts`. Keep the exported name and signature `diffPostgresRlsPolicies({ contract, schema })`; replace the body. The differ walks the **full** actual tree; the owned-namespace decision is applied to the **outcomes**, not the inputs:
+File: `packages/3-targets/3-targets/postgres/src/core/migrations/diff-postgres-schema.ts`.
+
+Both sides are real `PostgresSchemaIR` nodes. The expected side is built from the contract via `contractToPostgresSchemaIR`; the actual side is the introspected `schema`. No fabricated `{ children: () => … }` objects.
 
 ```ts
-export function diffPostgresRlsPolicies(input: {
+export function diffPostgresSchema(input: {
   readonly contract: Contract<SqlStorage>;
   readonly schema: PostgresSchemaIR;
 }): readonly SchemaDiffIssue[] {
   const { contract, schema } = input;
-  const expected: DiffableRoot = { children: () => collectContractRlsPolicies(contract) };
-  const actual: DiffableRoot = { children: () => schema.rlsPolicies }; // full tree — no pre-filter
-  const issues = diffSchemas(expected, actual);
+  const expected = contractToPostgresSchemaIR(
+    blindCast<PostgresContract, 'diffPostgresSchema is only called with a postgres contract'>(contract),
+    { annotationNamespace: 'pg' },
+  );
+  const issues = diffSchemas(expected, schema);
 
-  // Manage / leave-alone (seed doc point 7), applied to outcomes: an `extra`
-  // policy in a namespace this contract does not own belongs to another
-  // contract space — leave it. This preserves the supabase multi-space
-  // behavior without filtering the tree before the differ. Slice 2 folds this
-  // into the unified control-policy disposition (`filterSchemaDiffIssues` /
-  // `partitionCallsByControlPolicy`) alongside managed/external grading.
   const owned = new Set(Object.keys(contract.storage.namespaces).map(resolveNamespaceId));
-  return issues.filter(
-    (issue) =>
-      issue.outcome !== 'extra' || owned.has(resolveNamespaceId(issue.coordinate.namespaceId)),
+  return filterSchemaIssuesByOwnership(issues, (namespaceId) =>
+    owned.has(resolveNamespaceId(namespaceId)),
   );
 }
 ```
 
-`resolveNamespaceId` and `POSTGRES_DEFAULT_NAMESPACE_ID` are unchanged. This is **behavior-identical** to today's pre-filter: an unowned actual policy can never share a coordinate with an owned expected policy (expected policies are all in the contract's namespaces), so it only ever surfaces as `extra`, and the post-diff filter removes exactly the set the pre-filter did. The contract is read only for its policy nodes and its owned-namespace keys; the differ (`diffSchemas`) receives two full roots and never sees the contract.
+`collectContractRlsPolicies` is no longer imported here — it is consumed internally by `contractToPostgresSchemaIR`. It remains exported from `collect-contract-postgres-nodes.ts`.
 
 File: `packages/3-targets/3-targets/postgres/src/core/migrations/planner.ts`.
 - Delete the `migration plan` fail-loud block (lines 216–233) entirely.
@@ -154,14 +152,15 @@ One outcome: a Postgres contract is diffed for RLS the same way on every command
 
 ## Files touched (complete list)
 
-1. `…/framework-components/src/control/schema-diff.ts` — Unit A.
-2. `…/framework-components/src/exports/control.ts` — export `diffSchemas` + `DiffableRoot`, drop `diffNodes` (`DiffableNode` stays exported).
+1. `…/framework-components/src/control/schema-diff.ts` — Unit A (drop `DiffableRoot`, add `diffPair`, `diffSchemas` takes two `DiffableNode`s).
+2. `…/framework-components/src/exports/control.ts` — drop `DiffableRoot` export; `DiffableNode` + `diffSchemas` stay exported.
 3. `…/postgres/src/core/postgres-rls-policy.ts`, `…/postgres-role.ts` — Unit B.
-4. `…/postgres/src/core/postgres-schema-ir.ts` — Unit C.
-5. `…/postgres/src/core/migrations/project-postgres-schema-from-contract.ts` — Unit D (new).
+4. `…/postgres/src/core/postgres-schema-ir.ts` — Unit C (`DiffableNode` with `coord()`, `isEqualTo()`, `children()`).
+5. `…/postgres/src/core/migrations/project-postgres-schema-from-contract.ts` — Unit D (new, `contractToPostgresSchemaIR`).
 6. `…/postgres/src/exports/control.ts` — Unit D (wire `contractToSchema`).
-7. `…/postgres/src/core/migrations/verify-postgres-rls-policies.ts`, `…/migrations/planner.ts` — Unit E.
-8. Tests: `…/framework-components/test/schema-diff.test.ts`, `…/framework-components/test/rls-layer-invariant.test.ts`, `…/postgres/test/migrations/verify-postgres-rls-policies.test.ts`, plus the new `migration plan` e2e (AC-6).
+7. `…/postgres/src/core/migrations/diff-postgres-schema.ts` — Unit E (real IR nodes on both sides via `contractToPostgresSchemaIR`).
+8. `…/migrations/planner.ts` — Unit E (drop command branches).
+9. Tests: `…/framework-components/test/schema-diff.test.ts`, `…/framework-components/test/rls-layer-invariant.test.ts`, `…/postgres/test/migrations/diff-postgres-schema.test.ts`, plus the new `migration plan` e2e (AC-6).
 
 ## Pre-investigated edge cases
 
@@ -177,8 +176,9 @@ One outcome: a Postgres contract is diffed for RLS the same way on every command
 
 Each AC names the file(s) that prove it. "Unchanged" ACs are proven by existing tests passing without edit (beyond the mechanical `diffNodes`→`diffSchemas` test-helper rename in AC-1).
 
-- **AC-1 (differ behavior preserved).** `schema-diff.test.ts`, rewritten to call `diffSchemas(rootOf(expected), rootOf(actual))` where `rootOf = (xs) => ({ children: () => xs })`, asserts the same issues (coordinate, outcome, message, expected, actual) and the same order as before for every existing flat case.
-- **AC-2 (recursion).** A new `schema-diff.test.ts` case builds a synthetic two-level fixture: a parent node present on both sides whose `coord()` matches and `isEqualTo` is true, but whose `children()` differ on one child. `diffSchemas` reports exactly one issue, at the **child's** coordinate. (Proves the walk descends matched pairs.)
+- **AC-1 (differ behavior preserved).** `schema-diff.test.ts` calls `diffSchemas(rootOf(expected), rootOf(actual))` where `rootOf(nodes)` returns a `DiffableNode` with `isEqualTo → true` and `children() → nodes`. All existing flat cases assert the same issues (coordinate, outcome, message, expected, actual) in the same order.
+- **AC-2 (recursion).** A `schema-diff.test.ts` case builds a two-level fixture: a parent on both sides whose `coord()` matches and `isEqualTo` is true, but whose children differ on one child. `diffSchemas` reports exactly one issue at the child's coordinate. (Proves the walk descends matched pairs.)
+- **AC-2b (pair comparison).** A `schema-diff.test.ts` case passes two `DiffableNode`s directly to `diffSchemas` where `isEqualTo` is false AND their children differ (one child only on one side). `diffSchemas` yields BOTH a `mismatch` at the node's coordinate AND the child-level `missing`/`extra`. (Proves the differ compares the given nodes, not just their children.)
 - **AC-3 (RLS diff unchanged).** `verify-postgres-rls-policies.test.ts` passes unedited — same `diffPostgresRlsPolicies({ contract, schema })` calls, same expected issues, including the owned-namespace scoping case (the test at line 311, `contractOwningAuth`).
 - **AC-4 (project-from-contract).** A new unit test on `projectPostgresSchemaFromContract`: a contract with one SELECT policy yields a `PostgresSchemaIR` whose `rlsPolicies` contains that policy and whose `tables` match `contractToSchemaIR`, and for which `isPostgresSchemaIR` returns true. (No assertion on `annotations` — it is unread on the contract-derived side.)
 - **AC-5 (db paths unchanged).** The slice-1 lifecycle + drift e2e (`db init`/`db update`/`db verify` against PGlite) pass unedited.

@@ -8,7 +8,7 @@ Related: [design — generic schema differ](design-generic-schema-differ.md), [A
 
 A schema diff is computed between two schema IRs of the same shape — an *expected* IR and an *actual* IR. Both are produced by **derivation**: the expected IR from a contract, the actual IR by introspecting a live database. The differ compares the two IRs and reads nothing else — no contract, no database catalog — so it does not depend on which source produced either side.
 
-The differ **walks the two IRs as a tree.** From the roots down, it pairs up children, descends into each matched pair, and records a difference wherever the two sides disagree. Every node it visits answers three methods:
+The differ **walks the two IRs as a tree.** It is given two corresponding nodes — at the top, the two database roots — compares them, and descends into their children, recording a difference wherever the two sides disagree. Because it takes a single node on each side (not a list), it diffs any two corresponding subtrees alike: two databases, or — below them — two tables. Every node answers three methods:
 
 ```ts
 interface DiffableNode {
@@ -18,7 +18,7 @@ interface DiffableNode {
 }
 ```
 
-It pairs the children of a matched node by `coord()`, recurses, and emits one issue per disagreement:
+It emits a `mismatch` when a matched pair is not `isEqualTo`, pairs their children by `coord()`, recurses into each matched child, and emits one issue per disagreement:
 
 ```ts
 const issues: readonly SchemaDiffIssue[] = diffSchemas(expected, actual);
@@ -26,6 +26,8 @@ const issues: readonly SchemaDiffIssue[] = diffSchemas(expected, actual);
 ```
 
 `coord()` must be unique among the sibling nodes aligned at a level: the differ keys on it and treats a collision as the same entity (now enforced by a duplicate-key throw). A node kind whose natural key is unique only within its parent — a column, unique only within its table — must fold its parent into the coordinate.
+
+The top node of each IR is the **database** — a real node in the topology, since you connect to and migrate one database, not a synthetic wrapper fabricated to satisfy the differ. Its `coord()` is the database; its `isEqualTo` is trivially true until there are database-level attributes worth diffing; its `children()` are the database's entities. (Roles are cluster-scoped — above any one database — so when they enter the diff they will attach to a cluster node above the database root, or to the database root pragmatically; that is settled when roles are diffed, not here.)
 
 - **missing** — in expected, not in actual.
 - **extra** — in actual, not in expected.

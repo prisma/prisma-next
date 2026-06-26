@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import type { DiffableNode, DiffableRoot, SchemaDiffIssue } from '../src/control/schema-diff';
+import type { DiffableNode, SchemaDiffIssue } from '../src/control/schema-diff';
 import { diffSchemas } from '../src/control/schema-diff';
 import type { EntityCoordinate } from '../src/ir/storage';
 
-function rootOf(nodes: readonly DiffableNode[]): DiffableRoot {
-  return { children: () => nodes };
+/** A synthetic root node whose `isEqualTo` is always true — used to wrap flat node lists. */
+function rootOf(nodes: readonly DiffableNode[]): DiffableNode {
+  return {
+    coord(): EntityCoordinate {
+      return { plane: 'storage', namespaceId: '', entityKind: 'database', entityName: 'root' };
+    },
+    isEqualTo(): boolean {
+      return true;
+    },
+    children(): readonly DiffableNode[] {
+      return nodes;
+    },
+  };
 }
 
 function makeNode(
@@ -206,5 +217,25 @@ describe('diffSchemas', () => {
         entityName: 'only_in_expected',
       },
     });
+  });
+
+  it('emits mismatch at node coord AND child-level issues when diffing two nodes directly', () => {
+    // Proves diffSchemas compares the given nodes themselves, not just their children.
+    // tableA and tableB share the same coordinate but isEqualTo is false (different body).
+    // Their children also differ (one column only on tableA).
+    const onlyInA = makeNode('public', 'column', 'only_in_a', 'col');
+    const shared = makeNode('public', 'column', 'shared_col', 'same');
+
+    const tableA = makeNode('public', 'table', 'users', 'body-v1', [shared, onlyInA]);
+    const tableB = makeNode('public', 'table', 'users', 'body-v2', [
+      makeNode('public', 'column', 'shared_col', 'same'),
+    ]);
+
+    const issues = diffSchemas(tableA, tableB);
+
+    expect(issues).toHaveLength(2);
+    const byName = Object.fromEntries(issues.map((i) => [i.coordinate.entityName, i.outcome]));
+    expect(byName['users']).toBe('mismatch');
+    expect(byName['only_in_a']).toBe('missing');
   });
 });

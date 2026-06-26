@@ -103,7 +103,6 @@ export {
 } from '../control/control-stack';
 export type {
   DiffableNode,
-  DiffableRoot,
   SchemaDiffIssue,
   SchemaDiffOutcome,
 } from '../control/schema-diff';

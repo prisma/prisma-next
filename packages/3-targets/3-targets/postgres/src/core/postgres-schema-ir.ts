@@ -1,4 +1,5 @@
-import type { DiffableNode, DiffableRoot } from '@prisma-next/framework-components/control';
+import type { DiffableNode } from '@prisma-next/framework-components/control';
+import type { EntityCoordinate } from '@prisma-next/framework-components/ir';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import {
   type SqlAnnotations,
@@ -41,7 +42,7 @@ export interface PostgresSchemaIRInput {
  *
  * Nothing RLS-specific leaks into the sql-family layer.
  */
-export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableRoot {
+export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
   readonly nodeTarget: SqlSchemaTarget = 'postgres';
   readonly tables: Readonly<Record<string, SqlTableIR>>;
   declare readonly annotations?: SqlAnnotations;
@@ -84,6 +85,21 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableRoot {
       },
     };
     freezeNode(this);
+  }
+
+  coord(): EntityCoordinate {
+    return {
+      plane: 'storage',
+      namespaceId: '',
+      entityKind: 'database',
+      entityName: this.pgSchemaName,
+    };
+  }
+
+  // No database-level attributes to compare yet; two database roots from the
+  // same derivation are structurally identical at this level.
+  isEqualTo(_other: DiffableNode): boolean {
+    return true;
   }
 
   children(): readonly DiffableNode[] {
