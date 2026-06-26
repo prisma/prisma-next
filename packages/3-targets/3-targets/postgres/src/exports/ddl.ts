@@ -3,6 +3,7 @@ export {
   type AlterTableActionVisitor,
   type AnyAlterTableAction,
   type AnyPostgresDdlNode,
+  DropDefaultAction,
   PostgresAlterTable,
   PostgresCreatePolicy,
   PostgresCreateSchema,

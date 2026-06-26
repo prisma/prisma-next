@@ -1,15 +1,18 @@
 import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { FunctionColumnDefault } from '@prisma-next/sql-relational-core/ast';
+import { col } from '@prisma-next/sql-relational-core/contract-free';
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   columnDefaultAst,
   columnExistsAst,
   columnNullabilityAst,
 } from '../../contract-free/checks';
-import { quoteIdentifier } from '../sql-utils';
+import * as contractFreeDdl from '../../contract-free/ddl';
+import { boundSchema } from './bound-schema';
 import { step } from './operations/shared';
-import { buildAddColumnSql } from './planner-ddl-builders';
-import { qualifyTableName } from './planner-sql-checks';
+import { buildColumnTypeSql } from './planner-ddl-builders';
 import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
 
 export function buildAddColumnOperationIdentity(
@@ -51,7 +54,29 @@ export async function buildAddNotNullColumnWithTemporaryDefaultOperation(options
     temporaryDefault,
     lowerer,
   } = options;
-  const qualified = qualifyTableName(schema, tableName);
+
+  // The recipe handles NOT NULL columns that carry no contract default, so the
+  // temporary backfill value is the only default. It is a pre-rendered SQL
+  // fragment (e.g. `''`, `0`, `'{}'::jsonb`), carried verbatim as a
+  // `FunctionColumnDefault` so the adapter emits it as a `DEFAULT (...)` clause.
+  const ddlColumn = col(columnName, buildColumnTypeSql(column, codecHooks, storageTypes), {
+    notNull: true,
+    default: new FunctionColumnDefault(temporaryDefault),
+  });
+  const addColumn = await lowerer.lowerToExecuteRequest(
+    contractFreeDdl.alterTable({
+      ...ifDefined('schema', boundSchema(schema)),
+      table: tableName,
+      actions: [contractFreeDdl.addColumnAction(ddlColumn)],
+    }),
+  );
+  const dropTempDefault = await lowerer.lowerToExecuteRequest(
+    contractFreeDdl.alterTable({
+      ...ifDefined('schema', boundSchema(schema)),
+      table: tableName,
+      actions: [contractFreeDdl.dropDefaultAction(columnName)],
+    }),
+  );
 
   const absent = await lowerer.lowerToExecuteRequest(
     columnExistsAst({ schema, table: tableName, column: columnName }).columnAbsent(),
@@ -73,18 +98,11 @@ export async function buildAddNotNullColumnWithTemporaryDefaultOperation(options
     execute: [
       {
         description: `add column "${columnName}"`,
-        sql: buildAddColumnSql(
-          qualified,
-          columnName,
-          column,
-          codecHooks,
-          temporaryDefault,
-          storageTypes,
-        ),
+        sql: addColumn.sql,
       },
       {
         description: `drop temporary default from column "${columnName}"`,
-        sql: `ALTER TABLE ${qualified} ALTER COLUMN ${quoteIdentifier(columnName)} DROP DEFAULT`,
+        sql: dropTempDefault.sql,
       },
     ],
     postcheck: [

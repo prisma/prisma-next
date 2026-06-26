@@ -330,6 +330,10 @@ describe('Postgres adapter', () => {
     expect(typeof adapter.profile.readMarker).toBe('function');
   });
 
+  it('postgres adapter reports sql.scalarList capability', () => {
+    expect(adapter.profile.capabilities['sql']).toMatchObject({ scalarList: true });
+  });
+
   it('readMarker returns no-table when the information_schema probe yields no rows', async () => {
     const calls: Array<{ sql: string; params: readonly unknown[] | undefined }> = [];
     const queryable: SqlQueryable = {

@@ -1,29 +1,9 @@
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { quoteIdentifier } from '../../sql-utils';
 import type { OperationClass, PostgresPlanTargetDetails } from '../planner-target-details';
 
 export type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
-
-/**
- * Literal-args shape for a column definition consumed by `addColumn` and
- * similar operations. Fully materialized: codec expansion and default
- * rendering have already happened in the wrapper.
- *
- * - `typeSql` is the column's DDL type string (e.g. `"integer"`, `"SERIAL"`,
- *   `"varchar(100)"`), already produced by `buildColumnTypeSql` in the
- *   call-factory wrapper.
- * - `defaultSql` is the full `DEFAULT …` clause (e.g. `"DEFAULT 42"`) or an
- *   empty string when the column has no default, matching
- *   `buildColumnDefaultSql`'s output.
- */
-export interface ColumnSpec {
-  readonly name: string;
-  readonly typeSql: string;
-  readonly defaultSql: string;
-  readonly nullable: boolean;
-}
 
 /**
  * Literal-args shape for a foreign key definition. `references.schema`
@@ -56,14 +36,4 @@ export function targetDetails(
     id: 'postgres',
     details: { schema, objectType, name, ...ifDefined('table', table) },
   };
-}
-
-export function renderColumnDefinition(column: ColumnSpec): string {
-  const parts = [
-    quoteIdentifier(column.name),
-    column.typeSql,
-    column.defaultSql,
-    column.nullable ? '' : 'NOT NULL',
-  ].filter(Boolean);
-  return parts.join(' ');
 }

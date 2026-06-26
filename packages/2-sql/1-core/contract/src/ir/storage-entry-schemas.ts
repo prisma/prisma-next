@@ -39,6 +39,7 @@ const StorageColumnSchema = type({
   nativeType: 'string',
   codecId: 'string',
   nullable: 'boolean',
+  'many?': 'boolean',
   'typeParams?': 'Record<string, unknown>',
   'typeRef?': 'string',
   'default?': ColumnDefaultSchema,

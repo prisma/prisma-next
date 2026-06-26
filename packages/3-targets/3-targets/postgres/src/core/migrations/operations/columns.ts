@@ -1,4 +1,6 @@
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
+import type { DdlColumn } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   columnDefaultAst,
   columnExistsAst,
@@ -7,7 +9,9 @@ import {
   noNullValuesAst,
   tableIsEmptyAst,
 } from '../../../contract-free/checks';
+import * as contractFreeDdl from '../../../contract-free/ddl';
 import { quoteIdentifier } from '../../sql-utils';
+import { boundSchema } from '../bound-schema';
 import { qualifyTableName } from '../planner-sql-checks';
 import { type Op, step, targetDetails } from './shared';
 
@@ -242,12 +246,18 @@ export async function dropDefault(
   columnName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
   const { present } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
     column: columnName,
   });
+  const dropDefaultExec = await lowerer.lowerToExecuteRequest(
+    contractFreeDdl.alterTable({
+      ...ifDefined('schema', boundSchema(schemaName)),
+      table: tableName,
+      actions: [contractFreeDdl.dropDefaultAction(columnName)],
+    }),
+  );
   const noDefault = await lowerer.lowerToExecuteRequest(
     columnDefaultAst({ schema: schemaName, table: tableName, column: columnName }).defaultAbsent(),
   );
@@ -257,12 +267,7 @@ export async function dropDefault(
     operationClass: 'destructive',
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
-    execute: [
-      step(
-        `drop default on "${columnName}"`,
-        `ALTER TABLE ${qualified} ALTER COLUMN ${quoteIdentifier(columnName)} DROP DEFAULT`,
-      ),
-    ],
+    execute: [step(`drop default on "${columnName}"`, dropDefaultExec.sql)],
     postcheck: [
       step(`verify column "${columnName}" has no default`, noDefault.sql, noDefault.params),
     ],
@@ -272,16 +277,23 @@ export async function dropDefault(
 /**
  * Builds the op for adding a NOT NULL column (no contract default) to a
  * non-empty table. Prechecks assert the column is absent and the table is
- * empty; the execute step is the raw ADD COLUMN SQL passed by the caller
- * (slice-7 deferred); postchecks assert the column exists and is NOT NULL.
+ * empty; the execute step lowers the typed `AddColumn` DDL node through the
+ * adapter; postchecks assert the column exists and is NOT NULL.
  */
 export async function addNotNullColumnDirect(
   schemaName: string,
   tableName: string,
-  columnName: string,
-  executeStepSql: string,
+  column: DdlColumn,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
+  const columnName = column.name;
+  const addColumn = await lowerer.lowerToExecuteRequest(
+    contractFreeDdl.alterTable({
+      ...ifDefined('schema', boundSchema(schemaName)),
+      table: tableName,
+      actions: [contractFreeDdl.addColumnAction(column)],
+    }),
+  );
   const absent = await lowerer.lowerToExecuteRequest(
     columnExistsAst({ schema: schemaName, table: tableName, column: columnName }).columnAbsent(),
   );
@@ -311,7 +323,7 @@ export async function addNotNullColumnDirect(
         tableEmpty.params,
       ),
     ],
-    execute: [step(`add column "${columnName}"`, executeStepSql)],
+    execute: [step(`add column "${columnName}"`, addColumn.sql)],
     postcheck: [
       step(`verify column "${columnName}" exists`, present.sql, present.params),
       step(`verify column "${columnName}" is NOT NULL`, notNullable.sql, notNullable.params),

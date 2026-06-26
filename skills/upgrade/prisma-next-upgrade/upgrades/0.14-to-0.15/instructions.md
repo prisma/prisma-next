@@ -49,3 +49,24 @@ byte-identical; `FieldOutputTypes` is byte-identical to main. The examples/ diff
 purely `.d.ts` regeneration (the new `StorageColumnTypes` block added; observable
 types unchanged). No consumer action required. Incidental substrate diff only.
 -->
+
+# Upgrade 0.14 → 0.15
+
+No consumer-facing action is required for this transition.
+
+The diff under `examples/` (and the example migration snapshots) is incidental —
+emitted contract artefacts (`contract.json` / `contract.d.ts`) were regenerated
+for two internal substrate changes:
+
+- **Scalar-list storage machinery.** The emitted contracts now carry the
+  adapter-reported `scalarList` capability marker and the bumped envelope
+  version. The scalar-list machinery threaded through this release is internal —
+  no authoring path emits a list storage column yet, so generated types and
+  runtime behaviour for existing schemas are unchanged.
+- **Namespace-scoped execution-default refs (M:N).** The contract's
+  `ExecutionMutationDefault.ref` now carries a `namespace` alongside `table` and
+  `column`, so an execution-time mutation default is keyed by
+  `(namespace, table, column)`, disambiguating same-named tables across
+  namespaces. The runtime applies defaults by namespace transparently.
+
+No user action — a re-emit picks up the new contract shape.

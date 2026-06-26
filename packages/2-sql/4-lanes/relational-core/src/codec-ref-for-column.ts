@@ -2,6 +2,7 @@ import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecRef } from '@prisma-next/framework-components/codec';
 import { resolveStorageTable } from '@prisma-next/sql-contract/resolve-storage-table';
 import { isStorageTypeInstance, type SqlStorage } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 
 /**
  * Derive the canonical {@link CodecRef} for a `(table, column)` pair against a {@link SqlStorage}. This is the build-time path every column-bound `ParamRef` / `ProjectionItem` uses to stamp its `codec` slot before the AST is handed to the runtime — the runtime resolver then materialises a memoised {@link import('@prisma-next/sql-relational-core/ast').Codec} for the same `CodecRef` via `forCodecRef`.
@@ -42,7 +43,15 @@ export function codecRefForStorageColumn(
     return undefined;
   }
   if (columnDef.typeParams !== undefined && Object.keys(columnDef.typeParams).length > 0) {
-    return { codecId: columnDef.codecId, typeParams: columnDef.typeParams as JsonValue };
+    const typeParams = blindCast<
+      JsonValue,
+      'column typeParams is a validated contract record; its values are JSON-serialisable'
+    >(columnDef.typeParams);
+    return columnDef.many
+      ? { codecId: columnDef.codecId, typeParams, many: true }
+      : { codecId: columnDef.codecId, typeParams };
   }
-  return { codecId: columnDef.codecId };
+  return columnDef.many
+    ? { codecId: columnDef.codecId, many: true }
+    : { codecId: columnDef.codecId };
 }

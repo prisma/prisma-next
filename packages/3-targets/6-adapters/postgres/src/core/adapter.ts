@@ -30,6 +30,7 @@ const defaultCapabilities = Object.freeze({
     returning: true,
     defaultInInsert: true,
     lateral: true,
+    scalarList: true,
   },
 });
 

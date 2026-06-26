@@ -49,6 +49,7 @@ import {
 import type {
   AddColumnAction,
   AlterTableActionVisitor,
+  DropDefaultAction,
   PostgresAlterTable,
   PostgresCreatePolicy,
   PostgresCreateSchema,
@@ -954,11 +955,22 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           nativeType = colRow.udt_name || colRow.data_type;
         }
 
+        // Postgres reports array columns as data_type='ARRAY'; the element type
+        // is the `nativeType` string minus the trailing `[]`. Strip the suffix,
+        // normalize the element type to the canonical form (e.g. `integer` →
+        // `int4`), and record `many: true` so introspection consumers (verifier,
+        // psl-contract-infer) can reconstruct the full array type as needed.
+        const many = nativeType.endsWith('[]') ? true : undefined;
+        if (many) {
+          nativeType = normalizeSchemaNativeType(nativeType.slice(0, -2));
+        }
+
         columns[colRow.column_name] = {
           name: colRow.column_name,
           nativeType,
           nullable: colRow.is_nullable === 'YES',
           ...ifDefined('default', colRow.column_default ?? undefined),
+          ...ifDefined('many', many),
         };
       }
 
@@ -1248,6 +1260,9 @@ function extractContractNamespaceIds(contract: unknown): readonly string[] {
 }
 
 function normalizeFormattedType(formattedType: string, dataType: string, udtName: string): string {
+  if (formattedType.endsWith('[]')) {
+    return `${normalizeFormattedType(formattedType.slice(0, -2), dataType, udtName)}[]`;
+  }
   if (formattedType === 'integer') {
     return 'int4';
   }
@@ -1491,6 +1506,18 @@ function pgIsTextLikeNativeType(nativeType: string): boolean {
   );
 }
 
+function pgRenderArrayElement(el: unknown): string {
+  if (el === null) return 'NULL';
+  if (typeof el === 'number' || typeof el === 'boolean') return String(el);
+  if (typeof el === 'string') return `'${escapeLiteral(el)}'`;
+  return `'${escapeLiteral(JSON.stringify(el))}'`;
+}
+
+function pgRenderArrayLiteral(elements: unknown[]): string {
+  if (elements.length === 0) return "'{}'";
+  return `ARRAY[${elements.map(pgRenderArrayElement).join(', ')}]`;
+}
+
 function pgInlineLiteral(wire: unknown, nativeType: string): string {
   if (wire === null) return 'NULL';
   if (typeof wire === 'boolean') return wire ? 'true' : 'false';
@@ -1521,6 +1548,9 @@ function pgInlineLiteral(wire: unknown, nativeType: string): string {
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
     return `'\\x${hex}'::${nativeType}`;
+  }
+  if (Array.isArray(wire) && nativeType.endsWith('[]')) {
+    return pgRenderArrayLiteral(wire);
   }
   if (typeof wire === 'object') {
     const quoted = `'${escapeLiteral(JSON.stringify(wire))}'`;
@@ -1638,6 +1668,9 @@ async function pgRenderAlterTable(
     async addColumn(action: AddColumnAction): Promise<string> {
       const colFragment = await pgRenderDdlColumn(action.column, codecLookup);
       return `ADD COLUMN ${colFragment}`;
+    },
+    dropDefault(action: DropDefaultAction): Promise<string> {
+      return Promise.resolve(`ALTER COLUMN ${quoteIdentifier(action.columnName)} DROP DEFAULT`);
     },
   };
   const actionSqls = await Promise.all(node.actions.map((a) => a.accept(actionVisitor)));

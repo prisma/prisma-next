@@ -79,6 +79,10 @@ const contract = new SqlContractSerializer().deserializeContract({
 describe('SQLite adapter', () => {
   const adapter = createSqliteAdapter();
 
+  it('SQLite adapter does not report sql.scalarList capability', () => {
+    expect(adapter.profile.capabilities['sql']).not.toMatchObject({ scalarList: true });
+  });
+
   describe('SELECT', () => {
     it('renders simple select', () => {
       const ast = SelectAst.from(TableSource.named('user')).withProjection([

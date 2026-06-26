@@ -1,10 +1,16 @@
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { col } from '@prisma-next/sql-relational-core/contract-free';
 import { describe, expect, it } from 'vitest';
-import { constraintExistsAst, tableExistsAst } from '../../src/contract-free/checks';
+import {
+  columnExistsAst,
+  constraintExistsAst,
+  tableExistsAst,
+} from '../../src/contract-free/checks';
 import {
   AddCheckConstraintCall,
   AddForeignKeyCall,
+  AddNotNullColumnDirectCall,
+  AddNotNullColumnWithTempDefaultCall,
   AddPrimaryKeyCall,
   AddUniqueCall,
   CreateTableCall,
@@ -205,5 +211,81 @@ describe('DropConstraintCall', () => {
     ).toBe(
       'this.dropConstraint({ schema: "public", table: "user", constraint: "user_org_fk", kind: "foreignKey" })',
     );
+  });
+});
+
+function isAlterTableNode(value: unknown): value is { kind: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { kind?: unknown }).kind === 'alter-table'
+  );
+}
+
+describe('AddNotNullColumnDirectCall', () => {
+  it('lowers a typed AlterTable DDL node for the ADD COLUMN execute step', async () => {
+    const { lowerer, received } = recordingCheckLowerer();
+    const column = col('name', 'text', { notNull: true });
+    const call = new AddNotNullColumnDirectCall('public', 'user', 'name', column);
+    const op = await call.toOp(lowerer);
+
+    expect(isAlterTableNode(received[0])).toBe(true);
+    const colChecks = columnExistsAst({ schema: 'public', table: 'user', column: 'name' });
+    expect(received).toContainEqual(colChecks.columnAbsent());
+    expect(received).toContainEqual(colChecks.columnPresent());
+
+    expect(op.execute).toEqual([{ description: 'add column "name"', sql: 'LOWERED 1' }]);
+    expect(op.precheck).toHaveLength(2);
+    expect(op.postcheck).toHaveLength(2);
+  });
+
+  it('toOp() throws when no lowerer is provided', async () => {
+    const call = new AddNotNullColumnDirectCall(
+      'public',
+      'user',
+      'name',
+      col('name', 'text', { notNull: true }),
+    );
+    await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
+  });
+});
+
+describe('AddNotNullColumnWithTempDefaultCall', () => {
+  it('lowers a typed AlterTable DDL node for the ADD COLUMN execute step', async () => {
+    const { lowerer, received } = recordingCheckLowerer();
+    const storageColumn = { nativeType: 'text', codecId: 'pg/text@1', nullable: false } as const;
+    const call = new AddNotNullColumnWithTempDefaultCall({
+      schemaName: 'public',
+      tableName: 'user',
+      columnName: 'name',
+      column: storageColumn,
+      codecHooks: new Map(),
+      storageTypes: {},
+      temporaryDefault: "''",
+    });
+    const op = await call.toOp(lowerer);
+
+    expect(isAlterTableNode(received[0])).toBe(true);
+    const colChecks = columnExistsAst({ schema: 'public', table: 'user', column: 'name' });
+    expect(received).toContainEqual(colChecks.columnAbsent());
+
+    expect(op.execute).toHaveLength(2);
+    expect(op.execute[0]?.description).toBe('add column "name"');
+    expect(op.execute[1]?.description).toContain('drop temporary default');
+    expect(op.precheck).toHaveLength(1);
+    expect(op.postcheck).toHaveLength(3);
+  });
+
+  it('toOp() throws when no lowerer is provided', async () => {
+    const call = new AddNotNullColumnWithTempDefaultCall({
+      schemaName: 'public',
+      tableName: 'user',
+      columnName: 'name',
+      column: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+      codecHooks: new Map(),
+      storageTypes: {},
+      temporaryDefault: "''",
+    });
+    await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
   });
 });

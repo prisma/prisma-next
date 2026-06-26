@@ -1,7 +1,6 @@
-import type { Token } from '../../tokenizer';
 import type { AstNode } from '../ast-helpers';
 import { filterChildren, findChildToken, findFirstChild } from '../ast-helpers';
-import type { SyntaxNode } from '../red';
+import type { SyntaxNode, SyntaxToken } from '../red';
 import { AttributeArgAst } from './expressions';
 import { QualifiedNameAst } from './qualified-name';
 
@@ -12,11 +11,11 @@ export class AttributeArgListAst implements AstNode {
     this.syntax = syntax;
   }
 
-  lparen(): Token | undefined {
+  lparen(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LParen');
   }
 
-  rparen(): Token | undefined {
+  rparen(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RParen');
   }
 
@@ -36,7 +35,7 @@ export class FieldAttributeAst implements AstNode {
     this.syntax = syntax;
   }
 
-  at(): Token | undefined {
+  at(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'At');
   }
 
@@ -60,7 +59,7 @@ export class ModelAttributeAst implements AstNode {
     this.syntax = syntax;
   }
 
-  doubleAt(): Token | undefined {
+  doubleAt(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'DoubleAt');
   }
 

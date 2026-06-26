@@ -53,10 +53,10 @@ import {
   RawSqlCall,
   SetNotNullCall,
 } from './op-factory-call';
-import { buildAddColumnSql, buildColumnTypeSql } from './planner-ddl-builders';
+import { buildColumnTypeSql } from './planner-ddl-builders';
 import { resolveIdentityValue } from './planner-identity-values';
 import { buildSchemaLookupMap, hasForeignKey, hasUniqueConstraint } from './planner-schema-lookup';
-import { buildExpectedFormatType, qualifyTableName } from './planner-sql-checks';
+import { buildExpectedFormatType } from './planner-sql-checks';
 import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
@@ -600,20 +600,12 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
       continue;
     }
 
-    const qualified = qualifyTableName(schemaForTable, issue.table);
     calls.push(
       new AddNotNullColumnDirectCall(
         schemaForTable,
         issue.table,
         issue.column,
-        buildAddColumnSql(
-          qualified,
-          issue.column,
-          column,
-          mutableCodecHooks,
-          undefined,
-          mutableStorageTypes,
-        ),
+        buildColumnSpec(namespaceId, issue.table, issue.column, ctx),
       ),
     );
   }

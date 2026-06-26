@@ -205,6 +205,7 @@ type ContractBase = Omit<
       readonly enums: true;
       readonly lateral: true;
       readonly returning: true;
+      readonly scalarList: true;
     };
   };
   readonly extensionPacks: {
