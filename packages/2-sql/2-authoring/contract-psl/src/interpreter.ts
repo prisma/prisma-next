@@ -91,6 +91,7 @@ import {
 } from './psl-field-resolution';
 import { resolveNamedTypeDeclarations } from './psl-named-type-resolution';
 import {
+  type ArrowPath,
   applyBackrelationCandidates,
   type FkRelationMetadata,
   indexFkRelations,
@@ -527,6 +528,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     const relationAttribute = getAttribute(field.attributes, 'relation');
     let relationName: string | undefined;
     let through: ParsedThrough | undefined;
+    let arrowPath: ArrowPath | undefined;
     let inverse: string | undefined;
     if (relationAttribute) {
       const parsedRelation = parseRelationAttribute({
@@ -559,6 +561,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       }
       relationName = parsedRelation.relationName;
       through = parsedRelation.through;
+      arrowPath = parsedRelation.arrowPath;
       inverse = parsedRelation.inverse;
     }
     if (!attributesValid) {
@@ -572,6 +575,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       targetModelName: field.typeName,
       ...ifDefined('relationName', relationName),
       ...ifDefined('through', through),
+      ...ifDefined('arrowPath', arrowPath),
       ...ifDefined('inverse', inverse),
     });
   }
@@ -2066,6 +2070,9 @@ export function interpretPslDocumentToSqlContract(
   const modelIdColumns = new Map<string, readonly string[]>();
   const modelTableNames = new Map<string, string>();
   const declaredTableNames = new Set<string>();
+  // Field-name → storage-column maps per model, so an arrow-path `through:` can
+  // resolve its path-named columns straight from the declared models.
+  const modelFieldColumns = new Map<string, ReadonlyMap<string, string>>();
   for (const modelNode of modelNodes) {
     if (modelNode.id) {
       modelIdColumns.set(modelNode.modelName, modelNode.id.columns);
@@ -2073,12 +2080,17 @@ export function interpretPslDocumentToSqlContract(
     modelTableNames.set(modelNode.modelName, modelNode.tableName);
     declaredTableNames.add(modelNode.modelName);
     declaredTableNames.add(modelNode.tableName);
+    modelFieldColumns.set(
+      modelNode.modelName,
+      new Map(modelNode.fields.map((field) => [field.fieldName, field.columnName])),
+    );
   }
   const { synthesizedJunctions } = applyBackrelationCandidates({
     backrelationCandidates,
     fkRelationsByPair,
     fkRelationsByDeclaringModel,
     modelIdColumns,
+    modelFieldColumns,
     modelTableNames,
     modelNamespaceIds,
     declaredTableNames,
