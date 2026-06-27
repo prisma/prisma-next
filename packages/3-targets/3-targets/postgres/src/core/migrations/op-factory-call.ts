@@ -27,7 +27,6 @@ import type {
   OpFactoryCall as FrameworkOpFactoryCall,
   MigrationOperationClass,
 } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type {
   AnyDdlColumnDefault,
@@ -65,7 +64,7 @@ import { createExtension } from './operations/dependencies';
 import { createIndex, dropIndex } from './operations/indexes';
 import { createRlsPolicy, dropRlsPolicy, enableRowLevelSecurity } from './operations/rls';
 import type { ForeignKeySpec } from './operations/shared';
-import { step, targetDetails } from './operations/shared';
+import { quotedPair, step, targetDetails } from './operations/shared';
 import { dropTable } from './operations/tables';
 import { buildAddNotNullColumnWithTemporaryDefaultOperation } from './planner-recipes';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
@@ -85,6 +84,14 @@ type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 // ESM resolution at runtime in user migrations even though pnpm has the
 // transitive package on disk.
 const POSTGRES_MIGRATION_FACADE = '@prisma-next/postgres/migration';
+
+function tableRefAuthoringOpts(ref: PostgresEntityRef): string[] {
+  const opts: string[] = [];
+  const schema = ref.namespace.authoredSchema();
+  if (schema !== undefined) opts.push(`schema: ${jsonToTsSource(schema)}`);
+  opts.push(`table: ${jsonToTsSource(ref.id)}`);
+  return opts;
+}
 
 abstract class PostgresOpFactoryCallNode extends TsExpression implements FrameworkOpFactoryCall {
   abstract readonly factoryName: string;
@@ -257,11 +264,7 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
       ? this.constraints.map(renderDdlConstraintAsTsCall).join(', ')
       : undefined;
 
-    const opts: string[] = [];
-    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
-    }
-    opts.push(`table: ${jsonToTsSource(this.ref.id)}`);
+    const opts = tableRefAuthoringOpts(this.ref);
     opts.push(`columns: [${columnsList}]`);
     if (constraintsList) opts.push(`constraints: [${constraintsList}]`);
 
@@ -306,12 +309,7 @@ export class DropTableCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    const opts: string[] = [];
-    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
-    }
-    opts.push(`table: ${jsonToTsSource(this.ref.id)}`);
-    return `this.dropTable({ ${opts.join(', ')} })`;
+    return `this.dropTable({ ${tableRefAuthoringOpts(this.ref).join(', ')} })`;
   }
 
   override importRequirements(): readonly ImportRequirement[] {
@@ -367,11 +365,7 @@ export class AddColumnCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    const opts: string[] = [];
-    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
-    }
-    opts.push(`table: ${jsonToTsSource(this.ref.id)}`);
+    const opts = tableRefAuthoringOpts(this.ref);
     opts.push(`column: ${renderDdlColumnAsTsCall(this.column)}`);
     return `this.addColumn({ ${opts.join(', ')} })`;
   }
@@ -412,11 +406,7 @@ export class DropColumnCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    const opts: string[] = [];
-    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
-    }
-    opts.push(`table: ${jsonToTsSource(this.ref.id)}`);
+    const opts = tableRefAuthoringOpts(this.ref);
     opts.push(`column: ${jsonToTsSource(this.columnName)}`);
     return `this.dropColumn({ ${opts.join(', ')} })`;
   }
@@ -446,7 +436,7 @@ export class AlterColumnTypeCall extends PostgresOpFactoryCallNode {
     this.ref = ref;
     this.columnName = columnName;
     this.options = options;
-    this.label = `Alter type of "${ref.id}"."${columnName}" to ${options.rawTargetTypeForLabel}`;
+    this.label = `Alter type of ${quotedPair(ref.id, columnName)} to ${options.rawTargetTypeForLabel}`;
     this.freeze();
   }
 
@@ -460,11 +450,7 @@ export class AlterColumnTypeCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    const opts: string[] = [];
-    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
-    }
-    opts.push(`table: ${jsonToTsSource(this.ref.id)}`);
+    const opts = tableRefAuthoringOpts(this.ref);
     opts.push(`column: ${jsonToTsSource(this.columnName)}`);
     opts.push(`options: ${jsonToTsSource(this.options)}`);
     return `this.alterColumnType({ ${opts.join(', ')} })`;
@@ -486,7 +472,7 @@ export class SetNotNullCall extends PostgresOpFactoryCallNode {
     super();
     this.ref = ref;
     this.columnName = columnName;
-    this.label = `Set NOT NULL on "${ref.id}"."${columnName}"`;
+    this.label = `Set NOT NULL on ${quotedPair(ref.id, columnName)}`;
     this.freeze();
   }
 
@@ -500,11 +486,7 @@ export class SetNotNullCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    const opts: string[] = [];
-    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
-    }
-    opts.push(`table: ${jsonToTsSource(this.ref.id)}`);
+    const opts = tableRefAuthoringOpts(this.ref);
     opts.push(`column: ${jsonToTsSource(this.columnName)}`);
     return `this.setNotNull({ ${opts.join(', ')} })`;
   }
@@ -525,7 +507,7 @@ export class DropNotNullCall extends PostgresOpFactoryCallNode {
     super();
     this.ref = ref;
     this.columnName = columnName;
-    this.label = `Drop NOT NULL on "${ref.id}"."${columnName}"`;
+    this.label = `Drop NOT NULL on ${quotedPair(ref.id, columnName)}`;
     this.freeze();
   }
 
@@ -539,11 +521,7 @@ export class DropNotNullCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    const opts: string[] = [];
-    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
-    }
-    opts.push(`table: ${jsonToTsSource(this.ref.id)}`);
+    const opts = tableRefAuthoringOpts(this.ref);
     opts.push(`column: ${jsonToTsSource(this.columnName)}`);
     return `this.dropNotNull({ ${opts.join(', ')} })`;
   }
@@ -572,7 +550,7 @@ export class SetDefaultCall extends PostgresOpFactoryCallNode {
     this.columnName = columnName;
     this.defaultSql = defaultSql;
     this.operationClass = operationClass;
-    this.label = `Set default on "${ref.id}"."${columnName}"`;
+    this.label = `Set default on ${quotedPair(ref.id, columnName)}`;
     this.freeze();
   }
 
@@ -586,11 +564,7 @@ export class SetDefaultCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    const opts: string[] = [];
-    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
-    }
-    opts.push(`table: ${jsonToTsSource(this.ref.id)}`);
+    const opts = tableRefAuthoringOpts(this.ref);
     opts.push(`column: ${jsonToTsSource(this.columnName)}`);
     opts.push(`defaultSql: ${jsonToTsSource(this.defaultSql)}`);
     if (this.operationClass !== 'additive') {
@@ -615,7 +589,7 @@ export class DropDefaultCall extends PostgresOpFactoryCallNode {
     super();
     this.ref = ref;
     this.columnName = columnName;
-    this.label = `Drop default on "${ref.id}"."${columnName}"`;
+    this.label = `Drop default on ${quotedPair(ref.id, columnName)}`;
     this.freeze();
   }
 
@@ -629,11 +603,7 @@ export class DropDefaultCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    const opts: string[] = [];
-    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
-    }
-    opts.push(`table: ${jsonToTsSource(this.ref.id)}`);
+    const opts = tableRefAuthoringOpts(this.ref);
     opts.push(`column: ${jsonToTsSource(this.columnName)}`);
     return `this.dropDefault({ ${opts.join(', ')} })`;
   }
@@ -761,11 +731,7 @@ export class AddNotNullColumnWithTempDefaultCall extends PostgresOpFactoryCallNo
 // ============================================================================
 
 function constraintCallOptions(ref: PostgresEntityRef, constraintName: string): string {
-  const opts: string[] = [];
-  if (ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
-    opts.push(`schema: ${jsonToTsSource(ref.namespace.id)}`);
-  }
-  opts.push(`table: ${jsonToTsSource(ref.id)}`);
+  const opts = tableRefAuthoringOpts(ref);
   opts.push(`constraint: ${jsonToTsSource(constraintName)}`);
   return opts.join(', ');
 }
@@ -865,11 +831,7 @@ export class AddForeignKeyCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    const opts: string[] = [];
-    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
-    }
-    opts.push(`table: ${jsonToTsSource(this.ref.id)}`);
+    const opts = tableRefAuthoringOpts(this.ref);
     opts.push(`foreignKey: ${jsonToTsSource(this.fk)}`);
     return `this.addForeignKey({ ${opts.join(', ')} })`;
   }
@@ -942,7 +904,7 @@ export class AddCheckConstraintCall extends PostgresOpFactoryCallNode {
     this.constraintName = constraintName;
     this.column = column;
     this.values = values;
-    this.label = `Add check constraint "${constraintName}" on "${ref.id}"."${column}"`;
+    this.label = `Add check constraint "${constraintName}" on ${quotedPair(ref.id, column)}`;
     this.freeze();
   }
 
@@ -1042,11 +1004,7 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    const opts: string[] = [];
-    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
-    }
-    opts.push(`table: ${jsonToTsSource(this.ref.id)}`);
+    const opts = tableRefAuthoringOpts(this.ref);
     opts.push(`index: ${jsonToTsSource(this.indexName)}`);
     opts.push(`columns: ${jsonToTsSource(this.columns)}`);
     if (this.indexType !== undefined || this.options !== undefined) {
@@ -1088,11 +1046,7 @@ export class DropIndexCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    const opts: string[] = [];
-    if (this.ref.namespace.id !== UNBOUND_NAMESPACE_ID) {
-      opts.push(`schema: ${jsonToTsSource(this.ref.namespace.id)}`);
-    }
-    opts.push(`table: ${jsonToTsSource(this.ref.id)}`);
+    const opts = tableRefAuthoringOpts(this.ref);
     opts.push(`index: ${jsonToTsSource(this.indexName)}`);
     return `this.dropIndex({ ${opts.join(', ')} })`;
   }

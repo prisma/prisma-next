@@ -4,7 +4,7 @@ import { constraintExistsAst } from '../../../contract-free/checks';
 import type { PostgresEntityRef } from '../../entity-ref';
 import { postgresCreateNamespace } from '../../postgres-schema';
 import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
-import { type ForeignKeySpec, type Op, step, targetDetails } from './shared';
+import { type ForeignKeySpec, type Op, quotedPair, step, targetDetails } from './shared';
 
 async function constraintCheckSteps(
   lowerer: ExecuteRequestLowerer,
@@ -153,7 +153,7 @@ export async function addCheckConstraint(
   });
   return {
     id: `checkConstraint.${tableName}.${constraintName}`,
-    label: `Add check constraint "${constraintName}" on "${tableName}"."${column}"`,
+    label: `Add check constraint "${constraintName}" on ${quotedPair(tableName, column)}`,
     operationClass: 'additive',
     target: targetDetails('checkConstraint', constraintName, schemaName, tableName),
     precheck: [

@@ -110,6 +110,16 @@ export class PostgresSchema extends SqlNamespaceBase {
   }
 
   /**
+   * The schema name as it appears in an authoring `{ schema: … }` option
+   * — the string a user would write to address this namespace. Named schemas
+   * return their id; the unbound-schema singleton overrides this to return
+   * `undefined` so callers omit the `schema` option entirely.
+   */
+  authoredSchema(): string | undefined {
+    return this.id;
+  }
+
+  /**
    * The bare schema qualifier as it would appear in a rendered SQL
    * fragment (already quoted). The unbound-schema singleton overrides
    * this to return `''`.
@@ -225,6 +235,10 @@ export class PostgresUnboundSchema extends PostgresSchema {
 
   constructor(input?: PostgresSchemaInput) {
     super(input ?? { id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
+  }
+
+  override authoredSchema(): undefined {
+    return undefined;
   }
 
   override qualifier(): string {

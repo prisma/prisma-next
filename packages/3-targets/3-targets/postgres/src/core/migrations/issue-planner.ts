@@ -55,6 +55,7 @@ import {
   SetNotNullCall,
 } from './op-factory-call';
 import type { ForeignKeySpec } from './operations/shared';
+import { quotedPair } from './operations/shared';
 import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
 import { buildExpectedFormatType } from './planner-sql-checks';
 import {
@@ -339,7 +340,7 @@ function mapIssueToCall(
           return notOk(
             issueConflict(
               'unsupportedOperation',
-              `Column "${issue.table}"."${issue.column}" not in destination contract`,
+              `Column ${quotedPair(issue.table, issue.column)} not in destination contract`,
             ),
           );
         const namespaceNode = ctx.toContract.storage.namespaces[namespaceId];
@@ -373,7 +374,7 @@ function mapIssueToCall(
           return notOk(
             issueConflict(
               'unsupportedOperation',
-              `Column "${issue.table}"."${issue.column}" has no default in contract`,
+              `Column ${quotedPair(issue.table, issue.column)} has no default in contract`,
             ),
           );
         }
@@ -453,7 +454,7 @@ function mapIssueToCall(
         return notOk(
           issueConflict(
             'nullabilityConflict',
-            `Column "${issue.table}"."${issue.column}" not found in destination contract`,
+            `Column ${quotedPair(issue.table, issue.column)} not found in destination contract`,
           ),
         );
       const ref = tableRef(issue);
@@ -476,7 +477,7 @@ function mapIssueToCall(
           return notOk(
             issueConflict(
               'typeMismatch',
-              `Column "${issue.table}"."${issue.column}" not in destination contract`,
+              `Column ${quotedPair(issue.table, issue.column)} not in destination contract`,
             ),
           );
         const hooksMap = codecHooks as Map<string, CodecControlHooks>;

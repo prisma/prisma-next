@@ -11,7 +11,7 @@ import {
 import * as contractFreeDdl from '../../../contract-free/ddl';
 import type { PostgresEntityRef } from '../../entity-ref';
 import { quoteIdentifier } from '../../sql-utils';
-import { type Op, step, targetDetails } from './shared';
+import { type Op, quotedPair, step, targetDetails } from './shared';
 
 type CheckStep = { sql: string; params?: readonly unknown[] };
 
@@ -94,7 +94,7 @@ export async function alterColumnType(
   );
   return {
     id: `alterType.${tableName}.${columnName}`,
-    label: `Alter type of "${tableName}"."${columnName}" to ${options.rawTargetTypeForLabel}`,
+    label: `Alter type of ${quotedPair(tableName, columnName)} to ${options.rawTargetTypeForLabel}`,
     operationClass: 'destructive',
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
@@ -141,7 +141,7 @@ export async function setNotNull(
   );
   return {
     id: `alterNullability.setNotNull.${tableName}.${columnName}`,
-    label: `Set NOT NULL on "${tableName}"."${columnName}"`,
+    label: `Set NOT NULL on ${quotedPair(tableName, columnName)}`,
     operationClass: 'destructive',
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [
@@ -183,7 +183,7 @@ export async function dropNotNull(
   );
   return {
     id: `alterNullability.dropNotNull.${tableName}.${columnName}`,
-    label: `Drop NOT NULL on "${tableName}"."${columnName}"`,
+    label: `Drop NOT NULL on ${quotedPair(tableName, columnName)}`,
     operationClass: 'widening',
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
@@ -227,7 +227,7 @@ export async function setDefault(
   );
   return {
     id: `setDefault.${tableName}.${columnName}`,
-    label: `Set default on "${tableName}"."${columnName}"`,
+    label: `Set default on ${quotedPair(tableName, columnName)}`,
     operationClass,
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
@@ -266,7 +266,7 @@ export async function dropDefault(
   );
   return {
     id: `dropDefault.${tableName}.${columnName}`,
-    label: `Drop default on "${tableName}"."${columnName}"`,
+    label: `Drop default on ${quotedPair(tableName, columnName)}`,
     operationClass: 'destructive',
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
