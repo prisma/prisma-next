@@ -33,7 +33,7 @@ export class PostgresRole extends SqlNode implements DiffableNode {
   }
 
   /** Roles are cluster-unique; the name alone is sufficient as the id. */
-  id(): string {
+  get id(): string {
     return this.name;
   }
 

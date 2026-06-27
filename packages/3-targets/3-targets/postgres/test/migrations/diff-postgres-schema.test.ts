@@ -4,10 +4,14 @@ import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { contractToPostgresSchemaIR } from '../../src/core/migrations/contract-to-postgres-schema-ir';
-import { diffPostgresSchema } from '../../src/core/migrations/diff-postgres-schema';
+import {
+  diffPostgresSchema,
+  dropUnownedExtraPolicyIssues,
+} from '../../src/core/migrations/diff-postgres-schema';
 import { isPostgresRlsPolicy, PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
+import { groupPoliciesIntoTableNodes } from '../../src/core/postgres-table-node';
 
 const TABLE_NAME = 'profiles';
 const SCHEMA_NAME = 'public';
@@ -84,7 +88,7 @@ function makeSchema(actualPolicies: readonly PostgresRlsPolicy[]): PostgresSchem
     },
     pgSchemaName: 'public',
     pgVersion: 'unknown',
-    rlsPolicies: actualPolicies,
+    tableNodes: groupPoliciesIntoTableNodes(actualPolicies),
     roles: [],
     existingSchemas: ['public'],
     nativeEnumTypeNames: [],
@@ -262,7 +266,7 @@ describe('diffPostgresSchema', () => {
       },
       pgSchemaName: 'auth',
       pgVersion: 'unknown',
-      rlsPolicies: [authPolicy, foreignPublicPolicy],
+      tableNodes: groupPoliciesIntoTableNodes([authPolicy, foreignPublicPolicy]),
       roles: [],
       existingSchemas: ['auth', 'public'],
       nativeEnumTypeNames: [],
@@ -272,9 +276,78 @@ describe('diffPostgresSchema', () => {
       contractOwningOnlyAuth as Parameters<typeof contractToPostgresSchemaIR>[0],
       { annotationNamespace: 'pg' },
     );
-    const issues = diffPostgresSchema(expected, schemaWithBothNamespaces);
+    const rawIssues = diffPostgresSchema(expected, schemaWithBothNamespaces);
+    const ownedSchemaNames = new Set([
+      ...expected.rlsPolicies.map((p) => p.namespaceId),
+      ...expected.existingSchemas,
+    ]);
+    const issues = dropUnownedExtraPolicyIssues(rawIssues, ownedSchemaNames);
 
     expect(issues).toHaveLength(0);
+  });
+
+  it('diffPostgresSchema alone does not drop unowned extra policies (filtering is caller responsibility)', () => {
+    const authPolicy = makePolicy('auth_policy_a1b2c3d4', 'users', 'auth');
+    const foreignPublicPolicy = makePolicy('profile_owner_read_3486711c', 'profile', 'public');
+
+    const authSchema = new PostgresSchema({
+      id: 'auth',
+      entries: {
+        table: {
+          users: new StorageTable({
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+          }),
+        },
+        policy: { [authPolicy.name]: authPolicy },
+      },
+    });
+
+    const contractOwningOnlyAuth: Contract<SqlStorage> = {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:rls-cross-space-test'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:rls-cross-space-test'),
+        namespaces: { auth: authSchema },
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+
+    const schemaWithBothNamespaces = new PostgresSchemaIR({
+      tables: {
+        users: {
+          name: 'users',
+          columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      pgSchemaName: 'auth',
+      pgVersion: 'unknown',
+      tableNodes: groupPoliciesIntoTableNodes([authPolicy, foreignPublicPolicy]),
+      roles: [],
+      existingSchemas: ['auth', 'public'],
+      nativeEnumTypeNames: [],
+    });
+
+    const expected = contractToPostgresSchemaIR(
+      contractOwningOnlyAuth as Parameters<typeof contractToPostgresSchemaIR>[0],
+      { annotationNamespace: 'pg' },
+    );
+    const rawIssues = diffPostgresSchema(expected, schemaWithBothNamespaces);
+    const extraIssues = rawIssues.filter((i) => i.outcome === 'extra');
+    expect(extraIssues.length).toBeGreaterThan(0);
   });
 
   it('still reports an extra DB policy that is in an owned namespace', () => {
@@ -323,7 +396,7 @@ describe('diffPostgresSchema', () => {
       },
       pgSchemaName: 'auth',
       pgVersion: 'unknown',
-      rlsPolicies: [ownedExtra],
+      tableNodes: groupPoliciesIntoTableNodes([ownedExtra]),
       roles: [],
       existingSchemas: ['auth'],
       nativeEnumTypeNames: [],
@@ -333,7 +406,12 @@ describe('diffPostgresSchema', () => {
       contractOwningAuth as Parameters<typeof contractToPostgresSchemaIR>[0],
       { annotationNamespace: 'pg' },
     );
-    const issues = diffPostgresSchema(expected, schema);
+    const rawIssues = diffPostgresSchema(expected, schema);
+    const ownedSchemaNames = new Set([
+      ...expected.rlsPolicies.map((p) => p.namespaceId),
+      ...expected.existingSchemas,
+    ]);
+    const issues = dropUnownedExtraPolicyIssues(rawIssues, ownedSchemaNames);
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ outcome: 'extra' });
@@ -417,7 +495,7 @@ describe('diffPostgresSchema', () => {
       },
       pgSchemaName: SCHEMA_NAME,
       pgVersion: 'unknown',
-      rlsPolicies: [policyOnProfiles, policyOnOrders],
+      tableNodes: groupPoliciesIntoTableNodes([policyOnProfiles, policyOnOrders]),
       roles: [],
       existingSchemas: [SCHEMA_NAME],
       nativeEnumTypeNames: [],
@@ -485,7 +563,7 @@ describe('diffPostgresSchema', () => {
       tables: {},
       pgSchemaName: 'public',
       pgVersion: 'unknown',
-      rlsPolicies: [],
+      tableNodes: [],
       roles: [],
       existingSchemas: ['public'],
       nativeEnumTypeNames: [],
@@ -568,7 +646,7 @@ describe('diffPostgresSchema', () => {
       },
       pgSchemaName: 'public',
       pgVersion: 'unknown',
-      rlsPolicies: [introspectedPolicy],
+      tableNodes: groupPoliciesIntoTableNodes([introspectedPolicy]),
       roles: [],
       existingSchemas: ['public'],
       nativeEnumTypeNames: [],
@@ -645,16 +723,38 @@ describe('diffPostgresSchema', () => {
       tables: {},
       pgSchemaName: 'public',
       pgVersion: 'unknown',
-      rlsPolicies: [unownedExtra],
+      tableNodes: groupPoliciesIntoTableNodes([unownedExtra]),
       roles: [],
       existingSchemas: ['public', 'other_schema'],
       nativeEnumTypeNames: [],
     });
 
-    const issues = diffPostgresSchema(expected, actual);
+    const rawIssues = diffPostgresSchema(expected, actual);
+    const ownedSchemaNames = new Set([
+      ...expected.rlsPolicies.map((p) => p.namespaceId),
+      ...expected.existingSchemas,
+    ]);
+    const issues = dropUnownedExtraPolicyIssues(rawIssues, ownedSchemaNames);
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ outcome: 'missing' });
     expect(issues[0]?.expected).toMatchObject({ name: 'missing_policy_a1b2c3d4' });
+  });
+
+  it('policy issues carry a human-readable message', () => {
+    const policy = makePolicy('read_own_profiles_a1b2c3d4');
+    const contract = makeContract([policy]);
+    const expected = contractToPostgresSchemaIR(
+      contract as Parameters<typeof contractToPostgresSchemaIR>[0],
+      { annotationNamespace: 'pg' },
+    );
+    const actual = makeSchema([]);
+
+    const issues = diffPostgresSchema(expected, actual);
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.message).toBe(
+      'missing: policy "read_own_profiles_a1b2c3d4" on "public"."profiles"',
+    );
   });
 });

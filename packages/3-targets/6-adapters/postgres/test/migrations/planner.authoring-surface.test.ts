@@ -68,7 +68,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
         }).tables,
         pgSchemaName: 'public',
         pgVersion: '',
-        rlsPolicies: [],
+        tableNodes: [],
         roles: [],
         existingSchemas: [],
         nativeEnumTypeNames: [],

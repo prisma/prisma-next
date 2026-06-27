@@ -5,9 +5,7 @@ import { diffSchemas } from '../src/control/schema-diff';
 /** A synthetic root node whose `isEqualTo` is always true — used to wrap flat node lists. */
 function rootOf(nodes: readonly DiffableNode[]): DiffableNode {
   return {
-    id(): string {
-      return 'root';
-    },
+    id: 'root',
     isEqualTo(): boolean {
       return true;
     },
@@ -23,14 +21,12 @@ function makeNode(
   childNodes: readonly DiffableNode[] = [],
 ): DiffableNode {
   return {
-    id(): string {
-      return nodeId;
-    },
+    id: nodeId,
     children(): readonly DiffableNode[] {
       return childNodes;
     },
     isEqualTo(other: DiffableNode): boolean {
-      return nodeId === other.id() && body === (other as typeof this & { _body?: string })._body;
+      return nodeId === other.id && body === (other as typeof this & { _body?: string })._body;
     },
     _body: body,
   } as DiffableNode & { _body: string };

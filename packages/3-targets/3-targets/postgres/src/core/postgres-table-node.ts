@@ -32,7 +32,7 @@ export class PostgresTableNode extends SqlNode implements DiffableNode {
     freezeNode(this);
   }
 
-  id(): string {
+  get id(): string {
     return `${this.schemaName}/${this.tableName}`;
   }
 
@@ -47,4 +47,21 @@ export class PostgresTableNode extends SqlNode implements DiffableNode {
 
 export function isPostgresTableNode(node: DiffableNode | undefined): node is PostgresTableNode {
   return node !== undefined && 'kind' in node && node.kind === 'table-node';
+}
+
+export function groupPoliciesIntoTableNodes(
+  policies: readonly PostgresRlsPolicy[],
+): readonly PostgresTableNode[] {
+  type Group = { schemaName: string; tableName: string; policies: PostgresRlsPolicy[] };
+  const byKey = new Map<string, Group>();
+  for (const policy of policies) {
+    const key = `${policy.namespaceId}/${policy.tableName}`;
+    let group = byKey.get(key);
+    if (group === undefined) {
+      group = { schemaName: policy.namespaceId, tableName: policy.tableName, policies: [] };
+      byKey.set(key, group);
+    }
+    group.policies.push(policy);
+  }
+  return [...byKey.values()].map((g) => new PostgresTableNode(g));
 }

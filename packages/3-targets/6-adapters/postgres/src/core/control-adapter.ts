@@ -63,10 +63,13 @@ import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-t
 import {
   contractToPostgresSchemaIR,
   diffPostgresSchema,
+  dropUnownedExtraPolicyIssues,
 } from '@prisma-next/target-postgres/planner';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
+import type { PostgresTableNode } from '@prisma-next/target-postgres/types';
 import {
   ensurePostgresSchemaIR,
+  groupPoliciesIntoTableNodes,
   isPostgresSchemaIR,
   PostgresRlsPolicy,
   PostgresRole,
@@ -144,7 +147,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       { annotationNamespace: 'pg' },
     );
     const actual = ensurePostgresSchemaIR(schema);
-    return diffPostgresSchema(expected, actual);
+    const issues = diffPostgresSchema(expected, actual);
+    const ownedSchemaNames = new Set([
+      ...expected.rlsPolicies.map((p) => p.namespaceId),
+      ...expected.existingSchemas,
+    ]);
+    return dropUnownedExtraPolicyIssues(issues, ownedSchemaNames);
   }
 
   bootstrapControlTableQueries(): readonly DdlNode[] {
@@ -598,7 +606,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       tables: ir.tables,
       pgSchemaName: ir.pgSchemaName,
       pgVersion: ir.pgVersion,
-      rlsPolicies: ir.rlsPolicies,
+      tableNodes: ir.tableNodes,
       roles: ir.roles,
       existingSchemas,
       nativeEnumTypeNames: ir.nativeEnumTypeNames,
@@ -666,10 +674,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       }
     }
 
-    const mergedRlsPolicies: PostgresRlsPolicy[] = [];
+    const mergedTableNodes: PostgresTableNode[] = [];
     const mergedRoles: PostgresRole[] = [];
     for (const ir of perSchema) {
-      mergedRlsPolicies.push(...ir.rlsPolicies);
+      mergedTableNodes.push(...ir.tableNodes);
       mergedRoles.push(...ir.roles);
     }
 
@@ -678,7 +686,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       tables: mergedTables,
       pgSchemaName: first?.pgSchemaName ?? 'public',
       pgVersion: first?.pgVersion ?? 'unknown',
-      rlsPolicies: mergedRlsPolicies,
+      tableNodes: mergedTableNodes,
       roles: mergedRoles,
       existingSchemas: first?.existingSchemas ?? ['public'],
       nativeEnumTypeNames: first?.nativeEnumTypeNames ?? [],
@@ -1191,7 +1199,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       tables,
       pgSchemaName: schema,
       pgVersion: await this.getPostgresVersion(driver),
-      rlsPolicies,
+      tableNodes: groupPoliciesIntoTableNodes(rlsPolicies),
       roles,
       existingSchemas: [],
       nativeEnumTypeNames,

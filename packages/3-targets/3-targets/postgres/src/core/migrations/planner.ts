@@ -27,7 +27,7 @@ import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { assertPostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresContract } from '../postgres-schema';
-import { ensurePostgresSchemaIR, isPostgresSchemaIR } from '../postgres-schema-ir';
+import { assertPostgresSchemaIR, ensurePostgresSchemaIR } from '../postgres-schema-ir';
 import { resolveDdlSchemaForNamespaceStorage } from '../postgres-schema-ir-annotations';
 import { contractToPostgresSchemaIR } from './contract-to-postgres-schema-ir';
 import {
@@ -36,7 +36,7 @@ import {
   resolvePostgresIssueControlPolicySubject,
   resolvePostgresIssueCreationFactoryName,
 } from './control-policy';
-import { diffPostgresSchema } from './diff-postgres-schema';
+import { diffPostgresSchema, dropUnownedExtraPolicyIssues } from './diff-postgres-schema';
 import { planIssues } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 import {
@@ -205,12 +205,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       return plannerFailure(result.failure);
     }
 
-    // Translate RLS diff issues to DDL calls and run through control-policy
-    // partition. This runs AFTER the structural planIssues pass so the RLS
-    // calls can refer to tables that may have been created in this plan. Every
-    // command supplies a `PostgresSchemaIR` here — introspection on the live
-    // paths, `contractToSchema` on `migration plan` — so the diff runs the same
-    // way on each.
     const rlsCalls = this.planPostgresSchemaDiff(options);
     const rlsPartition = partitionCallsByControlPolicy({
       calls: rlsCalls,
@@ -272,12 +266,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
   private planPostgresSchemaDiff(
     options: PlannerOptionsWithComponents,
   ): readonly PostgresOpFactoryCall[] {
-    if (!isPostgresSchemaIR(options.schema)) {
-      // Every command supplies a PostgresSchemaIR here — introspection on the
-      // live paths, the contract projection on `migration plan` — so this guard
-      // is unreachable in production.
-      throw new Error('planPostgresSchemaDiff: options.schema must be a PostgresSchemaIR');
-    }
+    assertPostgresSchemaIR(options.schema);
     const expected = contractToPostgresSchemaIR(
       blindCast<PostgresContract, 'planPostgresSchemaDiff is only called with a postgres contract'>(
         options.contract,
@@ -285,7 +274,12 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       { annotationNamespace: 'pg' },
     );
     const actual = ensurePostgresSchemaIR(options.schema);
-    const diffIssues = diffPostgresSchema(expected, actual);
+    const rawIssues = diffPostgresSchema(expected, actual);
+    const ownedSchemaNames = new Set([
+      ...expected.rlsPolicies.map((p) => p.namespaceId),
+      ...expected.existingSchemas,
+    ]);
+    const diffIssues = dropUnownedExtraPolicyIssues(rawIssues, ownedSchemaNames);
 
     const allowsDestructive = options.policy.allowedOperationClasses.includes('destructive');
     const calls: PostgresOpFactoryCall[] = [];

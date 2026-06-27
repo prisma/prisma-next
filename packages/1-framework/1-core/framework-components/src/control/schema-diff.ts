@@ -12,22 +12,21 @@ export interface SchemaDiffIssue {
 }
 
 /**
- * A node in the schema tree. Every node in the tree — including the database root —
- * implements this interface.
+ * A node in the schema tree. Every node in the tree implements this interface.
  *
- * `id()` must be unique among sibling nodes at the same level — the differ keys
+ * `id` must be unique among sibling nodes at the same level — the differ keys
  * on it and treats a collision as the same entity (enforced by a duplicate-id
  * throw). The differ accumulates these ids into a path that stamps every emitted
  * issue.
  */
 export interface DiffableNode {
-  id(): string;
+  readonly id: string;
   isEqualTo(other: DiffableNode): boolean;
   children(): readonly DiffableNode[];
 }
 
 function insertNode(map: Map<string, DiffableNode>, node: DiffableNode): void {
-  const key = node.id();
+  const key = node.id;
   if (map.has(key)) {
     throw new Error(`diffSchemas: duplicate id among siblings: ${key}`);
   }
@@ -39,21 +38,19 @@ function outcomeMessage(outcome: SchemaDiffOutcome, path: readonly string[]): st
 }
 
 function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): SchemaDiffIssue[] {
-  const path = [...parentPath, node.id()];
-  const issues: SchemaDiffIssue[] = [
+  const path = [...parentPath, node.id];
+  return [
     { path, outcome: 'missing', message: outcomeMessage('missing', path), expected: node },
+    ...node.children().flatMap((c) => emitMissingSubtree(c, path)),
   ];
-  for (const child of node.children()) issues.push(...emitMissingSubtree(child, path));
-  return issues;
 }
 
 function emitExtraSubtree(node: DiffableNode, parentPath: readonly string[]): SchemaDiffIssue[] {
-  const path = [...parentPath, node.id()];
-  const issues: SchemaDiffIssue[] = [
+  const path = [...parentPath, node.id];
+  return [
     { path, outcome: 'extra', message: outcomeMessage('extra', path), actual: node },
+    ...node.children().flatMap((c) => emitExtraSubtree(c, path)),
   ];
-  for (const child of node.children()) issues.push(...emitExtraSubtree(child, path));
-  return issues;
 }
 
 /**
@@ -77,7 +74,7 @@ function diffPair(
   actual: DiffableNode,
   parentPath: readonly string[],
 ): readonly SchemaDiffIssue[] {
-  const path = [...parentPath, expected.id()];
+  const path = [...parentPath, expected.id];
   const issues: SchemaDiffIssue[] = [];
   if (!expected.isEqualTo(actual)) {
     issues.push({

@@ -7,6 +7,7 @@ import {
   normalizePredicate,
 } from '@prisma-next/target-postgres/rls-canonicalize';
 import {
+  groupPoliciesIntoTableNodes,
   PostgresRlsPolicy,
   PostgresSchema,
   PostgresSchemaIR,
@@ -65,7 +66,7 @@ function schemaWithPolicies(policies: PostgresRlsPolicy[]): PostgresSchemaIR {
     },
     pgSchemaName: 'public',
     pgVersion: 'unknown',
-    rlsPolicies: policies,
+    tableNodes: groupPoliciesIntoTableNodes(policies),
     roles: [],
     existingSchemas: ['public'],
     nativeEnumTypeNames: [],

@@ -106,7 +106,7 @@ function contractToSchemaIR(
     tables: sqlIr.tables,
     pgSchemaName: 'public',
     pgVersion: '',
-    rlsPolicies: [],
+    tableNodes: [],
     roles: [],
     existingSchemas: [],
     nativeEnumTypeNames,

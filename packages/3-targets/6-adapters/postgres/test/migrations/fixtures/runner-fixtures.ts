@@ -65,7 +65,7 @@ export const emptySchema = new PostgresSchemaIR({
   tables: {},
   pgSchemaName: 'public',
   pgVersion: 'unknown',
-  rlsPolicies: [],
+  tableNodes: [],
   roles: [],
   existingSchemas: ['public'],
   nativeEnumTypeNames: [],

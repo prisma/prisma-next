@@ -59,7 +59,7 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
     freezeNode(this);
   }
 
-  id(): string {
+  get id(): string {
     return this.name;
   }
 

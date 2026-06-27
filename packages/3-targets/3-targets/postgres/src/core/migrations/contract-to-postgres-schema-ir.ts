@@ -5,7 +5,7 @@ import { isPostgresSchema } from '../postgres-schema';
 import { PostgresSchemaIR } from '../postgres-schema-ir';
 import { resolveDdlSchemaForNamespaceStorage } from '../postgres-schema-ir-annotations';
 import {
-  collectContractRlsPolicies,
+  collectContractRlsTableNodes,
   collectContractRoles,
 } from './collect-contract-postgres-nodes';
 
@@ -23,7 +23,7 @@ export function contractToPostgresSchemaIR(
           .map((ns) => resolveDdlSchemaForNamespaceStorage(contract.storage, ns.id));
   return new PostgresSchemaIR({
     tables: sqlIr.tables,
-    rlsPolicies: collectContractRlsPolicies(contract),
+    tableNodes: collectContractRlsTableNodes(contract),
     roles: collectContractRoles(contract),
     pgSchemaName: 'public',
     pgVersion: '',

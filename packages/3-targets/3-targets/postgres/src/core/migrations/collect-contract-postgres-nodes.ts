@@ -4,6 +4,7 @@ import { PostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresRole } from '../postgres-role';
 import { isPostgresSchema } from '../postgres-schema';
 import { resolveDdlSchemaForNamespaceStorage } from '../postgres-schema-ir-annotations';
+import { groupPoliciesIntoTableNodes, type PostgresTableNode } from '../postgres-table-node';
 
 /** Collect a contract's Postgres RLS policy nodes, with namespaceId resolved to the DDL schema name. */
 export function collectContractRlsPolicies(
@@ -31,6 +32,13 @@ export function collectContractRlsPolicies(
       });
     });
   });
+}
+
+/** Collect a contract's RLS policies grouped into table nodes. */
+export function collectContractRlsTableNodes(
+  contract: Contract<SqlStorage> | null,
+): readonly PostgresTableNode[] {
+  return groupPoliciesIntoTableNodes(collectContractRlsPolicies(contract));
 }
 
 /** Collect a contract's Postgres role nodes. */

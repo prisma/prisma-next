@@ -11,13 +11,13 @@ import {
 import { blindCast } from '@prisma-next/utils/casts';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
 import type { PostgresRole } from './postgres-role';
-import { PostgresTableNode } from './postgres-table-node';
+import type { PostgresTableNode } from './postgres-table-node';
 
 export interface PostgresSchemaIRInput {
   readonly tables: Record<string, SqlTableIR | SqlTableIRInput>;
   readonly pgSchemaName: string;
   readonly pgVersion: string;
-  readonly rlsPolicies: readonly PostgresRlsPolicy[];
+  readonly tableNodes: readonly PostgresTableNode[];
   readonly roles: readonly PostgresRole[];
   readonly existingSchemas: readonly string[];
   readonly nativeEnumTypeNames: readonly string[];
@@ -34,7 +34,7 @@ export interface PostgresSchemaIRInput {
  * `SqlSchemaIR` structure and freezes itself at the end of its own
  * constructor.
  *
- * RLS-specific fields (`rlsPolicies`, `roles`) are typed top-level fields on
+ * RLS-specific fields (`tableNodes`, `roles`) are typed top-level fields on
  * this class — no `Reflect.get`, no untyped annotation bag access. The
  * `annotations.pg` bag is populated with only the subset the family layer
  * reads (`nativeEnumTypeNames`, `existingSchemas`, `schema`) so family-layer
@@ -49,7 +49,7 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
   declare readonly annotations?: SqlAnnotations;
   readonly pgSchemaName: string;
   readonly pgVersion: string;
-  readonly rlsPolicies: readonly PostgresRlsPolicy[];
+  readonly tableNodes: readonly PostgresTableNode[];
   readonly roles: readonly PostgresRole[];
   readonly existingSchemas: readonly string[];
   readonly nativeEnumTypeNames: readonly string[];
@@ -66,13 +66,13 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
     );
     this.pgSchemaName = input.pgSchemaName;
     this.pgVersion = input.pgVersion;
-    this.rlsPolicies = Object.freeze([...input.rlsPolicies]);
+    this.tableNodes = Object.freeze([...input.tableNodes]);
     this.roles = Object.freeze([...input.roles]);
     this.existingSchemas = Object.freeze([...input.existingSchemas]);
     this.nativeEnumTypeNames = Object.freeze([...input.nativeEnumTypeNames]);
     // Populate the annotations.pg bag with only the subset the family layer
     // reads (nativeEnumTypeNames for PSL inference, existingSchemas for
-    // namespace presence checks). rlsPolicies and roles are NOT placed here
+    // namespace presence checks). tableNodes and roles are NOT placed here
     // — they are consumed directly via typed fields on this class.
     this.annotations = {
       pg: {
@@ -88,9 +88,12 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
     freezeNode(this);
   }
 
-  /** Stable id for the differ. The schema name identifies this database root. */
-  id(): string {
+  get id(): string {
     return this.pgSchemaName;
+  }
+
+  get rlsPolicies(): readonly PostgresRlsPolicy[] {
+    return this.tableNodes.flatMap((t) => t.policies);
   }
 
   // No database-level attributes to compare yet; two database roots from the
@@ -100,18 +103,7 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
   }
 
   children(): readonly DiffableNode[] {
-    type Group = { schemaName: string; tableName: string; policies: PostgresRlsPolicy[] };
-    const byKey = new Map<string, Group>();
-    for (const policy of this.rlsPolicies) {
-      const key = `${policy.namespaceId}/${policy.tableName}`;
-      let group = byKey.get(key);
-      if (group === undefined) {
-        group = { schemaName: policy.namespaceId, tableName: policy.tableName, policies: [] };
-        byKey.set(key, group);
-      }
-      group.policies.push(policy);
-    }
-    return [...byKey.values()].map((g) => new PostgresTableNode(g));
+    return this.tableNodes;
   }
 }
 
@@ -127,6 +119,14 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
  */
 export function isPostgresSchemaIR(schema: SqlSchemaIR): schema is PostgresSchemaIR {
   return schema.nodeTarget === 'postgres';
+}
+
+export function assertPostgresSchemaIR(schema: SqlSchemaIR): asserts schema is PostgresSchemaIR {
+  if (!isPostgresSchemaIR(schema)) {
+    throw new Error(
+      `planPostgresSchemaDiff: expected a PostgresSchemaIR but got nodeTarget=${String(schema.nodeTarget ?? typeof schema)}`,
+    );
+  }
 }
 
 /**

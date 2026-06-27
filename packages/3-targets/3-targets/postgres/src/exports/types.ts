@@ -12,12 +12,14 @@ export {
   postgresCreateNamespace,
 } from '../core/postgres-schema';
 export {
+  assertPostgresSchemaIR,
   ensurePostgresSchemaIR,
   isPostgresSchemaIR,
   PostgresSchemaIR,
   type PostgresSchemaIRInput,
 } from '../core/postgres-schema-ir';
 export {
+  groupPoliciesIntoTableNodes,
   isPostgresTableNode,
   PostgresTableNode,
   type PostgresTableNodeInput,
