@@ -30,6 +30,8 @@ export type {
   MongoWildcardProjection,
   RootModelName,
 } from '../contract-types';
+export type { MongoContractAccessors, MongoContractView } from '../contract-view';
+export { buildMongoContractView } from '../contract-view';
 export {
   defaultMongoDomainNamespaceId,
   defaultMongoStorageNamespaceId,

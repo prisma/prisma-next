@@ -1,14 +1,14 @@
 #!/usr/bin/env -S node
 import { MigrationCLI } from '@prisma-next/cli/migration-cli';
-import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
+import { MongoContractView } from '@prisma-next/family-mongo/ir';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { createCollection, createIndex } from '@prisma-next/target-mongo/migration';
 import type { Contract } from './end-contract';
 import endContractJson from './end-contract.json' with { type: 'json' };
 
-const endContract = new MongoContractSerializer().deserializeContract<Contract>(endContractJson);
+const endContract = MongoContractView.fromJson<Contract>(endContractJson);
 
-const COLLECTIONS = endContract.storage.namespaces.__unbound__.entries.collection;
+const COLLECTIONS = endContract.collection;
 const CARTS_VALIDATOR = COLLECTIONS.carts.validator;
 const EVENTS_VALIDATOR = COLLECTIONS.events.validator;
 const INVOICES_VALIDATOR = COLLECTIONS.invoices.validator;
