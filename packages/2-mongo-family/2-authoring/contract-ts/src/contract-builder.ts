@@ -674,6 +674,10 @@ type BuilderBaseChannelType<
 type ExtractValueObjectFields<TBuilder> =
   TBuilder extends NamedValueObjectBuilder<string, infer Fields> ? Fields : Record<never, never>;
 
+// Runs once per `defineContract` call to build the precomputed `FieldOutputTypes`/`FieldInputTypes`
+// maps. Consumers index those maps in O(1) via `InferModelRow` — this is NOT re-evaluated per query.
+// Recursion is bounded to value-object nesting depth (each level resolves its fields exactly once).
+//
 // The JS type for one field builder on a given channel, with nullable/many applied.
 // Compose many first (array wrapping), then add nullability. This avoids the
 // TypeScript operator-precedence trap where `A | B extends infer X` infers X
