@@ -1,4 +1,1 @@
-export {
-  buildExpectedFormatType,
-  qualifyTableName,
-} from '../core/migrations/planner-sql-checks';
+export { buildExpectedFormatType } from '../core/migrations/planner-sql-checks';

@@ -3,7 +3,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { rlsEnabledAst, rlsPolicyExistsAst } from '../../../contract-free/checks';
 import { createPolicy, dropPolicy } from '../../../contract-free/ddl';
 import type { PostgresRlsPolicy } from '../../postgres-rls-policy';
-import { qualifyTableName } from '../planner-sql-checks';
+import { postgresCreateNamespace } from '../../postgres-schema';
 import { type Op, step, targetDetails } from './shared';
 
 const PLAIN_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$]*$/;
@@ -82,6 +82,7 @@ export async function enableRowLevelSecurity(
   tableName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
+  const ns = postgresCreateNamespace({ id: schemaName, entries: { table: {} } });
   const checks = rlsEnabledAst(schemaName, tableName);
   const disabled = await lowerer.lowerToExecuteRequest(checks.rlsDisabled());
   const enabled = await lowerer.lowerToExecuteRequest(checks.rlsEnabled());
@@ -96,7 +97,7 @@ export async function enableRowLevelSecurity(
     execute: [
       step(
         `enable row-level security on "${tableName}"`,
-        `ALTER TABLE ${qualifyTableName(schemaName, tableName)} ENABLE ROW LEVEL SECURITY`,
+        `ALTER TABLE ${ns.qualifyTable(tableName)} ENABLE ROW LEVEL SECURITY`,
       ),
     ],
     postcheck: [

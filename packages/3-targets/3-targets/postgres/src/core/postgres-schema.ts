@@ -131,9 +131,8 @@ export class PostgresSchema extends SqlNamespaceBase {
   /**
    * Qualify a table name using `quoteIdentifier` semantics, escaping embedded
    * `"` characters. Bound schemas render `"<schema>"."<table>"`; the unbound
-   * subclass overrides this to render just `"<table>"`. Used by
-   * `PostgresEntityRef.qualified()` to satisfy the byte-parity contract with
-   * the renderer.
+   * subclass overrides this to render just `"<table>"`. The DDL adapter uses
+   * this to render the qualified table name from a `PostgresEntityRef`.
    */
   quoteTable(tableName: string): string {
     return `${quoteIdentifier(this.id)}.${quoteIdentifier(tableName)}`;
@@ -197,10 +196,7 @@ export class PostgresSchema extends SqlNamespaceBase {
    * database (e.g. `CREATE TABLE "<ddlSchemaName>"."<table>" …`,
    * catalog filters, planner conflict lookups). Named schemas resolve
    * to their own id. The `PostgresUnboundSchema` singleton inherits
-   * this and returns `UNBOUND_NAMESPACE_ID` — callers that dispatch
-   * through `qualifyTableName` route through the polymorphic
-   * `PostgresUnboundSchema` overrides and produce unqualified
-   * (search-path-resolved) output automatically.
+   * this and returns `UNBOUND_NAMESPACE_ID`.
    */
   ddlSchemaName(_storage: SqlStorage): string {
     return this.id;
@@ -222,9 +218,7 @@ export class PostgresSchema extends SqlNamespaceBase {
  * `search_path`).
  *
  * `ddlSchemaName` is inherited from `PostgresSchema` and returns
- * `UNBOUND_NAMESPACE_ID`. Downstream helpers such as `qualifyTableName`
- * route through the polymorphic factory and produce unqualified output
- * automatically.
+ * `UNBOUND_NAMESPACE_ID`.
  */
 export class PostgresUnboundSchema extends PostgresSchema {
   static readonly instance: PostgresUnboundSchema = new PostgresUnboundSchema();

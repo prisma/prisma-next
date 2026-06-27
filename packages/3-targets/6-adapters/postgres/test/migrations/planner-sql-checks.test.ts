@@ -1,7 +1,4 @@
-import {
-  buildExpectedFormatType,
-  qualifyTableName,
-} from '@prisma-next/target-postgres/planner-sql-checks';
+import { buildExpectedFormatType } from '@prisma-next/target-postgres/planner-sql-checks';
 import { describe, expect, it } from 'vitest';
 
 // Raw-string check helpers (columnExistsCheck, columnNullabilityCheck,
@@ -11,12 +8,6 @@ import { describe, expect, it } from 'vitest';
 // @prisma-next/target-postgres/contract-free. Construction pins live in
 // target-postgres test/migrations/verification-checks.test.ts and lowering
 // pins in test/verification-checks-lowering.test.ts.
-
-describe('qualifyTableName', () => {
-  it('quotes schema and table', () => {
-    expect(qualifyTableName('public', 'user')).toBe('"public"."user"');
-  });
-});
 
 describe('buildExpectedFormatType', () => {
   const noHooks = new Map();

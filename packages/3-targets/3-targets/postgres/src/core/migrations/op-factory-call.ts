@@ -302,7 +302,7 @@ export class DropTableCall extends PostgresOpFactoryCallNode {
         `DropTableCall.toOp: a lowerer is required on the Postgres planner path (table "${this.ref.id}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return dropTable(this.ref.namespace.id, this.ref.id, lowerer);
+    return dropTable(this.ref, lowerer);
   }
 
   renderTypeScript(): string {
@@ -408,7 +408,7 @@ export class DropColumnCall extends PostgresOpFactoryCallNode {
         `DropColumnCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.ref.id}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return dropColumn(this.ref.namespace.id, this.ref.id, this.columnName, lowerer);
+    return dropColumn(this.ref, this.columnName, lowerer);
   }
 
   renderTypeScript(): string {
@@ -456,13 +456,7 @@ export class AlterColumnTypeCall extends PostgresOpFactoryCallNode {
         `AlterColumnTypeCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.ref.id}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return alterColumnType(
-      this.ref.namespace.id,
-      this.ref.id,
-      this.columnName,
-      this.options,
-      lowerer,
-    );
+    return alterColumnType(this.ref, this.columnName, this.options, lowerer);
   }
 
   renderTypeScript(): string {
@@ -502,7 +496,7 @@ export class SetNotNullCall extends PostgresOpFactoryCallNode {
         `SetNotNullCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.ref.id}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return setNotNull(this.ref.namespace.id, this.ref.id, this.columnName, lowerer);
+    return setNotNull(this.ref, this.columnName, lowerer);
   }
 
   renderTypeScript(): string {
@@ -541,7 +535,7 @@ export class DropNotNullCall extends PostgresOpFactoryCallNode {
         `DropNotNullCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.ref.id}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return dropNotNull(this.ref.namespace.id, this.ref.id, this.columnName, lowerer);
+    return dropNotNull(this.ref, this.columnName, lowerer);
   }
 
   renderTypeScript(): string {
@@ -588,14 +582,7 @@ export class SetDefaultCall extends PostgresOpFactoryCallNode {
         `SetDefaultCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.ref.id}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return setDefault(
-      this.ref.namespace.id,
-      this.ref.id,
-      this.columnName,
-      this.defaultSql,
-      lowerer,
-      this.operationClass,
-    );
+    return setDefault(this.ref, this.columnName, this.defaultSql, lowerer, this.operationClass);
   }
 
   renderTypeScript(): string {
@@ -806,13 +793,7 @@ export class AddPrimaryKeyCall extends PostgresOpFactoryCallNode {
         `AddPrimaryKeyCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.ref.id}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return addPrimaryKey(
-      this.ref.namespace.id,
-      this.ref.id,
-      this.constraintName,
-      this.columns,
-      lowerer,
-    );
+    return addPrimaryKey(this.ref, this.constraintName, this.columns, lowerer);
   }
 
   renderTypeScript(): string {
@@ -847,13 +828,7 @@ export class AddUniqueCall extends PostgresOpFactoryCallNode {
         `AddUniqueCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.ref.id}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return addUnique(
-      this.ref.namespace.id,
-      this.ref.id,
-      this.constraintName,
-      this.columns,
-      lowerer,
-    );
+    return addUnique(this.ref, this.constraintName, this.columns, lowerer);
   }
 
   renderTypeScript(): string {
@@ -886,7 +861,7 @@ export class AddForeignKeyCall extends PostgresOpFactoryCallNode {
         `AddForeignKeyCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.fk.name}" on table "${this.ref.id}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return addForeignKey(this.ref.namespace.id, this.ref.id, this.fk, lowerer);
+    return addForeignKey(this.ref, this.fk, lowerer);
   }
 
   renderTypeScript(): string {
@@ -931,13 +906,7 @@ export class DropConstraintCall extends PostgresOpFactoryCallNode {
         `DropConstraintCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.ref.id}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return dropConstraint(
-      this.ref.namespace.id,
-      this.ref.id,
-      this.constraintName,
-      lowerer,
-      this.kind,
-    );
+    return dropConstraint(this.ref, this.constraintName, lowerer, this.kind);
   }
 
   renderTypeScript(): string {
@@ -983,14 +952,7 @@ export class AddCheckConstraintCall extends PostgresOpFactoryCallNode {
         `AddCheckConstraintCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.ref.id}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return addCheckConstraint(
-      this.ref.namespace.id,
-      this.ref.id,
-      this.constraintName,
-      this.column,
-      this.values,
-      lowerer,
-    );
+    return addCheckConstraint(this.ref, this.constraintName, this.column, this.values, lowerer);
   }
 
   renderTypeScript(): string {
@@ -1023,7 +985,7 @@ export class DropCheckConstraintCall extends PostgresOpFactoryCallNode {
         `DropCheckConstraintCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.ref.id}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return dropCheckConstraint(this.ref.namespace.id, this.ref.id, this.constraintName, lowerer);
+    return dropCheckConstraint(this.ref, this.constraintName, lowerer);
   }
 
   renderTypeScript(): string {
@@ -1076,14 +1038,7 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
     const extras: { type?: string; options?: Record<string, unknown> } = {};
     if (this.indexType !== undefined) extras.type = this.indexType;
     if (this.options !== undefined) extras.options = this.options;
-    return createIndex(
-      this.ref.namespace.id,
-      this.ref.id,
-      this.indexName,
-      this.columns,
-      lowerer,
-      extras,
-    );
+    return createIndex(this.ref, this.indexName, this.columns, lowerer, extras);
   }
 
   renderTypeScript(): string {
@@ -1129,7 +1084,7 @@ export class DropIndexCall extends PostgresOpFactoryCallNode {
         `DropIndexCall.toOp: a lowerer is required on the Postgres planner path (index "${this.indexName}" on table "${this.ref.id}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
-    return dropIndex(this.ref.namespace.id, this.ref.id, this.indexName, lowerer);
+    return dropIndex(this.ref, this.indexName, lowerer);
   }
 
   renderTypeScript(): string {

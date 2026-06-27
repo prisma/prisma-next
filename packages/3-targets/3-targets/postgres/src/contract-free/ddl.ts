@@ -19,9 +19,8 @@ import type { PostgresEntityRef } from '../core/entity-ref';
  * unique constraints — use the {@link PrimaryKeyConstraint}, {@link ForeignKeyConstraint},
  * and {@link UniqueConstraint} classes from `@prisma-next/sql-relational-core/ast`.
  *
- * `ref.qualified()` produces the table identifier in SQL; identifiers are
- * quoted via `quoteIdentifier` semantics. String-literal default values are
- * single-quote-escaped by the renderer.
+ * The adapter renders the qualified table name from `ref.namespace.quoteTable(ref.id)`.
+ * String-literal default values are single-quote-escaped by the renderer.
  */
 export function createTable(options: {
   readonly ref: PostgresEntityRef;

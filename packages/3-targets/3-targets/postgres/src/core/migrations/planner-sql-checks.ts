@@ -1,23 +1,7 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import { postgresCreateNamespace } from '../postgres-schema';
 import { quoteIdentifier } from '../sql-utils';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
-
-/**
- * String-keyed entry points the migration ops use to render
- * schema-qualified DDL and catalog checks. The `schema` argument is
- * interpreted as a namespace coordinate: the framework `__unbound__`
- * sentinel resolves to the late-bound `PostgresUnboundSchema` singleton
- * (which elides the qualifier so `search_path` decides at runtime); any
- * other id materialises a `PostgresSchema(id)` whose qualifier is the
- * named schema. Helpers route through these `Namespace` concretions so
- * the unbound branch lives in the polymorphic override, not the call
- * site.
- */
-export function qualifyTableName(schema: string, table: string): string {
-  return postgresCreateNamespace({ id: schema, entries: { table: {} } }).qualifyTable(table);
-}
 
 const FORMAT_TYPE_DISPLAY: ReadonlyMap<string, string> = new Map([
   ['int2', 'smallint'],
