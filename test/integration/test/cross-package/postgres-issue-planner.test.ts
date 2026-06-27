@@ -846,7 +846,7 @@ describe('planIssues', () => {
       if (!result.ok) throw new Error('expected ok');
       const createTableCall = result.value.calls[0] as CreateTableCall;
       expect(createTableCall.factoryName).toBe('createTable');
-      expect(createTableCall.ref.name).toBe('users');
+      expect(createTableCall.ref.id).toBe('users');
       expect(createTableCall.ref.namespace.id).toBe('tenant_a');
     });
   });

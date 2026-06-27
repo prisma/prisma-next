@@ -4,29 +4,25 @@
 
 ## Purpose
 
-Replace the `(schemaName: string | undefined, tableName: string)` string pair carried through the Postgres migration DDL pipeline with a typed **entity-reference** node. The reference carries the live namespace node and renders its own qualified identifier; the renderer asks it to render itself instead of composing `"schema"."table"` from strings. This deletes `bound-schema.ts` and the three `isPostgresSchema(ns) ? ns.ddlSchemaName(storage) : namespaceId` fallbacks.
+Replace the `(schemaName: string | undefined, tableName: string)` string pair carried through the Postgres migration DDL pipeline with a typed **entity reference** — a coordinate `{ namespace, id }` passed around as one value instead of two loose strings. This deletes `bound-schema.ts` and the `isPostgresSchema(ns) ? ns.ddlSchemaName(storage) : namespaceId` fallbacks.
 
-## The design (settled at grounding — not a spike)
+## The design (corrected after the round-2 review)
 
-**The ref carries the live namespace node, not a resolved schema-name string.** Rendering delegates to the node's existing bound/unbound polymorphism, so the qualified-vs-unqualified decision lives in one place (the node) and is reached through the ref. This is what makes both the sentinel re-mapping (`bound-schema.ts`) and the three `ddlSchemaName`-fallback helpers dead — the planner hands the node to the ref instead of pre-resolving a string id.
+> The original premise below — "the ref renders its own qualified identifier" — was **wrong** and is superseded. A reference is a coordinate, not a renderer; rendering to SQL is the adapter's job (lowering). See `reviews/pr-877/round-2-entity-ref-usage/`. The first-pass implementation shipped the ref-renders-itself shape; the corrected design walks it back.
 
-**Entity coordinate, not table-specific** (frozen-class / visitor over entity kind):
+**The ref is a pure coordinate.** It carries `{ namespace: <PostgresSchema node>, id: string, parent?: PostgresEntityRef }` and has **no render methods**. `id` (not `name`) is the entity's identifier — it is the dictionary key in `entries[entityKind][id]`, and `name` carried a SQL bias that doesn't belong in a cross-target coordinate. The ref keeps the live namespace **node** (not a `namespaceId` key) because the DDL renderers receive no contract to resolve a key against, and control-plane DDL (`prisma_contract`) operates on namespaces absent from the user contract.
 
-- **Schema-qualified base** (tables, indexes, sequences, types, views): renders `"<schema>"."<name>"`, unqualified for the unbound namespace.
-- **Columns** nest a parent table ref: `"<schema>"."<table>"."<column>"`.
-- **Extensions** (TML-2920) and **RLS policies** (postgres-rls project) slot in later — extension overrides to database-global `"<name>"`; policy nests its table. **This slice implements table + column kinds only**, but the class family must be shaped so those slot in without reopening the base.
+**The adapter owns rendering.** The DDL renderers (`pgRenderCreateTable`/`pgRenderAlterTable`) compose the qualified name from `ref.namespace` + `ref.id` through the **same** composer the query path already uses (`qualifyTableFromNamespaceCoordinate` in `sql-renderer.ts`). `PostgresEntityRef.qualified()` and the `qualifyTableName` rebuild-a-namespace helper are both deleted — they were the IR-renders-SQL inversion in two places.
 
-**Hydration fix is a hard prerequisite** (see below): a non-empty unbound namespace currently hydrates as base `PostgresSchema({ id: '__unbound__' })`, whose `qualifyTable` would render `"__unbound__"."Doc"`. The ref-carries-node design surfaces that bug, so the fix lands in this slice.
+**`entityKind` is intentionally omitted** — the pipeline only references tables (and columns via `parent`); a kind field that is always `'table'` is speculative until extension/policy (TML-2920 / postgres-rls) need it.
+
+**Call sites stop re-deriving.** The 14 `ref.namespace.id !== UNBOUND_NAMESPACE_ID` sentinel checks in `renderTypeScript` collapse to reading the namespace's authored-schema *data* (a polymorphic property: the schema name, or nothing for unbound). The 17 hand-rolled `"table"."column"` labels stop composing quoted names by hand. The `operations/*.ts` helpers take the ref instead of `(schemaName, tableName)` strings.
+
+**Hydration fix (kept from the first pass):** a non-empty unbound namespace must hydrate as `PostgresUnboundSchema`, not base `PostgresSchema({ id: '__unbound__' })` whose qualifier would leak `"__unbound__"."Doc"`.
 
 ## Byte-parity contract (the hard gate)
 
-The ref's qualified rendering must be **byte-identical** to today's renderer composition (`control-adapter.ts` ~1493/1520):
-
-```
-node.schema ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}` : quoteIdentifier(node.table)
-```
-
-So the ref's render must reuse **`quoteIdentifier`** semantics (escapes embedded `"`), **not** `PostgresSchema.qualifyTable`'s lighter raw interpolation (`"${id}"`). Both `quoteIdentifier` and the ref live in the postgres target package — no layering inversion. The ref asks the node for the bound/unbound decision + schema name; it applies `quoteIdentifier` itself. `pnpm fixtures:check` zero-diff is the gate.
+Every rendering change is **byte-identical** — the unified adapter composer reproduces today's `"schema"."table"` (and unqualified-unbound) output exactly, reusing `quoteIdentifier` (which escapes embedded `"`). `pnpm fixtures:check` zero-diff is the gate on every step.
 
 ## In scope
 

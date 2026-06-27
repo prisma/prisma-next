@@ -33,9 +33,9 @@ describe('PostgresEntityRef (table)', () => {
     expect(ref.qualified()).toBe('"sessions"');
   });
 
-  it('name and namespace are accessible', () => {
+  it('id and namespace are accessible', () => {
     const ref = boundNs.tableRef('user');
-    expect(ref.name).toBe('user');
+    expect(ref.id).toBe('user');
     expect(ref.namespace).toBe(boundNs);
   });
 
@@ -49,40 +49,40 @@ describe('PostgresEntityRef (table)', () => {
     const ref = ns.tableRef('orders');
     expect(ref).toBeInstanceOf(PostgresEntityRef);
     expect(ref.namespace).toBe(ns);
-    expect(ref.name).toBe('orders');
+    expect(ref.id).toBe('orders');
   });
 });
 
 describe('PostgresEntityRef (column via parent)', () => {
   it('qualified: bound table renders schema.table.column', () => {
     const tableRef = boundNs.tableRef('user');
-    const ref = new PostgresEntityRef({ namespace: boundNs, name: 'email', parent: tableRef });
+    const ref = new PostgresEntityRef({ namespace: boundNs, id: 'email', parent: tableRef });
     expect(ref.qualified()).toBe('"public"."user"."email"');
   });
 
   it('qualified: unbound table renders table.column (no schema prefix)', () => {
     const tableRef = unboundNs.tableRef('user');
-    const ref = new PostgresEntityRef({ namespace: unboundNs, name: 'email', parent: tableRef });
+    const ref = new PostgresEntityRef({ namespace: unboundNs, id: 'email', parent: tableRef });
     expect(ref.qualified()).toBe('"user"."email"');
   });
 
   it('qualified: column name with embedded quote escapes correctly', () => {
     const tableRef = boundNs.tableRef('user');
-    const ref = new PostgresEntityRef({ namespace: boundNs, name: 'my"col', parent: tableRef });
+    const ref = new PostgresEntityRef({ namespace: boundNs, id: 'my"col', parent: tableRef });
     expect(ref.qualified()).toBe('"public"."user"."my""col"');
   });
 
-  it('name and parent are accessible', () => {
+  it('id and parent are accessible', () => {
     const tableRef = boundNs.tableRef('user');
-    const ref = new PostgresEntityRef({ namespace: boundNs, name: 'email', parent: tableRef });
-    expect(ref.name).toBe('email');
+    const ref = new PostgresEntityRef({ namespace: boundNs, id: 'email', parent: tableRef });
+    expect(ref.id).toBe('email');
     expect(ref.parent).toBe(tableRef);
-    expect(tableRef.name).toBe('user');
+    expect(tableRef.id).toBe('user');
   });
 
   it('is frozen', () => {
     const tableRef = boundNs.tableRef('user');
-    const ref = new PostgresEntityRef({ namespace: boundNs, name: 'email', parent: tableRef });
+    const ref = new PostgresEntityRef({ namespace: boundNs, id: 'email', parent: tableRef });
     expect(Object.isFrozen(ref)).toBe(true);
   });
 });

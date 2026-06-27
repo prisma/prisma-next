@@ -20,7 +20,7 @@ describe('postgres contract-free ddl', () => {
       columns: [col('space', 'text', { notNull: true, primaryKey: true, default: lit('app') })],
     });
     expect(node.kind).toBe('create-table');
-    expect(node.ref.name).toBe('marker');
+    expect(node.ref.id).toBe('marker');
     expect(node.ref.namespace.id).toBe('prisma_contract');
     expect(node.columns).toHaveLength(1);
     expect(Object.isFrozen(node)).toBe(true);

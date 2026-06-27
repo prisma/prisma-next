@@ -140,7 +140,7 @@ export class PostgresSchema extends SqlNamespaceBase {
   }
 
   tableRef(name: string): PostgresEntityRef {
-    return new PostgresEntityRef({ namespace: this, name });
+    return new PostgresEntityRef({ namespace: this, id: name });
   }
 
   /**

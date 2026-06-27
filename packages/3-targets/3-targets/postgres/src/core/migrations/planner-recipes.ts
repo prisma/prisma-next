@@ -21,7 +21,7 @@ export function buildAddColumnOperationIdentity(
   SqlMigrationPlanOperation<PostgresPlanTargetDetails>,
   'id' | 'label' | 'summary' | 'target'
 > {
-  const tableName = ref.name;
+  const tableName = ref.id;
   const schema = ref.namespace.id;
   return {
     id: `column.${tableName}.${columnName}`,
@@ -45,7 +45,7 @@ export async function buildAddNotNullColumnWithTemporaryDefaultOperation(options
 }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
   const { ref, columnName, column, codecHooks, storageTypes, temporaryDefault, lowerer } = options;
   const schema = ref.namespace.id;
-  const tableName = ref.name;
+  const tableName = ref.id;
 
   const ddlColumn = col(columnName, buildColumnTypeSql(column, codecHooks, storageTypes), {
     notNull: true,

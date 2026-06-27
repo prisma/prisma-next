@@ -245,7 +245,7 @@ export async function dropDefault(
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
   const schemaName = ref.namespace.id;
-  const tableName = ref.name;
+  const tableName = ref.id;
   const { present } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
@@ -285,7 +285,7 @@ export async function addNotNullColumnDirect(
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
   const schemaName = ref.namespace.id;
-  const tableName = ref.name;
+  const tableName = ref.id;
   const columnName = column.name;
   const addColumn = await lowerer.lowerToExecuteRequest(
     contractFreeDdl.alterTable({
