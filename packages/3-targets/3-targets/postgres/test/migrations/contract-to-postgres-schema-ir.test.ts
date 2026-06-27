@@ -1,13 +1,12 @@
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import { contractToSchemaIR } from '@prisma-next/family-sql/control';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { collectContractRlsPolicies } from '../../src/core/migrations/collect-contract-postgres-nodes';
 import { contractToPostgresSchemaIR } from '../../src/core/migrations/contract-to-postgres-schema-ir';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { type PostgresContract, PostgresSchema } from '../../src/core/postgres-schema';
 import { isPostgresSchemaIR } from '../../src/core/postgres-schema-ir';
+import { isPostgresTableIR } from '../../src/core/postgres-table-ir';
 import { postgresRenderDefault } from '../../src/exports/control';
 
 const TABLE_NAME = 'profiles';
@@ -71,7 +70,7 @@ const projectionOptions = {
 } as const;
 
 describe('contractToPostgresSchemaIR', () => {
-  it('projects a SELECT policy into rlsPolicies and tables matching contractToSchemaIR', () => {
+  it('projects a SELECT policy into rlsPolicies attached to the table', () => {
     const policy = makePolicy('read_own_profiles_a1b2c3d4');
     const contract = makeContract([policy]);
 
@@ -79,7 +78,18 @@ describe('contractToPostgresSchemaIR', () => {
 
     expect(isPostgresSchemaIR(ir)).toBe(true);
     expect(ir.rlsPolicies).toContainEqual(policy);
-    expect(ir.tables).toEqual(contractToSchemaIR(contract, projectionOptions).tables);
+    expect(Object.keys(ir.tables)).toEqual([TABLE_NAME]);
+    expect(isPostgresTableIR(ir.tables[TABLE_NAME]!)).toBe(true);
+    expect(ir.tables[TABLE_NAME]?.rlsPolicies).toContainEqual(policy);
+  });
+
+  it('tables are PostgresTableIR instances', () => {
+    const policy = makePolicy('read_own_profiles_a1b2c3d4');
+    const contract = makeContract([policy]);
+
+    const ir = contractToPostgresSchemaIR(contract, projectionOptions);
+
+    expect(Object.values(ir.tables).every(isPostgresTableIR)).toBe(true);
   });
 
   it('returns no policies for a null contract', () => {
@@ -87,15 +97,5 @@ describe('contractToPostgresSchemaIR', () => {
     expect(ir.rlsPolicies).toEqual([]);
     expect(ir.tables).toEqual({});
     expect(isPostgresSchemaIR(ir)).toBe(true);
-  });
-
-  it('collectContractRlsPolicies returns the contract policies', () => {
-    const policy = makePolicy('read_own_profiles_a1b2c3d4');
-    const contract = makeContract([policy]);
-    expect(collectContractRlsPolicies(contract)).toEqual([policy]);
-  });
-
-  it('collectContractRlsPolicies returns empty for null', () => {
-    expect(collectContractRlsPolicies(null)).toEqual([]);
   });
 });

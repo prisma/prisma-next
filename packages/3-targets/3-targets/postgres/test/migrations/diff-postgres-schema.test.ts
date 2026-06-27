@@ -11,7 +11,7 @@ import {
 import { isPostgresRlsPolicy, PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
-import { groupPoliciesIntoTableNodes } from '../../src/core/postgres-table-node';
+import { PostgresTableIR } from '../../src/core/postgres-table-ir';
 
 const TABLE_NAME = 'profiles';
 const SCHEMA_NAME = 'public';
@@ -72,10 +72,23 @@ function makeContract(policies: readonly PostgresRlsPolicy[]): Contract<SqlStora
   };
 }
 
+/**
+ * Build an actual `PostgresSchemaIR` that has the single `profiles` table plus
+ * any extra tables required to hold the supplied policies (keyed by tableName).
+ */
 function makeSchema(actualPolicies: readonly PostgresRlsPolicy[]): PostgresSchemaIR {
-  return new PostgresSchemaIR({
-    tables: {
-      [TABLE_NAME]: {
+  const policiesByTable = new Map<string, PostgresRlsPolicy[]>();
+  for (const p of actualPolicies) {
+    const list = policiesByTable.get(p.tableName) ?? [];
+    list.push(p);
+    policiesByTable.set(p.tableName, list);
+  }
+
+  const tableNames = new Set([TABLE_NAME, ...policiesByTable.keys()]);
+  const tables: Record<string, PostgresTableIR> = {};
+  for (const name of tableNames) {
+    if (name === TABLE_NAME) {
+      tables[name] = new PostgresTableIR({
         name: TABLE_NAME,
         columns: {
           id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -84,11 +97,24 @@ function makeSchema(actualPolicies: readonly PostgresRlsPolicy[]): PostgresSchem
         foreignKeys: [],
         uniques: [],
         indexes: [],
-      },
-    },
+        rlsPolicies: policiesByTable.get(name) ?? [],
+      });
+    } else {
+      tables[name] = new PostgresTableIR({
+        name,
+        columns: {},
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+        rlsPolicies: policiesByTable.get(name) ?? [],
+      });
+    }
+  }
+
+  return new PostgresSchemaIR({
+    tables,
     pgSchemaName: 'public',
     pgVersion: 'unknown',
-    tableNodes: groupPoliciesIntoTableNodes(actualPolicies),
     roles: [],
     existingSchemas: ['public'],
     nativeEnumTypeNames: [],
@@ -256,17 +282,25 @@ describe('diffPostgresSchema', () => {
 
     const schemaWithBothNamespaces = new PostgresSchemaIR({
       tables: {
-        users: {
+        users: new PostgresTableIR({
           name: 'users',
           columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
           foreignKeys: [],
           uniques: [],
           indexes: [],
-        },
+          rlsPolicies: [authPolicy],
+        }),
+        profile: new PostgresTableIR({
+          name: 'profile',
+          columns: {},
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+          rlsPolicies: [foreignPublicPolicy],
+        }),
       },
       pgSchemaName: 'auth',
       pgVersion: 'unknown',
-      tableNodes: groupPoliciesIntoTableNodes([authPolicy, foreignPublicPolicy]),
       roles: [],
       existingSchemas: ['auth', 'public'],
       nativeEnumTypeNames: [],
@@ -325,17 +359,25 @@ describe('diffPostgresSchema', () => {
 
     const schemaWithBothNamespaces = new PostgresSchemaIR({
       tables: {
-        users: {
+        users: new PostgresTableIR({
           name: 'users',
           columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
           foreignKeys: [],
           uniques: [],
           indexes: [],
-        },
+          rlsPolicies: [authPolicy],
+        }),
+        profile: new PostgresTableIR({
+          name: 'profile',
+          columns: {},
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+          rlsPolicies: [foreignPublicPolicy],
+        }),
       },
       pgSchemaName: 'auth',
       pgVersion: 'unknown',
-      tableNodes: groupPoliciesIntoTableNodes([authPolicy, foreignPublicPolicy]),
       roles: [],
       existingSchemas: ['auth', 'public'],
       nativeEnumTypeNames: [],
@@ -386,17 +428,17 @@ describe('diffPostgresSchema', () => {
 
     const schema = new PostgresSchemaIR({
       tables: {
-        users: {
+        users: new PostgresTableIR({
           name: 'users',
           columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
           foreignKeys: [],
           uniques: [],
           indexes: [],
-        },
+          rlsPolicies: [ownedExtra],
+        }),
       },
       pgSchemaName: 'auth',
       pgVersion: 'unknown',
-      tableNodes: groupPoliciesIntoTableNodes([ownedExtra]),
       roles: [],
       existingSchemas: ['auth'],
       nativeEnumTypeNames: [],
@@ -418,7 +460,7 @@ describe('diffPostgresSchema', () => {
     expect(issues[0]?.actual).toMatchObject({ name: 'auth_extra_99887766' });
   });
 
-  it('regression: same prefix+body on two different tables does not throw (distinct table nodes)', () => {
+  it('regression: same prefix+body on two different tables does not throw (distinct tables)', () => {
     const WIRE_NAME = 'read_own_a1b2c3d4';
     const policyOnProfiles = makePolicy(WIRE_NAME, 'profiles');
     const policyOnOrders = makePolicy(WIRE_NAME, 'orders');
@@ -472,7 +514,7 @@ describe('diffPostgresSchema', () => {
 
     const schema = new PostgresSchemaIR({
       tables: {
-        profiles: {
+        profiles: new PostgresTableIR({
           name: 'profiles',
           columns: {
             id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -481,8 +523,9 @@ describe('diffPostgresSchema', () => {
           foreignKeys: [],
           uniques: [],
           indexes: [],
-        },
-        orders: {
+          rlsPolicies: [policyOnProfiles],
+        }),
+        orders: new PostgresTableIR({
           name: 'orders',
           columns: {
             id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -491,11 +534,11 @@ describe('diffPostgresSchema', () => {
           foreignKeys: [],
           uniques: [],
           indexes: [],
-        },
+          rlsPolicies: [policyOnOrders],
+        }),
       },
       pgSchemaName: SCHEMA_NAME,
       pgVersion: 'unknown',
-      tableNodes: groupPoliciesIntoTableNodes([policyOnProfiles, policyOnOrders]),
       roles: [],
       existingSchemas: [SCHEMA_NAME],
       nativeEnumTypeNames: [],
@@ -510,7 +553,7 @@ describe('diffPostgresSchema', () => {
     expect(issues).toHaveLength(0);
   });
 
-  it('policies nest under table nodes: initial migration yields policy missing issues with correct paths', () => {
+  it('policies nest under tables: initial migration yields policy missing issues with correct paths', () => {
     const policyA = makePolicy('read_own_a1b2c3d4', 'profiles');
     const policyB = makePolicy('read_own_a1b2c3d4', 'orders');
 
@@ -563,7 +606,6 @@ describe('diffPostgresSchema', () => {
       tables: {},
       pgSchemaName: 'public',
       pgVersion: 'unknown',
-      tableNodes: [],
       roles: [],
       existingSchemas: ['public'],
       nativeEnumTypeNames: [],
@@ -574,10 +616,8 @@ describe('diffPostgresSchema', () => {
     expect(issues.every((i) => isPostgresRlsPolicy(i.expected ?? i.actual))).toBe(true);
     expect(issues).toHaveLength(2);
     const paths = issues.map((i) => i.path);
-    expect(paths.some((p) => p[1] === 'public/profiles' && p[2] === 'read_own_a1b2c3d4')).toBe(
-      true,
-    );
-    expect(paths.some((p) => p[1] === 'public/orders' && p[2] === 'read_own_a1b2c3d4')).toBe(true);
+    expect(paths.some((p) => p[1] === 'profiles' && p[2] === 'read_own_a1b2c3d4')).toBe(true);
+    expect(paths.some((p) => p[1] === 'orders' && p[2] === 'read_own_a1b2c3d4')).toBe(true);
   });
 
   it('multi-schema normalization: unbound contract policy pairs with public introspected policy (zero issues)', () => {
@@ -636,17 +676,17 @@ describe('diffPostgresSchema', () => {
 
     const actual = new PostgresSchemaIR({
       tables: {
-        profiles: {
+        profiles: new PostgresTableIR({
           name: 'profiles',
           columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
           foreignKeys: [],
           uniques: [],
           indexes: [],
-        },
+          rlsPolicies: [introspectedPolicy],
+        }),
       },
       pgSchemaName: 'public',
       pgVersion: 'unknown',
-      tableNodes: groupPoliciesIntoTableNodes([introspectedPolicy]),
       roles: [],
       existingSchemas: ['public'],
       nativeEnumTypeNames: [],
@@ -720,10 +760,18 @@ describe('diffPostgresSchema', () => {
       { annotationNamespace: 'pg' },
     );
     const actual = new PostgresSchemaIR({
-      tables: {},
+      tables: {
+        orders: new PostgresTableIR({
+          name: 'orders',
+          columns: {},
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+          rlsPolicies: [unownedExtra],
+        }),
+      },
       pgSchemaName: 'public',
       pgVersion: 'unknown',
-      tableNodes: groupPoliciesIntoTableNodes([unownedExtra]),
       roles: [],
       existingSchemas: ['public', 'other_schema'],
       nativeEnumTypeNames: [],

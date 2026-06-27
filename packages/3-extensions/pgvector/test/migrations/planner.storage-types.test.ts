@@ -27,7 +27,6 @@ const emptySchema = new PostgresSchemaIR({
   tables: {},
   pgSchemaName: 'public',
   pgVersion: '',
-  tableNodes: [],
   roles: [],
   existingSchemas: [],
   nativeEnumTypeNames: [],

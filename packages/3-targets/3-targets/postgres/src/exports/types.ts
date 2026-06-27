@@ -19,9 +19,8 @@ export {
   type PostgresSchemaIRInput,
 } from '../core/postgres-schema-ir';
 export {
-  groupPoliciesIntoTableNodes,
-  isPostgresTableNode,
-  PostgresTableNode,
-  type PostgresTableNodeInput,
-} from '../core/postgres-table-node';
+  isPostgresTableIR,
+  PostgresTableIR,
+  type PostgresTableIRInput,
+} from '../core/postgres-table-ir';
 export type { PostgresColumnDefault } from '../core/types';

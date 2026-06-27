@@ -39,7 +39,6 @@ import type {
   SqlIndexIR,
   SqlReferentialAction,
   SqlSchemaIR,
-  SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import {
@@ -66,14 +65,13 @@ import {
   dropUnownedExtraPolicyIssues,
 } from '@prisma-next/target-postgres/planner';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
-import type { PostgresTableNode } from '@prisma-next/target-postgres/types';
 import {
   ensurePostgresSchemaIR,
-  groupPoliciesIntoTableNodes,
   isPostgresSchemaIR,
   PostgresRlsPolicy,
   PostgresRole,
   PostgresSchemaIR,
+  PostgresTableIR,
 } from '@prisma-next/target-postgres/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -606,7 +604,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       tables: ir.tables,
       pgSchemaName: ir.pgSchemaName,
       pgVersion: ir.pgVersion,
-      tableNodes: ir.tableNodes,
       roles: ir.roles,
       existingSchemas,
       nativeEnumTypeNames: ir.nativeEnumTypeNames,
@@ -667,17 +664,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       perSchema.push(await this.introspectSchema(driver, schema));
     }
 
-    const mergedTables: Record<string, SqlTableIR> = {};
+    const mergedTables: Record<string, PostgresTableIR> = {};
+    const mergedRoles: PostgresRole[] = [];
     for (const ir of perSchema) {
       for (const [tableName, table] of Object.entries(ir.tables)) {
         mergedTables[tableName] = table;
       }
-    }
-
-    const mergedTableNodes: PostgresTableNode[] = [];
-    const mergedRoles: PostgresRole[] = [];
-    for (const ir of perSchema) {
-      mergedTableNodes.push(...ir.tableNodes);
       mergedRoles.push(...ir.roles);
     }
 
@@ -686,7 +678,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       tables: mergedTables,
       pgSchemaName: first?.pgSchemaName ?? 'public',
       pgVersion: first?.pgVersion ?? 'unknown',
-      tableNodes: mergedTableNodes,
       roles: mergedRoles,
       existingSchemas: first?.existingSchemas ?? ['public'],
       nativeEnumTypeNames: first?.nativeEnumTypeNames ?? [],
@@ -943,7 +934,18 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       constraints.add(row.constraint_name);
     }
 
-    const tables: Record<string, SqlTableIR> = {};
+    const tableInputs: Record<
+      string,
+      {
+        name: string;
+        columns: Record<string, SqlColumnIR>;
+        primaryKey?: PrimaryKey;
+        foreignKeys: readonly SqlForeignKeyIR[];
+        uniques: readonly SqlUniqueIR[];
+        indexes: readonly SqlIndexIR[];
+        checks?: SqlCheckConstraintIRInput[];
+      }
+    > = {};
 
     for (const tableRow of tablesResult.rows) {
       const tableName = tableRow.table_name;
@@ -1128,7 +1130,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         }
       }
 
-      tables[tableName] = {
+      tableInputs[tableName] = {
         name: tableName,
         columns,
         ...ifDefined('primaryKey', primaryKey),
@@ -1172,24 +1174,38 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          AND rolname != 'postgres'
        ORDER BY rolname`,
     );
-    const rlsPolicies: PostgresRlsPolicy[] = policiesResult.rows.map((row) => {
+    const policiesByTable = new Map<string, PostgresRlsPolicy[]>();
+    for (const row of policiesResult.rows) {
       const operation = mapPgCmd(row.cmd);
-      const roles = [...new Set(parsePgNameArray(row.roles).map((r) => r.toLowerCase()))].sort();
+      const policyRoles = [
+        ...new Set(parsePgNameArray(row.roles).map((r) => r.toLowerCase())),
+      ].sort();
       const permissive = row.permissive.toUpperCase() === 'PERMISSIVE';
       const hashSuffixMatch = /^(.+)_([0-9a-f]{8})$/.exec(row.policyname);
       const prefix = hashSuffixMatch?.[1] ?? row.policyname;
-      return new PostgresRlsPolicy({
+      const policy = new PostgresRlsPolicy({
         name: row.policyname,
         prefix,
         tableName: row.tablename,
         namespaceId: row.schemaname,
         operation,
-        roles,
+        roles: policyRoles,
         ...(row.qual !== null ? { using: row.qual } : {}),
         ...(row.with_check !== null ? { withCheck: row.with_check } : {}),
         permissive,
       });
-    });
+      const list = policiesByTable.get(row.tablename) ?? [];
+      list.push(policy);
+      policiesByTable.set(row.tablename, list);
+    }
+
+    const tables: Record<string, PostgresTableIR> = {};
+    for (const [tableName, input] of Object.entries(tableInputs)) {
+      tables[tableName] = new PostgresTableIR({
+        ...input,
+        rlsPolicies: policiesByTable.get(tableName) ?? [],
+      });
+    }
 
     const roles: PostgresRole[] = rolesResult.rows.map(
       (row) => new PostgresRole({ name: row.rolname, namespaceId: UNBOUND_NAMESPACE_ID }),
@@ -1199,7 +1215,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       tables,
       pgSchemaName: schema,
       pgVersion: await this.getPostgresVersion(driver),
-      tableNodes: groupPoliciesIntoTableNodes(rlsPolicies),
       roles,
       existingSchemas: [],
       nativeEnumTypeNames,

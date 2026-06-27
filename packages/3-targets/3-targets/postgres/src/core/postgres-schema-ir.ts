@@ -5,19 +5,20 @@ import {
   type SqlSchemaIR,
   SqlSchemaIRNode,
   type SqlSchemaTarget,
-  SqlTableIR,
   type SqlTableIRInput,
 } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
 import type { PostgresRole } from './postgres-role';
-import type { PostgresTableNode } from './postgres-table-node';
+import { PostgresTableIR } from './postgres-table-ir';
 
 export interface PostgresSchemaIRInput {
-  readonly tables: Record<string, SqlTableIR | SqlTableIRInput>;
+  readonly tables: Record<
+    string,
+    PostgresTableIR | (SqlTableIRInput & { rlsPolicies?: readonly PostgresRlsPolicy[] })
+  >;
   readonly pgSchemaName: string;
   readonly pgVersion: string;
-  readonly tableNodes: readonly PostgresTableNode[];
   readonly roles: readonly PostgresRole[];
   readonly existingSchemas: readonly string[];
   readonly nativeEnumTypeNames: readonly string[];
@@ -34,22 +35,18 @@ export interface PostgresSchemaIRInput {
  * `SqlSchemaIR` structure and freezes itself at the end of its own
  * constructor.
  *
- * RLS-specific fields (`tableNodes`, `roles`) are typed top-level fields on
- * this class — no `Reflect.get`, no untyped annotation bag access. The
- * `annotations.pg` bag is populated with only the subset the family layer
- * reads (`nativeEnumTypeNames`, `existingSchemas`, `schema`) so family-layer
- * PSL inference and namespace verification continue to work without knowing
- * about RLS.
+ * `tables` holds `PostgresTableIR` instances which carry their own RLS
+ * policies. `children()` returns the tables directly — the table instances
+ * ARE the diff-tree nodes.
  *
  * Nothing RLS-specific leaks into the sql-family layer.
  */
 export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
   readonly nodeTarget: SqlSchemaTarget = 'postgres';
-  readonly tables: Readonly<Record<string, SqlTableIR>>;
+  readonly tables: Readonly<Record<string, PostgresTableIR>>;
   declare readonly annotations?: SqlAnnotations;
   readonly pgSchemaName: string;
   readonly pgVersion: string;
-  readonly tableNodes: readonly PostgresTableNode[];
   readonly roles: readonly PostgresRole[];
   readonly existingSchemas: readonly string[];
   readonly nativeEnumTypeNames: readonly string[];
@@ -60,20 +57,18 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
       Object.fromEntries(
         Object.entries(input.tables).map(([key, t]) => [
           key,
-          t instanceof SqlTableIR ? t : new SqlTableIR(t),
+          t instanceof PostgresTableIR ? t : new PostgresTableIR(t),
         ]),
       ),
     );
     this.pgSchemaName = input.pgSchemaName;
     this.pgVersion = input.pgVersion;
-    this.tableNodes = Object.freeze([...input.tableNodes]);
     this.roles = Object.freeze([...input.roles]);
     this.existingSchemas = Object.freeze([...input.existingSchemas]);
     this.nativeEnumTypeNames = Object.freeze([...input.nativeEnumTypeNames]);
     // Populate the annotations.pg bag with only the subset the family layer
     // reads (nativeEnumTypeNames for PSL inference, existingSchemas for
-    // namespace presence checks). tableNodes and roles are NOT placed here
-    // — they are consumed directly via typed fields on this class.
+    // namespace presence checks).
     this.annotations = {
       pg: {
         schema: input.pgSchemaName,
@@ -93,17 +88,15 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
   }
 
   get rlsPolicies(): readonly PostgresRlsPolicy[] {
-    return this.tableNodes.flatMap((t) => t.policies);
+    return Object.values(this.tables).flatMap((t) => t.rlsPolicies);
   }
 
-  // No database-level attributes to compare yet; two database roots from the
-  // same derivation are structurally identical at this level.
   isEqualTo(_other: DiffableNode): boolean {
     return true;
   }
 
   children(): readonly DiffableNode[] {
-    return this.tableNodes;
+    return Object.values(this.tables);
   }
 }
 

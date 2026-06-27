@@ -7,11 +7,7 @@ import {
 } from '../src/core/postgres-rls-policy';
 import { PostgresRole } from '../src/core/postgres-role';
 import { PostgresSchemaIR } from '../src/core/postgres-schema-ir';
-import {
-  groupPoliciesIntoTableNodes,
-  isPostgresTableNode,
-  PostgresTableNode,
-} from '../src/core/postgres-table-node';
+import { isPostgresTableIR, PostgresTableIR } from '../src/core/postgres-table-ir';
 
 describe('PostgresRlsPolicy DiffableNode', () => {
   const baseInput = {
@@ -142,7 +138,7 @@ describe('PostgresRlsPolicy DiffableNode', () => {
   });
 });
 
-describe('PostgresTableNode', () => {
+describe('PostgresTableIR as diff-tree node', () => {
   const basePolicy = new PostgresRlsPolicy({
     name: 'read_own_a1b2c3d4',
     prefix: 'read_own',
@@ -154,68 +150,75 @@ describe('PostgresTableNode', () => {
     permissive: true,
   });
 
-  it('id returns "<schemaName>/<tableName>"', () => {
-    const node = new PostgresTableNode({
-      schemaName: 'public',
-      tableName: 'profiles',
-      policies: [basePolicy],
+  it('id returns the table name', () => {
+    const table = new PostgresTableIR({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      rlsPolicies: [basePolicy],
     });
-    expect(node.id).toBe('public/profiles');
+    expect(table.id).toBe('profiles');
   });
 
   it('isEqualTo() always returns true', () => {
-    const a = new PostgresTableNode({
-      schemaName: 'public',
-      tableName: 'profiles',
-      policies: [basePolicy],
+    const a = new PostgresTableIR({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      rlsPolicies: [basePolicy],
     });
-    const b = new PostgresTableNode({ schemaName: 'public', tableName: 'profiles', policies: [] });
+    const b = new PostgresTableIR({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      rlsPolicies: [],
+    });
     expect(a.isEqualTo(b)).toBe(true);
   });
 
   it('children() returns the policy nodes', () => {
-    const node = new PostgresTableNode({
-      schemaName: 'public',
-      tableName: 'profiles',
-      policies: [basePolicy],
+    const table = new PostgresTableIR({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      rlsPolicies: [basePolicy],
     });
-    expect(node.children()).toEqual([basePolicy]);
-  });
-
-  it('kind is "table-node"', () => {
-    const node = new PostgresTableNode({
-      schemaName: 'public',
-      tableName: 'profiles',
-      policies: [],
-    });
-    expect(node.kind).toBe('table-node');
+    expect(table.children()).toEqual([basePolicy]);
   });
 
   it('instance is frozen', () => {
-    const node = new PostgresTableNode({
-      schemaName: 'public',
-      tableName: 'profiles',
-      policies: [],
+    const table = new PostgresTableIR({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
     });
-    expect(Object.isFrozen(node)).toBe(true);
+    expect(Object.isFrozen(table)).toBe(true);
   });
 
-  describe('isPostgresTableNode guard', () => {
-    it('returns true for a PostgresTableNode', () => {
-      const node = new PostgresTableNode({
-        schemaName: 'public',
-        tableName: 'profiles',
-        policies: [],
+  describe('isPostgresTableIR guard', () => {
+    it('returns true for a PostgresTableIR', () => {
+      const table = new PostgresTableIR({
+        name: 'profiles',
+        columns: {},
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
       });
-      expect(isPostgresTableNode(node)).toBe(true);
+      expect(isPostgresTableIR(table)).toBe(true);
     });
 
     it('returns false for a PostgresRlsPolicy', () => {
-      expect(isPostgresTableNode(basePolicy)).toBe(false);
-    });
-
-    it('returns false for undefined', () => {
-      expect(isPostgresTableNode(undefined)).toBe(false);
+      expect(isPostgresTableIR(basePolicy)).toBe(false);
     });
   });
 });
@@ -270,7 +273,7 @@ describe('PostgresRole DiffableNode', () => {
   });
 });
 
-describe('groupPoliciesIntoTableNodes', () => {
+describe('PostgresSchemaIR tables-as-nodes and rlsPolicies', () => {
   const makeRlsPolicy = (name: string, tableName: string, namespaceId: string) =>
     new PostgresRlsPolicy({
       name,
@@ -283,64 +286,11 @@ describe('groupPoliciesIntoTableNodes', () => {
       permissive: true,
     });
 
-  it('groups policies by namespace+table into PostgresTableNodes', () => {
-    const p1 = makeRlsPolicy('pol_a1b2c3d4', 'profiles', 'public');
-    const p2 = makeRlsPolicy('pol_deadbeef', 'profiles', 'public');
-    const nodes = groupPoliciesIntoTableNodes([p1, p2]);
-    expect(nodes).toHaveLength(1);
-    expect(nodes[0]?.schemaName).toBe('public');
-    expect(nodes[0]?.tableName).toBe('profiles');
-    expect(nodes[0]?.policies).toEqual([p1, p2]);
-  });
-
-  it('creates distinct nodes for different tables', () => {
-    const p1 = makeRlsPolicy('pol_a1b2c3d4', 'profiles', 'public');
-    const p2 = makeRlsPolicy('pol_deadbeef', 'orders', 'public');
-    const nodes = groupPoliciesIntoTableNodes([p1, p2]);
-    expect(nodes).toHaveLength(2);
-    const tableNames = nodes.map((n) => n.tableName).sort();
-    expect(tableNames).toEqual(['orders', 'profiles']);
-  });
-
-  it('creates distinct nodes for different schemas', () => {
-    const p1 = makeRlsPolicy('pol_a1b2c3d4', 'users', 'public');
-    const p2 = makeRlsPolicy('pol_deadbeef', 'users', 'auth');
-    const nodes = groupPoliciesIntoTableNodes([p1, p2]);
-    expect(nodes).toHaveLength(2);
-  });
-
-  it('preserves first-seen order', () => {
-    const p1 = makeRlsPolicy('pol_a1b2c3d4', 'alpha', 'public');
-    const p2 = makeRlsPolicy('pol_deadbeef', 'beta', 'public');
-    const nodes = groupPoliciesIntoTableNodes([p1, p2]);
-    expect(nodes[0]?.tableName).toBe('alpha');
-    expect(nodes[1]?.tableName).toBe('beta');
-  });
-
-  it('returns empty array for empty input', () => {
-    expect(groupPoliciesIntoTableNodes([])).toEqual([]);
-  });
-});
-
-describe('PostgresSchemaIR tableNodes and rlsPolicies', () => {
-  const makeRlsPolicy = (name: string, tableName: string, namespaceId: string) =>
-    new PostgresRlsPolicy({
-      name,
-      prefix: name.replace(/_[0-9a-f]{8}$/, ''),
-      tableName,
-      namespaceId,
-      operation: 'select' as const,
-      roles: ['authenticated'],
-      using: '(true)',
-      permissive: true,
-    });
-
-  it('id is the pgSchemaName (property, not method)', () => {
+  it('id is the pgSchemaName', () => {
     const ir = new PostgresSchemaIR({
       tables: {},
       pgSchemaName: 'myschema',
       pgVersion: 'unknown',
-      tableNodes: [],
       roles: [],
       existingSchemas: [],
       nativeEnumTypeNames: [],
@@ -349,43 +299,51 @@ describe('PostgresSchemaIR tableNodes and rlsPolicies', () => {
     expect(ir.id).toBe('myschema');
   });
 
-  it('children() returns stored tableNodes', () => {
+  it('children() returns the PostgresTableIR instances in tables', () => {
     const p1 = makeRlsPolicy('pol_a1b2c3d4', 'profiles', 'public');
-    const node = new PostgresTableNode({
-      schemaName: 'public',
-      tableName: 'profiles',
-      policies: [p1],
+    const table = new PostgresTableIR({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      rlsPolicies: [p1],
     });
     const ir = new PostgresSchemaIR({
-      tables: {},
+      tables: { profiles: table },
       pgSchemaName: 'public',
       pgVersion: 'unknown',
-      tableNodes: [node],
       roles: [],
       existingSchemas: [],
       nativeEnumTypeNames: [],
     });
-    expect(ir.children()).toEqual([node]);
+    expect(ir.children()).toEqual([table]);
   });
 
-  it('rlsPolicies getter returns all policies from all tableNodes', () => {
+  it('rlsPolicies getter returns all policies from all tables', () => {
     const p1 = makeRlsPolicy('pol_a1b2c3d4', 'profiles', 'public');
     const p2 = makeRlsPolicy('pol_deadbeef', 'orders', 'public');
-    const node1 = new PostgresTableNode({
-      schemaName: 'public',
-      tableName: 'profiles',
-      policies: [p1],
-    });
-    const node2 = new PostgresTableNode({
-      schemaName: 'public',
-      tableName: 'orders',
-      policies: [p2],
-    });
     const ir = new PostgresSchemaIR({
-      tables: {},
+      tables: {
+        profiles: new PostgresTableIR({
+          name: 'profiles',
+          columns: {},
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+          rlsPolicies: [p1],
+        }),
+        orders: new PostgresTableIR({
+          name: 'orders',
+          columns: {},
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+          rlsPolicies: [p2],
+        }),
+      },
       pgSchemaName: 'public',
       pgVersion: 'unknown',
-      tableNodes: [node1, node2],
       roles: [],
       existingSchemas: [],
       nativeEnumTypeNames: [],

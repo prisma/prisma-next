@@ -48,7 +48,6 @@ function makeSchema(existingSchemas?: readonly string[]): SqlSchemaIR {
     tables: {},
     pgSchemaName: 'public',
     pgVersion: 'unknown',
-    tableNodes: [],
     roles: [],
     existingSchemas,
     nativeEnumTypeNames: [],
