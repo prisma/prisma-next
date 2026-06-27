@@ -201,22 +201,12 @@ describe('combineSchemaResults', () => {
       message: 'Table "profiles" is missing from the database',
     };
     const appDiffIssue: SchemaDiffIssue = {
-      coordinate: {
-        plane: 'storage',
-        namespaceId: 'public',
-        entityKind: 'policy',
-        entityName: 'policy_app_abc',
-      },
+      path: ['public', 'profiles', 'policy_app_abc'],
       outcome: 'missing',
       message: "RLS policy 'policy_app_abc' is missing from the database",
     };
     const extDiffIssue: SchemaDiffIssue = {
-      coordinate: {
-        plane: 'storage',
-        namespaceId: 'public',
-        entityKind: 'policy',
-        entityName: 'policy_cipher_def',
-      },
+      path: ['public', 'audit_log', 'policy_cipher_def'],
       outcome: 'extra',
       message: "RLS policy 'policy_cipher_def' is present in the database but not in the contract",
     };

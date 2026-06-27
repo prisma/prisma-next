@@ -6,6 +6,8 @@ import {
   PostgresRlsPolicy,
 } from '../src/core/postgres-rls-policy';
 import { PostgresRole } from '../src/core/postgres-role';
+import { PostgresSchemaIR } from '../src/core/postgres-schema-ir';
+import { isPostgresTableIR, PostgresTableIR } from '../src/core/postgres-table-ir';
 
 describe('PostgresRlsPolicy DiffableNode', () => {
   const baseInput = {
@@ -19,19 +21,23 @@ describe('PostgresRlsPolicy DiffableNode', () => {
     permissive: true,
   };
 
-  it('identity() returns a storage coordinate with policy entityKind and the wire name', () => {
+  it('id returns the bare wire name', () => {
     const policy = new PostgresRlsPolicy(baseInput);
-    expect(policy.identity()).toEqual({
-      plane: 'storage',
-      namespaceId: 'public',
-      entityKind: 'policy',
-      entityName: 'read_own_profiles_a1b2c3d4',
-    });
+    expect(policy.id).toBe('read_own_profiles_a1b2c3d4');
   });
 
-  it('identity() propagates namespaceId from input', () => {
-    const policy = new PostgresRlsPolicy({ ...baseInput, namespaceId: 'my_schema' });
-    expect(policy.identity().namespaceId).toBe('my_schema');
+  it('id returns bare wire name regardless of namespaceId and tableName', () => {
+    const policy = new PostgresRlsPolicy({
+      ...baseInput,
+      namespaceId: 'my_schema',
+      tableName: 'orders',
+    });
+    expect(policy.id).toBe('read_own_profiles_a1b2c3d4');
+  });
+
+  it('children() returns an empty list (leaf node)', () => {
+    const policy = new PostgresRlsPolicy(baseInput);
+    expect(policy.children()).toEqual([]);
   });
 
   it('isEqualTo() returns true for two policies with the same wire name', () => {
@@ -52,11 +58,18 @@ describe('PostgresRlsPolicy DiffableNode', () => {
     expect(() => policy.isEqualTo(notAPolicy)).toThrow();
   });
 
-  it('identity() and isEqualTo() are accessible on frozen instances (defined on prototype)', () => {
+  it('id and isEqualTo() are accessible on frozen instances (defined on prototype)', () => {
     const policy = new PostgresRlsPolicy(baseInput);
     expect(Object.isFrozen(policy)).toBe(true);
-    expect(typeof policy.identity).toBe('function');
+    expect(typeof policy.id).toBe('string');
     expect(typeof policy.isEqualTo).toBe('function');
+  });
+
+  it('two policies on different tables with the same wire name have the same id (uniqueness is at table-node level)', () => {
+    const policyOnProfiles = new PostgresRlsPolicy({ ...baseInput, tableName: 'profiles' });
+    const policyOnOrders = new PostgresRlsPolicy({ ...baseInput, tableName: 'orders' });
+    expect(policyOnProfiles.id).toBe(policyOnOrders.id);
+    expect(policyOnProfiles.id).toBe('read_own_profiles_a1b2c3d4');
   });
 
   describe('isPostgresRlsPolicy guard', () => {
@@ -82,7 +95,7 @@ describe('PostgresRlsPolicy DiffableNode', () => {
     it('throws with a descriptive message when given a non-policy node', () => {
       const role = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
       expect(() => assertPostgresRlsPolicy(role)).toThrow(
-        /planRlsDiff: expected a PostgresRlsPolicy/,
+        /planPostgresSchemaDiff: expected a PostgresRlsPolicy/,
       );
     });
 
@@ -93,12 +106,6 @@ describe('PostgresRlsPolicy DiffableNode', () => {
   });
 
   describe('content-addressed equality invariant', () => {
-    // Wire name == prefix + '_' + hash(body). Same prefix + different body
-    // produces different hashes, so the wire names differ and isEqualTo is
-    // false. Same body produces the same hash, so isEqualTo is true.
-    // We deliberately do NOT compare bodies directly — Postgres reprints
-    // predicate expressions, so a byte-compare would produce false mismatches
-    // on a clean re-verify.
     it('same prefix + different body → different wire names → isEqualTo false (no collision)', () => {
       const bodyV1 = new PostgresRlsPolicy({
         ...baseInput,
@@ -131,20 +138,105 @@ describe('PostgresRlsPolicy DiffableNode', () => {
   });
 });
 
-describe('PostgresRole DiffableNode', () => {
-  it('identity() returns a storage coordinate with role entityKind and the role name', () => {
-    const role = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
-    expect(role.identity()).toEqual({
-      plane: 'storage',
-      namespaceId: 'public',
-      entityKind: 'role',
-      entityName: 'app_user',
-    });
+describe('PostgresTableIR as diff-tree node', () => {
+  const basePolicy = new PostgresRlsPolicy({
+    name: 'read_own_a1b2c3d4',
+    prefix: 'read_own',
+    tableName: 'profiles',
+    namespaceId: 'public',
+    operation: 'select' as const,
+    roles: ['authenticated'],
+    using: '(auth.uid() = user_id)',
+    permissive: true,
   });
 
-  it('identity() propagates namespaceId from input', () => {
-    const role = new PostgresRole({ name: 'app_user', namespaceId: 'sentinel_namespace' });
-    expect(role.identity().namespaceId).toBe('sentinel_namespace');
+  it('id returns the table name', () => {
+    const table = new PostgresTableIR({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      rlsPolicies: [basePolicy],
+    });
+    expect(table.id).toBe('profiles');
+  });
+
+  it('isEqualTo() always returns true', () => {
+    const a = new PostgresTableIR({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      rlsPolicies: [basePolicy],
+    });
+    const b = new PostgresTableIR({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      rlsPolicies: [],
+    });
+    expect(a.isEqualTo(b)).toBe(true);
+  });
+
+  it('children() returns the policy nodes', () => {
+    const table = new PostgresTableIR({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      rlsPolicies: [basePolicy],
+    });
+    expect(table.children()).toEqual([basePolicy]);
+  });
+
+  it('instance is frozen', () => {
+    const table = new PostgresTableIR({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+    });
+    expect(Object.isFrozen(table)).toBe(true);
+  });
+
+  describe('isPostgresTableIR guard', () => {
+    it('returns true for a PostgresTableIR', () => {
+      const table = new PostgresTableIR({
+        name: 'profiles',
+        columns: {},
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      });
+      expect(isPostgresTableIR(table)).toBe(true);
+    });
+
+    it('returns false for a PostgresRlsPolicy', () => {
+      expect(isPostgresTableIR(basePolicy)).toBe(false);
+    });
+  });
+});
+
+describe('PostgresRole DiffableNode', () => {
+  it('id returns the role name (roles are cluster-unique)', () => {
+    const role = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
+    expect(role.id).toBe('app_user');
+  });
+
+  it('id propagates the role name from input', () => {
+    const role = new PostgresRole({ name: 'anon', namespaceId: 'sentinel_namespace' });
+    expect(role.id).toBe('anon');
+  });
+
+  it('children() returns an empty list (leaf node)', () => {
+    const role = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
+    expect(role.children()).toEqual([]);
   });
 
   it('isEqualTo() returns true for two roles with the same name', () => {
@@ -173,10 +265,89 @@ describe('PostgresRole DiffableNode', () => {
     expect(() => role.isEqualTo(notARole)).toThrow();
   });
 
-  it('identity() and isEqualTo() are accessible on frozen instances', () => {
+  it('id and isEqualTo() are accessible on frozen instances', () => {
     const role = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
     expect(Object.isFrozen(role)).toBe(true);
-    expect(typeof role.identity).toBe('function');
+    expect(typeof role.id).toBe('string');
     expect(typeof role.isEqualTo).toBe('function');
+  });
+});
+
+describe('PostgresSchemaIR tables-as-nodes and rlsPolicies', () => {
+  const makeRlsPolicy = (name: string, tableName: string, namespaceId: string) =>
+    new PostgresRlsPolicy({
+      name,
+      prefix: name.replace(/_[0-9a-f]{8}$/, ''),
+      tableName,
+      namespaceId,
+      operation: 'select' as const,
+      roles: ['authenticated'],
+      using: '(true)',
+      permissive: true,
+    });
+
+  it('id is the pgSchemaName', () => {
+    const ir = new PostgresSchemaIR({
+      tables: {},
+      pgSchemaName: 'myschema',
+      pgVersion: 'unknown',
+      roles: [],
+      existingSchemas: [],
+      nativeEnumTypeNames: [],
+    });
+    expect(typeof ir.id).toBe('string');
+    expect(ir.id).toBe('myschema');
+  });
+
+  it('children() returns the PostgresTableIR instances in tables', () => {
+    const p1 = makeRlsPolicy('pol_a1b2c3d4', 'profiles', 'public');
+    const table = new PostgresTableIR({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      rlsPolicies: [p1],
+    });
+    const ir = new PostgresSchemaIR({
+      tables: { profiles: table },
+      pgSchemaName: 'public',
+      pgVersion: 'unknown',
+      roles: [],
+      existingSchemas: [],
+      nativeEnumTypeNames: [],
+    });
+    expect(ir.children()).toEqual([table]);
+  });
+
+  it('rlsPolicies getter returns all policies from all tables', () => {
+    const p1 = makeRlsPolicy('pol_a1b2c3d4', 'profiles', 'public');
+    const p2 = makeRlsPolicy('pol_deadbeef', 'orders', 'public');
+    const ir = new PostgresSchemaIR({
+      tables: {
+        profiles: new PostgresTableIR({
+          name: 'profiles',
+          columns: {},
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+          rlsPolicies: [p1],
+        }),
+        orders: new PostgresTableIR({
+          name: 'orders',
+          columns: {},
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+          rlsPolicies: [p2],
+        }),
+      },
+      pgSchemaName: 'public',
+      pgVersion: 'unknown',
+      roles: [],
+      existingSchemas: [],
+      nativeEnumTypeNames: [],
+    });
+    expect(ir.rlsPolicies).toEqual([p1, p2]);
   });
 });

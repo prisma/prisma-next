@@ -23,7 +23,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { buildBuiltinIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
-import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
@@ -35,7 +35,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
   const contract = createTestContract();
 
   it('returns empty plan when schema already satisfies contract (superset)', () => {
-    const schema: SqlSchemaIR = {
+    const schema = new PostgresSchemaIR({
       tables: {
         user: buildUserTableSchema(),
         post: buildPostTableSchema(),
@@ -50,7 +50,12 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
           indexes: [],
         },
       },
-    };
+      pgSchemaName: 'public',
+      pgVersion: '',
+      roles: [],
+      existingSchemas: [],
+      nativeEnumTypeNames: [],
+    });
 
     const result = planner.plan({
       contract,
@@ -68,7 +73,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
   });
 
   it('plans additive operations for subset schema (missing column/index/fk)', async () => {
-    const schema: SqlSchemaIR = {
+    const schema = new PostgresSchemaIR({
       tables: {
         user: {
           name: 'user',
@@ -81,7 +86,12 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
           indexes: [],
         },
       },
-    };
+      pgSchemaName: 'public',
+      pgVersion: '',
+      roles: [],
+      existingSchemas: [],
+      nativeEnumTypeNames: [],
+    });
 
     const result = planner.plan({
       contract,
@@ -108,7 +118,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
   });
 
   it('fails with conflicts when schema has incompatible column types', () => {
-    const schema: SqlSchemaIR = {
+    const schema = new PostgresSchemaIR({
       tables: {
         user: {
           name: 'user',
@@ -122,7 +132,12 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
           indexes: [],
         },
       },
-    };
+      pgSchemaName: 'public',
+      pgVersion: '',
+      roles: [],
+      existingSchemas: [],
+      nativeEnumTypeNames: [],
+    });
 
     const result = planner.plan({
       contract,
@@ -719,12 +734,17 @@ async function planUserTableOperations(
       ...(options?.extraStorageTypes ? { types: options.extraStorageTypes } : {}),
     },
   });
-  const schema: SqlSchemaIR = {
+  const schema = new PostgresSchemaIR({
     tables: {
       ...(options?.extraSchemaTables ?? {}),
       user: schemaUserTable,
     },
-  };
+    pgSchemaName: 'public',
+    pgVersion: '',
+    roles: [],
+    existingSchemas: [],
+    nativeEnumTypeNames: [],
+  });
   const result = planner.plan({
     contract,
     schema,

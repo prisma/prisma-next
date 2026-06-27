@@ -14,7 +14,7 @@ import { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor, {
   postgresRenderDefault,
 } from '@prisma-next/target-postgres/control';
-import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import postgresAdapterDescriptor from '../../src/exports/control';
@@ -60,10 +60,17 @@ describe('PostgresMigrationPlanner authoring surface', () => {
     it('emits a migration scaffold carrying the destination storage hash', () => {
       const planner = makeFrameworkPlanner();
       const contract = createEmptyContract();
-      const fromSchemaIR = contractToSchemaIRImpl(null, {
-        annotationNamespace: 'pg',
-        expandNativeType: expandParameterizedNativeType,
-        renderDefault: postgresRenderDefault,
+      const fromSchemaIR = new PostgresSchemaIR({
+        tables: contractToSchemaIRImpl(null, {
+          annotationNamespace: 'pg',
+          expandNativeType: expandParameterizedNativeType,
+          renderDefault: postgresRenderDefault,
+        }).tables,
+        pgSchemaName: 'public',
+        pgVersion: '',
+        roles: [],
+        existingSchemas: [],
+        nativeEnumTypeNames: [],
       });
 
       const fromContract: Contract<SqlStorage> = {

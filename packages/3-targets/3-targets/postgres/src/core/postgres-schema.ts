@@ -1,3 +1,4 @@
+import type { Contract } from '@prisma-next/contract/types';
 import {
   freezeNode,
   hydrateNamespaceEntities,
@@ -12,6 +13,7 @@ import {
   type StorageTable,
   type StorageValueSet,
 } from '@prisma-next/sql-contract/types';
+
 import { type CfExpr, cfExpr } from '@prisma-next/sql-relational-core/contract-free';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -21,6 +23,8 @@ import { policyEntityKind, roleEntityKind } from './entity-kinds';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
 import type { PostgresRole } from './postgres-role';
 import { escapeLiteral } from './sql-utils';
+
+export type PostgresContract = Contract<SqlStorage> & { readonly target: 'postgres' };
 
 export type PostgresNamespaceEntries = SqlNamespaceEntries & {
   readonly policy?: Readonly<Record<string, PostgresRlsPolicy>>;

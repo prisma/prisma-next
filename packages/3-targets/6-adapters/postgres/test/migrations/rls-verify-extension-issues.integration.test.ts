@@ -211,7 +211,7 @@ describe.sequential('RLS verify extension issues', () => {
 
     const rlsIssues = result.schema.schemaDiffIssues.filter((i) => i.outcome === 'missing');
     expect(rlsIssues).toHaveLength(1);
-    expect(rlsIssues[0]?.coordinate.entityName).toBe(policy.name);
+    expect(rlsIssues[0]?.expected).toMatchObject({ name: policy.name });
   });
 
   it('verify result is ok:false when a declared policy is absent from the database', {

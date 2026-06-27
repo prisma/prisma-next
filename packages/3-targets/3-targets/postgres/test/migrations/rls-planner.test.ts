@@ -17,13 +17,13 @@ import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adap
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
-import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
+import { PostgresTableIR } from '../../src/core/postgres-table-ir';
 import { PostgresCreatePolicy } from '../../src/exports/ddl';
 
 const stubLowerer: ExecuteRequestLowerer = {
@@ -37,22 +37,32 @@ const stubLowerer: ExecuteRequestLowerer = {
 
 const TABLE_NAME = 'profiles';
 const SCHEMA_NAME = UNBOUND_NAMESPACE_ID;
+const RESOLVED_SCHEMA = 'public';
 
 function makePolicy(
   name: string,
   tableName = TABLE_NAME,
   using = '(auth.uid() = user_id)',
+  namespaceId: string = SCHEMA_NAME,
 ): PostgresRlsPolicy {
   return new PostgresRlsPolicy({
     name,
     prefix: name.replace(/_[0-9a-f]{8}$/, ''),
     tableName,
-    namespaceId: SCHEMA_NAME,
+    namespaceId,
     operation: 'select',
     roles: ['authenticated'],
     using,
     permissive: true,
   });
+}
+
+function makeActualPolicy(
+  name: string,
+  tableName = TABLE_NAME,
+  using = '(auth.uid() = user_id)',
+): PostgresRlsPolicy {
+  return makePolicy(name, tableName, using, RESOLVED_SCHEMA);
 }
 
 function buildContractWithPolicy(
@@ -105,7 +115,7 @@ function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<Sql
 function schemaWith(policies: readonly PostgresRlsPolicy[]): PostgresSchemaIR {
   return new PostgresSchemaIR({
     tables: {
-      [TABLE_NAME]: {
+      [TABLE_NAME]: new PostgresTableIR({
         name: TABLE_NAME,
         columns: {
           id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -114,11 +124,11 @@ function schemaWith(policies: readonly PostgresRlsPolicy[]): PostgresSchemaIR {
         foreignKeys: [],
         uniques: [],
         indexes: [],
-      },
+        rlsPolicies: policies,
+      }),
     },
     pgSchemaName: 'public',
     pgVersion: 'unknown',
-    rlsPolicies: policies,
     roles: [],
     existingSchemas: ['public'],
     nativeEnumTypeNames: [],
@@ -129,7 +139,6 @@ const emptySchema = new PostgresSchemaIR({
   tables: {},
   pgSchemaName: 'public',
   pgVersion: 'unknown',
-  rlsPolicies: [],
   roles: [],
   existingSchemas: ['public'],
   nativeEnumTypeNames: [],
@@ -229,7 +238,7 @@ describe('RLS planner diff-wiring', () => {
     const contract = buildContractWithPolicy();
     const planner = createPostgresMigrationPlanner(stubLowerer);
 
-    const existingPolicy = makePolicy('read_own_profiles_a1b2c3d4');
+    const existingPolicy = makeActualPolicy('read_own_profiles_a1b2c3d4');
     const schema = schemaWith([existingPolicy]);
 
     const result = planner.plan({
@@ -280,7 +289,7 @@ describe('RLS planner policy edit (missing + extra via generic pipeline)', () =>
     const contract = buildContractWith([newPolicy]);
     const planner = createPostgresMigrationPlanner(stubLowerer);
 
-    const oldPolicy = makePolicy('p_read_00000000', TABLE_NAME, '(auth.uid() = old_user_id)');
+    const oldPolicy = makeActualPolicy('p_read_00000000', TABLE_NAME, '(auth.uid() = old_user_id)');
     const schema = schemaWith([oldPolicy]);
 
     const result = planner.plan({
@@ -306,7 +315,7 @@ describe('RLS planner policy edit (missing + extra via generic pipeline)', () =>
     const contract = buildContractWith([newPolicy]);
     const planner = createPostgresMigrationPlanner(stubLowerer);
 
-    const oldPolicy = makePolicy('p_read_00000000', TABLE_NAME, '(auth.uid() = old_user_id)');
+    const oldPolicy = makeActualPolicy('p_read_00000000', TABLE_NAME, '(auth.uid() = old_user_id)');
     const schema = schemaWith([oldPolicy]);
 
     const result = planner.plan({
@@ -328,59 +337,7 @@ describe('RLS planner policy edit (missing + extra via generic pipeline)', () =>
   });
 });
 
-// On the `migration plan` path the planner receives a SqlSchemaIR derived from the
-// "from" contract (not a live-introspected PostgresSchemaIR). RLS policies cannot
-// be correctly reconciled without a live schema, so the planner must fail loudly
-// instead of silently emitting no RLS DDL when the contract declares policies.
-const derivedSchema = new SqlSchemaIR({
-  tables: {
-    [TABLE_NAME]: {
-      name: TABLE_NAME,
-      columns: {
-        id: { name: 'id', nativeType: 'int4', nullable: false },
-        user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
-      },
-      foreignKeys: [],
-      uniques: [],
-      indexes: [],
-    },
-  },
-});
-
-describe('migration plan path (non-PostgresSchemaIR schema)', () => {
-  it('returns unsupportedOperation failure when the contract declares RLS policies', () => {
-    const contract = buildContractWithPolicy();
-    const planner = createPostgresMigrationPlanner(stubLowerer);
-
-    const result = planner.plan({
-      contract,
-      schema: derivedSchema,
-      policy: INIT_ADDITIVE_POLICY,
-      fromContract: null,
-      frameworkComponents: [],
-      spaceId: APP_SPACE_ID,
-    });
-
-    expect(result.kind).toBe('failure');
-    if (result.kind !== 'failure') return;
-    expect(result.conflicts).toHaveLength(1);
-    expect(result.conflicts[0]!.kind).toBe('unsupportedOperation');
-    expect(result.conflicts[0]!.summary).toContain('RLS');
-  });
-
-  it('succeeds when the contract declares no RLS policies', () => {
-    const contractWithNoRls = buildContractWith([]);
-    const planner = createPostgresMigrationPlanner(stubLowerer);
-
-    const result = planner.plan({
-      contract: contractWithNoRls,
-      schema: derivedSchema,
-      policy: INIT_ADDITIVE_POLICY,
-      fromContract: null,
-      frameworkComponents: [],
-      spaceId: APP_SPACE_ID,
-    });
-
-    expect(result.kind).toBe('success');
-  });
-});
+// `migration plan` derives a contract-backed PostgresSchemaIR (the
+// `contractToSchema` projection) and emits CREATE POLICY through the same diff
+// pipeline as the live paths. A non-PostgresSchemaIR schema is rejected; the
+// `migration plan` e2e proves the emission end-to-end.

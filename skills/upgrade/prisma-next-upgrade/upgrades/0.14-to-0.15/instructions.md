@@ -29,6 +29,18 @@ only.
 -->
 
 <!--
+TML-2931 (Postgres RLS migration seam): internal refactor of how the RLS schema
+diff is represented — policies nest under a table node, the framework differ keys
+nodes by an `id()` path rather than an entity coordinate, and `SchemaDiffIssue`
+carries `path` instead of `coordinate`. The only `examples/` touch is
+`examples/supabase/test/skeleton.integration.test.ts`, which reads a diff issue's
+subject differently (`issue.path` instead of `issue.coordinate`). The RLS
+schema-diff surface is still in development (not a stable shipped API), and the
+authored RLS feature behaviour is unchanged. No user upgrade action. Incidental
+substrate diff only.
+-->
+
+<!--
 TML-2795: the `prisma-next-demo` example gains a Post<->Tag many-to-many. The demo
 authors the relation in PSL (with a re-baselined `add_post_tags` migration), switches
 its id fields to native uuid storage for M:N parity, and adds M:N ORM examples, CLI
