@@ -4,12 +4,12 @@ import type { PostgresEntityRef } from '../../entity-ref';
 import { type Op, step, targetDetails } from './shared';
 
 export async function dropTable(
-  ref: PostgresEntityRef,
+  table: PostgresEntityRef,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const schemaName = ref.namespace.id;
-  const tableName = ref.id;
-  const qualified = ref.namespace.qualifyTable(ref.id);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const checks = tableExistsAst(schemaName, tableName);
   const present = await lowerer.lowerToExecuteRequest(checks.tablePresent());
   const absent = await lowerer.lowerToExecuteRequest(checks.tableAbsent());

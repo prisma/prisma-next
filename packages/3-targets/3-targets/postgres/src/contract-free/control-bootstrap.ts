@@ -34,13 +34,13 @@ const ledgerColumns = [
 const controlNs = postgresCreateNamespace({ id: 'prisma_contract', entries: { table: {} } });
 
 const markerTable = createTable({
-  ref: controlNs.tableRef('marker'),
+  table: controlNs.tableRef('marker'),
   ifNotExists: true,
   columns: markerColumns,
 });
 
 const ledgerTable = createTable({
-  ref: controlNs.tableRef('ledger'),
+  table: controlNs.tableRef('ledger'),
   ifNotExists: true,
   columns: ledgerColumns,
 });

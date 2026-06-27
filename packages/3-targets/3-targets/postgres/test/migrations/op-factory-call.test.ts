@@ -271,7 +271,7 @@ describe('AddNotNullColumnWithTempDefaultCall', () => {
     const { lowerer, received } = recordingCheckLowerer();
     const storageColumn = { nativeType: 'text', codecId: 'pg/text@1', nullable: false } as const;
     const call = new AddNotNullColumnWithTempDefaultCall({
-      ref: publicNs.tableRef('user'),
+      table: publicNs.tableRef('user'),
       columnName: 'name',
       column: storageColumn,
       codecHooks: new Map(),
@@ -293,7 +293,7 @@ describe('AddNotNullColumnWithTempDefaultCall', () => {
 
   it('toOp() throws when no lowerer is provided', async () => {
     const call = new AddNotNullColumnWithTempDefaultCall({
-      ref: publicNs.tableRef('user'),
+      table: publicNs.tableRef('user'),
       columnName: 'name',
       column: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
       codecHooks: new Map(),

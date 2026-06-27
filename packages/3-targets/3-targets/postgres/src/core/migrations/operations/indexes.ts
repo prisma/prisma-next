@@ -38,15 +38,15 @@ function renderIndexOptions(options: Record<string, unknown>): string {
 }
 
 export async function createIndex(
-  ref: PostgresEntityRef,
+  table: PostgresEntityRef,
   indexName: string,
   columns: readonly string[],
   lowerer: ExecuteRequestLowerer,
   extras?: CreateIndexExtras,
 ): Promise<Op> {
-  const schemaName = ref.namespace.id;
-  const tableName = ref.id;
-  const qualified = ref.namespace.qualifyTable(ref.id);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const columnList = columns.map(quoteIdentifier).join(', ');
   const using = extras?.type ? ` USING ${quoteIdentifier(extras.type)}` : '';
   const options = extras?.options;
@@ -70,12 +70,12 @@ export async function createIndex(
 }
 
 export async function dropIndex(
-  ref: PostgresEntityRef,
+  table: PostgresEntityRef,
   indexName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const schemaName = ref.namespace.id;
-  const tableName = ref.id;
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
   const { present, absent } = await indexExistsSteps(lowerer, schemaName, indexName);
   return {
     id: `dropIndex.${tableName}.${indexName}`,
@@ -84,7 +84,7 @@ export async function dropIndex(
     target: targetDetails('index', indexName, schemaName, tableName),
     precheck: [step(`ensure index "${indexName}" exists`, present.sql, present.params)],
     execute: [
-      step(`drop index "${indexName}"`, `DROP INDEX ${ref.namespace.qualifyTable(indexName)}`),
+      step(`drop index "${indexName}"`, `DROP INDEX ${table.namespace.qualifyTable(indexName)}`),
     ],
     postcheck: [step(`verify index "${indexName}" does not exist`, absent.sql, absent.params)],
   };

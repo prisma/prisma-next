@@ -15,14 +15,14 @@ import { buildColumnTypeSql } from './planner-ddl-builders';
 import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
 
 export function buildAddColumnOperationIdentity(
-  ref: PostgresEntityRef,
+  table: PostgresEntityRef,
   columnName: string,
 ): Pick<
   SqlMigrationPlanOperation<PostgresPlanTargetDetails>,
   'id' | 'label' | 'summary' | 'target'
 > {
-  const tableName = ref.id;
-  const schema = ref.namespace.id;
+  const tableName = table.id;
+  const schema = table.namespace.id;
   return {
     id: `column.${tableName}.${columnName}`,
     label: `Add column ${columnName} to ${tableName}`,
@@ -35,7 +35,7 @@ export function buildAddColumnOperationIdentity(
 }
 
 export async function buildAddNotNullColumnWithTemporaryDefaultOperation(options: {
-  readonly ref: PostgresEntityRef;
+  readonly table: PostgresEntityRef;
   readonly columnName: string;
   readonly column: StorageColumn;
   readonly codecHooks: Map<string, CodecControlHooks>;
@@ -43,9 +43,10 @@ export async function buildAddNotNullColumnWithTemporaryDefaultOperation(options
   readonly temporaryDefault: string;
   readonly lowerer: ExecuteRequestLowerer;
 }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-  const { ref, columnName, column, codecHooks, storageTypes, temporaryDefault, lowerer } = options;
-  const schema = ref.namespace.id;
-  const tableName = ref.id;
+  const { table, columnName, column, codecHooks, storageTypes, temporaryDefault, lowerer } =
+    options;
+  const schema = table.namespace.id;
+  const tableName = table.id;
 
   const ddlColumn = col(columnName, buildColumnTypeSql(column, codecHooks, storageTypes), {
     notNull: true,
@@ -53,13 +54,13 @@ export async function buildAddNotNullColumnWithTemporaryDefaultOperation(options
   });
   const addColumn = await lowerer.lowerToExecuteRequest(
     contractFreeDdl.alterTable({
-      ref,
+      table,
       actions: [contractFreeDdl.addColumnAction(ddlColumn)],
     }),
   );
   const dropTempDefault = await lowerer.lowerToExecuteRequest(
     contractFreeDdl.alterTable({
-      ref,
+      table,
       actions: [contractFreeDdl.dropDefaultAction(columnName)],
     }),
   );
@@ -78,7 +79,7 @@ export async function buildAddNotNullColumnWithTemporaryDefaultOperation(options
   );
 
   return {
-    ...buildAddColumnOperationIdentity(ref, columnName),
+    ...buildAddColumnOperationIdentity(table, columnName),
     operationClass: 'additive',
     precheck: [step(`ensure column "${columnName}" is missing`, absent.sql, absent.params)],
     execute: [

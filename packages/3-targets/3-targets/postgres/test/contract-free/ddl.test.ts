@@ -15,13 +15,13 @@ describe('postgres contract-free ddl', () => {
   it('createTable returns a frozen create-table node', () => {
     const ns = postgresCreateNamespace({ id: 'prisma_contract', entries: { table: {} } });
     const node = createTable({
-      ref: ns.tableRef('marker'),
+      table: ns.tableRef('marker'),
       ifNotExists: true,
       columns: [col('space', 'text', { notNull: true, primaryKey: true, default: lit('app') })],
     });
     expect(node.kind).toBe('create-table');
-    expect(node.ref.id).toBe('marker');
-    expect(node.ref.namespace.id).toBe('prisma_contract');
+    expect(node.table.id).toBe('marker');
+    expect(node.table.namespace.id).toBe('prisma_contract');
     expect(node.columns).toHaveLength(1);
     expect(Object.isFrozen(node)).toBe(true);
     expect(Object.isFrozen(node.columns)).toBe(true);

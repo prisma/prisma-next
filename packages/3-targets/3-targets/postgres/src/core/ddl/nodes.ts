@@ -89,19 +89,19 @@ function freezeConstraints(
 
 export class PostgresCreateTable extends PostgresDdlNode {
   readonly kind = 'create-table' as const;
-  readonly ref: PostgresEntityRef;
+  readonly table: PostgresEntityRef;
   readonly ifNotExists: boolean | undefined;
   readonly columns: ReadonlyArray<DdlColumn>;
   readonly constraints: ReadonlyArray<DdlTableConstraint> | undefined;
 
   constructor(options: {
-    readonly ref: PostgresEntityRef;
+    readonly table: PostgresEntityRef;
     readonly ifNotExists?: boolean;
     readonly columns: readonly DdlColumn[];
     readonly constraints?: readonly DdlTableConstraint[];
   }) {
     super();
-    this.ref = options.ref;
+    this.table = options.table;
     this.ifNotExists = options.ifNotExists;
     this.columns = freezeDdlColumns(options.columns);
     this.constraints = freezeConstraints(options.constraints);
@@ -132,15 +132,15 @@ export class PostgresCreateSchema extends PostgresDdlNode {
 
 export class PostgresAlterTable extends PostgresDdlNode {
   readonly kind = 'alter-table' as const;
-  readonly ref: PostgresEntityRef;
+  readonly table: PostgresEntityRef;
   readonly actions: ReadonlyArray<AnyAlterTableAction>;
 
   constructor(options: {
-    readonly ref: PostgresEntityRef;
+    readonly table: PostgresEntityRef;
     readonly actions: readonly AnyAlterTableAction[];
   }) {
     super();
-    this.ref = options.ref;
+    this.table = options.table;
     this.actions = Object.freeze([...options.actions]);
     this.freeze();
   }

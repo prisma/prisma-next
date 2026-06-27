@@ -17,7 +17,7 @@ const unboundNs = PostgresSchema.unbound;
 describe('PostgresCreateTable with table-level constraints', () => {
   it('renders a join table with composite PK, two FKs, and a table-level unique', async () => {
     const ast = createTable({
-      ref: publicNs.tableRef('post_tags'),
+      table: publicNs.tableRef('post_tags'),
       columns: [col('postId', 'text', { notNull: true }), col('tagId', 'text', { notNull: true })],
       constraints: [
         new PrimaryKeyConstraint({ columns: ['postId', 'tagId'] }),
@@ -55,7 +55,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
 
   it('renders a named primary key', async () => {
     const ast = createTable({
-      ref: unboundNs.tableRef('items'),
+      table: unboundNs.tableRef('items'),
       columns: [col('a', 'text'), col('b', 'text')],
       constraints: [new PrimaryKeyConstraint({ columns: ['a', 'b'], name: 'pk_items' })],
     });
@@ -68,7 +68,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
 
   it('renders FK with onUpdate action', async () => {
     const ast = createTable({
-      ref: unboundNs.tableRef('orders'),
+      table: unboundNs.tableRef('orders'),
       columns: [col('userId', 'text', { notNull: true })],
       constraints: [
         new ForeignKeyConstraint({
@@ -92,7 +92,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
 
   it('quotes mixed-case constraint names and splits schema-qualified FK refTable', async () => {
     const ast = createTable({
-      ref: publicNs.tableRef('orders'),
+      table: publicNs.tableRef('orders'),
       columns: [col('id', 'text', { notNull: true }), col('userId', 'text', { notNull: true })],
       constraints: [
         new PrimaryKeyConstraint({ columns: ['id'], name: 'MyPK' }),
@@ -113,7 +113,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
 
   it('omits constraints section when no constraints given', async () => {
     const ast = createTable({
-      ref: unboundNs.tableRef('simple'),
+      table: unboundNs.tableRef('simple'),
       columns: [col('id', 'text', { primaryKey: true, notNull: true })],
     });
 

@@ -591,7 +591,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
     if (canUseSharedTempDefault && temporaryDefault !== null) {
       calls.push(
         new AddNotNullColumnWithTempDefaultCall({
-          ref: tableRef,
+          table: tableRef,
           columnName: issue.column,
           column,
           codecHooks: mutableCodecHooks,

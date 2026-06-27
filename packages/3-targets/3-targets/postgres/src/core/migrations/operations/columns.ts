@@ -26,13 +26,13 @@ async function columnExistsSteps(
 }
 
 export async function dropColumn(
-  ref: PostgresEntityRef,
+  table: PostgresEntityRef,
   columnName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const schemaName = ref.namespace.id;
-  const tableName = ref.id;
-  const qualified = ref.namespace.qualifyTable(ref.id);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const { present, absent } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
@@ -63,7 +63,7 @@ export async function dropColumn(
  * explicit, else the column's native type).
  */
 export async function alterColumnType(
-  ref: PostgresEntityRef,
+  table: PostgresEntityRef,
   columnName: string,
   options: {
     readonly qualifiedTargetType: string;
@@ -73,9 +73,9 @@ export async function alterColumnType(
   },
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const schemaName = ref.namespace.id;
-  const tableName = ref.id;
-  const qualified = ref.namespace.qualifyTable(ref.id);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const usingClause = options.using
     ? ` USING ${options.using}`
     : ` USING ${quoteIdentifier(columnName)}::${options.qualifiedTargetType}`;
@@ -116,13 +116,13 @@ export async function alterColumnType(
 }
 
 export async function setNotNull(
-  ref: PostgresEntityRef,
+  table: PostgresEntityRef,
   columnName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const schemaName = ref.namespace.id;
-  const tableName = ref.id;
-  const qualified = ref.namespace.qualifyTable(ref.id);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const { present } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
@@ -161,13 +161,13 @@ export async function setNotNull(
 }
 
 export async function dropNotNull(
-  ref: PostgresEntityRef,
+  table: PostgresEntityRef,
   columnName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const schemaName = ref.namespace.id;
-  const tableName = ref.id;
-  const qualified = ref.namespace.qualifyTable(ref.id);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const { present } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
@@ -208,15 +208,15 @@ export async function dropNotNull(
  * treats that as a widening change rather than an additive one.
  */
 export async function setDefault(
-  ref: PostgresEntityRef,
+  table: PostgresEntityRef,
   columnName: string,
   defaultSql: string,
   lowerer: ExecuteRequestLowerer,
   operationClass: 'additive' | 'widening' = 'additive',
 ): Promise<Op> {
-  const schemaName = ref.namespace.id;
-  const tableName = ref.id;
-  const qualified = ref.namespace.qualifyTable(ref.id);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const { present } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
@@ -244,12 +244,12 @@ export async function setDefault(
 }
 
 export async function dropDefault(
-  ref: PostgresEntityRef,
+  table: PostgresEntityRef,
   columnName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const schemaName = ref.namespace.id;
-  const tableName = ref.id;
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
   const { present } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
@@ -257,7 +257,7 @@ export async function dropDefault(
   });
   const dropDefaultExec = await lowerer.lowerToExecuteRequest(
     contractFreeDdl.alterTable({
-      ref,
+      table,
       actions: [contractFreeDdl.dropDefaultAction(columnName)],
     }),
   );
@@ -284,16 +284,16 @@ export async function dropDefault(
  * adapter; postchecks assert the column exists and is NOT NULL.
  */
 export async function addNotNullColumnDirect(
-  ref: PostgresEntityRef,
+  table: PostgresEntityRef,
   column: DdlColumn,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const schemaName = ref.namespace.id;
-  const tableName = ref.id;
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
   const columnName = column.name;
   const addColumn = await lowerer.lowerToExecuteRequest(
     contractFreeDdl.alterTable({
-      ref,
+      table,
       actions: [contractFreeDdl.addColumnAction(column)],
     }),
   );

@@ -12,7 +12,7 @@ const unboundNs = PostgresSchema.unbound;
 describe('PostgresCreateTable DDL lowering', () => {
   it('renders IF NOT EXISTS on schema-qualified create table', async () => {
     const ast = new PostgresCreateTable({
-      ref: prismaContractNs.tableRef('marker'),
+      table: prismaContractNs.tableRef('marker'),
       ifNotExists: true,
       columns: [
         col('space', 'text', { notNull: true, primaryKey: true }),
@@ -31,7 +31,7 @@ describe('PostgresCreateTable DDL lowering', () => {
 
   it('renders each column default shape', async () => {
     const ast = new PostgresCreateTable({
-      ref: unboundNs.tableRef('defaults'),
+      table: unboundNs.tableRef('defaults'),
       columns: [
         col('a', 'text', { default: lit('x') }),
         col('b', 'int', { default: lit(7) }),
@@ -58,7 +58,7 @@ describe('PostgresCreateTable DDL lowering', () => {
 
   it('escapes single quotes in string-literal defaults', async () => {
     const ast = new PostgresCreateTable({
-      ref: unboundNs.tableRef('defaults'),
+      table: unboundNs.tableRef('defaults'),
       columns: [col('name', 'text', { default: lit("O'Reilly") })],
     });
 
@@ -70,7 +70,7 @@ describe('PostgresCreateTable DDL lowering', () => {
 
   it('escapes single quotes in JSON-object literal defaults on jsonb columns and adds the ::jsonb cast', async () => {
     const ast = new PostgresCreateTable({
-      ref: unboundNs.tableRef('defaults'),
+      table: unboundNs.tableRef('defaults'),
       columns: [col('meta', 'jsonb', { default: lit({ a: "x'y" }) })],
     });
 
@@ -82,7 +82,7 @@ describe('PostgresCreateTable DDL lowering', () => {
 
   it('casts a string literal default to the column type on non-text columns', async () => {
     const ast = new PostgresCreateTable({
-      ref: unboundNs.tableRef('defaults'),
+      table: unboundNs.tableRef('defaults'),
       columns: [
         col('id', 'uuid', { default: lit('00000000-0000-0000-0000-000000000000') }),
         col('window', 'tstzrange', { default: lit('[2024-01-01,2024-12-31)') }),
@@ -100,7 +100,7 @@ describe('PostgresCreateTable DDL lowering', () => {
 
   it('omits the cast when the column type is already text-shaped', async () => {
     const ast = new PostgresCreateTable({
-      ref: unboundNs.tableRef('defaults'),
+      table: unboundNs.tableRef('defaults'),
       columns: [
         col('a_text', 'text', { default: lit('hello') }),
         col('a_varchar', 'varchar(50)', { default: lit('hello') }),
@@ -124,7 +124,7 @@ describe('PostgresCreateTable DDL lowering', () => {
 
   it('omits the cast on numeric, boolean, and null literal defaults', async () => {
     const ast = new PostgresCreateTable({
-      ref: unboundNs.tableRef('defaults'),
+      table: unboundNs.tableRef('defaults'),
       columns: [
         col('a_int', 'int', { default: lit(42) }),
         col('a_float', 'float8', { default: lit(3.14) }),
@@ -143,7 +143,7 @@ describe('PostgresCreateTable DDL lowering', () => {
 
   it('omits the cast on function defaults — a `DEFAULT (expr)` already returns the column type', async () => {
     const ast = new PostgresCreateTable({
-      ref: unboundNs.tableRef('defaults'),
+      table: unboundNs.tableRef('defaults'),
       columns: [
         col('id', 'uuid', { default: fn('gen_random_uuid()') }),
         col('meta', 'jsonb', { default: fn(`jsonb_build_object('k', 1)`) }),
@@ -158,7 +158,7 @@ describe('PostgresCreateTable DDL lowering', () => {
 
   it('column with both default and notNull renders DEFAULT before NOT NULL, neither dropped', async () => {
     const ast = new PostgresCreateTable({
-      ref: unboundNs.tableRef('t'),
+      table: unboundNs.tableRef('t'),
       columns: [
         col('active', 'bool', { notNull: true, default: lit(true) }),
         col('status', 'text', { notNull: true, default: lit('open') }),

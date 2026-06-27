@@ -27,7 +27,7 @@ const unboundNs = postgresCreateNamespace({ id: UNBOUND_NAMESPACE_ID, entries: {
 describe('PostgresAlterTable ADD COLUMN lowering', () => {
   it('plain nullable column (no default, no NOT NULL)', async () => {
     const ast = alterTable({
-      ref: sNs.tableRef('t'),
+      table: sNs.tableRef('t'),
       actions: [addColumnAction(col('c', 'text'))],
     });
     const lowered = await adapter.lowerToExecuteRequest(ast);
@@ -37,7 +37,7 @@ describe('PostgresAlterTable ADD COLUMN lowering', () => {
 
   it('NOT NULL column (no default)', async () => {
     const ast = alterTable({
-      ref: sNs.tableRef('t'),
+      table: sNs.tableRef('t'),
       actions: [addColumnAction(col('c', 'text', { notNull: true }))],
     });
     const lowered = await adapter.lowerToExecuteRequest(ast);
@@ -46,7 +46,7 @@ describe('PostgresAlterTable ADD COLUMN lowering', () => {
 
   it('nullable column with literal string default', async () => {
     const ast = alterTable({
-      ref: sNs.tableRef('t'),
+      table: sNs.tableRef('t'),
       actions: [addColumnAction(col('c', 'text', { default: lit('hello') }))],
     });
     const lowered = await adapter.lowerToExecuteRequest(ast);
@@ -55,7 +55,7 @@ describe('PostgresAlterTable ADD COLUMN lowering', () => {
 
   it('NOT NULL column with literal numeric default (DEFAULT before NOT NULL)', async () => {
     const ast = alterTable({
-      ref: sNs.tableRef('t'),
+      table: sNs.tableRef('t'),
       actions: [addColumnAction(col('count', 'int', { notNull: true, default: lit(0) }))],
     });
     const lowered = await adapter.lowerToExecuteRequest(ast);
@@ -64,7 +64,7 @@ describe('PostgresAlterTable ADD COLUMN lowering', () => {
 
   it('nullable column with function default (now())', async () => {
     const ast = alterTable({
-      ref: sNs.tableRef('t'),
+      table: sNs.tableRef('t'),
       actions: [addColumnAction(col('created_at', 'timestamptz', { default: fn('now()') }))],
     });
     const lowered = await adapter.lowerToExecuteRequest(ast);
@@ -75,7 +75,7 @@ describe('PostgresAlterTable ADD COLUMN lowering', () => {
 
   it('NOT NULL with literal boolean default', async () => {
     const ast = alterTable({
-      ref: sNs.tableRef('t'),
+      table: sNs.tableRef('t'),
       actions: [addColumnAction(col('active', 'boolean', { notNull: true, default: lit(true) }))],
     });
     const lowered = await adapter.lowerToExecuteRequest(ast);
@@ -86,7 +86,7 @@ describe('PostgresAlterTable ADD COLUMN lowering', () => {
 
   it('unqualified (no schema) table reference', async () => {
     const ast = alterTable({
-      ref: unboundNs.tableRef('t'),
+      table: unboundNs.tableRef('t'),
       actions: [addColumnAction(col('c', 'text'))],
     });
     const lowered = await adapter.lowerToExecuteRequest(ast);
@@ -95,7 +95,7 @@ describe('PostgresAlterTable ADD COLUMN lowering', () => {
 
   it('string literal default with single-quote escaping', async () => {
     const ast = alterTable({
-      ref: sNs.tableRef('t'),
+      table: sNs.tableRef('t'),
       actions: [addColumnAction(col('name', 'text', { default: lit("O'Reilly") }))],
     });
     const lowered = await adapter.lowerToExecuteRequest(ast);
@@ -104,7 +104,7 @@ describe('PostgresAlterTable ADD COLUMN lowering', () => {
 
   it('non-text type gets a ::type cast on string literal default', async () => {
     const ast = alterTable({
-      ref: sNs.tableRef('t'),
+      table: sNs.tableRef('t'),
       actions: [
         addColumnAction(
           col('id', 'uuid', { default: lit('00000000-0000-0000-0000-000000000000') }),
@@ -119,7 +119,7 @@ describe('PostgresAlterTable ADD COLUMN lowering', () => {
 
   it('codec-encoded default: pg/jsonb@1 encodes an object through the codec path', async () => {
     const ast = alterTable({
-      ref: sNs.tableRef('t'),
+      table: sNs.tableRef('t'),
       actions: [
         addColumnAction(
           col('meta', 'jsonb', {
@@ -137,7 +137,7 @@ describe('PostgresAlterTable ADD COLUMN lowering', () => {
 
   it('params array is always empty for DDL', async () => {
     const ast = alterTable({
-      ref: sNs.tableRef('t'),
+      table: sNs.tableRef('t'),
       actions: [addColumnAction(col('c', 'text'))],
     });
     const lowered = await adapter.lowerToExecuteRequest(ast);
@@ -148,7 +148,7 @@ describe('PostgresAlterTable ADD COLUMN lowering', () => {
 describe('PostgresAlterTable node shape', () => {
   it('is a frozen PostgresDdlNode with kind "alter-table"', () => {
     const ast = alterTable({
-      ref: unboundNs.tableRef('t'),
+      table: unboundNs.tableRef('t'),
       actions: [addColumnAction(col('c', 'text'))],
     });
     expect(ast).toBeInstanceOf(PostgresAlterTable);
