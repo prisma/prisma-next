@@ -823,7 +823,7 @@ function resolveNonRelationField(
   ownerName: string,
   compositeTypeNames: ReadonlySet<string>,
   scalarTypeDescriptors: ReadonlyMap<string, string>,
-  enumCodecIds: ReadonlyMap<string, string>,
+  codecIdByEnumName: ReadonlyMap<string, string>,
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
 ): ContractField | undefined {
@@ -835,9 +835,9 @@ function resolveNonRelationField(
     return field.list ? { ...result, many: true } : result;
   }
 
-  // Parallel to SQL's enumTypeDescriptors lookup, but reduced to codecId only —
-  // Mongo has no named-type system, so there is no nativeType table to populate.
-  const enumCodecId = enumCodecIds.get(field.typeName);
+  // If this field's declared type is a known enum name, treat the field as a scalar
+  // with that enum's codec and stamp the domain valueSet ref.
+  const enumCodecId = codecIdByEnumName.get(field.typeName);
   if (enumCodecId !== undefined) {
     const valueSet: ValueSetRef = {
       plane: 'domain',
@@ -971,7 +971,7 @@ export function interpretPslDocumentToMongoContract(
     diagnostics,
   });
 
-  const enumCodecIds: Map<string, string> = new Map(
+  const codecIdByEnumName: Map<string, string> = new Map(
     Object.entries(builtEnums).map(([name, e]) => [name, e.codecId]),
   );
 
@@ -1050,7 +1050,7 @@ export function interpretPslDocumentToMongoContract(
         pslModel.name,
         compositeTypeNames,
         scalarTypeDescriptors,
-        enumCodecIds,
+        codecIdByEnumName,
         sourceId,
         diagnostics,
       );
@@ -1124,7 +1124,7 @@ export function interpretPslDocumentToMongoContract(
         compositeType.name,
         compositeTypeNames,
         scalarTypeDescriptors,
-        enumCodecIds,
+        codecIdByEnumName,
         sourceId,
         diagnostics,
       );

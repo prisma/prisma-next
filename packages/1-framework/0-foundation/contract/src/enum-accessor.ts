@@ -75,10 +75,6 @@ export function buildNamespacedEnums(domain: {
   return result;
 }
 
-// Dual-carrier: `domain.namespaces[ns].enum` drives the type projection for both emitted and TS-DSL
-// contracts; `enumAccessors` (optional, TS-DSL only) adds a literal-tuple `.values` carrier because
-// `ContractEnum.members[].value` is typed as `JsonValue`, which erases literal types.
-
 type Present<T> = Exclude<T, undefined>;
 
 type EnumMemberEntry = { readonly name: string; readonly value: JsonValue };
