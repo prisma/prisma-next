@@ -4,6 +4,7 @@ import type {
   MongoCollectionOptionsAuthoringInput,
   MongoIndexOptionsInput,
   MongoModelsMap,
+  MongoUnboundFieldInputTypes,
 } from '@prisma-next/mongo-contract';
 import { expectTypeOf, test } from 'vitest';
 import { defineContract, field, index, model, valueObject } from '../src/contract-builder';
@@ -282,4 +283,143 @@ test('F14: namespace enum slot is typed with literal value preservation', () => 
   type RoleEntry = NonNullable<Ns['enum']>['F11Role'];
   type MemberValue = RoleEntry['members'][number]['value'];
   expectTypeOf<MemberValue>().toEqualTypeOf<'user' | 'admin'>();
+});
+
+// --- Exhaustive matrix: input channel for F11 fields ---
+
+type F11Input = MongoUnboundFieldInputTypes<typeof F11Contract>['F11Account'];
+
+test('F11 input: plain scalar resolves to codec type', () => {
+  expectTypeOf<F11Input['scalarField']>().toEqualTypeOf<string>();
+});
+
+test('F11 input: nullable scalar resolves to Base | null', () => {
+  expectTypeOf<F11Input['nullableField']>().toEqualTypeOf<string | null>();
+});
+
+test('F11 input: many scalar resolves to Base[]', () => {
+  expectTypeOf<F11Input['manyField']>().toEqualTypeOf<string[]>();
+});
+
+test('F11 input: nullable+many scalar resolves to Base[] | null, not (Base | null)[]', () => {
+  expectTypeOf<F11Input['nullableManyField']>().toEqualTypeOf<string[] | null>();
+  expectTypeOf<F11Input['nullableManyField']>().not.toEqualTypeOf<(string | null)[]>();
+});
+
+test('F11 input: plain enum resolves to value union', () => {
+  expectTypeOf<F11Input['role']>().toEqualTypeOf<'user' | 'admin'>();
+});
+
+test('F11 input: nullable enum resolves to value union | null', () => {
+  expectTypeOf<F11Input['nullableRole']>().toEqualTypeOf<'user' | 'admin' | null>();
+});
+
+test('F11 input: many enum resolves to value union array', () => {
+  expectTypeOf<F11Input['manyRoles']>().toEqualTypeOf<('user' | 'admin')[]>();
+});
+
+test('F11 input: nullable+many enum resolves to (union)[] | null, not (union | null)[]', () => {
+  expectTypeOf<F11Input['manyNullableRoles']>().toEqualTypeOf<('user' | 'admin')[] | null>();
+  // Precedence trap: nullable applied inside the array gives (union | null)[]; correct form is outside.
+  expectTypeOf<F11Input['manyNullableRoles']>().not.toEqualTypeOf<('user' | 'admin' | null)[]>();
+});
+
+// --- Value object and nested VO matrix ---
+
+const Inner = valueObject('Inner', {
+  fields: {
+    x: field.string(),
+    y: field.double(),
+  },
+});
+
+const Outer = valueObject('Outer', {
+  fields: {
+    inner: field.valueObject(Inner),
+    nullableInner: field.valueObject(Inner).optional(),
+    name: field.string(),
+  },
+});
+
+const VOModel = model('VOModel', {
+  collection: 'vo_models',
+  fields: {
+    _id: field.objectId(),
+    nested: field.valueObject(Outer),
+    nullableNested: field.valueObject(Outer).optional(),
+    manyNested: field.valueObject(Outer).many(),
+  },
+});
+
+const VOContract = defineContract({
+  family: mongoFamilyPack,
+  target: mongoTargetPack,
+  models: { VOModel },
+  valueObjects: { Inner, Outer },
+});
+
+type VORow = InferModelRow<typeof VOContract, 'VOModel'>;
+type VOInput = MongoUnboundFieldInputTypes<typeof VOContract>['VOModel'];
+
+test('VO output: plain value object resolves to the full nested shape', () => {
+  expectTypeOf<VORow['nested']>().toEqualTypeOf<{
+    inner: { x: string; y: number };
+    nullableInner: { x: string; y: number } | null;
+    name: string;
+  }>();
+});
+
+test('VO output: nullable value object resolves to shape | null', () => {
+  expectTypeOf<VORow['nullableNested']>().toEqualTypeOf<{
+    inner: { x: string; y: number };
+    nullableInner: { x: string; y: number } | null;
+    name: string;
+  } | null>();
+});
+
+test('VO output: many value object resolves to shape[]', () => {
+  expectTypeOf<VORow['manyNested']>().toEqualTypeOf<
+    {
+      inner: { x: string; y: number };
+      nullableInner: { x: string; y: number } | null;
+      name: string;
+    }[]
+  >();
+});
+
+test('VO output: nested VO recursion resolves inner shape (not unknown)', () => {
+  // If BuilderFieldChannelType recursion regresses, nested.inner resolves to unknown.
+  expectTypeOf<VORow['nested']['inner']>().toEqualTypeOf<{ x: string; y: number }>();
+  expectTypeOf<VORow['nested']['inner']>().not.toBeUnknown();
+});
+
+test('VO input: plain value object resolves to the full nested shape', () => {
+  expectTypeOf<VOInput['nested']>().toEqualTypeOf<{
+    inner: { x: string; y: number };
+    nullableInner: { x: string; y: number } | null;
+    name: string;
+  }>();
+});
+
+test('VO input: nullable value object resolves to shape | null', () => {
+  expectTypeOf<VOInput['nullableNested']>().toEqualTypeOf<{
+    inner: { x: string; y: number };
+    nullableInner: { x: string; y: number } | null;
+    name: string;
+  } | null>();
+});
+
+test('VO input: many value object resolves to shape[]', () => {
+  expectTypeOf<VOInput['manyNested']>().toEqualTypeOf<
+    {
+      inner: { x: string; y: number };
+      nullableInner: { x: string; y: number } | null;
+      name: string;
+    }[]
+  >();
+});
+
+test('VO input: nested VO recursion resolves inner shape (not unknown)', () => {
+  expectTypeOf<VOInput['nested']['inner']>().toEqualTypeOf<{ x: string; y: number }>();
+  expectTypeOf<VOInput['nested']['inner']>().not.toBeUnknown();
 });
