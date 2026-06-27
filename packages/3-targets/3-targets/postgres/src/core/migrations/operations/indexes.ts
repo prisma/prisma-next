@@ -1,7 +1,7 @@
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { indexExistsAst } from '../../../contract-free/checks';
+import type { PostgresEntityRef } from '../../entity-ref';
 import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
-import { qualifyTableName } from '../planner-sql-checks';
 import { type Op, step, targetDetails } from './shared';
 
 type CheckStep = { sql: string; params?: readonly unknown[] };
@@ -38,14 +38,15 @@ function renderIndexOptions(options: Record<string, unknown>): string {
 }
 
 export async function createIndex(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   indexName: string,
   columns: readonly string[],
   lowerer: ExecuteRequestLowerer,
   extras?: CreateIndexExtras,
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const columnList = columns.map(quoteIdentifier).join(', ');
   const using = extras?.type ? ` USING ${quoteIdentifier(extras.type)}` : '';
   const options = extras?.options;
@@ -69,11 +70,12 @@ export async function createIndex(
 }
 
 export async function dropIndex(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   indexName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
   const { present, absent } = await indexExistsSteps(lowerer, schemaName, indexName);
   return {
     id: `dropIndex.${tableName}.${indexName}`,
@@ -82,7 +84,7 @@ export async function dropIndex(
     target: targetDetails('index', indexName, schemaName, tableName),
     precheck: [step(`ensure index "${indexName}" exists`, present.sql, present.params)],
     execute: [
-      step(`drop index "${indexName}"`, `DROP INDEX ${qualifyTableName(schemaName, indexName)}`),
+      step(`drop index "${indexName}"`, `DROP INDEX ${table.namespace.qualifyTable(indexName)}`),
     ],
     postcheck: [step(`verify index "${indexName}" does not exist`, absent.sql, absent.params)],
   };

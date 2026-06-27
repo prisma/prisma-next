@@ -1,3 +1,4 @@
+export { PostgresEntityRef } from '../core/entity-ref';
 export {
   PostgresRlsPolicy,
   type PostgresRlsPolicyInput,

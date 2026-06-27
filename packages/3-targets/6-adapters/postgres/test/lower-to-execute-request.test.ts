@@ -16,7 +16,7 @@ import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
 import { jsonb, pgTable, text } from '@prisma-next/target-postgres/contract-free';
 import { PostgresCreateTable } from '@prisma-next/target-postgres/ddl';
-import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import { PostgresSchema, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { createContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
@@ -26,6 +26,7 @@ import type { PostgresContract } from '../src/core/types';
 
 const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 const ctx = { contract: {} as PostgresContract };
+const unboundNs = PostgresSchema.unbound;
 
 /**
  * A codec whose `encode` transforms its input (uppercases + prefixes). The
@@ -51,7 +52,7 @@ const transformingLookup: CodecRegistry = {
 describe('PostgresControlAdapter.lowerToExecuteRequest — DDL literal defaults', () => {
   it('inlines a string default with single-quoting and ::nativeType cast on non-text columns', async () => {
     const ast = new PostgresCreateTable({
-      table: 'events',
+      table: unboundNs.tableRef('events'),
       columns: [col('status', 'my_enum', { default: lit('active') })],
     });
     const result = await adapter.lowerToExecuteRequest(ast, ctx);
@@ -61,7 +62,7 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — DDL literal defaults'
 
   it('inlines a string default without cast on text columns', async () => {
     const ast = new PostgresCreateTable({
-      table: 't',
+      table: unboundNs.tableRef('t'),
       columns: [col('note', 'text', { default: lit('hello') })],
     });
     const result = await adapter.lowerToExecuteRequest(ast, ctx);
@@ -73,7 +74,7 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — DDL literal defaults'
   it('inlines a Date default as ISO string with ::nativeType cast', async () => {
     const date = new Date('2025-06-01T00:00:00.000Z');
     const ast = new PostgresCreateTable({
-      table: 'events',
+      table: unboundNs.tableRef('events'),
       columns: [col('created_at', 'timestamptz', { default: lit(date) })],
     });
     const result = await adapter.lowerToExecuteRequest(ast, ctx);
@@ -86,7 +87,7 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — DDL literal defaults'
   it('inlines a bigint default as a bare numeric string', async () => {
     // Use a large integer stored as a number (ColumnDefaultLiteralInputValue includes number)
     const ast = new PostgresCreateTable({
-      table: 'counters',
+      table: unboundNs.tableRef('counters'),
       columns: [col('big', 'int8', { default: lit(9007199254740991) })],
     });
     const result = await adapter.lowerToExecuteRequest(ast, ctx);
@@ -96,7 +97,7 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — DDL literal defaults'
 
   it('inlines a boolean default as bare true/false', async () => {
     const ast = new PostgresCreateTable({
-      table: 'flags',
+      table: unboundNs.tableRef('flags'),
       columns: [
         col('active', 'boolean', { default: lit(true) }),
         col('disabled', 'boolean', { default: lit(false) }),
@@ -110,7 +111,7 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — DDL literal defaults'
 
   it('inlines a JSON-object default with ::jsonb cast', async () => {
     const ast = new PostgresCreateTable({
-      table: 't',
+      table: unboundNs.tableRef('t'),
       columns: [col('meta', 'jsonb', { default: lit({ key: 'val' }) })],
     });
     const result = await adapter.lowerToExecuteRequest(ast, ctx);
@@ -120,7 +121,7 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — DDL literal defaults'
 
   it('inlines a null default as DEFAULT NULL', async () => {
     const ast = new PostgresCreateTable({
-      table: 't',
+      table: unboundNs.tableRef('t'),
       columns: [col('opt', 'uuid', { default: lit(null) })],
     });
     const result = await adapter.lowerToExecuteRequest(ast, ctx);
@@ -130,7 +131,7 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — DDL literal defaults'
 
   it('preserves a function default expression unchanged', async () => {
     const ast = new PostgresCreateTable({
-      table: 't',
+      table: unboundNs.tableRef('t'),
       columns: [
         col('id', 'uuid', { default: fn('gen_random_uuid()') }),
         col('ts', 'timestamptz', { default: fn('now()') }),
@@ -144,7 +145,7 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — DDL literal defaults'
 
   it('escapes single quotes in string defaults', async () => {
     const ast = new PostgresCreateTable({
-      table: 't',
+      table: unboundNs.tableRef('t'),
       columns: [col('name', 'text', { default: lit("O'Brien") })],
     });
     const result = await adapter.lowerToExecuteRequest(ast, ctx);
@@ -157,7 +158,7 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — guards', () => {
   it('throws when a numeric literal default is non-finite (NaN / ±Infinity)', async () => {
     for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
       const ast = new PostgresCreateTable({
-        table: 'defaults',
+        table: unboundNs.tableRef('defaults'),
         columns: [col('x', 'double precision', { default: lit(value) })],
       });
       await expect(adapter.lowerToExecuteRequest(ast, ctx)).rejects.toThrow(
@@ -168,7 +169,7 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — guards', () => {
 
   it('throws when a Date literal default is invalid', async () => {
     const ast = new PostgresCreateTable({
-      table: 'defaults',
+      table: unboundNs.tableRef('defaults'),
       columns: [col('x', 'timestamptz', { default: lit(new Date('not-a-date')) })],
     });
     await expect(adapter.lowerToExecuteRequest(ast, ctx)).rejects.toThrow(/invalid Date/);
@@ -177,7 +178,7 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — guards', () => {
   it('routes a codec-bearing literal default through codec.encode (not raw type-branching)', async () => {
     const codecAdapter = new PostgresControlAdapter(transformingLookup);
     const ast = new PostgresCreateTable({
-      table: 'secrets',
+      table: unboundNs.tableRef('secrets'),
       columns: [
         col('token', 'text', {
           default: lit('plaintext'),
@@ -194,7 +195,7 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — guards', () => {
 
   it('falls back to raw inlining when the codecRef resolves to no codec', async () => {
     const ast = new PostgresCreateTable({
-      table: 'secrets',
+      table: unboundNs.tableRef('secrets'),
       columns: [
         col('token', 'text', {
           default: lit('plaintext'),

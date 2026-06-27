@@ -1,6 +1,7 @@
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { DdlNode } from '@prisma-next/sql-relational-core/ast';
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
+import { postgresCreateNamespace } from '../core/postgres-schema';
 import { createSchema, createTable } from './ddl';
 
 const markerColumns = [
@@ -30,16 +31,16 @@ const ledgerColumns = [
   col('operations', 'jsonb', { notNull: true }),
 ] as const;
 
+const controlNs = postgresCreateNamespace({ id: 'prisma_contract', entries: { table: {} } });
+
 const markerTable = createTable({
-  schema: 'prisma_contract',
-  table: 'marker',
+  table: controlNs.tableRef('marker'),
   ifNotExists: true,
   columns: markerColumns,
 });
 
 const ledgerTable = createTable({
-  schema: 'prisma_contract',
-  table: 'ledger',
+  table: controlNs.tableRef('ledger'),
   ifNotExists: true,
   columns: ledgerColumns,
 });

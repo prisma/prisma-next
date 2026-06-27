@@ -1,0 +1,92 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { describe, expect, it } from 'vitest';
+import { PostgresEntityRef } from '../src/core/entity-ref';
+import { PostgresSchema, postgresCreateNamespace } from '../src/core/postgres-schema';
+
+const boundNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
+const unboundNs = postgresCreateNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
+
+describe('PostgresEntityRef (table)', () => {
+  it('bound namespace quoteTable renders schema-prefixed identifier', () => {
+    const ref = boundNs.tableRef('user');
+    expect(ref.namespace.quoteTable(ref.id)).toBe('"public"."user"');
+  });
+
+  it('unbound namespace quoteTable renders unqualified identifier (no schema prefix)', () => {
+    const ref = unboundNs.tableRef('user');
+    expect(ref.namespace.quoteTable(ref.id)).toBe('"user"');
+  });
+
+  it('bound namespace with embedded-quote in table name escapes correctly', () => {
+    const ref = boundNs.tableRef('my"table');
+    expect(ref.namespace.quoteTable(ref.id)).toBe('"public"."my""table"');
+  });
+
+  it('bound namespace byte-parity with legacy renderer composition', () => {
+    const ns = postgresCreateNamespace({ id: 'auth', entries: { table: {} } });
+    const ref = ns.tableRef('sessions');
+    expect(ref.namespace.quoteTable(ref.id)).toBe('"auth"."sessions"');
+  });
+
+  it('unbound byte-parity — same as legacy renderer unqualified path', () => {
+    const ref = unboundNs.tableRef('sessions');
+    expect(ref.namespace.quoteTable(ref.id)).toBe('"sessions"');
+  });
+
+  it('id and namespace are accessible', () => {
+    const ref = boundNs.tableRef('user');
+    expect(ref.id).toBe('user');
+    expect(ref.namespace).toBe(boundNs);
+  });
+
+  it('is frozen', () => {
+    const ref = boundNs.tableRef('user');
+    expect(Object.isFrozen(ref)).toBe(true);
+  });
+
+  it('factory on PostgresSchema returns a PostgresEntityRef', () => {
+    const ns = new PostgresSchema({ id: 'app', entries: { table: {} } });
+    const ref = ns.tableRef('orders');
+    expect(ref).toBeInstanceOf(PostgresEntityRef);
+    expect(ref.namespace).toBe(ns);
+    expect(ref.id).toBe('orders');
+  });
+});
+
+describe('PostgresEntityRef (column via parent)', () => {
+  it('bound table: column ref carries parent and id', () => {
+    const tableRef = boundNs.tableRef('user');
+    const ref = new PostgresEntityRef({ namespace: boundNs, id: 'email', parent: tableRef });
+    expect(ref.parent).toBe(tableRef);
+    expect(ref.id).toBe('email');
+    expect(tableRef.namespace.quoteTable(tableRef.id)).toBe('"public"."user"');
+  });
+
+  it('unbound table: column ref carries parent and id', () => {
+    const tableRef = unboundNs.tableRef('user');
+    const ref = new PostgresEntityRef({ namespace: unboundNs, id: 'email', parent: tableRef });
+    expect(ref.parent).toBe(tableRef);
+    expect(ref.id).toBe('email');
+    expect(tableRef.namespace.quoteTable(tableRef.id)).toBe('"user"');
+  });
+
+  it('column name with embedded quote is stored correctly', () => {
+    const tableRef = boundNs.tableRef('user');
+    const ref = new PostgresEntityRef({ namespace: boundNs, id: 'my"col', parent: tableRef });
+    expect(ref.id).toBe('my"col');
+  });
+
+  it('id and parent are accessible', () => {
+    const tableRef = boundNs.tableRef('user');
+    const ref = new PostgresEntityRef({ namespace: boundNs, id: 'email', parent: tableRef });
+    expect(ref.id).toBe('email');
+    expect(ref.parent).toBe(tableRef);
+    expect(tableRef.id).toBe('user');
+  });
+
+  it('is frozen', () => {
+    const tableRef = boundNs.tableRef('user');
+    const ref = new PostgresEntityRef({ namespace: boundNs, id: 'email', parent: tableRef });
+    expect(Object.isFrozen(ref)).toBe(true);
+  });
+});

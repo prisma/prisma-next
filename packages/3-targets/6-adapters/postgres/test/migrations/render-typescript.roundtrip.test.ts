@@ -29,6 +29,7 @@ import {
 } from '@prisma-next/target-postgres/op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from '@prisma-next/target-postgres/planner-produced-postgres-migration';
 import { renderOps } from '@prisma-next/target-postgres/render-ops';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -105,6 +106,8 @@ const META = {
   to: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
 } as const;
 
+const publicNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
+
 describe('TypeScriptRenderablePostgresMigration round-trip', () => {
   let tmpDir: string;
 
@@ -125,14 +128,13 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
       new CreateExtensionCall('citext'),
       new CreateSchemaCall('app'),
       new CreateTableCall(
-        'public',
-        'user',
+        publicNs.tableRef('user'),
         [col('id', 'text', { notNull: true }), col('email', 'text', { notNull: true })],
         [primaryKey(['id'])],
       ),
-      new AddColumnCall('public', 'user', col('nickname', 'text')),
-      new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
-      new DropTableCall('public', 'stale'),
+      new AddColumnCall(publicNs.tableRef('user'), col('nickname', 'text')),
+      new CreateIndexCall(publicNs.tableRef('user'), 'user_email_idx', ['email']),
+      new DropTableCall(publicNs.tableRef('stale')),
     ];
     const migration = new TypeScriptRenderablePostgresMigration(
       calls,

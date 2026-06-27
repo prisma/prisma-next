@@ -10,6 +10,7 @@ import {
   PostgresDropPolicy,
   type RlsPolicyOperation,
 } from '../core/ddl/nodes';
+import type { PostgresEntityRef } from '../core/entity-ref';
 
 /**
  * Build a Postgres `CREATE TABLE` query node.
@@ -18,16 +19,11 @@ import {
  * unique constraints — use the {@link PrimaryKeyConstraint}, {@link ForeignKeyConstraint},
  * and {@link UniqueConstraint} classes from `@prisma-next/sql-relational-core/ast`.
  *
- * Precondition: identifiers (`table`, `schema`, column names/types) are
- * emitted to SQL verbatim — they are not quoted or escaped, so callers must
- * pass pre-trusted values (e.g. fixed control-plane identifiers). String-literal
- * default values, by contrast, are single-quote-escaped (embedded `'` doubled)
- * by the renderer. Identifier quoting for untrusted identifiers is added when
- * the migration planner adopts this lowering path.
+ * The adapter renders the qualified table name from `table.namespace.quoteTable(table.id)`.
+ * String-literal default values are single-quote-escaped by the renderer.
  */
 export function createTable(options: {
-  readonly table: string;
-  readonly schema?: string;
+  readonly table: PostgresEntityRef;
   readonly ifNotExists?: boolean;
   readonly columns: readonly DdlColumn[];
   readonly constraints?: readonly DdlTableConstraint[];
@@ -68,8 +64,7 @@ export function dropDefaultAction(columnName: string): DropDefaultAction {
  * See {@link addColumnAction} / {@link dropDefaultAction} for building actions.
  */
 export function alterTable(options: {
-  readonly table: string;
-  readonly schema?: string;
+  readonly table: PostgresEntityRef;
   readonly actions: readonly AnyAlterTableAction[];
 }): PostgresAlterTable {
   return new PostgresAlterTable(options);

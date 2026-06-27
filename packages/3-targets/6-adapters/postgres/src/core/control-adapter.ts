@@ -1634,9 +1634,7 @@ async function pgRenderCreateTable(
   codecLookup: CodecLookup,
 ): Promise<SqlExecuteRequest> {
   const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
-  const tableRef = node.schema
-    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`
-    : quoteIdentifier(node.table);
+  const tableRef = node.table.namespace.quoteTable(node.table.id);
   const columnDefs = await Promise.all(
     node.columns.map((col) => pgRenderDdlColumn(col, codecLookup)),
   );
@@ -1661,9 +1659,7 @@ async function pgRenderAlterTable(
   node: PostgresAlterTable,
   codecLookup: CodecLookup,
 ): Promise<SqlExecuteRequest> {
-  const tableRef = node.schema
-    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`
-    : quoteIdentifier(node.table);
+  const tableRef = node.table.namespace.quoteTable(node.table.id);
   const actionVisitor: AlterTableActionVisitor<Promise<string>> = {
     async addColumn(action: AddColumnAction): Promise<string> {
       const colFragment = await pgRenderDdlColumn(action.column, codecLookup);

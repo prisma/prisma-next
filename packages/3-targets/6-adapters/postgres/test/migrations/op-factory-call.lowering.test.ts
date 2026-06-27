@@ -39,6 +39,7 @@ import {
 } from '@prisma-next/target-postgres/op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from '@prisma-next/target-postgres/planner-produced-postgres-migration';
 import { renderOps } from '@prisma-next/target-postgres/render-ops';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
@@ -46,6 +47,7 @@ import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 const META = { from: 'sha256:from', to: 'sha256:to' } as const;
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+const publicNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
 
 describe('renderOps', () => {
   it('lowers each variant via its pure factory, pinning id/operationClass/target.details', async () => {
@@ -59,31 +61,31 @@ describe('renderOps', () => {
       postcheck: [],
     };
     const calls = [
-      new CreateTableCall('public', 'user', [col('id', 'text', { notNull: true })]),
-      new DropTableCall('public', 'stale'),
-      new AddColumnCall('public', 'user', col('email', 'text')),
-      new DropColumnCall('public', 'user', 'legacy'),
-      new AlterColumnTypeCall('public', 'user', 'age', {
+      new CreateTableCall(publicNs.tableRef('user'), [col('id', 'text', { notNull: true })]),
+      new DropTableCall(publicNs.tableRef('stale')),
+      new AddColumnCall(publicNs.tableRef('user'), col('email', 'text')),
+      new DropColumnCall(publicNs.tableRef('user'), 'legacy'),
+      new AlterColumnTypeCall(publicNs.tableRef('user'), 'age', {
         qualifiedTargetType: 'integer',
         formatTypeExpected: 'integer',
         rawTargetTypeForLabel: 'integer',
       }),
-      new SetNotNullCall('public', 'user', 'email'),
-      new DropNotNullCall('public', 'user', 'nickname'),
-      new SetDefaultCall('public', 'user', 'created_at', 'DEFAULT now()'),
-      new DropDefaultCall('public', 'user', 'updated_at'),
-      new AddPrimaryKeyCall('public', 'user', 'user_pkey', ['id']),
-      new AddUniqueCall('public', 'user', 'user_email_key', ['email']),
-      new AddForeignKeyCall('public', 'user', {
+      new SetNotNullCall(publicNs.tableRef('user'), 'email'),
+      new DropNotNullCall(publicNs.tableRef('user'), 'nickname'),
+      new SetDefaultCall(publicNs.tableRef('user'), 'created_at', 'DEFAULT now()'),
+      new DropDefaultCall(publicNs.tableRef('user'), 'updated_at'),
+      new AddPrimaryKeyCall(publicNs.tableRef('user'), 'user_pkey', ['id']),
+      new AddUniqueCall(publicNs.tableRef('user'), 'user_email_key', ['email']),
+      new AddForeignKeyCall(publicNs.tableRef('user'), {
         name: 'user_org_fk',
         columns: ['org_id'],
         references: { schema: 'public', table: 'org', columns: ['id'] },
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
-      new DropConstraintCall('public', 'user', 'user_email_key'),
-      new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
-      new DropIndexCall('public', 'user', 'stale_idx'),
+      new DropConstraintCall(publicNs.tableRef('user'), 'user_email_key'),
+      new CreateIndexCall(publicNs.tableRef('user'), 'user_email_idx', ['email']),
+      new DropIndexCall(publicNs.tableRef('user'), 'stale_idx'),
       new RawSqlCall(liftedOp),
       new CreateExtensionCall('citext'),
       new CreateSchemaCall('app'),
@@ -221,7 +223,7 @@ describe('renderOps', () => {
 
 describe('TypeScriptRenderablePostgresMigration', () => {
   it('identifies as postgres, derives destination from meta.to, and materializes operations via renderOps', async () => {
-    const calls = [new DropTableCall('public', 'stale')];
+    const calls = [new DropTableCall(publicNs.tableRef('stale'))];
     const migration = new TypeScriptRenderablePostgresMigration(
       calls,
       META,
@@ -239,7 +241,7 @@ describe('TypeScriptRenderablePostgresMigration', () => {
   });
 
   it('renders TypeScript source mirroring renderCallsToTypeScript output', () => {
-    const calls = [new DropTableCall('public', 'stale')];
+    const calls = [new DropTableCall(publicNs.tableRef('stale'))];
     const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
 
     const source = migration.renderTypeScript();

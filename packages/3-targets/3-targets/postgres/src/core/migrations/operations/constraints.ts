@@ -1,9 +1,10 @@
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import { constraintExistsAst } from '../../../contract-free/checks';
+import type { PostgresEntityRef } from '../../entity-ref';
+import { postgresCreateNamespace } from '../../postgres-schema';
 import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
-import { qualifyTableName } from '../planner-sql-checks';
-import { type ForeignKeySpec, type Op, step, targetDetails } from './shared';
+import { type ForeignKeySpec, type Op, quotedPair, step, targetDetails } from './shared';
 
 async function constraintCheckSteps(
   lowerer: ExecuteRequestLowerer,
@@ -18,13 +19,15 @@ async function constraintCheckSteps(
   return { absent, present };
 }
 
-function renderForeignKeySql(schemaName: string, tableName: string, fk: ForeignKeySpec): string {
-  let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
+function renderForeignKeySql(table: PostgresEntityRef, fk: ForeignKeySpec): string {
+  const referencesQualified = postgresCreateNamespace({
+    id: fk.references.schema,
+    entries: { table: {} },
+  }).qualifyTable(fk.references.table);
+  let sql = `ALTER TABLE ${table.namespace.qualifyTable(table.id)}
 ADD CONSTRAINT ${quoteIdentifier(fk.name)}
 FOREIGN KEY (${fk.columns.map(quoteIdentifier).join(', ')})
-REFERENCES ${qualifyTableName(fk.references.schema, fk.references.table)} (${fk.references.columns
-    .map(quoteIdentifier)
-    .join(', ')})`;
+REFERENCES ${referencesQualified} (${fk.references.columns.map(quoteIdentifier).join(', ')})`;
 
   if (fk.onDelete !== undefined) {
     const action = REFERENTIAL_ACTION_SQL[fk.onDelete];
@@ -44,13 +47,14 @@ REFERENCES ${qualifyTableName(fk.references.schema, fk.references.table)} (${fk.
 }
 
 export async function addPrimaryKey(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   constraintName: string,
   columns: readonly string[],
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const columnList = columns.map(quoteIdentifier).join(', ');
   const { absent, present } = await constraintCheckSteps(lowerer, {
     constraintName,
@@ -76,13 +80,14 @@ export async function addPrimaryKey(
 }
 
 export async function addUnique(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   constraintName: string,
   columns: readonly string[],
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const columnList = columns.map(quoteIdentifier).join(', ');
   const { absent, present } = await constraintCheckSteps(lowerer, {
     constraintName,
@@ -108,11 +113,12 @@ export async function addUnique(
 }
 
 export async function addForeignKey(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   fk: ForeignKeySpec,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
   const { absent, present } = await constraintCheckSteps(lowerer, {
     constraintName: fk.name,
     schema: schemaName,
@@ -124,20 +130,21 @@ export async function addForeignKey(
     operationClass: 'additive',
     target: targetDetails('foreignKey', fk.name, schemaName, tableName),
     precheck: [step(`ensure FK "${fk.name}" does not exist`, absent.sql, absent.params)],
-    execute: [step(`add FK "${fk.name}"`, renderForeignKeySql(schemaName, tableName, fk))],
+    execute: [step(`add FK "${fk.name}"`, renderForeignKeySql(table, fk))],
     postcheck: [step(`verify FK "${fk.name}" exists`, present.sql, present.params)],
   };
 }
 
 export async function addCheckConstraint(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   constraintName: string,
   column: string,
   values: readonly string[],
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const valueList = values.map((v) => `'${escapeLiteral(v)}'`).join(', ');
   const { absent, present } = await constraintCheckSteps(lowerer, {
     constraintName,
@@ -146,7 +153,7 @@ export async function addCheckConstraint(
   });
   return {
     id: `checkConstraint.${tableName}.${constraintName}`,
-    label: `Add check constraint "${constraintName}" on "${tableName}"."${column}"`,
+    label: `Add check constraint "${constraintName}" on ${quotedPair(tableName, column)}`,
     operationClass: 'additive',
     target: targetDetails('checkConstraint', constraintName, schemaName, tableName),
     precheck: [
@@ -163,12 +170,13 @@ export async function addCheckConstraint(
 }
 
 export async function dropCheckConstraint(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   constraintName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const { absent, present } = await constraintCheckSteps(lowerer, {
     constraintName,
     schema: schemaName,
@@ -200,13 +208,14 @@ export async function dropCheckConstraint(
  * that produced the drop.
  */
 export async function dropConstraint(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   constraintName: string,
   lowerer: ExecuteRequestLowerer,
   kind: 'foreignKey' | 'unique' | 'primaryKey' = 'unique',
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const { absent, present } = await constraintCheckSteps(lowerer, {
     constraintName,
     schema: schemaName,

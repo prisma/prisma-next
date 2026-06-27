@@ -7,7 +7,7 @@ import {
   computeContentHash,
   normalizePredicate,
 } from '@prisma-next/target-postgres/rls-canonicalize';
-import { PostgresRlsPolicy, PostgresSchema } from '@prisma-next/target-postgres/types';
+import { PostgresRlsPolicy, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -47,7 +47,7 @@ const policy = new PostgresRlsPolicy({
 });
 
 function buildContractWithPolicy(): Contract<SqlStorage> {
-  const schema = new PostgresSchema({
+  const schema = postgresCreateNamespace({
     id: UNBOUND_NAMESPACE_ID,
     entries: {
       table: {
@@ -166,7 +166,7 @@ describe.sequential('RLS verify extension issues', () => {
     const contract = buildContractWithPolicy();
 
     // Apply only the table (no policy) by using a contract without any entries.policy.
-    const noPolicySchema = new PostgresSchema({
+    const noPolicySchema = postgresCreateNamespace({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
         table: {
@@ -219,7 +219,7 @@ describe.sequential('RLS verify extension issues', () => {
   }, async () => {
     const contract = buildContractWithPolicy();
 
-    const noPolicySchema = new PostgresSchema({
+    const noPolicySchema = postgresCreateNamespace({
       id: UNBOUND_NAMESPACE_ID,
       entries: {
         table: {

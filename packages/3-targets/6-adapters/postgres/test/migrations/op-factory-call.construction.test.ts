@@ -13,15 +13,20 @@ import {
   CreateTableCall,
   DataTransformCall,
 } from '@prisma-next/target-postgres/op-factory-call';
+import { PostgresSchema, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+const publicNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
+const unboundNs = PostgresSchema.unbound;
 
 describe('Postgres call classes - construction + toOp parity', () => {
   it('CreateTableCall freezes, labels from the table name, and lowers to a createTable op', async () => {
-    const call = new CreateTableCall('public', 'user', [col('id', 'text', { notNull: true })]);
+    const call = new CreateTableCall(publicNs.tableRef('user'), [
+      col('id', 'text', { notNull: true }),
+    ]);
 
     expect(Object.isFrozen(call)).toBe(true);
     expect(call.factoryName).toBe('createTable');
@@ -50,8 +55,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
 
   it('CreateTableCall.toOp produces byte-identical SQL for a composite-PK table', async () => {
     const call = new CreateTableCall(
-      'public',
-      'item',
+      publicNs.tableRef('item'),
       [
         col('tenant_id', 'uuid', { notNull: true }),
         col('id', 'uuid', { notNull: true }),
@@ -79,7 +83,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
   });
 
   it('CreateTableCall.toOp with a sequence default produces nextval SQL (byte-parity)', async () => {
-    const call = new CreateTableCall('public', 'user', [
+    const call = new CreateTableCall(publicNs.tableRef('user'), [
       col('id', 'bigint', { notNull: true, default: fn(`nextval('"user_id_seq"'::regclass)`) }),
     ]);
 
@@ -93,8 +97,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
 
   it('CreateTableCall.toOp with __unbound__ schema produces an unqualified table name', async () => {
     const call = new CreateTableCall(
-      '__unbound__',
-      'item',
+      unboundNs.tableRef('item'),
       [col('id', 'text', { notNull: true })],
       [primaryKey(['id'])],
     );
@@ -106,7 +109,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
   });
 
   it('AddColumnCall freezes, labels from column+table, requires a lowerer', async () => {
-    const call = new AddColumnCall('public', 'user', col('email', 'text'));
+    const call = new AddColumnCall(publicNs.tableRef('user'), col('email', 'text'));
 
     expect(Object.isFrozen(call)).toBe(true);
     expect(call.factoryName).toBe('addColumn');
@@ -116,7 +119,10 @@ describe('Postgres call classes - construction + toOp parity', () => {
   });
 
   it('AddColumnCall.toOp produces ALTER TABLE … ADD COLUMN SQL (byte-parity)', async () => {
-    const call = new AddColumnCall('public', 'user', col('email', 'text', { notNull: true }));
+    const call = new AddColumnCall(
+      publicNs.tableRef('user'),
+      col('email', 'text', { notNull: true }),
+    );
     const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe('ALTER TABLE "public"."user" ADD COLUMN "email" text NOT NULL');
     expect(op.id).toBe('column.public.user.email');
@@ -128,14 +134,15 @@ describe('Postgres call classes - construction + toOp parity', () => {
   });
 
   it('AddColumnCall.toOp with __unbound__ schema produces an unqualified table name', async () => {
-    const call = new AddColumnCall('__unbound__', 'item', col('score', 'int'));
+    const call = new AddColumnCall(unboundNs.tableRef('item'), col('score', 'int'));
     const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe('ALTER TABLE "item" ADD COLUMN "score" int');
   });
 
   it('AddColumnCall.toOp: identical table+column in different schemas produce distinct op ids', async () => {
-    const callPublic = new AddColumnCall('public', 'user', col('email', 'text'));
-    const callAudit = new AddColumnCall('audit', 'user', col('email', 'text'));
+    const auditNs = postgresCreateNamespace({ id: 'audit', entries: { table: {} } });
+    const callPublic = new AddColumnCall(publicNs.tableRef('user'), col('email', 'text'));
+    const callAudit = new AddColumnCall(auditNs.tableRef('user'), col('email', 'text'));
     const opPublic = await callPublic.toOp(testAdapter);
     const opAudit = await callAudit.toOp(testAdapter);
     expect(opPublic.id).toBe('column.public.user.email');

@@ -37,27 +37,30 @@ import {
   SetNotNullCall,
 } from '@prisma-next/target-postgres/op-factory-call';
 import { renderCallsToTypeScript } from '@prisma-next/target-postgres/render-typescript';
+import { PostgresSchema, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
+
+const publicNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
+const unboundNs = PostgresSchema.unbound;
 
 const META = { from: 'sha256:from', to: 'sha256:to' } as const;
 
 describe('Postgres call classes - renderTypeScript + importRequirements', () => {
   it('emits this.dropTable({...}) and contributes no imports', () => {
-    const call = new DropTableCall('public', 'user');
+    const call = new DropTableCall(publicNs.tableRef('user'));
     expect(call.renderTypeScript()).toBe('this.dropTable({ schema: "public", table: "user" })');
     expect(call.importRequirements()).toEqual([]);
   });
 
   it('SetDefaultCall emits this.setDefault({...}), omits operationClass when additive', () => {
-    const additive = new SetDefaultCall('public', 'user', 'created_at', "DEFAULT 'now'");
+    const additive = new SetDefaultCall(publicNs.tableRef('user'), 'created_at', "DEFAULT 'now'");
     expect(additive.renderTypeScript()).toBe(
       `this.setDefault({ schema: "public", table: "user", column: "created_at", defaultSql: "DEFAULT 'now'" })`,
     );
     expect(additive.importRequirements()).toEqual([]);
 
     const widening = new SetDefaultCall(
-      'public',
-      'user',
+      publicNs.tableRef('user'),
       'created_at',
       "DEFAULT 'now'",
       'widening',
@@ -68,13 +71,13 @@ describe('Postgres call classes - renderTypeScript + importRequirements', () => 
   });
 
   it('DropConstraintCall omits kind when unique, emits it otherwise', () => {
-    const unique = new DropConstraintCall('public', 'user', 'user_email_key');
+    const unique = new DropConstraintCall(publicNs.tableRef('user'), 'user_email_key');
     expect(unique.renderTypeScript()).toBe(
       'this.dropConstraint({ schema: "public", table: "user", constraint: "user_email_key" })',
     );
     expect(unique.importRequirements()).toEqual([]);
 
-    const fk = new DropConstraintCall('public', 'user', 'user_org_fk', 'foreignKey');
+    const fk = new DropConstraintCall(publicNs.tableRef('user'), 'user_org_fk', 'foreignKey');
     expect(fk.renderTypeScript()).toBe(
       'this.dropConstraint({ schema: "public", table: "user", constraint: "user_org_fk", kind: "foreignKey" })',
     );
@@ -113,7 +116,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   };
 
   it('CreateTableCall emits this.createTable({...}) with col() columns; omits constraints when absent', () => {
-    const withoutConstraints = new CreateTableCall('public', 'user', [
+    const withoutConstraints = new CreateTableCall(publicNs.tableRef('user'), [
       col('id', 'text', { notNull: true }),
     ]);
     expect(withoutConstraints.renderTypeScript()).toBe(
@@ -124,8 +127,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     ]);
 
     const withPk = new CreateTableCall(
-      'public',
-      'user',
+      publicNs.tableRef('user'),
       [col('id', 'text', { notNull: true })],
       [primaryKey(['id'])],
     );
@@ -139,14 +141,16 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   });
 
   it('CreateTableCall omits schema option when schema is __unbound__', () => {
-    const call = new CreateTableCall('__unbound__', 'item', [col('id', 'text', { notNull: true })]);
+    const call = new CreateTableCall(unboundNs.tableRef('item'), [
+      col('id', 'text', { notNull: true }),
+    ]);
     expect(call.renderTypeScript()).toBe(
       'this.createTable({ table: "item", columns: [col("id", "text", { notNull: true })] })',
     );
   });
 
   it('CreateTableCall includes lit() and fn() imports when columns have defaults', () => {
-    const call = new CreateTableCall('public', 'user', [
+    const call = new CreateTableCall(publicNs.tableRef('user'), [
       col('id', 'integer', { notNull: true, default: lit(0) }),
     ]);
     expect(call.importRequirements()).toEqual([
@@ -162,7 +166,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   });
 
   it('AddColumnCall emits this.addColumn({...}) and imports col', () => {
-    const call = new AddColumnCall('public', 'user', col('email', 'text'));
+    const call = new AddColumnCall(publicNs.tableRef('user'), col('email', 'text'));
     expect(call.renderTypeScript()).toBe(
       'this.addColumn({ schema: "public", table: "user", column: col("email", "text") })',
     );
@@ -174,14 +178,13 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   it('AddColumnCall includes codecRef in the rendered col() call when present', () => {
     const codecRef = { codecId: 'pg/uuid@1' };
     const column = col('id', 'uuid', { codecRef });
-    const call = new AddColumnCall('public', 'user', column);
+    const call = new AddColumnCall(publicNs.tableRef('user'), column);
     expect(call.renderTypeScript()).toBe(
       'this.addColumn({ schema: "public", table: "user", column: col("id", "uuid", { codecRef: { codecId: "pg/uuid@1" } }) })',
     );
 
     const callWithTypeParams = new AddColumnCall(
-      'public',
-      'user',
+      publicNs.tableRef('user'),
       col('data', 'jsonb', { codecRef: { codecId: 'pg/json@1', typeParams: { schema: 'v1' } } }),
     );
     expect(callWithTypeParams.renderTypeScript()).toContain(
@@ -202,12 +205,12 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   });
 
   it('AddColumnCall without codecRef renders col() with no codecRef property', () => {
-    const call = new AddColumnCall('public', 'user', col('score', 'integer'));
+    const call = new AddColumnCall(publicNs.tableRef('user'), col('score', 'integer'));
     expect(call.renderTypeScript()).not.toContain('codecRef');
   });
 
   it('DropColumnCall emits this.dropColumn({...}) and contributes no imports', () => {
-    const call = new DropColumnCall('public', 'user', 'legacy');
+    const call = new DropColumnCall(publicNs.tableRef('user'), 'legacy');
     expect(call.renderTypeScript()).toBe(
       'this.dropColumn({ schema: "public", table: "user", column: "legacy" })',
     );
@@ -215,7 +218,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   });
 
   it('AlterColumnTypeCall emits this.alterColumnType({...}) and contributes no imports', () => {
-    const call = new AlterColumnTypeCall('public', 'user', 'age', {
+    const call = new AlterColumnTypeCall(publicNs.tableRef('user'), 'age', {
       qualifiedTargetType: 'integer',
       formatTypeExpected: 'integer',
       rawTargetTypeForLabel: 'integer',
@@ -229,7 +232,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   });
 
   it('AlterColumnTypeCall preserves an explicit USING clause in the options literal', () => {
-    const call = new AlterColumnTypeCall('public', 'user', 'age', {
+    const call = new AlterColumnTypeCall(publicNs.tableRef('user'), 'age', {
       qualifiedTargetType: 'integer',
       formatTypeExpected: 'integer',
       rawTargetTypeForLabel: 'integer',
@@ -239,28 +242,32 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   });
 
   it('SetNotNullCall / DropNotNullCall / DropDefaultCall emit this.X({...}) and contribute no imports', () => {
-    expect(new SetNotNullCall('public', 'user', 'email').renderTypeScript()).toBe(
+    expect(new SetNotNullCall(publicNs.tableRef('user'), 'email').renderTypeScript()).toBe(
       'this.setNotNull({ schema: "public", table: "user", column: "email" })',
     );
-    expect(new DropNotNullCall('public', 'user', 'nickname').renderTypeScript()).toBe(
+    expect(new DropNotNullCall(publicNs.tableRef('user'), 'nickname').renderTypeScript()).toBe(
       'this.dropNotNull({ schema: "public", table: "user", column: "nickname" })',
     );
-    expect(new DropDefaultCall('public', 'user', 'updated_at').renderTypeScript()).toBe(
+    expect(new DropDefaultCall(publicNs.tableRef('user'), 'updated_at').renderTypeScript()).toBe(
       'this.dropDefault({ schema: "public", table: "user", column: "updated_at" })',
     );
-    expect(new SetNotNullCall('public', 'user', 'email').importRequirements()).toEqual([]);
-    expect(new DropNotNullCall('public', 'user', 'nickname').importRequirements()).toEqual([]);
-    expect(new DropDefaultCall('public', 'user', 'updated_at').importRequirements()).toEqual([]);
+    expect(new SetNotNullCall(publicNs.tableRef('user'), 'email').importRequirements()).toEqual([]);
+    expect(new DropNotNullCall(publicNs.tableRef('user'), 'nickname').importRequirements()).toEqual(
+      [],
+    );
+    expect(
+      new DropDefaultCall(publicNs.tableRef('user'), 'updated_at').importRequirements(),
+    ).toEqual([]);
   });
 
   it('AddPrimaryKeyCall / AddUniqueCall emit this.X({schema, table, constraint, columns})', () => {
-    const pk = new AddPrimaryKeyCall('public', 'user', 'user_pkey', ['id']);
+    const pk = new AddPrimaryKeyCall(publicNs.tableRef('user'), 'user_pkey', ['id']);
     expect(pk.renderTypeScript()).toBe(
       'this.addPrimaryKey({ schema: "public", table: "user", constraint: "user_pkey", columns: ["id"] })',
     );
     expect(pk.importRequirements()).toEqual([]);
 
-    const uq = new AddUniqueCall('public', 'user', 'user_email_key', ['email']);
+    const uq = new AddUniqueCall(publicNs.tableRef('user'), 'user_email_key', ['email']);
     expect(uq.renderTypeScript()).toBe(
       'this.addUnique({ schema: "public", table: "user", constraint: "user_email_key", columns: ["email"] })',
     );
@@ -268,7 +275,8 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   });
 
   it('AddForeignKeyCall serializes the full ForeignKeySpec including optional referential actions', () => {
-    const minimal = new AddForeignKeyCall('public', 'post', {
+    const postNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
+    const minimal = new AddForeignKeyCall(postNs.tableRef('post'), {
       name: 'fk',
       columns: ['a'],
       references: { schema: 'public', table: 'u', columns: ['id'] },
@@ -278,7 +286,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     );
     expect(minimal.importRequirements()).toEqual([]);
 
-    const withActions = new AddForeignKeyCall('public', 'post', {
+    const withActions = new AddForeignKeyCall(postNs.tableRef('post'), {
       name: 'post_author_fk',
       columns: ['author_id'],
       references: { schema: 'public', table: 'user', columns: ['id'] },
@@ -290,13 +298,13 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   });
 
   it('CreateIndexCall / DropIndexCall emit this.X({...}) and contribute no imports', () => {
-    const ci = new CreateIndexCall('public', 'user', 'user_email_idx', ['email']);
+    const ci = new CreateIndexCall(publicNs.tableRef('user'), 'user_email_idx', ['email']);
     expect(ci.renderTypeScript()).toBe(
       'this.createIndex({ schema: "public", table: "user", index: "user_email_idx", columns: ["email"] })',
     );
     expect(ci.importRequirements()).toEqual([]);
 
-    const di = new DropIndexCall('public', 'user', 'stale_idx');
+    const di = new DropIndexCall(publicNs.tableRef('user'), 'stale_idx');
     expect(di.renderTypeScript()).toBe(
       'this.dropIndex({ schema: "public", table: "user", index: "stale_idx" })',
     );
@@ -304,7 +312,8 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
   });
 
   it('CreateIndexCall renders extras when they are provided', () => {
-    const ci = new CreateIndexCall('public', 'doc', 'doc_body_idx', ['body'], {
+    const docNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
+    const ci = new CreateIndexCall(docNs.tableRef('doc'), 'doc_body_idx', ['body'], {
       type: 'gin',
       options: { fastupdate: false },
     });
@@ -358,10 +367,10 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
 describe('renderCallsToTypeScript', () => {
   it('deduplicates + sorts imports across a mixed call list and keeps the base Migration import', () => {
     const calls = [
-      new CreateTableCall('public', 'user', [col('id', 'text', { notNull: true })]),
-      new DropTableCall('public', 'old_user'),
-      new AddColumnCall('public', 'user', col('email', 'text')),
-      new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
+      new CreateTableCall(publicNs.tableRef('user'), [col('id', 'text', { notNull: true })]),
+      new DropTableCall(publicNs.tableRef('old_user')),
+      new AddColumnCall(publicNs.tableRef('user'), col('email', 'text')),
+      new CreateIndexCall(publicNs.tableRef('user'), 'user_email_idx', ['email']),
     ];
 
     const source = renderCallsToTypeScript(calls, META);
@@ -419,13 +428,12 @@ describe('renderCallsToTypeScript', () => {
 
   it('renders CreateTableCall as this.createTable({...}) with col() columns in the scaffold', () => {
     const calls = [
-      new CreateTableCall('public', 'bug', [
+      new CreateTableCall(publicNs.tableRef('bug'), [
         col('severity', 'text', { notNull: true }),
         col('stepsToRepro', 'text'),
       ]),
       new CreateTableCall(
-        'public',
-        'item',
+        publicNs.tableRef('item'),
         [col('tenant_id', 'uuid', { notNull: true }), col('id', 'uuid', { notNull: true })],
         [primaryKey(['tenant_id', 'id'])],
       ),

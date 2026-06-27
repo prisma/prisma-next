@@ -1,6 +1,5 @@
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type { DdlColumn } from '@prisma-next/sql-relational-core/ast';
-import { ifDefined } from '@prisma-next/utils/defined';
 import {
   columnDefaultAst,
   columnExistsAst,
@@ -10,10 +9,9 @@ import {
   tableIsEmptyAst,
 } from '../../../contract-free/checks';
 import * as contractFreeDdl from '../../../contract-free/ddl';
+import type { PostgresEntityRef } from '../../entity-ref';
 import { quoteIdentifier } from '../../sql-utils';
-import { boundSchema } from '../bound-schema';
-import { qualifyTableName } from '../planner-sql-checks';
-import { type Op, step, targetDetails } from './shared';
+import { type Op, quotedPair, step, targetDetails } from './shared';
 
 type CheckStep = { sql: string; params?: readonly unknown[] };
 
@@ -28,12 +26,13 @@ async function columnExistsSteps(
 }
 
 export async function dropColumn(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   columnName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const { present, absent } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
@@ -64,8 +63,7 @@ export async function dropColumn(
  * explicit, else the column's native type).
  */
 export async function alterColumnType(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   columnName: string,
   options: {
     readonly qualifiedTargetType: string;
@@ -75,7 +73,9 @@ export async function alterColumnType(
   },
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const usingClause = options.using
     ? ` USING ${options.using}`
     : ` USING ${quoteIdentifier(columnName)}::${options.qualifiedTargetType}`;
@@ -94,7 +94,7 @@ export async function alterColumnType(
   );
   return {
     id: `alterType.${tableName}.${columnName}`,
-    label: `Alter type of "${tableName}"."${columnName}" to ${options.rawTargetTypeForLabel}`,
+    label: `Alter type of ${quotedPair(tableName, columnName)} to ${options.rawTargetTypeForLabel}`,
     operationClass: 'destructive',
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
@@ -116,12 +116,13 @@ export async function alterColumnType(
 }
 
 export async function setNotNull(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   columnName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const { present } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
@@ -140,7 +141,7 @@ export async function setNotNull(
   );
   return {
     id: `alterNullability.setNotNull.${tableName}.${columnName}`,
-    label: `Set NOT NULL on "${tableName}"."${columnName}"`,
+    label: `Set NOT NULL on ${quotedPair(tableName, columnName)}`,
     operationClass: 'destructive',
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [
@@ -160,12 +161,13 @@ export async function setNotNull(
 }
 
 export async function dropNotNull(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   columnName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const { present } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
@@ -181,7 +183,7 @@ export async function dropNotNull(
   );
   return {
     id: `alterNullability.dropNotNull.${tableName}.${columnName}`,
-    label: `Drop NOT NULL on "${tableName}"."${columnName}"`,
+    label: `Drop NOT NULL on ${quotedPair(tableName, columnName)}`,
     operationClass: 'widening',
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
@@ -206,14 +208,15 @@ export async function dropNotNull(
  * treats that as a widening change rather than an additive one.
  */
 export async function setDefault(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   columnName: string,
   defaultSql: string,
   lowerer: ExecuteRequestLowerer,
   operationClass: 'additive' | 'widening' = 'additive',
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const { present } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
@@ -224,7 +227,7 @@ export async function setDefault(
   );
   return {
     id: `setDefault.${tableName}.${columnName}`,
-    label: `Set default on "${tableName}"."${columnName}"`,
+    label: `Set default on ${quotedPair(tableName, columnName)}`,
     operationClass,
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
@@ -241,11 +244,12 @@ export async function setDefault(
 }
 
 export async function dropDefault(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   columnName: string,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
   const { present } = await columnExistsSteps(lowerer, {
     schema: schemaName,
     table: tableName,
@@ -253,8 +257,7 @@ export async function dropDefault(
   });
   const dropDefaultExec = await lowerer.lowerToExecuteRequest(
     contractFreeDdl.alterTable({
-      ...ifDefined('schema', boundSchema(schemaName)),
-      table: tableName,
+      table,
       actions: [contractFreeDdl.dropDefaultAction(columnName)],
     }),
   );
@@ -263,7 +266,7 @@ export async function dropDefault(
   );
   return {
     id: `dropDefault.${tableName}.${columnName}`,
-    label: `Drop default on "${tableName}"."${columnName}"`,
+    label: `Drop default on ${quotedPair(tableName, columnName)}`,
     operationClass: 'destructive',
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [step(`ensure column "${columnName}" exists`, present.sql, present.params)],
@@ -281,16 +284,16 @@ export async function dropDefault(
  * adapter; postchecks assert the column exists and is NOT NULL.
  */
 export async function addNotNullColumnDirect(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   column: DdlColumn,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
   const columnName = column.name;
   const addColumn = await lowerer.lowerToExecuteRequest(
     contractFreeDdl.alterTable({
-      ...ifDefined('schema', boundSchema(schemaName)),
-      table: tableName,
+      table,
       actions: [contractFreeDdl.addColumnAction(column)],
     }),
   );

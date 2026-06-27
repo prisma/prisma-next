@@ -1,14 +1,15 @@
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { tableExistsAst } from '../../../contract-free/checks';
-import { qualifyTableName } from '../planner-sql-checks';
+import type { PostgresEntityRef } from '../../entity-ref';
 import { type Op, step, targetDetails } from './shared';
 
 export async function dropTable(
-  schemaName: string,
-  tableName: string,
+  table: PostgresEntityRef,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
-  const qualified = qualifyTableName(schemaName, tableName);
+  const schemaName = table.namespace.id;
+  const tableName = table.id;
+  const qualified = table.namespace.qualifyTable(table.id);
   const checks = tableExistsAst(schemaName, tableName);
   const present = await lowerer.lowerToExecuteRequest(checks.tablePresent());
   const absent = await lowerer.lowerToExecuteRequest(checks.tableAbsent());

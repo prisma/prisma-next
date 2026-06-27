@@ -31,7 +31,12 @@ function createsNewTopLevelObject(call: PostgresOpFactoryCall): boolean {
 
 function ddlSchemaNameForNamespace(contract: Contract<SqlStorage>, namespaceId: string): string {
   const namespace = contract.storage.namespaces[namespaceId];
-  return isPostgresSchema(namespace) ? namespace.ddlSchemaName(contract.storage) : namespaceId;
+  if (!isPostgresSchema(namespace)) {
+    throw new Error(
+      `ddlSchemaNameForNamespace: namespace "${namespaceId}" is not a PostgresSchema`,
+    );
+  }
+  return namespace.ddlSchemaName(contract.storage);
 }
 
 function resolveNamespaceIdForTable(
@@ -40,6 +45,7 @@ function resolveNamespaceIdForTable(
   ddlSchemaName: string | undefined,
 ): string {
   for (const namespaceId of Object.keys(contract.storage.namespaces)) {
+    if (!isPostgresSchema(contract.storage.namespaces[namespaceId])) continue;
     const table = entityAt<StorageTable>(contract.storage, {
       namespaceId,
       entityKind: 'table',
@@ -79,6 +85,9 @@ interface PostgresCallFields {
 }
 
 function postgresCallFields(call: PostgresOpFactoryCall): PostgresCallFields {
+  // Relies on the RLS-policy and field-event Calls still exposing `schemaName`/`tableName`
+  // as string fields. When those Calls convert to entity refs, this probe must be updated
+  // to read `call.ref` instead.
   return {
     ...ifDefined('schemaName', 'schemaName' in call ? call.schemaName : undefined),
     ...ifDefined('tableName', 'tableName' in call ? call.tableName : undefined),

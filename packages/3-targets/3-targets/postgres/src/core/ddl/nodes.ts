@@ -3,6 +3,7 @@ import {
   DdlNode,
   type DdlTableConstraint,
 } from '@prisma-next/sql-relational-core/ast';
+import type { PostgresEntityRef } from '../entity-ref';
 import type { RlsPolicyOperation } from '../rls/canonicalize';
 
 // ---------------------------------------------------------------------------
@@ -88,22 +89,19 @@ function freezeConstraints(
 
 export class PostgresCreateTable extends PostgresDdlNode {
   readonly kind = 'create-table' as const;
-  readonly table: string;
-  readonly schema: string | undefined;
+  readonly table: PostgresEntityRef;
   readonly ifNotExists: boolean | undefined;
   readonly columns: ReadonlyArray<DdlColumn>;
   readonly constraints: ReadonlyArray<DdlTableConstraint> | undefined;
 
   constructor(options: {
-    readonly table: string;
-    readonly schema?: string;
+    readonly table: PostgresEntityRef;
     readonly ifNotExists?: boolean;
     readonly columns: readonly DdlColumn[];
     readonly constraints?: readonly DdlTableConstraint[];
   }) {
     super();
     this.table = options.table;
-    this.schema = options.schema;
     this.ifNotExists = options.ifNotExists;
     this.columns = freezeDdlColumns(options.columns);
     this.constraints = freezeConstraints(options.constraints);
@@ -134,18 +132,15 @@ export class PostgresCreateSchema extends PostgresDdlNode {
 
 export class PostgresAlterTable extends PostgresDdlNode {
   readonly kind = 'alter-table' as const;
-  readonly table: string;
-  readonly schema: string | undefined;
+  readonly table: PostgresEntityRef;
   readonly actions: ReadonlyArray<AnyAlterTableAction>;
 
   constructor(options: {
-    readonly table: string;
-    readonly schema?: string;
+    readonly table: PostgresEntityRef;
     readonly actions: readonly AnyAlterTableAction[];
   }) {
     super();
     this.table = options.table;
-    this.schema = options.schema;
     this.actions = Object.freeze([...options.actions]);
     this.freeze();
   }

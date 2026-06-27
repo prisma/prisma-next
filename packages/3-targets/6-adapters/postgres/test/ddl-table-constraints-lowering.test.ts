@@ -5,19 +5,19 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { col } from '@prisma-next/sql-relational-core/contract-free';
 import { createTable } from '@prisma-next/target-postgres/contract-free';
+import { PostgresSchema, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../src/core/control-adapter';
 import type { PostgresContract } from '../src/core/types';
 
+const publicNs = postgresCreateNamespace({ id: 'public', entries: { table: {} } });
+const unboundNs = PostgresSchema.unbound;
+
 describe('PostgresCreateTable with table-level constraints', () => {
   it('renders a join table with composite PK, two FKs, and a table-level unique', async () => {
-    // Representative user table: a many-to-many join between "posts" and "tags"
-    // with a composite primary key (postId, tagId), two FKs, and a unique
-    // on (tagId, postId) for reverse lookups.
     const ast = createTable({
-      table: 'post_tags',
-      schema: 'public',
+      table: publicNs.tableRef('post_tags'),
       columns: [col('postId', 'text', { notNull: true }), col('tagId', 'text', { notNull: true })],
       constraints: [
         new PrimaryKeyConstraint({ columns: ['postId', 'tagId'] }),
@@ -55,7 +55,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
 
   it('renders a named primary key', async () => {
     const ast = createTable({
-      table: 'items',
+      table: unboundNs.tableRef('items'),
       columns: [col('a', 'text'), col('b', 'text')],
       constraints: [new PrimaryKeyConstraint({ columns: ['a', 'b'], name: 'pk_items' })],
     });
@@ -68,7 +68,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
 
   it('renders FK with onUpdate action', async () => {
     const ast = createTable({
-      table: 'orders',
+      table: unboundNs.tableRef('orders'),
       columns: [col('userId', 'text', { notNull: true })],
       constraints: [
         new ForeignKeyConstraint({
@@ -92,8 +92,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
 
   it('quotes mixed-case constraint names and splits schema-qualified FK refTable', async () => {
     const ast = createTable({
-      table: 'orders',
-      schema: 'public',
+      table: publicNs.tableRef('orders'),
       columns: [col('id', 'text', { notNull: true }), col('userId', 'text', { notNull: true })],
       constraints: [
         new PrimaryKeyConstraint({ columns: ['id'], name: 'MyPK' }),
@@ -114,7 +113,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
 
   it('omits constraints section when no constraints given', async () => {
     const ast = createTable({
-      table: 'simple',
+      table: unboundNs.tableRef('simple'),
       columns: [col('id', 'text', { primaryKey: true, notNull: true })],
     });
 

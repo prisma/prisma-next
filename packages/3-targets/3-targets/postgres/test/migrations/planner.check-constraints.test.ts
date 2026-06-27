@@ -181,7 +181,7 @@ describe('checkConstraintPlanCallStrategy', () => {
     expect(result.calls).toHaveLength(1);
     expect(result.calls[0]).toMatchObject({
       factoryName: 'addCheckConstraint',
-      tableName: TABLE_NAME,
+      table: expect.objectContaining({ id: TABLE_NAME }),
       constraintName: CHECK_NAME,
       column: COLUMN_NAME,
       values: expect.arrayContaining(['active', 'inactive']),
@@ -218,12 +218,12 @@ describe('checkConstraintPlanCallStrategy', () => {
     expect(result.calls).toHaveLength(2);
     expect(result.calls[0]).toMatchObject({
       factoryName: 'dropCheckConstraint',
-      tableName: TABLE_NAME,
+      table: expect.objectContaining({ id: TABLE_NAME }),
       constraintName: CHECK_NAME,
     });
     expect(result.calls[1]).toMatchObject({
       factoryName: 'addCheckConstraint',
-      tableName: TABLE_NAME,
+      table: expect.objectContaining({ id: TABLE_NAME }),
       constraintName: CHECK_NAME,
       values: expect.arrayContaining(['active', 'inactive', 'pending']),
     });
@@ -314,7 +314,7 @@ describe('planIssues — check constraint strategy', () => {
     const call = result.value.calls.find((c) => c.factoryName === 'dropCheckConstraint');
     expect(call).toMatchObject({
       factoryName: 'dropCheckConstraint',
-      tableName: TABLE_NAME,
+      table: expect.objectContaining({ id: TABLE_NAME }),
       constraintName: CHECK_NAME,
     });
   });
@@ -343,7 +343,7 @@ describe('planIssues — check constraint strategy', () => {
     const call = result.value.calls.find((c) => c.factoryName === 'addCheckConstraint');
     expect(call).toMatchObject({
       factoryName: 'addCheckConstraint',
-      tableName: TABLE_NAME,
+      table: expect.objectContaining({ id: TABLE_NAME }),
       constraintName: CHECK_NAME,
     });
   });

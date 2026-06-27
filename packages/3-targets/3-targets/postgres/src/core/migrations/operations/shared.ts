@@ -22,6 +22,10 @@ export interface ForeignKeySpec {
   readonly onUpdate?: ReferentialAction;
 }
 
+export function quotedPair(a: string, b: string): string {
+  return `"${a}"."${b}"`;
+}
+
 export function step(description: string, sql: string, params?: readonly unknown[]) {
   return { description, sql, ...ifDefined('params', params) };
 }

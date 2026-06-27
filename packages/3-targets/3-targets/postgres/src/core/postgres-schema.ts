@@ -18,9 +18,10 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresTableSource } from './ast/table-source';
 import { PG_TEXT_CODEC_ID } from './codec-ids';
 import { policyEntityKind, roleEntityKind } from './entity-kinds';
+import { PostgresEntityRef } from './entity-ref';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
 import type { PostgresRole } from './postgres-role';
-import { escapeLiteral } from './sql-utils';
+import { escapeLiteral, quoteIdentifier } from './sql-utils';
 
 export type PostgresNamespaceEntries = SqlNamespaceEntries & {
   readonly policy?: Readonly<Record<string, PostgresRlsPolicy>>;
@@ -109,6 +110,16 @@ export class PostgresSchema extends SqlNamespaceBase {
   }
 
   /**
+   * The schema name as it appears in an authoring `{ schema: … }` option
+   * — the string a user would write to address this namespace. Named schemas
+   * return their id; the unbound-schema singleton overrides this to return
+   * `undefined` so callers omit the `schema` option entirely.
+   */
+  authoredSchema(): string | undefined {
+    return this.id;
+  }
+
+  /**
    * The bare schema qualifier as it would appear in a rendered SQL
    * fragment (already quoted). The unbound-schema singleton overrides
    * this to return `''`.
@@ -125,6 +136,20 @@ export class PostgresSchema extends SqlNamespaceBase {
    */
   qualifyTable(tableName: string): string {
     return `"${this.id}"."${tableName}"`;
+  }
+
+  /**
+   * Qualify a table name using `quoteIdentifier` semantics, escaping embedded
+   * `"` characters. Bound schemas render `"<schema>"."<table>"`; the unbound
+   * subclass overrides this to render just `"<table>"`. The DDL adapter uses
+   * this to render the qualified table name from a `PostgresEntityRef`.
+   */
+  quoteTable(tableName: string): string {
+    return `${quoteIdentifier(this.id)}.${quoteIdentifier(tableName)}`;
+  }
+
+  tableRef(name: string): PostgresEntityRef {
+    return new PostgresEntityRef({ namespace: this, id: name });
   }
 
   /**
@@ -181,10 +206,7 @@ export class PostgresSchema extends SqlNamespaceBase {
    * database (e.g. `CREATE TABLE "<ddlSchemaName>"."<table>" …`,
    * catalog filters, planner conflict lookups). Named schemas resolve
    * to their own id. The `PostgresUnboundSchema` singleton inherits
-   * this and returns `UNBOUND_NAMESPACE_ID` — callers that dispatch
-   * through `qualifyTableName` route through the polymorphic
-   * `PostgresUnboundSchema` overrides and produce unqualified
-   * (search-path-resolved) output automatically.
+   * this and returns `UNBOUND_NAMESPACE_ID`.
    */
   ddlSchemaName(_storage: SqlStorage): string {
     return this.id;
@@ -206,9 +228,7 @@ export class PostgresSchema extends SqlNamespaceBase {
  * `search_path`).
  *
  * `ddlSchemaName` is inherited from `PostgresSchema` and returns
- * `UNBOUND_NAMESPACE_ID`. Downstream helpers such as `qualifyTableName`
- * route through the polymorphic factory and produce unqualified output
- * automatically.
+ * `UNBOUND_NAMESPACE_ID`.
  */
 export class PostgresUnboundSchema extends PostgresSchema {
   static readonly instance: PostgresUnboundSchema = new PostgresUnboundSchema();
@@ -217,12 +237,20 @@ export class PostgresUnboundSchema extends PostgresSchema {
     super(input ?? { id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
   }
 
+  override authoredSchema(): undefined {
+    return undefined;
+  }
+
   override qualifier(): string {
     return '';
   }
 
   override qualifyTable(tableName: string): string {
     return `"${tableName}"`;
+  }
+
+  override quoteTable(tableName: string): string {
+    return quoteIdentifier(tableName);
   }
 
   override schemaSqlExpression(): string {
