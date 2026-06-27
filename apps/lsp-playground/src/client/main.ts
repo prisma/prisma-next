@@ -1,4 +1,8 @@
 import { LogLevel } from '@codingame/monaco-vscode-api';
+import {
+  type IExtensionManifest,
+  registerExtension,
+} from '@codingame/monaco-vscode-api/extensions';
 import getFilesServiceOverride, {
   RegisteredFileSystemProvider,
   RegisteredMemoryFile,
@@ -6,6 +10,8 @@ import getFilesServiceOverride, {
 } from '@codingame/monaco-vscode-files-service-override';
 import getKeybindingsServiceOverride from '@codingame/monaco-vscode-keybindings-service-override';
 import type { ILogger } from '@codingame/monaco-vscode-log-service-override';
+import '@codingame/monaco-vscode-theme-defaults-default-extension';
+import getThemeServiceOverride from '@codingame/monaco-vscode-theme-service-override';
 import { EditorApp, type EditorAppConfig } from 'monaco-languageclient/editorApp';
 import { type LanguageClientConfig, LanguageClientWrapper } from 'monaco-languageclient/lcwrapper';
 import {
@@ -18,6 +24,34 @@ import { documentUri, rootUri, schemaPath, schemaText, wsPath } from './runtime'
 
 const LANGUAGE_ID = 'prisma';
 
+const pslSemanticThemeExtension = {
+  name: 'prisma-psl-semantic-theme-bridge',
+  publisher: 'prisma-next',
+  version: '0.0.0',
+  engines: { vscode: '*' },
+  contributes: {
+    semanticTokenScopes: [
+      {
+        language: LANGUAGE_ID,
+        scopes: {
+          keyword: ['keyword.control'],
+          namespace: ['entity.name.namespace'],
+          class: ['entity.name.type.class', 'support.class'],
+          struct: ['entity.name.type.struct', 'entity.name.type'],
+          type: ['entity.name.type', 'support.type'],
+          property: ['variable.other.property'],
+          decorator: ['entity.name.function', 'support.function'],
+          string: ['string.quoted'],
+          number: ['constant.numeric'],
+          comment: ['comment.line'],
+        },
+      },
+    ],
+  },
+} satisfies IExtensionManifest;
+
+registerExtension(pslSemanticThemeExtension, undefined, { system: true });
+
 const pathEl = document.getElementById('schema-path');
 if (pathEl !== null) {
   pathEl.textContent = schemaPath;
@@ -25,7 +59,6 @@ if (pathEl !== null) {
 
 function configureWorkerFactory(logger?: ILogger): void {
   const workerLoaders = defineDefaultWorkerLoaders();
-  workerLoaders['TextMateWorker'] = undefined;
   workerLoaders['extensionHostWorkerMain'] = undefined;
   const config = logger !== undefined ? { workerLoaders, logger } : { workerLoaders };
   useWorkerFactory(config);
@@ -54,7 +87,7 @@ async function main(): Promise<void> {
   registerFileSystemOverlay(1, fileSystemProvider);
 
   const vscodeApiConfig: MonacoVscodeApiConfig = {
-    $type: 'classic',
+    $type: 'extended',
     viewsConfig: {
       $type: 'EditorService',
       htmlContainer,
@@ -63,13 +96,19 @@ async function main(): Promise<void> {
     serviceOverrides: {
       ...getFilesServiceOverride(),
       ...getKeybindingsServiceOverride(),
+      ...getThemeServiceOverride(),
     },
     userConfiguration: {
       json: JSON.stringify({
+        'workbench.colorTheme': 'Default Dark+',
         'editor.wordBasedSuggestions': 'off',
+        'editor.semanticHighlighting.enabled': true,
       }),
     },
     monacoWorkerFactory: configureWorkerFactory,
+    advanced: {
+      enforceSemanticHighlighting: true,
+    },
   };
 
   const wsUrl = buildWebSocketUrl();
@@ -107,7 +146,6 @@ async function main(): Promise<void> {
       },
     },
     editorOptions: {
-      theme: 'vs-dark',
       fontSize: 16,
       lineHeight: 24,
       fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", Menlo, Monaco, monospace',

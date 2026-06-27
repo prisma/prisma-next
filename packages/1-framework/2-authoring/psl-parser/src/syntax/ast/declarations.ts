@@ -17,6 +17,11 @@ export type NamespaceMemberAst =
   | CompositeTypeDeclarationAst
   | GenericBlockDeclarationAst;
 
+export type DeclarationAst = NamespaceMemberAst | TypesBlockAst | NamespaceDeclarationAst;
+export type AttributeAst = FieldAttributeAst | ModelAttributeAst;
+export type BlockMemberAst = FieldDeclarationAst | ModelAttributeAst;
+export type GenericBlockMemberAst = KeyValuePairAst | ModelAttributeAst;
+
 function castNamespaceMember(node: SyntaxNode): NamespaceMemberAst | undefined {
   return (
     ModelDeclarationAst.cast(node) ??
@@ -32,7 +37,7 @@ export class DocumentAst implements AstNode {
     this.syntax = syntax;
   }
 
-  *declarations(): Iterable<NamespaceMemberAst | TypesBlockAst | NamespaceDeclarationAst> {
+  *declarations(): Iterable<DeclarationAst> {
     yield* filterChildren(
       this.syntax,
       (node) =>
@@ -76,6 +81,13 @@ export class ModelDeclarationAst implements AstNode {
     yield* filterChildren(this.syntax, ModelAttributeAst.cast);
   }
 
+  *members(): Iterable<BlockMemberAst> {
+    yield* filterChildren(
+      this.syntax,
+      (node) => FieldDeclarationAst.cast(node) ?? ModelAttributeAst.cast(node),
+    );
+  }
+
   static cast(node: SyntaxNode): ModelDeclarationAst | undefined {
     return node.kind === 'ModelDeclaration' ? new ModelDeclarationAst(node) : undefined;
   }
@@ -110,6 +122,13 @@ export class CompositeTypeDeclarationAst implements AstNode {
 
   *attributes(): Iterable<ModelAttributeAst> {
     yield* filterChildren(this.syntax, ModelAttributeAst.cast);
+  }
+
+  *members(): Iterable<BlockMemberAst> {
+    yield* filterChildren(
+      this.syntax,
+      (node) => FieldDeclarationAst.cast(node) ?? ModelAttributeAst.cast(node),
+    );
   }
 
   static cast(node: SyntaxNode): CompositeTypeDeclarationAst | undefined {
@@ -208,6 +227,13 @@ export class GenericBlockDeclarationAst implements AstNode {
 
   *attributes(): Iterable<ModelAttributeAst> {
     yield* filterChildren(this.syntax, ModelAttributeAst.cast);
+  }
+
+  *members(): Iterable<GenericBlockMemberAst> {
+    yield* filterChildren(
+      this.syntax,
+      (node) => KeyValuePairAst.cast(node) ?? ModelAttributeAst.cast(node),
+    );
   }
 
   static cast(node: SyntaxNode): GenericBlockDeclarationAst | undefined {

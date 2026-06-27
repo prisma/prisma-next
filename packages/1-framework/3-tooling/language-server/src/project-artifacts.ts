@@ -8,6 +8,7 @@ import type { SchemaInputSet } from './schema-inputs';
 export interface CachedDocument {
   readonly document: DocumentAst;
   readonly sourceFile: SourceFile;
+  readonly text: string;
 }
 
 export interface ProjectArtifacts {
@@ -40,6 +41,7 @@ export function createProjectArtifacts(): ProjectArtifacts {
       documents.set(uri, {
         document: computed.document,
         sourceFile: computed.sourceFile,
+        text,
       });
       // One symbol table per project. Single-input reality: it is (re)built from
       // the one open configured input on every edit. Merging several open inputs

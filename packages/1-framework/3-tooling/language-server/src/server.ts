@@ -11,7 +11,9 @@ import {
   type FoldingRange,
   type InitializeParams,
   type InitializeResult,
+  type Range,
   RegistrationRequest,
+  type SemanticTokens,
   TextDocumentSyncKind,
   TextDocuments,
   type TextEdit,
@@ -27,6 +29,7 @@ import {
   type ProjectArtifacts,
 } from './project-artifacts';
 import type { SchemaInputSet } from './schema-inputs';
+import { buildSemanticTokens, semanticTokensLegend } from './semantic-tokens';
 
 export interface LanguageServer {
   dispose(): void;
@@ -50,6 +53,8 @@ interface ProjectState {
   readonly artifacts: ProjectArtifacts;
 }
 
+const semanticTokenSourceLimit = 100_000;
+
 export function createServer(connection: Connection): LanguageServer {
   const documents = new TextDocuments(TextDocument);
   const projects = new Map<string, ProjectState>();
@@ -59,20 +64,22 @@ export function createServer(connection: Connection): LanguageServer {
   let watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
   let supportsWatchedFilesRegistration = false;
 
-  async function publish(uri: string, text: string): Promise<void> {
+  async function publish(uri: string): Promise<void> {
     const project = await resolveProjectForDocument(uri);
     if (project === undefined) {
       return;
     }
-    const currentDocument = documents.get(uri);
-    if (currentDocument === undefined) {
+    const document = documents.get(uri);
+    if (document === undefined) {
       documentConfigPaths.delete(uri);
       return;
     }
-    if (currentDocument.getText() !== text) {
-      return;
-    }
-    const computed = project.artifacts.update(uri, text, project.inputs, project.controlStack);
+    const computed = project.artifacts.update(
+      uri,
+      document.getText(),
+      project.inputs,
+      project.controlStack,
+    );
     if (computed === null) {
       void connection.sendDiagnostics({ uri, diagnostics: [] });
       return;
@@ -90,7 +97,11 @@ export function createServer(connection: Connection): LanguageServer {
   async function resolveProjectForDocument(uri: string): Promise<ProjectState | undefined> {
     const knownConfigPath = documentConfigPaths.get(uri);
     if (knownConfigPath !== undefined) {
-      return resolveProject(knownConfigPath);
+      const project = await resolveProjectIfLoadable(knownConfigPath);
+      if (project === undefined) {
+        documentConfigPaths.delete(uri);
+      }
+      return project;
     }
 
     const filePath = filePathFromUri(uri);
@@ -190,7 +201,7 @@ export function createServer(connection: Connection): LanguageServer {
     for (const document of documents.all()) {
       const knownConfigPath = documentConfigPaths.get(document.uri);
       if (knownConfigPath === configPath) {
-        await publish(document.uri, document.getText());
+        await publish(document.uri);
         continue;
       }
 
@@ -201,13 +212,13 @@ export function createServer(connection: Connection): LanguageServer {
       const nearestConfigPath = await findNearestConfigPathForFile(filePath);
       if (nearestConfigPath === configPath) {
         documentConfigPaths.set(document.uri, configPath);
-        await publish(document.uri, document.getText());
+        await publish(document.uri);
       }
     }
   }
 
-  function publishSafely(uri: string, text: string): void {
-    void publish(uri, text).catch((error: unknown) => {
+  function publishSafely(uri: string): void {
+    void publish(uri).catch((error: unknown) => {
       connection.console.error(error instanceof Error ? error.message : String(error));
     });
   }
@@ -248,6 +259,35 @@ export function createServer(connection: Connection): LanguageServer {
     ];
   }
 
+  async function semanticTokensForDocument(uri: string, range?: Range): Promise<SemanticTokens> {
+    const document = documents.get(uri);
+    if (document === undefined) {
+      return emptySemanticTokens();
+    }
+    const text = document.getText();
+    if (text.length > semanticTokenSourceLimit) {
+      return emptySemanticTokens();
+    }
+
+    const project = await resolveProjectForDocument(uri);
+    if (project === undefined) {
+      return emptySemanticTokens();
+    }
+
+    const cached = project.artifacts.getDocument(uri);
+    if (cached === undefined || cached.text !== text) {
+      return emptySemanticTokens();
+    }
+
+    const source = {
+      document: cached.document,
+      sourceFile: cached.sourceFile,
+      symbolTable: project.artifacts.getSymbolTable(),
+      scalarTypes: project.controlStack.scalarTypes,
+    };
+    return buildSemanticTokens(source, range);
+  }
+
   connection.onInitialize(async (params): Promise<InitializeResult> => {
     rootPath = resolveRootPath(params.rootUri, params.rootPath);
     watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
@@ -258,6 +298,11 @@ export function createServer(connection: Connection): LanguageServer {
         textDocumentSync: TextDocumentSyncKind.Incremental,
         documentFormattingProvider: true,
         foldingRangeProvider: true,
+        semanticTokensProvider: {
+          legend: semanticTokensLegend,
+          full: true,
+          range: true,
+        },
       },
     };
   });
@@ -299,6 +344,13 @@ export function createServer(connection: Connection): LanguageServer {
 
   connection.onDocumentFormatting((params) => formatDocument(params.textDocument.uri));
 
+  connection.languages.semanticTokens.on((params) =>
+    semanticTokensForDocument(params.textDocument.uri),
+  );
+  connection.languages.semanticTokens.onRange((params) =>
+    semanticTokensForDocument(params.textDocument.uri, params.range),
+  );
+
   connection.onFoldingRanges(async (params): Promise<FoldingRange[]> => {
     let project: ProjectState | undefined;
     try {
@@ -317,10 +369,10 @@ export function createServer(connection: Connection): LanguageServer {
   });
 
   documents.onDidOpen((event) => {
-    publishSafely(event.document.uri, event.document.getText());
+    publishSafely(event.document.uri);
   });
   documents.onDidChangeContent((event) => {
-    publishSafely(event.document.uri, event.document.getText());
+    publishSafely(event.document.uri);
   });
   documents.onDidClose((event) => {
     const uri = event.document.uri;
@@ -347,6 +399,10 @@ export function createServer(connection: Connection): LanguageServer {
     getDocumentAst: (uri) => artifactsForDocument(uri)?.getDocument(uri),
     getProjectSymbolTable: (uri) => artifactsForDocument(uri)?.getSymbolTable(),
   };
+}
+
+function emptySemanticTokens(): SemanticTokens {
+  return { data: [] };
 }
 
 function toLspSeverity(severity: number): DiagnosticSeverity {
