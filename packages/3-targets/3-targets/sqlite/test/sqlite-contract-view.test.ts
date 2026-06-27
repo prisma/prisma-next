@@ -12,30 +12,49 @@ describe('SqliteContractView', () => {
     expect(SqliteContractView.from(contract)).toBeDefined();
   });
 
-  it('cv.table exposes tables from the default namespace', () => {
-    const cv = SqliteContractView.from(contract);
-    expect(cv.table.users).toBeDefined();
-    expect(cv.table.posts).toBeDefined();
+  it('the view is a superset of the contract (contract fields present)', () => {
+    const view = SqliteContractView.from(contract);
+    expect(view.storage).toBe(contract.storage);
+    expect(view.domain).toBe(contract.domain);
+    expect(view.roots).toBe(contract.roots);
   });
 
-  it('cv.table.<name> returns the same entity object as the raw contract', () => {
-    const cv = SqliteContractView.from(contract);
+  it('view.table exposes tables from the default namespace', () => {
+    const view = SqliteContractView.from(contract);
+    expect(view.table.users).toBeDefined();
+    expect(view.table.posts).toBeDefined();
+  });
+
+  it('view.table.<name> returns the same entity object as the raw contract', () => {
+    const view = SqliteContractView.from(contract);
     const rawTables = contract.storage.namespaces[UNBOUND_NAMESPACE_ID].entries.table;
-    expect(cv.table.users).toBe(rawTables?.users);
+    expect(view.table.users).toBe(rawTables?.users);
   });
 
-  it('cv.valueSet is present and empty (SQLite emits no value sets)', () => {
-    const cv = SqliteContractView.from(contract);
-    expect(cv.valueSet).toEqual({});
+  it('view.namespace.__unbound__ reaches the default namespace by id', () => {
+    const view = SqliteContractView.from(contract);
+    expect(view.namespace[UNBOUND_NAMESPACE_ID].table.users).toBe(view.table.users);
   });
 
-  it('cv.entries does not contain the built-in table or valueSet keys', () => {
-    const cv = SqliteContractView.from(contract);
-    expect(Object.keys(cv.entries)).not.toContain('table');
-    expect(Object.keys(cv.entries)).not.toContain('valueSet');
+  it('view.valueSet is present and empty (SQLite emits no value sets)', () => {
+    const view = SqliteContractView.from(contract);
+    expect(view.valueSet).toEqual({});
   });
 
-  it('cv.entries exposes pack-contributed kinds', () => {
+  it('view.entries does not contain the built-in table or valueSet keys', () => {
+    const view = SqliteContractView.from(contract);
+    expect(Object.keys(view.entries)).not.toContain('table');
+    expect(Object.keys(view.entries)).not.toContain('valueSet');
+  });
+
+  it('fromJson() deserializes and wraps in one call', () => {
+    const view = SqliteContractView.fromJson<Contract>(contractJson);
+    expect(view.table.users).toBeDefined();
+    // Substitutable for Contract: storage hash matches the serializer's output.
+    expect(view.storage.storageHash).toBe(contract.storage.storageHash);
+  });
+
+  it('view.entries exposes pack-contributed kinds', () => {
     // SQLite emits only the built-in `table` kind, so this hand-builds a
     // contract with an extra pack-contributed `policy` kind to prove non-built-in
     // kinds land under `.entries`.
@@ -56,7 +75,7 @@ describe('SqliteContractView', () => {
       },
     } as unknown as Contract;
 
-    const cv = SqliteContractView.from(contractWithPackKind);
-    expect((cv.entries as Record<string, unknown>)['policy']).toEqual({ readPolicy: fakeEntry });
+    const view = SqliteContractView.from(contractWithPackKind);
+    expect((view.entries as Record<string, unknown>)['policy']).toEqual({ readPolicy: fakeEntry });
   });
 });

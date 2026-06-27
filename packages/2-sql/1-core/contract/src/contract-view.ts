@@ -1,11 +1,13 @@
 import type { Contract } from '@prisma-next/contract/types';
 import {
+  buildNamespaceAccessor,
   buildSingleNamespaceView,
+  composeContractView,
   type DefaultNamespaceEntries,
-  promoteBuiltinKinds,
+  type NamespaceAccessor,
+  type PromotedNamespaces,
   type SingleNamespaceView,
 } from '@prisma-next/framework-components/ir';
-import { blindCast } from '@prisma-next/utils/casts';
 import type { SqlStorage } from './ir/sql-storage';
 
 /**
@@ -20,67 +22,83 @@ type SqlEntries<TContract extends Contract<SqlStorage>> = DefaultNamespaceEntrie
   TContract['storage']
 >;
 
+type SqlNamespaces<TContract extends Contract<SqlStorage>> = TContract['storage']['namespaces'];
+
 /**
- * Single-namespace SQL view shape: `cv.table.<name>` and `cv.valueSet.<name>`
- * top-level, pack kinds under `cv.entries.<kind>`. A target that never emits a
- * given built-in kind (SQLite has `sql.enums: false`, so it emits no
- * `valueSet`) resolves that slot to an empty map.
+ * The single-namespace SQL accessors: `table`/`valueSet` top-level, pack kinds
+ * under `entries`. A target that never emits a built-in kind (SQLite has
+ * `sql.enums: false`, so it emits no `valueSet`) resolves that slot to an empty
+ * map.
  */
-export type SqlSingleNamespaceViewShape<TContract extends Contract<SqlStorage>> =
+export type SqlSingleNamespaceAccessors<TContract extends Contract<SqlStorage>> =
   SingleNamespaceView<SqlEntries<TContract>, SqlBuiltinKind>;
 
 /**
- * Builds the single-namespace SQL view: unwraps the default namespace and
- * promotes the SQL built-in kinds (`table`, `valueSet`). Targets with one
- * default namespace (SQLite) call this directly; Postgres qualifies by schema
- * and does not use it.
+ * Single-namespace SQL view: the deserialized contract intersected with the
+ * by-name accessors, so the value is substitutable for `Contract` while also
+ * exposing:
+ *  - `view.table.<name>` / `view.valueSet.<name>` — built-in kinds, default
+ *    namespace unwrapped; pack kinds under `view.entries.<kind>`.
+ *  - `view.namespace.<id>` — every namespace by raw id (SQLite's sole namespace
+ *    is `__unbound__`).
+ */
+export type SqlSingleNamespaceView<TContract extends Contract<SqlStorage>> = TContract &
+  SqlSingleNamespaceAccessors<TContract> & {
+    readonly namespace: NamespaceAccessor<SqlNamespaces<TContract>, SqlBuiltinKind>;
+  };
+
+/**
+ * Builds the single-namespace SQL view: promotes the SQL built-in-kind accessors
+ * (`table`, `valueSet`) at the root, attaches the `namespace` accessor, and
+ * layers everything over the deserialized contract. Targets with one default
+ * namespace (SQLite) call this directly; Postgres qualifies by schema.
  */
 export function buildSqlSingleNamespaceView<TContract extends Contract<SqlStorage>>(
   contract: TContract,
-): SqlSingleNamespaceViewShape<TContract> {
-  return buildSingleNamespaceView<SqlSingleNamespaceViewShape<TContract>>(
+): SqlSingleNamespaceView<TContract> {
+  const rootAccessors = buildSingleNamespaceView<SqlSingleNamespaceAccessors<TContract>>(
     contract.storage,
     SQL_BUILTIN_KINDS,
+  );
+  const namespaceAccessor = buildNamespaceAccessor<
+    NamespaceAccessor<SqlNamespaces<TContract>, SqlBuiltinKind>
+  >(contract.storage, SQL_BUILTIN_KINDS);
+  return composeContractView<SqlSingleNamespaceView<TContract>>(
+    contract,
+    rootAccessors,
+    namespaceAccessor,
   );
 }
 
 /**
- * Schema-qualified SQL view shape: each storage namespace key (`public`,
- * `auth`, the default `__unbound__`, …) maps to its own single-namespace view,
- * mirroring the facade's `sql.<ns>.<table>` keying exactly — including the
- * literal `__unbound__` key for the default schema (the facade does not rename
- * it). Within each schema, `cv.<ns>.table.<name>` / `cv.<ns>.valueSet.<name>`
- * are top-level and pack kinds sit under `cv.<ns>.entries.<kind>`.
+ * Schema-qualified SQL view: the deserialized contract intersected with
+ *  - `view.namespace.<id>` — every schema by raw id (the fully-qualified,
+ *    collision-proof accessor; `view.namespace.storage` is the schema literally
+ *    named `storage`), and
+ *  - root-promoted schema names — each schema promoted to a top-level accessor
+ *    EXCEPT names that collide with a contract envelope field or the reserved
+ *    `namespace` key, which are reachable only via `view.namespace.<id>`.
+ *
+ * So `view.public.table.users` works at the root, and `view.storage` always
+ * remains the contract's `storage` field (never a schema named `storage`).
+ * Mirrors the facade's `sql.<ns>` keying (the default schema keeps its literal
+ * `__unbound__` id).
  */
-export type SqlSchemaQualifiedViewShape<TContract extends Contract<SqlStorage>> = {
-  readonly [Ns in keyof TContract['storage']['namespaces']]: TContract['storage']['namespaces'][Ns] extends {
-    readonly entries: infer E;
-  }
-    ? SingleNamespaceView<E, SqlBuiltinKind>
-    : never;
-};
+export type SqlSchemaQualifiedView<TContract extends Contract<SqlStorage>> = TContract & {
+  readonly namespace: NamespaceAccessor<SqlNamespaces<TContract>, SqlBuiltinKind>;
+} & PromotedNamespaces<TContract, SqlNamespaces<TContract>, SqlBuiltinKind>;
 
 /**
- * Builds the schema-qualified SQL view: one single-namespace projection per
- * storage namespace, keyed by the raw namespace id (no renaming of the default
- * schema). Postgres uses this; SQLite (single default namespace) uses
+ * Builds the schema-qualified SQL view: the `namespace` accessor holds every
+ * schema by raw id; non-colliding schema names are promoted to the root.
+ * Postgres uses this; SQLite (single default namespace) uses
  * {@link buildSqlSingleNamespaceView}.
  */
 export function buildSqlSchemaQualifiedView<TContract extends Contract<SqlStorage>>(
   contract: TContract,
-): SqlSchemaQualifiedViewShape<TContract> {
-  const out: Record<string, unknown> = {};
-  for (const [nsId, ns] of Object.entries(contract.storage.namespaces)) {
-    out[nsId] = promoteBuiltinKinds(
-      blindCast<
-        Readonly<Record<string, unknown>>,
-        'Namespace.entries is the open ADR 224 dictionary Record<string, Record<string, unknown>>'
-      >(ns.entries),
-      SQL_BUILTIN_KINDS,
-    );
-  }
-  return blindCast<
-    SqlSchemaQualifiedViewShape<TContract>,
-    'each namespace projected to its SingleNamespaceView; keys mirror the storage namespace ids'
-  >(out);
+): SqlSchemaQualifiedView<TContract> {
+  const namespaceAccessor = buildNamespaceAccessor<
+    NamespaceAccessor<SqlNamespaces<TContract>, SqlBuiltinKind>
+  >(contract.storage, SQL_BUILTIN_KINDS);
+  return composeContractView<SqlSchemaQualifiedView<TContract>>(contract, {}, namespaceAccessor);
 }

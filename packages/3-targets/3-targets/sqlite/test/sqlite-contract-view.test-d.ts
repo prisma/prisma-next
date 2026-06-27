@@ -1,5 +1,6 @@
+import type { Contract as ContractBase } from '@prisma-next/contract/types';
 import { expectTypeOf, test } from 'vitest';
-import type { SqliteContractView } from '../src/core/sqlite-contract-view';
+import { SqliteContractView } from '../src/core/sqlite-contract-view';
 import type { Contract } from './fixtures/sqlite-contract.d';
 
 /**
@@ -8,9 +9,18 @@ import type { Contract } from './fixtures/sqlite-contract.d';
  * view type against the actual emitted shape, not a hand-authored `typeof`.
  */
 
-type CV = ReturnType<typeof SqliteContractView.from<Contract>>;
+type CV = SqliteContractView<Contract>;
 
-test('cv.table.<name> resolves to the concrete emitted table leaf', () => {
+test('the view is assignable to Contract (superset)', () => {
+  expectTypeOf<CV>().toMatchTypeOf<ContractBase>();
+});
+
+test('from() and fromJson() both return the view type', () => {
+  expectTypeOf(SqliteContractView.from<Contract>).returns.toEqualTypeOf<CV>();
+  expectTypeOf(SqliteContractView.fromJson<Contract>).returns.toEqualTypeOf<CV>();
+});
+
+test('view.table.<name> resolves to the concrete emitted table leaf', () => {
   expectTypeOf<
     CV['table']['users']['columns']['id']['codecId']
   >().toEqualTypeOf<'sqlite/integer@1'>();
@@ -29,17 +39,23 @@ test('multiple tables are reachable top-level', () => {
   >().toEqualTypeOf<'sqlite/text@1'>();
 });
 
+test('view.namespace.__unbound__ reaches the default namespace by id', () => {
+  expectTypeOf<
+    CV['namespace']['__unbound__']['table']['users']['columns']['id']['codecId']
+  >().toEqualTypeOf<'sqlite/integer@1'>();
+});
+
 test('a non-existent table name is a compile error', () => {
-  const cv = null as unknown as CV;
+  const view = null as unknown as CV;
   // @ts-expect-error 'nonexistent' is not an emitted table
-  cv.table.nonexistent;
+  view.table.nonexistent;
 });
 
 test('valueSet slot is present (SQLite emits none, so it is an empty map)', () => {
   expectTypeOf<CV['valueSet']>().toEqualTypeOf<Record<string, never>>();
 });
 
-test('cv.entries does not contain the built-in table or valueSet keys', () => {
+test('view.entries does not contain the built-in table or valueSet keys', () => {
   type Entries = CV['entries'];
   type HasTable = 'table' extends keyof Entries ? true : false;
   type HasValueSet = 'valueSet' extends keyof Entries ? true : false;

@@ -38,6 +38,36 @@ export type SingleNamespaceView<TEntries, TBuiltinKinds extends string> = {
   };
 };
 
+/** The `entries` shape of one namespace in a storage map. */
+type EntriesOf<TNamespace> = TNamespace extends { readonly entries: infer E } ? E : never;
+
+/**
+ * The `namespace` accessor: every storage namespace keyed by its raw id, each
+ * projected to its {@link SingleNamespaceView}. Fully qualified and
+ * collision-proof — `view.namespace.<id>` reaches any namespace by id even when
+ * the name collides with a contract envelope field.
+ */
+export type NamespaceAccessor<TNamespaces, TBuiltinKinds extends string> = {
+  readonly [Ns in keyof TNamespaces]: SingleNamespaceView<
+    EntriesOf<TNamespaces[Ns]>,
+    TBuiltinKinds
+  >;
+};
+
+/**
+ * Root-promoted namespaces: each namespace name promoted to a top-level
+ * accessor, EXCEPT names that collide with a contract envelope field (`keyof
+ * TContract`) or with the reserved `namespace` key. Those excluded names stay
+ * reachable only via {@link NamespaceAccessor}. The key-remapping `as ... ?
+ * never : Ns` is what keeps the root promotion from shadowing a contract field
+ * at the type level.
+ */
+export type PromotedNamespaces<TContract, TNamespaces, TBuiltinKinds extends string> = {
+  readonly [Ns in keyof TNamespaces as Ns extends keyof TContract | 'namespace'
+    ? never
+    : Ns]: SingleNamespaceView<EntriesOf<TNamespaces[Ns]>, TBuiltinKinds>;
+};
+
 /**
  * Projects one namespace's `entries` into the view shape: each built-in kind
  * becomes a top-level slot (materialized empty if absent), and the remaining
@@ -69,7 +99,7 @@ export function promoteBuiltinKinds<TView>(
 }
 
 /**
- * Builds the runtime projection object for a single-namespace contract: unwraps
+ * Builds the runtime accessor object for a single-namespace contract: unwraps
  * the default namespace and promotes the given built-in kind slots to top-level.
  * The static type is supplied by the caller via the generic factory; this
  * function is structural.
@@ -89,4 +119,69 @@ export function buildSingleNamespaceView<TView>(
     'Namespace.entries is the open ADR 224 dictionary Record<string, Record<string, unknown>>'
   >(defaultNs.entries);
   return promoteBuiltinKinds<TView>(entries, builtinKinds);
+}
+
+/**
+ * Builds the per-namespace accessor map (`{ <nsId>: SingleNamespaceView }`) for
+ * every namespace in the storage, keyed by raw namespace id.
+ */
+export function buildNamespaceAccessor<TAccessor>(
+  storage: Storage,
+  builtinKinds: readonly string[],
+): TAccessor {
+  const out: Record<string, unknown> = {};
+  for (const [nsId, ns] of Object.entries(storage.namespaces)) {
+    out[nsId] = promoteBuiltinKinds(
+      blindCast<
+        Readonly<Record<string, unknown>>,
+        'Namespace.entries is the open ADR 224 dictionary Record<string, Record<string, unknown>>'
+      >(ns.entries),
+      builtinKinds,
+    );
+  }
+  return blindCast<
+    TAccessor,
+    'each namespace projected to its SingleNamespaceView; keys mirror the storage namespace ids'
+  >(out);
+}
+
+/**
+ * Composes a contract view from the deserialized contract plus its accessors,
+ * enforcing collision-safe layering so the result stays substitutable for the
+ * contract:
+ *
+ * 1. **Contract envelope fields win at the root.** Every contract own field
+ *    (`storage`, `domain`, `roots`, …) is copied first and is never overwritten.
+ * 2. **`rootAccessors`** (kind-promoted slots for the single-namespace families,
+ *    e.g. `collection`/`table`/`entries`) are layered next; for Postgres this is
+ *    empty.
+ * 3. **`namespace`** holds every namespace by id — the fully-qualified,
+ *    collision-proof accessor.
+ * 4. **Root-promoted namespace names** are added last, but ONLY for names not
+ *    already present at the root (not a contract field, not `namespace`, not an
+ *    already-promoted kind slot). A namespace named `storage` is therefore
+ *    reachable only via `view.namespace.storage`, while `view.storage` stays the
+ *    contract's storage.
+ */
+export function composeContractView<TView>(
+  contract: object,
+  rootAccessors: Readonly<Record<string, unknown>>,
+  namespaceAccessor: Readonly<Record<string, unknown>>,
+): TView {
+  const root: Record<string, unknown> = { ...contract };
+  for (const [key, value] of Object.entries(rootAccessors)) {
+    if (!(key in root)) {
+      root[key] = value;
+    }
+  }
+  root['namespace'] = namespaceAccessor;
+  for (const [nsId, nsView] of Object.entries(namespaceAccessor)) {
+    if (!(nsId in root)) {
+      root[nsId] = nsView;
+    }
+  }
+  return blindCast<
+    TView,
+    'root carries every contract field, the kind-promoted root accessors, the namespace map, and the non-colliding promoted namespace names; the view type is the caller-supplied intersection'
+  >(root);
 }
