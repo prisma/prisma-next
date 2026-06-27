@@ -1,35 +1,41 @@
 import type { Contract } from '@prisma-next/contract/types';
 import {
   buildSqlSingleNamespaceView,
-  type SqlSingleNamespaceViewShape,
+  type SqlSingleNamespaceView,
 } from '@prisma-next/sql-contract/contract-view';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-
-export type SqliteContractViewShape<TContract extends Contract<SqlStorage>> =
-  SqlSingleNamespaceViewShape<TContract>;
+import { SqliteContractSerializer } from './sqlite-contract-serializer';
 
 /**
- * A read-only view over a deserialized SQLite contract that unwraps the single
- * default namespace and promotes the SQL built-in kinds to the top level.
+ * A SQLite contract view: the deserialized contract intersected with by-name
+ * accessors. It is substitutable for `Contract` (carries `storage`, `domain`,
+ * …) and also exposes the single default namespace unwrapped with the SQL
+ * built-in kinds promoted:
  *
- * Usage:
  * ```ts
- * const cv = SqliteContractView.from(endContract);
- * cv.table.users        // typed table leaf
- * cv.entries.policy.X   // pack-contributed kind (singular key)
+ * const view = SqliteContractView.fromJson<Contract>(contractJson);
+ * view.table.users      // typed table leaf
+ * view.entries.policy.X // pack-contributed kind (singular key)
+ * view.storage          // the full contract is still present
  * ```
  *
  * SQLite has `sql.enums: false`, so it never emits `valueSet` entries; the
- * `valueSet` slot is therefore an empty map. The `Contract` type is unchanged —
- * this view is a separate object layered on top, reusing the generic
- * single-namespace projection.
+ * `valueSet` slot is therefore an empty map.
  */
-export class SqliteContractView {
-  private constructor() {}
+export type SqliteContractView<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> =
+  SqlSingleNamespaceView<TContract>;
 
-  static from<TContract extends Contract<SqlStorage>>(
-    contract: TContract,
-  ): SqliteContractViewShape<TContract> {
+export const SqliteContractView = {
+  /** Wrap an already-deserialized SQLite contract in a view. */
+  from<TContract extends Contract<SqlStorage>>(contract: TContract): SqliteContractView<TContract> {
     return buildSqlSingleNamespaceView(contract);
-  }
-}
+  },
+
+  /** Deserialize a SQLite contract JSON envelope and wrap it in a view. */
+  fromJson<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>(
+    json: unknown,
+  ): SqliteContractView<TContract> {
+    const contract = new SqliteContractSerializer().deserializeContract<TContract>(json);
+    return buildSqlSingleNamespaceView(contract);
+  },
+};

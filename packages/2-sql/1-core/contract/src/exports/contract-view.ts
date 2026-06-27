@@ -1,7 +1,8 @@
 export type {
   SqlBuiltinKind,
-  SqlSchemaQualifiedViewShape,
-  SqlSingleNamespaceViewShape,
+  SqlSchemaQualifiedView,
+  SqlSingleNamespaceAccessors,
+  SqlSingleNamespaceView,
 } from '../contract-view';
 export {
   buildSqlSchemaQualifiedView,

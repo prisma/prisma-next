@@ -557,8 +557,10 @@
   },
   "capabilities": {
     "sql": {
+      "enums": false,
       "foreignKeys": true,
       "jsonAgg": true,
+      "lateral": false,
       "limit": true,
       "orderBy": true,
       "returning": true

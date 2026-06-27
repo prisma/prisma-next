@@ -1,0 +1,15 @@
+{
+  "extends": ["@prisma-next/tsconfig/base"],
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/mongo-contract-view.test.ts",
+    "test/mongo-contract-view.test-d.ts"
+  ],
+  "exclude": ["dist"]
+}

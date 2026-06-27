@@ -6,7 +6,6 @@ import type {
 import { postgresTargetDescriptorMetaRuntime } from '../core/descriptor-meta-runtime';
 
 export { PostgresContractSerializer } from '../core/postgres-contract-serializer';
-export type { PostgresContractViewShape } from '../core/postgres-contract-view';
 export { PostgresContractView } from '../core/postgres-contract-view';
 
 export interface PostgresRuntimeTargetInstance extends RuntimeTargetInstance<'sql', 'postgres'> {}
