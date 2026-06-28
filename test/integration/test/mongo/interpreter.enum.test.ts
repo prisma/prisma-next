@@ -10,6 +10,7 @@ import {
 } from '@prisma-next/mongo-contract-psl';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { parse } from '@prisma-next/psl-parser/syntax';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
 const authoringContributions = {
@@ -86,7 +87,7 @@ function interpretOk(
   return result.value;
 }
 
-describe('PSL enum lowering', () => {
+describe('PSL enum lowering', { timeout: timeouts.typeScriptCompilation }, () => {
   it('lowers enum block to domain.namespaces[__unbound__].enum', () => {
     const contract = interpretOk(`
 enum Role {
