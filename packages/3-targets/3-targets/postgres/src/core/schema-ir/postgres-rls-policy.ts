@@ -1,5 +1,4 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
-import type { EntityCoordinate } from '@prisma-next/framework-components/ir';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
 
@@ -60,13 +59,12 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
     freezeNode(this);
   }
 
-  identity(): EntityCoordinate {
-    return {
-      plane: 'storage',
-      namespaceId: this.namespaceId,
-      entityKind: 'policy',
-      entityName: this.name,
-    };
+  get id(): string {
+    return this.name;
+  }
+
+  children(): readonly DiffableNode[] {
+    return [];
   }
 
   /**
@@ -80,7 +78,7 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
   isEqualTo(other: DiffableNode): boolean {
     if (!isPostgresRlsPolicy(other)) {
       throw new Error(
-        `PostgresRlsPolicy.isEqualTo: expected a PostgresRlsPolicy, got ${other.identity().entityKind}`,
+        `PostgresRlsPolicy.isEqualTo: expected a PostgresRlsPolicy, got ${other.constructor?.name ?? typeof other}`,
       );
     }
     return this.name === other.name;
@@ -97,7 +95,7 @@ export function assertPostgresRlsPolicy(
   if (!isPostgresRlsPolicy(node)) {
     const kind = node !== undefined && 'kind' in node ? String(node.kind) : typeof node;
     throw new Error(
-      `planRlsDiff: expected a PostgresRlsPolicy on the policy-diff path but got ${kind}`,
+      `planPostgresSchemaDiff: expected a PostgresRlsPolicy on the policy-diff path but got ${kind}`,
     );
   }
 }

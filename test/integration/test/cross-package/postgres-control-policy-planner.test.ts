@@ -7,9 +7,8 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
-import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
@@ -48,12 +47,19 @@ const RECONCILIATION_POLICY: MigrationOperationPolicy = {
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 const planner = createPostgresMigrationPlanner(testAdapter);
 
-const emptySchema: SqlSchemaIR = { tables: {} };
+const emptySchema = new PostgresSchemaIR({
+  tables: {},
+  pgSchemaName: 'public',
+  pgVersion: '',
+  roles: [],
+  existingSchemas: [],
+  nativeEnumTypeNames: [],
+});
 
 function liveSchemaWithUsers(
   columns: Record<string, { name: string; nativeType: string; nullable: boolean }>,
-): SqlSchemaIR {
-  return {
+): PostgresSchemaIR {
+  return new PostgresSchemaIR({
     tables: {
       users: {
         name: 'users',
@@ -64,10 +70,15 @@ function liveSchemaWithUsers(
         indexes: [],
       },
     },
-  };
+    pgSchemaName: 'public',
+    pgVersion: '',
+    roles: [],
+    existingSchemas: [],
+    nativeEnumTypeNames: [],
+  });
 }
 
-async function planAgainst(contract: Contract<SqlStorage>, schema: SqlSchemaIR) {
+async function planAgainst(contract: Contract<SqlStorage>, schema: PostgresSchemaIR) {
   const result = planner.plan({
     contract,
     schema,
@@ -244,7 +255,7 @@ describe('PostgresMigrationPlanner.plan control-policy partitioning', async () =
 // but never be modified in place. The same diff under `managed` emits the
 // add-column.
 describe('PostgresMigrationPlanner.plan tolerated vs managed add-column', async () => {
-  const liveSchemaWithUsersIdOnly: SqlSchemaIR = liveSchemaWithUsers({
+  const liveSchemaWithUsersIdOnly: PostgresSchemaIR = liveSchemaWithUsers({
     id: { name: 'id', nativeType: 'text', nullable: false },
   });
 

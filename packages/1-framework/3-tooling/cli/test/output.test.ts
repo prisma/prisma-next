@@ -611,12 +611,7 @@ describe('formatSchemaVerifyOutput', () => {
         ...createResult().schema,
         schemaDiffIssues: [
           {
-            coordinate: {
-              plane: 'storage',
-              namespaceId: 'public',
-              entityKind: 'policy',
-              entityName: policyWireName,
-            },
+            path: ['public', 'profiles', policyWireName],
             outcome: 'missing',
             message: `RLS policy "${policyWireName}" on table "profiles" is missing from the database`,
           },

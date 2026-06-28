@@ -7,10 +7,10 @@ import type {
   AuthoringTypeNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
-import { PostgresRlsPolicy } from './postgres-rls-policy';
-import { PostgresRole, type PostgresRoleInput } from './postgres-role';
 import { PostgresRlsPolicySchema, PostgresRoleSchema } from './postgres-validators';
 import { computeContentHash, normalizePredicate } from './rls/canonicalize';
+import { PostgresRlsPolicy } from './schema-ir/postgres-rls-policy';
+import { PostgresRole, type PostgresRoleInput } from './schema-ir/postgres-role';
 
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
 

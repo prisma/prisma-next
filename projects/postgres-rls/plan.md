@@ -35,14 +35,17 @@ Already landed on the branch: the architecture (generic differ, content-addresse
 
 ### Slice 1.5 — `entity-kind-migration-seam` · [TML-2931](https://linear.app/prisma-company/issue/TML-2931)
 
-**Status: ⬜ not started.** Design seed: [`specs/extension-migration-participation.md`](specs/extension-migration-participation.md).
+**Status: ⬜ design complete, build not started.** Design: [`specs/adr-schema-diff-over-structured-ir.md`](specs/adr-schema-diff-over-structured-ir.md) (accepted) · seed [`specs/extension-migration-participation.md`](specs/extension-migration-participation.md). Slice spec: [`slices/entity-kind-migration-seam/spec.md`](slices/entity-kind-migration-seam/spec.md).
 
-Foundational seam, discovered during slice 1. Today a target-contributed entity kind only half-participates in migrations: the live-database derivation is hardcoded per target, and the contract→schema derivation drops target-specific objects entirely. The consequence is that `migration plan` cannot emit RLS at all — slice 1 ships a fail-loud stopgap (it refuses to plan when the contract declares policies). This slice builds the generic seam so a contributed kind works on **every** command.
+Foundational seam, discovered during slice 1. A target-contributed entity kind only half-participates in migrations: the live-database derivation is hardcoded in the Postgres reader, and the contract→schema derivation drops target-specific objects — so on the `migration plan` path the diff has no policies on either side, and on the live-DB paths it reaches into the contract object directly for the expected side. The consequence is that `migration plan` cannot emit RLS at all — slice 1 ships a fail-loud stopgap (it refuses to plan when the contract declares policies). This slice makes **both diff sides homogeneous, derived schema IRs** so a contributed node type works on **every** command.
 
-- **First task: complete the design + ADRs** from the seed doc — the schema IR as the single diff substrate; the diff-engine model (coordinate/identity, equality, nesting, cross-kind dependency ordering); the two-sided **derivation contribution** API (per kind: identity/equality + project-from-contract + project-from-database + planner + dependencies), registered like authoring contributions are.
-- Replace the hardcoded Postgres introspection of policies/roles with a registered **project-from-database**; add **project-from-contract** so a contract-derived schema IR carries policies/roles.
-- Make the planner **provenance-agnostic**: remove the `migration plan` fail-loud stopgap and the `isPostgresSchemaIR` command-awareness; `planRlsDiff` collapses to `diffNodes(from, to)`.
-- **DoD (operator-observable):** `migration plan` on a contract with a SELECT policy emits `CREATE POLICY` in the generated migration; both diff sides are homogeneous schema IRs (no contract fed directly); RLS continues to work on `db init` / `db update` / `db verify`.
+Per the accepted schema-diff ADR:
+
+- **project-from-contract builds a populated schema IR.** Postgres's `contractToSchema` returns a `PostgresSchemaIR` carrying its policies and roles, instead of a bare relational `SqlSchemaIR` that drops them. Both derivations — project-from-contract and project-from-database (introspection) — emit the same shape. Written directly in the Postgres target; **no registry** (deferred — follow-on C).
+- **The differ walks two schema-IR roots.** A generic framework `diffSchemas(expected, actual)` walks two full roots (`identity()`→`coord()`, `children()` added). `diffPostgresSchema` (the Postgres schema-diff strategy) projects the contract's policies for the expected side, walks the **full** introspected tree for the actual side, and suppresses unowned-namespace `extra` issues **post-diff** via the generic `filterSchemaIssuesByOwnership` (the supabase multi-space fix, preserved as an outcome filter, not a pre-filter on the tree — slice 2 folds it into the unified control-policy disposition). The differ itself never reads the contract.
+- **The planner becomes provenance-agnostic.** Remove the `migration plan` fail-loud stopgap and the two `isPostgresSchemaIR` command-branches in `planner.ts`; the diff path runs identically regardless of which derivation fed each side.
+- **Roles projected, not yet diffed.** project-from-contract populates roles so the IR is symmetric, but only policies are diffed here (the schema root yields policies, not roles) — role drift (missing-role detection, the policy→role edge) stays slice 2. Net observable change of this slice: `migration plan` emits RLS; `db init` / `db update` / `db verify` behave exactly as before.
+- **DoD (operator-observable):** `migration plan` on a contract with a SELECT policy emits `CREATE POLICY` in the generated migration; both diff sides are homogeneous schema IRs (the contract is not read directly on either side); RLS still works on `db init` / `db update` / `db verify`; SQLite + Mongo untouched.
 
 ### Slice 2 — `drift-handled-correctly` · [TML-2869](https://linear.app/prisma-company/issue/TML-2869)
 
@@ -93,7 +96,7 @@ The slice-4 resolution: when introspecting for the differ, only collect policies
 ## Not in this project's plan-of-record (operator cut, 2026-06-10)
 
 - **Cross-space role-ref *validation* / role authoring** — roles are external (platform-provided; shim-seeded in tests); policies reference them by name. The substrate's cross-space pass-through stands; real role-ref validation arrives with slice 2's role traversal only to the extent of "referenced role exists in the DB," not authoring-time cross-space resolution.
-- Independent follow-on projects (unchanged, filed in Linear): **A** — port the 25 legacy relational verifier kinds onto the generic differ; **B** — dependency-aware generic planner ordering (slice 2's policy→role edges are its seed).
+- Independent follow-on projects: **A** — port the 25 legacy relational verifier node types onto the generic differ; **B** — dependency-aware generic planner ordering (slice 2's policy→role edges are its seed); **C** — promote the per-target derivations (project-from-contract / project-from-database) into a generic registration surface, once a second consuming node type — the relational port, or another extension — makes the shared shape concrete (deferred from slice 1.5 per the schema-diff ADR).
 
 ## Architecture decisions (locked 2026-06-09 — unchanged by the re-cut)
 
@@ -103,6 +106,8 @@ The slice-4 resolution: when introspecting for the differ, only collect policies
 4. Derivation/introspection hold per-kind smarts; the diff stays a pure walk.
 5. Side-by-side with the legacy verifier/planner until follow-on A retires it; the new path emits only new-native structures.
 6. Layering invariant: zero RLS symbols in `packages/1-framework` / `packages/2-sql` — to be enforced by a structural test (slice 1 item 5), not review vigilance.
+
+Refined by the schema-diff ADR ([`specs/adr-schema-diff-over-structured-ir.md`](specs/adr-schema-diff-over-structured-ir.md)): the differ walks two derived schema-IR roots rather than flat node lists; the node alignment method is `coord()` (renamed from `identity()`) and nodes expose `children()`; both diff sides are homogeneous derived IRs produced by project-from-contract / project-from-database.
 
 ## Linear sync
 

@@ -1,1 +1,1 @@
-export { resolveDdlSchemaForNamespaceStorage } from '../core/postgres-schema-ir-annotations';
+export { resolveDdlSchemaForNamespaceStorage } from '../core/schema-ir/postgres-schema-ir-annotations';
