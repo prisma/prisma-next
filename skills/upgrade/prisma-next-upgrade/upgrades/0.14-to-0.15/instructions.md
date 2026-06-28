@@ -62,6 +62,17 @@ purely `.d.ts` regeneration (the new `StorageColumnTypes` block added; observabl
 types unchanged). No consumer action required. Incidental substrate diff only.
 -->
 
+<!--
+TML-2884 (PR #834): end-to-end MongoDB enum enforcement via `$jsonSchema`.
+The `mongo-demo` example gains a `UserRole` enum field (`role` on `users`),
+authored in both PSL and the TypeScript builder. The planner-generated migration
+applies a `collMod` with a `$jsonSchema` validator that enforces the enum values
+at the MongoDB layer. Three migration `end-contract.d.ts` / `start-contract.d.ts`
+snapshots were also updated for the TML-2891 `'mongo-namespace'` → `'mongo-database'`
+kind rename. Re-emit picks up the new contract shape automatically; no consumer
+action required. Incidental substrate diff only.
+-->
+
 # Upgrade 0.14 → 0.15
 
 No consumer-facing action is required for this transition.
