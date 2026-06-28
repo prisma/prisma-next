@@ -6,7 +6,7 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { verifyPostgresNamespacePresence } from '../../src/core/migrations/verify-postgres-namespaces';
 import { PostgresSchema, PostgresUnboundSchema } from '../../src/core/postgres-schema';
-import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
+import { PostgresSchemaIR } from '../../src/core/schema-ir/postgres-schema-ir';
 
 function makeContract(
   namespaceIds: readonly string[],

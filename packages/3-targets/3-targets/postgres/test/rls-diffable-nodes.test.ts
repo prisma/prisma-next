@@ -4,10 +4,10 @@ import {
   assertPostgresRlsPolicy,
   isPostgresRlsPolicy,
   PostgresRlsPolicy,
-} from '../src/core/postgres-rls-policy';
-import { PostgresRole } from '../src/core/postgres-role';
-import { PostgresSchemaIR } from '../src/core/postgres-schema-ir';
-import { isPostgresTableIR, PostgresTableIR } from '../src/core/postgres-table-ir';
+} from '../src/core/schema-ir/postgres-rls-policy';
+import { PostgresRole } from '../src/core/schema-ir/postgres-role';
+import { PostgresSchemaIR } from '../src/core/schema-ir/postgres-schema-ir';
+import { isPostgresTableIR, PostgresTableIR } from '../src/core/schema-ir/postgres-table-ir';
 
 describe('PostgresRlsPolicy DiffableNode', () => {
   const baseInput = {

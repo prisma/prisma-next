@@ -1,6 +1,6 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import {
   computeContentHash,
   normalizePredicate,
@@ -97,7 +97,17 @@ function contractWithPolicy(): Contract<SqlStorage> {
   const policy = managedPolicy();
   const schema = new PostgresSchema({
     id: UNBOUND_NAMESPACE_ID,
-    entries: { table: {}, policy: { [WIRE_NAME]: policy } },
+    entries: {
+      table: {
+        [TABLE_NAME]: new StorageTable({
+          columns: {},
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        }),
+      },
+      policy: { [WIRE_NAME]: policy },
+    },
   });
   return {
     target: 'postgres',

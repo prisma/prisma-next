@@ -6,12 +6,15 @@ import { describe, expect, it } from 'vitest';
 import { contractToPostgresSchemaIR } from '../../src/core/migrations/contract-to-postgres-schema-ir';
 import {
   diffPostgresSchema,
-  dropUnownedExtraPolicyIssues,
+  filterIssuesByOwnership,
 } from '../../src/core/migrations/diff-postgres-schema';
-import { isPostgresRlsPolicy, PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
-import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
-import { PostgresTableIR } from '../../src/core/postgres-table-ir';
+import {
+  isPostgresRlsPolicy,
+  PostgresRlsPolicy,
+} from '../../src/core/schema-ir/postgres-rls-policy';
+import { PostgresSchemaIR } from '../../src/core/schema-ir/postgres-schema-ir';
+import { PostgresTableIR } from '../../src/core/schema-ir/postgres-table-ir';
 
 const TABLE_NAME = 'profiles';
 const SCHEMA_NAME = 'public';
@@ -315,7 +318,7 @@ describe('diffPostgresSchema', () => {
       ...expected.rlsPolicies.map((p) => p.namespaceId),
       ...expected.existingSchemas,
     ]);
-    const issues = dropUnownedExtraPolicyIssues(rawIssues, ownedSchemaNames);
+    const issues = filterIssuesByOwnership(rawIssues, ownedSchemaNames);
 
     expect(issues).toHaveLength(0);
   });
@@ -453,7 +456,7 @@ describe('diffPostgresSchema', () => {
       ...expected.rlsPolicies.map((p) => p.namespaceId),
       ...expected.existingSchemas,
     ]);
-    const issues = dropUnownedExtraPolicyIssues(rawIssues, ownedSchemaNames);
+    const issues = filterIssuesByOwnership(rawIssues, ownedSchemaNames);
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ outcome: 'extra' });
@@ -782,7 +785,7 @@ describe('diffPostgresSchema', () => {
       ...expected.rlsPolicies.map((p) => p.namespaceId),
       ...expected.existingSchemas,
     ]);
-    const issues = dropUnownedExtraPolicyIssues(rawIssues, ownedSchemaNames);
+    const issues = filterIssuesByOwnership(rawIssues, ownedSchemaNames);
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ outcome: 'missing' });

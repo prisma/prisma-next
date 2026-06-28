@@ -1,12 +1,12 @@
 import type { ContractToSchemaIROptions } from '@prisma-next/family-sql/control';
 import { contractToSchemaIR } from '@prisma-next/family-sql/control';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { PostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresContract } from '../postgres-schema';
 import { isPostgresSchema } from '../postgres-schema';
-import { PostgresSchemaIR } from '../postgres-schema-ir';
-import { resolveDdlSchemaForNamespaceStorage } from '../postgres-schema-ir-annotations';
-import { PostgresTableIR } from '../postgres-table-ir';
+import { PostgresRlsPolicy } from '../schema-ir/postgres-rls-policy';
+import { PostgresSchemaIR } from '../schema-ir/postgres-schema-ir';
+import { resolveDdlSchemaForNamespaceStorage } from '../schema-ir/postgres-schema-ir-annotations';
+import { PostgresTableIR } from '../schema-ir/postgres-table-ir';
 
 /** The contract-to-postgres-schema-ir derivation: a populated PostgresSchemaIR. */
 export function contractToPostgresSchemaIR(
@@ -50,8 +50,9 @@ export function contractToPostgresSchemaIR(
     }
   }
 
-  // Attach policies to each table from the relational projection.
-  // Also create stub entries for tables referenced only by policies (no SQL table body).
+  // Attach policies to each table from the relational projection. A policy that
+  // references a table absent from the schema IR is a malformed contract — the
+  // loop below throws rather than fabricating a stub table.
   const tables: Record<string, PostgresTableIR> = {};
   for (const [tableName, sqlTable] of Object.entries(sqlIr.tables)) {
     tables[tableName] = new PostgresTableIR({
@@ -68,14 +69,10 @@ export function contractToPostgresSchemaIR(
   }
   for (const [tableName, policies] of policiesByTable) {
     if (!(tableName in tables)) {
-      tables[tableName] = new PostgresTableIR({
-        name: tableName,
-        columns: {},
-        foreignKeys: [],
-        uniques: [],
-        indexes: [],
-        rlsPolicies: policies,
-      });
+      const policyName = policies[0]?.name ?? '(unknown)';
+      throw new Error(
+        `contract-to-postgres-schema-ir: policy "${policyName}" references table "${tableName}" not present in the schema`,
+      );
     }
   }
 

@@ -2,7 +2,7 @@ import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adap
 import { ifDefined } from '@prisma-next/utils/defined';
 import { rlsEnabledAst, rlsPolicyExistsAst } from '../../../contract-free/checks';
 import { createPolicy, dropPolicy } from '../../../contract-free/ddl';
-import type { PostgresRlsPolicy } from '../../postgres-rls-policy';
+import type { PostgresRlsPolicy } from '../../schema-ir/postgres-rls-policy';
 import { qualifyTableName } from '../planner-sql-checks';
 import { type Op, step, targetDetails } from './shared';
 

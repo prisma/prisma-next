@@ -40,7 +40,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { columnExistsAst, tableExistsAst } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
-import type { PostgresRlsPolicy } from '../postgres-rls-policy';
+import type { PostgresRlsPolicy } from '../schema-ir/postgres-rls-policy';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import { boundSchema } from './bound-schema';

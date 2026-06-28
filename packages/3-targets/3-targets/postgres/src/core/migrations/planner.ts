@@ -25,10 +25,10 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
-import { assertPostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresContract } from '../postgres-schema';
-import { assertPostgresSchemaIR, ensurePostgresSchemaIR } from '../postgres-schema-ir';
-import { resolveDdlSchemaForNamespaceStorage } from '../postgres-schema-ir-annotations';
+import { assertPostgresRlsPolicy } from '../schema-ir/postgres-rls-policy';
+import { assertPostgresSchemaIR, ensurePostgresSchemaIR } from '../schema-ir/postgres-schema-ir';
+import { resolveDdlSchemaForNamespaceStorage } from '../schema-ir/postgres-schema-ir-annotations';
 import { contractToPostgresSchemaIR } from './contract-to-postgres-schema-ir';
 import {
   formatPostgresControlPolicySubjectLabel,
@@ -36,7 +36,7 @@ import {
   resolvePostgresIssueControlPolicySubject,
   resolvePostgresIssueCreationFactoryName,
 } from './control-policy';
-import { diffPostgresSchema, dropUnownedExtraPolicyIssues } from './diff-postgres-schema';
+import { diffPostgresSchema, filterIssuesByOwnership } from './diff-postgres-schema';
 import { planIssues } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 import {
@@ -279,13 +279,13 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       ...expected.rlsPolicies.map((p) => p.namespaceId),
       ...expected.existingSchemas,
     ]);
-    const diffIssues = dropUnownedExtraPolicyIssues(rawIssues, ownedSchemaNames);
+    const filteredDiffIssues = filterIssuesByOwnership(rawIssues, ownedSchemaNames);
 
     const allowsDestructive = options.policy.allowedOperationClasses.includes('destructive');
     const calls: PostgresOpFactoryCall[] = [];
     const seenEnableTables = new Set<string>();
 
-    for (const issue of diffIssues) {
+    for (const issue of filteredDiffIssues) {
       // 'mismatch' is unreachable for content-addressed policies: the wire name
       // encodes the body hash, so two policies sharing a local key (same name)
       // are always equal and isEqualTo never returns false.

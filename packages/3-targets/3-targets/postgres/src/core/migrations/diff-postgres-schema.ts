@@ -1,7 +1,7 @@
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { diffSchemas } from '@prisma-next/framework-components/control';
-import { isPostgresRlsPolicy, type PostgresRlsPolicy } from '../postgres-rls-policy';
-import { ensurePostgresSchemaIR, type PostgresSchemaIR } from '../postgres-schema-ir';
+import { isPostgresRlsPolicy, type PostgresRlsPolicy } from '../schema-ir/postgres-rls-policy';
+import { ensurePostgresSchemaIR, type PostgresSchemaIR } from '../schema-ir/postgres-schema-ir';
 
 function renderPostgresPolicyReference(policy: PostgresRlsPolicy): string {
   return `policy "${policy.name}" on "${policy.namespaceId}"."${policy.tableName}"`;
@@ -15,7 +15,7 @@ function renderPostgresPolicyReference(policy: PostgresRlsPolicy): string {
  * 3. Remaps the message to a human-readable policy reference.
  *
  * Ownership filtering (dropping `extra` issues in namespaces a contract doesn't
- * own) is the caller's responsibility — use `dropUnownedExtraPolicyIssues`.
+ * own) is the caller's responsibility — use `filterIssuesByOwnership`.
  */
 export function diffPostgresSchema(
   expected: PostgresSchemaIR,
@@ -34,11 +34,11 @@ export function diffPostgresSchema(
 }
 
 /**
- * Filters out `extra` policy issues whose policy's namespace is not in the
- * owned set. Call after `diffPostgresSchema` with the union of namespace ids
- * from the expected IR's policies and its `existingSchemas`.
+ * Filters `extra` policy issues to those in owned namespaces. Call after
+ * `diffPostgresSchema` with the union of namespace ids from the expected IR's
+ * policies and its `existingSchemas`.
  */
-export function dropUnownedExtraPolicyIssues(
+export function filterIssuesByOwnership(
   issues: readonly SchemaDiffIssue[],
   ownedSchemaNames: ReadonlySet<string>,
 ): readonly SchemaDiffIssue[] {

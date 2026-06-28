@@ -62,7 +62,7 @@ import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-t
 import {
   contractToPostgresSchemaIR,
   diffPostgresSchema,
-  dropUnownedExtraPolicyIssues,
+  filterIssuesByOwnership,
 } from '@prisma-next/target-postgres/planner';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
@@ -150,7 +150,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       ...expected.rlsPolicies.map((p) => p.namespaceId),
       ...expected.existingSchemas,
     ]);
-    return dropUnownedExtraPolicyIssues(issues, ownedSchemaNames);
+    return filterIssuesByOwnership(issues, ownedSchemaNames);
   }
 
   bootstrapControlTableQueries(): readonly DdlNode[] {

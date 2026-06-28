@@ -1,7 +1,7 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { isPostgresSchema } from './postgres-schema';
+import { isPostgresSchema } from '../postgres-schema';
 import { isPostgresSchemaIR } from './postgres-schema-ir';
 
 export function resolveDdlSchemaForNamespaceStorage(

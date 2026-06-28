@@ -20,10 +20,10 @@ import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
-import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
-import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
-import { PostgresTableIR } from '../../src/core/postgres-table-ir';
+import { PostgresRlsPolicy } from '../../src/core/schema-ir/postgres-rls-policy';
+import { PostgresSchemaIR } from '../../src/core/schema-ir/postgres-schema-ir';
+import { PostgresTableIR } from '../../src/core/schema-ir/postgres-table-ir';
 import { PostgresCreatePolicy } from '../../src/exports/ddl';
 
 const stubLowerer: ExecuteRequestLowerer = {
