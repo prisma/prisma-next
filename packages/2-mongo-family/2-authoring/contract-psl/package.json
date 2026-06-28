@@ -17,6 +17,7 @@
   "dependencies": {
     "@prisma-next/config": "workspace:0.14.0",
     "@prisma-next/contract": "workspace:0.14.0",
+    "@prisma-next/contract-authoring": "workspace:0.14.0",
     "@prisma-next/framework-components": "workspace:0.14.0",
     "@prisma-next/mongo-contract": "workspace:0.14.0",
     "@prisma-next/mongo-value": "workspace:0.14.0",

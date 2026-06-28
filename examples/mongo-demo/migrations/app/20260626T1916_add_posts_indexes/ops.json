@@ -29,8 +29,8 @@
           "collection": "posts",
           "keys": [
             {
-              "field": "authorId",
-              "direction": 1
+              "direction": 1,
+              "field": "authorId"
             }
           ],
           "name": "authorId_1"
@@ -87,12 +87,12 @@
           "collection": "posts",
           "keys": [
             {
-              "field": "createdAt",
-              "direction": -1
+              "direction": -1,
+              "field": "createdAt"
             },
             {
-              "field": "authorId",
-              "direction": 1
+              "direction": 1,
+              "field": "authorId"
             }
           ],
           "name": "createdAt_-1_authorId_1"

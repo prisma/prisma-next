@@ -117,7 +117,31 @@ type BlogCodecTypes = {
   readonly 'mongo/date@1': { readonly input: Date; readonly output: Date };
 };
 
-type BlogTypeMaps = MongoTypeMaps<BlogCodecTypes>;
+type BlogFieldOutputTypes = {
+  readonly __unbound__: {
+    readonly User: {
+      readonly _id: string;
+      readonly name: string;
+      readonly email: string;
+      readonly bio: string | null;
+      readonly createdAt: Date;
+    };
+    readonly Post: {
+      readonly _id: string;
+      readonly title: string;
+      readonly slug: string;
+      readonly content: string;
+      readonly status: string;
+      readonly authorId: string;
+      readonly viewCount: number;
+      readonly publishedAt: Date | null;
+      readonly updatedAt: Date;
+    };
+  };
+};
+
+type BlogFieldInputTypes = BlogFieldOutputTypes;
+type BlogTypeMaps = MongoTypeMaps<BlogCodecTypes, BlogFieldOutputTypes, BlogFieldInputTypes>;
 
 export type Contract = MongoContractWithTypeMaps<BlogContract, BlogTypeMaps>;
 export type TypeMaps = BlogTypeMaps;

@@ -16,6 +16,25 @@
   "domain": {
     "namespaces": {
       "__unbound__": {
+        "enum": {
+          "UserRole": {
+            "codecId": "mongo/string@1",
+            "members": [
+              {
+                "name": "Admin",
+                "value": "admin"
+              },
+              {
+                "name": "Author",
+                "value": "author"
+              },
+              {
+                "name": "Reader",
+                "value": "reader"
+              }
+            ]
+          }
+        },
         "models": {
           "Article": {
             "base": {
@@ -175,6 +194,19 @@
                   "codecId": "mongo/string@1",
                   "kind": "scalar"
                 }
+              },
+              "role": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "UserRole",
+                  "namespaceId": "__unbound__",
+                  "plane": "domain"
+                }
               }
             },
             "relations": {
@@ -243,6 +275,28 @@
           "collection": {
             "posts": {
               "indexes": [
+                {
+                  "keys": [
+                    {
+                      "direction": 1,
+                      "field": "authorId"
+                    }
+                  ],
+                  "kind": "mongo-index"
+                },
+                {
+                  "keys": [
+                    {
+                      "direction": -1,
+                      "field": "createdAt"
+                    },
+                    {
+                      "direction": 1,
+                      "field": "authorId"
+                    }
+                  ],
+                  "kind": "mongo-index"
+                },
                 {
                   "keys": [
                     {
@@ -419,12 +473,21 @@
                     },
                     "name": {
                       "bsonType": "string"
+                    },
+                    "role": {
+                      "bsonType": "string",
+                      "enum": [
+                        "admin",
+                        "author",
+                        "reader"
+                      ]
                     }
                   },
                   "required": [
                     "_id",
                     "email",
-                    "name"
+                    "name",
+                    "role"
                   ]
                 },
                 "kind": "mongo-validator",
@@ -438,7 +501,7 @@
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:2827cbad7293fe13a4fb2aab60a55d3cddd856a86d1f6ccea6e11519faacff92"
+    "storageHash": "sha256:ecc554e5f2f05ec120f8fef5ddf536286471edd3de11b8a906ba70e71f5e5df3"
   },
   "capabilities": {},
   "extensionPacks": {},

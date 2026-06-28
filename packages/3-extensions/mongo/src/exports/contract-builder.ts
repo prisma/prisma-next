@@ -2,6 +2,8 @@ export type {
   ContractDefinition,
   ContractFactory,
   ContractScaffold,
+  EnumMember,
+  EnumTypeHandle,
   FieldBuilder,
   FieldReference,
   ModelBuilder,
@@ -12,8 +14,10 @@ export type {
 export {
   field,
   index,
+  member,
   model,
   rel,
   valueObject,
 } from '@prisma-next/mongo-contract-ts/contract-builder';
 export { defineContract } from '../contract/define-contract';
+export { enumType } from '../contract/enum-type';

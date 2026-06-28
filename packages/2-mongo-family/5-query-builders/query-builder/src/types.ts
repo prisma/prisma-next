@@ -1,10 +1,10 @@
 import type {
+  AnyMongoTypeMaps,
   ExtractMongoTypeMaps,
   InferModelRow,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoModelsMap,
-  MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import type { MongoAggAccumulator, MongoAggExpr } from '@prisma-next/mongo-query-ast/execution';
 import type { ModelArrayField, ModelOriginBrand, ModelOriginBranded } from './resolve-path';
@@ -65,7 +65,7 @@ type ResolveFields<
 > = {
   -readonly [K in keyof Shape & string]: Shape[K] extends ModelArrayField<infer ModelName>
     ? IsConcreteContract<TContract> extends true
-      ? TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>
+      ? TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>
         ? ModelName extends string & keyof MongoModelsMap<TContract>
           ? Array<InferModelRow<TContract, ModelName>>
           : unknown[]
@@ -114,7 +114,7 @@ type Flatten<T> = T extends infer U ? { [K in keyof U]: U[K] } : never;
 /**
  * Decide whether to route a brand-positive `ResolveRow` through
  * `InferModelRow`. The default `MongoContract` (no concrete models)
- * still satisfies `MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>`
+ * still satisfies `MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>`
  * because the phantom key is optional, but `InferModelRow<MongoContract, …>`
  * collapses to an empty/unknown row. Gate on the presence of the
  * type-maps phantom: a concrete contract attaches concrete `TestTypeMaps`-
@@ -131,7 +131,7 @@ export type ResolveRow<
   TContract extends MongoContract = MongoContract,
 > = Shape extends { readonly [ModelOriginBrand]?: infer ModelName extends string }
   ? IsConcreteContract<TContract> extends true
-    ? TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>
+    ? TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>
       ? ModelName extends string & keyof MongoModelsMap<TContract>
         ? Flatten<
             InferModelRow<TContract, ModelName> &

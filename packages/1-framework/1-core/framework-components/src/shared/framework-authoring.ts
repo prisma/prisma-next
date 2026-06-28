@@ -835,7 +835,7 @@ function resolveAuthoringStorageTypeTemplate(
   return {
     codecId: template.codecId,
     nativeType,
-    ...(typeParams === undefined ? {} : { typeParams }),
+    ...ifDefined('typeParams', typeParams),
   };
 }
 
@@ -916,12 +916,12 @@ export function instantiateAuthoringTypeConstructor(
   return resolveAuthoringStorageTypeTemplate(descriptor.output, args);
 }
 
-export function instantiateAuthoringEntityType(
+export function instantiateAuthoringEntityType<TOutput = unknown>(
   helperPath: string,
   descriptor: AuthoringEntityTypeDescriptor,
   args: readonly unknown[],
   ctx: AuthoringEntityContext,
-): unknown {
+): TOutput {
   // Factory-output entities carry their input contract on the factory
   // signature itself — TypeScript narrows callers via
   // `EntityHelperFunction`'s extracted `input` parameter, and the factory
@@ -936,14 +936,16 @@ export function instantiateAuthoringEntityType(
     // contravariant position (see the type's docstring). The runtime
     // delegates input validation to the pack's factory itself, so we
     // forward the supplied input here without a static input contract.
-    const factory = descriptor.output.factory as (
-      input: unknown,
-      ctx: AuthoringEntityContext,
-    ) => unknown;
+    const factory = blindCast<
+      (input: unknown, ctx: AuthoringEntityContext) => TOutput,
+      'entity factory output is caller-selected via instantiateAuthoringEntityType<TOutput>'
+    >(descriptor.output.factory);
     return factory(input, ctx);
   }
   validateAuthoringHelperArguments(helperPath, descriptor.args, args);
-  return resolveAuthoringTemplateValue(descriptor.output.template, args);
+  return blindCast<TOutput, 'template-output resolves to the declared TOutput by convention'>(
+    resolveAuthoringTemplateValue(descriptor.output.template, args),
+  );
 }
 
 export function instantiateAuthoringFieldPreset(

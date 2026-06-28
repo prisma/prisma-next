@@ -1,7 +1,7 @@
 import type {
+  AnyMongoTypeMaps,
   MongoContract,
   MongoContractWithTypeMaps,
-  MongoTypeMaps,
   RootModelName,
 } from '@prisma-next/mongo-contract';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -15,7 +15,7 @@ export interface MongoOrmOptions<TContract extends MongoContract> {
 }
 
 export type MongoOrmClient<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 > = {
   readonly [K in keyof TContract['roots'] & string]: MongoCollection<
     TContract,
@@ -23,9 +23,9 @@ export type MongoOrmClient<
   >;
 };
 
-export function mongoOrm<TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>>(
-  options: MongoOrmOptions<TContract>,
-): MongoOrmClient<TContract> {
+export function mongoOrm<
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
+>(options: MongoOrmOptions<TContract>): MongoOrmClient<TContract> {
   const { contract, executor } = options;
   const client: Record<string, unknown> = {};
 

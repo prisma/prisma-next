@@ -77,6 +77,7 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
           seedDiagnostics,
           scalarTypeDescriptors: context.scalarTypeDescriptors,
           codecLookup: context.codecLookup,
+          authoringContributions: context.authoringContributions,
         });
         if (!interpreted.ok) {
           return interpreted;

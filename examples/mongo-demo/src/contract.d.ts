@@ -17,7 +17,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:2827cbad7293fe13a4fb2aab60a55d3cddd856a86d1f6ccea6e11519faacff92'>;
+  StorageHashBase<'sha256:ecc554e5f2f05ec120f8fef5ddf536286471edd3de11b8a906ba70e71f5e5df3'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510'>;
@@ -56,6 +56,7 @@ export type FieldOutputTypes = {
       readonly name: CodecTypes['mongo/string@1']['output'];
       readonly email: CodecTypes['mongo/string@1']['output'];
       readonly bio: CodecTypes['mongo/string@1']['output'] | null;
+      readonly role: 'admin' | 'author' | 'reader';
       readonly address: AddressOutput | null;
     };
   };
@@ -80,6 +81,7 @@ export type FieldInputTypes = {
       readonly name: CodecTypes['mongo/string@1']['input'];
       readonly email: CodecTypes['mongo/string@1']['input'];
       readonly bio: CodecTypes['mongo/string@1']['input'] | null;
+      readonly role: 'admin' | 'author' | 'reader';
       readonly address: AddressInput | null;
     };
   };
@@ -97,6 +99,17 @@ type ContractBase = Omit<
             readonly posts: {
               readonly kind: 'mongo-collection';
               readonly indexes: readonly [
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [{ readonly field: 'authorId'; readonly direction: 1 }];
+                },
+                {
+                  readonly kind: 'mongo-index';
+                  readonly keys: readonly [
+                    { readonly field: 'createdAt'; readonly direction: -1 },
+                    { readonly field: 'authorId'; readonly direction: 1 },
+                  ];
+                },
                 {
                   readonly kind: 'mongo-index';
                   readonly keys: readonly [{ readonly field: 'summary'; readonly direction: 1 }];
@@ -169,6 +182,10 @@ type ContractBase = Omit<
                     readonly name: { readonly bsonType: 'string' };
                     readonly email: { readonly bsonType: 'string' };
                     readonly bio: { readonly bsonType: readonly ['null', 'string'] };
+                    readonly role: {
+                      readonly bsonType: 'string';
+                      readonly enum: readonly ['admin', 'author', 'reader'];
+                    };
                     readonly address: {
                       readonly oneOf: readonly [
                         { readonly bsonType: 'null' },
@@ -187,7 +204,7 @@ type ContractBase = Omit<
                     };
                   };
                   readonly additionalProperties: false;
-                  readonly required: readonly ['_id', 'email', 'name'];
+                  readonly required: readonly ['_id', 'email', 'name', 'role'];
                 };
                 readonly validationLevel: 'strict';
                 readonly validationAction: 'error';
@@ -308,6 +325,10 @@ type ContractBase = Omit<
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
               };
+              readonly role: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+              };
               readonly address: {
                 readonly nullable: true;
                 readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
@@ -349,6 +370,16 @@ type ContractBase = Omit<
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
               };
             };
+          };
+        };
+        readonly enum: {
+          readonly UserRole: {
+            readonly codecId: 'mongo/string@1';
+            readonly members: readonly [
+              { readonly name: 'Admin'; readonly value: 'admin' },
+              { readonly name: 'Author'; readonly value: 'author' },
+              { readonly name: 'Reader'; readonly value: 'reader' },
+            ];
           };
         };
       };

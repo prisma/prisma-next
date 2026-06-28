@@ -77,7 +77,26 @@ type TestCodecTypes = {
   readonly 'mongo/bool@1': { readonly output: boolean };
 };
 
-type TestTypeMaps = MongoTypeMaps<TestCodecTypes>;
+type TestFieldOutputTypes = {
+  readonly __unbound__: {
+    readonly Product: {
+      readonly _id: string;
+      readonly name: string;
+      readonly category: string;
+      readonly price: number;
+      readonly tags: unknown[];
+      readonly createdAt: Date;
+    };
+    readonly Order: {
+      readonly _id: string;
+      readonly productName: string;
+      readonly quantity: number;
+      readonly status: string;
+    };
+  };
+};
+
+type TestTypeMaps = MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes, TestFieldOutputTypes>;
 type TContract = MongoContractWithTypeMaps<PipelineContract, TestTypeMaps>;
 
 const scalarField = <TCodecId extends string>(codecId: TCodecId) => ({

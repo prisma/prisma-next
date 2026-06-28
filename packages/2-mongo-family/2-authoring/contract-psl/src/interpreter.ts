@@ -5,12 +5,24 @@ import type {
 import { computeProfileHash, computeStorageHash } from '@prisma-next/contract/hashing';
 import {
   type Contract,
+  type ContractEnum,
   type ContractField,
   type ContractReferenceRelation,
   type ContractValueObject,
   type CrossReference,
   crossRef,
+  type JsonValue,
+  type ValueSetRef,
 } from '@prisma-next/contract/types';
+import type { EnumTypeHandle } from '@prisma-next/contract-authoring';
+import type {
+  AuthoringContributions,
+  AuthoringEntityContext,
+} from '@prisma-next/framework-components/authoring';
+import {
+  instantiateAuthoringEntityType,
+  isAuthoringEntityTypeDescriptor,
+} from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -28,6 +40,7 @@ import type {
   FieldSymbol,
   ModelSymbol,
   NamespaceSymbol,
+  PslExtensionBlock,
   PslSpan,
   ResolvedAttribute,
   SymbolTable,
@@ -35,6 +48,7 @@ import type {
 import { nodePslSpan } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { deriveJsonSchema, derivePolymorphicJsonSchema } from './derive-json-schema';
 import {
@@ -55,6 +69,7 @@ export interface InterpretPslDocumentToMongoContractInput {
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly codecLookup?: CodecLookup;
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
+  readonly authoringContributions?: AuthoringContributions;
 }
 
 /**
@@ -808,6 +823,7 @@ function resolveNonRelationField(
   ownerName: string,
   compositeTypeNames: ReadonlySet<string>,
   scalarTypeDescriptors: ReadonlyMap<string, string>,
+  codecIdByEnumName: ReadonlyMap<string, string>,
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
 ): ContractField | undefined {
@@ -815,6 +831,24 @@ function resolveNonRelationField(
     const result: ContractField = {
       type: { kind: 'valueObject', name: field.typeName },
       nullable: field.optional,
+    };
+    return field.list ? { ...result, many: true } : result;
+  }
+
+  // If this field's declared type is a known enum name, treat the field as a scalar
+  // with that enum's codec and stamp the domain valueSet ref.
+  const enumCodecId = codecIdByEnumName.get(field.typeName);
+  if (enumCodecId !== undefined) {
+    const valueSet: ValueSetRef = {
+      plane: 'domain',
+      entityKind: 'enum',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      entityName: field.typeName,
+    };
+    const result: ContractField = {
+      type: { kind: 'scalar', codecId: enumCodecId },
+      nullable: field.optional,
+      valueSet,
     };
     return field.list ? { ...result, many: true } : result;
   }
@@ -842,6 +876,59 @@ function resolveNonRelationField(
   return field.list ? { ...result, many: true } : result;
 }
 
+function processEnumDeclarations(input: {
+  readonly enumBlocks: readonly PslExtensionBlock[];
+  readonly sourceId: string;
+  readonly authoringContributions: AuthoringContributions | undefined;
+  readonly entityContext: AuthoringEntityContext;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): Record<string, ContractEnum> {
+  const builtEnums: Record<string, ContractEnum> = {};
+
+  if (input.enumBlocks.length === 0) return builtEnums;
+
+  const enumDescriptor =
+    input.authoringContributions?.entityTypes?.['enum'] !== undefined &&
+    isAuthoringEntityTypeDescriptor(input.authoringContributions.entityTypes['enum'])
+      ? input.authoringContributions.entityTypes['enum']
+      : undefined;
+
+  if (!enumDescriptor) {
+    for (const decl of input.enumBlocks) {
+      input.diagnostics.push({
+        code: 'PSL_ENUM_MISSING_FACTORY',
+        message: `enum "${decl.name}" requires an "enum" entityType factory in the active authoring contributions`,
+        sourceId: input.sourceId,
+        span: decl.span,
+      });
+    }
+    return builtEnums;
+  }
+
+  for (const decl of input.enumBlocks) {
+    const handle = instantiateAuthoringEntityType<EnumTypeHandle | undefined>(
+      'enum',
+      enumDescriptor,
+      [decl],
+      input.entityContext,
+    );
+
+    if (handle === undefined || handle === null) continue;
+
+    builtEnums[decl.name] = {
+      codecId: handle.codecId,
+      members: handle.enumMembers.map((m) => ({
+        name: m.name,
+        value: blindCast<JsonValue, 'factory-validated enum members are JsonValue-compatible'>(
+          m.value,
+        ),
+      })),
+    };
+  }
+
+  return builtEnums;
+}
+
 export function interpretPslDocumentToMongoContract(
   input: InterpretPslDocumentToMongoContractInput,
 ): Result<Contract, ContractSourceDiagnostics> {
@@ -859,6 +946,34 @@ export function interpretPslDocumentToMongoContract(
   const allCompositeTypes: CompositeTypeSymbol[] = Object.values(topLevel.compositeTypes);
   const modelNames = new Set(allModels.map((m) => m.name));
   const compositeTypeNames = new Set(allCompositeTypes.map((ct) => ct.name));
+
+  const topLevelEnumBlocks = Object.values(topLevel.blocks)
+    .filter((b) => b.keyword === 'enum')
+    .map((b) => b.block);
+
+  const builtEnums = processEnumDeclarations({
+    enumBlocks: topLevelEnumBlocks,
+    sourceId,
+    authoringContributions: input.authoringContributions,
+    entityContext: {
+      family: 'mongo',
+      target: 'mongo',
+      ...ifDefined('codecLookup', codecLookup),
+      sourceId,
+      diagnostics: {
+        push: (d) => {
+          diagnostics.push(
+            blindCast<ContractSourceDiagnostic, 'sink diagnostics are span-compatible'>(d),
+          );
+        },
+      },
+    },
+    diagnostics,
+  });
+
+  const codecIdByEnumName: Map<string, string> = new Map(
+    Object.entries(builtEnums).map(([name, e]) => [name, e.codecId]),
+  );
 
   const models: Record<string, MongoModelEntry> = {};
   const collections: Record<string, Record<string, unknown>> = {};
@@ -893,9 +1008,7 @@ export function interpretPslDocumentToMongoContract(
             modelName: pslModel.name,
             fieldName: field.name,
             targetModelName: field.typeName,
-            ...(relation?.relationName !== undefined
-              ? { relationName: relation.relationName }
-              : {}),
+            ...ifDefined('relationName', relation?.relationName),
             cardinality: field.list ? '1:N' : '1:1',
             field,
           });
@@ -924,7 +1037,7 @@ export function interpretPslDocumentToMongoContract(
             declaringModel: pslModel.name,
             fieldName: field.name,
             targetModel: field.typeName,
-            ...(relation.relationName !== undefined ? { relationName: relation.relationName } : {}),
+            ...ifDefined('relationName', relation.relationName),
             localFields: localMapped,
             targetFields: targetMapped,
           });
@@ -937,6 +1050,7 @@ export function interpretPslDocumentToMongoContract(
         pslModel.name,
         compositeTypeNames,
         scalarTypeDescriptors,
+        codecIdByEnumName,
         sourceId,
         diagnostics,
       );
@@ -1010,6 +1124,7 @@ export function interpretPslDocumentToMongoContract(
         compositeType.name,
         compositeTypeNames,
         scalarTypeDescriptors,
+        codecIdByEnumName,
         sourceId,
         diagnostics,
       );
@@ -1118,9 +1233,15 @@ export function interpretPslDocumentToMongoContract(
         variantEntries,
         valueObjects,
         codecLookup,
+        builtEnums,
       );
     } else {
-      coll['validator'] = deriveJsonSchema(modelEntry.fields, valueObjects, codecLookup);
+      coll['validator'] = deriveJsonSchema(
+        modelEntry.fields,
+        valueObjects,
+        codecLookup,
+        builtEnums,
+      );
     }
   }
 
@@ -1166,6 +1287,8 @@ export function interpretPslDocumentToMongoContract(
   }) as Contract['storage'];
   const capabilities: Record<string, Record<string, boolean>> = {};
 
+  const hasEnums = Object.keys(builtEnums).length > 0;
+
   return ok({
     targetFamily,
     target,
@@ -1175,6 +1298,7 @@ export function interpretPslDocumentToMongoContract(
         [UNBOUND_NAMESPACE_ID]: {
           models: polyResult.models,
           ...(Object.keys(valueObjects).length > 0 ? { valueObjects } : {}),
+          ...(hasEnums ? { enum: builtEnums } : {}),
         },
       },
     },

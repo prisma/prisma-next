@@ -1,6 +1,7 @@
 import { computeProfileHash, computeStorageHash } from '@prisma-next/contract/hashing';
 import {
   type ContractEmbedRelation,
+  type ContractEnum,
   type ContractField,
   type ContractFieldType,
   type ContractModelBase,
@@ -9,8 +10,10 @@ import {
   type ControlPolicy,
   type CrossReference,
   crossRef,
+  type JsonValue,
   type ProfileHashBase,
   type StorageHashBase,
+  type ValueSetRef,
 } from '@prisma-next/contract/types';
 import {
   createEntityHelpersFromNamespace,
@@ -53,6 +56,7 @@ import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { EnumTypeHandle } from './enum-type';
 
 // `canonicalStringify` rejects non-plain objects so a `Map` or class
 // instance cannot silently collapse to `{}`. The storage-shape values
@@ -139,13 +143,15 @@ export interface FieldBuilder<
   Type extends ContractFieldType = ContractFieldType,
   Nullable extends boolean = boolean,
   Many extends boolean = boolean,
+  Handle extends EnumTypeHandle | undefined = EnumTypeHandle | undefined,
 > {
   readonly __kind: 'field';
   readonly __type: Type;
   readonly __nullable: Nullable;
   readonly __many: Many;
-  optional(): FieldBuilder<Type, true, Many>;
-  many(): FieldBuilder<Type, Nullable, true>;
+  readonly __enumHandle: Handle;
+  optional(): FieldBuilder<Type, true, Many, Handle>;
+  many(): FieldBuilder<Type, Nullable, true, Handle>;
 }
 
 export interface ValueObjectBuilder<
@@ -220,7 +226,12 @@ export interface ModelBuilder<
   ): FieldReference<Name, FieldName>;
 }
 
-type AnyFieldBuilder = FieldBuilder<ContractFieldType, boolean, boolean>;
+type AnyFieldBuilder = FieldBuilder<
+  ContractFieldType,
+  boolean,
+  boolean,
+  EnumTypeHandle | undefined
+>;
 type AnyReferenceRelationBuilder = RelationBuilder<string, '1:1' | '1:N' | 'N:1', RelationOn>;
 type AnyEmbedRelationBuilder = RelationBuilder<string, '1:1' | '1:N', undefined>;
 type AnyRelationBuilder = AnyReferenceRelationBuilder | AnyEmbedRelationBuilder;
@@ -486,6 +497,34 @@ type DefinitionValueObjects<Definition> = Definition extends {
   ? ValueObjects
   : Record<never, never>;
 
+type DefinitionEnums<Definition> = Definition extends {
+  readonly enums?: infer E;
+}
+  ? Present<E> extends Record<string, EnumTypeHandle>
+    ? string extends keyof Present<E>
+      ? Record<never, never>
+      : Present<E>
+    : Record<never, never>
+  : Record<never, never>;
+
+type EnumHandleAccessorType<Handle> =
+  Handle extends EnumTypeHandle<infer _Name, infer Values, infer Names, infer MembersMap>
+    ? {
+        readonly values: Values;
+        readonly names: Names;
+        readonly members: MembersMap;
+        has(v: Values[number]): boolean;
+        nameOf(v: Values[number]): string | undefined;
+        ordinalOf(v: Values[number]): number;
+      }
+    : never;
+
+type BuiltEnumAccessors<Definition> = {
+  readonly [K in keyof DefinitionEnums<Definition>]: EnumHandleAccessorType<
+    DefinitionEnums<Definition>[K]
+  >;
+};
+
 type DefinitionRoots<Definition> = Definition extends {
   readonly roots?: infer Roots extends Record<string, ModelNameInput>;
 }
@@ -527,10 +566,34 @@ type MaybeValueObjectsSection<ValueObjects extends Record<string, AnyValueObject
         readonly valueObjects: ContractValueObjectsFromRecord<ValueObjects>;
       };
 
+// Project EnumTypeHandle to the namespace enum-entry shape.
+// Uses enumMembers (which carries Values[number] literals) rather than
+// ContractEnum.members (which uses JsonValue and erases literals).
+type EnumHandleToEntry<Handle> =
+  Handle extends EnumTypeHandle<string, infer Values, infer _Names, infer _MembersMap>
+    ? {
+        readonly codecId: string;
+        readonly members: readonly { readonly name: string; readonly value: Values[number] }[];
+      }
+    : never;
+
+type ContractEnumsFromRecord<Enums extends Record<string, EnumTypeHandle>> = {
+  readonly [K in keyof Enums as Enums[K] extends EnumTypeHandle<infer Name>
+    ? Name
+    : never]: EnumHandleToEntry<Enums[K]>;
+};
+
+type MaybeEnumsSection<Enums extends Record<string, EnumTypeHandle>> = keyof Enums extends never
+  ? EmptyObject
+  : {
+      readonly enum: ContractEnumsFromRecord<Enums>;
+    };
+
 type MongoDomainNamespaceFromDefinition<Definition> = Simplify<
   {
     readonly models: ContractModelsFromRecord<DefinitionModels<Definition>>;
-  } & MaybeValueObjectsSection<DefinitionValueObjects<Definition>>
+  } & MaybeValueObjectsSection<DefinitionValueObjects<Definition>> &
+    MaybeEnumsSection<DefinitionEnums<Definition>>
 >;
 
 type MongoContractBaseFromDefinition<Definition> = Simplify<{
@@ -548,14 +611,133 @@ type MongoContractBaseFromDefinition<Definition> = Simplify<{
   readonly profileHash: ProfileHashBase<string>;
   readonly meta: Record<string, never>;
   readonly defaultControlPolicy?: ControlPolicy;
+  readonly enumAccessors?: BuiltEnumAccessors<Definition>;
 }>;
 
 type CodecTypesFromDefinition<Definition> = MongoCodecTypes &
   MergeExtensionCodecTypesSafe<DefinitionExtensionPacks<Definition>>;
 
+// The enum value union for a field builder — `EnumTypeHandle['values'][number]`
+// when the builder carries an enum handle, `never` otherwise.
+type BuilderEnumValueUnion<TBuilder> =
+  TBuilder extends FieldBuilder<
+    ContractFieldType,
+    boolean,
+    boolean,
+    infer Handle extends EnumTypeHandle | undefined
+  >
+    ? [Handle] extends [EnumTypeHandle<string, infer Values>]
+      ? readonly unknown[] extends Values
+        ? never
+        : Values[number]
+      : never
+    : never;
+
+// The base codec/enum/value-object type for a builder field on a given channel,
+// before nullable/many modifiers. Enum fields resolve to the value union on both
+// channels; scalar fields resolve to the codec's channel-specific type.
+type BuilderBaseChannelType<
+  TBuilder,
+  TValueObjects extends Record<string, AnyValueObjectBuilder>,
+  TCodecTypes extends Record<string, { output: unknown; input: unknown }>,
+  Channel extends 'output' | 'input',
+> =
+  TBuilder extends FieldBuilder<
+    infer Type extends ContractFieldType,
+    boolean,
+    boolean,
+    EnumTypeHandle | undefined
+  >
+    ? [BuilderEnumValueUnion<TBuilder>] extends [never]
+      ? Type extends {
+          readonly kind: 'scalar';
+          readonly codecId: infer CId extends keyof TCodecTypes;
+        }
+        ? TCodecTypes[CId][Channel]
+        : Type extends { readonly kind: 'valueObject'; readonly name: infer VOName extends string }
+          ? VOName extends keyof TValueObjects
+            ? {
+                -readonly [K in keyof ExtractValueObjectFields<
+                  TValueObjects[VOName]
+                >]: BuilderFieldChannelType<
+                  ExtractValueObjectFields<TValueObjects[VOName]>[K],
+                  TValueObjects,
+                  TCodecTypes,
+                  Channel
+                >;
+              }
+            : unknown
+          : unknown
+      : BuilderEnumValueUnion<TBuilder>
+    : never;
+
+type ExtractValueObjectFields<TBuilder> =
+  TBuilder extends NamedValueObjectBuilder<string, infer Fields> ? Fields : Record<never, never>;
+
+// Runs once per `defineContract` call to build the precomputed `FieldOutputTypes`/`FieldInputTypes`
+// maps. Consumers index those maps in O(1) via `InferModelRow` — this is NOT re-evaluated per query.
+// Recursion is bounded to value-object nesting depth (each level resolves its fields exactly once).
+//
+// The JS type for one field builder on a given channel, with nullable/many applied.
+// Compose many first (array wrapping), then add nullability. This avoids the
+// TypeScript operator-precedence trap where `A | B extends infer X` infers X
+// only from B, not from `A | B`.
+type BuilderFieldChannelType<
+  TBuilder,
+  TValueObjects extends Record<string, AnyValueObjectBuilder>,
+  TCodecTypes extends Record<string, { output: unknown; input: unknown }>,
+  Channel extends 'output' | 'input',
+> =
+  TBuilder extends FieldBuilder<
+    ContractFieldType,
+    infer Nullable extends boolean,
+    infer Many extends boolean,
+    EnumTypeHandle | undefined
+  >
+    ?
+        | (Many extends true
+            ? BuilderBaseChannelType<TBuilder, TValueObjects, TCodecTypes, Channel>[]
+            : BuilderBaseChannelType<TBuilder, TValueObjects, TCodecTypes, Channel>)
+        | (Nullable extends true ? null : never)
+    : never;
+
+type ExtractModelFields<TBuilder> =
+  TBuilder extends NamedModelBuilder<string, infer Fields> ? Fields : Record<never, never>;
+
+type FieldChannelTypesFromDefinition<Definition, Channel extends 'output' | 'input'> = {
+  readonly [K in typeof UNBOUND_NAMESPACE_ID]: {
+    readonly [ModelKey in keyof DefinitionModels<Definition> as ExtractModelName<
+      DefinitionModels<Definition>[ModelKey]
+    >]: {
+      readonly [FieldName in keyof ExtractModelFields<
+        DefinitionModels<Definition>[ModelKey]
+      >]: BuilderFieldChannelType<
+        ExtractModelFields<DefinitionModels<Definition>[ModelKey]>[FieldName],
+        DefinitionValueObjects<Definition>,
+        CodecTypesFromDefinition<Definition>,
+        Channel
+      >;
+    };
+  };
+};
+
+type FieldOutputTypesFromDefinition<Definition> = FieldChannelTypesFromDefinition<
+  Definition,
+  'output'
+>;
+
+type FieldInputTypesFromDefinition<Definition> = FieldChannelTypesFromDefinition<
+  Definition,
+  'input'
+>;
+
 export type MongoContractResult<Definition> = MongoContractWithTypeMaps<
   MongoContractBaseFromDefinition<Definition>,
-  MongoTypeMaps<CodecTypesFromDefinition<Definition>>
+  MongoTypeMaps<
+    CodecTypesFromDefinition<Definition>,
+    FieldOutputTypesFromDefinition<Definition>,
+    FieldInputTypesFromDefinition<Definition>
+  >
 >;
 
 type ExtractEntitiesNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
@@ -663,6 +845,7 @@ export type ContractDefinition<
 > = ContractScaffold<Family, Target, ExtensionPacks, Roots> & {
   readonly models?: Models;
   readonly valueObjects?: ValueObjects;
+  readonly enums?: Record<string, EnumTypeHandle>;
 };
 
 export type ContractFactory<
@@ -692,25 +875,31 @@ function createFieldBuilder<
   Type extends ContractFieldType,
   Nullable extends boolean,
   Many extends boolean,
->(spec: FieldBuilderSpec<Type, Nullable, Many>): FieldBuilder<Type, Nullable, Many> {
+  Handle extends EnumTypeHandle | undefined = undefined,
+>(
+  spec: FieldBuilderSpec<Type, Nullable, Many>,
+  enumHandle?: Handle,
+): FieldBuilder<Type, Nullable, Many, Handle> {
   return {
     __kind: 'field',
     __type: spec.type,
     __nullable: spec.nullable,
     __many: spec.many,
+    __enumHandle: blindCast<
+      Handle,
+      'optional param widens to Handle | undefined; Handle defaults to undefined when no enum handle is passed'
+    >(enumHandle),
     optional() {
-      return createFieldBuilder<Type, true, Many>({
-        type: spec.type,
-        nullable: true,
-        many: spec.many,
-      });
+      return createFieldBuilder<Type, true, Many, Handle>(
+        { type: spec.type, nullable: true, many: spec.many },
+        enumHandle,
+      );
     },
     many() {
-      return createFieldBuilder<Type, Nullable, true>({
-        type: spec.type,
-        nullable: spec.nullable,
-        many: true,
-      });
+      return createFieldBuilder<Type, Nullable, true, Handle>(
+        { type: spec.type, nullable: spec.nullable, many: true },
+        enumHandle,
+      );
     },
   };
 }
@@ -790,6 +979,22 @@ export const field = {
       nullable: false,
       many: false,
     });
+  },
+  namedType<const Handle extends EnumTypeHandle>(handle: Handle) {
+    return createFieldBuilder(
+      {
+        type: blindCast<
+          { readonly kind: 'scalar'; readonly codecId: Handle['codecId'] },
+          'literal narrowing: kind is inferred as string without the cast'
+        >({
+          kind: 'scalar',
+          codecId: handle.codecId,
+        }),
+        nullable: false,
+        many: false,
+      },
+      handle,
+    );
   },
 } as const;
 
@@ -1193,15 +1398,26 @@ function isContractScaffold(
 }
 
 function buildContractField(builder: AnyFieldBuilder): ContractField {
+  const valueSet: ValueSetRef | undefined = builder.__enumHandle
+    ? {
+        plane: 'domain',
+        entityKind: 'enum',
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        entityName: builder.__enumHandle.enumName,
+      }
+    : undefined;
+
   return builder.__many
     ? {
         type: builder.__type,
         nullable: builder.__nullable,
         many: true,
+        ...ifDefined('valueSet', valueSet),
       }
     : {
         type: builder.__type,
         nullable: builder.__nullable,
+        ...ifDefined('valueSet', valueSet),
       };
 }
 
@@ -1343,20 +1559,16 @@ function toStorageCollectionOptions(
     ...(opts.capped
       ? { capped: { size: opts.size ?? 0, ...(opts.max != null && { max: opts.max }) } }
       : {}),
-    ...(opts.storageEngine !== undefined && { storageEngine: opts.storageEngine }),
-    ...(opts.indexOptionDefaults !== undefined && {
-      indexOptionDefaults: opts.indexOptionDefaults,
-    }),
-    ...(opts.collation !== undefined && { collation: opts.collation }),
-    ...(opts.timeseries !== undefined && { timeseries: opts.timeseries }),
+    ...ifDefined('storageEngine', opts.storageEngine),
+    ...ifDefined('indexOptionDefaults', opts.indexOptionDefaults),
+    ...ifDefined('collation', opts.collation),
+    ...ifDefined('timeseries', opts.timeseries),
     ...(opts.clusteredIndex !== undefined && {
       clusteredIndex:
         opts.clusteredIndex.name !== undefined ? { name: opts.clusteredIndex.name } : {},
     }),
-    ...(opts.expireAfterSeconds !== undefined && { expireAfterSeconds: opts.expireAfterSeconds }),
-    ...(opts.changeStreamPreAndPostImages !== undefined && {
-      changeStreamPreAndPostImages: opts.changeStreamPreAndPostImages,
-    }),
+    ...ifDefined('expireAfterSeconds', opts.expireAfterSeconds),
+    ...ifDefined('changeStreamPreAndPostImages', opts.changeStreamPreAndPostImages),
   };
   return new MongoCollectionOptions(input);
 }
@@ -1582,6 +1794,37 @@ function buildContractFromDefinition<
     },
   }) as unknown as MongoStorageShape<string>;
 
+  const builtEnums: Record<string, ContractEnum> = {};
+  for (const [enumName, handle] of Object.entries(definition.enums ?? {})) {
+    if (enumName !== handle.enumName) {
+      throw new Error(
+        `enum declaration key "${enumName}" must match enumType name "${handle.enumName}". Aliases are not supported.`,
+      );
+    }
+    builtEnums[enumName] = {
+      codecId: handle.codecId,
+      members: handle.enumMembers.map((m) => ({
+        name: m.name,
+        value: blindCast<
+          JsonValue,
+          'enum member values are codec inputs (string/number/bool) and are always JsonValue-compatible'
+        >(m.value),
+      })),
+    };
+  }
+  const hasEnums = Object.keys(builtEnums).length > 0;
+
+  for (const [modelName, modelBuilder] of Object.entries(definition.models ?? {})) {
+    for (const [fieldName, fieldBuilder] of Object.entries(modelBuilder.__fields)) {
+      const handle = fieldBuilder.__enumHandle;
+      if (handle && !(handle.enumName in builtEnums)) {
+        throw new Error(
+          `Model "${modelName}" field "${fieldName}" references enum "${handle.enumName}" which is not declared in defineContract({ enums: { ... } }).`,
+        );
+      }
+    }
+  }
+
   const builtContract = {
     target: definition.target.targetId,
     targetFamily: definition.family.familyId,
@@ -1592,6 +1835,7 @@ function buildContractFromDefinition<
         [UNBOUND_NAMESPACE_ID]: {
           models: builtModels,
           ...(Object.keys(builtValueObjects).length > 0 ? { valueObjects: builtValueObjects } : {}),
+          ...(hasEnums ? { enum: builtEnums } : {}),
         },
       },
     },
@@ -1624,6 +1868,7 @@ type BoundDefinitionInput<
   readonly defaultControlPolicy?: ControlPolicy;
   readonly models?: Models;
   readonly valueObjects?: ValueObjects;
+  readonly enums?: Record<string, EnumTypeHandle>;
 };
 
 // Merges a bound input with the pre-bound family/target to produce a full ContractDefinition.

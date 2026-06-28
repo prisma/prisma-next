@@ -1,11 +1,11 @@
 import { domainModelsAtDefaultNamespace, type PlanMeta } from '@prisma-next/contract/types';
 import type {
+  AnyMongoTypeMaps,
   ExtractMongoCodecTypes,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoModelDefinition,
   MongoModelsMap,
-  MongoTypeMaps,
   RootModelName,
 } from '@prisma-next/mongo-contract';
 import type {
@@ -94,7 +94,7 @@ function writeMeta(storageHash: string): PlanMeta {
  *    later in the chain. Bodies land in M2.
  */
 export class CollectionHandle<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends keyof MongoModelsMap<TContract> & string,
 > extends PipelineChain<
   TContract,
@@ -318,7 +318,7 @@ export class CollectionHandle<
  * after a filter has been applied.
  */
 export class FilteredCollection<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends keyof MongoModelsMap<TContract> & string,
 > extends PipelineChain<
   TContract,
@@ -609,7 +609,7 @@ function foldAnd(filters: ReadonlyArray<MongoFilterExpr>): MongoFilterExpr {
  * MongoContract` double-casts.
  */
 export function asMongoContract(
-  contract: MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  contract: MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 ): MongoContract {
   return contract;
 }
@@ -618,7 +618,7 @@ export function asMongoContract(
  * Bound execution context shared across the three state classes.
  */
 export interface BindingContext<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 > {
   readonly contract: TContract;
   readonly collection: string;
@@ -630,7 +630,7 @@ export interface BindingContext<
  * Used by `mongoQuery(...).from(name)` to enter the state machine.
  */
 export function createCollectionHandle<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   RootName extends keyof TContract['roots'] & string,
 >(
   contract: TContract,
