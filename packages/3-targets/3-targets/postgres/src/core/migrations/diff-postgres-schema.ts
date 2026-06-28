@@ -3,15 +3,20 @@ import { diffSchemas } from '@prisma-next/framework-components/control';
 import { isPostgresRlsPolicy, type PostgresRlsPolicy } from '../schema-ir/postgres-rls-policy';
 import { ensurePostgresSchemaIR, type PostgresSchemaIR } from '../schema-ir/postgres-schema-ir';
 
+// Renders a display-only reference string for the diff message. If policy
+// rendering grows, route it through the adapter's SQL renderer so the message
+// can't diverge from the emitted policy SQL.
 function renderPostgresPolicyReference(policy: PostgresRlsPolicy): string {
   return `policy "${policy.name}" on "${policy.namespaceId}"."${policy.tableName}"`;
 }
 
 /**
- * Computes RLS policy drift between two derived schema IRs.
+ * Computes schema drift between two derived schema IRs.
  *
  * 1. Runs the framework total diff.
- * 2. Whitelists to policy-subject issues (drops table-node and root-node issues).
+ * 2. Filters to policy-subject issues only — this is transitional: the generic
+ *    differ walks the whole tree, but the legacy relational verifier still owns
+ *    table/column drift, so non-policy issues are dropped here.
  * 3. Remaps the message to a human-readable policy reference.
  *
  * Ownership filtering (dropping `extra` issues in namespaces a contract doesn't

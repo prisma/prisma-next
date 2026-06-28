@@ -8,7 +8,6 @@ import { PostgresSchemaIR } from '../schema-ir/postgres-schema-ir';
 import { resolveDdlSchemaForNamespaceStorage } from '../schema-ir/postgres-schema-ir-annotations';
 import { PostgresTableIR } from '../schema-ir/postgres-table-ir';
 
-/** The contract-to-postgres-schema-ir derivation: a populated PostgresSchemaIR. */
 export function contractToPostgresSchemaIR(
   contract: PostgresContract | null,
   options: ContractToSchemaIROptions,

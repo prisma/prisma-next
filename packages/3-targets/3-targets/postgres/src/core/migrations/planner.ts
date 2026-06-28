@@ -205,9 +205,9 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       return plannerFailure(result.failure);
     }
 
-    const rlsCalls = this.planPostgresSchemaDiff(options);
-    const rlsPartition = partitionCallsByControlPolicy({
-      calls: rlsCalls,
+    const schemaDiffCalls = this.planPostgresSchemaDiff(options);
+    const schemaDiffPartition = partitionCallsByControlPolicy({
+      calls: schemaDiffCalls,
       contract: options.contract,
       resolveControlPolicySubject: (call) =>
         resolvePostgresCallControlPolicySubject(call, options.contract),
@@ -241,10 +241,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       formatSubjectLabel: (factoryName, subject) =>
         formatPostgresControlPolicySubjectLabel(factoryName, subject, options.contract),
     });
-    const calls = [...result.value.calls, ...rlsPartition.kept, ...fieldEventPartition.kept];
+    const calls = [...result.value.calls, ...schemaDiffPartition.kept, ...fieldEventPartition.kept];
     const warnings: SqlPlannerConflict[] = [
       ...issuePartition.warnings,
-      ...rlsPartition.warnings,
+      ...schemaDiffPartition.warnings,
       ...fieldEventPartition.warnings,
     ];
 
@@ -356,7 +356,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // rather than in the family verifier. Stitch it in here so a single
     // `SchemaIssue[]` flows through `planIssues` and the planner emits
     // CREATE SCHEMA in the dep bucket before any CreateTableCall.
-    // RLS policy drift is handled separately via diffPostgresSchema → planPostgresSchemaDiff.
+    // Schema drift is handled separately via diffPostgresSchema → planPostgresSchemaDiff.
     const namespaceIssues = verifyPostgresNamespacePresence({
       contract: options.contract,
       schema: options.schema,
