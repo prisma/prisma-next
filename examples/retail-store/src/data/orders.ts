@@ -19,7 +19,7 @@ export function createOrder(
     userId: string;
     items: ReadonlyArray<OrderLineItemInput>;
     shippingAddress: string;
-    type: string;
+    type: 'home' | 'bopis';
     statusHistory: ReadonlyArray<StatusEntryInput>;
   },
 ) {
