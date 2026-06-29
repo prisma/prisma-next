@@ -16,7 +16,7 @@ export async function findProductsPaginated(
   take: number,
 ): Promise<Product[]> {
   const plan = db.query.from('products').sort({ _id: 1 }).skip(skip).limit(take).build();
-  return db.execute(plan).toArray();
+  return db.execute(plan);
 }
 
 export function findProductById(db: Db, id: string) {
@@ -35,12 +35,12 @@ export async function searchProducts(db: Db, query: string): Promise<Product[]> 
     MongoFieldFilter.of('articleType', '$regex', regex),
   ]);
   const plan = db.query.from('products').match(filter).build();
-  return db.execute(plan).toArray();
+  return db.execute(plan);
 }
 
 export async function getRandomProducts(db: Db, count: number): Promise<Product[]> {
   const plan = db.query.from('products').sample(count).build();
-  return db.execute(plan).toArray();
+  return db.execute(plan);
 }
 
 /**
@@ -73,5 +73,5 @@ export async function findSimilarProducts(
   return blindCast<
     Product[],
     'db.raw aggregate plan is untyped (Atlas $vectorSearch); rows are Product documents'
-  >(await db.execute(plan).toArray());
+  >(await db.execute(plan));
 }
