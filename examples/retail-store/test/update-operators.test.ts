@@ -95,7 +95,7 @@ describe('array update operators', { timeout: timeouts.spinUpMongoMemoryServer }
         },
       ],
       shippingAddress: '123 St',
-      type: 'home',
+      type: 'delivery',
       statusHistory: [{ status: 'placed', timestamp: new Date('2026-03-01T10:00:00Z') }],
     });
 

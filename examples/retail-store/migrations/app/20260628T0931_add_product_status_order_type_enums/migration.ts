@@ -7,7 +7,7 @@ class M extends Migration {
   override describe() {
     return {
       from: 'sha256:71f1cc5c3f4de1ea7c9c8426fde682cd78c7c005f6688f58c2d9d6ddd8b2284c',
-      to: 'sha256:04af8abf76e953f360847eea1f8d7f863733d5dcd39fffd4cf12e4d90de6baa6',
+      to: 'sha256:24e1562cabc8241f7fd50b830ce29ea955b5cd668488fbfb5d6744b48d174d14',
     };
   }
 
@@ -61,7 +61,7 @@ class M extends Migration {
                     required: ['status', 'timestamp'],
                   },
                 },
-                type: { bsonType: 'string', enum: ['home', 'bopis'] },
+                type: { bsonType: 'string', enum: ['delivery', 'pickup'] },
                 userId: { bsonType: 'objectId' },
               },
               required: ['_id', 'items', 'shippingAddress', 'statusHistory', 'type', 'userId'],

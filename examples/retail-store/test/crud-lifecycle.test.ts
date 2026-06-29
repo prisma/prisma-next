@@ -117,7 +117,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
         },
       ],
       shippingAddress: '456 Test Ave',
-      type: 'home',
+      type: 'delivery',
       statusHistory: [{ status: 'placed', timestamp: new Date('2026-01-01') }],
     });
 
@@ -214,7 +214,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
         },
       ],
       shippingAddress: '123 St',
-      type: 'home',
+      type: 'delivery',
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 

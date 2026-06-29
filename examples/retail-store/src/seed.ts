@@ -316,7 +316,7 @@ export async function seed(db: Db) {
       },
     ],
     shippingAddress: '456 Oak Ave, Portland, OR 97201',
-    type: 'home',
+    type: 'delivery',
     statusHistory: [{ status: 'placed', timestamp: new Date('2026-03-01T10:00:00Z') }],
   });
 

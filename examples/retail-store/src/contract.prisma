@@ -9,8 +9,8 @@ enum ProductStatus {
 
 enum OrderType {
   @@type("mongo/string@1")
-  Home  = "home"
-  Bopis = "bopis"
+  Delivery = "delivery"
+  Pickup   = "pickup"
 }
 
 type Price {

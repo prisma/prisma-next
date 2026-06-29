@@ -38,7 +38,7 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
       userId: user._id,
       items: cart!.items,
       shippingAddress: '123 Main St',
-      type: 'home',
+      type: 'delivery',
       statusHistory: [{ status: 'placed', timestamp: new Date('2026-03-01T10:00:00Z') }],
     });
 
@@ -62,7 +62,7 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
       userId: user._id,
       items: [ITEM],
       shippingAddress: '456 Oak Ave',
-      type: 'home',
+      type: 'delivery',
       statusHistory: [{ status: 'placed', timestamp: new Date('2026-03-01T10:00:00Z') }],
     });
 
@@ -105,7 +105,7 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
       userId: user._id,
       items: [ITEM],
       shippingAddress: '789 Elm',
-      type: 'home',
+      type: 'delivery',
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -125,14 +125,14 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
       userId: user._id,
       items: [ITEM],
       shippingAddress: 'Addr 1',
-      type: 'home',
+      type: 'delivery',
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
     await createOrder(ctx.db, {
       userId: user._id,
       items: [{ ...ITEM, productId: 'prod-2', name: 'Chinos' }],
       shippingAddress: 'Addr 2',
-      type: 'bopis',
+      type: 'pickup',
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -151,7 +151,7 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
       userId: user._id,
       items: [ITEM],
       shippingAddress: '101 Pine',
-      type: 'home',
+      type: 'delivery',
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 

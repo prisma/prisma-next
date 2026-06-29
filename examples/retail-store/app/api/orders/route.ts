@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     userId,
     items: body.items,
     shippingAddress: body.shippingAddress,
-    type: body.type ?? 'home',
+    type: body.type ?? 'delivery',
     statusHistory: [{ status: 'placed', timestamp: new Date() }],
   });
   await clearCart(db, userId);

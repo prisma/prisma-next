@@ -17,7 +17,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:04af8abf76e953f360847eea1f8d7f863733d5dcd39fffd4cf12e4d90de6baa6'>;
+  StorageHashBase<'sha256:24e1562cabc8241f7fd50b830ce29ea955b5cd668488fbfb5d6744b48d174d14'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510'>;
@@ -138,7 +138,7 @@ export type FieldOutputTypes = {
       readonly userId: CodecTypes['mongo/objectId@1']['output'];
       readonly items: ReadonlyArray<OrderLineItemOutput>;
       readonly shippingAddress: CodecTypes['mongo/string@1']['output'];
-      readonly type: 'home' | 'bopis';
+      readonly type: 'delivery' | 'pickup';
       readonly statusHistory: ReadonlyArray<StatusEntryOutput>;
     };
     readonly Product: {
@@ -210,7 +210,7 @@ export type FieldInputTypes = {
       readonly userId: CodecTypes['mongo/objectId@1']['input'];
       readonly items: ReadonlyArray<OrderLineItemInput>;
       readonly shippingAddress: CodecTypes['mongo/string@1']['input'];
-      readonly type: 'home' | 'bopis';
+      readonly type: 'delivery' | 'pickup';
       readonly statusHistory: ReadonlyArray<StatusEntryInput>;
     };
     readonly Product: {
@@ -533,7 +533,7 @@ type ContractBase = Omit<
                     readonly shippingAddress: { readonly bsonType: 'string' };
                     readonly type: {
                       readonly bsonType: 'string';
-                      readonly enum: readonly ['home', 'bopis'];
+                      readonly enum: readonly ['delivery', 'pickup'];
                     };
                     readonly statusHistory: {
                       readonly bsonType: 'array';
@@ -1224,8 +1224,8 @@ type ContractBase = Omit<
           readonly OrderType: {
             readonly codecId: 'mongo/string@1';
             readonly members: readonly [
-              { readonly name: 'Home'; readonly value: 'home' },
-              { readonly name: 'Bopis'; readonly value: 'bopis' },
+              { readonly name: 'Delivery'; readonly value: 'delivery' },
+              { readonly name: 'Pickup'; readonly value: 'pickup' },
             ];
           };
         };

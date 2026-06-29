@@ -55,7 +55,7 @@ describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemorySe
         },
       ],
       shippingAddress: '123 St',
-      type: 'home',
+      type: 'delivery',
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -87,7 +87,7 @@ describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemorySe
         },
       ],
       shippingAddress: '789 St',
-      type: 'bopis',
+      type: 'pickup',
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -104,7 +104,7 @@ describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemorySe
     expect(invoiceWithOrder).not.toBeNull();
     expect(invoiceWithOrder!.order).toMatchObject({
       shippingAddress: '789 St',
-      type: 'bopis',
+      type: 'pickup',
     });
   });
 });

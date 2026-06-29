@@ -41,12 +41,12 @@
             "codecId": "mongo/string@1",
             "members": [
               {
-                "name": "Home",
-                "value": "home"
+                "name": "Delivery",
+                "value": "delivery"
               },
               {
-                "name": "Bopis",
-                "value": "bopis"
+                "name": "Pickup",
+                "value": "pickup"
               }
             ]
           },
@@ -1362,8 +1362,8 @@
                     "type": {
                       "bsonType": "string",
                       "enum": [
-                        "home",
-                        "bopis"
+                        "delivery",
+                        "pickup"
                       ]
                     },
                     "userId": {
@@ -1608,7 +1608,7 @@
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:04af8abf76e953f360847eea1f8d7f863733d5dcd39fffd4cf12e4d90de6baa6"
+    "storageHash": "sha256:24e1562cabc8241f7fd50b830ce29ea955b5cd668488fbfb5d6744b48d174d14"
   },
   "capabilities": {},
   "extensionPacks": {},

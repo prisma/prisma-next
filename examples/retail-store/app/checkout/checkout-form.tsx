@@ -39,7 +39,7 @@ interface CheckoutFormProps {
 export function CheckoutForm({ defaultAddress, locations, cartItems }: CheckoutFormProps) {
   const router = useRouter();
   const { invalidateCart } = useCart();
-  const [orderType, setOrderType] = useState<'home' | 'bopis'>('home');
+  const [orderType, setOrderType] = useState<'delivery' | 'pickup'>('delivery');
   const [address, setAddress] = useState(defaultAddress);
   const [locationId, setLocationId] = useState(locations[0]?.id ?? '');
   const [loading, setLoading] = useState(false);
@@ -51,11 +51,11 @@ export function CheckoutForm({ defaultAddress, locations, cartItems }: CheckoutF
     setLoading(true);
     try {
       const shippingAddress =
-        orderType === 'home' ? address : locations.find((l) => l.id === locationId)?.address;
+        orderType === 'delivery' ? address : locations.find((l) => l.id === locationId)?.address;
 
       if (!shippingAddress?.trim()) {
         setError(
-          orderType === 'home'
+          orderType === 'delivery'
             ? 'Please enter a shipping address.'
             : 'Please select a pickup location.',
         );
@@ -89,24 +89,24 @@ export function CheckoutForm({ defaultAddress, locations, cartItems }: CheckoutF
       <h2 className="font-semibold mb-3">Delivery Method</h2>
       <RadioGroup
         value={orderType}
-        onValueChange={(v: string) => setOrderType(v as 'home' | 'bopis')}
+        onValueChange={(v: string) => setOrderType(v as 'delivery' | 'pickup')}
         className="mb-4"
       >
         <div className="flex items-center gap-2">
-          <RadioGroupItem value="home" id="home" />
-          <label htmlFor="home" className="text-sm cursor-pointer">
-            Home Delivery
+          <RadioGroupItem value="delivery" id="delivery" />
+          <label htmlFor="delivery" className="text-sm cursor-pointer">
+            Home delivery
           </label>
         </div>
         <div className="flex items-center gap-2">
-          <RadioGroupItem value="bopis" id="bopis" />
-          <label htmlFor="bopis" className="text-sm cursor-pointer">
-            Buy Online, Pick Up In Store
+          <RadioGroupItem value="pickup" id="pickup" />
+          <label htmlFor="pickup" className="text-sm cursor-pointer">
+            Store pickup
           </label>
         </div>
       </RadioGroup>
 
-      {orderType === 'home' ? (
+      {orderType === 'delivery' ? (
         <div className="mb-6">
           <label htmlFor="address" className="text-sm font-medium mb-1.5 block">
             Shipping Address

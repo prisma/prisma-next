@@ -98,7 +98,7 @@
                 },
                 "type": {
                   "bsonType": "string",
-                  "enum": ["home", "bopis"]
+                  "enum": ["delivery", "pickup"]
                 },
                 "userId": {
                   "bsonType": "objectId"
@@ -216,7 +216,7 @@
                   },
                   "type": {
                     "bsonType": "string",
-                    "enum": ["home", "bopis"]
+                    "enum": ["delivery", "pickup"]
                   },
                   "userId": {
                     "bsonType": "objectId"
