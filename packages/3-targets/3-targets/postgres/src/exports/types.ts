@@ -29,8 +29,7 @@ export {
   type PostgresSchemaIRInput,
 } from '../core/schema-ir/postgres-schema-ir';
 export {
-  isPostgresTableIR,
-  PostgresTableIR,
-  type PostgresTableIRInput,
-} from '../core/schema-ir/postgres-table-ir';
+  PostgresTableSchemaNode,
+  type PostgresTableSchemaNodeInput,
+} from '../core/schema-ir/postgres-table-schema-node';
 export type { PostgresColumnDefault } from '../core/types';

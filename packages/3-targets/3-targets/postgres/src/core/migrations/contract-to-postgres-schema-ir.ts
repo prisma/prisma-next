@@ -6,7 +6,7 @@ import type { PostgresContract } from '../postgres-schema';
 import { isPostgresSchema } from '../postgres-schema';
 import { PostgresSchemaIR } from '../schema-ir/postgres-schema-ir';
 import { resolveDdlSchemaForNamespaceStorage } from '../schema-ir/postgres-schema-ir-annotations';
-import { PostgresTableIR } from '../schema-ir/postgres-table-ir';
+import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 
 export function contractToPostgresSchemaIR(
   contract: PostgresContract | null,
@@ -52,9 +52,9 @@ export function contractToPostgresSchemaIR(
   // Attach policies to each table from the relational projection. A policy that
   // references a table absent from the schema IR is a malformed contract — the
   // loop below throws rather than fabricating a stub table.
-  const tables: Record<string, PostgresTableIR> = {};
+  const tables: Record<string, PostgresTableSchemaNode> = {};
   for (const [tableName, sqlTable] of Object.entries(sqlIr.tables)) {
-    tables[tableName] = new PostgresTableIR({
+    tables[tableName] = new PostgresTableSchemaNode({
       name: sqlTable.name,
       columns: sqlTable.columns,
       foreignKeys: sqlTable.foreignKeys,
@@ -63,7 +63,7 @@ export function contractToPostgresSchemaIR(
       ...(sqlTable.primaryKey !== undefined ? { primaryKey: sqlTable.primaryKey } : {}),
       ...(sqlTable.annotations !== undefined ? { annotations: sqlTable.annotations } : {}),
       ...(sqlTable.checks !== undefined ? { checks: sqlTable.checks } : {}),
-      rlsPolicies: policiesByTable.get(tableName) ?? [],
+      policies: policiesByTable.get(tableName) ?? [],
     });
   }
   for (const [tableName, policies] of policiesByTable) {

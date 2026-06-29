@@ -11,25 +11,25 @@ import {
   type SqlTableIRInput,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
-import type { PostgresRlsPolicy } from '../postgres-rls-policy';
+import type { PostgresPolicySchemaNode } from './postgres-policy-schema-node';
 
-export interface PostgresTableIRInput extends SqlTableIRInput {
-  readonly rlsPolicies?: readonly PostgresRlsPolicy[];
+export interface PostgresTableSchemaNodeInput extends SqlTableIRInput {
+  readonly policies?: readonly PostgresPolicySchemaNode[];
 }
 
 /**
- * Postgres-specific table IR node. Carries all `SqlTableIR` fields plus
- * `rlsPolicies`, and implements `DiffableNode` so the table instance is
+ * Postgres-specific table schema-diff node. Carries all `SqlTableIR` fields
+ * plus `policies`, and implements `DiffableNode` so the table instance is
  * directly the diff-tree node — no separate wrapper needed.
  *
  * Extends `SqlSchemaIRNode` directly rather than `SqlTableIR` because
  * `SqlTableIR` calls `freezeNode` in its own constructor, which prevents
- * subclass field initialisation. Same pattern as `PostgresSchemaIR`.
+ * subclass field initialisation.
  *
- * `id` is the table name. `children()` returns the policies on this table.
+ * `id` is the table name. `children()` returns the policy nodes on this table.
  * `isEqualTo` is always true — table-level attributes are not diffed yet.
  */
-export class PostgresTableIR extends SqlSchemaIRNode implements DiffableNode {
+export class PostgresTableSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   readonly name: string;
   readonly columns: Readonly<Record<string, SqlColumnIR>>;
   readonly foreignKeys: ReadonlyArray<SqlForeignKeyIR>;
@@ -38,9 +38,9 @@ export class PostgresTableIR extends SqlSchemaIRNode implements DiffableNode {
   declare readonly primaryKey?: PrimaryKey;
   declare readonly annotations?: SqlAnnotations;
   declare readonly checks?: ReadonlyArray<SqlCheckConstraintIR>;
-  readonly rlsPolicies: readonly PostgresRlsPolicy[];
+  readonly policies: readonly PostgresPolicySchemaNode[];
 
-  constructor(input: PostgresTableIRInput) {
+  constructor(input: PostgresTableSchemaNodeInput) {
     super();
     this.name = input.name;
     this.columns = Object.freeze(
@@ -74,7 +74,7 @@ export class PostgresTableIR extends SqlSchemaIRNode implements DiffableNode {
         ),
       );
     }
-    this.rlsPolicies = Object.freeze([...(input.rlsPolicies ?? [])]);
+    this.policies = Object.freeze([...(input.policies ?? [])]);
     freezeNode(this);
   }
 
@@ -87,10 +87,10 @@ export class PostgresTableIR extends SqlSchemaIRNode implements DiffableNode {
   }
 
   children(): readonly DiffableNode[] {
-    return this.rlsPolicies;
+    return this.policies;
   }
-}
 
-export function isPostgresTableIR(node: DiffableNode): node is PostgresTableIR {
-  return node instanceof PostgresTableIR;
+  static is(node: DiffableNode): node is PostgresTableSchemaNode {
+    return node instanceof PostgresTableSchemaNode;
+  }
 }

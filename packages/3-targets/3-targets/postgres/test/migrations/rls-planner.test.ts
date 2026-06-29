@@ -23,7 +23,7 @@ import { createPostgresMigrationPlanner } from '../../src/core/migrations/planne
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresSchemaIR } from '../../src/core/schema-ir/postgres-schema-ir';
-import { PostgresTableIR } from '../../src/core/schema-ir/postgres-table-ir';
+import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 import { PostgresCreatePolicy } from '../../src/exports/ddl';
 
 const stubLowerer: ExecuteRequestLowerer = {
@@ -115,7 +115,7 @@ function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<Sql
 function schemaWith(policies: readonly PostgresRlsPolicy[]): PostgresSchemaIR {
   return new PostgresSchemaIR({
     tables: {
-      [TABLE_NAME]: new PostgresTableIR({
+      [TABLE_NAME]: new PostgresTableSchemaNode({
         name: TABLE_NAME,
         columns: {
           id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -124,7 +124,7 @@ function schemaWith(policies: readonly PostgresRlsPolicy[]): PostgresSchemaIR {
         foreignKeys: [],
         uniques: [],
         indexes: [],
-        rlsPolicies: policies,
+        policies,
       }),
     },
     pgSchemaName: 'public',

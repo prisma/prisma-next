@@ -8,14 +8,14 @@ import {
   type SqlTableIRInput,
 } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
-import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresRole } from '../postgres-role';
-import { PostgresTableIR } from './postgres-table-ir';
+import type { PostgresPolicySchemaNode } from './postgres-policy-schema-node';
+import { PostgresTableSchemaNode } from './postgres-table-schema-node';
 
 export interface PostgresSchemaIRInput {
   readonly tables: Record<
     string,
-    PostgresTableIR | (SqlTableIRInput & { rlsPolicies?: readonly PostgresRlsPolicy[] })
+    PostgresTableSchemaNode | (SqlTableIRInput & { policies?: readonly PostgresPolicySchemaNode[] })
   >;
   readonly pgSchemaName: string;
   readonly pgVersion: string;
@@ -35,7 +35,7 @@ export interface PostgresSchemaIRInput {
  * `SqlSchemaIR` structure and freezes itself at the end of its own
  * constructor.
  *
- * `tables` holds `PostgresTableIR` instances which carry their own RLS
+ * `tables` holds `PostgresTableSchemaNode` instances which carry their own RLS
  * policies. `children()` returns the tables directly — the table instances
  * ARE the diff-tree nodes.
  *
@@ -43,7 +43,7 @@ export interface PostgresSchemaIRInput {
  */
 export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
   readonly nodeTarget: SqlSchemaTarget = 'postgres';
-  readonly tables: Readonly<Record<string, PostgresTableIR>>;
+  readonly tables: Readonly<Record<string, PostgresTableSchemaNode>>;
   declare readonly annotations?: SqlAnnotations;
   readonly pgSchemaName: string;
   readonly pgVersion: string;
@@ -57,7 +57,7 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
       Object.fromEntries(
         Object.entries(input.tables).map(([key, t]) => [
           key,
-          t instanceof PostgresTableIR ? t : new PostgresTableIR(t),
+          t instanceof PostgresTableSchemaNode ? t : new PostgresTableSchemaNode(t),
         ]),
       ),
     );
@@ -87,8 +87,8 @@ export class PostgresSchemaIR extends SqlSchemaIRNode implements DiffableNode {
     return this.pgSchemaName;
   }
 
-  get rlsPolicies(): readonly PostgresRlsPolicy[] {
-    return Object.values(this.tables).flatMap((t) => t.rlsPolicies);
+  get rlsPolicies(): readonly PostgresPolicySchemaNode[] {
+    return Object.values(this.tables).flatMap((t) => t.policies);
   }
 
   isEqualTo(_other: DiffableNode): boolean {

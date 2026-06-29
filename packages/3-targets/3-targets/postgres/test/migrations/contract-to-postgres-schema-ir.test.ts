@@ -6,7 +6,7 @@ import { contractToPostgresSchemaIR } from '../../src/core/migrations/contract-t
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { type PostgresContract, PostgresSchema } from '../../src/core/postgres-schema';
 import { isPostgresSchemaIR } from '../../src/core/schema-ir/postgres-schema-ir';
-import { isPostgresTableIR } from '../../src/core/schema-ir/postgres-table-ir';
+import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 import { postgresRenderDefault } from '../../src/exports/control';
 
 const TABLE_NAME = 'profiles';
@@ -70,26 +70,28 @@ const projectionOptions = {
 } as const;
 
 describe('contractToPostgresSchemaIR', () => {
-  it('projects a SELECT policy into rlsPolicies attached to the table', () => {
+  it('projects a SELECT policy into policies attached to the table', () => {
     const policy = makePolicy('read_own_profiles_a1b2c3d4');
     const contract = makeContract([policy]);
 
     const ir = contractToPostgresSchemaIR(contract, projectionOptions);
 
     expect(isPostgresSchemaIR(ir)).toBe(true);
-    expect(ir.rlsPolicies).toContainEqual(policy);
+    expect(ir.rlsPolicies).toContainEqual(expect.objectContaining({ name: policy.name }));
     expect(Object.keys(ir.tables)).toEqual([TABLE_NAME]);
-    expect(isPostgresTableIR(ir.tables[TABLE_NAME]!)).toBe(true);
-    expect(ir.tables[TABLE_NAME]?.rlsPolicies).toContainEqual(policy);
+    expect(PostgresTableSchemaNode.is(ir.tables[TABLE_NAME]!)).toBe(true);
+    expect(ir.tables[TABLE_NAME]?.policies).toContainEqual(
+      expect.objectContaining({ name: policy.name }),
+    );
   });
 
-  it('tables are PostgresTableIR instances', () => {
+  it('tables are PostgresTableSchemaNode instances', () => {
     const policy = makePolicy('read_own_profiles_a1b2c3d4');
     const contract = makeContract([policy]);
 
     const ir = contractToPostgresSchemaIR(contract, projectionOptions);
 
-    expect(Object.values(ir.tables).every(isPostgresTableIR)).toBe(true);
+    expect(Object.values(ir.tables).every(PostgresTableSchemaNode.is)).toBe(true);
   });
 
   it('returns no policies for a null contract', () => {

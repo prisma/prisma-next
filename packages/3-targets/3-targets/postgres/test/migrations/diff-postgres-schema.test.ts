@@ -11,7 +11,7 @@ import {
 import { isPostgresRlsPolicy, PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresSchemaIR } from '../../src/core/schema-ir/postgres-schema-ir';
-import { PostgresTableIR } from '../../src/core/schema-ir/postgres-table-ir';
+import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 
 const TABLE_NAME = 'profiles';
 const SCHEMA_NAME = 'public';
@@ -85,10 +85,10 @@ function makeSchema(actualPolicies: readonly PostgresRlsPolicy[]): PostgresSchem
   }
 
   const tableNames = new Set([TABLE_NAME, ...policiesByTable.keys()]);
-  const tables: Record<string, PostgresTableIR> = {};
+  const tables: Record<string, PostgresTableSchemaNode> = {};
   for (const name of tableNames) {
     if (name === TABLE_NAME) {
-      tables[name] = new PostgresTableIR({
+      tables[name] = new PostgresTableSchemaNode({
         name: TABLE_NAME,
         columns: {
           id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -97,16 +97,16 @@ function makeSchema(actualPolicies: readonly PostgresRlsPolicy[]): PostgresSchem
         foreignKeys: [],
         uniques: [],
         indexes: [],
-        rlsPolicies: policiesByTable.get(name) ?? [],
+        policies: policiesByTable.get(name) ?? [],
       });
     } else {
-      tables[name] = new PostgresTableIR({
+      tables[name] = new PostgresTableSchemaNode({
         name,
         columns: {},
         foreignKeys: [],
         uniques: [],
         indexes: [],
-        rlsPolicies: policiesByTable.get(name) ?? [],
+        policies: policiesByTable.get(name) ?? [],
       });
     }
   }
@@ -282,21 +282,21 @@ describe('diffPostgresSchema', () => {
 
     const schemaWithBothNamespaces = new PostgresSchemaIR({
       tables: {
-        users: new PostgresTableIR({
+        users: new PostgresTableSchemaNode({
           name: 'users',
           columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
           foreignKeys: [],
           uniques: [],
           indexes: [],
-          rlsPolicies: [authPolicy],
+          policies: [authPolicy],
         }),
-        profile: new PostgresTableIR({
+        profile: new PostgresTableSchemaNode({
           name: 'profile',
           columns: {},
           foreignKeys: [],
           uniques: [],
           indexes: [],
-          rlsPolicies: [foreignPublicPolicy],
+          policies: [foreignPublicPolicy],
         }),
       },
       pgSchemaName: 'auth',
@@ -359,21 +359,21 @@ describe('diffPostgresSchema', () => {
 
     const schemaWithBothNamespaces = new PostgresSchemaIR({
       tables: {
-        users: new PostgresTableIR({
+        users: new PostgresTableSchemaNode({
           name: 'users',
           columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
           foreignKeys: [],
           uniques: [],
           indexes: [],
-          rlsPolicies: [authPolicy],
+          policies: [authPolicy],
         }),
-        profile: new PostgresTableIR({
+        profile: new PostgresTableSchemaNode({
           name: 'profile',
           columns: {},
           foreignKeys: [],
           uniques: [],
           indexes: [],
-          rlsPolicies: [foreignPublicPolicy],
+          policies: [foreignPublicPolicy],
         }),
       },
       pgSchemaName: 'auth',
@@ -428,13 +428,13 @@ describe('diffPostgresSchema', () => {
 
     const schema = new PostgresSchemaIR({
       tables: {
-        users: new PostgresTableIR({
+        users: new PostgresTableSchemaNode({
           name: 'users',
           columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
           foreignKeys: [],
           uniques: [],
           indexes: [],
-          rlsPolicies: [ownedExtra],
+          policies: [ownedExtra],
         }),
       },
       pgSchemaName: 'auth',
@@ -514,7 +514,7 @@ describe('diffPostgresSchema', () => {
 
     const schema = new PostgresSchemaIR({
       tables: {
-        profiles: new PostgresTableIR({
+        profiles: new PostgresTableSchemaNode({
           name: 'profiles',
           columns: {
             id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -523,9 +523,9 @@ describe('diffPostgresSchema', () => {
           foreignKeys: [],
           uniques: [],
           indexes: [],
-          rlsPolicies: [policyOnProfiles],
+          policies: [policyOnProfiles],
         }),
-        orders: new PostgresTableIR({
+        orders: new PostgresTableSchemaNode({
           name: 'orders',
           columns: {
             id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -534,7 +534,7 @@ describe('diffPostgresSchema', () => {
           foreignKeys: [],
           uniques: [],
           indexes: [],
-          rlsPolicies: [policyOnOrders],
+          policies: [policyOnOrders],
         }),
       },
       pgSchemaName: SCHEMA_NAME,
@@ -676,13 +676,13 @@ describe('diffPostgresSchema', () => {
 
     const actual = new PostgresSchemaIR({
       tables: {
-        profiles: new PostgresTableIR({
+        profiles: new PostgresTableSchemaNode({
           name: 'profiles',
           columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
           foreignKeys: [],
           uniques: [],
           indexes: [],
-          rlsPolicies: [introspectedPolicy],
+          policies: [introspectedPolicy],
         }),
       },
       pgSchemaName: 'public',
@@ -761,13 +761,13 @@ describe('diffPostgresSchema', () => {
     );
     const actual = new PostgresSchemaIR({
       tables: {
-        orders: new PostgresTableIR({
+        orders: new PostgresTableSchemaNode({
           name: 'orders',
           columns: {},
           foreignKeys: [],
           uniques: [],
           indexes: [],
-          rlsPolicies: [unownedExtra],
+          policies: [unownedExtra],
         }),
       },
       pgSchemaName: 'public',
