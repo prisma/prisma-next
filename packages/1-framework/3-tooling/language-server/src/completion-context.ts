@@ -139,14 +139,17 @@ function classifyModelFieldType(input: {
   readonly replacementStartOffset: number;
 }): PslCompletionContext {
   const fieldName = input.field.name();
-  const fieldNameText = fieldName?.name();
-  if (fieldName === undefined || fieldNameText === undefined) {
+  if (fieldName === undefined) {
+    return unsupported(input.offset);
+  }
+  const fieldNameText = fieldName.name();
+  if (fieldNameText === undefined) {
     return unsupported(input.offset);
   }
 
-  const fieldNameStart = fieldName.syntax.offset;
   const fieldNameEnd = fieldName.syntax.endOffset;
-  if (input.offset >= fieldNameStart && input.offset <= fieldNameEnd) {
+
+  if (fieldName.syntax.isInside(input.offset)) {
     return unsupported(input.offset);
   }
 
@@ -156,7 +159,7 @@ function classifyModelFieldType(input: {
   }
 
   const typeStart = typeAnnotation.syntax.offset;
-  const typeEnd = typeAnnotation.syntax.endOffset;
+
   if (typeAnnotation.syntax.textLength === 0) {
     const fieldNameToken = fieldName.syntax.lastToken;
     if (
@@ -170,12 +173,12 @@ function classifyModelFieldType(input: {
     return unsupported(input.offset);
   }
 
-  if (input.offset < typeStart || input.offset > typeEnd) {
+  if (typeAnnotation.syntax.isOutside(input.offset)) {
     return unsupported(input.offset);
   }
 
   const constructorArgList = typeAnnotation.argList();
-  if (constructorArgList !== undefined && containsOffset(constructorArgList.syntax, input.offset)) {
+  if (constructorArgList?.syntax.isInside(input.offset)) {
     return unsupported(input.offset);
   }
 
@@ -183,7 +186,7 @@ function classifyModelFieldType(input: {
   if (name === undefined) {
     return unsupported(input.offset);
   }
-  if (!containsOffset(name.syntax, input.offset)) {
+  if (name.syntax.isOutside(input.offset)) {
     return unsupported(input.offset);
   }
   if (name.isOverQualified()) {
@@ -333,7 +336,7 @@ function classifyGenericBlockParameter(input: {
   }
 
   const field = closestAst(input.node, FieldDeclarationAst.cast);
-  if (field !== undefined && containsOffset(field.syntax, input.offset)) {
+  if (field?.syntax.isInside(input.offset)) {
     return unsupported(input.offset);
   }
 
@@ -366,7 +369,7 @@ function activeKeyValuePair(
   offset: number,
 ): KeyValuePairAst | undefined {
   const pair = closestAst(node, KeyValuePairAst.cast);
-  if (pair === undefined || !containsOffset(pair.syntax, offset)) {
+  if (pair === undefined || pair.syntax.isOutside(offset)) {
     return undefined;
   }
   return pair;
@@ -583,12 +586,6 @@ function onlyWhitespaceBetween(from: SyntaxToken, toOffset: number): boolean {
     token = token.nextToken;
   }
   return true;
-}
-
-function containsOffset(node: SyntaxNode, offset: number): boolean {
-  const start = node.offset;
-  const end = node.endOffset;
-  return node.textLength === 0 ? offset === start : offset >= start && offset <= end;
 }
 
 function tokenEndOffset(token: SyntaxToken): number {
