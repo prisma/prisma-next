@@ -45,6 +45,14 @@ export interface ArgType<T> {
  */
 export interface InterpretCtx {
   readonly level: AttributeLevel;
+  /**
+   * The code a leaf stamps onto the diagnostics it emits. `interpretAttribute`
+   * populates it from the active spec's `diagnosticCode` before calling any
+   * leaf, so a combinator emits with the attribute's code rather than a
+   * hard-coded generic. When a leaf is exercised directly (outside the engine),
+   * the caller sets it.
+   */
+  readonly diagnosticCode: PslDiagnosticCode;
   /** Identifier of the source the attribute was parsed from; stamped onto diagnostics. */
   readonly sourceId: string;
   /** The parsed source, used to resolve node offsets into diagnostic spans. */

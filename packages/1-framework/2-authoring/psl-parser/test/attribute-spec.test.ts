@@ -10,7 +10,10 @@ import { FieldAttributeAst } from '../src/syntax/ast/attributes';
 import { StringLiteralExprAst } from '../src/syntax/ast/expressions';
 import { createSyntaxTree } from '../src/syntax/red';
 
-function makeCtx(sourceFile: SourceFile): InterpretCtx {
+function makeCtx(
+  sourceFile: SourceFile,
+  diagnosticCode: PslDiagnostic['code'] = 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+): InterpretCtx {
   const { document, sourceFile: modelSource } = parse('model M {\n  id Int @id\n}\n');
   const { table } = buildSymbolTable({
     document,
@@ -27,6 +30,7 @@ function makeCtx(sourceFile: SourceFile): InterpretCtx {
     symbols: table,
     selfModel,
     resolveReferencedModel: () => undefined,
+    diagnosticCode,
   };
 }
 
@@ -296,6 +300,44 @@ describe('interpretAttribute leaf purity', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure).toEqual([FAILING_DIAGNOSTIC]);
+    }
+  });
+});
+
+/** A leaf that emits a diagnostic carrying whatever code the context threads to it. */
+function codeEcho(): ArgType<never> {
+  return {
+    kind: 'codeEcho',
+    label: 'codeEcho',
+    parse: (arg, ctx): Result<never, readonly PslDiagnostic[]> =>
+      notOk([
+        {
+          code: ctx.diagnosticCode,
+          message: 'leaf emitted with the threaded code',
+          sourceId: ctx.sourceId,
+          span: nodePslSpan(arg.syntax, ctx.sourceFile),
+        },
+      ]),
+  };
+}
+
+describe('interpretAttribute diagnostic-code threading', () => {
+  it('drives the leaf context code from the spec, overriding the caller baseline', () => {
+    const cursor = new Cursor('@rel(name: "x")');
+    const node = FieldAttributeAst.cast(createSyntaxTree(parseAttribute(cursor)));
+    if (!node) throw new Error('expected a field attribute');
+    const ctx = makeCtx(cursor.sourceFile, 'PSL_INVALID_ATTRIBUTE_SYNTAX');
+    const spec = fieldAttribute('rel', {
+      named: { name: codeEcho() },
+      diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
+    });
+
+    const result = interpretAttribute(node, spec, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
     }
   });
 });
