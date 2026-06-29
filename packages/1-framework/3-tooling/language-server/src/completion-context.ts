@@ -79,10 +79,7 @@ export function classifyPslCompletionContext(
   const root = input.document.syntax;
   const offset = input.sourceFile.offsetAt(input.position);
   const at = root.tokenAtOffset(offset);
-  if (
-    currentToken(at, offset)?.kind === 'Comment' ||
-    touchingToken(at, offset)?.kind === 'Comment'
-  ) {
+  if (at.rightBiased()?.kind === 'Comment' || at.leftBiased()?.kind === 'Comment') {
     return unsupported(offset);
   }
 
@@ -540,18 +537,6 @@ function closestAst<T>(
   return undefined;
 }
 
-/** The token the cursor sits strictly inside, if any. */
-function currentToken(at: TokenAtOffset, offset: number): SyntaxToken | undefined {
-  const right = at.rightBiased();
-  return right !== undefined && offset < tokenEndOffset(right) ? right : undefined;
-}
-
-/** The token whose right edge the cursor touches, if any. */
-function touchingToken(at: TokenAtOffset, offset: number): SyntaxToken | undefined {
-  const left = at.leftBiased();
-  return left !== undefined && tokenEndOffset(left) === offset ? left : undefined;
-}
-
 /** The nearest non-trivia token ending at or before the cursor. */
 function previousSignificantToken(at: TokenAtOffset, offset: number): SyntaxToken | undefined {
   const left = at.leftBiased();
@@ -563,13 +548,13 @@ function previousSignificantToken(at: TokenAtOffset, offset: number): SyntaxToke
 
 /** The identifier token the cursor is editing, if any. */
 function cursorIdentifier(at: TokenAtOffset, offset: number): SyntaxToken | undefined {
-  const current = currentToken(at, offset);
-  if (current?.kind === 'Ident') {
-    return current;
+  const right = at.rightBiased();
+  if (right?.kind === 'Ident' && offset < tokenEndOffset(right)) {
+    return right;
   }
-  const touching = touchingToken(at, offset);
-  if (touching?.kind === 'Ident') {
-    return touching;
+  const left = at.leftBiased();
+  if (left?.kind === 'Ident' && tokenEndOffset(left) === offset) {
+    return left;
   }
   return undefined;
 }
