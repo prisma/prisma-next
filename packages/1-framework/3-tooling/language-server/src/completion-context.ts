@@ -73,27 +73,23 @@ export type PslCompletionContext =
   | ModelFieldTypeCompletionContext
   | UnsupportedPslCompletionContext;
 
-interface TokenContext {
-  readonly current: SyntaxToken | undefined;
-  readonly previousSignificant: SyntaxToken | undefined;
-  readonly touching: SyntaxToken | undefined;
-}
-
 export function classifyPslCompletionContext(
   input: ClassifyPslCompletionContextInput,
 ): PslCompletionContext {
   const root = input.document.syntax;
   const offset = input.sourceFile.offsetAt(input.position);
   const at = root.tokenAtOffset(offset);
-  const tokenContext = tokenContextAt(at, offset);
-  if (tokenContext.current?.kind === 'Comment' || tokenContext.touching?.kind === 'Comment') {
+  if (
+    currentToken(at, offset)?.kind === 'Comment' ||
+    touchingToken(at, offset)?.kind === 'Comment'
+  ) {
     return unsupported(offset);
   }
 
   // Anchor on the token left of the cursor and navigate outward via
   // `token.parent` rather than scanning the whole tree.
   const anchorNode = at.leftBiased()?.parent;
-  const previousSignificantNode = tokenContext.previousSignificant?.parent;
+  const previousSignificantNode = previousSignificantToken(at, offset)?.parent;
   const contextNode = nodeForContext(anchorNode, previousSignificantNode);
   if (hasUnsupportedAncestor(contextNode)) {
     return unsupported(offset);
@@ -101,13 +97,13 @@ export function classifyPslCompletionContext(
 
   // The edit replaces the identifier under the cursor, or is empty when the
   // cursor sits in trivia.
-  const replacementStartOffset = sourceRangeStart(tokenContext, offset);
+  const replacementStartOffset = sourceRangeStart(at, offset);
 
   const declarationKeywordContext = classifyDeclarationKeyword({
     node: contextNode,
     offset,
     source: input.sourceFile.text,
-    tokenContext,
+    at,
     replacementStartOffset,
   });
   if (declarationKeywordContext !== undefined) {
@@ -118,7 +114,7 @@ export function classifyPslCompletionContext(
     node: contextNode,
     offset,
     source: input.sourceFile.text,
-    tokenContext,
+    at,
     replacementStartOffset,
   });
   if (genericBlockContext !== undefined) {
@@ -218,7 +214,7 @@ function classifyDeclarationKeyword(input: {
   readonly node: SyntaxNode | undefined;
   readonly offset: number;
   readonly source: string;
-  readonly tokenContext: TokenContext;
+  readonly at: TokenAtOffset;
   readonly replacementStartOffset: number;
 }): DeclarationKeywordCompletionContext | undefined {
   if (isInsideNonDeclarationKeywordBody(input.node, input.offset)) {
@@ -228,7 +224,7 @@ function classifyDeclarationKeyword(input: {
   const namespace = closestAst(input.node, NamespaceDeclarationAst.cast);
   const scope = namespaceBodyContainsOffset(namespace, input.offset) ? 'namespace' : 'document';
 
-  const prefixToken = cursorIdentifier(input.tokenContext, input.offset);
+  const prefixToken = cursorIdentifier(input.at, input.offset);
   if (!declarationKeywordAllowed(prefixToken, namespace, input)) {
     return undefined;
   }
@@ -250,12 +246,12 @@ function classifyDeclarationKeyword(input: {
 function declarationKeywordAllowed(
   prefixToken: SyntaxToken | undefined,
   namespace: NamespaceDeclarationAst | undefined,
-  input: { readonly offset: number; readonly tokenContext: TokenContext },
+  input: { readonly offset: number; readonly at: TokenAtOffset },
 ): boolean {
   const previous =
     prefixToken !== undefined
       ? previousNonTriviaToken(prefixToken)
-      : input.tokenContext.previousSignificant;
+      : previousSignificantToken(input.at, input.offset);
   if (previous === undefined) {
     return true;
   }
@@ -321,7 +317,7 @@ function classifyGenericBlockParameter(input: {
   readonly node: SyntaxNode | undefined;
   readonly offset: number;
   readonly source: string;
-  readonly tokenContext: TokenContext;
+  readonly at: TokenAtOffset;
   readonly replacementStartOffset: number;
 }): PslCompletionContext | undefined {
   const block = closestAst(input.node, GenericBlockDeclarationAst.cast);
@@ -344,7 +340,7 @@ function classifyGenericBlockParameter(input: {
     return unsupported(input.offset);
   }
 
-  if (input.tokenContext.previousSignificant?.kind === 'Equals') {
+  if (previousSignificantToken(input.at, input.offset)?.kind === 'Equals') {
     return unsupported(input.offset);
   }
 
@@ -544,36 +540,42 @@ function closestAst<T>(
   return undefined;
 }
 
-function tokenContextAt(at: TokenAtOffset, offset: number): TokenContext {
-  const left = at.leftBiased();
+/** The token the cursor sits strictly inside, if any. */
+function currentToken(at: TokenAtOffset, offset: number): SyntaxToken | undefined {
   const right = at.rightBiased();
-  const current = right !== undefined && offset < tokenEndOffset(right) ? right : undefined;
-  const touching = left !== undefined && tokenEndOffset(left) === offset ? left : undefined;
-  let previousSignificant: SyntaxToken | undefined;
-  if (left !== undefined) {
-    previousSignificant =
-      tokenEndOffset(left) <= offset && !isTrivia(left) ? left : previousNonTriviaToken(left);
+  return right !== undefined && offset < tokenEndOffset(right) ? right : undefined;
+}
+
+/** The token whose right edge the cursor touches, if any. */
+function touchingToken(at: TokenAtOffset, offset: number): SyntaxToken | undefined {
+  const left = at.leftBiased();
+  return left !== undefined && tokenEndOffset(left) === offset ? left : undefined;
+}
+
+/** The nearest non-trivia token ending at or before the cursor. */
+function previousSignificantToken(at: TokenAtOffset, offset: number): SyntaxToken | undefined {
+  const left = at.leftBiased();
+  if (left === undefined) {
+    return undefined;
   }
-  return { current, previousSignificant, touching };
+  return tokenEndOffset(left) <= offset && !isTrivia(left) ? left : previousNonTriviaToken(left);
 }
 
 /** The identifier token the cursor is editing, if any. */
-function cursorIdentifier(tokenContext: TokenContext, offset: number): SyntaxToken | undefined {
-  if (tokenContext.current?.kind === 'Ident') {
-    return tokenContext.current;
+function cursorIdentifier(at: TokenAtOffset, offset: number): SyntaxToken | undefined {
+  const current = currentToken(at, offset);
+  if (current?.kind === 'Ident') {
+    return current;
   }
-  if (tokenContext.touching?.kind === 'Ident') {
-    return tokenContext.touching;
-  }
-  const previous = tokenContext.previousSignificant;
-  if (previous?.kind === 'Ident' && tokenEndOffset(previous) === offset) {
-    return previous;
+  const touching = touchingToken(at, offset);
+  if (touching?.kind === 'Ident') {
+    return touching;
   }
   return undefined;
 }
 
-function sourceRangeStart(tokenContext: TokenContext, offset: number): number {
-  return cursorIdentifier(tokenContext, offset)?.offset ?? offset;
+function sourceRangeStart(at: TokenAtOffset, offset: number): number {
+  return cursorIdentifier(at, offset)?.offset ?? offset;
 }
 
 /** Whether a newline trivia token separates `from` from `toOffset`. */
