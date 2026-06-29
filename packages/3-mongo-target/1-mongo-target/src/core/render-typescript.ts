@@ -32,18 +32,26 @@ const BASE_IMPORTS: readonly ImportRequirement[] = [
  * Render a list of Mongo `OpFactoryCall`s as a `migration.ts`
  * source string. The result is shebanged, extends the user-facing
  * `Migration` (i.e. `MongoMigration`) from `@prisma-next/family-mongo`, and
- * implements the abstract `operations` and `describe` members. `meta` is
- * always rendered — `describe()` is part of the `Migration` contract, so
- * even an empty stub must satisfy it; callers pass `from: null` for a
- * baseline `migration-new` scaffold (and a real `to` hash either way).
+ * implements `operations`.
+ *
+ * The scaffold does NOT render a `describe()` method. Instead it imports the
+ * committed contract JSON (`end-contract.json`, plus `start-contract.json` for a
+ * non-baseline migration) and assigns it to the `endContractJson` /
+ * `startContractJson` fields; the `Migration` base derives `describe()`'s
+ * from/to from those JSONs' `storage.storageHash`. The class is parameterised
+ * `Migration<Start, End>` (or `Migration<never, End>` for a baseline, where
+ * `meta.from === null` — no start contract). `meta.to` is no longer embedded as
+ * a literal (the base reads it from the JSON at runtime); `meta.from` only
+ * selects the baseline vs non-baseline shape.
  *
  * The walk is polymorphic: each call node contributes its own
  * `renderTypeScript()` expression and declares its own
  * `importRequirements()`. The top-level renderer aggregates imports
  * across all nodes and emits one `import { … } from "…"` line per module.
- * The `Migration` and `MigrationCLI` imports are always emitted — they're
- * structural to the rendered scaffold (extends `Migration`, calls
- * `MigrationCLI.run`), not driven by any node.
+ * The `Migration` / `MigrationCLI` base imports and the contract-JSON imports
+ * are always emitted — they're structural to the rendered scaffold (extends
+ * `Migration`, derives `describe()` from the JSON, calls `MigrationCLI.run`),
+ * not driven by any node.
  */
 export function renderCallsToTypeScript(
   calls: ReadonlyArray<OpFactoryCall>,

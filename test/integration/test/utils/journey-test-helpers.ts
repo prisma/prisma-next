@@ -437,12 +437,26 @@ export async function runMigrationCheck(
   return runCommand(createMigrationCheckCommand(), ctx, extraArgs);
 }
 
+// The generator emits `import endContract from './end-contract.json' with { type: "json" };`
+// (double-quoted attribute value via JSON.stringify). Match either quote style
+// so the helper is robust to formatting.
 const END_CONTRACT_JSON_IMPORT_RE =
-  /import endContract from '\.\/end-contract\.json' with \{ type: 'json' \};\r?\n/;
+  /import endContract from '\.\/end-contract\.json' with \{ type: ["']json["'] \};\r?\n/;
+
+// The generator's class header carries the `<Start, End>` / `<never, End>`
+// generics (post TML-2892). Match the header up to the opening brace.
+const MIGRATION_CLASS_HEADER_RE = /export default class M extends Migration(?:<[^>]*>)? \{/;
 
 /**
- * Planner scaffolds import raw `end-contract.json` as `endContract`. Runtime SQL
- * qualification requires a hydrated Postgres schema namespace (`qualifyTable`).
+ * Planner scaffolds import raw `end-contract.json` as `endContract` and derive
+ * their from/to from it via the `Migration` base. This helper rewrites the
+ * scaffold for the journey test's runtime apply: it drops the raw-JSON import,
+ * deserializes the contract (runtime SQL qualification needs a hydrated Postgres
+ * schema namespace with `qualifyTable`), and wires a `db = sql(...)` the
+ * filled-in dataTransform closures use. The deserialized contract is bound back
+ * to `endContract`, so the scaffold's `endContractJson = endContract` field
+ * still resolves (and the base still derives `describe()` from its
+ * `storage.storageHash`).
  */
 export function injectMigrationSqlDbSetup(scaffold: string): string {
   const block = [
@@ -462,11 +476,10 @@ export function injectMigrationSqlDbSetup(scaffold: string): string {
     '  }),',
     '});',
     '',
-    'export default class M extends Migration {',
   ].join('\n');
   return scaffold
     .replace(END_CONTRACT_JSON_IMPORT_RE, '')
-    .replace('export default class M extends Migration {', block);
+    .replace(MIGRATION_CLASS_HEADER_RE, (header) => `${block}${header}`);
 }
 
 /**
