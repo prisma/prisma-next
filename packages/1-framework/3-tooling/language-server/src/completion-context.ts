@@ -1,5 +1,4 @@
 import {
-  type AstNode,
   AttributeArgListAst,
   type BracedBlock,
   CompositeTypeDeclarationAst,
@@ -292,7 +291,7 @@ function isInsideNonDeclarationKeywordBody(node: SyntaxNode | undefined, offset:
   return blockBodyContainsOffset(
     closestAst(
       node,
-      any<BracedBlock>(
+      any(
         ModelDeclarationAst.cast,
         CompositeTypeDeclarationAst.cast,
         TypesBlockAst.cast,
@@ -415,7 +414,7 @@ function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
   return (
     closestAst(
       node,
-      any<AstNode>(AttributeArgListAst.cast, FieldAttributeAst.cast, ModelAttributeAst.cast),
+      any(AttributeArgListAst.cast, FieldAttributeAst.cast, ModelAttributeAst.cast),
     ) !== undefined
   );
 }
@@ -440,9 +439,14 @@ function closestAst<T>(
   return undefined;
 }
 
-function any<T>(
-  ...casts: ReadonlyArray<(node: SyntaxNode) => T | undefined>
-): (node: SyntaxNode) => T | undefined {
+type CastTarget<C> = C extends (node: SyntaxNode) => infer R ? Exclude<R, undefined> : never;
+
+function any<Casts extends readonly ((node: SyntaxNode) => unknown)[]>(
+  ...casts: Casts
+): (node: SyntaxNode) => CastTarget<Casts[number]> | undefined;
+function any(
+  ...casts: ReadonlyArray<(node: SyntaxNode) => unknown>
+): (node: SyntaxNode) => unknown {
   return (node) => {
     for (const cast of casts) {
       const result = cast(node);
