@@ -182,6 +182,49 @@ describe('projectSchemaToSpace', () => {
       expect(projected.meta).toBe(schema.meta);
     });
 
+    it('prunes other-member tables within each namespace of a namespaced schema tree', () => {
+      // A Postgres `PostgresDatabaseSchemaNode` root groups tables under
+      // per-schema namespace nodes (`namespaces[…].tables`) rather than a flat
+      // `tables` record. The projector prunes inside each namespace.
+      const schema = {
+        nodeTarget: 'postgres',
+        nodeKind: 'postgres-database',
+        namespaces: {
+          public: {
+            schemaName: 'public',
+            tables: {
+              app_user: { name: 'app_user' },
+              ext_owned: { name: 'ext_owned' },
+            },
+          },
+          auth: {
+            schemaName: 'auth',
+            tables: { ext_session: { name: 'ext_session' } },
+          },
+        },
+      };
+      const member = memberWithTables('app', { app_user: {} });
+      const others = [memberWithTables('ext', { ext_owned: {}, ext_session: {} })];
+
+      const projected = projectSchemaToSpace(schema, member, others) as {
+        readonly namespaces: Record<string, { readonly tables: Record<string, unknown> }>;
+      };
+
+      expect(Object.keys(projected.namespaces['public']!.tables)).toEqual(['app_user']);
+      expect(Object.keys(projected.namespaces['auth']!.tables)).toEqual([]);
+    });
+
+    it('returns a namespaced schema tree unchanged when no other-member tables are present', () => {
+      const schema = {
+        nodeKind: 'postgres-database',
+        namespaces: { public: { schemaName: 'public', tables: { app_user: {} } } },
+      };
+      const member = memberWithTables('app', { app_user: {} });
+      const others = [memberWithTables('ext', { ext_owned: {} })];
+
+      expect(projectSchemaToSpace(schema, member, others)).toBe(schema);
+    });
+
     it('removes other-member collections from a Mongo-shaped introspected schema (array form)', () => {
       // Mongo's introspected `MongoSchemaIR` exposes
       // `collections: ReadonlyArray<{name, ...}>` rather than a record.

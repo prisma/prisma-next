@@ -11,13 +11,14 @@ import {
   plannerFailure,
 } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
-import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
+import { namespaceSchemaNodes, verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   MigrationPlanner,
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
+import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { parseSqliteDefault } from '../default-normalizer';
 import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
@@ -117,7 +118,7 @@ export class SqliteMigrationPlanner
       fromContract: options.fromContract,
       codecHooks,
       storageTypes,
-      schema: options.schema,
+      schema: sqliteFlatSchema(options.schema),
       policy: options.policy,
       frameworkComponents: options.frameworkComponents,
       strategies: sqlitePlannerStrategies,
@@ -183,7 +184,7 @@ export class SqliteMigrationPlanner
     const strict = allowed.includes('widening') || allowed.includes('destructive');
     const verifyResult = verifySqlSchema({
       contract: options.contract,
-      schema: options.schema,
+      schema: sqliteFlatSchema(options.schema),
       strict,
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
@@ -192,4 +193,13 @@ export class SqliteMigrationPlanner
     });
     return verifyResult.schema.issues;
   }
+}
+
+/**
+ * SQLite has a single, flat schema — its introspected node IS the per-schema
+ * `SqlSchemaIR`. `namespaceSchemaNodes` returns that sole node; SQLite never
+ * carries the multi-namespace tree the Postgres target builds.
+ */
+function sqliteFlatSchema(schema: SqlSchemaIRNode): SqlSchemaIR {
+  return namespaceSchemaNodes(schema)[0] ?? { tables: {} };
 }

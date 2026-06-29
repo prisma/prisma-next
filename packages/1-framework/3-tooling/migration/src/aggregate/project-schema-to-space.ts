@@ -65,7 +65,23 @@ export function projectSchemaToSpace(
   const ownedByOthers = collectOwnedNames(member, otherMembers);
   if (ownedByOthers.size === 0) return schema;
 
-  const schemaObj = schema as { readonly tables?: unknown; readonly collections?: unknown };
+  const schemaObj = schema as {
+    readonly tables?: unknown;
+    readonly collections?: unknown;
+    readonly namespaces?: unknown;
+  };
+
+  // A namespaced schema tree (the Postgres `PostgresDatabaseSchemaNode` root)
+  // groups tables under per-schema namespace nodes rather than a flat `tables`
+  // record. Prune each namespace's tables in place, so per-space isolation
+  // holds without flattening namespaces into one (collision-prone) record.
+  if (
+    typeof schemaObj.namespaces === 'object' &&
+    schemaObj.namespaces !== null &&
+    !Array.isArray(schemaObj.namespaces)
+  ) {
+    return pruneNamespaceTables(schemaObj, ownedByOthers);
+  }
 
   if (
     typeof schemaObj.tables === 'object' &&
@@ -102,6 +118,43 @@ function collectOwnedNames(
     }
   }
   return owned;
+}
+
+/**
+ * Prunes other-space tables from every namespace node of a schema tree root,
+ * returning a new root with pruned namespaces. The namespace nodes are spread
+ * into plain objects (losing their class prototype), mirroring the flat
+ * `pruneRecord` path — downstream consumers duck-type the result, and the
+ * `…SchemaNode.ensure()` guards reconstruct a node from the spread shape when
+ * a structure-aware consumer needs one.
+ */
+function pruneNamespaceTables(
+  schemaObj: { readonly namespaces?: unknown },
+  ownedByOthers: ReadonlySet<string>,
+): unknown {
+  const namespaces = schemaObj.namespaces as Record<string, unknown>;
+  let removed = false;
+  const prunedNamespaces: Record<string, unknown> = {};
+  for (const [namespaceId, namespaceNode] of Object.entries(namespaces)) {
+    if (
+      typeof namespaceNode === 'object' &&
+      namespaceNode !== null &&
+      typeof (namespaceNode as { readonly tables?: unknown }).tables === 'object' &&
+      (namespaceNode as { readonly tables?: unknown }).tables !== null
+    ) {
+      const prunedNode = pruneRecord(
+        namespaceNode as { readonly tables?: unknown },
+        'tables',
+        ownedByOthers,
+      );
+      if (prunedNode !== namespaceNode) removed = true;
+      prunedNamespaces[namespaceId] = prunedNode;
+    } else {
+      prunedNamespaces[namespaceId] = namespaceNode;
+    }
+  }
+  if (!removed) return schemaObj;
+  return { ...schemaObj, namespaces: prunedNamespaces };
 }
 
 function pruneRecord(

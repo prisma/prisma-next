@@ -12,7 +12,7 @@ import type {
   SqlMigrationRunnerSuccessValue,
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
-import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
+import { namespaceSchemaNodes, verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { MigrationRunnerResult } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -92,10 +92,14 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     }
 
     if (space === APP_SPACE_ID) {
-      const schemaIR = await this.family.introspect({
+      const schemaNode = await this.family.introspect({
         driver,
         contract: options.destinationContract,
       });
+      // SQLite has a single flat schema — its introspected node IS the
+      // per-schema `SqlSchemaIR` that `namespaceSchemaNodes` returns as the
+      // sole node.
+      const schemaIR = namespaceSchemaNodes(schemaNode)[0] ?? { tables: {} };
 
       const schemaVerifyResult = verifySqlSchema({
         contract: options.destinationContract,

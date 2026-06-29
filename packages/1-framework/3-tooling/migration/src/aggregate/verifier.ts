@@ -205,8 +205,8 @@ function detectOrphanElements(
   members: ReadonlyArray<ContractSpaceMember>,
 ): readonly OrphanElement[] {
   if (typeof schemaIntrospection !== 'object' || schemaIntrospection === null) return [];
-  const liveTables = (schemaIntrospection as { readonly tables?: unknown }).tables;
-  if (typeof liveTables !== 'object' || liveTables === null) return [];
+  const liveTableNames = collectLiveTableNames(schemaIntrospection);
+  if (liveTableNames.length === 0) return [];
 
   const claimedTables = new Set<string>();
   for (const member of members) {
@@ -217,11 +217,42 @@ function detectOrphanElements(
   }
 
   const orphans: OrphanElement[] = [];
-  for (const tableName of Object.keys(liveTables as Record<string, unknown>)) {
+  for (const tableName of liveTableNames) {
     if (!claimedTables.has(tableName)) {
       orphans.push({ kind: 'table', name: tableName });
     }
   }
   orphans.sort((a, b) => a.name.localeCompare(b.name));
   return orphans;
+}
+
+/**
+ * Bare names of every live table in the introspected schema. Duck-typed:
+ * a flat schema (SQLite) exposes a `tables` record; a namespaced schema tree
+ * (the Postgres `PostgresDatabaseSchemaNode` root) groups tables under
+ * per-schema namespace nodes, so the names are gathered across namespaces.
+ * Any other shape yields none (the {@link projectSchemaToSpace} fall-through).
+ */
+function collectLiveTableNames(schemaIntrospection: object): readonly string[] {
+  const schema = schemaIntrospection as {
+    readonly tables?: unknown;
+    readonly namespaces?: unknown;
+  };
+  if (isRecord(schema.namespaces)) {
+    const names: string[] = [];
+    for (const namespaceNode of Object.values(schema.namespaces)) {
+      if (isRecord(namespaceNode) && isRecord(namespaceNode['tables'])) {
+        names.push(...Object.keys(namespaceNode['tables']));
+      }
+    }
+    return names;
+  }
+  if (isRecord(schema.tables)) {
+    return Object.keys(schema.tables);
+  }
+  return [];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
