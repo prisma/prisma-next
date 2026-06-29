@@ -101,9 +101,9 @@ import {
   applyBackrelationCandidates,
   type FkRelationMetadata,
   indexFkRelations,
+  interpretRelationAttribute,
   type ModelBackrelationCandidate,
   normalizeReferentialAction,
-  parseRelationAttribute,
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
 
@@ -446,6 +446,8 @@ interface BuildModelNodeInput {
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly sourceId: string;
+  readonly sourceFile: SourceFile;
+  readonly symbolTable: SymbolTable;
   readonly diagnostics: ContractSourceDiagnostic[];
   /** Resolved namespace id keyed by model name — used to stamp the target namespace on FKs. */
   readonly modelNamespaceIds: ReadonlyMap<string, string>;
@@ -525,10 +527,11 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     const relationAttribute = getAttribute(field.attributes, 'relation');
     let relationName: string | undefined;
     if (relationAttribute) {
-      const parsedRelation = parseRelationAttribute({
-        attribute: relationAttribute,
-        modelName: model.name,
-        fieldName: field.name,
+      const parsedRelation = interpretRelationAttribute({
+        selfModel: model,
+        field,
+        symbols: input.symbolTable,
+        sourceFile: input.sourceFile,
         sourceId,
         diagnostics,
       });
@@ -854,10 +857,11 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         continue;
       }
 
-      const parsedRelation = parseRelationAttribute({
-        attribute: relationAttribute.relation,
-        modelName: model.name,
-        fieldName: relationAttribute.field.name,
+      const parsedRelation = interpretRelationAttribute({
+        selfModel: model,
+        field: relationAttribute.field,
+        symbols: input.symbolTable,
+        sourceFile: input.sourceFile,
         sourceId,
         diagnostics,
       });
@@ -1025,10 +1029,11 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       continue;
     }
 
-    const parsedRelation = parseRelationAttribute({
-      attribute: relationAttribute.relation,
-      modelName: model.name,
-      fieldName: relationAttribute.field.name,
+    const parsedRelation = interpretRelationAttribute({
+      selfModel: model,
+      field: relationAttribute.field,
+      symbols: input.symbolTable,
+      sourceFile: input.sourceFile,
       sourceId,
       diagnostics,
     });
@@ -1927,6 +1932,8 @@ export function interpretPslDocumentToSqlContract(
       generatorDescriptorById,
       scalarTypeDescriptors: input.scalarTypeDescriptors,
       sourceId,
+      sourceFile,
+      symbolTable: input.symbolTable,
       diagnostics,
       modelNamespaceIds,
       ...(enumHandlesByName.size > 0 ? { enumHandles: enumHandlesByName } : {}),
