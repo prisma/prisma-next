@@ -5,6 +5,11 @@ export interface AstNode {
   readonly syntax: SyntaxNode;
 }
 
+export interface BracedBlock extends AstNode {
+  lbrace(): SyntaxToken | undefined;
+  rbrace(): SyntaxToken | undefined;
+}
+
 export function findChildToken(node: SyntaxNode, kind: TokenKind): SyntaxToken | undefined {
   for (const child of node.children()) {
     if (!(child instanceof SyntaxNode) && child.kind === kind) {
