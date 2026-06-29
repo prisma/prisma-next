@@ -8,8 +8,8 @@ import {
   type SqlTableIRInput,
 } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
-import type { PostgresRlsPolicy } from './postgres-rls-policy';
-import type { PostgresRole } from './postgres-role';
+import type { PostgresRlsPolicy } from '../postgres-rls-policy';
+import type { PostgresRole } from '../postgres-role';
 import { PostgresTableIR } from './postgres-table-ir';
 
 export interface PostgresSchemaIRInput {

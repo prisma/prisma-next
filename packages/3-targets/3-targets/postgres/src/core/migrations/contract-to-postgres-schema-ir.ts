@@ -1,9 +1,9 @@
 import type { ContractToSchemaIROptions } from '@prisma-next/family-sql/control';
 import { contractToSchemaIR } from '@prisma-next/family-sql/control';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { PostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresContract } from '../postgres-schema';
 import { isPostgresSchema } from '../postgres-schema';
-import { PostgresRlsPolicy } from '../schema-ir/postgres-rls-policy';
 import { PostgresSchemaIR } from '../schema-ir/postgres-schema-ir';
 import { resolveDdlSchemaForNamespaceStorage } from '../schema-ir/postgres-schema-ir-annotations';
 import { PostgresTableIR } from '../schema-ir/postgres-table-ir';

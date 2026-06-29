@@ -1,4 +1,3 @@
-import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
 
@@ -12,7 +11,11 @@ export interface PostgresRoleInput {
 }
 
 /**
- * Postgres IR class for a database role (`CREATE ROLE …`).
+ * Postgres contract-IR class for a database role (`CREATE ROLE …`).
+ *
+ * This is an authored, serialized Contract-IR entity — it is registered as an entity
+ * kind, extends `SqlNode`, and is stored in `contract.json`. It is NOT a DiffableNode;
+ * the schema-diff tree uses `PostgresRoleSchemaNode` for that role.
  *
  * Roles are cluster-scoped, so their namespace coordinate is always
  * `UNBOUND_NAMESPACE_ID`. Target-only concept — no SQL-family abstract.
@@ -20,7 +23,7 @@ export interface PostgresRoleInput {
  * The `kind: 'role'` discriminant is enumerable so it survives JSON.
  * Matches the entries key (one-string rule).
  */
-export class PostgresRole extends SqlNode implements DiffableNode {
+export class PostgresRole extends SqlNode {
   override readonly kind = 'role' as const;
   readonly name: string;
   readonly namespaceId: string;
@@ -30,23 +33,5 @@ export class PostgresRole extends SqlNode implements DiffableNode {
     this.name = input.name;
     this.namespaceId = input.namespaceId;
     freezeNode(this);
-  }
-
-  /** Roles are cluster-unique; the name alone is sufficient as the id. */
-  get id(): string {
-    return this.name;
-  }
-
-  children(): readonly DiffableNode[] {
-    return [];
-  }
-
-  isEqualTo(other: DiffableNode): boolean {
-    if (!(other instanceof PostgresRole)) {
-      throw new Error(
-        `PostgresRole.isEqualTo: expected a PostgresRole, got ${other.constructor?.name ?? typeof other}`,
-      );
-    }
-    return this.name === other.name;
   }
 }

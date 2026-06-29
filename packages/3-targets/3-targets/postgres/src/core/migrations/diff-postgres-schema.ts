@@ -1,6 +1,6 @@
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { diffSchemas } from '@prisma-next/framework-components/control';
-import { isPostgresRlsPolicy, type PostgresRlsPolicy } from '../schema-ir/postgres-rls-policy';
+import { isPostgresRlsPolicy, type PostgresRlsPolicy } from '../postgres-rls-policy';
 import { ensurePostgresSchemaIR, type PostgresSchemaIR } from '../schema-ir/postgres-schema-ir';
 
 // Renders a display-only reference string for the diff message. If policy

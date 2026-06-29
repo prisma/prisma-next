@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PostgresRlsPolicy } from '../src/core/schema-ir/postgres-rls-policy';
+import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
 import { isPostgresTableIR, PostgresTableIR } from '../src/core/schema-ir/postgres-table-ir';
 
 const basePolicy = new PostgresRlsPolicy({

@@ -1,4 +1,12 @@
 export {
+  assertPostgresRlsPolicy,
+  isPostgresRlsPolicy,
+  PostgresRlsPolicy,
+  type PostgresRlsPolicyInput,
+  type RlsPolicyOperation,
+} from '../core/postgres-rls-policy';
+export { PostgresRole, type PostgresRoleInput } from '../core/postgres-role';
+export {
   isPostgresSchema,
   type PostgresContract,
   PostgresSchema,
@@ -6,11 +14,13 @@ export {
   postgresCreateNamespace,
 } from '../core/postgres-schema';
 export {
-  PostgresRlsPolicy,
-  type PostgresRlsPolicyInput,
-  type RlsPolicyOperation,
-} from '../core/schema-ir/postgres-rls-policy';
-export { PostgresRole, type PostgresRoleInput } from '../core/schema-ir/postgres-role';
+  PostgresPolicySchemaNode,
+  type PostgresPolicySchemaNodeInput,
+} from '../core/schema-ir/postgres-policy-schema-node';
+export {
+  PostgresRoleSchemaNode,
+  type PostgresRoleSchemaNodeInput,
+} from '../core/schema-ir/postgres-role-schema-node';
 export {
   assertPostgresSchemaIR,
   ensurePostgresSchemaIR,

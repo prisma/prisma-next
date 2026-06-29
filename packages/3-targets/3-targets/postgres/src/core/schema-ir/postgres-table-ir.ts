@@ -11,7 +11,7 @@ import {
   type SqlTableIRInput,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
-import type { PostgresRlsPolicy } from './postgres-rls-policy';
+import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 
 export interface PostgresTableIRInput extends SqlTableIRInput {
   readonly rlsPolicies?: readonly PostgresRlsPolicy[];

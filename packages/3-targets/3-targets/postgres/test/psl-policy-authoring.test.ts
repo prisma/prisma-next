@@ -24,9 +24,9 @@ import {
   postgresAuthoringPslBlockDescriptors,
 } from '../src/core/authoring';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
+import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
 import { PostgresSchema, postgresCreateNamespace } from '../src/core/postgres-schema';
 import { computeContentHash } from '../src/core/rls/canonicalize';
-import { PostgresRlsPolicy } from '../src/core/schema-ir/postgres-rls-policy';
 
 const assembled = assembleAuthoringContributions([
   {

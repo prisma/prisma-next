@@ -8,11 +8,8 @@ import {
   diffPostgresSchema,
   filterIssuesByOwnership,
 } from '../../src/core/migrations/diff-postgres-schema';
+import { isPostgresRlsPolicy, PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
-import {
-  isPostgresRlsPolicy,
-  PostgresRlsPolicy,
-} from '../../src/core/schema-ir/postgres-rls-policy';
 import { PostgresSchemaIR } from '../../src/core/schema-ir/postgres-schema-ir';
 import { PostgresTableIR } from '../../src/core/schema-ir/postgres-table-ir';
 
