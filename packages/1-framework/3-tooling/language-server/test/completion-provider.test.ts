@@ -351,6 +351,18 @@ describe('providePslCompletionItems', () => {
     });
   });
 
+  it('returns no completions for a contract-space-qualified position', () => {
+    const { items } = complete(['model Post {', '  external supabase:|', '}'].join('\n'));
+
+    expect(items).toEqual([]);
+  });
+
+  it('returns no completions for a generic block value position', () => {
+    const { items } = complete(['policy Rule {', '  on = |', '}'].join('\n'));
+
+    expect(items).toEqual([]);
+  });
+
   it('returns descriptor-backed generic block parameter completions', () => {
     const { items, sourceFile, cursorOffset } = complete(['policy Rule {', '  |', '}'].join('\n'));
 

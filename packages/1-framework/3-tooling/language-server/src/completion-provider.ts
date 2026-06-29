@@ -11,8 +11,9 @@ import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import { type CompletionItem, CompletionItemKind, InsertTextFormat } from 'vscode-languageserver';
 import type {
   DeclarationKeywordCompletionContext,
-  GenericBlockParameterCompletionContext,
-  ModelFieldTypeCompletionContext,
+  GenericBlockKeyCompletionContext,
+  ModelTypeCompletionContext,
+  NamespaceMemberCompletionContext,
   PslCompletionContext,
 } from './completion-context';
 
@@ -100,25 +101,32 @@ const namespaceNativeDeclarationKeywords: readonly DeclarationKeywordCompletionC
 export function providePslCompletionItems(
   input: ProvidePslCompletionItemsInput,
 ): readonly CompletionItem[] {
-  if (input.context.kind === 'unsupported') {
-    return [];
+  const { context } = input;
+  switch (context.kind) {
+    case 'unsupported':
+      return [];
+    // Foreign contract-space members require the multi-input symbol table; no
+    // contract-space registry exists today, so this position yields nothing yet.
+    case 'spaceMember':
+      return [];
+    // Parameter-value completion (option allowed-values / ref scopes) is future
+    // work.
+    case 'genericBlockValue':
+      return [];
+    case 'declarationKeyword':
+      return provideDeclarationKeywordCompletionItems(
+        context,
+        input.sourceFile,
+        input.candidates,
+        input.clientSupportsSnippets,
+      );
+    case 'genericBlockKey':
+      return provideGenericBlockKeyCompletionItems(context, input.sourceFile, input.candidates);
+    case 'modelType':
+      return provideModelTypeCompletionItems(context, input.sourceFile, input.candidates);
+    case 'namespaceMember':
+      return provideNamespaceMemberCompletionItems(context, input.sourceFile, input.candidates);
   }
-  if (input.context.kind === 'declarationKeyword') {
-    return provideDeclarationKeywordCompletionItems(
-      input.context,
-      input.sourceFile,
-      input.candidates,
-      input.clientSupportsSnippets,
-    );
-  }
-  if (input.context.kind === 'genericBlockParameter') {
-    return provideGenericBlockParameterCompletionItems(
-      input.context,
-      input.sourceFile,
-      input.candidates,
-    );
-  }
-  return provideModelFieldTypeCompletionItems(input.context, input.sourceFile, input.candidates);
 }
 
 function provideDeclarationKeywordCompletionItems(
@@ -211,8 +219,8 @@ function declarationKeywordSortText(candidate: DeclarationKeywordCompletionCandi
   return `${declarationKeywordCategoryOrder[candidate.category]}:${candidate.label}`;
 }
 
-function provideGenericBlockParameterCompletionItems(
-  context: GenericBlockParameterCompletionContext,
+function provideGenericBlockKeyCompletionItems(
+  context: GenericBlockKeyCompletionContext,
   sourceFile: SourceFile,
   source: PslCompletionCandidateSource,
 ): readonly CompletionItem[] {
@@ -242,17 +250,41 @@ function provideGenericBlockParameterCompletionItems(
     }));
 }
 
-function provideModelFieldTypeCompletionItems(
-  context: ModelFieldTypeCompletionContext,
+function provideModelTypeCompletionItems(
+  context: ModelTypeCompletionContext,
   sourceFile: SourceFile,
   source: PslCompletionCandidateSource,
+): readonly CompletionItem[] {
+  return modelTypeCompletionItems(context, sourceFile, [
+    ...configuredScalarCandidates(source.scalarTypes),
+    ...topLevelSymbolCandidates(source.symbolTable),
+    ...allNamespaceCandidates(source.symbolTable),
+  ]);
+}
+
+function provideNamespaceMemberCompletionItems(
+  context: NamespaceMemberCompletionContext,
+  sourceFile: SourceFile,
+  source: PslCompletionCandidateSource,
+): readonly CompletionItem[] {
+  return modelTypeCompletionItems(
+    context,
+    sourceFile,
+    namespaceCandidates(source.symbolTable?.topLevel.namespaces[context.namespace]),
+  );
+}
+
+function modelTypeCompletionItems(
+  context: ModelTypeCompletionContext | NamespaceMemberCompletionContext,
+  sourceFile: SourceFile,
+  candidates: readonly ModelTypeCompletionCandidate[],
 ): readonly CompletionItem[] {
   const replacementRange = {
     start: sourceFile.positionAt(context.replacementStartOffset),
     end: sourceFile.positionAt(context.offset),
   };
 
-  return candidatesForContext(context, source).map((candidate) => ({
+  return candidates.map((candidate) => ({
     label: candidate.label,
     kind: candidate.kind,
     detail: candidate.detail,
@@ -263,22 +295,6 @@ function provideModelFieldTypeCompletionItems(
       newText: candidate.insertText,
     },
   }));
-}
-
-function candidatesForContext(
-  context: ModelFieldTypeCompletionContext,
-  source: PslCompletionCandidateSource,
-): readonly ModelTypeCompletionCandidate[] {
-  const namespace = context.namespace;
-  if (namespace !== undefined) {
-    return namespaceCandidates(source.symbolTable?.topLevel.namespaces[namespace]);
-  }
-
-  return [
-    ...configuredScalarCandidates(source.scalarTypes),
-    ...topLevelSymbolCandidates(source.symbolTable),
-    ...allNamespaceCandidates(source.symbolTable),
-  ];
 }
 
 function configuredScalarCandidates(

@@ -68,9 +68,8 @@ describe('classifyPslCompletionContext', () => {
     const context = classify(['model Post {', '  author |', '}'].join('\n'));
 
     expect(context).toMatchObject({
-      kind: 'modelFieldType',
+      kind: 'modelType',
       fieldName: 'author',
-      namespace: undefined,
     });
   });
 
@@ -86,21 +85,20 @@ describe('classifyPslCompletionContext', () => {
     const context = classify(['model Post {', '  reviewer U|', '}'].join('\n'));
 
     expect(context).toMatchObject({
-      kind: 'modelFieldType',
+      kind: 'modelType',
       fieldName: 'reviewer',
-      namespace: undefined,
     });
   });
 
   it('classifies namespace-qualified model field type prefixes', () => {
     expect(classify(['model Post {', '  owner auth.|', '}'].join('\n'))).toMatchObject({
-      kind: 'modelFieldType',
+      kind: 'namespaceMember',
       fieldName: 'owner',
       namespace: 'auth',
     });
 
     expect(classify(['model Post {', '  editor auth.U|', '}'].join('\n'))).toMatchObject({
-      kind: 'modelFieldType',
+      kind: 'namespaceMember',
       fieldName: 'editor',
       namespace: 'auth',
     });
@@ -108,37 +106,37 @@ describe('classifyPslCompletionContext', () => {
 
   it('classifies contract-space-qualified model field type prefixes', () => {
     expect(classify(['model Post {', '  external supabase:|', '}'].join('\n'))).toMatchObject({
-      kind: 'modelFieldType',
+      kind: 'spaceMember',
       fieldName: 'external',
-      namespace: undefined,
+      space: 'supabase',
     });
 
     expect(
       classify(['model Post {', '  externalUser supabase:auth.|', '}'].join('\n')),
     ).toMatchObject({
-      kind: 'modelFieldType',
+      kind: 'namespaceMember',
       fieldName: 'externalUser',
       namespace: 'auth',
     });
 
     expect(classify(['model Post {', '  owner supabase:auth.U|', '}'].join('\n'))).toMatchObject({
-      kind: 'modelFieldType',
+      kind: 'namespaceMember',
       fieldName: 'owner',
       namespace: 'auth',
     });
   });
 
-  it('classifies a contract-space-qualified prefix without a namespace segment', () => {
+  it('classifies a contract-space-qualified prefix without a namespace segment as a space member', () => {
     expect(classify(['model Post {', '  external supabase:U|', '}'].join('\n'))).toMatchObject({
-      kind: 'modelFieldType',
+      kind: 'spaceMember',
       fieldName: 'external',
-      namespace: undefined,
+      space: 'supabase',
     });
   });
 
   it('resolves the namespace when the cursor sits mid-name', () => {
     expect(classify(['model Post {', '  owner auth.Use|r', '}'].join('\n'))).toMatchObject({
-      kind: 'modelFieldType',
+      kind: 'namespaceMember',
       fieldName: 'owner',
       namespace: 'auth',
     });
@@ -159,38 +157,41 @@ describe('classifyPslCompletionContext', () => {
     expectUnsupported(['model Post {', '  authorId Int @relation(fields: [|])', '}'].join('\n'));
   });
 
-  it('classifies blank generic block parameter positions', () => {
+  it('classifies blank generic block key positions', () => {
     expect(classify(['policy UserAccess {', '  |', '}'].join('\n'))).toMatchObject({
-      kind: 'genericBlockParameter',
+      kind: 'genericBlockKey',
       blockKeyword: 'policy',
       existingParameterNames: [],
     });
   });
 
-  it('classifies generic block parameter prefixes and records sibling keys', () => {
+  it('classifies generic block key prefixes and records sibling keys', () => {
     expect(classify(['policy UserAccess {', '  on = User', '  wh|', '}'].join('\n'))).toMatchObject(
       {
-        kind: 'genericBlockParameter',
+        kind: 'genericBlockKey',
         blockKeyword: 'policy',
         existingParameterNames: ['on'],
       },
     );
   });
 
-  it('returns unsupported inside generic block parameter values', () => {
-    expectUnsupported(['datasource db {', '  provider = |', '}'].join('\n'));
+  it('classifies generic block value positions after the equals sign', () => {
+    expect(classify(['datasource db {', '  provider = |', '}'].join('\n'))).toMatchObject({
+      kind: 'genericBlockValue',
+      blockKeyword: 'datasource',
+    });
   });
 
-  it('classifies the gap before = as a generic block parameter with an empty source range', () => {
+  it('classifies the gap before = as a generic block key with an empty source range', () => {
     const context = classify(['datasource db {', '  url |= "x"', '}'].join('\n'));
 
     expect(context).toMatchObject({
-      kind: 'genericBlockParameter',
+      kind: 'genericBlockKey',
       blockKeyword: 'datasource',
     });
     // rust-analyzer `source_range()` shape: the cursor sits in whitespace, so the
     // edit range is empty at the cursor rather than synthesising the `url` key.
-    if (context.kind === 'genericBlockParameter') {
+    if (context.kind === 'genericBlockKey') {
       expect(context.replacementStartOffset).toBe(context.offset);
     }
   });

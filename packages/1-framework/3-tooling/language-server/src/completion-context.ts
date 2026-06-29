@@ -26,20 +26,42 @@ export interface ClassifyPslCompletionContextInput {
   readonly position: Position;
 }
 
-export interface ModelFieldTypeCompletionContext {
-  readonly kind: 'modelFieldType';
+export interface ModelTypeCompletionContext {
+  readonly kind: 'modelType';
   readonly offset: number;
   readonly fieldName: string;
-  readonly namespace: string | undefined;
   readonly replacementStartOffset: number;
 }
 
-export interface GenericBlockParameterCompletionContext {
-  readonly kind: 'genericBlockParameter';
+export interface SpaceMemberCompletionContext {
+  readonly kind: 'spaceMember';
+  readonly offset: number;
+  readonly fieldName: string;
+  readonly replacementStartOffset: number;
+  readonly space: string;
+}
+
+export interface NamespaceMemberCompletionContext {
+  readonly kind: 'namespaceMember';
+  readonly offset: number;
+  readonly fieldName: string;
+  readonly replacementStartOffset: number;
+  readonly namespace: string;
+}
+
+export interface GenericBlockKeyCompletionContext {
+  readonly kind: 'genericBlockKey';
   readonly offset: number;
   readonly blockKeyword: string;
   readonly replacementStartOffset: number;
   readonly existingParameterNames: readonly string[];
+}
+
+export interface GenericBlockValueCompletionContext {
+  readonly kind: 'genericBlockValue';
+  readonly offset: number;
+  readonly blockKeyword: string;
+  readonly replacementStartOffset: number;
 }
 
 export type DeclarationKeywordCompletionScope = 'document' | 'namespace';
@@ -58,8 +80,11 @@ export interface UnsupportedPslCompletionContext {
 
 export type PslCompletionContext =
   | DeclarationKeywordCompletionContext
-  | GenericBlockParameterCompletionContext
-  | ModelFieldTypeCompletionContext
+  | GenericBlockKeyCompletionContext
+  | GenericBlockValueCompletionContext
+  | ModelTypeCompletionContext
+  | NamespaceMemberCompletionContext
+  | SpaceMemberCompletionContext
   | UnsupportedPslCompletionContext;
 
 export function classifyPslCompletionContext(
@@ -155,7 +180,7 @@ function classifyModelFieldType(input: {
       input.offset <= typeStart &&
       onlyWhitespaceBetween(fieldNameToken, input.offset)
     ) {
-      return modelFieldType(input.offset, fieldNameText, undefined, input.offset);
+      return modelType(input.offset, fieldNameText, input.offset);
     }
     return unsupported(input.offset);
   }
@@ -180,21 +205,82 @@ function classifyModelFieldType(input: {
     return unsupported(input.offset);
   }
 
-  const namespace = typeCompletionNamespace(name);
-  if (namespace === undefined) {
+  const position = classifyTypePosition(name);
+  if (position === undefined) {
     return unsupported(input.offset);
   }
 
-  return modelFieldType(input.offset, fieldNameText, namespace.value, input.replacementStartOffset);
+  switch (position.kind) {
+    case 'modelType':
+      return modelType(input.offset, fieldNameText, input.replacementStartOffset);
+    case 'spaceMember':
+      return spaceMember(input.offset, fieldNameText, input.replacementStartOffset, position.space);
+    case 'namespaceMember':
+      return namespaceMember(
+        input.offset,
+        fieldNameText,
+        input.replacementStartOffset,
+        position.namespace,
+      );
+  }
 }
 
-function modelFieldType(
+type TypePosition =
+  | { readonly kind: 'modelType' }
+  | { readonly kind: 'spaceMember'; readonly space: string }
+  | { readonly kind: 'namespaceMember'; readonly namespace: string };
+
+/**
+ * Resolves which type-completion position a qualified name sits in, gating on
+ * the same separator validity as the name itself: a `:` requires a contract-
+ * space segment and a `.` requires a namespace segment. A failed gate yields
+ * `undefined` (the caller maps it to `unsupported`).
+ *
+ * Behaviour change: a `:`-qualified name with no `.` (e.g. `supabase:`,
+ * `supabase:U`) is now a `spaceMember` position rather than falling through to
+ * bare model-type completions.
+ */
+function classifyTypePosition(name: QualifiedNameAst): TypePosition | undefined {
+  if (name.colon() !== undefined) {
+    const space = name.space()?.name();
+    if (space === undefined || space.length === 0) return undefined;
+    if (name.dot() === undefined) return { kind: 'spaceMember', space };
+    const namespace = name.namespace()?.name();
+    if (namespace === undefined || namespace.length === 0) return undefined;
+    return { kind: 'namespaceMember', namespace };
+  }
+  if (name.dot() !== undefined) {
+    const namespace = name.namespace()?.name();
+    if (namespace === undefined || namespace.length === 0) return undefined;
+    return { kind: 'namespaceMember', namespace };
+  }
+  return { kind: 'modelType' };
+}
+
+function modelType(
   offset: number,
   fieldName: string,
-  namespace: string | undefined,
   replacementStartOffset: number,
-): ModelFieldTypeCompletionContext {
-  return { kind: 'modelFieldType', offset, fieldName, namespace, replacementStartOffset };
+): ModelTypeCompletionContext {
+  return { kind: 'modelType', offset, fieldName, replacementStartOffset };
+}
+
+function spaceMember(
+  offset: number,
+  fieldName: string,
+  replacementStartOffset: number,
+  space: string,
+): SpaceMemberCompletionContext {
+  return { kind: 'spaceMember', offset, fieldName, replacementStartOffset, space };
+}
+
+function namespaceMember(
+  offset: number,
+  fieldName: string,
+  replacementStartOffset: number,
+  namespace: string,
+): NamespaceMemberCompletionContext {
+  return { kind: 'namespaceMember', offset, fieldName, replacementStartOffset, namespace };
 }
 
 function classifyDeclarationKeyword(input: {
@@ -324,13 +410,20 @@ function classifyGenericBlockParameter(input: {
     return unsupported(input.offset);
   }
 
-  if (previousSignificantToken(input.at, input.offset)?.kind === 'Equals') {
-    return unsupported(input.offset);
-  }
-
   const keyword = block.keyword()?.text;
   if (keyword === undefined || keyword.length === 0) {
     return unsupported(input.offset);
+  }
+
+  // Value position: the cursor follows a `=`. The position is now classified
+  // distinctly from keys; populating value candidates is the provider's concern.
+  if (previousSignificantToken(input.at, input.offset)?.kind === 'Equals') {
+    return {
+      kind: 'genericBlockValue',
+      offset: input.offset,
+      blockKeyword: keyword,
+      replacementStartOffset: input.replacementStartOffset,
+    };
   }
 
   const activePair = activeKeyValuePair(input.node, input.offset);
@@ -339,7 +432,7 @@ function classifyGenericBlockParameter(input: {
   }
 
   return {
-    kind: 'genericBlockParameter',
+    kind: 'genericBlockKey',
     offset: input.offset,
     blockKeyword: keyword,
     replacementStartOffset: input.replacementStartOffset,
@@ -394,33 +487,6 @@ function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
     closestAst(node, FieldAttributeAst.cast) !== undefined ||
     closestAst(node, ModelAttributeAst.cast) !== undefined
   );
-}
-
-/**
- * Selects the namespace whose members completion should offer, gating on the
- * same separator-positional validity rules as the qualified type name: a `:`
- * requires a contract-space segment and a `.` requires a namespace segment.
- * Returns `undefined` when a gate fails (the caller yields `unsupported`); on
- * success wraps the namespace string, which is itself `undefined` when the name
- * has no `.`.
- */
-function typeCompletionNamespace(
-  name: QualifiedNameAst,
-): { readonly value: string | undefined } | undefined {
-  if (name.colon() !== undefined) {
-    const contractSpace = name.space()?.name();
-    if (contractSpace === undefined || contractSpace.length === 0) {
-      return undefined;
-    }
-  }
-  if (name.dot() === undefined) {
-    return { value: undefined };
-  }
-  const namespace = name.namespace()?.name();
-  if (namespace === undefined || namespace.length === 0) {
-    return undefined;
-  }
-  return { value: namespace };
 }
 
 function nodeForContext(
