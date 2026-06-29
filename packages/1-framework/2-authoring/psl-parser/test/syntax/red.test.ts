@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GreenNodeBuilder } from '../../src/syntax/green-builder';
-import { createSyntaxTree, SyntaxNode, SyntaxToken } from '../../src/syntax/red';
+import { createSyntaxTree, SyntaxNode, SyntaxToken, TokenAtOffset } from '../../src/syntax/red';
 import type { SyntaxKind } from '../../src/syntax/syntax-kind';
 
 /** Source rendered by {@link buildSampleTree}, with token offsets used below. */
@@ -343,6 +343,45 @@ describe('SyntaxNode.tokenAtOffset', () => {
     b.startNode('Document');
     const root = createSyntaxTree(b.finishNode());
     expect(root.tokenAtOffset(0).isEmpty).toBe(true);
+  });
+});
+
+describe('TokenAtOffset public surface', () => {
+  it('none exposes no token on either bias', () => {
+    const none = TokenAtOffset.none();
+    expect(none.isEmpty).toBe(true);
+    expect(none.isBetween).toBe(false);
+    expect(none.leftBiased()).toBeUndefined();
+    expect(none.rightBiased()).toBeUndefined();
+  });
+
+  it('single collapses both biases to the same token and is never between', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const token = root.tokenAtOffset(19).leftBiased();
+    expect(token).toBeInstanceOf(SyntaxToken);
+    if (token instanceof SyntaxToken) {
+      const single = TokenAtOffset.single(token);
+      expect(single.isEmpty).toBe(false);
+      expect(single.isBetween).toBe(false);
+      expect(single.leftBiased()).toBe(token);
+      expect(single.rightBiased()).toBe(token);
+    }
+  });
+
+  it('between exposes both tokens and is never empty', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const seam = root.tokenAtOffset(5);
+    const left = seam.leftBiased();
+    const right = seam.rightBiased();
+    expect(left).toBeInstanceOf(SyntaxToken);
+    expect(right).toBeInstanceOf(SyntaxToken);
+    if (left instanceof SyntaxToken && right instanceof SyntaxToken) {
+      const between = TokenAtOffset.between(left, right);
+      expect(between.isEmpty).toBe(false);
+      expect(between.isBetween).toBe(true);
+      expect(between.leftBiased()).toBe(left);
+      expect(between.rightBiased()).toBe(right);
+    }
   });
 });
 

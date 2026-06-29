@@ -66,41 +66,58 @@ export type SyntaxElement = SyntaxNode | SyntaxToken;
  * collapse the seam case to one side; for `single` both return the same token,
  * for `none` both return `undefined`.
  */
-export class TokenAtOffset {
-  readonly #left: SyntaxToken | undefined;
-  readonly #right: SyntaxToken | undefined;
+type TokenAtOffsetState =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'single'; readonly token: SyntaxToken }
+  | { readonly kind: 'between'; readonly left: SyntaxToken; readonly right: SyntaxToken };
 
-  private constructor(left: SyntaxToken | undefined, right: SyntaxToken | undefined) {
-    this.#left = left;
-    this.#right = right;
+export class TokenAtOffset {
+  readonly #state: TokenAtOffsetState;
+
+  private constructor(state: TokenAtOffsetState) {
+    this.#state = state;
   }
 
   static none(): TokenAtOffset {
-    return new TokenAtOffset(undefined, undefined);
+    return new TokenAtOffset({ kind: 'none' });
   }
 
   static single(token: SyntaxToken): TokenAtOffset {
-    return new TokenAtOffset(token, token);
+    return new TokenAtOffset({ kind: 'single', token });
   }
 
   static between(left: SyntaxToken, right: SyntaxToken): TokenAtOffset {
-    return new TokenAtOffset(left, right);
+    return new TokenAtOffset({ kind: 'between', left, right });
   }
 
   get isEmpty(): boolean {
-    return this.#left === undefined && this.#right === undefined;
+    return this.#state.kind === 'none';
   }
 
   get isBetween(): boolean {
-    return this.#left !== undefined && this.#right !== undefined && this.#left !== this.#right;
+    return this.#state.kind === 'between';
   }
 
   leftBiased(): SyntaxToken | undefined {
-    return this.#left;
+    switch (this.#state.kind) {
+      case 'none':
+        return undefined;
+      case 'single':
+        return this.#state.token;
+      case 'between':
+        return this.#state.left;
+    }
   }
 
   rightBiased(): SyntaxToken | undefined {
-    return this.#right;
+    switch (this.#state.kind) {
+      case 'none':
+        return undefined;
+      case 'single':
+        return this.#state.token;
+      case 'between':
+        return this.#state.right;
+    }
   }
 }
 
