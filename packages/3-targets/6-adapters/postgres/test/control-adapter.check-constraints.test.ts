@@ -134,7 +134,7 @@ describe('PostgresControlAdapter.introspect — check constraints', () => {
 
     const result = await adapter.introspect(mockDriver);
 
-    expect(result.tables['post']?.checks).toEqual([
+    expect(Object.values(result.namespaces)[0]?.tables['post']?.checks).toEqual([
       {
         name: 'post_status_check',
         column: 'status',
@@ -189,7 +189,7 @@ describe('PostgresControlAdapter.introspect — check constraints', () => {
     const result = await adapter.introspect(mockDriver);
 
     // The free-form CHECK predicate is silently skipped
-    expect(result.tables['order']?.checks).toBeUndefined();
+    expect(Object.values(result.namespaces)[0]?.tables['order']?.checks).toBeUndefined();
   });
 
   it('does not add checks property when table has no check constraints', async () => {
@@ -226,6 +226,6 @@ describe('PostgresControlAdapter.introspect — check constraints', () => {
 
     const result = await adapter.introspect(mockDriver);
 
-    expect(result.tables['user']?.checks).toBeUndefined();
+    expect(Object.values(result.namespaces)[0]?.tables['user']?.checks).toBeUndefined();
   });
 });

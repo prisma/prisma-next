@@ -11,7 +11,7 @@ import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
-import { contractToPostgresSchemaIR } from '../core/migrations/contract-to-postgres-schema-ir';
+import { contractToPostgresDatabaseSchemaNode } from '../core/migrations/contract-to-postgres-database-schema-node';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
@@ -65,7 +65,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
           PostgresContract | null,
           'the family resolver only binds this hook for a Postgres-target contract'
         >(contract);
-        return contractToPostgresSchemaIR(postgresContract, {
+        return contractToPostgresDatabaseSchemaNode(postgresContract, {
           annotationNamespace: 'pg',
           ...ifDefined('expandNativeType', expander),
           renderDefault: postgresRenderDefault,

@@ -60,7 +60,7 @@ import type {
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import {
-  contractToPostgresSchemaIR,
+  contractToPostgresDatabaseSchemaNode,
   diffPostgresSchema,
   filterIssuesByOwnership,
 } from '@prisma-next/target-postgres/planner';
@@ -68,10 +68,11 @@ import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql
 import {
   ensurePostgresSchemaIR,
   isPostgresSchemaIR,
-  PostgresRlsPolicy,
-  PostgresRole,
-  PostgresSchemaIR,
-  PostgresTableIR,
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  PostgresPolicySchemaNode,
+  PostgresRoleSchemaNode,
+  PostgresTableSchemaNode,
 } from '@prisma-next/target-postgres/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -137,7 +138,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         `Postgres schema diff requires a PostgresSchemaIR; got ${(schema as { constructor?: { name?: string } }).constructor?.name ?? typeof schema}`,
       );
     }
-    const expected = contractToPostgresSchemaIR(
+    const expected = contractToPostgresDatabaseSchemaNode(
       blindCast<
         PostgresContract,
         'collectSchemaDiffIssues is only called with a postgres contract'
@@ -593,21 +594,51 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     driver: SqlControlDriverInstance<'postgres'>,
     contract?: unknown,
     schema = 'public',
-  ): Promise<PostgresSchemaIR> {
+  ): Promise<PostgresDatabaseSchemaNode> {
     const declaredNamespaces = extractContractNamespaceIds(contract);
-    const ir =
+    const resolvedSchemas =
       declaredNamespaces.length > 0
-        ? await this.introspectNamespaces(driver, declaredNamespaces)
-        : await this.introspectSchema(driver, schema);
+        ? await this.resolveNamespaceSchemas(driver, declaredNamespaces)
+        : [schema];
+
+    // Walk schemas sequentially: every introspectSchema call shares the one
+    // control connection, so a parallel walk only serialises behind the wire
+    // protocol and trips pg's "already executing a query" deprecation.
+    const namespaces: Record<string, PostgresNamespaceSchemaNode> = {};
+    let pgVersion = 'unknown';
+    for (const resolved of resolvedSchemas) {
+      const { namespace, pgVersion: version } = await this.introspectSchema(driver, resolved);
+      namespaces[resolved] = namespace;
+      pgVersion = version;
+    }
+
+    const roles = await this.introspectRoles(driver);
     const existingSchemas = await this.listExistingSchemas(driver);
-    return new PostgresSchemaIR({
-      tables: ir.tables,
-      pgSchemaName: ir.pgSchemaName,
-      pgVersion: ir.pgVersion,
-      roles: ir.roles,
+    return new PostgresDatabaseSchemaNode({
+      namespaces,
+      roles,
       existingSchemas,
-      nativeEnumTypeNames: ir.nativeEnumTypeNames,
+      pgVersion,
     });
+  }
+
+  /**
+   * Reads cluster-scoped database roles. Roles are not schema-qualified, so
+   * this is queried once for the whole database rather than per namespace.
+   */
+  private async introspectRoles(
+    driver: SqlControlDriverInstance<'postgres'>,
+  ): Promise<readonly PostgresRoleSchemaNode[]> {
+    const rolesResult = await driver.query<{ rolname: string }>(
+      `SELECT rolname
+       FROM pg_catalog.pg_roles
+       WHERE rolname NOT LIKE 'pg_%'
+         AND rolname != 'postgres'
+       ORDER BY rolname`,
+    );
+    return rolesResult.rows.map(
+      (row) => new PostgresRoleSchemaNode({ name: row.rolname, namespaceId: UNBOUND_NAMESPACE_ID }),
+    );
   }
 
   /**
@@ -633,16 +664,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   }
 
   /**
-   * Walks every declared namespace, resolving `UNBOUND_NAMESPACE_ID` to
-   * the connection's `current_schema()`, and merges the per-schema results
-   * into a single `SqlSchemaIR`. The merged `tables` map is flat (keyed by
-   * table name) so callers that look up by `tableName` see every contract
-   * table regardless of which namespace it lives in.
+   * Resolves the declared namespace ids to their live DDL schema names,
+   * mapping `UNBOUND_NAMESPACE_ID` to the connection's `current_schema()`
+   * and de-duplicating. The caller introspects one namespace node per
+   * resolved schema — there is no flat cross-schema merge, so two schemas
+   * holding a same-named table no longer collide.
    */
-  private async introspectNamespaces(
+  private async resolveNamespaceSchemas(
     driver: SqlControlDriverInstance<'postgres'>,
     namespaceIds: readonly string[],
-  ): Promise<PostgresSchemaIR> {
+  ): Promise<readonly string[]> {
     const resolvedSchemas: string[] = [];
     for (const id of namespaceIds) {
       if (id === UNBOUND_NAMESPACE_ID) {
@@ -654,45 +685,19 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         resolvedSchemas.push(id);
       }
     }
-    const uniqueSchemas = Array.from(new Set(resolvedSchemas));
-
-    // Walk schemas sequentially: every introspectSchema call shares the one
-    // control connection, so a parallel walk only serialises behind the wire
-    // protocol and trips pg's "already executing a query" deprecation.
-    const perSchema: PostgresSchemaIR[] = [];
-    for (const schema of uniqueSchemas) {
-      perSchema.push(await this.introspectSchema(driver, schema));
-    }
-
-    const mergedTables: Record<string, PostgresTableIR> = {};
-    const mergedRoles: PostgresRole[] = [];
-    for (const ir of perSchema) {
-      for (const [tableName, table] of Object.entries(ir.tables)) {
-        mergedTables[tableName] = table;
-      }
-      mergedRoles.push(...ir.roles);
-    }
-
-    const first = perSchema[0];
-    return new PostgresSchemaIR({
-      tables: mergedTables,
-      pgSchemaName: first?.pgSchemaName ?? 'public',
-      pgVersion: first?.pgVersion ?? 'unknown',
-      roles: mergedRoles,
-      existingSchemas: first?.existingSchemas ?? ['public'],
-      nativeEnumTypeNames: first?.nativeEnumTypeNames ?? [],
-    });
+    return Array.from(new Set(resolvedSchemas));
   }
 
   /**
-   * Introspects a single Postgres schema and returns a raw SqlSchemaIR
-   * containing only the tables in that schema. Used by `introspect` as
+   * Introspects a single Postgres schema and returns the namespace node for
+   * that schema (its tables, their policies, and its native enum type names),
+   * alongside the cluster-scoped Postgres version. Used by `introspect` as
    * the per-namespace walk.
    */
   private async introspectSchema(
     driver: SqlControlDriverInstance<'postgres'>,
     schema: string,
-  ): Promise<PostgresSchemaIR> {
+  ): Promise<{ readonly namespace: PostgresNamespaceSchemaNode; readonly pgVersion: string }> {
     // Issue the schema-wide queries one at a time. A single control connection
     // serialises queries anyway, so Promise.all buys no parallelism here and
     // makes pg emit a "client is already executing a query" deprecation. One
@@ -1167,14 +1172,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
        ORDER BY tablename, policyname`,
       [schema],
     );
-    const rolesResult = await driver.query<{ rolname: string }>(
-      `SELECT rolname
-       FROM pg_catalog.pg_roles
-       WHERE rolname NOT LIKE 'pg_%'
-         AND rolname != 'postgres'
-       ORDER BY rolname`,
-    );
-    const policiesByTable = new Map<string, PostgresRlsPolicy[]>();
+    const policiesByTable = new Map<string, PostgresPolicySchemaNode[]>();
     for (const row of policiesResult.rows) {
       const operation = mapPgCmd(row.cmd);
       const policyRoles = [
@@ -1183,7 +1181,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       const permissive = row.permissive.toUpperCase() === 'PERMISSIVE';
       const hashSuffixMatch = /^(.+)_([0-9a-f]{8})$/.exec(row.policyname);
       const prefix = hashSuffixMatch?.[1] ?? row.policyname;
-      const policy = new PostgresRlsPolicy({
+      const policy = new PostgresPolicySchemaNode({
         name: row.policyname,
         prefix,
         tableName: row.tablename,
@@ -1199,26 +1197,20 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       policiesByTable.set(row.tablename, list);
     }
 
-    const tables: Record<string, PostgresTableIR> = {};
+    const tables: Record<string, PostgresTableSchemaNode> = {};
     for (const [tableName, input] of Object.entries(tableInputs)) {
-      tables[tableName] = new PostgresTableIR({
+      tables[tableName] = new PostgresTableSchemaNode({
         ...input,
-        rlsPolicies: policiesByTable.get(tableName) ?? [],
+        policies: policiesByTable.get(tableName) ?? [],
       });
     }
 
-    const roles: PostgresRole[] = rolesResult.rows.map(
-      (row) => new PostgresRole({ name: row.rolname, namespaceId: UNBOUND_NAMESPACE_ID }),
-    );
-
-    return new PostgresSchemaIR({
+    const namespace = new PostgresNamespaceSchemaNode({
+      schemaName: schema,
       tables,
-      pgSchemaName: schema,
-      pgVersion: await this.getPostgresVersion(driver),
-      roles,
-      existingSchemas: [],
       nativeEnumTypeNames,
     });
+    return { namespace, pgVersion: await this.getPostgresVersion(driver) };
   }
 
   /**

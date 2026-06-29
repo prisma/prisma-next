@@ -29,7 +29,7 @@ import { assertPostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresContract } from '../postgres-schema';
 import { assertPostgresSchemaIR, ensurePostgresSchemaIR } from '../schema-ir/postgres-schema-ir';
 import { resolveDdlSchemaForNamespaceStorage } from '../schema-ir/postgres-schema-ir-annotations';
-import { contractToPostgresSchemaIR } from './contract-to-postgres-schema-ir';
+import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
 import {
   formatPostgresControlPolicySubjectLabel,
   resolvePostgresCallControlPolicySubject,
@@ -267,7 +267,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     options: PlannerOptionsWithComponents,
   ): readonly PostgresOpFactoryCall[] {
     assertPostgresSchemaIR(options.schema);
-    const expected = contractToPostgresSchemaIR(
+    const expected = contractToPostgresDatabaseSchemaNode(
       blindCast<PostgresContract, 'planPostgresSchemaDiff is only called with a postgres contract'>(
         options.contract,
       ),
