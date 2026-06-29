@@ -69,7 +69,7 @@ export function isPostgresRlsPolicy(node: unknown): node is PostgresRlsPolicy {
     node !== null &&
     typeof node === 'object' &&
     'kind' in node &&
-    (node as { kind: unknown }).kind === 'policy'
+    node.kind === 'policy'
   );
 }
 
@@ -77,7 +77,7 @@ export function assertPostgresRlsPolicy(node: unknown): asserts node is Postgres
   if (!isPostgresRlsPolicy(node)) {
     const kind =
       node !== undefined && node !== null && typeof node === 'object' && 'kind' in node
-        ? String((node as { kind: unknown }).kind)
+        ? String(node.kind)
         : typeof node;
     throw new Error(
       `planPostgresSchemaDiff: expected a PostgresRlsPolicy on the policy-diff path but got ${kind}`,
