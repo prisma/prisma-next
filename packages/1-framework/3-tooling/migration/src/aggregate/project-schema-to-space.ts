@@ -132,21 +132,12 @@ function pruneNamespaceTables(
   schemaObj: { readonly namespaces?: unknown },
   ownedByOthers: ReadonlySet<string>,
 ): unknown {
-  const namespaces = schemaObj.namespaces as Record<string, unknown>;
+  if (!isRecord(schemaObj.namespaces)) return schemaObj;
   let removed = false;
   const prunedNamespaces: Record<string, unknown> = {};
-  for (const [namespaceId, namespaceNode] of Object.entries(namespaces)) {
-    if (
-      typeof namespaceNode === 'object' &&
-      namespaceNode !== null &&
-      typeof (namespaceNode as { readonly tables?: unknown }).tables === 'object' &&
-      (namespaceNode as { readonly tables?: unknown }).tables !== null
-    ) {
-      const prunedNode = pruneRecord(
-        namespaceNode as { readonly tables?: unknown },
-        'tables',
-        ownedByOthers,
-      );
+  for (const [namespaceId, namespaceNode] of Object.entries(schemaObj.namespaces)) {
+    if (isRecord(namespaceNode) && isRecord(namespaceNode['tables'])) {
+      const prunedNode = pruneRecord(namespaceNode, 'tables', ownedByOthers);
       if (prunedNode !== namespaceNode) removed = true;
       prunedNamespaces[namespaceId] = prunedNode;
     } else {
@@ -155,6 +146,10 @@ function pruneNamespaceTables(
   }
   if (!removed) return schemaObj;
   return { ...schemaObj, namespaces: prunedNamespaces };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function pruneRecord(
