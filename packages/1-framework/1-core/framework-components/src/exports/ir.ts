@@ -1,13 +1,11 @@
 export type {
   DefaultNamespaceEntries,
-  NamespaceAccessor,
-  PromotedNamespaces,
+  NamespacedEntities,
   SingleNamespaceView,
 } from '../ir/contract-view';
 export {
-  buildNamespaceAccessor,
+  buildNamespacedEntities,
   buildSingleNamespaceView,
-  composeContractView,
   promoteBuiltinKinds,
 } from '../ir/contract-view';
 export { domainElementCoordinates } from '../ir/domain';

@@ -8,21 +8,24 @@ import { PostgresContractSerializer } from './postgres-contract-serializer';
 
 /**
  * A schema-qualified Postgres contract view: the deserialized contract
- * intersected with per-schema accessors. It is substitutable for `Contract`
- * (carries `storage`, `domain`, …) and also exposes each schema's entities:
+ * intersected with a single `namespace` member holding every schema by id. It is
+ * substitutable for `Contract` (carries `storage`, `domain`, …) and reaches each
+ * schema's entities through `view.namespace.<schema>`:
  *
  * ```ts
  * const view = PostgresContractView.fromJson<Contract>(contractJson);
- * view.public.table.users      // typed table leaf in the public schema
- * view.auth.table.users        // the auth schema's own users table
- * view.public.entries.policy.X // pack-contributed kind (RLS / #771 path)
- * view.__unbound__.table.X     // default schema, keyed by its raw id
- * view.storage                 // the full contract is still present
+ * view.namespace.public.table.users      // typed table leaf in the public schema
+ * view.namespace.auth.table.users        // the auth schema's own users table
+ * view.namespace.public.entries.policy.X // pack-contributed kind (RLS / #771 path)
+ * view.namespace.__unbound__.table.X     // default schema, keyed by its raw id
+ * view.storage                           // the full contract is still present
  * ```
  *
- * The schema keys mirror the facade's `sql.<ns>` keying exactly — the default
- * schema is reachable under its literal `__unbound__` id, with no renaming.
- * Each schema is its own key; there is no flat cross-namespace merge.
+ * This mirrors the runtime `db.enums.<ns>` keying exactly (the default schema
+ * keeps its literal `__unbound__` id). Schema names are NOT promoted to the
+ * contract root, so there is no collision with contract envelope fields — a
+ * schema named `storage` is `view.namespace.storage`, while `view.storage`
+ * stays the contract's `storage`.
  */
 export type PostgresContractView<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> =
   SqlSchemaQualifiedView<TContract>;
