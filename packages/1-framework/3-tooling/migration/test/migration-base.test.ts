@@ -76,6 +76,63 @@ describe('Migration', async () => {
     });
   });
 
+  describe('derived describe() from contract JSON', async () => {
+    const endJson = { storage: { storageHash: 'sha256:endhash' } };
+    const startJson = { storage: { storageHash: 'sha256:starthash' } };
+
+    it('derives to from endContractJson.storage.storageHash and from:null when no start', async () => {
+      class M extends Migration {
+        readonly targetId = 'test';
+        override readonly endContractJson = endJson;
+        override get operations() {
+          return [];
+        }
+      }
+      const m = new M();
+      expect(m.describe()).toEqual({ from: null, to: 'sha256:endhash' });
+      expect(m.origin).toBeNull();
+      expect(m.destination).toEqual({ storageHash: 'sha256:endhash' });
+    });
+
+    it('derives from from startContractJson.storage.storageHash when present', async () => {
+      class M extends Migration {
+        readonly targetId = 'test';
+        override readonly startContractJson = startJson;
+        override readonly endContractJson = endJson;
+        override get operations() {
+          return [];
+        }
+      }
+      const m = new M();
+      expect(m.describe()).toEqual({ from: 'sha256:starthash', to: 'sha256:endhash' });
+      expect(m.origin).toEqual({ storageHash: 'sha256:starthash' });
+    });
+
+    it('throws a clear error when neither endContractJson nor a describe() override is present', async () => {
+      class M extends Migration {
+        readonly targetId = 'test';
+        override get operations() {
+          return [];
+        }
+      }
+      expect(() => new M().describe()).toThrow(/endContractJson or override describe\(\)/);
+    });
+
+    it('a describe() override still wins over the derived default', async () => {
+      class M extends Migration {
+        readonly targetId = 'test';
+        override readonly endContractJson = endJson;
+        override get operations() {
+          return [];
+        }
+        override describe() {
+          return { from: null, to: 'sha256:overridden' };
+        }
+      }
+      expect(new M().describe()).toEqual({ from: null, to: 'sha256:overridden' });
+    });
+  });
+
   describe('constructor accepts and stores a ControlStack', async () => {
     /**
      * The constructor injection contract is that a subclass (e.g.

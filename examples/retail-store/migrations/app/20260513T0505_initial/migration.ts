@@ -1,31 +1,22 @@
 #!/usr/bin/env -S node
 import { MigrationCLI } from '@prisma-next/cli/migration-cli';
-import { MongoContractView } from '@prisma-next/family-mongo/ir';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { createCollection, createIndex } from '@prisma-next/target-mongo/migration';
-import type { Contract } from './end-contract';
+import type { Contract as End } from './end-contract';
 import endContractJson from './end-contract.json' with { type: 'json' };
 
-const endContract = MongoContractView.fromJson<Contract>(endContractJson);
-
-const COLLECTIONS = endContract.collection;
-const CARTS_VALIDATOR = COLLECTIONS.carts.validator;
-const EVENTS_VALIDATOR = COLLECTIONS.events.validator;
-const INVOICES_VALIDATOR = COLLECTIONS.invoices.validator;
-const LOCATIONS_VALIDATOR = COLLECTIONS.locations.validator;
-const ORDERS_VALIDATOR = COLLECTIONS.orders.validator;
-const PRODUCTS_VALIDATOR = COLLECTIONS.products.validator;
-const USERS_VALIDATOR = COLLECTIONS.users.validator;
-
-class M extends Migration {
-  override describe() {
-    return {
-      from: null,
-      to: 'sha256:8ee1e7ce30ed334572583d826d9c41388c46f7db82ae2352c3a3fccf1de7cbab',
-    };
-  }
+class M extends Migration<End, End> {
+  override readonly endContractJson = endContractJson;
 
   override get operations() {
+    const COLLECTIONS = this.endContract.collection;
+    const CARTS_VALIDATOR = COLLECTIONS.carts.validator;
+    const EVENTS_VALIDATOR = COLLECTIONS.events.validator;
+    const INVOICES_VALIDATOR = COLLECTIONS.invoices.validator;
+    const LOCATIONS_VALIDATOR = COLLECTIONS.locations.validator;
+    const ORDERS_VALIDATOR = COLLECTIONS.orders.validator;
+    const PRODUCTS_VALIDATOR = COLLECTIONS.products.validator;
+    const USERS_VALIDATOR = COLLECTIONS.users.validator;
     return [
       createCollection('carts', {
         validator: { $jsonSchema: CARTS_VALIDATOR.jsonSchema },
