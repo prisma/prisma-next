@@ -132,16 +132,26 @@ describe('providePslCompletionItems', () => {
     expect(items[0]?.insertTextFormat).toBeUndefined();
   });
 
-  it('filters document-level declaration keyword prefixes and replaces the typed segment', () => {
+  it('returns the full document-level declaration keyword set with a replace range over the typed segment', () => {
     const { items, sourceFile, cursorOffset } = complete('mo|');
 
-    expect(items.map((item) => item.label)).toEqual(['model']);
-    expect(items[0]?.textEdit).toEqual({
-      range: {
-        start: sourceFile.positionAt(cursorOffset - 'mo'.length),
-        end: sourceFile.positionAt(cursorOffset),
+    expect(items.map((item) => item.label)).toEqual([
+      'model',
+      'type',
+      'types',
+      'namespace',
+      'audit',
+      'policy',
+    ]);
+    expect(items[0]).toMatchObject({
+      filterText: 'model',
+      textEdit: {
+        range: {
+          start: sourceFile.positionAt(cursorOffset - 'mo'.length),
+          end: sourceFile.positionAt(cursorOffset),
+        },
+        newText: 'model ',
       },
-      newText: 'model ',
     });
   });
 
@@ -153,10 +163,22 @@ describe('providePslCompletionItems', () => {
     expect(items.map((item) => item.label)).not.toContain('namespace');
   });
 
-  it('filters namespace-body declaration keyword prefixes', () => {
-    const { items } = complete(['namespace feature {', '  po|', '}'].join('\n'));
+  it('returns the full namespace-body declaration keyword set with a replace range over the typed segment', () => {
+    const { items, sourceFile, cursorOffset } = complete(
+      ['namespace feature {', '  po|', '}'].join('\n'),
+    );
 
-    expect(items.map((item) => item.label)).toEqual(['policy']);
+    expect(items.map((item) => item.label)).toEqual(['model', 'type', 'audit', 'policy']);
+    expect(items.find((item) => item.label === 'policy')).toMatchObject({
+      filterText: 'policy',
+      textEdit: {
+        range: {
+          start: sourceFile.positionAt(cursorOffset - 'po'.length),
+          end: sourceFile.positionAt(cursorOffset),
+        },
+        newText: 'policy ',
+      },
+    });
   });
 
   it('returns snippet declaration keyword edits only when the client supports snippets', () => {
@@ -216,19 +238,53 @@ describe('providePslCompletionItems', () => {
     });
   });
 
-  it('filters bare prefixes against visible candidate labels', () => {
-    const { items } = complete(['model Post {', '  reviewer U|', '}'].join('\n'));
+  it('returns the full bare candidate set with a replace range over the typed segment', () => {
+    const { items, sourceFile, cursorOffset } = complete(
+      ['model Post {', '  reviewer U|', '}'].join('\n'),
+    );
 
-    expect(items.map((item) => item.label)).toEqual(['User', 'UserId']);
+    expect(items.map((item) => item.label)).toEqual([
+      'Boolean',
+      'DateTime',
+      'Int',
+      'String',
+      'Post',
+      'User',
+      'Address',
+      'Email',
+      'UserId',
+      'auth',
+    ]);
+    expect(items.find((item) => item.label === 'User')).toMatchObject({
+      filterText: 'User',
+      textEdit: {
+        range: {
+          start: sourceFile.positionAt(cursorOffset - 'U'.length),
+          end: sourceFile.positionAt(cursorOffset),
+        },
+        newText: 'User',
+      },
+    });
   });
 
-  it('filters bare namespace prefixes and replaces the typed segment with the namespace qualifier', () => {
+  it('returns the full bare candidate set including the namespace qualifier with a replace range over the typed segment', () => {
     const { items, sourceFile, cursorOffset } = complete(
       ['model Post {', '  reviewer a|', '}'].join('\n'),
     );
 
-    expect(items.map((item) => item.label)).toEqual(['auth']);
-    expect(items[0]).toMatchObject({
+    expect(items.map((item) => item.label)).toEqual([
+      'Boolean',
+      'DateTime',
+      'Int',
+      'String',
+      'Post',
+      'User',
+      'Address',
+      'Email',
+      'UserId',
+      'auth',
+    ]);
+    expect(items.find((item) => item.label === 'auth')).toMatchObject({
       kind: CompletionItemKind.Module,
       detail: 'Namespace',
       filterText: 'auth',
@@ -257,13 +313,14 @@ describe('providePslCompletionItems', () => {
     });
   });
 
-  it('returns namespace-qualified candidates with replacement metadata for the typed segment', () => {
+  it('returns the full namespace member set with replacement metadata for the typed segment', () => {
     const { items, sourceFile, cursorOffset } = complete(
       ['model Post {', '  owner auth.U|', '}'].join('\n'),
     );
 
-    expect(items.map((item) => item.label)).toEqual(['User']);
-    expect(items[0]).toMatchObject({
+    expect(items.map((item) => item.label)).toEqual(['Account', 'User', 'Profile']);
+    expect(items.find((item) => item.label === 'User')).toMatchObject({
+      filterText: 'User',
       detail: 'Model in namespace auth',
       textEdit: {
         range: {
@@ -275,13 +332,14 @@ describe('providePslCompletionItems', () => {
     });
   });
 
-  it('returns contract-space-qualified candidates from visible namespace data', () => {
+  it('returns the full contract-space-qualified namespace member set from visible namespace data', () => {
     const { items, sourceFile, cursorOffset } = complete(
       ['model Post {', '  owner supabase:auth.P|', '}'].join('\n'),
     );
 
-    expect(items.map((item) => item.label)).toEqual(['Profile']);
-    expect(items[0]).toMatchObject({
+    expect(items.map((item) => item.label)).toEqual(['Account', 'User', 'Profile']);
+    expect(items.find((item) => item.label === 'Profile')).toMatchObject({
+      filterText: 'Profile',
       detail: 'Composite type in namespace auth',
       textEdit: {
         range: {
@@ -312,18 +370,21 @@ describe('providePslCompletionItems', () => {
     });
   });
 
-  it('filters descriptor-backed generic block parameters and excludes sibling keys', () => {
+  it('returns the full descriptor-backed generic block parameter set excluding already-present sibling keys', () => {
     const { items, sourceFile, cursorOffset } = complete(
       ['policy Rule {', '  on = User', '  wh|', '}'].join('\n'),
     );
 
-    expect(items.map((item) => item.label)).toEqual(['where']);
-    expect(items[0]?.textEdit).toEqual({
-      range: {
-        start: sourceFile.positionAt(cursorOffset - 'wh'.length),
-        end: sourceFile.positionAt(cursorOffset),
+    expect(items.map((item) => item.label)).toEqual(['where', 'mode', 'using']);
+    expect(items.find((item) => item.label === 'where')).toMatchObject({
+      filterText: 'where',
+      textEdit: {
+        range: {
+          start: sourceFile.positionAt(cursorOffset - 'wh'.length),
+          end: sourceFile.positionAt(cursorOffset),
+        },
+        newText: 'where',
       },
-      newText: 'where',
     });
   });
 
