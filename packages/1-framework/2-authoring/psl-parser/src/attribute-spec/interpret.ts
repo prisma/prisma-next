@@ -25,6 +25,7 @@ export function interpretAttribute<Out>(
 ): Result<Out, readonly PslDiagnostic[]> {
   const diagnostics: PslDiagnostic[] = [];
   const code = spec.diagnosticCode ?? DEFAULT_STRUCTURAL_CODE;
+  const leafCtx: InterpretCtx = { ...ctx, diagnosticCode: code };
   const attributeSpan = nodePslSpan(attrNode.syntax, ctx.sourceFile);
 
   const positionalArgs: AttributeArgAst[] = [];
@@ -53,7 +54,7 @@ export function interpretAttribute<Out>(
     }
     if (namedSeen.has(key)) continue;
     namedSeen.add(key);
-    const result = parseArgValue(arg, argTypeOf(param), ctx, diagnostics, code);
+    const result = parseArgValue(arg, argTypeOf(param), leafCtx, diagnostics, code);
     if (result.ok) namedParsed.set(key, result.value);
   }
 
@@ -66,7 +67,7 @@ export function interpretAttribute<Out>(
       for (; index < positionalArgs.length; index++) {
         const arg = positionalArgs[index];
         if (arg === undefined) continue;
-        const result = parseArgValue(arg, argTypeOf(param.type), ctx, diagnostics, code);
+        const result = parseArgValue(arg, argTypeOf(param.type), leafCtx, diagnostics, code);
         if (result.ok) collected.push(result.value);
       }
       positionalSeen.add(param.key);
@@ -77,7 +78,7 @@ export function interpretAttribute<Out>(
     if (arg === undefined) continue;
     index += 1;
     positionalSeen.add(param.key);
-    const result = parseArgValue(arg, argTypeOf(param.type), ctx, diagnostics, code);
+    const result = parseArgValue(arg, argTypeOf(param.type), leafCtx, diagnostics, code);
     if (result.ok) positionalParsed.set(param.key, result.value);
   }
   if (index < positionalArgs.length) {
@@ -166,7 +167,7 @@ export function interpretAttribute<Out>(
     'The engine builds the output object structurally from the spec; TypeScript cannot relate the dynamically-keyed record to the spec-inferred output type.'
   >(output);
   if (spec.refine !== undefined) {
-    const refineDiagnostics = spec.refine(value, ctx);
+    const refineDiagnostics = spec.refine(value, leafCtx);
     if (refineDiagnostics.length > 0) {
       return notOk<readonly PslDiagnostic[]>(refineDiagnostics);
     }
