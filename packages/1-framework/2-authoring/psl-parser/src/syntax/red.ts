@@ -232,7 +232,7 @@ export class SyntaxNode {
   }
 
   /** The nearest match, testing this node itself before walking its ancestors. */
-  findClosestParent<T>(cast: (node: SyntaxNode) => T | undefined): T | undefined {
+  findAncestor<T>(cast: (node: SyntaxNode) => T | undefined): T | undefined {
     const self = cast(this);
     if (self !== undefined) {
       return self;
