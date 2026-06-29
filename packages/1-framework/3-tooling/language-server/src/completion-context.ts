@@ -1,4 +1,5 @@
 import {
+  type AstNode,
   AttributeArgListAst,
   type BracedBlock,
   CompositeTypeDeclarationAst,
@@ -288,11 +289,17 @@ function declarationKeywordAllowed(
 }
 
 function isInsideNonDeclarationKeywordBody(node: SyntaxNode | undefined, offset: number): boolean {
-  return (
-    blockBodyContainsOffset(closestAst(node, ModelDeclarationAst.cast), offset) ||
-    blockBodyContainsOffset(closestAst(node, CompositeTypeDeclarationAst.cast), offset) ||
-    blockBodyContainsOffset(closestAst(node, TypesBlockAst.cast), offset) ||
-    blockBodyContainsOffset(closestAst(node, GenericBlockDeclarationAst.cast), offset)
+  return blockBodyContainsOffset(
+    closestAst(
+      node,
+      any<BracedBlock>(
+        ModelDeclarationAst.cast,
+        CompositeTypeDeclarationAst.cast,
+        TypesBlockAst.cast,
+        GenericBlockDeclarationAst.cast,
+      ),
+    ),
+    offset,
   );
 }
 
@@ -406,9 +413,10 @@ function unsupported(offset: number): UnsupportedPslCompletionContext {
 
 function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
   return (
-    closestAst(node, AttributeArgListAst.cast) !== undefined ||
-    closestAst(node, FieldAttributeAst.cast) !== undefined ||
-    closestAst(node, ModelAttributeAst.cast) !== undefined
+    closestAst(
+      node,
+      any<AstNode>(AttributeArgListAst.cast, FieldAttributeAst.cast, ModelAttributeAst.cast),
+    ) !== undefined
   );
 }
 
