@@ -148,7 +148,7 @@ function classifyModelFieldType(input: {
   }
 
   const fieldNameStart = fieldName.syntax.offset;
-  const fieldNameEnd = endOffset(fieldName.syntax);
+  const fieldNameEnd = fieldName.syntax.endOffset;
   if (input.offset >= fieldNameStart && input.offset <= fieldNameEnd) {
     return unsupported(input.offset);
   }
@@ -159,7 +159,7 @@ function classifyModelFieldType(input: {
   }
 
   const typeStart = typeAnnotation.syntax.offset;
-  const typeEnd = endOffset(typeAnnotation.syntax);
+  const typeEnd = typeAnnotation.syntax.endOffset;
   if (typeAnnotation.syntax.textLength === 0) {
     const fieldNameToken = fieldName.syntax.lastToken;
     if (
@@ -292,7 +292,7 @@ function declarationBodyContainsOffset(
   }
   const bodyStart = lbrace.offset + lbrace.text.length;
   const rbrace = declaration.rbrace();
-  const bodyEnd = rbrace?.offset ?? endOffset(declaration.syntax);
+  const bodyEnd = rbrace?.offset ?? declaration.syntax.endOffset;
   return offset >= bodyStart && offset <= bodyEnd;
 }
 
@@ -309,7 +309,7 @@ function namespaceBodyContainsOffset(
   }
   const bodyStart = lbrace.offset + lbrace.text.length;
   const rbrace = namespace.rbrace();
-  const bodyEnd = rbrace?.offset ?? endOffset(namespace.syntax);
+  const bodyEnd = rbrace?.offset ?? namespace.syntax.endOffset;
   return offset >= bodyStart && offset <= bodyEnd;
 }
 
@@ -422,7 +422,7 @@ function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
  * slicing the cursor segment's own identifier-token text.
  */
 function typeNamePrefix(name: QualifiedNameAst, offset: number): TypeNamePrefix | undefined {
-  const cursor = Math.min(offset, endOffset(name.syntax));
+  const cursor = Math.min(offset, name.syntax.endOffset);
   const segments = Array.from(filterChildren(name.syntax, IdentifierAst.cast));
 
   const colon = name.colon();
@@ -602,12 +602,8 @@ function onlyWhitespaceBetween(from: SyntaxToken, toOffset: number): boolean {
 
 function containsOffset(node: SyntaxNode, offset: number): boolean {
   const start = node.offset;
-  const end = endOffset(node);
+  const end = node.endOffset;
   return node.textLength === 0 ? offset === start : offset >= start && offset <= end;
-}
-
-function endOffset(node: SyntaxNode): number {
-  return node.offset + node.textLength;
 }
 
 function tokenEndOffset(token: SyntaxToken): number {

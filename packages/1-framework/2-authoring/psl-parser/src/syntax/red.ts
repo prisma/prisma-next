@@ -140,6 +140,10 @@ export class SyntaxNode {
     return this.green.textLength;
   }
 
+  get endOffset(): number {
+    return this.offset + this.textLength;
+  }
+
   get firstChild(): SyntaxElement | undefined {
     return childAt(this, 0);
   }

@@ -201,6 +201,14 @@ describe('SyntaxNode.textLength', () => {
   });
 });
 
+describe('SyntaxNode.endOffset', () => {
+  it('is the sum of offset and textLength', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const node = firstNodeOfKind(root, 'FieldDeclaration');
+    expect(node.endOffset).toBe(node.offset + node.textLength);
+  });
+});
+
 describe('SyntaxNode.ancestors', () => {
   it('walks from node to root', () => {
     const root = createSyntaxTree(buildSampleTree());
