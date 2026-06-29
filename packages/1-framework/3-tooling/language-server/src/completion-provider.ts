@@ -132,20 +132,18 @@ function provideDeclarationKeywordCompletionItems(
     end: sourceFile.positionAt(context.offset),
   };
 
-  return declarationKeywordCandidates(context.scope, source)
-    .filter((candidate) => candidate.label.startsWith(context.prefix))
-    .map((candidate) => ({
-      label: candidate.label,
-      kind: candidate.kind,
-      detail: candidate.detail,
-      sortText: declarationKeywordSortText(candidate),
-      filterText: candidate.label,
-      ...(clientSupportsSnippets ? { insertTextFormat: InsertTextFormat.Snippet } : {}),
-      textEdit: {
-        range: replacementRange,
-        newText: clientSupportsSnippets ? candidate.snippetText : candidate.insertText,
-      },
-    }));
+  return declarationKeywordCandidates(context.scope, source).map((candidate) => ({
+    label: candidate.label,
+    kind: candidate.kind,
+    detail: candidate.detail,
+    sortText: declarationKeywordSortText(candidate),
+    filterText: candidate.label,
+    ...(clientSupportsSnippets ? { insertTextFormat: InsertTextFormat.Snippet } : {}),
+    textEdit: {
+      range: replacementRange,
+      newText: clientSupportsSnippets ? candidate.snippetText : candidate.insertText,
+    },
+  }));
 }
 
 function declarationKeywordCandidates(
@@ -231,7 +229,6 @@ function provideGenericBlockParameterCompletionItems(
 
   return Object.keys(descriptor.parameters)
     .filter((parameterName) => !existing.has(parameterName))
-    .filter((parameterName) => parameterName.startsWith(context.prefix))
     .map((parameterName, index) => ({
       label: parameterName,
       kind: CompletionItemKind.Property,
@@ -255,19 +252,17 @@ function provideModelFieldTypeCompletionItems(
     end: sourceFile.positionAt(context.offset),
   };
 
-  return candidatesForContext(context, source)
-    .filter((candidate) => candidate.filterText.startsWith(context.prefix.name))
-    .map((candidate) => ({
-      label: candidate.label,
-      kind: candidate.kind,
-      detail: candidate.detail,
-      sortText: sortText(candidate),
-      filterText: candidate.filterText,
-      textEdit: {
-        range: replacementRange,
-        newText: candidate.insertText,
-      },
-    }));
+  return candidatesForContext(context, source).map((candidate) => ({
+    label: candidate.label,
+    kind: candidate.kind,
+    detail: candidate.detail,
+    sortText: sortText(candidate),
+    filterText: candidate.filterText,
+    textEdit: {
+      range: replacementRange,
+      newText: candidate.insertText,
+    },
+  }));
 }
 
 function candidatesForContext(

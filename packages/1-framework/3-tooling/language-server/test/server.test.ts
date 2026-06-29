@@ -540,7 +540,14 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
     });
 
     const items = completionItems(await requestCompletion(harness, schemaUri, updated.position));
-    expect(items.map((item) => item.label)).toEqual(['User']);
+    expect(items.map((item) => item.label)).toEqual([
+      'Boolean',
+      'DateTime',
+      'Int',
+      'String',
+      'Post',
+      'User',
+    ]);
     await republished;
   });
 
@@ -552,7 +559,7 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
     await harness.waitForDiagnostics(schemaUri);
 
     const items = completionItems(await requestCompletion(harness, schemaUri, position));
-    expect(items.map((item) => item.label)).toEqual(['where']);
+    expect(items.map((item) => item.label)).toEqual(['on', 'where', 'mode']);
   });
 
   it('returns declaration keyword completions with plain-text edits by default', async () => {
