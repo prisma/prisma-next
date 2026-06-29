@@ -1,18 +1,30 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import type { FieldSymbol, PslSpan, ResolvedAttribute } from '@prisma-next/psl-parser';
+import type {
+  FieldSymbol,
+  InferAttr,
+  InterpretCtx,
+  ModelSymbol,
+  PslDiagnostic,
+  PslSpan,
+  SymbolTable,
+} from '@prisma-next/psl-parser';
+import {
+  fieldAttribute,
+  fieldRef,
+  identifierName,
+  interpretAttribute,
+  list,
+  nodePslSpan,
+  optional,
+  str,
+} from '@prisma-next/psl-parser';
+import type { FieldAttributeAst, SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 
-import {
-  getNamedArgument,
-  getPositionalArgumentEntry,
-  parseFieldList,
-  parseQuotedStringLiteral,
-  unquoteStringLiteral,
-} from './psl-attribute-parsing';
 import { checkUncomposedNamespace, reportUncomposedNamespace } from './psl-column-resolution';
 
 export const REFERENTIAL_ACTION_MAP: Record<string, ReferentialAction | undefined> = {
@@ -90,150 +102,142 @@ export function normalizeReferentialAction(input: {
   return undefined;
 }
 
-export function parseRelationAttribute(input: {
-  readonly attribute: ResolvedAttribute;
-  readonly modelName: string;
-  readonly fieldName: string;
+/**
+ * Cross-argument rules the engine cannot express through per-argument leaves:
+ * `fields` and `references` are both-or-neither. Anchored to the attribute span
+ * with the legacy code, preserving codes-and-spans parity for that error path.
+ */
+function relationInvariants(
+  parsed: { readonly fields?: readonly string[]; readonly references?: readonly string[] },
+  ctx: InterpretCtx,
+): readonly PslDiagnostic[] {
+  const hasFields = parsed.fields !== undefined;
+  const hasReferences = parsed.references !== undefined;
+  if (hasFields !== hasReferences) {
+    return [
+      {
+        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+        message: `Relation field "${ctx.selfModel.name}.${ctx.field?.name ?? ''}" requires fields and references arguments`,
+        sourceId: ctx.sourceId,
+        span: relationAttributeSpan(ctx),
+      },
+    ];
+  }
+  return [];
+}
+
+/**
+ * Declarative replacement for the hand-written `@relation` parser. The engine
+ * binds the positional-or-named `name`, the `fields`/`references` field lists,
+ * `map`, and the bare-identifier referential actions; `relationInvariants`
+ * holds the both-or-neither rule. The action set itself is validated downstream
+ * by `normalizeReferentialAction`, so the actions are parsed to their raw
+ * identifier name here without a parse-time set check.
+ */
+const sqlRelation = fieldAttribute('relation', {
+  positional: [{ key: 'name', type: optional(str()) }],
+  named: {
+    name: optional(str()),
+    fields: optional(list(fieldRef('self'), { nonEmpty: true })),
+    references: optional(list(fieldRef('referenced'), { nonEmpty: true })),
+    map: optional(str()),
+    onDelete: optional(identifierName()),
+    onUpdate: optional(identifierName()),
+  },
+  refine: relationInvariants,
+  diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
+});
+
+type SqlRelationOutput = InferAttr<typeof sqlRelation>;
+
+function findRelationAttributeNode(field: FieldSymbol): FieldAttributeAst | undefined {
+  for (const attribute of field.node.attributes()) {
+    if (attribute.name()?.path().join('.') === 'relation') {
+      return attribute;
+    }
+  }
+  return undefined;
+}
+
+function relationAttributeSpan(ctx: InterpretCtx): PslSpan {
+  const field = ctx.field;
+  if (field !== undefined) {
+    const node = findRelationAttributeNode(field);
+    if (node !== undefined) {
+      return nodePslSpan(node.syntax, ctx.sourceFile);
+    }
+    return field.span;
+  }
+  return ctx.selfModel.span;
+}
+
+function resolveReferencedModel(symbols: SymbolTable, field: FieldSymbol): ModelSymbol | undefined {
+  const topLevel = symbols.topLevel.models[field.typeName];
+  if (topLevel !== undefined) {
+    return topLevel;
+  }
+  for (const namespace of Object.values(symbols.topLevel.namespaces)) {
+    const model = namespace.models[field.typeName];
+    if (model !== undefined) {
+      return model;
+    }
+  }
+  return undefined;
+}
+
+function buildRelationInterpretCtx(input: {
+  readonly selfModel: ModelSymbol;
+  readonly field: FieldSymbol;
+  readonly symbols: SymbolTable;
+  readonly sourceFile: SourceFile;
+  readonly sourceId: string;
+}): InterpretCtx {
+  return {
+    level: 'field',
+    diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
+    sourceId: input.sourceId,
+    sourceFile: input.sourceFile,
+    symbols: input.symbols,
+    selfModel: input.selfModel,
+    field: input.field,
+    resolveReferencedModel: () => resolveReferencedModel(input.symbols, input.field),
+  };
+}
+
+/**
+ * Validates and lowers a field's `@relation` attribute through the declarative
+ * `sqlRelation` spec, mapping the inferred output onto `ParsedRelationAttribute`.
+ * The engine aggregates every error path's diagnostics; like the previous
+ * first-error parser, the caller skips the field when this returns `undefined`.
+ */
+export function interpretRelationAttribute(input: {
+  readonly selfModel: ModelSymbol;
+  readonly field: FieldSymbol;
+  readonly symbols: SymbolTable;
+  readonly sourceFile: SourceFile;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): ParsedRelationAttribute | undefined {
-  const positionalEntries = input.attribute.args.filter((arg) => arg.kind === 'positional');
-  if (positionalEntries.length > 1) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-      message: `Relation field "${input.modelName}.${input.fieldName}" has too many positional arguments`,
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
+  const attributeNode = findRelationAttributeNode(input.field);
+  if (attributeNode === undefined) {
     return undefined;
   }
-
-  let relationNameFromPositional: string | undefined;
-  const positionalNameEntry = getPositionalArgumentEntry(input.attribute);
-  if (positionalNameEntry) {
-    const parsedName = parseQuotedStringLiteral(positionalNameEntry.value);
-    if (!parsedName) {
-      input.diagnostics.push({
-        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-        message: `Relation field "${input.modelName}.${input.fieldName}" positional relation name must be a quoted string literal`,
-        sourceId: input.sourceId,
-        span: positionalNameEntry.span,
-      });
-      return undefined;
+  const ctx = buildRelationInterpretCtx(input);
+  const result = interpretAttribute(attributeNode, sqlRelation, ctx);
+  if (!result.ok) {
+    for (const failure of result.failure) {
+      input.diagnostics.push(failure);
     }
-    relationNameFromPositional = parsedName;
-  }
-
-  for (const arg of input.attribute.args) {
-    if (arg.kind === 'positional') {
-      continue;
-    }
-    if (
-      arg.name !== 'name' &&
-      arg.name !== 'fields' &&
-      arg.name !== 'references' &&
-      arg.name !== 'map' &&
-      arg.name !== 'onDelete' &&
-      arg.name !== 'onUpdate'
-    ) {
-      input.diagnostics.push({
-        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-        message: `Relation field "${input.modelName}.${input.fieldName}" has unsupported argument "${arg.name}"`,
-        sourceId: input.sourceId,
-        span: arg.span,
-      });
-      return undefined;
-    }
-  }
-
-  const namedRelationNameRaw = getNamedArgument(input.attribute, 'name');
-  const namedRelationName = namedRelationNameRaw
-    ? parseQuotedStringLiteral(namedRelationNameRaw)
-    : undefined;
-  if (namedRelationNameRaw && !namedRelationName) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-      message: `Relation field "${input.modelName}.${input.fieldName}" named relation name must be a quoted string literal`,
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
     return undefined;
   }
-
-  if (
-    relationNameFromPositional &&
-    namedRelationName &&
-    relationNameFromPositional !== namedRelationName
-  ) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-      message: `Relation field "${input.modelName}.${input.fieldName}" has conflicting positional and named relation names`,
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return undefined;
-  }
-  const relationName = namedRelationName ?? relationNameFromPositional;
-
-  const constraintNameRaw = getNamedArgument(input.attribute, 'map');
-  const constraintName = constraintNameRaw
-    ? parseQuotedStringLiteral(constraintNameRaw)
-    : undefined;
-  if (constraintNameRaw && !constraintName) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-      message: `Relation field "${input.modelName}.${input.fieldName}" map argument must be a quoted string literal`,
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return undefined;
-  }
-
-  const fieldsRaw = getNamedArgument(input.attribute, 'fields');
-  const referencesRaw = getNamedArgument(input.attribute, 'references');
-  if ((fieldsRaw && !referencesRaw) || (!fieldsRaw && referencesRaw)) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-      message: `Relation field "${input.modelName}.${input.fieldName}" requires fields and references arguments`,
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return undefined;
-  }
-
-  let fields: readonly string[] | undefined;
-  let references: readonly string[] | undefined;
-  if (fieldsRaw && referencesRaw) {
-    const parsedFields = parseFieldList(fieldsRaw);
-    const parsedReferences = parseFieldList(referencesRaw);
-    if (
-      !parsedFields ||
-      !parsedReferences ||
-      parsedFields.length === 0 ||
-      parsedReferences.length === 0
-    ) {
-      input.diagnostics.push({
-        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-        message: `Relation field "${input.modelName}.${input.fieldName}" requires bracketed fields and references lists`,
-        sourceId: input.sourceId,
-        span: input.attribute.span,
-      });
-      return undefined;
-    }
-    fields = parsedFields;
-    references = parsedReferences;
-  }
-
-  const onDeleteArgument = getNamedArgument(input.attribute, 'onDelete');
-  const onUpdateArgument = getNamedArgument(input.attribute, 'onUpdate');
-
+  const parsed: SqlRelationOutput = result.value;
   return {
-    ...ifDefined('relationName', relationName),
-    ...ifDefined('fields', fields),
-    ...ifDefined('references', references),
-    ...ifDefined('constraintName', constraintName),
-    ...ifDefined('onDelete', onDeleteArgument ? unquoteStringLiteral(onDeleteArgument) : undefined),
-    ...ifDefined('onUpdate', onUpdateArgument ? unquoteStringLiteral(onUpdateArgument) : undefined),
+    ...ifDefined('relationName', parsed.name),
+    ...ifDefined('fields', parsed.fields),
+    ...ifDefined('references', parsed.references),
+    ...ifDefined('constraintName', parsed.map),
+    ...ifDefined('onDelete', parsed.onDelete),
+    ...ifDefined('onUpdate', parsed.onUpdate),
   };
 }
 
