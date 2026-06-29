@@ -42,8 +42,11 @@ describe('classifyPslCompletionContext', () => {
     });
   });
 
-  it('does not classify declaration keyword prefixes after other tokens on the same line', () => {
-    expectUnsupported('model User {} mo|');
+  it('offers a declaration keyword after a closing brace on the same line', () => {
+    expect(classify('model User {} mo|')).toMatchObject({
+      kind: 'declarationKeyword',
+      scope: 'document',
+    });
   });
 
   it('classifies blank namespace-body declaration keyword positions', () => {

@@ -1,5 +1,6 @@
 import {
   AttributeArgListAst,
+  type BracedBlock,
   CompositeTypeDeclarationAst,
   type DocumentAst,
   FieldAttributeAst,
@@ -129,10 +130,10 @@ export function classifyPslCompletionContext(
   if (field === undefined) {
     return unsupported(offset);
   }
-  const inModelOrComposite =
-    closestAst(field.syntax, ModelDeclarationAst.cast) !== undefined ||
-    closestAst(field.syntax, CompositeTypeDeclarationAst.cast) !== undefined;
-  if (!inModelOrComposite) {
+  if (
+    closestAst(field.syntax, ModelDeclarationAst.cast, CompositeTypeDeclarationAst.cast) ===
+    undefined
+  ) {
     return unsupported(offset);
   }
 
@@ -202,43 +203,12 @@ function classifyModelFieldType(input: {
     return unsupported(input.offset);
   }
 
-  const position = classifyTypePosition(name);
-
-  switch (position.kind) {
-    case 'modelType':
-      return {
-        kind: 'modelType',
-        offset: input.offset,
-        fieldName: fieldNameText,
-        replacementStartOffset: input.replacementStartOffset,
-      };
-    case 'spaceMember':
-      return {
-        kind: 'spaceMember',
-        offset: input.offset,
-        fieldName: fieldNameText,
-        replacementStartOffset: input.replacementStartOffset,
-        space: position.space,
-      };
-    case 'namespaceMember':
-      return {
-        kind: 'namespaceMember',
-        offset: input.offset,
-        fieldName: fieldNameText,
-        replacementStartOffset: input.replacementStartOffset,
-        namespace: position.namespace,
-      };
-  }
+  return classifyTypePosition(name, input.offset, fieldNameText, input.replacementStartOffset);
 }
 
-type TypePosition =
-  | { readonly kind: 'modelType' }
-  | { readonly kind: 'spaceMember'; readonly space: string }
-  | { readonly kind: 'namespaceMember'; readonly namespace: string };
-
 /**
- * Resolves which type-completion position a qualified name sits in. Roles are
- * read straight off the separator-positional accessors: a populated namespace
+ * Builds the type-completion context for a qualified name. Roles are read
+ * straight off the separator-positional accessors: a populated namespace
  * segment is a `.`-qualified name, a populated space segment is a `:`-qualified
  * name, and the absence of both is a bare model type.
  *
@@ -248,16 +218,21 @@ type TypePosition =
  * carries no populated segment and resolves to `modelType` rather than
  * `unsupported`.
  */
-function classifyTypePosition(name: QualifiedNameAst): TypePosition {
+function classifyTypePosition(
+  name: QualifiedNameAst,
+  offset: number,
+  fieldName: string,
+  replacementStartOffset: number,
+): ModelTypeCompletionContext | SpaceMemberCompletionContext | NamespaceMemberCompletionContext {
   const namespace = name.namespace()?.name();
   if (namespace !== undefined && namespace.length > 0) {
-    return { kind: 'namespaceMember', namespace };
+    return { kind: 'namespaceMember', offset, fieldName, replacementStartOffset, namespace };
   }
   const space = name.space()?.name();
   if (space !== undefined && space.length > 0) {
-    return { kind: 'spaceMember', space };
+    return { kind: 'spaceMember', offset, fieldName, replacementStartOffset, space };
   }
-  return { kind: 'modelType' };
+  return { kind: 'modelType', offset, fieldName, replacementStartOffset };
 }
 
 function classifyDeclarationKeyword(input: {
@@ -271,7 +246,7 @@ function classifyDeclarationKeyword(input: {
   }
 
   const namespace = closestAst(input.node, NamespaceDeclarationAst.cast);
-  const scope = namespaceBodyContainsOffset(namespace, input.offset) ? 'namespace' : 'document';
+  const scope = blockBodyContainsOffset(namespace, input.offset) ? 'namespace' : 'document';
 
   const prefixToken = cursorIdentifier(input.at, input.offset);
   if (!declarationKeywordAllowed(prefixToken, namespace, input)) {
@@ -287,9 +262,11 @@ function classifyDeclarationKeyword(input: {
 }
 
 /**
- * A declaration keyword may be completed only when nothing but whitespace
- * precedes the cursor on its line — i.e. the previous significant token is on an
- * earlier line, is absent, or is the enclosing namespace's opening brace.
+ * A declaration keyword may be completed where a new declaration can begin: at
+ * the start of the document or namespace body, immediately after a previous
+ * declaration's closing `}`, or right after the enclosing namespace's opening
+ * brace. Newlines are trivia and play no role — `model A {} model B {}` is valid
+ * PSL on a single line.
  */
 function declarationKeywordAllowed(
   prefixToken: SyntaxToken | undefined,
@@ -303,61 +280,32 @@ function declarationKeywordAllowed(
   if (previous === undefined) {
     return true;
   }
-
-  const start = prefixToken?.offset ?? input.offset;
-  if (newlineBetween(previous, start)) {
+  if (previous.kind === 'RBrace') {
     return true;
   }
-
   const lbrace = namespace?.lbrace();
   return lbrace !== undefined && lbrace.offset === previous.offset;
 }
 
 function isInsideNonDeclarationKeywordBody(node: SyntaxNode | undefined, offset: number): boolean {
   return (
-    declarationBodyContainsOffset(closestAst(node, ModelDeclarationAst.cast), offset) ||
-    declarationBodyContainsOffset(closestAst(node, CompositeTypeDeclarationAst.cast), offset) ||
-    declarationBodyContainsOffset(closestAst(node, TypesBlockAst.cast), offset) ||
-    declarationBodyContainsOffset(closestAst(node, GenericBlockDeclarationAst.cast), offset)
+    blockBodyContainsOffset(closestAst(node, ModelDeclarationAst.cast), offset) ||
+    blockBodyContainsOffset(closestAst(node, CompositeTypeDeclarationAst.cast), offset) ||
+    blockBodyContainsOffset(closestAst(node, TypesBlockAst.cast), offset) ||
+    blockBodyContainsOffset(closestAst(node, GenericBlockDeclarationAst.cast), offset)
   );
 }
 
-function declarationBodyContainsOffset(
-  declaration:
-    | CompositeTypeDeclarationAst
-    | GenericBlockDeclarationAst
-    | ModelDeclarationAst
-    | TypesBlockAst
-    | undefined,
-  offset: number,
-): boolean {
-  if (declaration === undefined) {
+function blockBodyContainsOffset(block: BracedBlock | undefined, offset: number): boolean {
+  if (block === undefined) {
     return false;
   }
-  const lbrace = declaration.lbrace();
+  const lbrace = block.lbrace();
   if (lbrace === undefined) {
     return false;
   }
   const bodyStart = lbrace.endOffset;
-  const rbrace = declaration.rbrace();
-  const bodyEnd = rbrace?.offset ?? declaration.syntax.endOffset;
-  return offset >= bodyStart && offset <= bodyEnd;
-}
-
-function namespaceBodyContainsOffset(
-  namespace: NamespaceDeclarationAst | undefined,
-  offset: number,
-): boolean {
-  if (namespace === undefined) {
-    return false;
-  }
-  const lbrace = namespace.lbrace();
-  if (lbrace === undefined) {
-    return false;
-  }
-  const bodyStart = lbrace.endOffset;
-  const rbrace = namespace.rbrace();
-  const bodyEnd = rbrace?.offset ?? namespace.syntax.endOffset;
+  const bodyEnd = block.rbrace()?.offset ?? block.syntax.endOffset;
   return offset >= bodyStart && offset <= bodyEnd;
 }
 
@@ -376,13 +324,7 @@ function classifyGenericBlockParameter(input: {
     return unsupported(input.offset);
   }
 
-  const lbrace = block.lbrace();
-  if (lbrace === undefined || input.offset < lbrace.offset + lbrace.text.length) {
-    return unsupported(input.offset);
-  }
-
-  const rbrace = block.rbrace();
-  if (rbrace !== undefined && input.offset > rbrace.offset) {
+  if (!blockBodyContainsOffset(block, input.offset)) {
     return unsupported(input.offset);
   }
 
@@ -472,18 +414,18 @@ function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
 
 function closestAst<T>(
   node: SyntaxNode | undefined,
-  cast: (node: SyntaxNode) => T | undefined,
+  ...casts: ReadonlyArray<(node: SyntaxNode) => T | undefined>
 ): T | undefined {
   if (node === undefined) {
     return undefined;
   }
-  const current = cast(node);
-  if (current !== undefined) {
-    return current;
-  }
-  for (const ancestor of node.ancestors()) {
-    const result = cast(ancestor);
-    if (result !== undefined) return result;
+  for (const candidate of [node, ...node.ancestors()]) {
+    for (const cast of casts) {
+      const result = cast(candidate);
+      if (result !== undefined) {
+        return result;
+      }
+    }
   }
   return undefined;
 }
@@ -508,15 +450,4 @@ function cursorIdentifier(at: TokenAtOffset, offset: number): SyntaxToken | unde
     return left;
   }
   return undefined;
-}
-
-/** Whether a newline trivia token separates `from` from `toOffset`. */
-function newlineBetween(from: SyntaxToken, toOffset: number): boolean {
-  for (let token = from.nextToken; token !== undefined && token.offset < toOffset; ) {
-    if (token.kind === 'Newline') {
-      return true;
-    }
-    token = token.nextToken;
-  }
-  return false;
 }
