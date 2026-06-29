@@ -77,7 +77,6 @@ export interface DeclarationKeywordCompletionContext {
 
 export interface UnsupportedPslCompletionContext {
   readonly kind: 'unsupported';
-  readonly offset: number;
 }
 
 export type PslCompletionContext =
@@ -89,6 +88,8 @@ export type PslCompletionContext =
   | SpaceMemberCompletionContext
   | UnsupportedPslCompletionContext;
 
+const UNSUPPORTED: UnsupportedPslCompletionContext = { kind: 'unsupported' };
+
 export function classifyPslCompletionContext(
   input: ClassifyPslCompletionContextInput,
 ): PslCompletionContext {
@@ -98,7 +99,7 @@ export function classifyPslCompletionContext(
 
   // Completion is never offered when the cursor sits inside a comment.
   if (at.leftBiased()?.kind === 'Comment') {
-    return unsupported(offset);
+    return UNSUPPORTED;
   }
 
   // Anchor on the token left of the cursor and navigate outward via
@@ -131,13 +132,13 @@ export function classifyPslCompletionContext(
 
   const field = contextNode?.findAncestor(FieldDeclarationAst.cast);
   if (field === undefined) {
-    return unsupported(offset);
+    return UNSUPPORTED;
   }
   if (
     field.syntax.findAncestor(any(ModelDeclarationAst.cast, CompositeTypeDeclarationAst.cast)) ===
     undefined
   ) {
-    return unsupported(offset);
+    return UNSUPPORTED;
   }
 
   return classifyModelFieldType({
@@ -154,22 +155,22 @@ function classifyModelFieldType(input: {
 }): PslCompletionContext {
   const fieldName = input.field.name();
   if (fieldName === undefined) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
   const fieldNameText = fieldName.name();
   if (fieldNameText === undefined) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
 
   const fieldNameEnd = fieldName.syntax.endOffset;
 
   if (fieldName.syntax.isInside(input.offset)) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
 
   const typeAnnotation = input.field.typeAnnotation();
   if (typeAnnotation === undefined) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
 
   const typeStart = typeAnnotation.syntax.offset;
@@ -183,27 +184,27 @@ function classifyModelFieldType(input: {
         replacementStartOffset: input.offset,
       };
     }
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
 
   if (typeAnnotation.syntax.isOutside(input.offset)) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
 
   const constructorArgList = typeAnnotation.argList();
   if (constructorArgList?.syntax.isInside(input.offset)) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
 
   const name = typeAnnotation.name();
   if (name === undefined) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
   if (name.syntax.isOutside(input.offset)) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
   if (name.isOverQualified()) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
 
   return classifyTypePosition(name, input.offset, fieldNameText, input.replacementStartOffset);
@@ -329,21 +330,21 @@ function classifyGenericBlockParameter(input: {
   }
 
   if (hasUnsupportedAncestor(input.node)) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
 
   if (!blockBodyContainsOffset(block, input.offset)) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
 
   const field = input.node?.findAncestor(FieldDeclarationAst.cast);
   if (field?.syntax.isInside(input.offset)) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
 
   const keyword = block.keyword()?.text;
   if (keyword === undefined || keyword.length === 0) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
 
   // Value position: the cursor follows a `=`. The position is now classified
@@ -359,7 +360,7 @@ function classifyGenericBlockParameter(input: {
 
   const activePair = activeKeyValuePair(input.node, input.offset);
   if (activePair !== undefined && isAfterEquals(activePair, input.offset)) {
-    return unsupported(input.offset);
+    return UNSUPPORTED;
   }
 
   return {
@@ -406,10 +407,6 @@ function existingParameterNames(
 
 function sameSpan(left: SyntaxNode, right: SyntaxNode): boolean {
   return left.offset === right.offset && left.textLength === right.textLength;
-}
-
-function unsupported(offset: number): UnsupportedPslCompletionContext {
-  return { kind: 'unsupported', offset };
 }
 
 function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
