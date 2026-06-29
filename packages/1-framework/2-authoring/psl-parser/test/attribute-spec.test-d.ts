@@ -60,3 +60,14 @@ test('a variadic positional slot contributes an array property', () => {
   });
   expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ tags: readonly string[] }>();
 });
+
+test('a spec carrying a refine still infers its output', () => {
+  const spec = fieldAttribute('demo', {
+    named: { name: optional(str()) },
+    refine: (parsed) => {
+      void parsed.name;
+      return [];
+    },
+  });
+  expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ name?: string }>();
+});
