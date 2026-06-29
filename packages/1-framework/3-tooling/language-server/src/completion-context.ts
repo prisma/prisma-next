@@ -131,7 +131,7 @@ export function classifyPslCompletionContext(
     return unsupported(offset);
   }
   if (
-    closestAst(field.syntax, ModelDeclarationAst.cast, CompositeTypeDeclarationAst.cast) ===
+    closestAst(field.syntax, any(ModelDeclarationAst.cast, CompositeTypeDeclarationAst.cast)) ===
     undefined
   ) {
     return unsupported(offset);
@@ -414,20 +414,36 @@ function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
 
 function closestAst<T>(
   node: SyntaxNode | undefined,
-  ...casts: ReadonlyArray<(node: SyntaxNode) => T | undefined>
+  cast: (node: SyntaxNode) => T | undefined,
 ): T | undefined {
   if (node === undefined) {
     return undefined;
   }
-  for (const candidate of [node, ...node.ancestors()]) {
+  const current = cast(node);
+  if (current !== undefined) {
+    return current;
+  }
+  for (const ancestor of node.ancestors()) {
+    const result = cast(ancestor);
+    if (result !== undefined) {
+      return result;
+    }
+  }
+  return undefined;
+}
+
+function any<T>(
+  ...casts: ReadonlyArray<(node: SyntaxNode) => T | undefined>
+): (node: SyntaxNode) => T | undefined {
+  return (node) => {
     for (const cast of casts) {
-      const result = cast(candidate);
+      const result = cast(node);
       if (result !== undefined) {
         return result;
       }
     }
-  }
-  return undefined;
+    return undefined;
+  };
 }
 
 /** The nearest non-trivia token ending at or before the cursor. */
