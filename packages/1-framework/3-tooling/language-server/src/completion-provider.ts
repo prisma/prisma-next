@@ -269,7 +269,7 @@ function candidatesForContext(
   context: ModelFieldTypeCompletionContext,
   source: PslCompletionCandidateSource,
 ): readonly ModelTypeCompletionCandidate[] {
-  const namespace = context.prefix.namespace;
+  const namespace = context.namespace;
   if (namespace !== undefined) {
     return namespaceCandidates(source.symbolTable?.topLevel.namespaces[namespace]);
   }
