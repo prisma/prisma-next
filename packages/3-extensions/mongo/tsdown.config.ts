@@ -6,7 +6,6 @@ export default defineConfig({
     'src/exports/config.ts',
     'src/exports/contract-builder.ts',
     'src/exports/control.ts',
-    'src/exports/enums.ts',
     'src/exports/family.ts',
     'src/exports/runtime.ts',
     'src/exports/target.ts',

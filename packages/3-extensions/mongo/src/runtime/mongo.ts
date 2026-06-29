@@ -1,6 +1,8 @@
 import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
+import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contract/enum-accessor';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
   AnyMongoTypeMaps,
@@ -17,6 +19,7 @@ import {
   createMongoRuntime,
 } from '@prisma-next/mongo-runtime';
 import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type MongoBinding,
@@ -24,13 +27,17 @@ import {
   resolveMongoBinding,
   resolveOptionalMongoBinding,
 } from './binding';
-import type { UnboundEnums } from './enums';
-import { buildEnums } from './enums';
 
-export type { UnboundEnums } from './enums';
-export { mongoEnums } from './enums';
+export type MongoTargetId = typeof mongoRuntimeTarget.targetId;
 
-export type MongoTargetId = 'mongo';
+type UnboundEnums<TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>> =
+  NamespacedEnums<TContract>[typeof UNBOUND_NAMESPACE_ID];
+
+function unboundNamespace<T>(builderOutput: { readonly [UNBOUND_NAMESPACE_ID]?: unknown }): T {
+  return blindCast<T, 'the unbound namespace always exists on a mongo builder output'>(
+    builderOutput[UNBOUND_NAMESPACE_ID],
+  );
+}
 
 export interface MongoClient<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
@@ -196,7 +203,9 @@ export default function mongo<
 
   const raw = mongoRaw<TContract>({ contract });
 
-  const enums: UnboundEnums<TContract> = buildEnums<TContract>(contract.domain);
+  const enums: UnboundEnums<TContract> = unboundNamespace(
+    Object.freeze(buildNamespacedEnums(contract.domain)),
+  );
 
   return {
     orm,
