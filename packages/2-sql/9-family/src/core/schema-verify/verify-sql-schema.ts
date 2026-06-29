@@ -119,6 +119,15 @@ export interface VerifySqlSchemaOptions {
    * with contract native types (e.g., Postgres 'varchar' → 'character varying').
    */
   readonly normalizeNativeType?: NativeTypeNormalizer;
+  /**
+   * When set, only the contract tables in these namespace ids are checked
+   * against `schema` (the matching actual namespace node). The full contract is
+   * still consulted for cross-namespace value-set / control-policy resolution.
+   * Used by the multi-schema verify, which pairs each contract namespace to its
+   * own actual node. Absent ⇒ all contract namespaces are checked against the
+   * single (flat) `schema` — the single-schema / SQLite path.
+   */
+  readonly restrictToNamespaceIds?: ReadonlySet<string>;
 }
 
 /**
@@ -158,6 +167,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     storageTypes,
     ...ifDefined('normalizeDefault', normalizeDefault),
     ...ifDefined('normalizeNativeType', normalizeNativeType),
+    ...ifDefined('restrictToNamespaceIds', options.restrictToNamespaceIds),
   });
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
@@ -305,6 +315,7 @@ function verifySchemaTables(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
+  restrictToNamespaceIds?: ReadonlySet<string>;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
   const {
     contract,
@@ -315,6 +326,7 @@ function verifySchemaTables(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
+    restrictToNamespaceIds,
   } = options;
   const contractDefaultControl = contract.defaultControlPolicy;
   const issues: SchemaIssue[] = [];
@@ -325,6 +337,10 @@ function verifySchemaTables(options: {
   );
 
   for (const namespaceId of namespaceIds) {
+    // When the caller pairs each contract namespace to its own actual node, it
+    // restricts the table check to that namespace; the full contract is still
+    // consulted for value-set / control-policy resolution.
+    if (restrictToNamespaceIds !== undefined && !restrictToNamespaceIds.has(namespaceId)) continue;
     const ns = contract.storage.namespaces[namespaceId];
     if (!ns) continue;
     for (const [tableName, contractTableRaw] of Object.entries(ns.entries.table ?? {})) {
