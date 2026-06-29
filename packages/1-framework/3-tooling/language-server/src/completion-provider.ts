@@ -368,12 +368,11 @@ function namespaceCandidates(
 }
 
 function namespaceQualifierCandidate(namespace: NamespaceSymbol): ModelTypeCompletionCandidate {
-  const qualifier = `${namespace.name}.`;
   return {
     category: 'namespace',
-    label: qualifier,
-    insertText: qualifier,
-    filterText: qualifier,
+    label: namespace.name,
+    insertText: namespace.name,
+    filterText: namespace.name,
     detail: 'Namespace',
     kind: CompletionItemKind.Module,
   };

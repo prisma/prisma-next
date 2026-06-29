@@ -193,7 +193,7 @@ describe('providePslCompletionItems', () => {
       'Address',
       'Email',
       'UserId',
-      'auth.',
+      'auth',
     ]);
     expect(items.map((item) => item.detail)).toEqual([
       'Configured scalar type',
@@ -227,17 +227,17 @@ describe('providePslCompletionItems', () => {
       ['model Post {', '  reviewer a|', '}'].join('\n'),
     );
 
-    expect(items.map((item) => item.label)).toEqual(['auth.']);
+    expect(items.map((item) => item.label)).toEqual(['auth']);
     expect(items[0]).toMatchObject({
       kind: CompletionItemKind.Module,
       detail: 'Namespace',
-      filterText: 'auth.',
+      filterText: 'auth',
       textEdit: {
         range: {
           start: sourceFile.positionAt(cursorOffset - 'a'.length),
           end: sourceFile.positionAt(cursorOffset),
         },
-        newText: 'auth.',
+        newText: 'auth',
       },
     });
   });
