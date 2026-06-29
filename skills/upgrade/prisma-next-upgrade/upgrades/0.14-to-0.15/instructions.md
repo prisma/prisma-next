@@ -93,3 +93,13 @@ for two internal substrate changes:
   namespaces. The runtime applies defaults by namespace transparently.
 
 No user action — a re-emit picks up the new contract shape.
+
+<!--
+Exercise Mongo enums in retail-store (this PR): the retail-store example now imports
+the standalone `mongoEnums(...)` export from `@prisma-next/mongo/runtime` to replace
+order-type string literals with typed enum accessors (`enums.OrderType.members.Delivery`/
+`.Pickup`). The `MongoClient` facade also gains a direct `db.execute(plan)` method and
+a `db.raw` property (both additive). None of these changes affect the emitted contract
+shape; a re-emit picks them up automatically. No user action required. Incidental
+substrate diff only.
+-->

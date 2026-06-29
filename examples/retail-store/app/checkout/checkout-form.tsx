@@ -1,5 +1,7 @@
 'use client';
 
+import type { EnumValues } from '@prisma-next/contract/enum-accessor';
+import { blindCast } from '@prisma-next/utils/casts';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useCart } from '../../src/components/cart-provider';
@@ -14,6 +16,7 @@ import {
   SelectValue,
 } from '../../src/components/ui/select';
 import { Separator } from '../../src/components/ui/separator';
+import { enums } from '../../src/enums';
 
 interface CartItem {
   productId: string;
@@ -39,7 +42,9 @@ interface CheckoutFormProps {
 export function CheckoutForm({ defaultAddress, locations, cartItems }: CheckoutFormProps) {
   const router = useRouter();
   const { invalidateCart } = useCart();
-  const [orderType, setOrderType] = useState<'delivery' | 'pickup'>('delivery');
+  const [orderType, setOrderType] = useState<EnumValues<typeof enums.OrderType>>(
+    enums.OrderType.members.Delivery,
+  );
   const [address, setAddress] = useState(defaultAddress);
   const [locationId, setLocationId] = useState(locations[0]?.id ?? '');
   const [loading, setLoading] = useState(false);
@@ -51,11 +56,13 @@ export function CheckoutForm({ defaultAddress, locations, cartItems }: CheckoutF
     setLoading(true);
     try {
       const shippingAddress =
-        orderType === 'delivery' ? address : locations.find((l) => l.id === locationId)?.address;
+        orderType === enums.OrderType.members.Delivery
+          ? address
+          : locations.find((l) => l.id === locationId)?.address;
 
       if (!shippingAddress?.trim()) {
         setError(
-          orderType === 'delivery'
+          orderType === enums.OrderType.members.Delivery
             ? 'Please enter a shipping address.'
             : 'Please select a pickup location.',
         );
@@ -89,24 +96,36 @@ export function CheckoutForm({ defaultAddress, locations, cartItems }: CheckoutF
       <h2 className="font-semibold mb-3">Delivery Method</h2>
       <RadioGroup
         value={orderType}
-        onValueChange={(v: string) => setOrderType(v as 'delivery' | 'pickup')}
+        onValueChange={(v: string) =>
+          setOrderType(
+            blindCast<EnumValues<typeof enums.OrderType>, 'RadioGroup only emits values we passed'>(
+              v,
+            ),
+          )
+        }
         className="mb-4"
       >
         <div className="flex items-center gap-2">
-          <RadioGroupItem value="delivery" id="delivery" />
-          <label htmlFor="delivery" className="text-sm cursor-pointer">
+          <RadioGroupItem
+            value={enums.OrderType.members.Delivery}
+            id={enums.OrderType.members.Delivery}
+          />
+          <label htmlFor={enums.OrderType.members.Delivery} className="text-sm cursor-pointer">
             Home delivery
           </label>
         </div>
         <div className="flex items-center gap-2">
-          <RadioGroupItem value="pickup" id="pickup" />
-          <label htmlFor="pickup" className="text-sm cursor-pointer">
+          <RadioGroupItem
+            value={enums.OrderType.members.Pickup}
+            id={enums.OrderType.members.Pickup}
+          />
+          <label htmlFor={enums.OrderType.members.Pickup} className="text-sm cursor-pointer">
             Store pickup
           </label>
         </div>
       </RadioGroup>
 
-      {orderType === 'delivery' ? (
+      {orderType === enums.OrderType.members.Delivery ? (
         <div className="mb-6">
           <label htmlFor="address" className="text-sm font-medium mb-1.5 block">
             Shipping Address

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { getCartWithUser, upsertCart } from '../src/data/carts';
 import { createInvoice, findInvoiceWithOrder } from '../src/data/invoices';
 import { createOrder, getOrderWithUser } from '../src/data/orders';
+import { enums } from '../src/enums';
 import { setupTestDb } from './setup';
 
 describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
@@ -55,7 +56,7 @@ describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemorySe
         },
       ],
       shippingAddress: '123 St',
-      type: 'delivery',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -87,7 +88,7 @@ describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemorySe
         },
       ],
       shippingAddress: '789 St',
-      type: 'pickup',
+      type: enums.OrderType.members.Pickup,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -104,7 +105,7 @@ describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemorySe
     expect(invoiceWithOrder).not.toBeNull();
     expect(invoiceWithOrder!.order).toMatchObject({
       shippingAddress: '789 St',
-      type: 'pickup',
+      type: enums.OrderType.members.Pickup,
     });
   });
 });
