@@ -28,6 +28,7 @@ import {
 import { IdentifierAst } from '../../src/syntax/ast/identifier';
 import { QualifiedNameAst } from '../../src/syntax/ast/qualified-name';
 import { TypeAnnotationAst } from '../../src/syntax/ast/type-annotation';
+import { any } from '../../src/syntax/ast-helpers';
 import { GreenNodeBuilder } from '../../src/syntax/green-builder';
 import { createSyntaxTree, type SyntaxNode } from '../../src/syntax/red';
 import type { SyntaxKind } from '../../src/syntax/syntax-kind';
@@ -59,6 +60,39 @@ describe('IdentifierAst', () => {
     const green = b.finishNode();
     const root = createSyntaxTree(green);
     expect(IdentifierAst.cast(root)).toBeUndefined();
+  });
+});
+
+describe('any', () => {
+  it('returns the result of the first matching cast', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('ModelDeclaration');
+    const model = createSyntaxTree(b.finishNode());
+    const first = (node: SyntaxNode) => node.kind;
+    const second = (node: SyntaxNode) => node.offset;
+    expect(any(first, second)(model)).toBe('ModelDeclaration');
+  });
+
+  it('classifies different node kinds through the combined predicate', () => {
+    const classify = any(ModelDeclarationAst.cast, FieldDeclarationAst.cast);
+
+    const modelBuilder = new GreenNodeBuilder();
+    modelBuilder.startNode('ModelDeclaration');
+    const model = createSyntaxTree(modelBuilder.finishNode());
+
+    const fieldBuilder = new GreenNodeBuilder();
+    fieldBuilder.startNode('FieldDeclaration');
+    const field = createSyntaxTree(fieldBuilder.finishNode());
+
+    expect(classify(model)).toBeInstanceOf(ModelDeclarationAst);
+    expect(classify(field)).toBeInstanceOf(FieldDeclarationAst);
+  });
+
+  it('returns undefined when no cast matches', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('Document');
+    const document = createSyntaxTree(b.finishNode());
+    expect(any(ModelDeclarationAst.cast, FieldDeclarationAst.cast)(document)).toBeUndefined();
   });
 });
 

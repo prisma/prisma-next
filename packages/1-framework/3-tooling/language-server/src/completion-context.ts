@@ -1,5 +1,6 @@
 import {
   AttributeArgListAst,
+  any,
   type BracedBlock,
   CompositeTypeDeclarationAst,
   type DocumentAst,
@@ -126,13 +127,14 @@ export function classifyPslCompletionContext(
     return genericBlockContext;
   }
 
-  const field = closestAst(contextNode, FieldDeclarationAst.cast);
+  const field = contextNode?.findClosestParent(FieldDeclarationAst.cast);
   if (field === undefined) {
     return unsupported(offset);
   }
   if (
-    closestAst(field.syntax, any(ModelDeclarationAst.cast, CompositeTypeDeclarationAst.cast)) ===
-    undefined
+    field.syntax.findClosestParent(
+      any(ModelDeclarationAst.cast, CompositeTypeDeclarationAst.cast),
+    ) === undefined
   ) {
     return unsupported(offset);
   }
@@ -245,7 +247,7 @@ function classifyDeclarationKeyword(input: {
     return undefined;
   }
 
-  const namespace = closestAst(input.node, NamespaceDeclarationAst.cast);
+  const namespace = input.node?.findClosestParent(NamespaceDeclarationAst.cast);
   const scope = blockBodyContainsOffset(namespace, input.offset) ? 'namespace' : 'document';
 
   const prefixToken = cursorIdentifier(input.at, input.offset);
@@ -289,8 +291,7 @@ function declarationKeywordAllowed(
 
 function isInsideNonDeclarationKeywordBody(node: SyntaxNode | undefined, offset: number): boolean {
   return blockBodyContainsOffset(
-    closestAst(
-      node,
+    node?.findClosestParent(
       any(
         ModelDeclarationAst.cast,
         CompositeTypeDeclarationAst.cast,
@@ -321,7 +322,7 @@ function classifyGenericBlockParameter(input: {
   readonly at: TokenAtOffset;
   readonly replacementStartOffset: number;
 }): PslCompletionContext | undefined {
-  const block = closestAst(input.node, GenericBlockDeclarationAst.cast);
+  const block = input.node?.findClosestParent(GenericBlockDeclarationAst.cast);
   if (block === undefined) {
     return undefined;
   }
@@ -334,7 +335,7 @@ function classifyGenericBlockParameter(input: {
     return unsupported(input.offset);
   }
 
-  const field = closestAst(input.node, FieldDeclarationAst.cast);
+  const field = input.node?.findClosestParent(FieldDeclarationAst.cast);
   if (field?.syntax.isInside(input.offset)) {
     return unsupported(input.offset);
   }
@@ -373,7 +374,7 @@ function activeKeyValuePair(
   node: SyntaxNode | undefined,
   offset: number,
 ): KeyValuePairAst | undefined {
-  const pair = closestAst(node, KeyValuePairAst.cast);
+  const pair = node?.findClosestParent(KeyValuePairAst.cast);
   if (pair === undefined || pair.syntax.isOutside(offset)) {
     return undefined;
   }
@@ -412,50 +413,10 @@ function unsupported(offset: number): UnsupportedPslCompletionContext {
 
 function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
   return (
-    closestAst(
-      node,
+    node?.findClosestParent(
       any(AttributeArgListAst.cast, FieldAttributeAst.cast, ModelAttributeAst.cast),
     ) !== undefined
   );
-}
-
-function closestAst<T>(
-  node: SyntaxNode | undefined,
-  cast: (node: SyntaxNode) => T | undefined,
-): T | undefined {
-  if (node === undefined) {
-    return undefined;
-  }
-  const current = cast(node);
-  if (current !== undefined) {
-    return current;
-  }
-  for (const ancestor of node.ancestors()) {
-    const result = cast(ancestor);
-    if (result !== undefined) {
-      return result;
-    }
-  }
-  return undefined;
-}
-
-type CastTarget<C> = C extends (node: SyntaxNode) => infer R ? Exclude<R, undefined> : never;
-
-function any<Casts extends readonly ((node: SyntaxNode) => unknown)[]>(
-  ...casts: Casts
-): (node: SyntaxNode) => CastTarget<Casts[number]> | undefined;
-function any(
-  ...casts: ReadonlyArray<(node: SyntaxNode) => unknown>
-): (node: SyntaxNode) => unknown {
-  return (node) => {
-    for (const cast of casts) {
-      const result = cast(node);
-      if (result !== undefined) {
-        return result;
-      }
-    }
-    return undefined;
-  };
 }
 
 /** The nearest non-trivia token ending at or before the cursor. */

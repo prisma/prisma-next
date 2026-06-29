@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { FieldDeclarationAst, ModelDeclarationAst } from '../../src/syntax/ast/declarations';
 import { GreenNodeBuilder } from '../../src/syntax/green-builder';
 import { createSyntaxTree, SyntaxNode, SyntaxToken, TokenAtOffset } from '../../src/syntax/red';
 import type { SyntaxKind } from '../../src/syntax/syntax-kind';
@@ -285,6 +286,28 @@ describe('SyntaxNode.ancestors', () => {
     const root = createSyntaxTree(buildSampleTree());
     const ancestors = Array.from(root.ancestors());
     expect(ancestors).toHaveLength(0);
+  });
+});
+
+describe('SyntaxNode.findClosestParent', () => {
+  it('returns the node itself when it satisfies the cast', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const model = firstNodeOfKind(root, 'ModelDeclaration');
+    const found = model.findClosestParent(ModelDeclarationAst.cast);
+    expect(found?.syntax).toBe(model);
+  });
+
+  it('returns the nearest matching ancestor of a descendant', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const field = firstNodeOfKind(root, 'FieldDeclaration');
+    const identifier = firstNodeOfKind(field, 'Identifier');
+    const found = identifier.findClosestParent(FieldDeclarationAst.cast);
+    expect(found?.syntax).toBe(field);
+  });
+
+  it('returns undefined when neither the node nor its ancestors match', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    expect(root.findClosestParent(FieldDeclarationAst.cast)).toBeUndefined();
   });
 });
 
