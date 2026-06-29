@@ -15,7 +15,7 @@ export function setupTestDb(dbName: string) {
     });
     nativeClient = new MongoClient(replSet.getUri());
     await nativeClient.connect();
-    db = await createClient(replSet.getUri(), dbName);
+    db = createClient(replSet.getUri(), dbName);
   }, timeouts.spinUpMongoMemoryServer);
 
   beforeEach(async () => {
