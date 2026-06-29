@@ -26,7 +26,6 @@ describe('classifyPslCompletionContext', () => {
     expect(context).toMatchObject({
       kind: 'declarationKeyword',
       scope: 'document',
-      prefix: '',
       replacementStartOffset: 0,
       offset: 0,
     });
@@ -38,7 +37,6 @@ describe('classifyPslCompletionContext', () => {
     expect(context).toMatchObject({
       kind: 'declarationKeyword',
       scope: 'document',
-      prefix: 'mo',
       replacementStartOffset: 0,
       offset: 2,
     });
@@ -54,7 +52,6 @@ describe('classifyPslCompletionContext', () => {
     expect(context).toMatchObject({
       kind: 'declarationKeyword',
       scope: 'namespace',
-      prefix: '',
     });
   });
 
@@ -64,7 +61,6 @@ describe('classifyPslCompletionContext', () => {
     expect(context).toMatchObject({
       kind: 'declarationKeyword',
       scope: 'namespace',
-      prefix: 'ty',
     });
   });
 
@@ -74,7 +70,7 @@ describe('classifyPslCompletionContext', () => {
     expect(context).toMatchObject({
       kind: 'modelFieldType',
       fieldName: 'author',
-      prefix: { path: [], name: '' },
+      namespace: undefined,
     });
   });
 
@@ -92,7 +88,7 @@ describe('classifyPslCompletionContext', () => {
     expect(context).toMatchObject({
       kind: 'modelFieldType',
       fieldName: 'reviewer',
-      prefix: { path: ['U'], name: 'U' },
+      namespace: undefined,
     });
   });
 
@@ -100,13 +96,13 @@ describe('classifyPslCompletionContext', () => {
     expect(classify(['model Post {', '  owner auth.|', '}'].join('\n'))).toMatchObject({
       kind: 'modelFieldType',
       fieldName: 'owner',
-      prefix: { path: ['auth'], namespace: 'auth', name: '' },
+      namespace: 'auth',
     });
 
     expect(classify(['model Post {', '  editor auth.U|', '}'].join('\n'))).toMatchObject({
       kind: 'modelFieldType',
       fieldName: 'editor',
-      prefix: { path: ['auth', 'U'], namespace: 'auth', name: 'U' },
+      namespace: 'auth',
     });
   });
 
@@ -114,7 +110,7 @@ describe('classifyPslCompletionContext', () => {
     expect(classify(['model Post {', '  external supabase:|', '}'].join('\n'))).toMatchObject({
       kind: 'modelFieldType',
       fieldName: 'external',
-      prefix: { path: ['supabase'], contractSpace: 'supabase', name: '' },
+      namespace: undefined,
     });
 
     expect(
@@ -122,23 +118,13 @@ describe('classifyPslCompletionContext', () => {
     ).toMatchObject({
       kind: 'modelFieldType',
       fieldName: 'externalUser',
-      prefix: {
-        path: ['supabase', 'auth'],
-        contractSpace: 'supabase',
-        namespace: 'auth',
-        name: '',
-      },
+      namespace: 'auth',
     });
 
     expect(classify(['model Post {', '  owner supabase:auth.U|', '}'].join('\n'))).toMatchObject({
       kind: 'modelFieldType',
       fieldName: 'owner',
-      prefix: {
-        path: ['supabase', 'auth', 'U'],
-        contractSpace: 'supabase',
-        namespace: 'auth',
-        name: 'U',
-      },
+      namespace: 'auth',
     });
   });
 
@@ -146,15 +132,15 @@ describe('classifyPslCompletionContext', () => {
     expect(classify(['model Post {', '  external supabase:U|', '}'].join('\n'))).toMatchObject({
       kind: 'modelFieldType',
       fieldName: 'external',
-      prefix: { path: ['supabase', 'U'], contractSpace: 'supabase', name: 'U' },
+      namespace: undefined,
     });
   });
 
-  it('truncates the cursor segment at the offset when the cursor sits mid-name', () => {
+  it('resolves the namespace when the cursor sits mid-name', () => {
     expect(classify(['model Post {', '  owner auth.Use|r', '}'].join('\n'))).toMatchObject({
       kind: 'modelFieldType',
       fieldName: 'owner',
-      prefix: { path: ['auth', 'Use'], namespace: 'auth', name: 'Use' },
+      namespace: 'auth',
     });
   });
 
@@ -177,7 +163,6 @@ describe('classifyPslCompletionContext', () => {
     expect(classify(['policy UserAccess {', '  |', '}'].join('\n'))).toMatchObject({
       kind: 'genericBlockParameter',
       blockKeyword: 'policy',
-      prefix: '',
       existingParameterNames: [],
     });
   });
@@ -187,7 +172,6 @@ describe('classifyPslCompletionContext', () => {
       {
         kind: 'genericBlockParameter',
         blockKeyword: 'policy',
-        prefix: 'wh',
         existingParameterNames: ['on'],
       },
     );
@@ -203,7 +187,6 @@ describe('classifyPslCompletionContext', () => {
     expect(context).toMatchObject({
       kind: 'genericBlockParameter',
       blockKeyword: 'datasource',
-      prefix: '',
     });
     // rust-analyzer `source_range()` shape: the cursor sits in whitespace, so the
     // edit range is empty at the cursor rather than synthesising the `url` key.

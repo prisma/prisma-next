@@ -5,7 +5,6 @@ import {
   FieldAttributeAst,
   FieldDeclarationAst,
   GenericBlockDeclarationAst,
-  type IdentifierAst,
   isTrivia,
   KeyValuePairAst,
   ModelAttributeAst,
@@ -27,18 +26,11 @@ export interface ClassifyPslCompletionContextInput {
   readonly position: Position;
 }
 
-export interface TypeNamePrefix {
-  readonly path: readonly string[];
-  readonly contractSpace?: string;
-  readonly namespace?: string;
-  readonly name: string;
-}
-
 export interface ModelFieldTypeCompletionContext {
   readonly kind: 'modelFieldType';
   readonly offset: number;
   readonly fieldName: string;
-  readonly prefix: TypeNamePrefix;
+  readonly namespace: string | undefined;
   readonly replacementStartOffset: number;
 }
 
@@ -46,7 +38,6 @@ export interface GenericBlockParameterCompletionContext {
   readonly kind: 'genericBlockParameter';
   readonly offset: number;
   readonly blockKeyword: string;
-  readonly prefix: string;
   readonly replacementStartOffset: number;
   readonly existingParameterNames: readonly string[];
 }
@@ -57,7 +48,6 @@ export interface DeclarationKeywordCompletionContext {
   readonly kind: 'declarationKeyword';
   readonly offset: number;
   readonly scope: DeclarationKeywordCompletionScope;
-  readonly prefix: string;
   readonly replacementStartOffset: number;
 }
 
@@ -98,7 +88,6 @@ export function classifyPslCompletionContext(
   const declarationKeywordContext = classifyDeclarationKeyword({
     node: contextNode,
     offset,
-    source: input.sourceFile.text,
     at,
     replacementStartOffset,
   });
@@ -109,7 +98,6 @@ export function classifyPslCompletionContext(
   const genericBlockContext = classifyGenericBlockParameter({
     node: contextNode,
     offset,
-    source: input.sourceFile.text,
     at,
     replacementStartOffset,
   });
@@ -167,7 +155,7 @@ function classifyModelFieldType(input: {
       input.offset <= typeStart &&
       onlyWhitespaceBetween(fieldNameToken, input.offset)
     ) {
-      return modelFieldType(input.offset, fieldNameText, { path: [], name: '' }, input.offset);
+      return modelFieldType(input.offset, fieldNameText, undefined, input.offset);
     }
     return unsupported(input.offset);
   }
@@ -192,27 +180,26 @@ function classifyModelFieldType(input: {
     return unsupported(input.offset);
   }
 
-  const prefix = typeNamePrefix(name, input.offset);
-  if (prefix === undefined) {
+  const namespace = typeCompletionNamespace(name);
+  if (namespace === undefined) {
     return unsupported(input.offset);
   }
 
-  return modelFieldType(input.offset, fieldNameText, prefix, input.replacementStartOffset);
+  return modelFieldType(input.offset, fieldNameText, namespace.value, input.replacementStartOffset);
 }
 
 function modelFieldType(
   offset: number,
   fieldName: string,
-  prefix: TypeNamePrefix,
+  namespace: string | undefined,
   replacementStartOffset: number,
 ): ModelFieldTypeCompletionContext {
-  return { kind: 'modelFieldType', offset, fieldName, prefix, replacementStartOffset };
+  return { kind: 'modelFieldType', offset, fieldName, namespace, replacementStartOffset };
 }
 
 function classifyDeclarationKeyword(input: {
   readonly node: SyntaxNode | undefined;
   readonly offset: number;
-  readonly source: string;
   readonly at: TokenAtOffset;
   readonly replacementStartOffset: number;
 }): DeclarationKeywordCompletionContext | undefined {
@@ -232,7 +219,6 @@ function classifyDeclarationKeyword(input: {
     kind: 'declarationKeyword',
     offset: input.offset,
     scope,
-    prefix: input.source.slice(input.replacementStartOffset, input.offset),
     replacementStartOffset: input.replacementStartOffset,
   };
 }
@@ -315,7 +301,6 @@ function namespaceBodyContainsOffset(
 function classifyGenericBlockParameter(input: {
   readonly node: SyntaxNode | undefined;
   readonly offset: number;
-  readonly source: string;
   readonly at: TokenAtOffset;
   readonly replacementStartOffset: number;
 }): PslCompletionContext | undefined {
@@ -357,7 +342,6 @@ function classifyGenericBlockParameter(input: {
     kind: 'genericBlockParameter',
     offset: input.offset,
     blockKeyword: keyword,
-    prefix: input.source.slice(input.replacementStartOffset, input.offset),
     replacementStartOffset: input.replacementStartOffset,
     existingParameterNames: existingParameterNames(block, activePair),
   };
@@ -413,42 +397,30 @@ function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
 }
 
 /**
- * Derives the qualified type-name prefix from the {@link QualifiedNameAst}
- * roles, which are themselves separator-positional: space, namespace, and name
- * are decided purely by the `:` / `.` separator tokens, independent of the
- * cursor. The single cursor-dependent step is slicing the name segment's own
- * identifier-token text to the prefix the user has typed.
+ * Selects the namespace whose members completion should offer, gating on the
+ * same separator-positional validity rules as the qualified type name: a `:`
+ * requires a contract-space segment and a `.` requires a namespace segment.
+ * Returns `undefined` when a gate fails (the caller yields `unsupported`); on
+ * success wraps the namespace string, which is itself `undefined` when the name
+ * has no `.`.
  */
-function typeNamePrefix(name: QualifiedNameAst, offset: number): TypeNamePrefix | undefined {
-  const cursor = Math.min(offset, name.syntax.endOffset);
-  const contractSpace = name.colon() === undefined ? undefined : name.space()?.name();
-  if (name.colon() !== undefined && (contractSpace === undefined || contractSpace.length === 0)) {
+function typeCompletionNamespace(
+  name: QualifiedNameAst,
+): { readonly value: string | undefined } | undefined {
+  if (name.colon() !== undefined) {
+    const contractSpace = name.space()?.name();
+    if (contractSpace === undefined || contractSpace.length === 0) {
+      return undefined;
+    }
+  }
+  if (name.dot() === undefined) {
+    return { value: undefined };
+  }
+  const namespace = name.namespace()?.name();
+  if (namespace === undefined || namespace.length === 0) {
     return undefined;
   }
-  const namespace = name.dot() === undefined ? undefined : name.namespace()?.name();
-  if (name.dot() !== undefined && (namespace === undefined || namespace.length === 0)) {
-    return undefined;
-  }
-  const nameSegment = name.identifier();
-  const nameText = nameSegment === undefined ? '' : segmentTextBeforeCursor(nameSegment, cursor);
-  const path = [contractSpace, namespace, nameText].filter(
-    (segment): segment is string => segment !== undefined && segment.length > 0,
-  );
-  return {
-    path,
-    name: nameText,
-    ...(contractSpace === undefined ? {} : { contractSpace }),
-    ...(namespace === undefined ? {} : { namespace }),
-  };
-}
-
-/** The cursor segment's identifier text, truncated at the cursor. */
-function segmentTextBeforeCursor(segment: IdentifierAst, cursor: number): string {
-  const token = segment.token();
-  if (token === undefined) return '';
-  const take = cursor - token.offset;
-  if (take <= 0) return '';
-  return token.text.slice(0, Math.min(take, token.text.length));
+  return { value: namespace };
 }
 
 function nodeForContext(
