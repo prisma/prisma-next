@@ -87,6 +87,13 @@ describe('classifyPslCompletionContext', () => {
     expectUnsupported(['model Post {', '  author // |', '}'].join('\n'));
   });
 
+  it('offers a model field type before a trailing comment', () => {
+    expect(classify(['model Post {', '  author |// note', '}'].join('\n'))).toMatchObject({
+      kind: 'modelType',
+      fieldName: 'author',
+    });
+  });
+
   it('classifies a partial bare model field type prefix', () => {
     const context = classify(['model Post {', '  reviewer U|', '}'].join('\n'));
 
