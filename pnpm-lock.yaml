@@ -1174,9 +1174,6 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:0.14.0
         version: link:../../packages/2-mongo-family/1-foundation/mongo-contract
-      '@prisma-next/mongo-orm':
-        specifier: workspace:0.14.0
-        version: link:../../packages/2-mongo-family/5-query-builders/orm
       '@prisma-next/mongo-query-ast':
         specifier: workspace:0.14.0
         version: link:../../packages/2-mongo-family/4-query/query-ast

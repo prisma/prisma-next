@@ -25,7 +25,6 @@
     "@prisma-next/middleware-cache": "workspace:0.14.0",
     "@prisma-next/mongo": "workspace:0.14.0",
     "@prisma-next/mongo-contract": "workspace:0.14.0",
-    "@prisma-next/mongo-orm": "workspace:0.14.0",
     "@prisma-next/mongo-query-builder": "workspace:0.14.0",
     "@prisma-next/mongo-query-ast": "workspace:0.14.0",
     "@prisma-next/mongo-runtime": "workspace:0.14.0",
