@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildNamespaceAccessor,
-  buildSingleNamespaceView,
-  composeContractView,
-} from '../src/ir/contract-view';
-import { UNBOUND_NAMESPACE_ID } from '../src/ir/namespace';
+import { buildNamespacedEntities, buildSingleNamespaceView } from '../src/ir/contract-view';
+import { UNBOUND_NAMESPACE_ID, unboundNamespace } from '../src/ir/namespace';
 import type { Storage } from '../src/ir/storage';
 
 function storageWith(entries: Record<string, unknown>): Storage {
@@ -67,13 +63,13 @@ describe('buildSingleNamespaceView', () => {
   });
 });
 
-describe('buildNamespaceAccessor', () => {
-  it('keys every namespace by raw id, each kind-promoted', () => {
+describe('buildNamespacedEntities', () => {
+  it('keys every namespace by raw id, each kind-promoted (mirrors buildNamespacedEnums)', () => {
     const storage = multiNamespaceStorage({
       public: { table: { users: { c: 1 } } },
       auth: { table: { sessions: { c: 2 } } },
     });
-    const ns = buildNamespaceAccessor<{
+    const ns = buildNamespacedEntities<{
       public: { table: { users: unknown }; entries: object };
       auth: { table: { sessions: unknown }; entries: object };
     }>(storage, ['table', 'valueSet']);
@@ -82,64 +78,26 @@ describe('buildNamespaceAccessor', () => {
     expect(ns.public.table.users).toEqual({ c: 1 });
     expect(ns.auth.table.sessions).toEqual({ c: 2 });
   });
+
+  it('a schema named `storage` is a normal key under the map (collision-proof by nesting)', () => {
+    const storage = multiNamespaceStorage({
+      storage: { table: { secrets: { c: 1 } } },
+      public: { table: { widgets: { c: 2 } } },
+    });
+    const ns = buildNamespacedEntities<{
+      storage: { table: { secrets: unknown }; entries: object };
+      public: { table: { widgets: unknown }; entries: object };
+    }>(storage, ['table', 'valueSet']);
+
+    expect(ns.storage.table.secrets).toEqual({ c: 1 });
+    expect(ns.public.table.widgets).toEqual({ c: 2 });
+  });
 });
 
-describe('composeContractView', () => {
-  it('contract fields win at the root; root accessors and namespace are added', () => {
-    const contract = { storage: { ns: 1 }, domain: { models: {} }, roots: {} };
-    const rootAccessors = { table: { users: {} }, entries: {} };
-    const namespaceAccessor = { __unbound__: { table: { users: {} }, entries: {} } };
-    const view = composeContractView<
-      typeof contract & typeof rootAccessors & { namespace: typeof namespaceAccessor }
-    >(contract, rootAccessors, namespaceAccessor);
-
-    expect(view.storage).toBe(contract.storage);
-    expect(view.table).toBe(rootAccessors.table);
-    expect(view.namespace).toBe(namespaceAccessor);
-    expect(view).not.toBe(contract);
-  });
-
-  it('promotes non-colliding namespace names to the root', () => {
-    const contract = { storage: {}, domain: {}, roots: {} };
-    const namespaceAccessor = {
-      public: { table: { widgets: {} } },
-      auth: { table: { sessions: {} } },
-    };
-    const view = composeContractView<Record<string, unknown>>(contract, {}, namespaceAccessor);
-
-    expect(view['public']).toBe(namespaceAccessor.public);
-    expect(view['auth']).toBe(namespaceAccessor.auth);
-  });
-
-  it('does NOT promote a namespace whose name collides with a contract field', () => {
-    const contract = { storage: { isContractField: true }, domain: {}, roots: {} };
-    const namespaceAccessor = {
-      storage: { table: { secrets: {} } },
-      public: { table: { widgets: {} } },
-    };
-    const view = composeContractView<Record<string, unknown>>(contract, {}, namespaceAccessor);
-
-    // The contract field wins at the root.
-    expect(view['storage']).toBe(contract.storage);
-    expect((view['storage'] as Record<string, unknown>)['table']).toBeUndefined();
-    // The colliding schema is reachable only via the namespace accessor.
-    expect((view['namespace'] as Record<string, unknown>)['storage']).toBe(
-      namespaceAccessor.storage,
-    );
-    // A non-colliding schema is still promoted.
-    expect(view['public']).toBe(namespaceAccessor.public);
-  });
-
-  it('does NOT let a namespace named `namespace` overwrite the namespace accessor', () => {
-    const contract = { storage: {}, domain: {}, roots: {} };
-    const namespaceAccessor = { namespace: { table: { x: {} } }, public: { table: { y: {} } } };
-    const view = composeContractView<Record<string, unknown>>(contract, {}, namespaceAccessor);
-
-    // `view.namespace` is the accessor map (holds both ids), not the schema view.
-    expect(view['namespace']).toBe(namespaceAccessor);
-    expect((view['namespace'] as Record<string, unknown>)['namespace']).toBe(
-      namespaceAccessor.namespace,
-    );
-    expect(view['public']).toBe(namespaceAccessor.public);
+describe('unboundNamespace', () => {
+  it('unwraps the default namespace entry of a namespace-keyed projection', () => {
+    const unboundValue = { table: { users: {} } };
+    const projection = { [UNBOUND_NAMESPACE_ID]: unboundValue, other: { table: {} } };
+    expect(unboundNamespace<typeof unboundValue>(projection)).toBe(unboundValue);
   });
 });

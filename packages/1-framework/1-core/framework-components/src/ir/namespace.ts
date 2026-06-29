@@ -1,4 +1,5 @@
 import type { StorageNamespace } from '@prisma-next/contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { type IRNode, IRNodeBase } from './ir-node';
 
 /**
@@ -25,6 +26,23 @@ import { type IRNode, IRNodeBase } from './ir-node';
  * constant.
  */
 export const UNBOUND_NAMESPACE_ID = '__unbound__' as const;
+
+/**
+ * Unwraps a namespace-keyed projection down to its sole default
+ * (`UNBOUND_NAMESPACE_ID`) entry — the shared helper for single-namespace
+ * targets (SQLite, Mongo) that present their one namespace's accessors at the
+ * root rather than under a namespace key. Multi-namespace targets (Postgres)
+ * keep the namespace key and do not call this.
+ *
+ * Used by the runtime facades (`db.enums`, `sql`, `orm`) and by the
+ * migration-author `ContractView` to drop `__unbound__` from the projection.
+ */
+export function unboundNamespace<T>(projection: { readonly [UNBOUND_NAMESPACE_ID]?: unknown }): T {
+  return blindCast<
+    T,
+    'the unbound namespace always exists on a single-namespace target projection'
+  >(projection[UNBOUND_NAMESPACE_ID]);
+}
 
 /**
  * Framework-level building block for a "namespace" — the database-level

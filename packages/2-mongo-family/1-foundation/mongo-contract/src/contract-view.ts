@@ -1,9 +1,8 @@
 import {
-  buildNamespaceAccessor,
+  buildNamespacedEntities,
   buildSingleNamespaceView,
-  composeContractView,
   type DefaultNamespaceEntries,
-  type NamespaceAccessor,
+  type NamespacedEntities,
   type SingleNamespaceView,
 } from '@prisma-next/framework-components/ir';
 import type { MongoContract } from './contract-types';
@@ -12,8 +11,6 @@ const MONGO_BUILTIN_KINDS = ['collection'] as const;
 type MongoBuiltinKind = (typeof MONGO_BUILTIN_KINDS)[number];
 
 type MongoEntries<TContract extends MongoContract> = DefaultNamespaceEntries<TContract['storage']>;
-
-type MongoNamespaces<TContract extends MongoContract> = TContract['storage']['namespaces'];
 
 /**
  * The Mongo accessors: the built-in `collection` kind promoted to a top-level
@@ -28,10 +25,12 @@ export type MongoContractAccessors<TContract extends MongoContract> = SingleName
  * A Mongo contract view: the deserialized contract intersected with the by-name
  * accessors, so the value is substitutable for `Contract` (carries `storage`,
  * `domain`, …) while also exposing:
- *  - `view.collection.<name>` — the built-in kind, default namespace unwrapped.
+ *  - `view.collection.<name>` — the built-in kind, sole namespace unwrapped to
+ *    the root (Mongo is single-namespace).
  *  - `view.entries.<kind>` — pack-contributed kinds (singular keys).
- *  - `view.namespace.<id>` — every namespace by raw id (Mongo's sole namespace
- *    is `__unbound__`), the fully-qualified collision-proof accessor.
+ *  - `view.namespace.<id>` — the namespace-keyed entity map (Mongo's sole
+ *    namespace is `__unbound__`). This mirrors the runtime `db.enums` pattern:
+ *    a single fixed `namespace` member, collision-proof.
  *
  * The factory (`MongoContractView.from` / `.fromJson`) lives in
  * `@prisma-next/family-mongo/ir`, where the Mongo serializer is reachable; this
@@ -39,14 +38,14 @@ export type MongoContractAccessors<TContract extends MongoContract> = SingleName
  */
 export type MongoContractView<TContract extends MongoContract = MongoContract> = TContract &
   MongoContractAccessors<TContract> & {
-    readonly namespace: NamespaceAccessor<MongoNamespaces<TContract>, MongoBuiltinKind>;
+    readonly namespace: NamespacedEntities<TContract['storage'], MongoBuiltinKind>;
   };
 
 /**
- * Builds the Mongo view: unwraps the default namespace, promotes the built-in
- * `collection` kind at the root, attaches the `namespace` accessor, and layers
- * everything over the deserialized contract so the result is a structural
- * superset of the contract.
+ * Builds the Mongo view: unwraps the sole namespace's built-in `collection` kind
+ * to the root, attaches the namespace-keyed `namespace` map, and layers both
+ * over the deserialized contract so the result is a structural superset of the
+ * contract.
  */
 export function buildMongoContractView<TContract extends MongoContract>(
   contract: TContract,
@@ -55,12 +54,12 @@ export function buildMongoContractView<TContract extends MongoContract>(
     contract.storage,
     MONGO_BUILTIN_KINDS,
   );
-  const namespaceAccessor = buildNamespaceAccessor<
-    NamespaceAccessor<MongoNamespaces<TContract>, MongoBuiltinKind>
+  const namespace = buildNamespacedEntities<
+    NamespacedEntities<TContract['storage'], MongoBuiltinKind>
   >(contract.storage, MONGO_BUILTIN_KINDS);
-  return composeContractView<MongoContractView<TContract>>(
-    contract,
-    rootAccessors,
-    namespaceAccessor,
-  );
+  return {
+    ...contract,
+    ...rootAccessors,
+    namespace,
+  };
 }
