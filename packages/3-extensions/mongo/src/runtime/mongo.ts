@@ -9,8 +9,8 @@ import type {
   MongoContract,
   MongoContractWithTypeMaps,
 } from '@prisma-next/mongo-contract';
-import type { MongoOrmClient, MongoQueryPlan } from '@prisma-next/mongo-orm';
-import { mongoOrm } from '@prisma-next/mongo-orm';
+import type { MongoOrmClient, MongoQueryPlan, MongoRawClient } from '@prisma-next/mongo-orm';
+import { mongoOrm, mongoRaw } from '@prisma-next/mongo-orm';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
 import type { MongoMiddleware, MongoRuntime } from '@prisma-next/mongo-runtime';
 import {
@@ -44,6 +44,7 @@ export interface MongoClient<
 > {
   readonly orm: MongoOrmClient<TContract>;
   readonly query: ReturnType<typeof mongoQuery<TContract>>;
+  readonly raw: MongoRawClient<TContract>;
   readonly contract: TContract;
   readonly enums: UnboundEnums<TContract>;
   connect(bindingInput?: MongoBindingInput): Promise<MongoRuntime>;
@@ -199,6 +200,8 @@ export default function mongo<
     },
   });
 
+  const raw = mongoRaw<TContract>({ contract });
+
   const enums: UnboundEnums<TContract> = unboundNamespace(
     Object.freeze(buildNamespacedEnums(contract.domain)),
   );
@@ -206,6 +209,7 @@ export default function mongo<
   return {
     orm,
     query,
+    raw,
     contract,
     enums,
 

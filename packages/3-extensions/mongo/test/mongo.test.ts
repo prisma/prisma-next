@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   deserializeContract: vi.fn(),
   mongoOrm: vi.fn(),
   mongoQuery: vi.fn(),
+  mongoRaw: vi.fn(),
 }));
 
 vi.mock('@prisma-next/adapter-mongo/runtime', () => ({
@@ -52,6 +53,7 @@ vi.mock('@prisma-next/family-mongo/ir', () => ({
 
 vi.mock('@prisma-next/mongo-orm', () => ({
   mongoOrm: mocks.mongoOrm,
+  mongoRaw: mocks.mongoRaw,
 }));
 
 vi.mock('@prisma-next/mongo-query-builder', () => ({
@@ -70,6 +72,7 @@ const fakeDriverClose = vi.fn().mockResolvedValue(undefined);
 const fakeDriverFromDbClose = vi.fn().mockResolvedValue(undefined);
 const fakeOrm = { id: 'orm-instance' };
 const fakeQuery = { id: 'query-instance' };
+const fakeRaw = { id: 'raw-instance', collection: vi.fn() };
 
 describe('mongo() facade', () => {
   beforeEach(() => {
@@ -88,6 +91,8 @@ describe('mongo() facade', () => {
     mocks.createMongoRuntime.mockReturnValue(fakeRuntime);
     mocks.mongoOrm.mockReturnValue(fakeOrm);
     mocks.mongoQuery.mockReturnValue(fakeQuery);
+    mocks.mongoRaw.mockReturnValue(fakeRaw);
+    fakeRaw.collection.mockClear();
     fakeRuntime.close.mockClear();
     fakeDriverClose.mockClear();
     fakeDriverFromDbClose.mockClear();
@@ -104,6 +109,20 @@ describe('mongo() facade', () => {
     expect(mocks.driverFromConnection).not.toHaveBeenCalled();
     expect(mocks.driverFromDb).not.toHaveBeenCalled();
     expect(mocks.createMongoRuntime).not.toHaveBeenCalled();
+  });
+
+  it('exposes raw eagerly and raw.collection does not throw', () => {
+    const fakeCollection = { id: 'raw-collection' };
+    fakeRaw.collection.mockReturnValue(fakeCollection);
+
+    const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+
+    expect(db.raw).toBe(fakeRaw);
+    expect(mocks.mongoRaw).toHaveBeenCalledTimes(1);
+    expect(mocks.driverFromConnection).not.toHaveBeenCalled();
+
+    const col = db.raw.collection('users' as never);
+    expect(col).toBe(fakeCollection);
   });
 
   it('builds the runtime exactly once on the first runtime() call from a url', async () => {

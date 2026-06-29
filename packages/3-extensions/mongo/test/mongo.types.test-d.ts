@@ -2,7 +2,13 @@ import type { ContractEnumAccessor } from '@prisma-next/contract/enum-accessor';
 import type { ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mongo-contract';
-import type { CreateInput, IncludedRow, MongoCollection, NoIncludes } from '@prisma-next/mongo-orm';
+import type {
+  CreateInput,
+  IncludedRow,
+  MongoCollection,
+  MongoRawClient,
+  NoIncludes,
+} from '@prisma-next/mongo-orm';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../../../2-mongo-family/1-foundation/mongo-contract/test/fixtures/orm-contract';
 import { defineContract, enumType, field, member, model } from '../src/exports/contract-builder';
@@ -50,6 +56,10 @@ test('db.orm.tasks.variant("Bug").where(...) narrows to the variant', () => {
 test('db.orm key set matches the emitted roots (lowercased plurals only)', () => {
   type OrmKeys = keyof Db['orm'];
   expectTypeOf<OrmKeys>().toEqualTypeOf<'tasks' | 'users'>();
+});
+
+test('db.raw is MongoRawClient<Contract>', () => {
+  expectTypeOf<Db['raw']>().toEqualTypeOf<MongoRawClient<Contract>>();
 });
 
 type RoleEnum = {
