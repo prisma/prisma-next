@@ -95,7 +95,9 @@ export function classifyPslCompletionContext(
   const root = input.document.syntax;
   const offset = input.sourceFile.offsetAt(input.position);
   const at = root.tokenAtOffset(offset);
-  if (at.rightBiased()?.kind === 'Comment' || at.leftBiased()?.kind === 'Comment') {
+
+  // Completion is never offered when the cursor sits inside a comment.
+  if (at.leftBiased()?.kind === 'Comment') {
     return unsupported(offset);
   }
 
