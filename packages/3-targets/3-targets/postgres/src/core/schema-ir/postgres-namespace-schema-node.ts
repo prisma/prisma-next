@@ -5,11 +5,14 @@ import {
   SqlSchemaIRNode,
   type SqlSchemaTarget,
 } from '@prisma-next/sql-schema-ir/types';
-import type { PostgresTableSchemaNode } from './postgres-table-schema-node';
+import {
+  PostgresTableSchemaNode,
+  type PostgresTableSchemaNodeInput,
+} from './postgres-table-schema-node';
 
 export interface PostgresNamespaceSchemaNodeInput {
   readonly schemaName: string;
-  readonly tables: Readonly<Record<string, PostgresTableSchemaNode>>;
+  readonly tables: Readonly<Record<string, PostgresTableSchemaNode | PostgresTableSchemaNodeInput>>;
   readonly nativeEnumTypeNames: readonly string[];
 }
 
@@ -38,7 +41,16 @@ export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements Diff
   constructor(input: PostgresNamespaceSchemaNodeInput) {
     super();
     this.schemaName = input.schemaName;
-    this.tables = input.tables;
+    // Reconstruct table nodes from plain objects: `projectSchemaToSpace`
+    // spreads the tree into plain objects before a consumer `ensure`s the root.
+    this.tables = Object.freeze(
+      Object.fromEntries(
+        Object.entries(input.tables).map(([key, t]) => [
+          key,
+          t instanceof PostgresTableSchemaNode ? t : new PostgresTableSchemaNode(t),
+        ]),
+      ),
+    );
     this.nativeEnumTypeNames = Object.freeze([...input.nativeEnumTypeNames]);
     this.annotations = {
       pg: {
@@ -63,7 +75,7 @@ export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements Diff
     return Object.values(this.tables);
   }
 
-  static is(node: DiffableNode): node is PostgresNamespaceSchemaNode {
+  static is(node: unknown): node is PostgresNamespaceSchemaNode {
     return node instanceof PostgresNamespaceSchemaNode;
   }
 }

@@ -79,4 +79,12 @@ export class PostgresPolicySchemaNode extends SqlSchemaIRNode implements Diffabl
   static is(node: DiffableNode): node is PostgresPolicySchemaNode {
     return node instanceof PostgresPolicySchemaNode;
   }
+
+  static assert(node: DiffableNode | undefined): asserts node is PostgresPolicySchemaNode {
+    if (node === undefined || !PostgresPolicySchemaNode.is(node)) {
+      throw new Error(
+        `Expected a PostgresPolicySchemaNode, got ${node?.constructor?.name ?? typeof node}`,
+      );
+    }
+  }
 }

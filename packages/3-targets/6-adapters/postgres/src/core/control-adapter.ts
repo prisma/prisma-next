@@ -38,7 +38,7 @@ import type {
   SqlForeignKeyIR,
   SqlIndexIR,
   SqlReferentialAction,
-  SqlSchemaIR,
+  SqlSchemaIRNode,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import {
@@ -66,8 +66,6 @@ import {
 } from '@prisma-next/target-postgres/planner';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
-  ensurePostgresSchemaIR,
-  isPostgresSchemaIR,
   PostgresDatabaseSchemaNode,
   PostgresNamespaceSchemaNode,
   PostgresPolicySchemaNode,
@@ -131,13 +129,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
   collectSchemaDiffIssues(
     contract: Contract<SqlStorage>,
-    schema: SqlSchemaIR,
+    schema: SqlSchemaIRNode,
   ): readonly SchemaDiffIssue[] {
-    if (!isPostgresSchemaIR(schema)) {
-      throw new Error(
-        `Postgres schema diff requires a PostgresSchemaIR; got ${(schema as { constructor?: { name?: string } }).constructor?.name ?? typeof schema}`,
-      );
-    }
+    PostgresDatabaseSchemaNode.assert(schema);
     const expected = contractToPostgresDatabaseSchemaNode(
       blindCast<
         PostgresContract,
@@ -145,12 +139,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       >(contract),
       { annotationNamespace: 'pg' },
     );
-    const actual = ensurePostgresSchemaIR(schema);
+    const actual = PostgresDatabaseSchemaNode.ensure(schema);
     const issues = diffPostgresSchema(expected, actual);
-    const ownedSchemaNames = new Set([
-      ...expected.rlsPolicies.map((p) => p.namespaceId),
-      ...expected.existingSchemas,
-    ]);
+    const expectedPolicyNamespaces = Object.values(expected.namespaces).flatMap((ns) =>
+      Object.values(ns.tables).flatMap((t) => t.policies.map((p) => p.namespaceId)),
+    );
+    const ownedSchemaNames = new Set([...expectedPolicyNamespaces, ...expected.existingSchemas]);
     return filterIssuesByOwnership(issues, ownedSchemaNames);
   }
 

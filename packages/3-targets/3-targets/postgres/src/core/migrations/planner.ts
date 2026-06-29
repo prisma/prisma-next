@@ -13,7 +13,7 @@ import {
   plannerFailure,
 } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
-import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
+import { namespaceSchemaNodes, verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   MigrationPlanner,
@@ -22,12 +22,15 @@ import type {
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
-import { assertPostgresRlsPolicy } from '../postgres-rls-policy';
+import { PostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresContract } from '../postgres-schema';
-import { assertPostgresSchemaIR, ensurePostgresSchemaIR } from '../schema-ir/postgres-schema-ir';
+import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
+import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
 import { resolveDdlSchemaForNamespaceStorage } from '../schema-ir/postgres-schema-ir-annotations';
 import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
 import {
@@ -165,6 +168,13 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const schemaIssues = this.collectSchemaIssues(options);
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
     const storageTypes = options.contract.storage.types ?? {};
+    // The strategy layer reads the live schema by bare table name for
+    // existence checks (shared-temp-default safety, FK/unique probes). It
+    // takes the per-schema namespace node, never the whole tree root — and
+    // never a flat merge of every namespace (that would collide same-named
+    // tables across schemas). Single-schema is the one node matching the
+    // planner's resolved schema name; multi-schema scoping is CF-2.
+    const relationalSchema = relationalNamespaceNode(options.schema, schemaName);
 
     // Input-side control-policy partition. `external` / `observed` subjects
     // — and non-creation issues for `tolerated` subjects — are dropped from
@@ -195,7 +205,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       schemaName,
       codecHooks,
       storageTypes,
-      schema: options.schema,
+      ...ifDefined('schema', relationalSchema),
       policy: options.policy,
       frameworkComponents: options.frameworkComponents,
       strategies: postgresPlannerStrategies,
@@ -266,19 +276,19 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
   private planPostgresSchemaDiff(
     options: PlannerOptionsWithComponents,
   ): readonly PostgresOpFactoryCall[] {
-    assertPostgresSchemaIR(options.schema);
+    PostgresDatabaseSchemaNode.assert(options.schema);
     const expected = contractToPostgresDatabaseSchemaNode(
       blindCast<PostgresContract, 'planPostgresSchemaDiff is only called with a postgres contract'>(
         options.contract,
       ),
       { annotationNamespace: 'pg' },
     );
-    const actual = ensurePostgresSchemaIR(options.schema);
+    const actual = PostgresDatabaseSchemaNode.ensure(options.schema);
     const rawIssues = diffPostgresSchema(expected, actual);
-    const ownedSchemaNames = new Set([
-      ...expected.rlsPolicies.map((p) => p.namespaceId),
-      ...expected.existingSchemas,
-    ]);
+    const expectedPolicyNamespaces = Object.values(expected.namespaces).flatMap((ns) =>
+      Object.values(ns.tables).flatMap((t) => t.policies.map((p) => p.namespaceId)),
+    );
+    const ownedSchemaNames = new Set([...expectedPolicyNamespaces, ...expected.existingSchemas]);
     const filteredDiffIssues = filterIssuesByOwnership(rawIssues, ownedSchemaNames);
 
     const allowsDestructive = options.policy.allowedOperationClasses.includes('destructive');
@@ -290,13 +300,12 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       // encodes the body hash, so two policies sharing a local key (same name)
       // are always equal and isEqualTo never returns false.
       if (issue.outcome === 'missing') {
-        assertPostgresRlsPolicy(issue.expected);
+        PostgresPolicySchemaNode.assert(issue.expected);
         // issue.expected.namespaceId is the DDL schema name (resolved during projection);
         // this re-resolution is a no-op as long as PostgresSchema.ddlSchemaName() returns this.id.
         const schemaForTable = resolveDdlSchemaForNamespaceStorage(
           options.contract.storage,
           issue.expected.namespaceId,
-          options.schema,
         );
         const tableKey = `${schemaForTable}.${issue.expected.tableName}`;
         if (!seenEnableTables.has(tableKey)) {
@@ -304,14 +313,17 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
           calls.push(new EnableRowLevelSecurityCall(schemaForTable, issue.expected.tableName));
         }
         calls.push(
-          new CreatePostgresRlsPolicyCall(schemaForTable, issue.expected.tableName, issue.expected),
+          new CreatePostgresRlsPolicyCall(
+            schemaForTable,
+            issue.expected.tableName,
+            policyNodeToContractPolicy(issue.expected),
+          ),
         );
       } else if (issue.outcome === 'extra' && allowsDestructive) {
-        assertPostgresRlsPolicy(issue.actual);
+        PostgresPolicySchemaNode.assert(issue.actual);
         const schemaForTable = resolveDdlSchemaForNamespaceStorage(
           options.contract.storage,
           issue.actual.namespaceId,
-          options.schema,
         );
         calls.push(
           new DropPostgresRlsPolicyCall(schemaForTable, issue.actual.tableName, issue.actual.name),
@@ -341,29 +353,97 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // destructive) must inspect extras to reconcile strict equality.
     const allowed = options.policy.allowedOperationClasses;
     const strict = allowed.includes('widening') || allowed.includes('destructive');
-    const verifyOptions: VerifySqlSchemaOptionsWithComponents = {
-      contract: options.contract,
-      schema: options.schema,
-      strict,
-      typeMetadataRegistry: new Map(),
-      frameworkComponents: options.frameworkComponents,
-      normalizeDefault: parsePostgresDefault,
-      normalizeNativeType: normalizeSchemaNativeType,
-    };
-    const verifyResult = verifySqlSchema(verifyOptions);
+    // The relational verify walks one per-schema namespace node at a time,
+    // never a flat merge of every namespace — a merge would silently collide
+    // same-named tables across schemas (the dual-representation flatten the
+    // tree restructure removed). Single-schema (the common case) is the sole
+    // namespace node, byte-identical to the pre-tree flat verify; multi-schema
+    // verify-side contract scoping is CF-2. A fresh database (empty root, no
+    // namespaces) still runs one pass against an empty schema so the contract's
+    // tables surface as `missing_table` — the same as the pre-tree empty
+    // flat schema.
+    const verifyIssues = relationalSchemaNodes(options.schema).flatMap((namespaceNode) => {
+      const verifyOptions: VerifySqlSchemaOptionsWithComponents = {
+        contract: options.contract,
+        schema: namespaceNode,
+        strict,
+        typeMetadataRegistry: new Map(),
+        frameworkComponents: options.frameworkComponents,
+        normalizeDefault: parsePostgresDefault,
+        normalizeNativeType: normalizeSchemaNativeType,
+      };
+      return verifySqlSchema(verifyOptions).schema.issues;
+    });
     // Schema presence is a Postgres-specific concern (no equivalent in
     // SQLite / Mongo), so the issue emission lives in the target layer
     // rather than in the family verifier. Stitch it in here so a single
     // `SchemaIssue[]` flows through `planIssues` and the planner emits
     // CREATE SCHEMA in the dep bucket before any CreateTableCall.
+    // It reads `existingSchemas` off the database root (CF-1), so it takes the
+    // whole tree, not a per-namespace node.
     // Schema drift is handled separately via diffPostgresSchema → planPostgresSchemaDiff.
     const namespaceIssues = verifyPostgresNamespacePresence({
       contract: options.contract,
       schema: options.schema,
     });
     if (namespaceIssues.length === 0) {
-      return verifyResult.schema.issues;
+      return verifyIssues;
     }
-    return [...namespaceIssues, ...verifyResult.schema.issues];
+    return [...namespaceIssues, ...verifyIssues];
   }
+}
+
+/**
+ * The per-schema namespace nodes the relational verify runs against, one pass
+ * each. A fresh database (empty root, no namespaces) yields a single empty
+ * schema so the contract's tables surface as `missing_table` — the pre-tree
+ * empty flat schema behaviour.
+ */
+function relationalSchemaNodes(schema: SqlSchemaIRNode): readonly SqlSchemaIR[] {
+  const namespaceNodes = namespaceSchemaNodes(schema);
+  return namespaceNodes.length > 0 ? namespaceNodes : [{ tables: {} }];
+}
+
+/**
+ * Selects the per-schema namespace node the relational strategy layer probes
+ * for live-table existence. Prefers the node matching the planner's resolved
+ * schema name; otherwise the sole namespace node (the single-schema common
+ * case). Returns `undefined` when the tree carries no namespaces, so the
+ * strategy context falls back to its empty-schema default.
+ *
+ * Multi-schema selection by name is CF-2: the relational strategies key tables
+ * by bare name, so only one namespace's tables can be probed at a time.
+ */
+function relationalNamespaceNode(
+  schema: SqlSchemaIRNode,
+  schemaName: string,
+): SqlSchemaIR | undefined {
+  const namespaceNodes = namespaceSchemaNodes(schema);
+  const byName = namespaceNodes.find(
+    (node) =>
+      blindCast<{ readonly schemaName?: string }, 'reading the namespace node schema name'>(node)
+        .schemaName === schemaName,
+  );
+  return byName ?? namespaceNodes[0];
+}
+
+/**
+ * Rebuilds the serialized `PostgresRlsPolicy` contract entity from a policy
+ * schema node. The migration op (`CreatePostgresRlsPolicyCall`) carries the
+ * authored contract entity — its `renderTypeScript`/`createRlsPolicy` paths
+ * serialize it — so the planner converts the diff node back to the entity the
+ * call type expects, preserving byte-identical migration output.
+ */
+function policyNodeToContractPolicy(node: PostgresPolicySchemaNode): PostgresRlsPolicy {
+  return new PostgresRlsPolicy({
+    name: node.name,
+    prefix: node.prefix,
+    tableName: node.tableName,
+    namespaceId: node.namespaceId,
+    operation: node.operation,
+    roles: [...node.roles],
+    ...ifDefined('using', node.using),
+    ...ifDefined('withCheck', node.withCheck),
+    permissive: node.permissive,
+  });
 }

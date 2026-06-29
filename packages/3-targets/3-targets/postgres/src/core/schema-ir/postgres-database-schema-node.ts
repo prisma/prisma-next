@@ -2,12 +2,17 @@ import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlSchemaIRNode, type SqlSchemaTarget } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
-import type { PostgresNamespaceSchemaNode } from './postgres-namespace-schema-node';
-import type { PostgresRoleSchemaNode } from './postgres-role-schema-node';
+import {
+  PostgresNamespaceSchemaNode,
+  type PostgresNamespaceSchemaNodeInput,
+} from './postgres-namespace-schema-node';
+import { PostgresRoleSchemaNode } from './postgres-role-schema-node';
 
 export interface PostgresDatabaseSchemaNodeInput {
-  readonly namespaces: Readonly<Record<string, PostgresNamespaceSchemaNode>>;
-  readonly roles: readonly PostgresRoleSchemaNode[];
+  readonly namespaces: Readonly<
+    Record<string, PostgresNamespaceSchemaNode | PostgresNamespaceSchemaNodeInput>
+  >;
+  readonly roles: readonly (PostgresRoleSchemaNode | { name: string; namespaceId: string })[];
   readonly existingSchemas: readonly string[];
   readonly pgVersion: string;
 }
@@ -36,8 +41,22 @@ export class PostgresDatabaseSchemaNode extends SqlSchemaIRNode implements Diffa
 
   constructor(input: PostgresDatabaseSchemaNodeInput) {
     super();
-    this.namespaces = input.namespaces;
-    this.roles = Object.freeze([...input.roles]);
+    // Reconstruct namespace/role nodes from plain objects: `projectSchemaToSpace`
+    // spreads the tree into plain objects (losing prototypes) before this root
+    // is `ensure`d, so the differ must still see real `DiffableNode`s.
+    this.namespaces = Object.freeze(
+      Object.fromEntries(
+        Object.entries(input.namespaces).map(([key, ns]) => [
+          key,
+          ns instanceof PostgresNamespaceSchemaNode ? ns : new PostgresNamespaceSchemaNode(ns),
+        ]),
+      ),
+    );
+    this.roles = Object.freeze(
+      input.roles.map((r) =>
+        r instanceof PostgresRoleSchemaNode ? r : new PostgresRoleSchemaNode(r),
+      ),
+    );
     this.existingSchemas = Object.freeze([...input.existingSchemas]);
     this.pgVersion = input.pgVersion;
     freezeNode(this);

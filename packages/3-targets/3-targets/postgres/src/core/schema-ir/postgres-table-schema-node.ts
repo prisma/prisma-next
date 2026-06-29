@@ -11,10 +11,13 @@ import {
   type SqlTableIRInput,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
-import type { PostgresPolicySchemaNode } from './postgres-policy-schema-node';
+import {
+  PostgresPolicySchemaNode,
+  type PostgresPolicySchemaNodeInput,
+} from './postgres-policy-schema-node';
 
 export interface PostgresTableSchemaNodeInput extends SqlTableIRInput {
-  readonly policies?: readonly PostgresPolicySchemaNode[];
+  readonly policies?: readonly (PostgresPolicySchemaNode | PostgresPolicySchemaNodeInput)[];
 }
 
 /**
@@ -74,7 +77,13 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
         ),
       );
     }
-    this.policies = Object.freeze([...(input.policies ?? [])]);
+    // Reconstruct policy nodes from plain objects: `projectSchemaToSpace`
+    // spreads the tree into plain objects before a consumer `ensure`s the root.
+    this.policies = Object.freeze(
+      (input.policies ?? []).map((p) =>
+        p instanceof PostgresPolicySchemaNode ? p : new PostgresPolicySchemaNode(p),
+      ),
+    );
     freezeNode(this);
   }
 

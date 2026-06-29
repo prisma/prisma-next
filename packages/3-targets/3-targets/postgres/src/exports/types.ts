@@ -30,13 +30,6 @@ export {
   type PostgresRoleSchemaNodeInput,
 } from '../core/schema-ir/postgres-role-schema-node';
 export {
-  assertPostgresSchemaIR,
-  ensurePostgresSchemaIR,
-  isPostgresSchemaIR,
-  PostgresSchemaIR,
-  type PostgresSchemaIRInput,
-} from '../core/schema-ir/postgres-schema-ir';
-export {
   PostgresTableSchemaNode,
   type PostgresTableSchemaNodeInput,
 } from '../core/schema-ir/postgres-table-schema-node';

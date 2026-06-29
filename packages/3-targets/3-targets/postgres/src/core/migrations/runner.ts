@@ -12,7 +12,7 @@ import type {
   SqlMigrationRunnerSuccessValue,
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
-import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
+import { namespaceSchemaNodes, verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { MigrationRunnerResult } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -130,25 +130,32 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     // would flag every app-space table as "extra" when called against
     // an extension contract.
     if (space === APP_SPACE_ID) {
-      const schemaIR = await this.family.introspect({
+      const schemaNode = await this.family.introspect({
         driver,
         contract: options.destinationContract,
       });
-      const schemaVerifyResult = verifySqlSchema({
-        contract: options.destinationContract,
-        schema: schemaIR,
-        strict: options.strictVerification ?? true,
-        context: options.context ?? {},
-        typeMetadataRegistry: this.family.typeMetadataRegistry,
-        frameworkComponents: options.frameworkComponents,
-        normalizeDefault: parsePostgresDefault,
-        normalizeNativeType: normalizeSchemaNativeType,
-      });
-      if (!schemaVerifyResult.ok) {
-        return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
-          why: 'The resulting database schema does not satisfy the destination contract.',
-          meta: { issues: schemaVerifyResult.schema.issues },
+      // `introspect` returns the target's schema-IR node (the Postgres tree
+      // root). The relational verify walks one per-schema namespace node at a
+      // time — never a flat merge of every namespace, which would collide
+      // same-named tables across schemas. Single-schema (the common case) is
+      // the sole namespace node; multi-schema contract scoping is CF-2.
+      for (const namespaceNode of namespaceSchemaNodes(schemaNode)) {
+        const schemaVerifyResult = verifySqlSchema({
+          contract: options.destinationContract,
+          schema: namespaceNode,
+          strict: options.strictVerification ?? true,
+          context: options.context ?? {},
+          typeMetadataRegistry: this.family.typeMetadataRegistry,
+          frameworkComponents: options.frameworkComponents,
+          normalizeDefault: parsePostgresDefault,
+          normalizeNativeType: normalizeSchemaNativeType,
         });
+        if (!schemaVerifyResult.ok) {
+          return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
+            why: 'The resulting database schema does not satisfy the destination contract.',
+            meta: { issues: schemaVerifyResult.schema.issues },
+          });
+        }
       }
     }
 
