@@ -19,7 +19,7 @@ export function createOrder(
     userId: string;
     items: ReadonlyArray<OrderLineItemInput>;
     shippingAddress: string;
-    type: 'home' | 'bopis';
+    type: Db['enums']['OrderType']['values'][number];
     statusHistory: ReadonlyArray<StatusEntryInput>;
   },
 ) {

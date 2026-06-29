@@ -14,7 +14,7 @@ export async function createClient(connectionUri: string, dbName: string) {
   });
   const runtime = await db.runtime();
   const raw = mongoRaw({ contract: db.contract });
-  return { orm: db.orm, runtime, query: db.query, raw, contract: db.contract };
+  return { ...db, runtime, raw };
 }
 
 export type Db = Awaited<ReturnType<typeof createClient>>;
