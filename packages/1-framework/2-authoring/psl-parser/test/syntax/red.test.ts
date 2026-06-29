@@ -209,6 +209,54 @@ describe('SyntaxNode.endOffset', () => {
   });
 });
 
+describe('SyntaxNode.isInside / isOutside', () => {
+  it('is inclusive at start, interior, and end, exclusive just outside', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const field = firstNodeOfKind(root, 'FieldDeclaration');
+    const start = field.offset;
+    const end = field.endOffset;
+    expect(field.isInside(start)).toBe(true);
+    expect(field.isInside(start + 1)).toBe(true);
+    expect(field.isInside(end)).toBe(true);
+    expect(field.isInside(start - 1)).toBe(false);
+    expect(field.isInside(end + 1)).toBe(false);
+  });
+
+  it('isOutside is the negation of isInside', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const field = firstNodeOfKind(root, 'FieldDeclaration');
+    expect(field.isOutside(field.offset)).toBe(false);
+    expect(field.isOutside(field.endOffset + 1)).toBe(true);
+  });
+});
+
+describe('SyntaxToken.isInside / isOutside', () => {
+  it('is inclusive at start, interior, and end, exclusive just outside', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const token = root.tokenAtOffset(19).leftBiased();
+    expect(token).toBeInstanceOf(SyntaxToken);
+    if (token instanceof SyntaxToken) {
+      const start = token.offset;
+      const end = token.offset + token.text.length;
+      expect(token.isInside(start)).toBe(true);
+      expect(token.isInside(start + 1)).toBe(true);
+      expect(token.isInside(end)).toBe(true);
+      expect(token.isInside(start - 1)).toBe(false);
+      expect(token.isInside(end + 1)).toBe(false);
+    }
+  });
+
+  it('isOutside is the negation of isInside', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const token = root.tokenAtOffset(19).leftBiased();
+    expect(token).toBeInstanceOf(SyntaxToken);
+    if (token instanceof SyntaxToken) {
+      expect(token.isOutside(token.offset)).toBe(false);
+      expect(token.isOutside(token.offset + token.text.length + 1)).toBe(true);
+    }
+  });
+});
+
 describe('SyntaxNode.ancestors', () => {
   it('walks from node to root', () => {
     const root = createSyntaxTree(buildSampleTree());

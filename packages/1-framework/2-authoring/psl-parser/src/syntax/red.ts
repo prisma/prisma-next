@@ -28,6 +28,17 @@ export class SyntaxToken implements Token {
     return this.text.length;
   }
 
+  /** Whether `offset` falls within this token, using the zero-width containment rule. */
+  isInside(offset: number): boolean {
+    const start = this.offset;
+    const len = this.text.length;
+    return len === 0 ? offset === start : offset >= start && offset <= start + len;
+  }
+
+  isOutside(offset: number): boolean {
+    return !this.isInside(offset);
+  }
+
   /** The sibling element immediately after this token within its parent. */
   get nextSiblingOrToken(): SyntaxElement | undefined {
     return siblingAfter(this.parent, this.green, this.offset);
@@ -142,6 +153,16 @@ export class SyntaxNode {
 
   get endOffset(): number {
     return this.offset + this.textLength;
+  }
+
+  /** Whether `offset` falls within this node, using the zero-width containment rule. */
+  isInside(offset: number): boolean {
+    const len = this.textLength;
+    return len === 0 ? offset === this.offset : offset >= this.offset && offset <= this.endOffset;
+  }
+
+  isOutside(offset: number): boolean {
+    return !this.isInside(offset);
   }
 
   get firstChild(): SyntaxElement | undefined {
