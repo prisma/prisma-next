@@ -38,16 +38,20 @@ and the `MongoDriverImpl` is created separately and only handed to `createMongoR
 the static context is built without touching `mongodb` today — it is just buried in the
 connect path and discarded as a standalone value.
 
-This slice surfaces that abstraction symmetrically and uses it to replace an interim helper.
+This slice surfaces that abstraction symmetrically and uses it to replace the example's interim
+`buildNamespacedEnums` + `blindCast` static-enum helper.
 
 ## Why now
 
 PR #880 ("Exercise Mongo enums in retail-store") needed the static enum accessors importable
 from a `'use client'` component without pulling the Mongo driver into the browser bundle. It
-shipped an interim `mongoEnums` + dedicated `@prisma-next/mongo/enums` entrypoint to do that.
-That works, but it is a narrow point solution: the real abstraction is the `ExecutionContext`,
-which both targets should build upfront, expose, and offer client-safe. This slice supersedes
-the interim `mongoEnums` surface with the principled one.
+prototyped a `mongoEnums` + dedicated `@prisma-next/mongo/enums` entrypoint to do that, then
+**pulled it back out** — that machinery did not belong in an "exercise enums" PR. The example
+now builds its static enums directly from the existing public, driver-free `buildNamespacedEnums`
+(`@prisma-next/contract/enum-accessor`) with one `blindCast` in `src/enums.ts`. That works but
+is a narrow point solution: the real abstraction is the `ExecutionContext`, which both targets
+should build upfront, expose, and offer client-safe. This slice provides the principled surface
+the prototype was reaching for.
 
 ## Chosen design
 
@@ -75,9 +79,10 @@ foundation). `enums`, the query builder (`query`/`sql`), and `raw` all derive fr
    `readonly contract` on `PostgresClient` for shape symmetry (it surfaces `context`/`stack`
    today but not `contract`).
 
-4. **Retire the interim surface.** Remove `mongoEnums` + `@prisma-next/mongo/enums` (added in
-   #880) in favour of `mongoStatic`/`@prisma-next/mongo/static`. Update `examples/retail-store`
-   (`src/enums.ts`) to consume the new static context.
+4. **Replace the example's interim static enums.** `examples/retail-store/src/enums.ts` currently
+   builds its accessors from `buildNamespacedEnums(contractJson.domain)['__unbound__']` with a
+   `blindCast` (the leak this slice removes). Point it at `mongoStatic`/`@prisma-next/mongo/static`
+   so the typing comes from the framework, not a cast in example code.
 
 ## Definition of done
 
@@ -87,8 +92,8 @@ foundation). `enums`, the query builder (`query`/`sql`), and `raw` all derive fr
   `ExecutionContext` + derived static surface, and are **client-safe**: a `'use client'`
   component importing them builds (`next build`) with **no driver code in the client bundle**
   (the acceptance test that gated #880).
-- The interim `mongoEnums`/`@prisma-next/mongo/enums` is gone; `retail-store` uses the new
-  surface and stays green (typecheck, tests, `next build`).
+- `retail-store`'s `src/enums.ts` uses the new `@prisma-next/mongo/static` surface instead of
+  the `buildNamespacedEnums` + `blindCast` interim, and stays green (typecheck, tests, `next build`).
 - `db.enums`/`db.query`/`db.raw`/`db.sql` continue to behave identically (derived from the
   shared context).
 - Symmetric: the same factory + entrypoint pattern on both targets; member shapes align
