@@ -99,9 +99,7 @@ export function classifyPslCompletionContext(
 
   // Anchor on the token left of the cursor and navigate outward via
   // `token.parent` rather than scanning the whole tree.
-  const anchorNode = at.leftBiased()?.parent;
-  const previousSignificantNode = previousSignificantToken(at, offset)?.parent;
-  const contextNode = nodeForContext(anchorNode, previousSignificantNode);
+  const contextNode = at.leftBiased()?.parent;
 
   // The edit replaces the identifier under the cursor, or is empty when the
   // cursor sits in trivia.
@@ -470,16 +468,6 @@ function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
     closestAst(node, FieldAttributeAst.cast) !== undefined ||
     closestAst(node, ModelAttributeAst.cast) !== undefined
   );
-}
-
-function nodeForContext(
-  node: SyntaxNode | undefined,
-  previousNode: SyntaxNode | undefined,
-): SyntaxNode | undefined {
-  if (node === undefined || node.kind === 'Document' || node.kind === 'ModelDeclaration') {
-    return previousNode ?? node;
-  }
-  return node;
 }
 
 function closestAst<T>(
