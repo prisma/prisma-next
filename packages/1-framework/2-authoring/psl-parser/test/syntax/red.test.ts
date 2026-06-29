@@ -289,11 +289,11 @@ describe('SyntaxNode.ancestors', () => {
   });
 });
 
-describe('SyntaxNode.findClosestParent', () => {
+describe('SyntaxNode.findAncestor', () => {
   it('returns the node itself when it satisfies the cast', () => {
     const root = createSyntaxTree(buildSampleTree());
     const model = firstNodeOfKind(root, 'ModelDeclaration');
-    const found = model.findClosestParent(ModelDeclarationAst.cast);
+    const found = model.findAncestor(ModelDeclarationAst.cast);
     expect(found?.syntax).toBe(model);
   });
 
@@ -301,13 +301,13 @@ describe('SyntaxNode.findClosestParent', () => {
     const root = createSyntaxTree(buildSampleTree());
     const field = firstNodeOfKind(root, 'FieldDeclaration');
     const identifier = firstNodeOfKind(field, 'Identifier');
-    const found = identifier.findClosestParent(FieldDeclarationAst.cast);
+    const found = identifier.findAncestor(FieldDeclarationAst.cast);
     expect(found?.syntax).toBe(field);
   });
 
   it('returns undefined when neither the node nor its ancestors match', () => {
     const root = createSyntaxTree(buildSampleTree());
-    expect(root.findClosestParent(FieldDeclarationAst.cast)).toBeUndefined();
+    expect(root.findAncestor(FieldDeclarationAst.cast)).toBeUndefined();
   });
 });
 

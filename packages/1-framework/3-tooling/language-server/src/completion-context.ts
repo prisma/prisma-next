@@ -129,14 +129,13 @@ export function classifyPslCompletionContext(
     return genericBlockContext;
   }
 
-  const field = contextNode?.findClosestParent(FieldDeclarationAst.cast);
+  const field = contextNode?.findAncestor(FieldDeclarationAst.cast);
   if (field === undefined) {
     return unsupported(offset);
   }
   if (
-    field.syntax.findClosestParent(
-      any(ModelDeclarationAst.cast, CompositeTypeDeclarationAst.cast),
-    ) === undefined
+    field.syntax.findAncestor(any(ModelDeclarationAst.cast, CompositeTypeDeclarationAst.cast)) ===
+    undefined
   ) {
     return unsupported(offset);
   }
@@ -249,7 +248,7 @@ function classifyDeclarationKeyword(input: {
     return undefined;
   }
 
-  const namespace = input.node?.findClosestParent(NamespaceDeclarationAst.cast);
+  const namespace = input.node?.findAncestor(NamespaceDeclarationAst.cast);
   const scope = blockBodyContainsOffset(namespace, input.offset) ? 'namespace' : 'document';
 
   const prefixToken = cursorIdentifier(input.at, input.offset);
@@ -293,7 +292,7 @@ function declarationKeywordAllowed(
 
 function isInsideNonDeclarationKeywordBody(node: SyntaxNode | undefined, offset: number): boolean {
   return blockBodyContainsOffset(
-    node?.findClosestParent(
+    node?.findAncestor(
       any(
         ModelDeclarationAst.cast,
         CompositeTypeDeclarationAst.cast,
@@ -324,7 +323,7 @@ function classifyGenericBlockParameter(input: {
   readonly at: TokenAtOffset;
   readonly replacementStartOffset: number;
 }): PslCompletionContext | undefined {
-  const block = input.node?.findClosestParent(GenericBlockDeclarationAst.cast);
+  const block = input.node?.findAncestor(GenericBlockDeclarationAst.cast);
   if (block === undefined) {
     return undefined;
   }
@@ -337,7 +336,7 @@ function classifyGenericBlockParameter(input: {
     return unsupported(input.offset);
   }
 
-  const field = input.node?.findClosestParent(FieldDeclarationAst.cast);
+  const field = input.node?.findAncestor(FieldDeclarationAst.cast);
   if (field?.syntax.isInside(input.offset)) {
     return unsupported(input.offset);
   }
@@ -376,7 +375,7 @@ function activeKeyValuePair(
   node: SyntaxNode | undefined,
   offset: number,
 ): KeyValuePairAst | undefined {
-  const pair = node?.findClosestParent(KeyValuePairAst.cast);
+  const pair = node?.findAncestor(KeyValuePairAst.cast);
   if (pair === undefined || pair.syntax.isOutside(offset)) {
     return undefined;
   }
@@ -415,7 +414,7 @@ function unsupported(offset: number): UnsupportedPslCompletionContext {
 
 function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
   return (
-    node?.findClosestParent(
+    node?.findAncestor(
       any(AttributeArgListAst.cast, FieldAttributeAst.cast, ModelAttributeAst.cast),
     ) !== undefined
   );
