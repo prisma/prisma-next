@@ -1180,6 +1180,53 @@ describe('QualifiedNameAst', () => {
     expect(qn.path()).toEqual(['supabase', 'auth', 'User']);
   });
 
+  it('reads a colon-prefixed space:name without a namespace', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'supabase');
+    b.token('Colon', ':');
+    ident(b, 'User');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.space()?.token()?.text).toBe('supabase');
+    expect(qn.namespace()).toBeUndefined();
+    expect(qn.identifier()?.token()?.text).toBe('User');
+  });
+
+  it('reads a trailing dot as a namespace with no name', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'auth');
+    b.token('Dot', '.');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.space()).toBeUndefined();
+    expect(qn.namespace()?.token()?.text).toBe('auth');
+    expect(qn.identifier()).toBeUndefined();
+  });
+
+  it('reads a trailing dot after a space as namespace with no name', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'supabase');
+    b.token('Colon', ':');
+    ident(b, 'auth');
+    b.token('Dot', '.');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.space()?.token()?.text).toBe('supabase');
+    expect(qn.namespace()?.token()?.text).toBe('auth');
+    expect(qn.identifier()).toBeUndefined();
+  });
+
+  it('reads a trailing colon as a space with no name', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'supabase');
+    b.token('Colon', ':');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.space()?.token()?.text).toBe('supabase');
+    expect(qn.namespace()).toBeUndefined();
+    expect(qn.identifier()).toBeUndefined();
+  });
+
   it('flags a second dot or colon as over-qualified', () => {
     const b = new GreenNodeBuilder();
     b.startNode('QualifiedName');
