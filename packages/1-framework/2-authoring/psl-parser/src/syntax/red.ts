@@ -28,6 +28,10 @@ export class SyntaxToken implements Token {
     return this.text.length;
   }
 
+  get endOffset(): number {
+    return this.offset + this.textLength;
+  }
+
   /** Whether `offset` falls within this token, using the zero-width containment rule. */
   isInside(offset: number): boolean {
     const start = this.offset;

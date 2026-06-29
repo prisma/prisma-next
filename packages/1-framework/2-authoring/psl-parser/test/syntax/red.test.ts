@@ -209,6 +209,17 @@ describe('SyntaxNode.endOffset', () => {
   });
 });
 
+describe('SyntaxToken.endOffset', () => {
+  it('is the sum of offset and text length', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    const token = root.tokenAtOffset(19).leftBiased();
+    expect(token).toBeInstanceOf(SyntaxToken);
+    if (token instanceof SyntaxToken) {
+      expect(token.endOffset).toBe(token.offset + token.text.length);
+    }
+  });
+});
+
 describe('SyntaxNode.isInside / isOutside', () => {
   it('is inclusive at start, interior, and end, exclusive just outside', () => {
     const root = createSyntaxTree(buildSampleTree());
