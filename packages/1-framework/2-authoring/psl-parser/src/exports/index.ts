@@ -36,6 +36,23 @@ export {
   namespacePslExtensionBlocks,
 } from '@prisma-next/framework-components/psl-ast';
 export { getPositionalArgument, parseQuotedStringLiteral } from '../attribute-helpers';
+export { fieldAttribute } from '../attribute-spec/field-attribute';
+export { interpretAttribute } from '../attribute-spec/interpret';
+export { optional } from '../attribute-spec/optional';
+export type {
+  ArgType,
+  AttributeLevel,
+  AttributeOut,
+  AttributeSpec,
+  InferAttr,
+  InterpretCtx,
+  NamedOut,
+  OptionalParam,
+  OutOf,
+  Param,
+  PositionalParam,
+  PosOut,
+} from '../attribute-spec/types';
 export { findBlockDescriptor, validateExtensionBlockFromSymbol } from '../extension-block';
 export {
   keywordPslSpan,
