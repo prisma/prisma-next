@@ -8,7 +8,10 @@ import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
-import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import {
+  PostgresDatabaseSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { createPostgresScalarTypeDescriptors } from '../../src/core/control-mutation-defaults';
@@ -87,7 +90,7 @@ function buildPslContract() {
 }
 
 describe('migration plan emits RLS (offline, no live database)', () => {
-  it('derives a PostgresSchemaIR from the contract and plans CREATE POLICY + ENABLE RLS', async () => {
+  it('derives a PostgresDatabaseSchemaNode from the contract and plans CREATE POLICY + ENABLE RLS', async () => {
     const result = buildPslContract();
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -95,15 +98,18 @@ describe('migration plan emits RLS (offline, no live database)', () => {
     const contract = result.value as Contract<SqlStorage>;
 
     // The initial `migration plan` derives the "from" schema from a null
-    // contract (no prior state) — an empty PostgresSchemaIR. The differ then
-    // reports the contract's policy as missing → CREATE POLICY.
+    // contract (no prior state) — an empty PostgresDatabaseSchemaNode. The differ
+    // then reports the contract's policy as missing → CREATE POLICY.
     const fromSchema = postgresTargetDescriptor.migrations.contractToSchema(
       null,
       frameworkComponents,
     );
-    expect(fromSchema).toBeInstanceOf(PostgresSchemaIR);
-    if (!(fromSchema instanceof PostgresSchemaIR)) return;
-    expect(fromSchema.rlsPolicies).toEqual([]);
+    PostgresDatabaseSchemaNode.assert(fromSchema);
+    expect(fromSchema).toBeInstanceOf(PostgresDatabaseSchemaNode);
+    const allPolicies = Object.values(fromSchema.namespaces).flatMap((ns) =>
+      Object.values(ns.tables).flatMap((t) => t.policies),
+    );
+    expect(allPolicies).toEqual([]);
 
     const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
     const planResult = planner.plan({

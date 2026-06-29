@@ -4,19 +4,17 @@ import sql from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
+import { PostgresDatabaseSchemaNode } from '@prisma-next/target-postgres/types';
 import { createDevDatabase, type DevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-// Type for schemaIR returned by introspect
-type SchemaIR = Awaited<ReturnType<ReturnType<typeof sql.create>['introspect']>>;
-
 /**
- * Helper to run introspection and pass schemaIR to callback.
+ * Helper to run introspection and pass the narrowed database root to callback.
  * Handles driver lifecycle (create + close) automatically.
  */
 async function withIntrospection<T>(
   connectionString: string,
-  fn: (schemaIR: SchemaIR) => T | Promise<T>,
+  fn: (schemaIR: PostgresDatabaseSchemaNode) => T | Promise<T>,
 ): Promise<T> {
   const driver = await postgresDriver.create(connectionString);
   try {
@@ -31,6 +29,7 @@ async function withIntrospection<T>(
     );
 
     const schemaIR = await familyInstance.introspect({ driver });
+    PostgresDatabaseSchemaNode.assert(schemaIR);
     return await fn(schemaIR);
   } finally {
     await driver.close();
@@ -89,8 +88,9 @@ describe('family instance introspect', () => {
       'returns schema IR with tables and columns',
       async () => {
         await withIntrospection(connectionString!, (schemaIR) => {
+          const ns = schemaIR.namespaces['public']!;
           expect(schemaIR).toBeDefined();
-          expect(schemaIR.tables).toBeDefined();
+          expect(ns.tables).toBeDefined();
         });
       },
       timeouts.spinUpPpgDev,
@@ -100,7 +100,8 @@ describe('family instance introspect', () => {
       'includes user table with correct columns',
       async () => {
         await withIntrospection(connectionString!, (schemaIR) => {
-          const userTable = schemaIR.tables['user']!;
+          const ns = schemaIR.namespaces['public']!;
+          const userTable = ns.tables['user']!;
           expect(userTable.name).toBe('user');
           expect(userTable.columns).toBeDefined();
 
@@ -127,7 +128,8 @@ describe('family instance introspect', () => {
       'includes primary key for user table',
       async () => {
         await withIntrospection(connectionString!, (schemaIR) => {
-          const userTable = schemaIR.tables['user']!;
+          const ns = schemaIR.namespaces['public']!;
+          const userTable = ns.tables['user']!;
           expect(userTable.primaryKey).toBeDefined();
           expect(userTable.primaryKey?.columns).toEqual(['id']);
         });
@@ -139,7 +141,8 @@ describe('family instance introspect', () => {
       'includes unique constraint for user email',
       async () => {
         await withIntrospection(connectionString!, (schemaIR) => {
-          const userTable = schemaIR.tables['user']!;
+          const ns = schemaIR.namespaces['public']!;
+          const userTable = ns.tables['user']!;
           expect(userTable.uniques).toBeDefined();
           expect(userTable.uniques.length).toBeGreaterThan(0);
           const emailUnique = userTable.uniques.find((uq) => uq.name === 'user_email_unique');
@@ -154,7 +157,8 @@ describe('family instance introspect', () => {
       'includes post table with foreign key to user',
       async () => {
         await withIntrospection(connectionString!, (schemaIR) => {
-          const postTable = schemaIR.tables['post']!;
+          const ns = schemaIR.namespaces['public']!;
+          const postTable = ns.tables['post']!;
           expect(postTable.name).toBe('post');
           expect(postTable.columns['id']).toBeDefined();
           expect(postTable.columns['userId']).toBeDefined();
@@ -175,7 +179,8 @@ describe('family instance introspect', () => {
       'includes indexes for post table',
       async () => {
         await withIntrospection(connectionString!, (schemaIR) => {
-          const postTable = schemaIR.tables['post']!;
+          const ns = schemaIR.namespaces['public']!;
+          const postTable = ns.tables['post']!;
           expect(postTable.indexes).toBeDefined();
           expect(postTable.indexes.length).toBeGreaterThan(0);
           const userIdIndex = postTable.indexes.find((idx) => idx.name === 'post_userId_idx');
@@ -190,8 +195,9 @@ describe('family instance introspect', () => {
       'includes Postgres annotations',
       async () => {
         await withIntrospection(connectionString!, (schemaIR) => {
-          expect(schemaIR.annotations).toBeDefined();
-          expect(schemaIR.annotations?.['pg']).toBeDefined();
+          const ns = schemaIR.namespaces['public']!;
+          expect(ns.annotations).toBeDefined();
+          expect(ns.annotations?.['pg']).toBeDefined();
         });
       },
       timeouts.spinUpPpgDev,

@@ -9,6 +9,7 @@ import { defineContract, field, model } from '@prisma-next/postgres/contract-bui
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+import { PostgresDatabaseSchemaNode } from '@prisma-next/target-postgres/types';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -81,8 +82,10 @@ describe('referential actions integration', () => {
           );
 
           const schemaIR = await familyInstance.introspect({ driver });
+          PostgresDatabaseSchemaNode.assert(schemaIR);
+          const ns = schemaIR.namespaces['public']!;
 
-          const postTable = schemaIR.tables['post'];
+          const postTable = ns.tables['post'];
           expect(postTable).toBeDefined();
           expect(postTable?.foreignKeys).toHaveLength(1);
 
@@ -116,8 +119,10 @@ describe('referential actions integration', () => {
           );
 
           const schemaIR = await familyInstance.introspect({ driver });
+          PostgresDatabaseSchemaNode.assert(schemaIR);
+          const ns = schemaIR.namespaces['public']!;
 
-          const commentTable = schemaIR.tables['comment'];
+          const commentTable = ns.tables['comment'];
           expect(commentTable).toBeDefined();
           expect(commentTable?.foreignKeys).toHaveLength(1);
 
@@ -165,7 +170,10 @@ describe('referential actions integration', () => {
           );
 
           const schemaIR = await familyInstance.introspect({ driver });
-          const fk = schemaIR.tables['post']?.foreignKeys[0];
+          PostgresDatabaseSchemaNode.assert(schemaIR);
+          const ns = schemaIR.namespaces['public']!;
+
+          const fk = ns.tables['post']?.foreignKeys[0];
           expect(fk).toBeDefined();
           expect(fk!.onDelete).toBeUndefined();
           expect(fk!.onUpdate).toBeUndefined();

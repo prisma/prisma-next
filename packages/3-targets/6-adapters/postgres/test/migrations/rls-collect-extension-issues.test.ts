@@ -6,10 +6,12 @@ import {
   normalizePredicate,
 } from '@prisma-next/target-postgres/rls-canonicalize';
 import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  PostgresPolicySchemaNode,
   PostgresRlsPolicy,
   PostgresSchema,
-  PostgresSchemaIR,
-  PostgresTableIR,
+  PostgresTableSchemaNode,
 } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -52,23 +54,41 @@ function externalPolicy(): PostgresRlsPolicy {
   });
 }
 
-function schemaWithPolicies(policies: PostgresRlsPolicy[]): PostgresSchemaIR {
-  return new PostgresSchemaIR({
-    tables: {
-      [TABLE_NAME]: new PostgresTableIR({
-        name: TABLE_NAME,
-        columns: {},
-        foreignKeys: [],
-        uniques: [],
-        indexes: [],
-        rlsPolicies: policies,
+function toPolicyNode(p: PostgresRlsPolicy): PostgresPolicySchemaNode {
+  return new PostgresPolicySchemaNode({
+    name: p.name,
+    prefix: p.prefix,
+    tableName: p.tableName,
+    namespaceId: p.namespaceId,
+    operation: p.operation,
+    roles: [...p.roles],
+    ...(p.using !== undefined ? { using: p.using } : {}),
+    ...(p.withCheck !== undefined ? { withCheck: p.withCheck } : {}),
+    permissive: p.permissive,
+  });
+}
+
+function schemaWithPolicies(policies: PostgresRlsPolicy[]): PostgresDatabaseSchemaNode {
+  return new PostgresDatabaseSchemaNode({
+    namespaces: {
+      public: new PostgresNamespaceSchemaNode({
+        schemaName: 'public',
+        tables: {
+          [TABLE_NAME]: new PostgresTableSchemaNode({
+            name: TABLE_NAME,
+            columns: {},
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+            policies: policies.map(toPolicyNode),
+          }),
+        },
+        nativeEnumTypeNames: [],
       }),
     },
-    pgSchemaName: 'public',
     pgVersion: 'unknown',
     roles: [],
     existingSchemas: ['public'],
-    nativeEnumTypeNames: [],
   });
 }
 

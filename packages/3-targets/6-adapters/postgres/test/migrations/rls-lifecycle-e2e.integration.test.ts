@@ -9,7 +9,7 @@ import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { isPostgresSchema, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
@@ -145,7 +145,7 @@ const ALLOW_DESTRUCTIVE: MigrationOperationPolicy = {
 async function applyContract(
   driver: PostgresControlDriver,
   contract: Contract<SqlStorage>,
-  schema: SqlSchemaIR,
+  schema: SqlSchemaIRNode,
   policy: MigrationOperationPolicy = INIT_ADDITIVE_POLICY,
 ): Promise<void> {
   const planner = postgresTargetDescriptor.createPlanner(controlAdapter);

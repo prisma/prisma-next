@@ -13,7 +13,12 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
-import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  PostgresTableSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
@@ -39,25 +44,30 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         },
       });
 
-      const schema = new PostgresSchemaIR({
-        tables: {
-          user: {
-            name: 'user',
-            columns: {
-              id: { name: 'id', nativeType: 'uuid', nullable: false },
-              email: { name: 'email', nativeType: 'text', nullable: false },
+      const schema = new PostgresDatabaseSchemaNode({
+        namespaces: {
+          public: new PostgresNamespaceSchemaNode({
+            schemaName: 'public',
+            tables: {
+              user: new PostgresTableSchemaNode({
+                name: 'user',
+                columns: {
+                  id: { name: 'id', nativeType: 'uuid', nullable: false },
+                  email: { name: 'email', nativeType: 'text', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                foreignKeys: [],
+                indexes: [{ columns: ['email'], unique: true, name: 'user_email_idx' }],
+                policies: [],
+              }),
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            foreignKeys: [],
-            indexes: [{ columns: ['email'], unique: true, name: 'user_email_idx' }],
-          },
+            nativeEnumTypeNames: [],
+          }),
         },
-        pgSchemaName: 'public',
         pgVersion: '',
         roles: [],
         existingSchemas: [],
-        nativeEnumTypeNames: [],
       });
 
       const result = planner.plan({
@@ -92,25 +102,30 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         },
       });
 
-      const schema = new PostgresSchemaIR({
-        tables: {
-          user: {
-            name: 'user',
-            columns: {
-              id: { name: 'id', nativeType: 'uuid', nullable: false },
-              email: { name: 'email', nativeType: 'text', nullable: false },
+      const schema = new PostgresDatabaseSchemaNode({
+        namespaces: {
+          public: new PostgresNamespaceSchemaNode({
+            schemaName: 'public',
+            tables: {
+              user: new PostgresTableSchemaNode({
+                name: 'user',
+                columns: {
+                  id: { name: 'id', nativeType: 'uuid', nullable: false },
+                  email: { name: 'email', nativeType: 'text', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                foreignKeys: [],
+                indexes: [{ columns: ['email'], unique: true, name: 'user_email_idx' }],
+                policies: [],
+              }),
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            foreignKeys: [],
-            indexes: [{ columns: ['email'], unique: true, name: 'user_email_idx' }],
-          },
+            nativeEnumTypeNames: [],
+          }),
         },
-        pgSchemaName: 'public',
         pgVersion: '',
         roles: [],
         existingSchemas: [],
-        nativeEnumTypeNames: [],
       });
 
       const result = planner.plan({
@@ -143,25 +158,30 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         },
       });
 
-      const schema = new PostgresSchemaIR({
-        tables: {
-          user: {
-            name: 'user',
-            columns: {
-              id: { name: 'id', nativeType: 'uuid', nullable: false },
-              email: { name: 'email', nativeType: 'text', nullable: false },
+      const schema = new PostgresDatabaseSchemaNode({
+        namespaces: {
+          public: new PostgresNamespaceSchemaNode({
+            schemaName: 'public',
+            tables: {
+              user: new PostgresTableSchemaNode({
+                name: 'user',
+                columns: {
+                  id: { name: 'id', nativeType: 'uuid', nullable: false },
+                  email: { name: 'email', nativeType: 'text', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [{ columns: ['email'], name: 'user_email_key' }],
+                foreignKeys: [],
+                indexes: [],
+                policies: [],
+              }),
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [{ columns: ['email'], name: 'user_email_key' }],
-            foreignKeys: [],
-            indexes: [],
-          },
+            nativeEnumTypeNames: [],
+          }),
         },
-        pgSchemaName: 'public',
         pgVersion: '',
         roles: [],
         existingSchemas: [],
-        nativeEnumTypeNames: [],
       });
 
       const result = planner.plan({
@@ -196,25 +216,30 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         },
       });
 
-      const schema = new PostgresSchemaIR({
-        tables: {
-          user: {
-            name: 'user',
-            columns: {
-              id: { name: 'id', nativeType: 'uuid', nullable: false },
-              email: { name: 'email', nativeType: 'text', nullable: false },
+      const schema = new PostgresDatabaseSchemaNode({
+        namespaces: {
+          public: new PostgresNamespaceSchemaNode({
+            schemaName: 'public',
+            tables: {
+              user: new PostgresTableSchemaNode({
+                name: 'user',
+                columns: {
+                  id: { name: 'id', nativeType: 'uuid', nullable: false },
+                  email: { name: 'email', nativeType: 'text', nullable: false },
+                },
+                primaryKey: { columns: ['id'], name: 'user_pkey' },
+                uniques: [{ columns: ['email'], name: 'user_email_key' }],
+                foreignKeys: [],
+                indexes: [{ columns: ['email'], unique: false, name: 'user_email_idx' }],
+                policies: [],
+              }),
             },
-            primaryKey: { columns: ['id'], name: 'user_pkey' },
-            uniques: [{ columns: ['email'], name: 'user_email_key' }],
-            foreignKeys: [],
-            indexes: [{ columns: ['email'], unique: false, name: 'user_email_idx' }],
-          },
+            nativeEnumTypeNames: [],
+          }),
         },
-        pgSchemaName: 'public',
         pgVersion: '',
         roles: [],
         existingSchemas: [],
-        nativeEnumTypeNames: [],
       });
 
       const result = planner.plan({

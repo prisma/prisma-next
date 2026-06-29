@@ -22,7 +22,9 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
-import { PostgresSchemaIR } from '../../src/core/schema-ir/postgres-schema-ir';
+import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
+import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
+import { PostgresPolicySchemaNode } from '../../src/core/schema-ir/postgres-policy-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 import { PostgresCreatePolicy } from '../../src/exports/ddl';
 
@@ -112,36 +114,52 @@ function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<Sql
   };
 }
 
-function schemaWith(policies: readonly PostgresRlsPolicy[]): PostgresSchemaIR {
-  return new PostgresSchemaIR({
-    tables: {
-      [TABLE_NAME]: new PostgresTableSchemaNode({
-        name: TABLE_NAME,
-        columns: {
-          id: { name: 'id', nativeType: 'int4', nullable: false },
-          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
-        },
-        foreignKeys: [],
-        uniques: [],
-        indexes: [],
-        policies,
-      }),
-    },
-    pgSchemaName: 'public',
-    pgVersion: 'unknown',
-    roles: [],
-    existingSchemas: ['public'],
-    nativeEnumTypeNames: [],
+function policyNode(policy: PostgresRlsPolicy): PostgresPolicySchemaNode {
+  return new PostgresPolicySchemaNode({
+    name: policy.name,
+    prefix: policy.prefix,
+    tableName: policy.tableName,
+    namespaceId: policy.namespaceId,
+    operation: policy.operation,
+    roles: [...policy.roles],
+    ...(policy.using !== undefined ? { using: policy.using } : {}),
+    ...(policy.withCheck !== undefined ? { withCheck: policy.withCheck } : {}),
+    permissive: policy.permissive,
   });
 }
 
-const emptySchema = new PostgresSchemaIR({
-  tables: {},
-  pgSchemaName: 'public',
-  pgVersion: 'unknown',
+function schemaWith(policies: readonly PostgresRlsPolicy[]): PostgresDatabaseSchemaNode {
+  return new PostgresDatabaseSchemaNode({
+    namespaces: {
+      public: new PostgresNamespaceSchemaNode({
+        schemaName: 'public',
+        tables: {
+          [TABLE_NAME]: new PostgresTableSchemaNode({
+            name: TABLE_NAME,
+            columns: {
+              id: { name: 'id', nativeType: 'int4', nullable: false },
+              user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+            },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+            policies: policies.map(policyNode),
+          }),
+        },
+        nativeEnumTypeNames: [],
+      }),
+    },
+    roles: [],
+    existingSchemas: ['public'],
+    pgVersion: 'unknown',
+  });
+}
+
+const emptySchema = new PostgresDatabaseSchemaNode({
+  namespaces: {},
   roles: [],
   existingSchemas: ['public'],
-  nativeEnumTypeNames: [],
+  pgVersion: 'unknown',
 });
 const DB_UPDATE_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
@@ -337,7 +355,7 @@ describe('RLS planner policy edit (missing + extra via generic pipeline)', () =>
   });
 });
 
-// `migration plan` derives a contract-backed PostgresSchemaIR (the
-// `contractToSchema` projection) and emits CREATE POLICY through the same diff
-// pipeline as the live paths. A non-PostgresSchemaIR schema is rejected; the
-// `migration plan` e2e proves the emission end-to-end.
+// `migration plan` derives a contract-backed PostgresDatabaseSchemaNode (the
+// `contractToPostgresDatabaseSchemaNode` projection) and emits CREATE POLICY
+// through the same diff pipeline as the live paths. A non-database-root schema
+// is rejected; the `migration plan` e2e proves the emission end-to-end.
