@@ -6,6 +6,7 @@ import type { ControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import { errorPostgresMigrationStackMissing } from '../errors';
+import { PostgresContractView } from '../postgres-contract-view';
 import {
   AddCheckConstraintCall,
   AddColumnCall,
@@ -60,10 +61,10 @@ import type { PostgresPlanTargetDetails } from './planner-target-details';
  * is an antipattern in a migration. (The unbound/unspecified namespace concept
  * remains for SQLite, which has no schemas, and for Mongo's connection `db`.)
  */
-export abstract class PostgresMigration extends SqlMigration<
-  PostgresPlanTargetDetails,
-  'postgres'
-> {
+export abstract class PostgresMigration<
+  Start extends Contract<SqlStorage> = Contract<SqlStorage>,
+  End extends Contract<SqlStorage> = Contract<SqlStorage>,
+> extends SqlMigration<PostgresPlanTargetDetails, 'postgres', Start, End> {
   readonly targetId = 'postgres' as const;
 
   /**
@@ -74,6 +75,9 @@ export abstract class PostgresMigration extends SqlMigration<
    */
   protected readonly controlAdapter: SqlControlAdapter<'postgres'> | undefined;
 
+  #endContract?: PostgresContractView<End>;
+  #startContract?: PostgresContractView<Start> | null;
+
   constructor(stack?: ControlStack<'sql', 'postgres'>) {
     super(stack);
     // The descriptor `create()` is typed as the wider `ControlAdapterInstance`;
@@ -82,6 +86,39 @@ export abstract class PostgresMigration extends SqlMigration<
     this.controlAdapter = stack?.adapter
       ? (stack.adapter.create(stack) as SqlControlAdapter<'postgres'>)
       : undefined;
+  }
+
+  /**
+   * The typed, schema-qualified Postgres view over this migration's end-state
+   * contract — `this.endContract.namespace.<schema>.table.<name>`, etc. Lazily
+   * built from `endContractJson` and memoized. Throws if no `endContractJson`
+   * was provided.
+   */
+  get endContract(): PostgresContractView<End> {
+    if (this.#endContract === undefined) {
+      if (this.endContractJson === undefined) {
+        throw new Error(
+          'PostgresMigration.endContract: no endContractJson provided — set endContractJson to read the end-state contract view.',
+        );
+      }
+      this.#endContract = PostgresContractView.fromJson<End>(this.endContractJson);
+    }
+    return this.#endContract;
+  }
+
+  /**
+   * The typed Postgres view over this migration's start-state contract, or
+   * `null` for a baseline migration (no `startContractJson`). Lazily built and
+   * memoized.
+   */
+  get startContract(): PostgresContractView<Start> | null {
+    if (this.#startContract === undefined) {
+      this.#startContract =
+        this.startContractJson === undefined
+          ? null
+          : PostgresContractView.fromJson<Start>(this.startContractJson);
+    }
+    return this.#startContract;
   }
 
   /**

@@ -1,5 +1,7 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { deriveProvidedInvariants } from '@prisma-next/migration-tools/invariants';
 import { Migration } from '@prisma-next/migration-tools/migration';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { isThenable } from '@prisma-next/utils/promise';
 import type { SqlMigrationPlanOperation, SqlPlanTargetDetails } from './migrations/types';
 
@@ -14,13 +16,22 @@ import type { SqlMigrationPlanOperation, SqlPlanTargetDetails } from './migratio
  * fully concrete operation shape. Target-free code in SQL family / tooling
  * parameterises over `TDetails` (and usually `TTargetId = string`).
  *
+ * The `Start` / `End` contract generics are forwarded to the framework
+ * `Migration` base so the derived `describe()` and the per-target view getters
+ * (`PostgresMigration` / `SqliteMigration`) carry each migration's precise
+ * contract types. The view getters themselves live on the per-target bases
+ * because the SQL ContractView shapes differ per target (SQLite unwraps its
+ * sole namespace to the root; Postgres is schema-qualified).
+ *
  * Keeps target-free contract/runtime features in the family layer while
  * letting adapters own target shape.
  */
 export abstract class SqlMigration<
   TDetails extends SqlPlanTargetDetails,
   TTargetId extends string = string,
-> extends Migration<SqlMigrationPlanOperation<TDetails>, 'sql', TTargetId> {
+  Start extends Contract<SqlStorage> = Contract<SqlStorage>,
+  End extends Contract<SqlStorage> = Contract<SqlStorage>,
+> extends Migration<SqlMigrationPlanOperation<TDetails>, 'sql', TTargetId, Start, End> {
   /**
    * Sorted, deduplicated invariant ids declared by this migration's
    * data-transform ops. Derived from `this.operations` so the field remains
