@@ -9,7 +9,8 @@
   "include": [
     "src/**/*.ts",
     "test/mongo-contract-view.test.ts",
-    "test/mongo-contract-view.test-d.ts"
+    "test/mongo-contract-view.test-d.ts",
+    "test/mongo-migration.test.ts"
   ],
   "exclude": ["dist"]
 }
