@@ -231,6 +231,21 @@ export class SyntaxNode {
     }
   }
 
+  /** The nearest match, testing this node itself before walking its ancestors. */
+  findClosestParent<T>(cast: (node: SyntaxNode) => T | undefined): T | undefined {
+    const self = cast(this);
+    if (self !== undefined) {
+      return self;
+    }
+    for (const ancestor of this.ancestors()) {
+      const result = cast(ancestor);
+      if (result !== undefined) {
+        return result;
+      }
+    }
+    return undefined;
+  }
+
   *descendants(): Iterable<SyntaxElement> {
     const stack: SyntaxElement[] = [this];
     for (let el = stack.pop(); el !== undefined; el = stack.pop()) {

@@ -42,7 +42,13 @@ export { IdentifierAst } from '../syntax/ast/identifier';
 export { QualifiedNameAst } from '../syntax/ast/qualified-name';
 export { TypeAnnotationAst } from '../syntax/ast/type-annotation';
 export type { AstNode, BracedBlock } from '../syntax/ast-helpers';
-export { filterChildren, findChildToken, findFirstChild, printSyntax } from '../syntax/ast-helpers';
+export {
+  any,
+  filterChildren,
+  findChildToken,
+  findFirstChild,
+  printSyntax,
+} from '../syntax/ast-helpers';
 export type { GreenElement, GreenNode, GreenToken } from '../syntax/green';
 export { greenNode, greenToken } from '../syntax/green';
 export { GreenNodeBuilder } from '../syntax/green-builder';

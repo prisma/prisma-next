@@ -40,6 +40,25 @@ export function* filterChildren<T>(
   }
 }
 
+type CastTarget<C> = C extends (node: SyntaxNode) => infer R ? Exclude<R, undefined> : never;
+
+export function any<Casts extends readonly ((node: SyntaxNode) => unknown)[]>(
+  ...casts: Casts
+): (node: SyntaxNode) => CastTarget<Casts[number]> | undefined;
+export function any(
+  ...casts: ReadonlyArray<(node: SyntaxNode) => unknown>
+): (node: SyntaxNode) => unknown {
+  return (node) => {
+    for (const cast of casts) {
+      const result = cast(node);
+      if (result !== undefined) {
+        return result;
+      }
+    }
+    return undefined;
+  };
+}
+
 /**
  * Raw source text of a CST node, verbatim (quotes and brackets preserved). For
  * the decoded value of a string literal, decode it instead.
