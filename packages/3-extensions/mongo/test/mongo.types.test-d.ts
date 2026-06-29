@@ -1,11 +1,13 @@
-import type { ContractEnumAccessor } from '@prisma-next/contract/enum-accessor';
+import type { ContractEnumAccessor, NamespacedEnums } from '@prisma-next/contract/enum-accessor';
 import type { ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
+import type { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mongo-contract';
 import type {
   CreateInput,
   IncludedRow,
   MongoCollection,
+  MongoQueryPlan,
   MongoRawClient,
   NoIncludes,
 } from '@prisma-next/mongo-orm';
@@ -13,6 +15,7 @@ import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../../../2-mongo-family/1-foundation/mongo-contract/test/fixtures/orm-contract';
 import { defineContract, enumType, field, member, model } from '../src/exports/contract-builder';
 import type { MongoClient } from '../src/runtime/mongo';
+import { mongoEnums } from '../src/runtime/mongo';
 
 type UserRow = IncludedRow<Contract, 'User', NoIncludes>;
 
@@ -218,4 +221,29 @@ test('R5: create() accepts an in-union literal, rejects an out-of-union literal'
     tags: [],
     moodTags: null,
   });
+});
+
+type UnboundEnums<
+  TContract extends MongoContractWithTypeMaps<
+    import('@prisma-next/mongo-contract').MongoContract,
+    import('@prisma-next/mongo-contract').AnyMongoTypeMaps
+  >,
+> = NamespacedEnums<TContract>[typeof UNBOUND_NAMESPACE_ID];
+
+test('mongoEnums<Contract>(contractJson) is typed UnboundEnums<Contract>', () => {
+  const enums = mongoEnums<EnumContract>({ contractJson: {} });
+  expectTypeOf(enums).toEqualTypeOf<UnboundEnums<EnumContract>>();
+});
+
+test('mongoEnums<Contract>(contractJson).Role is ContractEnumAccessor<RoleEnum>', () => {
+  const enums = mongoEnums<EnumContract>({ contractJson: {} });
+  expectTypeOf(enums['Role']).toMatchTypeOf<ContractEnumAccessor<RoleEnum>>();
+});
+
+type ExecuteRow = { id: string };
+declare const executePlan: MongoQueryPlan<ExecuteRow>;
+
+test('db.execute(plan) is typed AsyncIterableResult<Row>', () => {
+  const result = enumDb.execute(executePlan);
+  expectTypeOf(result).toEqualTypeOf<AsyncIterableResult<ExecuteRow>>();
 });

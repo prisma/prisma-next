@@ -119,3 +119,12 @@ authoring path emits a list storage column yet, so extension contracts and runti
 behaviour are unchanged. No extension-author API or surface change. Incidental
 substrate diff only.
 -->
+
+<!--
+Exercise Mongo enums in retail-store (this PR): the `MongoClient` facade gains three
+additive members — `raw` (MongoRawClient), `execute<Row>(plan)` (direct query execution
+without going through `runtime()`), and a standalone `mongoEnums(options)` export from
+`@prisma-next/mongo/runtime` (static enum accessors, no connection required). All
+additive; existing extension code is unaffected. No extension-author action required.
+Incidental substrate diff only.
+-->

@@ -5,5 +5,6 @@ export type {
   MongoOptionsWithContract,
   MongoOptionsWithContractJson,
   MongoTargetId,
+  UnboundEnums,
 } from '../runtime/mongo';
-export { default } from '../runtime/mongo';
+export { default, mongoEnums } from '../runtime/mongo';
