@@ -1,8 +1,8 @@
 import { MongoFieldFilter, MongoOrExpr } from '@prisma-next/mongo-query-ast/execution';
 import { MongoParamRef } from '@prisma-next/mongo-value';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { FieldOutputTypes } from '../contract';
 import type { Db } from '../db';
-import { collectResults } from './execute-raw';
 
 type Product = FieldOutputTypes['__unbound__']['Product'];
 
@@ -16,7 +16,7 @@ export async function findProductsPaginated(
   take: number,
 ): Promise<Product[]> {
   const plan = db.query.from('products').sort({ _id: 1 }).skip(skip).limit(take).build();
-  return collectResults<Product>(db, plan);
+  return (await db.runtime()).execute(plan).toArray();
 }
 
 export function findProductById(db: Db, id: string) {
@@ -35,12 +35,12 @@ export async function searchProducts(db: Db, query: string): Promise<Product[]> 
     MongoFieldFilter.of('articleType', '$regex', regex),
   ]);
   const plan = db.query.from('products').match(filter).build();
-  return collectResults<Product>(db, plan);
+  return (await db.runtime()).execute(plan).toArray();
 }
 
 export async function getRandomProducts(db: Db, count: number): Promise<Product[]> {
   const plan = db.query.from('products').sample(count).build();
-  return collectResults<Product>(db, plan);
+  return (await db.runtime()).execute(plan).toArray();
 }
 
 /**
@@ -70,5 +70,8 @@ export async function findSimilarProducts(
       },
     ])
     .build();
-  return collectResults<Product>(db, plan);
+  return blindCast<
+    Product[],
+    'db.raw aggregate plan is untyped (Atlas $vectorSearch); rows are Product documents'
+  >(await (await db.runtime()).execute(plan).toArray());
 }

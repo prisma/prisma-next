@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { findUserById } from '../data/users';
-import { getDb } from '../db-singleton';
+import { getDb } from '../db';
 
 export async function getAuthUserId(): Promise<string | null> {
   const cookieStore = await cookies();

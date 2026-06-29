@@ -1189,6 +1189,9 @@ importers:
       '@prisma-next/target-mongo':
         specifier: workspace:0.14.0
         version: link:../../packages/3-mongo-target/1-mongo-target
+      '@prisma-next/utils':
+        specifier: workspace:0.14.0
+        version: link:../../packages/1-framework/0-foundation/utils
       '@radix-ui/react-dropdown-menu':
         specifier: ^2.1.16
         version: 2.1.16(@types/react-dom@19.2.3(@types/react@19.2.16))(@types/react@19.2.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)

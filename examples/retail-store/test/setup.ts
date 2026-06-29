@@ -23,7 +23,14 @@ export function setupTestDb(dbName: string) {
   });
 
   afterAll(async () => {
-    await Promise.allSettled([db?.close(), nativeClient?.close(), replSet?.stop()]);
+    const results = await Promise.allSettled([db?.close(), nativeClient?.close(), replSet?.stop()]);
+    const failures = results.filter((r) => r.status === 'rejected');
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures.map((r) => (r as PromiseRejectedResult).reason),
+        'Test teardown failed',
+      );
+    }
   }, timeouts.spinUpMongoMemoryServer);
 
   return {

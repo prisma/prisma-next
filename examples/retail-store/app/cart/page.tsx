@@ -4,7 +4,7 @@ import { Button } from '../../src/components/ui/button';
 import { Card, CardContent } from '../../src/components/ui/card';
 import { Separator } from '../../src/components/ui/separator';
 import { getCartByUserId } from '../../src/data/carts';
-import { getDb } from '../../src/db-singleton';
+import { getDb } from '../../src/db';
 import { getAuthUserId } from '../../src/lib/auth';
 import { CartActions } from './cart-actions';
 
