@@ -39,6 +39,7 @@ export { getPositionalArgument, parseQuotedStringLiteral } from '../attribute-he
 export { enumOf } from '../attribute-spec/combinators/enum-of';
 export type { FieldRefArgType, FieldRefScope } from '../attribute-spec/combinators/field-ref';
 export { fieldRef } from '../attribute-spec/combinators/field-ref';
+export { identifierName } from '../attribute-spec/combinators/identifier-name';
 export type { ListOptions } from '../attribute-spec/combinators/list';
 export { list } from '../attribute-spec/combinators/list';
 export { str } from '../attribute-spec/combinators/str';

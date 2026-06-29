@@ -123,5 +123,11 @@ export type AttributeOut<
   Named extends Record<string, Param<unknown>>,
 > = Simplify<PosOut<Pos> & NamedOut<Named>>;
 
-export type InferAttr<S extends AttributeSpec<unknown>> =
-  S extends AttributeSpec<infer Out> ? Out : never;
+/**
+ * Recovers a spec's inferred output type. The parameter is intentionally
+ * unconstrained: `Out` sits contravariantly in `AttributeSpec.refine`, so a
+ * `refine`-carrying `AttributeSpec<Out>` is not assignable to
+ * `AttributeSpec<unknown>` and a constraint would reject every spec that uses a
+ * cross-argument `refine`. Inference still recovers `Out` precisely.
+ */
+export type InferAttr<S> = S extends AttributeSpec<infer Out> ? Out : never;
