@@ -30,10 +30,38 @@ describe('renderCallsToTypeScript', () => {
     expect(output).toContain("import { Migration } from '@prisma-next/family-mongo/migration';");
     expect(output).toContain("import { MigrationCLI } from '@prisma-next/cli/migration-cli';");
     expect(output).toContain("import { createIndex } from '@prisma-next/target-mongo/migration';");
-    expect(output).toContain('class M extends Migration');
     expect(output).toContain('override get operations()');
     expect(output).toContain('export default M;');
     expect(output).toContain('MigrationCLI.run(import.meta.url, M);');
+  });
+
+  it('emits the contract-JSON imports + fields and the Migration<Start, End> header (with-start)', () => {
+    const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
+
+    const output = renderTypeScript(calls, { from: 'sha256:aaa', to: 'sha256:bbb' });
+
+    expect(output).toContain(
+      'import endContract from \'./end-contract.json\' with { type: "json" };',
+    );
+    expect(output).toContain(
+      'import startContract from \'./start-contract.json\' with { type: "json" };',
+    );
+    expect(output).toContain("import type { Contract as End } from './end-contract';");
+    expect(output).toContain("import type { Contract as Start } from './start-contract';");
+    expect(output).toContain('class M extends Migration<Start, End> {');
+    expect(output).toContain('override readonly startContractJson = startContract;');
+    expect(output).toContain('override readonly endContractJson = endContract;');
+  });
+
+  it('does NOT emit a describe() method (the base derives it from the contract JSON)', () => {
+    const calls = [new DropCollectionCall('users')];
+
+    const output = renderTypeScript(calls, { from: 'sha256:aaa', to: 'sha256:bbb' });
+
+    expect(output).not.toContain('describe()');
+    // The hash values are no longer literal-embedded — they come from the JSON.
+    expect(output).not.toContain('sha256:aaa');
+    expect(output).not.toContain('sha256:bbb');
   });
 
   it('prepends a node shebang as the first line under the default test env', () => {
@@ -58,27 +86,6 @@ describe('renderCallsToTypeScript', () => {
     expect(output).not.toContain('dropIndex');
     expect(output).not.toContain('createCollection');
     expect(output).not.toContain('collMod');
-  });
-
-  it('includes describe() method when meta is provided', () => {
-    const calls = [new DropCollectionCall('users')];
-
-    const output = renderTypeScript(calls, {
-      from: 'sha256:abc',
-      to: 'sha256:def',
-    });
-
-    expect(output).toContain('override describe()');
-    expect(output).toContain('"sha256:abc"');
-    expect(output).toContain('"sha256:def"');
-  });
-
-  it('always renders describe() since migration.json is required', () => {
-    const calls = [new DropCollectionCall('users')];
-
-    const output = renderTypeScript(calls);
-
-    expect(output).toContain('override describe()');
   });
 
   it('renders createIndex with options', () => {
@@ -206,7 +213,7 @@ describe('renderCallsToTypeScript', () => {
     expect(importLine).toContain('createIndex');
   });
 
-  it('renders `from: null` for baseline migrations', () => {
+  it('renders the baseline shape for from: null (no start imports, Migration<never, End>)', () => {
     const calls = [new DropCollectionCall('users')];
 
     const output = renderTypeScript(calls, {
@@ -214,7 +221,16 @@ describe('renderCallsToTypeScript', () => {
       to: 'sha256:def',
     });
 
-    expect(output).toContain('from: null');
+    expect(output).toContain('class M extends Migration<never, End> {');
+    expect(output).toContain('override readonly endContractJson = endContract;');
+    expect(output).toContain(
+      'import endContract from \'./end-contract.json\' with { type: "json" };',
+    );
+    expect(output).toContain("import type { Contract as End } from './end-contract';");
+    // No start contract for a baseline.
+    expect(output).not.toContain('start-contract');
+    expect(output).not.toContain('startContractJson');
+    expect(output).not.toContain('describe()');
   });
 
   it('handles empty calls array', () => {

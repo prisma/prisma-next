@@ -55,17 +55,23 @@ describe('PlannerProducedMongoMigration', () => {
     expect(migration.operations).toEqual([]);
   });
 
-  it('renders authoring TypeScript that wires up MigrationCLI.run and embeds describe() metadata', () => {
+  it('renders authoring TypeScript that wires up MigrationCLI.run and derives describe() from contract JSON', () => {
     const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
     const migration = new PlannerProducedMongoMigration(calls, META);
 
     const source = migration.renderTypeScript();
 
-    expect(source).toContain('class M extends Migration');
+    // New shape: base derives describe() from the imported contract JSON, so the
+    // scaffold carries `Migration<Start, End>` + the JSON/field imports and emits
+    // no describe()/hash literals.
+    expect(source).toContain('class M extends Migration<Start, End>');
+    expect(source).toContain('override readonly startContractJson = startContract;');
+    expect(source).toContain('override readonly endContractJson = endContract;');
     expect(source).toContain('override get operations()');
     expect(source).toContain('createIndex');
-    expect(source).toContain(META.from);
-    expect(source).toContain(META.to);
+    expect(source).not.toContain('describe()');
+    expect(source).not.toContain(META.from);
+    expect(source).not.toContain(META.to);
     expect(source).toContain("import { MigrationCLI } from '@prisma-next/cli/migration-cli';");
     expect(source).toContain('MigrationCLI.run(import.meta.url, M);');
   });
@@ -75,21 +81,20 @@ describe('PlannerProducedMongoMigration', () => {
 
     const source = migration.renderTypeScript();
 
-    expect(source).toContain('class M extends Migration');
+    expect(source).toContain('class M extends Migration<Start, End>');
+    expect(source).toContain('override readonly endContractJson = endContract;');
     expect(source).toContain('override get operations()');
-    expect(source).toContain(META.from);
-    expect(source).toContain(META.to);
+    expect(source).not.toContain('describe()');
   });
 
-  it('renderTypeScript does not include labels in the describe block', () => {
+  it('renderTypeScript emits no describe() block (so no labels leak through it)', () => {
     const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
     const migration = new PlannerProducedMongoMigration(calls, META);
 
     const source = migration.renderTypeScript();
 
-    expect(source).toContain('class M extends Migration');
-    expect(source).toContain(META.from);
-    expect(source).toContain(META.to);
+    expect(source).toContain('class M extends Migration<Start, End>');
+    expect(source).not.toContain('describe()');
     expect(source).not.toContain('labels:');
   });
 });
