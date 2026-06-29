@@ -4,9 +4,8 @@ import {
   type DocumentAst,
   FieldAttributeAst,
   FieldDeclarationAst,
-  filterChildren,
   GenericBlockDeclarationAst,
-  IdentifierAst,
+  type IdentifierAst,
   isTrivia,
   KeyValuePairAst,
   ModelAttributeAst,
@@ -414,93 +413,33 @@ function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
 }
 
 /**
- * Derives the qualified type-name prefix purely from the {@link QualifiedNameAst}
- * segments and its `:` / `.` separator tokens, relative to the cursor. A
- * separator counts only when it lies before the cursor, so structure is decided
- * by what the user has actually typed: in `space:auth.User` the namespace role
- * appears only once the cursor passes the dot. The single source touch is
- * slicing the cursor segment's own identifier-token text.
+ * Derives the qualified type-name prefix from the {@link QualifiedNameAst}
+ * roles, which are themselves separator-positional: space, namespace, and name
+ * are decided purely by the `:` / `.` separator tokens, independent of the
+ * cursor. The single cursor-dependent step is slicing the name segment's own
+ * identifier-token text to the prefix the user has typed.
  */
 function typeNamePrefix(name: QualifiedNameAst, offset: number): TypeNamePrefix | undefined {
   const cursor = Math.min(offset, name.syntax.endOffset);
-  const segments = Array.from(filterChildren(name.syntax, IdentifierAst.cast));
-
-  const colon = name.colon();
-  const dot = name.dot();
-  const colonOffset = colon !== undefined && colon.offset < cursor ? colon.offset : undefined;
-  const dotOffset = dot !== undefined && dot.offset < cursor ? dot.offset : undefined;
-
-  const contractSpaceSegment =
-    colonOffset === undefined ? undefined : lastSegmentBefore(segments, colonOffset);
-  const namespaceSegment =
-    dotOffset === undefined ? undefined : lastSegmentBetween(segments, colonOffset, dotOffset);
-  const lastSeparatorOffset = dotOffset ?? colonOffset;
-  const nameSegment = firstSegmentAfter(segments, lastSeparatorOffset, cursor);
-
-  const contractSpace = colonOffset === undefined ? undefined : contractSpaceSegment?.name();
-  if (colonOffset !== undefined && (contractSpace === undefined || contractSpace.length === 0)) {
+  const contractSpace = name.colon() === undefined ? undefined : name.space()?.name();
+  if (name.colon() !== undefined && (contractSpace === undefined || contractSpace.length === 0)) {
     return undefined;
   }
-  const namespace = dotOffset === undefined ? undefined : namespaceSegment?.name();
-  if (dotOffset !== undefined && (namespace === undefined || namespace.length === 0)) {
+  const namespace = name.dot() === undefined ? undefined : name.namespace()?.name();
+  if (name.dot() !== undefined && (namespace === undefined || namespace.length === 0)) {
     return undefined;
   }
-
+  const nameSegment = name.identifier();
   const nameText = nameSegment === undefined ? '' : segmentTextBeforeCursor(nameSegment, cursor);
   const path = [contractSpace, namespace, nameText].filter(
     (segment): segment is string => segment !== undefined && segment.length > 0,
   );
-
   return {
     path,
     name: nameText,
     ...(contractSpace === undefined ? {} : { contractSpace }),
     ...(namespace === undefined ? {} : { namespace }),
   };
-}
-
-/** The last segment that starts strictly before `boundary`. */
-function lastSegmentBefore(
-  segments: readonly IdentifierAst[],
-  boundary: number,
-): IdentifierAst | undefined {
-  let found: IdentifierAst | undefined;
-  for (const segment of segments) {
-    if (segment.syntax.offset >= boundary) break;
-    found = segment;
-  }
-  return found;
-}
-
-/** The last segment that starts after `lowerBound` (if any) and before `upperBound`. */
-function lastSegmentBetween(
-  segments: readonly IdentifierAst[],
-  lowerBound: number | undefined,
-  upperBound: number,
-): IdentifierAst | undefined {
-  let found: IdentifierAst | undefined;
-  for (const segment of segments) {
-    const start = segment.syntax.offset;
-    if (start >= upperBound) break;
-    if (lowerBound !== undefined && start < lowerBound) continue;
-    found = segment;
-  }
-  return found;
-}
-
-/** The first segment that starts after `boundary` and before the cursor. */
-function firstSegmentAfter(
-  segments: readonly IdentifierAst[],
-  boundary: number | undefined,
-  cursor: number,
-): IdentifierAst | undefined {
-  for (const segment of segments) {
-    const start = segment.syntax.offset;
-    if (boundary !== undefined && start <= boundary) continue;
-    if (start >= cursor) continue;
-    return segment;
-  }
-  return undefined;
 }
 
 /** The cursor segment's identifier text, truncated at the cursor. */
