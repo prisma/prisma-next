@@ -86,7 +86,7 @@ Nodes first (new vocabulary), then producers/consumers/inference (depend on the 
 3. **Namespace node** (R3, R5, R6) — new `PostgresNamespaceSchemaNode`, shaped to satisfy the per-schema `SqlSchemaIR` interface.
 4. **Database root** (R1, R3, R4) — new `PostgresDatabaseSchemaNode` (+ guard/assert/ensure), replacing `PostgresSchemaIR`.
 5. **Producers** (R3, R5) — projection + introspection build the tree; `introspect()` returns the root.
-6. **Consumers** (R6) — the differ + planner `ensure` the root and walk it; the legacy verify / relational planning / view operate on a namespace node; `introspect()` returns a generic node and each consumer `ensure`s the target type.
+6. **Consumers** (R6) — the differ + planner `ensure` the root and walk it; the legacy verify / relational planning / view operate on a namespace node; `introspect()` returns a generic node and each consumer `ensure`s the target type. **CF-1 (R9 trap):** `verify-postgres-namespaces.ts` (`existingSchemasFromSchema`) reads `existingSchemas` off the flat schema via `isPostgresSchemaIR` today; once it's handed a namespace node it must read `existingSchemas` from the **database root**, not fall through to the `['public']` default — otherwise namespace presence silently regresses. Rewire this consumer here.
 7. **Inference to target** (R7) — move the maps + projection to the Postgres target descriptor; family delegates; delete the flat walker; leaf transforms become utilities.
 
 ## Tests (write first)
