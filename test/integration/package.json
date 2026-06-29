@@ -73,7 +73,7 @@
     "@prisma-next/test-utils": "workspace:0.14.0",
     "@prisma-next/tsconfig": "workspace:0.14.0",
     "@types/pg": "catalog:",
-    "commander": "^14.0.3",
+    "commander": "^15.0.0",
     "mongodb": "catalog:",
     "mongodb-memory-server": "catalog:",
     "pathe": "^2.0.3",
