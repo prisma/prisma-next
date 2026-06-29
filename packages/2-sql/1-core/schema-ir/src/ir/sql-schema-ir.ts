@@ -31,8 +31,9 @@ export interface SqlSchemaIRInput {
 export class SqlSchemaIR extends SqlSchemaIRNode {
   // Optional on the type so plain-data `SqlSchemaIR`-shaped literals (common in
   // tests and the contract-derived schema) still satisfy it without restating
-  // the field; instances always carry the concrete `'sql'`. `isPostgresSchemaIR`
-  // reads it — an absent value is correctly not Postgres.
+  // the field; instances always carry the concrete `'sql'`.
+  // `PostgresDatabaseSchemaNode.is` reads it — an absent value is correctly not
+  // Postgres.
   readonly nodeTarget?: SqlSchemaTarget = 'sql';
   readonly tables: Readonly<Record<string, SqlTableIR>>;
   declare readonly annotations?: SqlAnnotations;

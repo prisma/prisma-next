@@ -30,7 +30,7 @@ import type {
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlAdapter } from '../control-adapter';
 import type { SqlControlFamilyInstance } from '../control-instance';
@@ -308,7 +308,13 @@ export type SqlPlannerResult<TTargetDetails> =
 
 export interface SqlMigrationPlannerPlanOptions {
   readonly contract: Contract<SqlStorage>;
-  readonly schema: SqlSchemaIR;
+  /**
+   * The "from"/live schema as the target's introspected node. SQLite returns a
+   * flat `SqlSchemaIR`; Postgres returns a `PostgresDatabaseSchemaNode` tree
+   * root. Structure-aware consumers (the differ, the relational verify glue)
+   * `ensure`/flatten the concrete shape before walking it.
+   */
+  readonly schema: SqlSchemaIRNode;
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
   /**

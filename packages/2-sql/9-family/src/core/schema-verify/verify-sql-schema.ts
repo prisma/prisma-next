@@ -25,8 +25,9 @@ import {
   type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
 import { resolveValueSetValues } from '../migrations/contract-to-schema-ir';
@@ -42,6 +43,34 @@ import {
   verifyPrimaryKey,
   verifyUniqueConstraints,
 } from './verify-helpers';
+
+/**
+ * Returns the per-schema namespace nodes of an introspected schema node, for
+ * the relational verify and schema-view to consume one at a time.
+ *
+ * Structure-agnostic — it imports no target node class. A tree root that
+ * exposes a `namespaces` record (Postgres) yields its namespace nodes; the
+ * nodes are NEVER merged, so same-named tables in different schemas cannot
+ * collide. A flat schema (SQLite, or a single namespace node) has no
+ * `namespaces` and is its own single namespace, so it yields itself.
+ * Duck-typing mirrors `projectSchemaToSpace`, which spreads these nodes into
+ * plain objects, so the helper also handles spread-flattened input.
+ */
+export function namespaceSchemaNodes(schema: SqlSchemaIRNode): readonly SqlSchemaIR[] {
+  const obj = blindCast<
+    { readonly namespaces?: Readonly<Record<string, SqlSchemaIR>> },
+    'structural read of an own-enumerable namespaces record; survives the projectSchemaToSpace spread'
+  >(schema);
+  if (obj.namespaces !== undefined) {
+    return Object.values(obj.namespaces);
+  }
+  return [
+    blindCast<
+      SqlSchemaIR,
+      'a flat schema node (no namespaces) is its own single namespace, exposing the per-schema { tables } shape'
+    >(schema),
+  ];
+}
 
 /**
  * Function type for normalizing raw database default expressions into ColumnDefault.

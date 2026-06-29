@@ -16,7 +16,7 @@ import type {
   LowererContext,
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/verify-sql-schema';
 
 /**
@@ -162,22 +162,27 @@ export interface SqlControlAdapter<TTarget extends string = string>
   ): Promise<void>;
 
   /**
-   * Introspects a database schema and returns a raw SqlSchemaIR.
+   * Introspects a database schema and returns the target's schema-IR node.
    *
    * This is a pure schema discovery operation that queries the database catalog
    * and returns the schema structure without type mapping or contract enrichment.
    * Type mapping and enrichment are handled separately by enrichment helpers.
    *
+   * The return type is the family-base `SqlSchemaIRNode` so each target returns
+   * its own node shape: SQLite returns a flat `SqlSchemaIR`, Postgres returns a
+   * `PostgresDatabaseSchemaNode` tree root. Consumers `ensure` the concrete
+   * target type before walking it.
+   *
    * @param driver - ControlDriverInstance instance for executing queries (target-specific)
    * @param contract - Optional contract for contract-guided introspection (filtering, optimization)
    * @param schema - Schema name to introspect (defaults to 'public')
-   * @returns Promise resolving to SqlSchemaIR representing the live database schema
+   * @returns Promise resolving to the live database schema node
    */
   introspect(
     driver: SqlControlDriverInstance<TTarget>,
     contract?: unknown,
     schema?: string,
-  ): Promise<SqlSchemaIR>;
+  ): Promise<SqlSchemaIRNode>;
 
   /**
    * Optional target-specific normalizer for raw database default expressions.
@@ -202,7 +207,7 @@ export interface SqlControlAdapter<TTarget extends string = string>
    */
   collectSchemaDiffIssues?(
     contract: Contract<SqlStorage>,
-    schema: SqlSchemaIR,
+    schema: SqlSchemaIRNode,
   ): readonly SchemaDiffIssue[];
 
   /**

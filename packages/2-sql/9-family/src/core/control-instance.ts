@@ -44,7 +44,7 @@ import type {
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
-import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlSchemaIRNode, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlControlAdapter } from './control-adapter';
@@ -55,7 +55,8 @@ import type {
 } from './migrations/types';
 import { sqlOperationsToPreview } from './operation-preview';
 import { sqlSchemaIrToPslAst } from './psl-contract-infer/sql-schema-ir-to-psl-ast';
-import { verifySqlSchema } from './schema-verify/verify-sql-schema';
+import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/verify-sql-schema';
+import { namespaceSchemaNodes, verifySqlSchema } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds } from './verify';
 
 function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
@@ -192,9 +193,9 @@ interface SqlFamilyInstanceState {
 }
 
 export interface SqlControlFamilyInstance
-  extends ControlFamilyInstance<'sql', SqlSchemaIR>,
-    SchemaViewCapable<SqlSchemaIR>,
-    PslContractInferCapable<SqlSchemaIR>,
+  extends ControlFamilyInstance<'sql', SqlSchemaIRNode>,
+    SchemaViewCapable<SqlSchemaIRNode>,
+    PslContractInferCapable<SqlSchemaIRNode>,
     OperationPreviewCapable,
     SqlFamilyInstanceState {
   /**
@@ -227,7 +228,7 @@ export interface SqlControlFamilyInstance
    */
   verifySchema(options: {
     readonly contract: unknown;
-    readonly schema: SqlSchemaIR;
+    readonly schema: SqlSchemaIRNode;
     readonly strict: boolean;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): VerifyDatabaseSchemaResult;
@@ -242,9 +243,9 @@ export interface SqlControlFamilyInstance
   introspect(options: {
     readonly driver: SqlControlDriverInstance<string>;
     readonly contract?: unknown;
-  }): Promise<SqlSchemaIR>;
+  }): Promise<SqlSchemaIRNode>;
 
-  inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst;
+  inferPslContract(schemaIR: SqlSchemaIRNode): PslDocumentAst;
 
   lowerAst(
     ast: AnyQueryAst | DdlNode,
@@ -687,21 +688,27 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
     verifySchema(options: {
       readonly contract: unknown;
-      readonly schema: SqlSchemaIR;
+      readonly schema: SqlSchemaIRNode;
       readonly strict: boolean;
       readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
     }): VerifyDatabaseSchemaResult {
       const contract = deserializeWithTargetSerializer(options.contract) as Contract<SqlStorage>;
       const controlAdapter = getControlAdapter();
-      const sqlResult = verifySqlSchema({
+      // The relational verify walks one per-schema namespace node at a time
+      // (never a merged flat schema — that would collide same-named tables
+      // across schemas). A flat schema (SQLite) is its own single namespace.
+      const namespaceNodes = namespaceSchemaNodes(options.schema);
+      const sqlResult = verifyContractAgainstNamespaceNodes({
         contract,
-        schema: options.schema,
+        namespaceNodes,
         strict: options.strict,
         typeMetadataRegistry,
         frameworkComponents: options.frameworkComponents,
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
       });
+      // The target's RLS diff machinery ensures and walks the tree root, so it
+      // receives the node unchanged (not the per-namespace relational view).
       const rawSchemaDiffIssues =
         controlAdapter.collectSchemaDiffIssues?.(contract, options.schema) ?? [];
       const schemaDiffIssues = filterSchemaDiffIssues(
@@ -885,11 +892,11 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     async introspect(options: {
       readonly driver: SqlControlDriverInstance<string>;
       readonly contract?: unknown;
-    }): Promise<SqlSchemaIR> {
+    }): Promise<SqlSchemaIRNode> {
       return getControlAdapter().introspect(options.driver, options.contract);
     },
 
-    inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst {
+    inferPslContract(schemaIR: SqlSchemaIRNode): PslDocumentAst {
       return sqlSchemaIrToPslAst(schemaIR);
     },
 
@@ -912,8 +919,15 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       return sqlOperationsToPreview(operations);
     },
 
-    toSchemaView(schema: SqlSchemaIR): CoreSchemaView {
-      const tableNodes: readonly SchemaTreeNode[] = Object.entries(schema.tables).map(
+    toSchemaView(schema: SqlSchemaIRNode): CoreSchemaView {
+      // Walk root → namespaces → tables into one flat list of table nodes. The
+      // single-schema common case (one namespace node) renders the same
+      // table-level view as today — no synthetic namespace level. A flat schema
+      // (SQLite) is its own single namespace.
+      const tableEntries: ReadonlyArray<[string, SqlTableIR]> = namespaceSchemaNodes(
+        schema,
+      ).flatMap((namespace) => Object.entries(namespace.tables));
+      const tableNodes: readonly SchemaTreeNode[] = tableEntries.map(
         ([tableName, table]: [string, SqlTableIR]) => {
           const children: SchemaTreeNode[] = [];
 
@@ -1028,6 +1042,78 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           ...(tableNodes.length > 0 ? { children: tableNodes } : {}),
         }),
       };
+    },
+  };
+}
+
+/**
+ * Runs the relational verify against the introspected namespace nodes — one
+ * `verifySqlSchema` pass per node, the nodes never merged so same-named tables
+ * in different schemas can't collide.
+ *
+ * Single-schema (one node, the common case) is one pass of the whole contract
+ * against the sole namespace node — byte-identical to the pre-tree flat verify.
+ * SQLite (a flat schema, its own single namespace) is likewise one pass.
+ *
+ * Genuine multi-schema (more than one node) is the open CF-2 item: the expected
+ * (contract) side still routes through the flat `contractToSchemaIR`, so it is
+ * not yet scoped per namespace. Pairing each contract namespace to its live
+ * node needs target DDL-schema resolution, which the family layer can't do
+ * generically. Until that lands, each node is verified against the whole
+ * contract; tables a node doesn't own surface as `missing_table`. This is
+ * flagged, not worked around with a collision-prone flat merge.
+ */
+function verifyContractAgainstNamespaceNodes(options: {
+  readonly contract: Contract<SqlStorage>;
+  readonly namespaceNodes: readonly SqlSchemaIR[];
+  readonly strict: boolean;
+  readonly typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  readonly normalizeDefault?: DefaultNormalizer;
+  readonly normalizeNativeType?: NativeTypeNormalizer;
+}): VerifyDatabaseSchemaResult {
+  const baseOptions = {
+    contract: options.contract,
+    strict: options.strict,
+    typeMetadataRegistry: options.typeMetadataRegistry,
+    frameworkComponents: options.frameworkComponents,
+    ...ifDefined('normalizeDefault', options.normalizeDefault),
+    ...ifDefined('normalizeNativeType', options.normalizeNativeType),
+  };
+  const [first, ...rest] = options.namespaceNodes;
+  const firstResult = verifySqlSchema({ ...baseOptions, schema: first ?? { tables: {} } });
+  if (rest.length === 0) return firstResult;
+  return rest.reduce<VerifyDatabaseSchemaResult>(
+    (acc, node) => mergeVerifyResults(acc, verifySqlSchema({ ...baseOptions, schema: node })),
+    firstResult,
+  );
+}
+
+/**
+ * Combines two `VerifyDatabaseSchemaResult`s by concatenating issues and
+ * summing counts. Used to fold the per-namespace verify passes of a
+ * multi-schema database (CF-2) into one result. The `root` verification node
+ * of the first pass is retained — multi-schema verify-tree shaping is part of
+ * the open CF-2 work, not this slice.
+ */
+function mergeVerifyResults(
+  a: VerifyDatabaseSchemaResult,
+  b: VerifyDatabaseSchemaResult,
+): VerifyDatabaseSchemaResult {
+  return {
+    ...a,
+    ok: a.ok && b.ok,
+    ...ifDefined('code', a.code ?? b.code),
+    schema: {
+      ...a.schema,
+      issues: [...a.schema.issues, ...b.schema.issues],
+      schemaDiffIssues: [...a.schema.schemaDiffIssues, ...b.schema.schemaDiffIssues],
+      counts: {
+        pass: a.schema.counts.pass + b.schema.counts.pass,
+        warn: a.schema.counts.warn + b.schema.counts.warn,
+        fail: a.schema.counts.fail + b.schema.counts.fail,
+        totalNodes: a.schema.counts.totalNodes + b.schema.counts.totalNodes,
+      },
     },
   };
 }
