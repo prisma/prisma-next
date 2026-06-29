@@ -73,8 +73,11 @@ describe('classifyPslCompletionContext', () => {
     });
   });
 
-  it('does not treat the next indented line as a blank model field type position', () => {
-    expectUnsupported(['model Post {', '  author', '  |', '}'].join('\n'));
+  it('treats the next indented line as a blank model field type position', () => {
+    expect(classify(['model Post {', '  author', '  |', '}'].join('\n'))).toMatchObject({
+      kind: 'modelType',
+      fieldName: 'author',
+    });
   });
 
   it('does not treat a comment after the field name as a blank model field type position', () => {
@@ -155,6 +158,27 @@ describe('classifyPslCompletionContext', () => {
   it('returns unsupported inside attribute arguments', () => {
     expectUnsupported(['model Post {', '  id Int @default(|)', '}'].join('\n'));
     expectUnsupported(['model Post {', '  authorId Int @relation(fields: [|])', '}'].join('\n'));
+  });
+
+  it('returns unsupported inside an attribute within a generic block', () => {
+    expectUnsupported(['policy Foo {', '  @@bar(baz|)', '}'].join('\n'));
+  });
+
+  it('returns unsupported inside field and model attribute arguments', () => {
+    expectUnsupported(['model M {', '  id Int @map(baz|)', '}'].join('\n'));
+    expectUnsupported(['model M {', '  @@map(baz|)', '}'].join('\n'));
+  });
+
+  it('classifies a composite-type field type position', () => {
+    expect(classify(['type Address {', '  city |', '}'].join('\n'))).toMatchObject({
+      kind: 'modelType',
+      fieldName: 'city',
+    });
+
+    expect(classify(['type Address {', '  city U|', '}'].join('\n'))).toMatchObject({
+      kind: 'modelType',
+      fieldName: 'city',
+    });
   });
 
   it('classifies blank generic block key positions', () => {

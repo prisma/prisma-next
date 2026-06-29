@@ -102,13 +102,10 @@ export function classifyPslCompletionContext(
   const anchorNode = at.leftBiased()?.parent;
   const previousSignificantNode = previousSignificantToken(at, offset)?.parent;
   const contextNode = nodeForContext(anchorNode, previousSignificantNode);
-  if (hasUnsupportedAncestor(contextNode)) {
-    return unsupported(offset);
-  }
 
   // The edit replaces the identifier under the cursor, or is empty when the
   // cursor sits in trivia.
-  const replacementStartOffset = sourceRangeStart(at, offset);
+  const replacementStartOffset = cursorIdentifier(at, offset)?.offset ?? offset;
 
   const declarationKeywordContext = classifyDeclarationKeyword({
     node: contextNode,
@@ -134,7 +131,10 @@ export function classifyPslCompletionContext(
   if (field === undefined) {
     return unsupported(offset);
   }
-  if (closestAst(field.syntax, ModelDeclarationAst.cast) === undefined) {
+  const inModelOrComposite =
+    closestAst(field.syntax, ModelDeclarationAst.cast) !== undefined ||
+    closestAst(field.syntax, CompositeTypeDeclarationAst.cast) !== undefined;
+  if (!inModelOrComposite) {
     return unsupported(offset);
   }
 
@@ -173,14 +173,13 @@ function classifyModelFieldType(input: {
   const typeStart = typeAnnotation.syntax.offset;
 
   if (typeAnnotation.syntax.textLength === 0) {
-    const fieldNameToken = fieldName.syntax.lastToken;
-    if (
-      fieldNameToken !== undefined &&
-      input.offset > fieldNameEnd &&
-      input.offset <= typeStart &&
-      onlyWhitespaceBetween(fieldNameToken, input.offset)
-    ) {
-      return modelType(input.offset, fieldNameText, input.offset);
+    if (input.offset > fieldNameEnd && input.offset <= typeStart) {
+      return {
+        kind: 'modelType',
+        offset: input.offset,
+        fieldName: fieldNameText,
+        replacementStartOffset: input.offset,
+      };
     }
     return unsupported(input.offset);
   }
@@ -206,22 +205,31 @@ function classifyModelFieldType(input: {
   }
 
   const position = classifyTypePosition(name);
-  if (position === undefined) {
-    return unsupported(input.offset);
-  }
 
   switch (position.kind) {
     case 'modelType':
-      return modelType(input.offset, fieldNameText, input.replacementStartOffset);
+      return {
+        kind: 'modelType',
+        offset: input.offset,
+        fieldName: fieldNameText,
+        replacementStartOffset: input.replacementStartOffset,
+      };
     case 'spaceMember':
-      return spaceMember(input.offset, fieldNameText, input.replacementStartOffset, position.space);
+      return {
+        kind: 'spaceMember',
+        offset: input.offset,
+        fieldName: fieldNameText,
+        replacementStartOffset: input.replacementStartOffset,
+        space: position.space,
+      };
     case 'namespaceMember':
-      return namespaceMember(
-        input.offset,
-        fieldNameText,
-        input.replacementStartOffset,
-        position.namespace,
-      );
+      return {
+        kind: 'namespaceMember',
+        offset: input.offset,
+        fieldName: fieldNameText,
+        replacementStartOffset: input.replacementStartOffset,
+        namespace: position.namespace,
+      };
   }
 }
 
@@ -231,56 +239,27 @@ type TypePosition =
   | { readonly kind: 'namespaceMember'; readonly namespace: string };
 
 /**
- * Resolves which type-completion position a qualified name sits in, gating on
- * the same separator validity as the name itself: a `:` requires a contract-
- * space segment and a `.` requires a namespace segment. A failed gate yields
- * `undefined` (the caller maps it to `unsupported`).
+ * Resolves which type-completion position a qualified name sits in. Roles are
+ * read straight off the separator-positional accessors: a populated namespace
+ * segment is a `.`-qualified name, a populated space segment is a `:`-qualified
+ * name, and the absence of both is a bare model type.
  *
  * Behaviour change: a `:`-qualified name with no `.` (e.g. `supabase:`,
- * `supabase:U`) is now a `spaceMember` position rather than falling through to
- * bare model-type completions.
+ * `supabase:U`) is a `spaceMember` position rather than falling through to bare
+ * model-type completions. A malformed leading-separator name (`:User`, `.User`)
+ * carries no populated segment and resolves to `modelType` rather than
+ * `unsupported`.
  */
-function classifyTypePosition(name: QualifiedNameAst): TypePosition | undefined {
-  if (name.colon() !== undefined) {
-    const space = name.space()?.name();
-    if (space === undefined || space.length === 0) return undefined;
-    if (name.dot() === undefined) return { kind: 'spaceMember', space };
-    const namespace = name.namespace()?.name();
-    if (namespace === undefined || namespace.length === 0) return undefined;
+function classifyTypePosition(name: QualifiedNameAst): TypePosition {
+  const namespace = name.namespace()?.name();
+  if (namespace !== undefined && namespace.length > 0) {
     return { kind: 'namespaceMember', namespace };
   }
-  if (name.dot() !== undefined) {
-    const namespace = name.namespace()?.name();
-    if (namespace === undefined || namespace.length === 0) return undefined;
-    return { kind: 'namespaceMember', namespace };
+  const space = name.space()?.name();
+  if (space !== undefined && space.length > 0) {
+    return { kind: 'spaceMember', space };
   }
   return { kind: 'modelType' };
-}
-
-function modelType(
-  offset: number,
-  fieldName: string,
-  replacementStartOffset: number,
-): ModelTypeCompletionContext {
-  return { kind: 'modelType', offset, fieldName, replacementStartOffset };
-}
-
-function spaceMember(
-  offset: number,
-  fieldName: string,
-  replacementStartOffset: number,
-  space: string,
-): SpaceMemberCompletionContext {
-  return { kind: 'spaceMember', offset, fieldName, replacementStartOffset, space };
-}
-
-function namespaceMember(
-  offset: number,
-  fieldName: string,
-  replacementStartOffset: number,
-  namespace: string,
-): NamespaceMemberCompletionContext {
-  return { kind: 'namespaceMember', offset, fieldName, replacementStartOffset, namespace };
 }
 
 function classifyDeclarationKeyword(input: {
@@ -361,7 +340,7 @@ function declarationBodyContainsOffset(
   if (lbrace === undefined) {
     return false;
   }
-  const bodyStart = lbrace.offset + lbrace.text.length;
+  const bodyStart = lbrace.endOffset;
   const rbrace = declaration.rbrace();
   const bodyEnd = rbrace?.offset ?? declaration.syntax.endOffset;
   return offset >= bodyStart && offset <= bodyEnd;
@@ -378,7 +357,7 @@ function namespaceBodyContainsOffset(
   if (lbrace === undefined) {
     return false;
   }
-  const bodyStart = lbrace.offset + lbrace.text.length;
+  const bodyStart = lbrace.endOffset;
   const rbrace = namespace.rbrace();
   const bodyEnd = rbrace?.offset ?? namespace.syntax.endOffset;
   return offset >= bodyStart && offset <= bodyEnd;
@@ -393,6 +372,10 @@ function classifyGenericBlockParameter(input: {
   const block = closestAst(input.node, GenericBlockDeclarationAst.cast);
   if (block === undefined) {
     return undefined;
+  }
+
+  if (hasUnsupportedAncestor(input.node)) {
+    return unsupported(input.offset);
   }
 
   const lbrace = block.lbrace();
@@ -523,24 +506,20 @@ function previousSignificantToken(at: TokenAtOffset, offset: number): SyntaxToke
   if (left === undefined) {
     return undefined;
   }
-  return tokenEndOffset(left) <= offset && !isTrivia(left) ? left : previousNonTriviaToken(left);
+  return left.endOffset <= offset && !isTrivia(left) ? left : previousNonTriviaToken(left);
 }
 
 /** The identifier token the cursor is editing, if any. */
 function cursorIdentifier(at: TokenAtOffset, offset: number): SyntaxToken | undefined {
   const right = at.rightBiased();
-  if (right?.kind === 'Ident' && offset < tokenEndOffset(right)) {
+  if (right?.kind === 'Ident' && offset < right.endOffset) {
     return right;
   }
   const left = at.leftBiased();
-  if (left?.kind === 'Ident' && tokenEndOffset(left) === offset) {
+  if (left?.kind === 'Ident' && left.endOffset === offset) {
     return left;
   }
   return undefined;
-}
-
-function sourceRangeStart(at: TokenAtOffset, offset: number): number {
-  return cursorIdentifier(at, offset)?.offset ?? offset;
 }
 
 /** Whether a newline trivia token separates `from` from `toOffset`. */
@@ -552,19 +531,4 @@ function newlineBetween(from: SyntaxToken, toOffset: number): boolean {
     token = token.nextToken;
   }
   return false;
-}
-
-/** Whether only whitespace trivia tokens lie between `from` and `toOffset`. */
-function onlyWhitespaceBetween(from: SyntaxToken, toOffset: number): boolean {
-  for (let token = from.nextToken; token !== undefined && token.offset < toOffset; ) {
-    if (token.kind !== 'Whitespace') {
-      return false;
-    }
-    token = token.nextToken;
-  }
-  return true;
-}
-
-function tokenEndOffset(token: SyntaxToken): number {
-  return token.offset + token.text.length;
 }
