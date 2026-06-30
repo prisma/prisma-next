@@ -1,4 +1,3 @@
-import { format } from '@prisma-next/psl-parser/format';
 import { printPsl } from '@prisma-next/psl-printer';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
@@ -609,28 +608,5 @@ describe('printer retires @relation(name:)', () => {
 
     expect(result).toContain('@relation(inverse: sender)');
     expect(result).toContain('@relation(inverse: recipient)');
-  });
-});
-
-describe('legacy @relation(name:) input survives format unchanged', () => {
-  it('leaves a legacy name: argument untouched (no auto-conversion)', () => {
-    const schema = [
-      'model User {',
-      '  id              Int       @id',
-      '  messages        Message[] @relation(name: "message_sender_fk")',
-      '}',
-      '',
-      'model Message {',
-      '  id       Int  @id',
-      '  senderId Int',
-      '  sender   User @relation(name: "message_sender_fk", from: [senderId], to: [id])',
-      '}',
-      '',
-    ].join('\n');
-
-    const formatted = format(schema);
-
-    expect(formatted).toContain('@relation(name: "message_sender_fk")');
-    expect(formatted).toContain('@relation(name: "message_sender_fk", from:[senderId], to:[id])');
   });
 });

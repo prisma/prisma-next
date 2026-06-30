@@ -41,7 +41,6 @@ export type ParsedThrough = {
 };
 
 export type ParsedRelationAttribute = {
-  readonly relationName?: string;
   readonly fields?: readonly string[];
   readonly references?: readonly string[];
   /**
@@ -133,7 +132,6 @@ export type FkRelationMetadata = {
   readonly targetTableName: string;
   /** Resolved namespace coordinate of the related model, when known. */
   readonly targetNamespaceId?: string;
-  readonly relationName?: string;
   readonly localColumns: readonly string[];
   readonly referencedColumns: readonly string[];
 };
@@ -143,7 +141,6 @@ export type ModelBackrelationCandidate = {
   readonly tableName: string;
   readonly field: FieldSymbol;
   readonly targetModelName: string;
-  readonly relationName?: string;
   /**
    * The junction named by `through:` on the list field. When present,
    * many-to-many recognition considers only `junction` rather than scanning
@@ -191,6 +188,18 @@ export function normalizeReferentialAction(input: {
   return undefined;
 }
 
+function legacyRelationNameDiagnostic(
+  input: { readonly modelName: string; readonly fieldName: string; readonly sourceId: string },
+  span: PslSpan,
+): ContractSourceDiagnostic {
+  return {
+    code: 'PSL_LEGACY_RELATION_NAME',
+    message: `Relation field "${input.modelName}.${input.fieldName}" uses @relation(name:) (or a positional @relation("...")), which is no longer supported — disambiguate with inverse: (1:N back-relation) or through: Junction.field (M:N)`,
+    sourceId: input.sourceId,
+    span,
+  };
+}
+
 export function parseRelationAttribute(input: {
   readonly attribute: ResolvedAttribute;
   readonly modelName: string;
@@ -209,20 +218,10 @@ export function parseRelationAttribute(input: {
     return undefined;
   }
 
-  let relationNameFromPositional: string | undefined;
   const positionalNameEntry = getPositionalArgumentEntry(input.attribute);
   if (positionalNameEntry) {
-    const parsedName = parseQuotedStringLiteral(positionalNameEntry.value);
-    if (!parsedName) {
-      input.diagnostics.push({
-        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-        message: `Relation field "${input.modelName}.${input.fieldName}" positional relation name must be a quoted string literal`,
-        sourceId: input.sourceId,
-        span: positionalNameEntry.span,
-      });
-      return undefined;
-    }
-    relationNameFromPositional = parsedName;
+    input.diagnostics.push(legacyRelationNameDiagnostic(input, positionalNameEntry.span));
+    return undefined;
   }
 
   for (const arg of input.attribute.args) {
@@ -238,8 +237,11 @@ export function parseRelationAttribute(input: {
       });
       return undefined;
     }
+    if (arg.name === 'name') {
+      input.diagnostics.push(legacyRelationNameDiagnostic(input, arg.span));
+      return undefined;
+    }
     if (
-      arg.name !== 'name' &&
       arg.name !== 'from' &&
       arg.name !== 'to' &&
       arg.name !== 'through' &&
@@ -257,35 +259,6 @@ export function parseRelationAttribute(input: {
       return undefined;
     }
   }
-
-  const namedRelationNameRaw = getNamedArgument(input.attribute, 'name');
-  const namedRelationName = namedRelationNameRaw
-    ? parseQuotedStringLiteral(namedRelationNameRaw)
-    : undefined;
-  if (namedRelationNameRaw && !namedRelationName) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-      message: `Relation field "${input.modelName}.${input.fieldName}" named relation name must be a quoted string literal`,
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return undefined;
-  }
-
-  if (
-    relationNameFromPositional &&
-    namedRelationName &&
-    relationNameFromPositional !== namedRelationName
-  ) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-      message: `Relation field "${input.modelName}.${input.fieldName}" has conflicting positional and named relation names`,
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return undefined;
-  }
-  const relationName = namedRelationName ?? relationNameFromPositional;
 
   const constraintNameRaw = getNamedArgument(input.attribute, 'map');
   const constraintName = constraintNameRaw
@@ -368,7 +341,6 @@ export function parseRelationAttribute(input: {
   const onUpdateArgument = getNamedArgument(input.attribute, 'onUpdate');
 
   return {
-    ...ifDefined('relationName', relationName),
     ...ifDefined('fields', fields),
     ...ifDefined('references', references),
     ...ifDefined('referencesInferred', referencesInferred),
@@ -597,12 +569,6 @@ function findJunctionFkPairs(input: {
       if (parentFk.targetModelName !== input.candidate.modelName) {
         continue;
       }
-      if (
-        input.candidate.relationName !== undefined &&
-        parentFk.relationName !== input.candidate.relationName
-      ) {
-        continue;
-      }
       // `through: Junction.relationField` pins the parent-side FK to the
       // junction relation field named, selecting one leg of a self-relation or
       // of multiple many-to-many between the same pair of models.
@@ -773,9 +739,7 @@ export function applyBackrelationCandidates(input: {
       continue;
     }
 
-    const matches = candidate.relationName
-      ? pairMatches.filter((relation) => relation.relationName === candidate.relationName)
-      : [...pairMatches];
+    const matches = [...pairMatches];
 
     if (matches.length === 0) {
       const { pairs: junctionPairs, nearMisses } = findJunctionFkPairs({
@@ -793,7 +757,7 @@ export function applyBackrelationCandidates(input: {
       if (junctionPairs.length > 1) {
         input.diagnostics.push({
           code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
-          message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple junction FK pairs for a many-to-many relation. Add @relation(name: "...") (or @relation("...")) to the list field and the junction FK-side relation pointing back at "${candidate.modelName}" to disambiguate.`,
+          message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple junction FK pairs for a many-to-many relation. Add through: Junction.relationField (the qualified junction pin) to the list field to disambiguate.`,
           sourceId: input.sourceId,
           span: candidate.field.span,
         });
@@ -815,7 +779,7 @@ export function applyBackrelationCandidates(input: {
     if (matches.length > 1) {
       input.diagnostics.push({
         code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add @relation(name: "...") (or @relation("...")) to both sides to disambiguate.`,
+        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add inverse: <fkField> to the list field, naming the FK-side relation field it pairs with, to disambiguate.`,
         sourceId: input.sourceId,
         span: candidate.field.span,
       });

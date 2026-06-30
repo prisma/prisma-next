@@ -93,7 +93,6 @@ export function getMapName(attributes: readonly ResolvedAttribute[]): string | u
 }
 
 export interface ParsedRelationAttribute {
-  readonly relationName?: string;
   readonly fields?: readonly string[];
   readonly references?: readonly string[];
   /**
@@ -103,6 +102,12 @@ export interface ParsedRelationAttribute {
    * never co-occur.
    */
   readonly referencesInferred?: true;
+  /**
+   * The FK-side relation field named by `inverse:` on a one-to-many back-relation
+   * list field. A bare relation-field name pinning the owning foreign-key field,
+   * used to disambiguate when multiple relations link the same pair of models.
+   */
+  readonly inverse?: string;
 }
 
 /**
@@ -129,16 +134,21 @@ export function parseRelationAttribute(input: {
   const relationAttr = getAttribute(input.attributes, 'relation');
   if (!relationAttr) return undefined;
 
-  let relationName: string | undefined;
   let fromRaw: string | undefined;
   let toRaw: string | undefined;
+  let inverse: string | undefined;
 
   for (const arg of relationAttr.args) {
-    if (arg.kind === 'positional') {
-      relationName = stripQuotes(arg.value);
-    } else if (arg.name === 'name') {
-      relationName = stripQuotes(arg.value);
-    } else if (arg.name === 'fields' || arg.name === 'references') {
+    if (arg.kind === 'positional' || arg.name === 'name') {
+      input.diagnostics.push({
+        code: 'PSL_LEGACY_RELATION_NAME',
+        message: `Relation field "${input.modelName}.${input.fieldName}" uses @relation(name:) (or a positional @relation("...")), which is no longer supported — disambiguate with inverse: (1:N back-relation) or through: Junction.field (M:N)`,
+        sourceId: input.sourceId,
+        span: arg.span,
+      });
+      return undefined;
+    }
+    if (arg.name === 'fields' || arg.name === 'references') {
       input.diagnostics.push({
         code: 'PSL_LEGACY_FIELDS_REFERENCES',
         message: `Relation field "${input.modelName}.${input.fieldName}" uses @relation(fields:/references:), which is no longer supported — use from:/to: instead`,
@@ -146,10 +156,14 @@ export function parseRelationAttribute(input: {
         span: arg.span,
       });
       return undefined;
-    } else if (arg.name === 'from') {
+    }
+    if (arg.name === 'from') {
       fromRaw = arg.value;
     } else if (arg.name === 'to') {
       toRaw = arg.value;
+    } else if (arg.name === 'inverse') {
+      const trimmed = arg.value.trim();
+      inverse = trimmed.length > 0 ? trimmed : undefined;
     }
   }
 
@@ -199,10 +213,10 @@ export function parseRelationAttribute(input: {
   }
 
   return {
-    ...ifDefined('relationName', relationName),
     ...ifDefined('fields', fields),
     ...ifDefined('references', references),
     ...ifDefined('referencesInferred', referencesInferred),
+    ...ifDefined('inverse', inverse),
   };
 }
 

@@ -516,7 +516,6 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       targetId: input.targetId,
     });
     const relationAttribute = getAttribute(field.attributes, 'relation');
-    let relationName: string | undefined;
     let through: ParsedThrough | undefined;
     let inverse: string | undefined;
     if (relationAttribute) {
@@ -548,7 +547,6 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         });
         continue;
       }
-      relationName = parsedRelation.relationName;
       through = parsedRelation.through;
       inverse = parsedRelation.inverse;
     }
@@ -561,7 +559,6 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       tableName,
       field,
       targetModelName: field.typeName,
-      ...ifDefined('relationName', relationName),
       ...ifDefined('through', through),
       ...ifDefined('inverse', inverse),
     });
@@ -1157,7 +1154,6 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       targetModelName: targetMapping.model.name,
       targetTableName: targetMapping.tableName,
       ...ifDefined('targetNamespaceId', targetNamespaceId),
-      ...ifDefined('relationName', parsedRelation.relationName),
       localColumns,
       referencedColumns,
     });
