@@ -58,7 +58,6 @@ export {
   isTrivia,
   isTriviaKind,
   nonTriviaSibling,
-  previousNonTriviaToken,
   skipTriviaToken,
 } from '../syntax/navigation';
 // Red layer

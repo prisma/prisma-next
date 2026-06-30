@@ -4,7 +4,6 @@ import {
   isTrivia,
   isTriviaKind,
   nonTriviaSibling,
-  previousNonTriviaToken,
   skipTriviaToken,
 } from '../../src/syntax/navigation';
 import { createSyntaxTree, SyntaxNode, type SyntaxToken } from '../../src/syntax/red';
@@ -143,30 +142,6 @@ describe('nonTriviaSibling', () => {
     expect(intToken).not.toBeInstanceOf(SyntaxNode);
     if (intToken !== undefined && !(intToken instanceof SyntaxNode)) {
       expect(nonTriviaSibling(intToken, 'next')).toBeUndefined();
-    }
-  });
-});
-
-describe('previousNonTriviaToken', () => {
-  it('finds the significant token before a token, crossing nodes', () => {
-    const intToken = sampleTokens(createSyntaxTree(buildSampleTree()))[9];
-    expect(intToken.text).toBe('Int');
-    expect(previousNonTriviaToken(intToken)?.text).toBe('id'); // the field name
-  });
-
-  it('accepts a node and starts from its first token', () => {
-    const root = createSyntaxTree(buildSampleTree());
-    const attr = firstNodeOfKind(root, 'FieldAttribute');
-    // FieldAttribute's first token is `@`; the previous significant token is `Int`.
-    expect(previousNonTriviaToken(attr)?.text).toBe('Int');
-  });
-
-  it('returns undefined at the start of the document', () => {
-    const root = createSyntaxTree(buildSampleTree());
-    const first = root.firstToken;
-    expect(first?.text).toBe('model');
-    if (first !== undefined) {
-      expect(previousNonTriviaToken(first)).toBeUndefined();
     }
   });
 });

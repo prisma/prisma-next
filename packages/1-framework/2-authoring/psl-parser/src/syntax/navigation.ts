@@ -50,16 +50,6 @@ export function nonTriviaSibling(
   return undefined;
 }
 
-/**
- * The nearest significant token strictly before `element` in document order,
- * crossing node boundaries.
- */
-export function previousNonTriviaToken(element: SyntaxElement): SyntaxToken | undefined {
-  const start = element instanceof SyntaxToken ? element : element.firstToken;
-  const prev = start?.prevToken;
-  return prev === undefined ? undefined : skipTriviaToken(prev, 'prev');
-}
-
 function step(element: SyntaxElement, direction: Direction): SyntaxElement | undefined {
   return direction === 'next' ? element.nextSiblingOrToken : element.prevSiblingOrToken;
 }
