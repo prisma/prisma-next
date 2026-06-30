@@ -20,7 +20,7 @@
     "@codingame/monaco-vscode-files-service-override": "^25.1.2",
     "@codingame/monaco-vscode-keybindings-service-override": "^25.1.2",
     "@codingame/monaco-vscode-log-service-override": "^25.1.2",
-    "@codingame/monaco-vscode-textmate-service-override": "^25.1.2",
+    "@codingame/monaco-vscode-textmate-service-override": "^33.0.9",
     "@codingame/monaco-vscode-theme-defaults-default-extension": "^25.1.2",
     "@codingame/monaco-vscode-theme-service-override": "^25.1.2",
     "@prisma-next/adapter-postgres": "workspace:0.14.0",
