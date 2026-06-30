@@ -195,6 +195,15 @@ describe('list', () => {
     if (!result.ok) expect(result.failure).toHaveLength(1);
   });
 
+  it('accepts a populated list when nonEmpty is set', () => {
+    const { expr, ctx } = argOf('["a", "b"]');
+
+    const result = list(str(), { nonEmpty: true }).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual(['a', 'b']);
+  });
+
   it('rejects duplicates when unique is set, anchored per offending element', () => {
     const { expr, ctx } = argOf('["a", "a"]');
 

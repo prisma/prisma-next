@@ -24,15 +24,16 @@ export function list<T>(of: ArgType<T>, opts?: ListOptions): ArgType<T[]> {
       if (!(arg instanceof ArrayLiteralAst)) {
         return notOk([leafDiagnostic(ctx, arg, `Expected a list of ${of.label}`)]);
       }
-      const elements = [...arg.elements()];
       const diagnostics: PslDiagnostic[] = [];
       const parsed: { node: ExpressionAst; value: T }[] = [];
-      for (const element of elements) {
+      let count = 0;
+      for (const element of arg.elements()) {
+        count += 1;
         const result = of.parse(element, ctx);
         if (result.ok) parsed.push({ node: element, value: result.value });
         else diagnostics.push(...result.failure);
       }
-      if (opts?.nonEmpty === true && elements.length === 0) {
+      if (opts?.nonEmpty === true && count === 0) {
         diagnostics.push(leafDiagnostic(ctx, arg, 'Expected a non-empty list'));
       }
       if (opts?.unique === true) {
