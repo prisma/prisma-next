@@ -547,7 +547,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         });
         continue;
       }
-      relationName = parsedRelation.relationName;
+      relationName = parsedRelation.name;
     }
     if (!attributesValid) {
       continue;
@@ -945,7 +945,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
           namespaceId: crossTargetNamespaceId,
           spaceId: fieldTypeContractSpaceId,
         },
-        ...ifDefined('name', parsedRelation.constraintName),
+        ...ifDefined('name', parsedRelation.map),
         ...ifDefined('onDelete', onDelete),
         ...ifDefined('onUpdate', onUpdate),
       });
@@ -1094,7 +1094,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         columns: referencedColumns,
         ...ifDefined('namespaceId', targetNamespaceId),
       },
-      ...ifDefined('name', parsedRelation.constraintName),
+      ...ifDefined('name', parsedRelation.map),
       ...ifDefined('onDelete', onDelete),
       ...ifDefined('onUpdate', onUpdate),
     });
@@ -1107,7 +1107,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       targetModelName: targetMapping.model.name,
       targetTableName: targetMapping.tableName,
       ...ifDefined('targetNamespaceId', targetNamespaceId),
-      ...ifDefined('relationName', parsedRelation.relationName),
+      ...ifDefined('relationName', parsedRelation.name),
       localColumns,
       referencedColumns,
     });

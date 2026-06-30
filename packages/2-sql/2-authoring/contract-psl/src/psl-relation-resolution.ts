@@ -41,15 +41,6 @@ export const REFERENTIAL_ACTION_MAP: Record<string, ReferentialAction | undefine
   setDefault: 'setDefault',
 };
 
-export type ParsedRelationAttribute = {
-  readonly relationName?: string;
-  readonly fields?: readonly string[];
-  readonly references?: readonly string[];
-  readonly constraintName?: string;
-  readonly onDelete?: string;
-  readonly onUpdate?: string;
-};
-
 export type FkRelationMetadata = {
   readonly declaringModelName: string;
   readonly declaringFieldName: string;
@@ -152,7 +143,7 @@ const sqlRelation = fieldAttribute('relation', {
   diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
 });
 
-type SqlRelationOutput = InferAttr<typeof sqlRelation>;
+export type SqlRelationOutput = InferAttr<typeof sqlRelation>;
 
 function findRelationAttributeNode(field: FieldSymbol): FieldAttributeAst | undefined {
   for (const attribute of field.node.attributes()) {
@@ -210,9 +201,9 @@ function buildRelationInterpretCtx(input: {
 
 /**
  * Validates and lowers a field's `@relation` attribute through the declarative
- * `sqlRelation` spec, mapping the inferred output onto `ParsedRelationAttribute`.
- * The engine aggregates every error path's diagnostics; like the previous
- * first-error parser, the caller skips the field when this returns `undefined`.
+ * `sqlRelation` spec, returning the spec's inferred output directly. The engine
+ * aggregates every error path's diagnostics; like the previous first-error
+ * parser, the caller skips the field when this returns `undefined`.
  */
 export function interpretRelationAttribute(input: {
   readonly selfModel: ModelSymbol;
@@ -221,7 +212,7 @@ export function interpretRelationAttribute(input: {
   readonly sourceFile: SourceFile;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
-}): ParsedRelationAttribute | undefined {
+}): SqlRelationOutput | undefined {
   const attributeNode = findRelationAttributeNode(input.field);
   if (attributeNode === undefined) {
     return undefined;
@@ -234,15 +225,7 @@ export function interpretRelationAttribute(input: {
     }
     return undefined;
   }
-  const parsed: SqlRelationOutput = result.value;
-  return {
-    ...ifDefined('relationName', parsed.name),
-    ...ifDefined('fields', parsed.fields),
-    ...ifDefined('references', parsed.references),
-    ...ifDefined('constraintName', parsed.map),
-    ...ifDefined('onDelete', parsed.onDelete),
-    ...ifDefined('onUpdate', parsed.onUpdate),
-  };
+  return result.value;
 }
 
 export function indexFkRelations(input: {
