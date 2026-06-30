@@ -236,21 +236,24 @@ describe('classifyPslCompletionContext', () => {
   });
 
   it('classifies blank generic block key positions', () => {
-    expect(classify(['policy UserAccess {', '  |', '}'].join('\n'))).toMatchObject({
+    const context = classify(['policy UserAccess {', '  |', '}'].join('\n'));
+    expect(context).toMatchObject({
       kind: 'genericBlockKey',
       blockKeyword: 'policy',
-      existingParameterNames: [],
     });
+    if (context.kind !== 'genericBlockKey') throw new Error('expected genericBlockKey');
+    expect(context.block.keyword()?.text).toBe('policy');
   });
 
-  it('classifies generic block key prefixes and records sibling keys', () => {
-    expect(classify(['policy UserAccess {', '  on = User', '  wh|', '}'].join('\n'))).toMatchObject(
-      {
-        kind: 'genericBlockKey',
-        blockKeyword: 'policy',
-        existingParameterNames: ['on'],
-      },
-    );
+  it('carries the enclosing block AST node for generic block key prefixes', () => {
+    const context = classify(['policy UserAccess {', '  on = User', '  wh|', '}'].join('\n'));
+    expect(context).toMatchObject({
+      kind: 'genericBlockKey',
+      blockKeyword: 'policy',
+    });
+    if (context.kind !== 'genericBlockKey') throw new Error('expected genericBlockKey');
+    expect(context.block.keyword()?.text).toBe('policy');
+    expect([...context.block.entries()].map((entry) => entry.key()?.name())).toEqual(['on', 'wh']);
   });
 
   it('classifies generic block value positions after the equals sign', () => {
