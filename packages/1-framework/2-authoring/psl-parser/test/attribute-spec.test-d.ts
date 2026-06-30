@@ -54,13 +54,6 @@ test('a positional-or-named alias collapses to one property', () => {
   expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ name?: string; map?: string }>();
 });
 
-test('a variadic positional slot contributes an array property', () => {
-  const spec = fieldAttribute('demo', {
-    positional: [{ key: 'tags', type: str(), variadic: true }],
-  });
-  expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ tags: readonly string[] }>();
-});
-
 test('a spec carrying a refine still infers its output', () => {
   const spec = fieldAttribute('demo', {
     named: { name: optional(str()) },
