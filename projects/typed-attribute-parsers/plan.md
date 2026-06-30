@@ -32,6 +32,7 @@ Three slices in a substrate-then-consumers shape: slice 1 lands the combinator k
   - **Builds on:** Slice 1's kit API + `InterpretCtx` wiring recipe + migration recipe.
   - **Hands to:** Mongo family fully spec-driven; no legacy Mongo attribute-argument parser remains (grep gate).
   - **Focus:** Mongo family only (`packages/2-mongo-family/2-authoring/contract-psl`). Mongo migrates its own `@relation` spec (distinct value shapes from SQL's). The "at most one `@@textIndex` per collection" rule stays in Mongo's existing model-level aggregation, not in a per-attribute `refine` (spec decision).
+  - **Carry-in from slice 1 (D5):** `enumOf` was restricted to bare identifiers + number literals (no quoted strings). Mongo's index `type` set (`1`, `-1`, `"text"`, `"2dsphere"`, `"2d"`, `"hashed"`) has **quoted-string** members that can't be bare identifiers (digit-leading) — so slice 3 needs a **dedicated string-literal-set combinator** (e.g. `stringEnumOf`) for that case rather than `enumOf`.
 
 ## Dependencies (external)
 
