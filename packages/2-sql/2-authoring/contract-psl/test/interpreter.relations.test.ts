@@ -312,7 +312,7 @@ model Post {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_UNSUPPORTED_REFERENTIAL_ACTION',
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
           sourceId: 'schema.prisma',
         }),
       ]),

@@ -1,15 +1,7 @@
 import type { PslDiagnostic } from '@prisma-next/framework-components/psl-ast';
 import { describe, expect, it } from 'vitest';
 import type { InterpretCtx } from '../src/exports';
-import {
-  enumOf,
-  fieldAttribute,
-  fieldRef,
-  identifierName,
-  interpretAttribute,
-  list,
-  str,
-} from '../src/exports';
+import { enumOf, fieldAttribute, fieldRef, interpretAttribute, list, str } from '../src/exports';
 import { Cursor, parse, parseAttribute } from '../src/parse';
 import type { SourceFile } from '../src/source-file';
 import { buildSymbolTable } from '../src/symbol-table';
@@ -111,6 +103,24 @@ describe('enumOf', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
   });
+
+  it('accepts a bare identifier matching a string member', () => {
+    const { expr, ctx } = argOf('Cascade');
+
+    const result = enumOf('Cascade', 'SetNull').parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe('Cascade');
+  });
+
+  it('rejects a bare identifier matching no member', () => {
+    const { expr, ctx } = argOf('WeirdAction');
+
+    const result = enumOf('Cascade', 'SetNull').parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+  });
 });
 
 describe('fieldRef', () => {
@@ -141,35 +151,6 @@ describe('fieldRef', () => {
     const { expr, ctx } = argOf('"title"');
 
     const result = fieldRef('self').parse(expr, ctx);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
-  });
-});
-
-describe('identifierName', () => {
-  it('returns the bare identifier name', () => {
-    const { expr, ctx } = argOf('Cascade');
-
-    const result = identifierName().parse(expr, ctx);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toBe('Cascade');
-  });
-
-  it('returns an unknown identifier name without a set or existence check', () => {
-    const { expr, ctx } = argOf('WeirdAction');
-
-    const result = identifierName().parse(expr, ctx);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toBe('WeirdAction');
-  });
-
-  it('rejects a quoted string with the threaded code', () => {
-    const { expr, ctx } = argOf('"Cascade"');
-
-    const result = identifierName().parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
