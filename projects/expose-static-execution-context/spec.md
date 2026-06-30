@@ -79,10 +79,19 @@ foundation). `enums`, the query builder (`query`/`sql`), and `raw` all derive fr
    `readonly contract` on `PostgresClient` for shape symmetry (it surfaces `context`/`stack`
    today but not `contract`).
 
-4. **Replace the example's interim static enums.** `examples/retail-store/src/enums.ts` currently
-   builds its accessors from `buildNamespacedEnums(contractJson.domain)['__unbound__']` with a
-   `blindCast` (the leak this slice removes). Point it at `mongoStatic`/`@prisma-next/mongo/static`
-   so the typing comes from the framework, not a cast in example code.
+4. **Centralise the enum/`raw` derivation; remove the per-facade `blindCast`.** The actual
+   `buildNamespacedEnums` + `blindCast` leak lives in the **facades** today, not the example —
+   `postgres.ts` (`blindCast<NamespacedEnums…>`) and `mongo.ts` (`unboundNamespace` blindCast).
+   The `<target>Static` factory owns the typed enum (and `raw`, where the target has one)
+   derivation once; the facade calls the same builder, so the cast lives in framework code in
+   one place instead of being re-asserted per facade.
+
+5. **Add a fresh client consumer for the acceptance test.** The example file the original spec
+   named (`examples/retail-store/src/enums.ts`) does not exist on `main` — retail-store does not
+   reference `.enums` today, and #880's enum work was pulled, not merged. So there is nothing to
+   migrate; instead add a minimal `'use client'` component in retail-store that imports
+   `@prisma-next/mongo/static` and uses the static surface, giving the real `next build`
+   acceptance test a concrete consumer.
 
 ## Definition of done
 
@@ -91,9 +100,13 @@ foundation). `enums`, the query builder (`query`/`sql`), and `raw` all derive fr
 - `mongoStatic`/`postgresStatic` exist on `@prisma-next/<target>/static`, return the
   `ExecutionContext` + derived static surface, and are **client-safe**: a `'use client'`
   component importing them builds (`next build`) with **no driver code in the client bundle**
-  (the acceptance test that gated #880).
-- `retail-store`'s `src/enums.ts` uses the new `@prisma-next/mongo/static` surface instead of
-  the `buildNamespacedEnums` + `blindCast` interim, and stays green (typecheck, tests, `next build`).
+  (the acceptance test that gated #880). Client-safety is also asserted cheaply in CI by a
+  package test that imports each `/static` entrypoint and fails if the resolved module graph
+  pulls in a driver package (`mongodb`, `pg`, `@prisma-next/driver-*`).
+- A minimal `'use client'` component in `retail-store` consumes `@prisma-next/mongo/static` and
+  stays green (typecheck, tests, `next build`).
+- The per-facade enum `blindCast` is gone — both facades derive `enums` through the shared
+  static builder.
 - `db.enums`/`db.query`/`db.raw`/`db.sql` continue to behave identically (derived from the
   shared context).
 - Symmetric: the same factory + entrypoint pattern on both targets; member shapes align
