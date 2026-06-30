@@ -898,26 +898,10 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       }
 
       const onDelete = parsedRelation.onDelete
-        ? normalizeReferentialAction({
-            modelName: model.name,
-            fieldName: relationAttribute.field.name,
-            actionName: 'onDelete',
-            actionToken: parsedRelation.onDelete,
-            sourceId,
-            span: relationAttribute.field.span,
-            diagnostics,
-          })
+        ? normalizeReferentialAction(parsedRelation.onDelete)
         : undefined;
       const onUpdate = parsedRelation.onUpdate
-        ? normalizeReferentialAction({
-            modelName: model.name,
-            fieldName: relationAttribute.field.name,
-            actionName: 'onUpdate',
-            actionToken: parsedRelation.onUpdate,
-            sourceId,
-            span: relationAttribute.field.span,
-            diagnostics,
-          })
+        ? normalizeReferentialAction(parsedRelation.onUpdate)
         : undefined;
 
       // Target namespace: use the colon-prefix namespace qualifier, or `__unbound__` when the
@@ -1092,26 +1076,10 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     }
 
     const onDelete = parsedRelation.onDelete
-      ? normalizeReferentialAction({
-          modelName: model.name,
-          fieldName: relationAttribute.field.name,
-          actionName: 'onDelete',
-          actionToken: parsedRelation.onDelete,
-          sourceId,
-          span: relationAttribute.field.span,
-          diagnostics,
-        })
+      ? normalizeReferentialAction(parsedRelation.onDelete)
       : undefined;
     const onUpdate = parsedRelation.onUpdate
-      ? normalizeReferentialAction({
-          modelName: model.name,
-          fieldName: relationAttribute.field.name,
-          actionName: 'onUpdate',
-          actionToken: parsedRelation.onUpdate,
-          sourceId,
-          span: relationAttribute.field.span,
-          diagnostics,
-        })
+      ? normalizeReferentialAction(parsedRelation.onUpdate)
       : undefined;
 
     const targetNamespaceId =

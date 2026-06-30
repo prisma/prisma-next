@@ -10,9 +10,9 @@ import type {
   SymbolTable,
 } from '@prisma-next/psl-parser';
 import {
+  enumOf,
   fieldAttribute,
   fieldRef,
-  identifierName,
   interpretAttribute,
   list,
   nodePslSpan,
@@ -79,27 +79,13 @@ export function fkRelationPairKey(declaringModelName: string, targetModelName: s
   return `${declaringModelName}::${targetModelName}`;
 }
 
-export function normalizeReferentialAction(input: {
-  readonly modelName: string;
-  readonly fieldName: string;
-  readonly actionName: 'onDelete' | 'onUpdate';
-  readonly actionToken: string;
-  readonly sourceId: string;
-  readonly span: PslSpan;
-  readonly diagnostics: ContractSourceDiagnostic[];
-}): ReferentialAction | undefined {
-  const normalized = REFERENTIAL_ACTION_MAP[input.actionToken];
-  if (normalized) {
-    return normalized;
-  }
-
-  input.diagnostics.push({
-    code: 'PSL_UNSUPPORTED_REFERENTIAL_ACTION',
-    message: `Relation field "${input.modelName}.${input.fieldName}" has unsupported ${input.actionName} action "${input.actionToken}"`,
-    sourceId: input.sourceId,
-    span: input.span,
-  });
-  return undefined;
+/**
+ * Maps a validated referential-action token to its contract action. The action
+ * set is validated upstream by the `@relation` spec's `enumOf`, so this is a
+ * pure lookup with no second validation path.
+ */
+export function normalizeReferentialAction(actionToken: string): ReferentialAction | undefined {
+  return REFERENTIAL_ACTION_MAP[actionToken];
 }
 
 /**
@@ -130,9 +116,10 @@ function relationInvariants(
  * Declarative replacement for the hand-written `@relation` parser. The engine
  * binds the positional-or-named `name`, the `fields`/`references` field lists,
  * `map`, and the bare-identifier referential actions; `relationInvariants`
- * holds the both-or-neither rule. The action set itself is validated downstream
- * by `normalizeReferentialAction`, so the actions are parsed to their raw
- * identifier name here without a parse-time set check.
+ * holds the both-or-neither rule. The action set is validated at parse via
+ * `enumOf`, which accepts the bare identifier and rejects an unknown action
+ * with the attribute's own code; `normalizeReferentialAction` then maps the
+ * validated token to its contract action.
  */
 const sqlRelation = fieldAttribute('relation', {
   positional: [{ key: 'name', type: optional(str()) }],
@@ -141,8 +128,8 @@ const sqlRelation = fieldAttribute('relation', {
     fields: optional(list(fieldRef('self'), { nonEmpty: true, unique: true })),
     references: optional(list(fieldRef('referenced'), { nonEmpty: true, unique: true })),
     map: optional(str()),
-    onDelete: optional(identifierName()),
-    onUpdate: optional(identifierName()),
+    onDelete: optional(enumOf('NoAction', 'Restrict', 'Cascade', 'SetNull', 'SetDefault')),
+    onUpdate: optional(enumOf('NoAction', 'Restrict', 'Cascade', 'SetNull', 'SetDefault')),
   },
   refine: relationInvariants,
   diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
