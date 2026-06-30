@@ -10,12 +10,13 @@ import type {
   SymbolTable,
 } from '@prisma-next/psl-parser';
 import {
-  enumOf,
   fieldAttribute,
   fieldRef,
+  identifier,
   interpretAttribute,
   list,
   nodePslSpan,
+  oneOf,
   optional,
   str,
 } from '@prisma-next/psl-parser';
@@ -81,8 +82,8 @@ export function fkRelationPairKey(declaringModelName: string, targetModelName: s
 
 /**
  * Maps a validated referential-action token to its contract action. The action
- * set is validated upstream by the `@relation` spec's `enumOf`, so this is a
- * pure lookup with no second validation path.
+ * set is validated upstream by the `@relation` spec's `oneOf(identifier(...))`,
+ * so this is a pure lookup with no second validation path.
  */
 export function normalizeReferentialAction(actionToken: string): ReferentialAction | undefined {
   return REFERENTIAL_ACTION_MAP[actionToken];
@@ -117,9 +118,9 @@ function relationInvariants(
  * binds the positional-or-named `name`, the `fields`/`references` field lists,
  * `map`, and the bare-identifier referential actions; `relationInvariants`
  * holds the both-or-neither rule. The action set is validated at parse via
- * `enumOf`, which accepts the bare identifier and rejects an unknown action
- * with the attribute's own code; `normalizeReferentialAction` then maps the
- * validated token to its contract action.
+ * `oneOf` over one `identifier` per action, which accepts the bare identifier
+ * and rejects an unknown action with the attribute's own code;
+ * `normalizeReferentialAction` then maps the validated token to its contract action.
  */
 const sqlRelation = fieldAttribute('relation', {
   positional: [{ key: 'name', type: optional(str()) }],
@@ -128,8 +129,24 @@ const sqlRelation = fieldAttribute('relation', {
     fields: optional(list(fieldRef('self'), { nonEmpty: true, unique: true })),
     references: optional(list(fieldRef('referenced'), { nonEmpty: true, unique: true })),
     map: optional(str()),
-    onDelete: optional(enumOf('NoAction', 'Restrict', 'Cascade', 'SetNull', 'SetDefault')),
-    onUpdate: optional(enumOf('NoAction', 'Restrict', 'Cascade', 'SetNull', 'SetDefault')),
+    onDelete: optional(
+      oneOf(
+        identifier('NoAction'),
+        identifier('Restrict'),
+        identifier('Cascade'),
+        identifier('SetNull'),
+        identifier('SetDefault'),
+      ),
+    ),
+    onUpdate: optional(
+      oneOf(
+        identifier('NoAction'),
+        identifier('Restrict'),
+        identifier('Cascade'),
+        identifier('SetNull'),
+        identifier('SetDefault'),
+      ),
+    ),
   },
   refine: relationInvariants,
   diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',

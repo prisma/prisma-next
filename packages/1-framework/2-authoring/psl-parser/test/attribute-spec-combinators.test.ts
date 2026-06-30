@@ -1,7 +1,17 @@
 import type { PslDiagnostic } from '@prisma-next/framework-components/psl-ast';
+import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
-import type { InterpretCtx } from '../src/exports';
-import { enumOf, fieldAttribute, fieldRef, interpretAttribute, list, str } from '../src/exports';
+import type { ArgType, InterpretCtx } from '../src/exports';
+import {
+  fieldAttribute,
+  fieldRef,
+  identifier,
+  interpretAttribute,
+  list,
+  nodePslSpan,
+  oneOf,
+  str,
+} from '../src/exports';
 import { Cursor, parse, parseAttribute } from '../src/parse';
 import type { SourceFile } from '../src/source-file';
 import { buildSymbolTable } from '../src/symbol-table';
@@ -67,59 +77,82 @@ describe('str', () => {
   });
 });
 
-describe('enumOf', () => {
-  it('accepts a bare-identifier string member of a mixed set', () => {
+describe('identifier', () => {
+  it('matches a bare identifier equal to the pinned name', () => {
     const { expr, ctx } = argOf('Cascade');
 
-    const result = enumOf('Cascade', 'SetNull', 1, 2).parse(expr, ctx);
+    const result = identifier('Cascade').parse(expr, ctx);
 
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toBe('Cascade');
   });
 
-  it('accepts a number member of a mixed set', () => {
-    const { expr, ctx } = argOf('2');
+  it('rejects a bare identifier with a different name', () => {
+    const { expr, ctx } = argOf('Cascade');
 
-    const result = enumOf('Cascade', 'SetNull', 1, 2).parse(expr, ctx);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toBe(2);
-  });
-
-  it('rejects a quoted string member', () => {
-    const { expr, ctx } = argOf('"Cascade"');
-
-    const result = enumOf('Cascade', 'SetNull').parse(expr, ctx);
+    const result = identifier('NoAction').parse(expr, ctx);
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
   });
 
-  it('rejects a token of the wrong kind', () => {
-    const { expr, ctx } = argOf('["Cascade"]');
+  it('rejects a quoted string with the same characters', () => {
+    const { expr, ctx } = argOf('"Cascade"');
 
-    const result = enumOf('Cascade', 1).parse(expr, ctx);
+    const result = identifier('Cascade').parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
   });
 
-  it('accepts a bare identifier matching a string member', () => {
-    const { expr, ctx } = argOf('Cascade');
+  it('rejects a number token', () => {
+    const { expr, ctx } = argOf('1');
 
-    const result = enumOf('Cascade', 'SetNull').parse(expr, ctx);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toBe('Cascade');
-  });
-
-  it('rejects a bare identifier matching no member', () => {
-    const { expr, ctx } = argOf('WeirdAction');
-
-    const result = enumOf('Cascade', 'SetNull').parse(expr, ctx);
+    const result = identifier('Cascade').parse(expr, ctx);
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+});
+
+describe('oneOf', () => {
+  it('returns the first alternative that succeeds', () => {
+    const { expr, ctx } = argOf('Cascade');
+    const first: ArgType<'first'> = { kind: 'const', label: 'first', parse: () => ok('first') };
+    const second: ArgType<'second'> = { kind: 'const', label: 'second', parse: () => ok('second') };
+
+    const result = oneOf(first, second).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe('first');
+  });
+
+  it('matches whichever alternative accepts the argument', () => {
+    const { expr, ctx } = argOf('SetNull');
+
+    const result = oneOf(identifier('Cascade'), identifier('SetNull')).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe('SetNull');
+  });
+
+  it('emits a single aggregate diagnostic anchored to the arg node when every alternative fails', () => {
+    const { expr, ctx } = argOf('WeirdAction');
+    const relationCtx: InterpretCtx = { ...ctx, diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE' };
+
+    const result = oneOf(identifier('Cascade'), identifier('SetNull')).parse(expr, relationCtx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
+      expect(result.failure[0]?.span).toEqual(nodePslSpan(expr.syntax, ctx.sourceFile));
+      expect(result.failure[0]?.message).toContain('Cascade');
+      expect(result.failure[0]?.message).toContain('SetNull');
+    }
   });
 });
 

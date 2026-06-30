@@ -1,13 +1,15 @@
 import { expectTypeOf, test } from 'vitest';
 import type { ArgType } from '../src/exports';
-import { enumOf, list, str } from '../src/exports';
+import { identifier, list, oneOf, str } from '../src/exports';
 
-test('enumOf preserves a homogeneous string member union', () => {
-  expectTypeOf(enumOf('NoAction', 'Cascade')).toEqualTypeOf<ArgType<'NoAction' | 'Cascade'>>();
+test('identifier pins its name as the output literal type', () => {
+  expectTypeOf(identifier('NoAction')).toEqualTypeOf<ArgType<'NoAction'>>();
 });
 
-test('enumOf carries a mixed string/number member union', () => {
-  expectTypeOf(enumOf('text', 1, -1)).toEqualTypeOf<ArgType<'text' | 1 | -1>>();
+test('oneOf infers the union of its alternatives output types', () => {
+  expectTypeOf(oneOf(identifier('NoAction'), identifier('Cascade'))).toEqualTypeOf<
+    ArgType<'NoAction' | 'Cascade'>
+  >();
 });
 
 test('list infers an array of its element type', () => {
