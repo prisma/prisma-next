@@ -5,18 +5,23 @@
 
 ## Decision
 
-A domain enum can be **realized in storage as a native Postgres enum type**
-(`CREATE TYPE … AS ENUM`) — a **second persistence strategy for the same domain enum**. The
-domain plane is unchanged; only the storage projection differs. The domain enum stays the
-single source of truth for the application concept (members, values, `db.enums`, typed
-reads).
+A native Postgres enum is a **distinct database type** (`CREATE TYPE … AS ENUM`) — a
+**persistence-plane entity, not a domain enum.** Prisma Next represents it in the contract
+and surfaces it to the application as a typed value union. The relationship to a domain enum
+runs in **opposite directions** in the two cases, and the primary case is the *inverse* of a
+domain-authored enum:
 
-This exists primarily to **represent native enums Postgres databases already have** — above
-all **Supabase**, whose schemas ship a large set of built-in native enums. Those are owned
-by an external system, never created or altered by Prisma Next, and must still be
-**surfaced to the application** as typed value unions. **Porting** an existing
-Postgres/Supabase project is the same case: user-authored native enums must be
-*representable* in the contract, not rejected.
+- **Externally-managed (Supabase) / adopted — the primary driver.** The native type already
+  exists in the database — Supabase ships a large set of built-in native enums (owned
+  externally, never created or altered by PN); a **ported** project has user-authored ones.
+  **The type is the source.** PN represents it and *derives* what the app needs from it: the
+  **value-set** that drives typing, and a `db.enums`-style accessor (members where
+  name = value). There is no authored domain enum; the type is surfaced directly, and a
+  ported project's native enums must be *representable*, not rejected.
+- **Authored (phase 2) — secondary.** A user may choose to **realize a domain enum as a
+  native type** instead of a text column + check. Only here is native "a persistence strategy
+  for a domain enum" (domain → storage) — and even then the native type is a distinct storage
+  entity, not the domain enum itself.
 
 Native realization is deliberately **Postgres-only**. SQLite and MongoDB have no native
 enum; they keep the check/validator realization. This is a SQL/Postgres-target storage
@@ -65,13 +70,16 @@ cheap-ops-only form.
 
 ## The model (settled)
 
-The spine (from the parent project): a domain enum is application-domain; **how it persists
-is a storage strategy.** Native is one such strategy — and, crucially, **everything
-downstream of the permitted values reuses the same machinery as the check strategy.** The
-native-only pieces are exactly two: the managed type, and the cast.
+The spine: a native enum is a storage **type**. When a domain enum is *authored*, native is
+one strategy for persisting it (the other is check); when *externally-managed*, the type
+stands alone and is the source. Crucially, **everything downstream of the permitted values
+reuses the same machinery as the check strategy** — the native-only pieces are exactly two:
+the managed type, and the cast.
 
-- **Domain enum** (domain plane) — unchanged. Members (name→value) + codec. Powers
-  `db.enums`; the origin of the permitted values.
+- **Domain enum** (domain plane) — present only for an *authored* native enum (phase 2),
+  unchanged (members + codec). For an *externally-managed* enum there is **no authored domain
+  enum**; the native type is the origin of the permitted values, and a `db.enums` accessor is
+  **derived from the type** (members where name = value).
 - **`native_enum` entity** (storage plane, `entries.native_enum[name]`, kind
   `postgres-enum`, ordered `values`, optional `control` grade) — does **two** jobs:
   1. it is the **authoring source** of the permitted values;
@@ -91,8 +99,8 @@ native-only pieces are exactly two: the managed type, and the cast.
 **Downstream of the value-set it is all the regular-enum machinery:**
 
 - **Typing** — value-set + codec → value union, via TML-2952's `renderValueType`. *Identical*
-  to a check enum; there is no native-specific typing path. `db.enums` comes from the domain
-  enum.
+  to a check enum; there is no native-specific typing path. `db.enums` is derived from the
+  native type (external) or the domain enum (authored).
 - **Enforcement** — a per-strategy *render* from the same value-set. **Native: the type
   itself enforces membership** (the `CREATE TYPE`'s value list is taken from the value-set);
   **no `CHECK`.** (Check → `CHECK (col IN (...))` from the value-set; Mongo → `$jsonSchema`
@@ -166,12 +174,14 @@ The persistence-strategy abstraction (#5) is the spine; the rest hang off it.
 
 ### #5 — Alternative persistence strategy (the spine; both phases)
 
-A domain enum is application-domain; how it persists is a storage strategy. **check** (text
-column + value-set + `CHECK`; family-agnostic) and **native** (`native_enum` type +
-value-set; Postgres-only) are the two. The strategy is **structural** — the shape declares
-it (enums spec §10), no marker field. **Both strategies derive the same value-set**, and
-everything downstream (typing, enforcement-source) is shared. The choice is made by the
-source: Phase 1 the database/extension dictates native; Phase 2 the author opts in.
+When a domain enum **is** authored, how it persists is a storage strategy — **check** (text
+column + value-set + `CHECK`; family-agnostic) or **native** (`native_enum` type + value-set;
+Postgres-only). For an **externally-managed** native enum there is no domain enum and no
+choice: the type exists, and PN derives the value-set from it. Either way the strategy is
+**structural** — the shape declares it (enums spec §10), no marker field — and **both derive
+the same value-set**, so everything downstream (typing, enforcement-source) is shared. The
+choice, when there is one, is made by the source: Phase 1 the database/extension dictates
+native; Phase 2 the author opts in.
 
 ### #1 — ContractIR representation (both phases)
 
@@ -212,9 +222,10 @@ is surfaced to the runner.
 
 A native-enum column reads/writes as the **value union** via the value-set + codec machinery
 (TML-2952's `StorageColumnTypes` / `renderValueType`) — *the same path a check enum uses*,
-sourcing the union from the derived value-set. `db.enums` is unchanged (domain enum). The
-no-emit (`typeof contract`) path propagates the authored handle values, as for any enum. The
-native-only addition is the codec-emitted `::type` **cast** in generated SQL.
+sourcing the union from the derived value-set. `db.enums` is derived from the native type
+(external) or the domain enum (authored). The no-emit (`typeof contract`) path propagates the
+authored handle values, as for any enum. The native-only addition is the codec-emitted
+`::type` **cast** in generated SQL.
 
 ## Relationship to the enum-typing refactor (TML-2952/2953) — parallel-safe
 
@@ -253,12 +264,13 @@ So the *physical* permitted values must live in storage (the value-set, and the
   `control`) round-trips through serializer + validator and is a first-class storage entity.
 - **R2 — Derive + reference.** The `native_enum` entity derives a `valueSet`; the column
   references the `valueSet` (typing) and carries the `native_enum` codec + `nativeType` (cast).
-  No `CHECK`. The domain enum is unchanged.
+  No `CHECK`. The domain enum, where one exists (authored), is unchanged.
 - **R3 — Surface (typed read).** A native-enum column reads as the value union (not `string`)
   in the query builder and ORM, emitted-contract and no-emit; typed input rejects out-of-set
   literals; generated SQL carries the `::type` cast where required.
 - **R4 — `db.enums` parity.** `db.enums.<ns>.<Name>` works identically regardless of
-  realization (it reads the domain enum).
+  realization — derived from the native type for externally-managed enums (members where
+  name = value), from the domain enum for authored ones.
 - **R5 — External grade.** `external`/`observed` native enums produce no DDL and no drift
   reports; the Supabase extension's `external` default applies to its contributed enums.
 - **R6 — Adopt (porting).** Contract-infer emits the `native_enum` representation for an
