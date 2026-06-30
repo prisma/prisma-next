@@ -13,7 +13,7 @@ import { leafDiagnostic } from './diagnostic';
  * (listing the alternatives' labels) with the threaded code, anchored to the
  * argument node, rather than leaking the branches' internal failures.
  */
-export function oneOf<Alts extends readonly ArgType<unknown>[]>(
+export function oneOf<Alts extends readonly [ArgType<unknown>, ...ArgType<unknown>[]]>(
   ...alts: Alts
 ): ArgType<OutOf<Alts[number]>> {
   const label = alts.map((alt) => alt.label).join(' | ');
