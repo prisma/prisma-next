@@ -17,10 +17,13 @@ export interface FieldRefArgType extends ArgType<string> {
 }
 
 /**
- * Parses a bare identifier into the field name. Existence is deliberately not
- * checked here: the downstream interpreter validates the field against the
- * scoped entity, so a parse-time check would emit a second diagnostic for the
- * same fault.
+ * Parses a bare identifier into a field name and resolves it against the scoped
+ * model: `'self'` against the declaring model, `'referenced'` against a
+ * relation's target. A name absent from the resolved model emits the
+ * field-existence diagnostic here, anchored to the identifier. When the
+ * referenced model is out of scope (e.g. a cross-space target the parser cannot
+ * see), existence cannot be checked, so the name is carried through unchecked
+ * and validated where the target is known. The parsed value is always the name.
  */
 export function fieldRef(scope: FieldRefScope): FieldRefArgType {
   return {
@@ -28,11 +31,20 @@ export function fieldRef(scope: FieldRefScope): FieldRefArgType {
     label: 'field name',
     scope,
     parse: (arg, ctx): Result<string, readonly PslDiagnostic[]> => {
-      if (arg instanceof IdentifierAst) {
-        const name = arg.name();
-        if (name !== undefined) return ok(name);
+      if (!(arg instanceof IdentifierAst)) {
+        return notOk([leafDiagnostic(ctx, arg, 'Expected a field name')]);
       }
-      return notOk([leafDiagnostic(ctx, arg, 'Expected a field name')]);
+      const name = arg.name();
+      if (name === undefined) {
+        return notOk([leafDiagnostic(ctx, arg, 'Expected a field name')]);
+      }
+      const model = scope === 'self' ? ctx.selfModel : ctx.resolveReferencedModel();
+      if (model !== undefined && !Object.hasOwn(model.fields, name)) {
+        return notOk([
+          leafDiagnostic(ctx, arg, `Field "${name}" does not exist on model "${model.name}"`),
+        ]);
+      }
+      return ok(name);
     },
   };
 }
