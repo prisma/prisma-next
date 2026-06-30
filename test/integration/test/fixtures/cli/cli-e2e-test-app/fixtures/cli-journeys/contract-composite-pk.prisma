@@ -19,8 +19,8 @@ model Membership {
   userId Int @map("user_id")
   role   String
 
-  org  Org  @relation(fields: [orgId], references: [id])
-  user User @relation(fields: [userId], references: [id])
+  org  Org  @relation(from: [orgId], to: [id])
+  user User @relation(from: [userId], to: [id])
 
   @@id([orgId, userId], map: "membership_pkey")
   @@map("membership")

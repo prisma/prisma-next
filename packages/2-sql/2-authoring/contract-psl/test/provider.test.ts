@@ -226,7 +226,7 @@ describe('prismaContract provider helper', () => {
 model Post {
   id Int @id
   userId Int
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(from: [userId], to: [id])
 }
 `,
         'utf-8',
@@ -318,7 +318,7 @@ model Post {
 model Post {
   id Int @id
   userId Int
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(from: [userId], to: [id])
 }
 `,
         'utf-8',

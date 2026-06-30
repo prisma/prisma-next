@@ -30,7 +30,7 @@ namespace public {
     // namespace-qualified model identifier within that contract space.
     // Cascade across the contract-space boundary is the developer's
     // explicit opt-in — no diagnostic.
-    user      supabase:auth.User @relation(fields: [userId], references: [id], onDelete: Cascade, map: "profile_userId_fkey")
+    user      supabase:auth.User @relation(from: [userId], to: [id], onDelete: Cascade, map: "profile_userId_fkey")
 
     // Inverse of Post.author. No FK lives on this side; cardinality is
     // captured by the array type.
@@ -48,7 +48,7 @@ namespace public {
     createdAt   DateTime  @default(now())
 
     // Local within-namespace relation.
-    author      Profile   @relation(fields: [authorId], references: [id], onDelete: Cascade, map: "post_authorId_fkey")
+    author      Profile   @relation(from: [authorId], to: [id], onDelete: Cascade, map: "post_authorId_fkey")
 
     @@map("post")
   }

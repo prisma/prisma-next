@@ -32,7 +32,7 @@ describe('interpretPslDocumentToSqlContract relations', () => {
 model Post {
   id Int @id
   userId Int
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(from: [userId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -86,8 +86,8 @@ model Post {
   id Int @id
   authorId Int
   reviewerId Int
-  author User @relation("AuthoredPosts", fields: [authorId], references: [id])
-  reviewer User @relation(name: "ReviewedPosts", fields: [reviewerId], references: [id])
+  author User @relation("AuthoredPosts", from: [authorId], to: [id])
+  reviewer User @relation(name: "ReviewedPosts", from: [reviewerId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -132,7 +132,7 @@ model Post {
 model Post {
   id Int @id
   userId Int
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(from: [userId], to: [id])
 }
 
 model Team {
@@ -142,7 +142,7 @@ model Team {
 model Member {
   id Int @id
   teamId Int
-  team Team @relation(fields: [teamId], references: [id])
+  team Team @relation(from: [teamId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -180,7 +180,7 @@ model Member {
       schema: `model Employee {
   id Int @id
   managerId Int?
-  manager Employee? @relation("Manages", fields: [managerId], references: [id])
+  manager Employee? @relation("Manages", from: [managerId], to: [id])
   reports Employee[] @relation("Manages")
 }
 `,
@@ -222,8 +222,8 @@ model Member {
   id Int @id
   managerId Int?
   mentorId Int?
-  manager Employee? @relation(fields: [managerId], references: [id])
-  mentor Employee? @relation(fields: [mentorId], references: [id])
+  manager Employee? @relation(from: [managerId], to: [id])
+  mentor Employee? @relation(from: [mentorId], to: [id])
   reports Employee[]
 }
 `,
@@ -257,7 +257,7 @@ model Member {
 model Member {
   id Int @id @map("member_id")
   teamId Int @map("team_ref")
-  team Team @relation(fields: [teamId], references: [id], map: "team_member_team_ref_fkey")
+  team Team @relation(from: [teamId], to: [id], map: "team_member_team_ref_fkey")
 
   @@map("team_member")
 }
@@ -292,7 +292,7 @@ model Member {
 model Post {
   id Int @id
   userId Int
-  author User @relation(fields: [userId], references: [id], onDelete: WeirdAction)
+  author User @relation(from: [userId], to: [id], onDelete: WeirdAction)
 }
 `,
       sourceId: 'schema.prisma',
@@ -327,7 +327,7 @@ model Post {
 model Post {
   id Int @id
   userId Int
-  user User @relation(fields: [missingUserId], references: [id])
+  user User @relation(from: [missingUserId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -363,7 +363,7 @@ model Post {
 model Post {
   id Int @id
   userId Int
-  user User @relation(fields: [userId], references: [missingId])
+  user User @relation(from: [userId], to: [missingId])
 }
 `,
       sourceId: 'schema.prisma',
@@ -399,7 +399,7 @@ model Post {
 model Post {
   id Int @id
   userId Int
-  user User @relation(references: [id])
+  user User @relation(to: [id])
 }
 `,
       sourceId: 'schema.prisma',

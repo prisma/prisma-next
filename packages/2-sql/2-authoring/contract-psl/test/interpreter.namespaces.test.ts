@@ -134,7 +134,7 @@ describe('interpretPslDocumentToSqlContract cross-namespace FK resolution', () =
   model Post {
     id Int @id
     userId Int
-    user auth.User @relation(fields: [userId], references: [id])
+    user auth.User @relation(from: [userId], to: [id])
   }
 }
 
@@ -177,7 +177,7 @@ namespace blog {
   model Post {
     id Int @id
     authorId Int
-    author User @relation(fields: [authorId], references: [id])
+    author User @relation(from: [authorId], to: [id])
   }
 }
 `,
@@ -204,7 +204,7 @@ namespace blog {
   model Post {
     id Int @id
     userId Int
-    user User @relation(fields: [userId], references: [id])
+    user User @relation(from: [userId], to: [id])
   }
 }
 
@@ -243,7 +243,7 @@ namespace auth {
   model Profile {
     id Int @id
     userId Int
-    user auth.User @relation(fields: [userId], references: [id])
+    user auth.User @relation(from: [userId], to: [id])
     @@map("profile")
   }
 }
@@ -297,7 +297,7 @@ namespace auth {
   model Post {
     id Int @id
     userId Int
-    user wrong.User @relation(fields: [userId], references: [id])
+    user wrong.User @relation(from: [userId], to: [id])
   }
 }
 
@@ -332,7 +332,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
       schema: `model Profile {
   id Int @id
   userId Int
-  user supabase:auth.User @relation(fields: [userId], references: [id])
+  user supabase:auth.User @relation(from: [userId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -371,7 +371,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
       schema: `model Profile {
   id Int @id
   userId Int
-  user supabase:User @relation(fields: [userId], references: [id])
+  user supabase:User @relation(from: [userId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -407,7 +407,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
       schema: `model Profile {
   id Int @id
   userId Int
-  user supabase:auth.User @relation(fields: [userId], references: [id])
+  user supabase:auth.User @relation(from: [userId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -434,7 +434,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
       schema: `model Profile {
   id Int @id
   userId Int
-  posts supabase:auth.Post[] @relation(fields: [userId], references: [id])
+  posts supabase:auth.Post[] @relation(from: [userId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -465,7 +465,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
       schema: `model Profile {
   id Int @id
   userId Int
-  user supabase:auth.User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user supabase:auth.User @relation(from: [userId], to: [id], onDelete: Cascade)
 }
 `,
       sourceId: 'schema.prisma',
@@ -498,7 +498,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
       schema: `model Profile {
   id Int @id
   userId Int
-  user supabase:auth.User @relation(fields: [userId], references: [id])
+  user supabase:auth.User @relation(from: [userId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -535,7 +535,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
       schema: `model Profile {
   id Int @id
   userId Int
-  user supabase:auth.User @relation(fields: [userId], references: [id])
+  user supabase:auth.User @relation(from: [userId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -571,7 +571,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
       schema: `model Profile {
   id Int @id
   userId Int
-  user supabase:auth.NonExistentModel @relation(fields: [userId], references: [id])
+  user supabase:auth.NonExistentModel @relation(from: [userId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',

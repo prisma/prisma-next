@@ -24,7 +24,7 @@ model Post {
   userId Int
   title String
   rating Float?
-  author User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  author User @relation(from: [userId], to: [id], onDelete: Cascade, onUpdate: Cascade)
   @@index([userId])
   @@unique([title, userId])
 }

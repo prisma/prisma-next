@@ -20,5 +20,5 @@ model Post {
   userId Int
   title String
   rating Float?
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user User @relation(from: [userId], to: [id], onDelete: Cascade, onUpdate: Cascade)
 }
