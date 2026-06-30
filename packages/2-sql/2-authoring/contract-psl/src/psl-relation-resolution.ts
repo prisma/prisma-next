@@ -22,7 +22,11 @@ import {
   optional,
   str,
 } from '@prisma-next/psl-parser';
-import type { FieldAttributeAst, SourceFile } from '@prisma-next/psl-parser/syntax';
+import type {
+  AttributeArgAst,
+  FieldAttributeAst,
+  SourceFile,
+} from '@prisma-next/psl-parser/syntax';
 import { ArrayLiteralAst } from '@prisma-next/psl-parser/syntax';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -117,13 +121,11 @@ function relationInvariants(
   parsed: {
     readonly from?: readonly string[];
     readonly to?: readonly string[];
-    readonly fields?: readonly string[];
-    readonly references?: readonly string[];
   },
   ctx: InterpretCtx,
 ): readonly PslDiagnostic[] {
-  const hasFrom = parsed.from !== undefined || parsed.fields !== undefined;
-  const hasTo = parsed.to !== undefined || parsed.references !== undefined;
+  const hasFrom = parsed.from !== undefined;
+  const hasTo = parsed.to !== undefined;
   // `to:` may stand alone only alongside `from:` — a referenced key without
   // local FK fields is unresolvable, a cross-argument rule that per-argument
   // parsing can't enforce. `from:` alone is fine (references are inferred from
@@ -141,18 +143,16 @@ function relationInvariants(
   return [];
 }
 
-// `from:`/`to:` are the canonical local-fields/referenced-key arguments;
-// legacy `fields:`/`references:` are accepted as input aliases that lower to
-// the identical resolved relation. Canonical arguments accept a bare field or
-// a bracketed list; the legacy spellings keep their bracketed-only contract.
+// `from:`/`to:` are the only local-fields/referenced-key arguments; both
+// accept a bare field or a bracketed list. The legacy `fields:`/`references:`
+// spellings are rejected up front with a guiding diagnostic (see
+// interpretRelationAttribute) rather than reported as unknown arguments.
 const sqlRelation = fieldAttribute('relation', {
   positional: [{ key: 'name', type: optional(str()) }],
   named: {
     name: optional(str()),
     from: optional(fieldRefOrList('self')),
     to: optional(fieldRefOrList('referenced')),
-    fields: optional(list(fieldRef('self'), { nonEmpty: true, unique: true })),
-    references: optional(list(fieldRef('referenced'), { nonEmpty: true, unique: true })),
     map: optional(str()),
     onDelete: optional(
       oneOf(
@@ -180,19 +180,18 @@ export type SqlRelationOutput = InferAttr<typeof sqlRelation>;
 
 /**
  * The interpreted `@relation` attribute with the directional arguments
- * normalised: `from:` (or legacy `fields:`) lands in `fields`, `to:` (or
- * legacy `references:`) in `references`, so consumers see one shape whichever
- * spelling the schema used.
+ * normalised: `from:` lands in `fields` and `to:` in `references`, the names
+ * the resolution pipeline consumes.
  */
 export type ParsedSqlRelation = {
   readonly name?: string;
   readonly fields?: readonly string[];
   readonly references?: readonly string[];
   /**
-   * Set when local FK fields are declared (`from:`/`fields:`) but the
-   * referenced key is omitted (`to:`/`references:` absent). The caller resolves
-   * the referenced columns from the target model's `@id`. `references` stays
-   * undefined in this case; the two never co-occur.
+   * Set when local FK fields are declared (`from:`) but the referenced key is
+   * omitted (`to:` absent). The caller resolves the referenced columns from
+   * the target model's `@id`. `references` stays undefined in this case; the
+   * two never co-occur.
    */
   readonly referencesInferred?: true;
   readonly map?: string;
@@ -252,6 +251,23 @@ function buildRelationInterpretCtx(input: {
   };
 }
 
+/**
+ * Finds a legacy `fields:`/`references:` argument on the `@relation` attribute
+ * so it can be rejected with a guiding diagnostic instead of the generic
+ * unknown-argument message the spec would produce.
+ */
+function findLegacyDirectionalArgument(
+  attributeNode: FieldAttributeAst,
+): AttributeArgAst | undefined {
+  for (const arg of attributeNode.argList()?.args() ?? []) {
+    const name = arg.name()?.name();
+    if (name === 'fields' || name === 'references') {
+      return arg;
+    }
+  }
+  return undefined;
+}
+
 export function interpretRelationAttribute(input: {
   readonly selfModel: ModelSymbol;
   readonly field: FieldSymbol;
@@ -264,6 +280,16 @@ export function interpretRelationAttribute(input: {
   if (attributeNode === undefined) {
     return undefined;
   }
+  const legacyArgument = findLegacyDirectionalArgument(attributeNode);
+  if (legacyArgument !== undefined) {
+    input.diagnostics.push({
+      code: 'PSL_LEGACY_FIELDS_REFERENCES',
+      message: `Relation field "${input.selfModel.name}.${input.field.name}" uses @relation(fields:/references:), which is no longer supported — use from:/to: instead`,
+      sourceId: input.sourceId,
+      span: nodePslSpan(legacyArgument.syntax, input.sourceFile),
+    });
+    return undefined;
+  }
   const ctx = buildRelationInterpretCtx(input);
   const result = interpretAttribute(attributeNode, sqlRelation, ctx);
   if (!result.ok) {
@@ -273,8 +299,8 @@ export function interpretRelationAttribute(input: {
     return undefined;
   }
   const value = result.value;
-  const fields = value.from ?? value.fields;
-  const references = value.to ?? value.references;
+  const fields = value.from;
+  const references = value.to;
   const referencesInferred: true | undefined =
     fields !== undefined && references === undefined ? true : undefined;
   return {
@@ -613,7 +639,7 @@ export function applyBackrelationCandidates(input: {
       }
       input.diagnostics.push({
         code: 'PSL_ORPHANED_BACKRELATION_LIST',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
+        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(from: [...], to: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
         sourceId: input.sourceId,
         span: candidate.field.span,
       });
