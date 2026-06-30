@@ -138,8 +138,8 @@ const sqlRelation = fieldAttribute('relation', {
   positional: [{ key: 'name', type: optional(str()) }],
   named: {
     name: optional(str()),
-    fields: optional(list(fieldRef('self'), { nonEmpty: true })),
-    references: optional(list(fieldRef('referenced'), { nonEmpty: true })),
+    fields: optional(list(fieldRef('self'), { nonEmpty: true, unique: true })),
+    references: optional(list(fieldRef('referenced'), { nonEmpty: true, unique: true })),
     map: optional(str()),
     onDelete: optional(identifierName()),
     onUpdate: optional(identifierName()),
