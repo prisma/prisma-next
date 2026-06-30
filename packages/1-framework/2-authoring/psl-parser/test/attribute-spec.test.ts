@@ -90,18 +90,6 @@ describe('interpretAttribute positional binding', () => {
     if (result.ok) expect(result.value).toEqual({ name: 'Posts' });
   });
 
-  it('collects a variadic positional slot into an array', () => {
-    const { node, ctx } = fieldAttr('@rel("a", "b")');
-    const spec = fieldAttribute('rel', {
-      positional: [{ key: 'tags', type: str(), variadic: true }],
-    });
-
-    const result = interpretAttribute(node, spec, ctx);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ tags: ['a', 'b'] });
-  });
-
   it('rejects more positional arguments than declared slots', () => {
     const { node, ctx } = fieldAttr('@rel("a", "b")');
     const spec = fieldAttribute('rel', {

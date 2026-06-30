@@ -73,8 +73,6 @@ export interface PositionalParam<T = unknown> {
   /** The output key this slot writes into. */
   readonly key: string;
   readonly type: Param<T>;
-  /** A trailing rest slot that consumes every remaining positional argument. */
-  readonly variadic?: boolean;
 }
 
 export interface AttributeSpec<Out> {
@@ -100,9 +98,8 @@ export type NamedOut<N extends Record<string, Param<unknown>>> = Simplify<
   }
 >;
 
-type PosEntryObject<E extends PositionalParam> = E extends { variadic: true }
-  ? { [K in E['key']]: readonly OutOf<E['type']>[] }
-  : E['type'] extends OptionalParam<unknown>
+type PosEntryObject<E extends PositionalParam> =
+  E['type'] extends OptionalParam<unknown>
     ? { [K in E['key']]?: OutOf<E['type']> }
     : { [K in E['key']]: OutOf<E['type']> };
 

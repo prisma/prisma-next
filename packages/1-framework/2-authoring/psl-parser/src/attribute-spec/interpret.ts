@@ -72,18 +72,6 @@ export function interpretAttribute<Out>(
   const positionalParsed = new Map<string, unknown>();
   let index = 0;
   for (const param of spec.positional) {
-    if (param.variadic) {
-      const collected: unknown[] = [];
-      for (; index < positionalArgs.length; index++) {
-        const arg = positionalArgs[index];
-        if (arg === undefined) continue;
-        const result = parseArgValue(arg, argTypeOf(param.type), leafCtx, diagnostics, code);
-        if (result.ok) collected.push(result.value);
-      }
-      positionalSeen.add(param.key);
-      positionalParsed.set(param.key, collected);
-      continue;
-    }
     const arg = positionalArgs[index];
     if (arg === undefined) continue;
     index += 1;
