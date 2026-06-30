@@ -68,8 +68,8 @@ describe('str', () => {
 });
 
 describe('enumOf', () => {
-  it('accepts a string member of a mixed set', () => {
-    const { expr, ctx } = argOf('"Cascade"');
+  it('accepts a bare-identifier string member of a mixed set', () => {
+    const { expr, ctx } = argOf('Cascade');
 
     const result = enumOf('Cascade', 'SetNull', 1, 2).parse(expr, ctx);
 
@@ -86,8 +86,8 @@ describe('enumOf', () => {
     if (result.ok) expect(result.value).toBe(2);
   });
 
-  it('rejects a non-member of the set', () => {
-    const { expr, ctx } = argOf('"Nope"');
+  it('rejects a quoted string member', () => {
+    const { expr, ctx } = argOf('"Cascade"');
 
     const result = enumOf('Cascade', 'SetNull').parse(expr, ctx);
 

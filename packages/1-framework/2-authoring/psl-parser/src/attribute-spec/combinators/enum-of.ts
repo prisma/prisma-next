@@ -1,6 +1,6 @@
 import type { PslDiagnostic } from '@prisma-next/framework-components/psl-ast';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { NumberLiteralExprAst, StringLiteralExprAst } from '../../syntax/ast/expressions';
+import { NumberLiteralExprAst } from '../../syntax/ast/expressions';
 import { IdentifierAst } from '../../syntax/ast/identifier';
 import type { ArgType } from '../types';
 import { leafDiagnostic } from './diagnostic';
@@ -8,11 +8,11 @@ import { leafDiagnostic } from './diagnostic';
 type EnumMember = string | number;
 
 /**
- * Parses an argument that is a member of a fixed set. The member may be written
- * as a string literal, a number literal, or — matching a string member — a bare
- * identifier (e.g. a referential action `Cascade`). Members may mix strings and
- * numbers, so a single `enumOf` types a homogeneous or a mixed set; the matched
- * member is returned with its literal type preserved.
+ * Parses an argument that is a member of a fixed set. A string member is matched
+ * only when written as a bare identifier (e.g. a referential action `Cascade`); a
+ * quoted string is rejected. A number member matches a number literal (`1`, `-1`).
+ * Members may mix strings and numbers, so a single `enumOf` types a homogeneous or
+ * a mixed set; the matched member is returned with its literal type preserved.
  */
 export function enumOf<const Values extends readonly EnumMember[]>(
   ...values: Values
@@ -28,13 +28,11 @@ export function enumOf<const Values extends readonly EnumMember[]>(
     label,
     parse: (arg, ctx): Result<Values[number], readonly PslDiagnostic[]> => {
       const value =
-        arg instanceof StringLiteralExprAst
+        arg instanceof NumberLiteralExprAst
           ? arg.value()
-          : arg instanceof NumberLiteralExprAst
-            ? arg.value()
-            : arg instanceof IdentifierAst
-              ? arg.name()
-              : undefined;
+          : arg instanceof IdentifierAst
+            ? arg.name()
+            : undefined;
       if (value !== undefined && isMember(value)) return ok(value);
       return notOk([leafDiagnostic(ctx, arg, `Expected one of: ${label}`)]);
     },
