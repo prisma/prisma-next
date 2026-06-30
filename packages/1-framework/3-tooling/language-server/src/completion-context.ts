@@ -275,13 +275,13 @@ function classifyDeclarationKeyword(input: {
   readonly offset: number;
   readonly replacementStartOffset: number;
 }): DeclarationKeywordCompletionContext | undefined {
-  const declaration = input.node?.findAncestor(declarationCast);
+  const precedingDeclaration = input.node?.findAncestor(declarationCast);
   const namespace = input.node?.findAncestor(NamespaceDeclarationAst.cast);
   const inNamespaceBody = blockBodyContainsOffset(namespace, input.offset);
 
   if (
-    declaration !== undefined &&
-    !canBeginDeclaration(declaration, input.offset, inNamespaceBody)
+    precedingDeclaration !== undefined &&
+    !canCompleteDeclaration(precedingDeclaration, input.offset, inNamespaceBody)
   ) {
     return undefined;
   }
@@ -300,21 +300,21 @@ function classifyDeclarationKeyword(input: {
  * typed, no name or body yet), when it is a namespace whose body holds further
  * declarations, or when the cursor sits past its closing `}`.
  */
-function canBeginDeclaration(
-  declaration: DeclarationAst,
+function canCompleteDeclaration(
+  precedingDeclaration: DeclarationAst,
   offset: number,
   inNamespaceBody: boolean,
 ): boolean {
   const keywordOnly =
-    declaration.lbrace() === undefined &&
-    (declaration instanceof TypesBlockAst || declaration.name() === undefined);
+    precedingDeclaration.lbrace() === undefined &&
+    (precedingDeclaration instanceof TypesBlockAst || precedingDeclaration.name() === undefined);
   if (keywordOnly) {
     return true;
   }
-  if (declaration instanceof NamespaceDeclarationAst && inNamespaceBody) {
+  if (precedingDeclaration instanceof NamespaceDeclarationAst && inNamespaceBody) {
     return true;
   }
-  const rbrace = declaration.rbrace();
+  const rbrace = precedingDeclaration.rbrace();
   return rbrace !== undefined && offset >= rbrace.endOffset;
 }
 
