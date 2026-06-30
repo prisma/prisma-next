@@ -1358,3 +1358,141 @@ function formatLiteralValue(value: unknown): string {
   }
   return JSON.stringify(value);
 }
+
+/**
+ * Reads a namespace node's DDL schema name. Namespaced target nodes (Postgres
+ * `PostgresNamespaceSchemaNode`) carry `schemaName`; a flat schema (SQLite) has
+ * none and pairs by position as the sole namespace.
+ */
+function namespaceSchemaName(node: SqlSchemaIR): string | undefined {
+  return blindCast<
+    { readonly schemaName?: string },
+    'reading the optional namespace schemaName off a per-schema node'
+  >(node).schemaName;
+}
+
+/**
+ * Returns a shallow copy of `contract` exposing only the one named namespace —
+ * used solely to resolve that namespace's live DDL schema via the target's
+ * expected-tree projection (never for verification, so global value-sets it may
+ * reference are not consulted).
+ */
+function scopeContractToNamespace(
+  contract: Contract<SqlStorage>,
+  namespaceId: string,
+): Contract<SqlStorage> {
+  const namespace = contract.storage.namespaces[namespaceId];
+  const scopedNamespaces = namespace === undefined ? {} : { [namespaceId]: namespace };
+  return blindCast<
+    Contract<SqlStorage>,
+    'narrowing storage.namespaces to one entry; the rest of the contract is preserved'
+  >({
+    ...contract,
+    storage: blindCast<
+      SqlStorage,
+      'shallow storage copy with a single-namespace map; other storage fields are preserved'
+    >({
+      ...contract.storage,
+      namespaces: scopedNamespaces,
+    }),
+  });
+}
+
+/**
+ * Combines two `VerifyDatabaseSchemaResult`s by concatenating issues and summing
+ * counts — used to fold the per-namespace pairings of a multi-schema database
+ * into one result. The verification-tree `root` of the first pairing is
+ * retained (multi-schema verify-tree shaping is future work).
+ */
+function mergeVerifyResults(
+  a: VerifyDatabaseSchemaResult,
+  b: VerifyDatabaseSchemaResult,
+): VerifyDatabaseSchemaResult {
+  return {
+    ...a,
+    ok: a.ok && b.ok,
+    ...ifDefined('code', a.code ?? b.code),
+    schema: {
+      ...a.schema,
+      issues: [...a.schema.issues, ...b.schema.issues],
+      schemaDiffIssues: [...a.schema.schemaDiffIssues, ...b.schema.schemaDiffIssues],
+      counts: {
+        pass: a.schema.counts.pass + b.schema.counts.pass,
+        warn: a.schema.counts.warn + b.schema.counts.warn,
+        fail: a.schema.counts.fail + b.schema.counts.fail,
+        totalNodes: a.schema.counts.totalNodes + b.schema.counts.totalNodes,
+      },
+    },
+  };
+}
+
+/**
+ * The single per-namespace-paired relational verify shared by the migration
+ * planner and the family schema verify — there is exactly one such operation.
+ *
+ * Each contract namespace is paired to the introspected namespace node holding
+ * the same DDL schema, then `verifySqlSchema` checks that namespace's tables
+ * against the matching actual node (a contract table under `auth` is only ever
+ * looked up in the `auth` actual node, so a multi-schema database no longer
+ * reports tables in other schemas as missing). The full contract is passed every
+ * time — `restrictToNamespaceIds` scopes only which tables are checked, so
+ * cross-namespace value-set / control-policy resolution is unaffected.
+ *
+ * The DDL schema of each contract namespace is read from a single-namespace
+ * expected projection (`buildExpectedSchema`), which both callers already build
+ * the same way. Empty contract namespaces verify nothing and are skipped.
+ * Single-schema (one namespace) and SQLite's flat schema are one pairing —
+ * byte-identical to the prior per-node verify.
+ */
+export function verifySqlSchemaTree(options: {
+  readonly contract: Contract<SqlStorage>;
+  readonly actualSchema: SqlSchemaIRNode;
+  readonly buildExpectedSchema: (contract: Contract<SqlStorage>) => SqlSchemaIRNode;
+  readonly strict: boolean;
+  readonly typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  readonly normalizeDefault?: DefaultNormalizer;
+  readonly normalizeNativeType?: NativeTypeNormalizer;
+}): VerifyDatabaseSchemaResult {
+  const baseOptions = {
+    contract: options.contract,
+    strict: options.strict,
+    typeMetadataRegistry: options.typeMetadataRegistry,
+    frameworkComponents: options.frameworkComponents,
+    ...ifDefined('normalizeDefault', options.normalizeDefault),
+    ...ifDefined('normalizeNativeType', options.normalizeNativeType),
+  };
+
+  const actualNodes = namespaceSchemaNodes(options.actualSchema);
+  const actualByName = new Map<string, SqlSchemaIR>();
+  for (const node of actualNodes) {
+    const name = namespaceSchemaName(node);
+    if (name !== undefined) actualByName.set(name, node);
+  }
+  // A flat actual schema (SQLite) has no named namespaces — it is the sole node.
+  const soleFlatActual = actualByName.size === 0 ? actualNodes[0] : undefined;
+  const emptyNamespace: SqlSchemaIR = { tables: {} };
+
+  let combined: VerifyDatabaseSchemaResult | undefined;
+  for (const namespaceId of Object.keys(options.contract.storage.namespaces)) {
+    const namespace = options.contract.storage.namespaces[namespaceId];
+    if (!namespace || Object.keys(namespace.entries.table ?? {}).length === 0) continue;
+
+    const ddlSchema = namespaceSchemaNodes(
+      options.buildExpectedSchema(scopeContractToNamespace(options.contract, namespaceId)),
+    )
+      .map(namespaceSchemaName)
+      .find((name) => name !== undefined);
+    const actualNode =
+      (ddlSchema !== undefined ? actualByName.get(ddlSchema) : soleFlatActual) ?? emptyNamespace;
+
+    const result = verifySqlSchema({
+      ...baseOptions,
+      schema: actualNode,
+      restrictToNamespaceIds: new Set([namespaceId]),
+    });
+    combined = combined === undefined ? result : mergeVerifyResults(combined, result);
+  }
+
+  return combined ?? verifySqlSchema({ ...baseOptions, schema: emptyNamespace });
+}

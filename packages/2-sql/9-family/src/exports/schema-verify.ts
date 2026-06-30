@@ -15,4 +15,8 @@ export type {
   NativeTypeNormalizer,
   VerifySqlSchemaOptions,
 } from '../core/schema-verify/verify-sql-schema';
-export { namespaceSchemaNodes, verifySqlSchema } from '../core/schema-verify/verify-sql-schema';
+export {
+  namespaceSchemaNodes,
+  verifySqlSchema,
+  verifySqlSchemaTree,
+} from '../core/schema-verify/verify-sql-schema';

@@ -13,7 +13,7 @@ import {
   plannerFailure,
 } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
-import { namespaceSchemaNodes, verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
+import { namespaceSchemaNodes, verifySqlSchemaTree } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   MigrationPlanner,
@@ -58,10 +58,6 @@ type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   : ReadonlyArray<unknown>;
 
 type PlannerOptionsWithComponents = SqlMigrationPlannerPlanOptions & {
-  readonly frameworkComponents: PlannerFrameworkComponents;
-};
-
-type VerifySqlSchemaOptionsWithComponents = Parameters<typeof verifySqlSchema>[0] & {
   readonly frameworkComponents: PlannerFrameworkComponents;
 };
 
@@ -353,27 +349,28 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // destructive) must inspect extras to reconcile strict equality.
     const allowed = options.policy.allowedOperationClasses;
     const strict = allowed.includes('widening') || allowed.includes('destructive');
-    // The relational verify walks one per-schema namespace node at a time,
-    // never a flat merge of every namespace — a merge would silently collide
-    // same-named tables across schemas (the dual-representation flatten the
-    // tree restructure removed). Single-schema (the common case) is the sole
-    // namespace node, byte-identical to the pre-tree flat verify; multi-schema
-    // verify-side contract scoping is CF-2. A fresh database (empty root, no
-    // namespaces) still runs one pass against an empty schema so the contract's
-    // tables surface as `missing_table` — the same as the pre-tree empty
-    // flat schema.
-    const verifyIssues = relationalSchemaNodes(options.schema).flatMap((namespaceNode) => {
-      const verifyOptions: VerifySqlSchemaOptionsWithComponents = {
-        contract: options.contract,
-        schema: namespaceNode,
-        strict,
-        typeMetadataRegistry: new Map(),
-        frameworkComponents: options.frameworkComponents,
-        normalizeDefault: parsePostgresDefault,
-        normalizeNativeType: normalizeSchemaNativeType,
-      };
-      return verifySqlSchema(verifyOptions).schema.issues;
-    });
+    // The relational verify pairs each contract namespace to its live actual
+    // node — the SAME shared `verifySqlSchemaTree` the family schema verify
+    // runs, so the planner and verify diff identically. A fresh database (empty
+    // root) pairs every contract table to an empty node, surfacing them as
+    // `missing_table` so the planner emits the CREATE TABLEs.
+    const verifyIssues = verifySqlSchemaTree({
+      contract: options.contract,
+      actualSchema: options.schema,
+      buildExpectedSchema: (scopedContract) =>
+        contractToPostgresDatabaseSchemaNode(
+          blindCast<
+            PostgresContract | null,
+            'collectSchemaIssues is only called with a postgres contract'
+          >(scopedContract),
+          { annotationNamespace: 'pg' },
+        ),
+      strict,
+      typeMetadataRegistry: new Map(),
+      frameworkComponents: options.frameworkComponents,
+      normalizeDefault: parsePostgresDefault,
+      normalizeNativeType: normalizeSchemaNativeType,
+    }).schema.issues;
     // Schema presence is a Postgres-specific concern (no equivalent in
     // SQLite / Mongo), so the issue emission lives in the target layer
     // rather than in the family verifier. Stitch it in here so a single
@@ -391,17 +388,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     }
     return [...namespaceIssues, ...verifyIssues];
   }
-}
-
-/**
- * The per-schema namespace nodes the relational verify runs against, one pass
- * each. A fresh database (empty root, no namespaces) yields a single empty
- * schema so the contract's tables surface as `missing_table` — the pre-tree
- * empty flat schema behaviour.
- */
-function relationalSchemaNodes(schema: SqlSchemaIRNode): readonly SqlSchemaIR[] {
-  const namespaceNodes = namespaceSchemaNodes(schema);
-  return namespaceNodes.length > 0 ? namespaceNodes : [{ tables: {} }];
 }
 
 /**
