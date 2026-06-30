@@ -121,7 +121,6 @@ interface FkRelation {
   readonly declaringModel: string;
   readonly fieldName: string;
   readonly targetModel: string;
-  readonly relationName?: string;
   readonly localFields: readonly string[];
   readonly targetFields: readonly string[];
 }
@@ -1008,7 +1007,7 @@ export function interpretPslDocumentToMongoContract(
     readonly modelName: string;
     readonly fieldName: string;
     readonly targetModelName: string;
-    readonly relationName?: string;
+    readonly inverse?: string;
     readonly cardinality: '1:1' | '1:N';
     readonly field: FieldSymbol;
   }
@@ -1060,7 +1059,7 @@ export function interpretPslDocumentToMongoContract(
             modelName: pslModel.name,
             fieldName: field.name,
             targetModelName: field.typeName,
-            ...ifDefined('relationName', relation?.relationName),
+...(relation?.inverse !== undefined ? { inverse: relation.inverse } : {}),
             cardinality: field.list ? '1:N' : '1:1',
             field,
           });
@@ -1087,7 +1086,6 @@ export function interpretPslDocumentToMongoContract(
           declaringModel: pslModel.name,
           fieldName: field.name,
           targetModel: field.typeName,
-          ...(relation.relationName !== undefined ? { relationName: relation.relationName } : {}),
           localFields: localMapped,
           targetFields: targetMapped,
         });
@@ -1197,30 +1195,48 @@ export function interpretPslDocumentToMongoContract(
   for (const candidate of backrelationCandidates) {
     const pairKey = fkRelationPairKey(candidate.targetModelName, candidate.modelName);
     const pairMatches = fkRelationsByPair.get(pairKey) ?? [];
-    const matches = candidate.relationName
-      ? pairMatches.filter((r) => r.relationName === candidate.relationName)
-      : [...pairMatches];
 
-    if (matches.length === 0) {
-      diagnostics.push({
-        code: 'PSL_ORPHANED_BACKRELATION',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.fieldName}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(from: [...], to: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
-        sourceId,
-        span: candidate.field.span,
-      });
-      continue;
-    }
-    if (matches.length > 1) {
-      diagnostics.push({
-        code: 'PSL_AMBIGUOUS_BACKRELATION',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.fieldName}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add @relation("...") to both sides to disambiguate.`,
-        sourceId,
-        span: candidate.field.span,
-      });
-      continue;
+    // `inverse:` pins a one-to-many back-relation to the FK-side relation whose
+    // declaring field it names, the directional disambiguator across multiple
+    // relations between the same pair of models. A relation field name is unique
+    // within its model, so at most one FK-side relation matches. When `inverse:`
+    // names a field that is not an FK-side relation back to the candidate, report
+    // it rather than letting recognition fall into the generic ambiguity path.
+    let fk: FkRelation | undefined;
+    if (candidate.inverse !== undefined) {
+      const inverseMatched = pairMatches.find((r) => r.fieldName === candidate.inverse);
+      if (!inverseMatched) {
+        diagnostics.push({
+          code: 'PSL_INVERSE_FIELD_NOT_FK',
+          message: `Backrelation list field "${candidate.modelName}.${candidate.fieldName}" pins FK-side relation field "${candidate.inverse}" via inverse: ${candidate.inverse}, but "${candidate.targetModelName}" has no relation field "${candidate.inverse}" with a foreign key back to "${candidate.modelName}". Name an FK-side relation field whose foreign key references "${candidate.modelName}".`,
+          sourceId,
+          span: candidate.field.span,
+        });
+        continue;
+      }
+      fk = inverseMatched;
+    } else {
+      if (pairMatches.length === 0) {
+        diagnostics.push({
+          code: 'PSL_ORPHANED_BACKRELATION',
+          message: `Backrelation list field "${candidate.modelName}.${candidate.fieldName}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(from: [...], to: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
+          sourceId,
+          span: candidate.field.span,
+        });
+        continue;
+      }
+      if (pairMatches.length > 1) {
+        diagnostics.push({
+          code: 'PSL_AMBIGUOUS_BACKRELATION',
+          message: `Backrelation list field "${candidate.modelName}.${candidate.fieldName}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add inverse: <fkField> to the list field, naming the FK-side relation field it pairs with, to disambiguate.`,
+          sourceId,
+          span: candidate.field.span,
+        });
+        continue;
+      }
+      fk = pairMatches[0];
     }
 
-    const fk = matches[0];
     if (!fk) continue;
     const modelEntry = models[candidate.modelName];
     if (!modelEntry) continue;

@@ -75,20 +75,20 @@ model Post {
     });
   });
 
-  it('matches named backrelations using positional and named relation forms', () => {
+  it('matches backrelations disambiguated by inverse:', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
-  authored Post[] @relation("AuthoredPosts")
-  reviewed Post[] @relation(name: "ReviewedPosts")
+  authored Post[] @relation(inverse: author)
+  reviewed Post[] @relation(inverse: reviewer)
 }
 
 model Post {
   id Int @id
   authorId Int
   reviewerId Int
-  author User @relation("AuthoredPosts", from: [authorId], to: [id])
-  reviewer User @relation(name: "ReviewedPosts", from: [reviewerId], to: [id])
+  author User @relation(from: [authorId], to: [id])
+  reviewer User @relation(from: [reviewerId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -176,13 +176,13 @@ model Member {
     });
   });
 
-  it('matches self-referential backrelations when disambiguated by relation name', () => {
+  it('matches self-referential backrelations when disambiguated by inverse:', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model Employee {
   id Int @id
   managerId Int?
-  manager Employee? @relation("Manages", from: [managerId], to: [id])
-  reports Employee[] @relation("Manages")
+  manager Employee? @relation(from: [managerId], to: [id])
+  reports Employee[] @relation(inverse: manager)
 }
 `,
       sourceId: 'schema.prisma',

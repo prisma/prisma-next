@@ -246,8 +246,8 @@ model PostTag {
 model Follow {
   followerId Int
   followeeId Int
-  follower User @relation("follower", from: [followerId], to: [id])
-  followee User @relation("followee", from: [followeeId], to: [id])
+  follower User @relation(from: [followerId], to: [id])
+  followee User @relation(from: [followeeId], to: [id])
 
   @@id([followerId, followeeId])
 }

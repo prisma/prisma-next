@@ -2,11 +2,11 @@
 
 model User {
   id Int @id
-  posts Post[] @relation("UserPosts")
+  posts Post[]
 }
 
 model Post {
   id Int @id
   userId Int
-  user User @relation("UserPosts", from: [userId], to: [id], onDelete: Cascade, onUpdate: Cascade)
+  user User @relation(from: [userId], to: [id], onDelete: Cascade, onUpdate: Cascade)
 }

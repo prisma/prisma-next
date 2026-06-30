@@ -98,6 +98,60 @@ model Post {
     });
   });
 
+  describe('legacy relation name rejection', () => {
+    it('rejects @relation(name: "...") with a guiding diagnostic pointing at inverse:/through:', () => {
+      const result = interpret(`model User {
+  id Int @id
+  authoredPosts Post[] @relation(name: "AuthoredPosts")
+  editedPosts Post[] @relation(name: "EditedPosts")
+}
+
+model Post {
+  id Int @id
+  authorId Int
+  editorId Int
+  author User @relation(name: "AuthoredPosts", from: authorId)
+  editor User @relation(name: "EditedPosts", from: editorId)
+}
+`);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_LEGACY_RELATION_NAME',
+            message: expect.stringContaining('inverse:'),
+          }),
+        ]),
+      );
+      const diagnostic = result.failure.diagnostics.find(
+        (d) => d.code === 'PSL_LEGACY_RELATION_NAME',
+      );
+      expect(diagnostic?.message).toContain('through: Junction.field');
+    });
+
+    it('rejects the positional @relation("...") name form', () => {
+      const result = interpret(`model User {
+  id Int @id
+  posts Post[] @relation("UserPosts")
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation("UserPosts", from: [userId], to: [id])
+}
+`);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'PSL_LEGACY_RELATION_NAME' })]),
+      );
+    });
+  });
+
   describe('to inference (omit to: ⇒ target @id)', () => {
     it('infers the single-column target @id when to: is omitted', () => {
       const inferred = interpret(`model User {
@@ -308,12 +362,12 @@ model Post {
   });
 
   describe('self-referential from/to', () => {
-    it('resolves a named self-referential from/to relation, inferring to: from @id', () => {
+    it('resolves a self-referential from/to relation disambiguated by inverse:, inferring to: from @id', () => {
       const result = interpret(`model Employee {
   id Int @id
   managerId Int?
-  manager Employee? @relation("Manages", from: managerId)
-  reports Employee[] @relation("Manages")
+  manager Employee? @relation(from: managerId)
+  reports Employee[] @relation(inverse: manager)
 }
 `);
 

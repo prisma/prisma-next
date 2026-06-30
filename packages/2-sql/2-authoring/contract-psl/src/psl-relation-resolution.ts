@@ -22,7 +22,6 @@ import {
   str,
 } from '@prisma-next/psl-parser';
 import type {
-  AttributeArgAst,
   ExpressionAst,
   FieldAttributeAst,
   SourceFile,
@@ -66,7 +65,6 @@ export type FkRelationMetadata = {
   readonly targetTableName: string;
   /** Resolved namespace coordinate of the related model, when known. */
   readonly targetNamespaceId?: string;
-  readonly relationName?: string;
   readonly localColumns: readonly string[];
   readonly referencedColumns: readonly string[];
 };
@@ -76,7 +74,6 @@ export type ModelBackrelationCandidate = {
   readonly tableName: string;
   readonly field: FieldSymbol;
   readonly targetModelName: string;
-  readonly relationName?: string;
   /**
    * The junction named by `through:` on the list field. When present,
    * many-to-many recognition considers only `junction` rather than scanning
@@ -295,9 +292,7 @@ function relationInvariants(
 // spellings are rejected up front with a guiding diagnostic (see
 // interpretRelationAttribute) rather than reported as unknown arguments.
 const sqlRelation = fieldAttribute('relation', {
-  positional: [{ key: 'name', type: optional(str()) }],
   named: {
-    name: optional(str()),
     from: optional(fieldRefOrList('self')),
     to: optional(fieldRefOrList('referenced')),
     through: optional(throughRef()),
@@ -333,7 +328,6 @@ export type SqlRelationOutput = InferAttr<typeof sqlRelation>;
  * the resolution pipeline consumes.
  */
 export type ParsedSqlRelation = {
-  readonly name?: string;
   readonly fields?: readonly string[];
   readonly references?: readonly string[];
   /**
@@ -417,18 +411,46 @@ function buildRelationInterpretCtx(input: {
   };
 }
 
+function legacyRelationNameDiagnostic(
+  input: { readonly selfModel: ModelSymbol; readonly field: FieldSymbol; readonly sourceId: string },
+  span: PslSpan,
+): ContractSourceDiagnostic {
+  return {
+    code: 'PSL_LEGACY_RELATION_NAME',
+    message: `Relation field "${input.selfModel.name}.${input.field.name}" uses @relation(name:) (or a positional @relation("...")), which is no longer supported — disambiguate with inverse: (1:N back-relation) or through: Junction.field (M:N)`,
+    sourceId: input.sourceId,
+    span,
+  };
+}
+
 /**
- * Finds a legacy `fields:`/`references:` argument on the `@relation` attribute
- * so it can be rejected with a guiding diagnostic instead of the generic
- * unknown-argument message the spec would produce.
+ * Rejects retired `@relation` arguments with a guiding diagnostic instead of
+ * the generic unknown-argument message the spec would produce: the legacy
+ * `fields:`/`references:` directional spellings, and the `name:`/positional
+ * relation-name disambiguator that `inverse:`/`through:` replace.
  */
-function findLegacyDirectionalArgument(
+function findLegacyArgumentDiagnostic(
   attributeNode: FieldAttributeAst,
-): AttributeArgAst | undefined {
+  input: {
+    readonly selfModel: ModelSymbol;
+    readonly field: FieldSymbol;
+    readonly sourceFile: SourceFile;
+    readonly sourceId: string;
+  },
+): ContractSourceDiagnostic | undefined {
   for (const arg of attributeNode.argList()?.args() ?? []) {
     const name = arg.name()?.name();
+    const span = nodePslSpan(arg.syntax, input.sourceFile);
     if (name === 'fields' || name === 'references') {
-      return arg;
+      return {
+        code: 'PSL_LEGACY_FIELDS_REFERENCES',
+        message: `Relation field "${input.selfModel.name}.${input.field.name}" uses @relation(fields:/references:), which is no longer supported — use from:/to: instead`,
+        sourceId: input.sourceId,
+        span,
+      };
+    }
+    if (name === undefined || name === 'name') {
+      return legacyRelationNameDiagnostic(input, span);
     }
   }
   return undefined;
@@ -446,14 +468,9 @@ export function interpretRelationAttribute(input: {
   if (attributeNode === undefined) {
     return undefined;
   }
-  const legacyArgument = findLegacyDirectionalArgument(attributeNode);
-  if (legacyArgument !== undefined) {
-    input.diagnostics.push({
-      code: 'PSL_LEGACY_FIELDS_REFERENCES',
-      message: `Relation field "${input.selfModel.name}.${input.field.name}" uses @relation(fields:/references:), which is no longer supported — use from:/to: instead`,
-      sourceId: input.sourceId,
-      span: nodePslSpan(legacyArgument.syntax, input.sourceFile),
-    });
+  const legacyDiagnostic = findLegacyArgumentDiagnostic(attributeNode, input);
+  if (legacyDiagnostic !== undefined) {
+    input.diagnostics.push(legacyDiagnostic);
     return undefined;
   }
   const ctx = buildRelationInterpretCtx(input);
@@ -470,7 +487,6 @@ export function interpretRelationAttribute(input: {
   const referencesInferred: true | undefined =
     fields !== undefined && references === undefined ? true : undefined;
   return {
-    ...ifDefined('name', value.name),
     ...ifDefined('fields', fields),
     ...ifDefined('references', references),
     ...ifDefined('referencesInferred', referencesInferred),
@@ -699,12 +715,6 @@ function findJunctionFkPairs(input: {
       if (parentFk.targetModelName !== input.candidate.modelName) {
         continue;
       }
-      if (
-        input.candidate.relationName !== undefined &&
-        parentFk.relationName !== input.candidate.relationName
-      ) {
-        continue;
-      }
       // `through: Junction.relationField` pins the parent-side FK to the
       // junction relation field named, selecting one leg of a self-relation or
       // of multiple many-to-many between the same pair of models.
@@ -875,9 +885,7 @@ export function applyBackrelationCandidates(input: {
       continue;
     }
 
-    const matches = candidate.relationName
-      ? pairMatches.filter((relation) => relation.relationName === candidate.relationName)
-      : [...pairMatches];
+    const matches = [...pairMatches];
 
     if (matches.length === 0) {
       const { pairs: junctionPairs, nearMisses } = findJunctionFkPairs({
@@ -895,7 +903,7 @@ export function applyBackrelationCandidates(input: {
       if (junctionPairs.length > 1) {
         input.diagnostics.push({
           code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
-          message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple junction FK pairs for a many-to-many relation. Add @relation(name: "...") (or @relation("...")) to the list field and the junction FK-side relation pointing back at "${candidate.modelName}" to disambiguate.`,
+          message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple junction FK pairs for a many-to-many relation. Add through: Junction.relationField (the qualified junction pin) to the list field to disambiguate.`,
           sourceId: input.sourceId,
           span: candidate.field.span,
         });
@@ -917,7 +925,7 @@ export function applyBackrelationCandidates(input: {
     if (matches.length > 1) {
       input.diagnostics.push({
         code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add @relation(name: "...") (or @relation("...")) to both sides to disambiguate.`,
+        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add inverse: <fkField> to the list field, naming the FK-side relation field it pairs with, to disambiguate.`,
         sourceId: input.sourceId,
         span: candidate.field.span,
       });

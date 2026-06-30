@@ -126,15 +126,7 @@ ${twoRelationPostModel}`);
     expect(diagnostic?.message).toContain('Post');
   });
 
-  it('still disambiguates a legacy name:-authored version to the same contract', () => {
-    const viaInverse = interpret(`model User {
-  id Int @id
-  authoredPosts Post[] @relation(inverse: author)
-  editedPosts Post[] @relation(inverse: editor)
-}
-
-${twoRelationPostModel}`);
-
+  it('rejects the legacy name:-authored version that inverse: replaces', () => {
     const viaName = interpret(`model User {
   id Int @id
   authoredPosts Post[] @relation(name: "AuthoredPosts")
@@ -150,12 +142,16 @@ model Post {
 }
 `);
 
-    expect(viaInverse.ok).toBe(true);
-    expect(viaName.ok).toBe(true);
-    if (!viaInverse.ok || !viaName.ok) return;
+    expect(viaName.ok).toBe(false);
+    if (viaName.ok) return;
 
-    const inverseRelations = relationsOf(viaInverse.value)['User']?.relations;
-    const nameRelations = relationsOf(viaName.value)['User']?.relations;
-    expect(inverseRelations).toEqual(nameRelations);
+    expect(viaName.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_LEGACY_RELATION_NAME',
+          message: expect.stringContaining('inverse:'),
+        }),
+      ]),
+    );
   });
 });
