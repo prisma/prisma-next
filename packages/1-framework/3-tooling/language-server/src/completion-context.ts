@@ -17,7 +17,7 @@ import {
   type QualifiedNameAst,
   type SourceFile,
   type SyntaxNode,
-  type SyntaxToken,
+  SyntaxToken,
   type TokenAtOffset,
   TypesBlockAst,
 } from '@prisma-next/psl-parser/syntax';
@@ -113,7 +113,6 @@ export function classifyPslCompletionContext(
   const declarationKeywordContext = classifyDeclarationKeyword({
     node: contextNode,
     offset,
-    at,
     replacementStartOffset,
   });
   if (declarationKeywordContext !== undefined) {
@@ -239,70 +238,63 @@ function classifyTypePosition(
   return { kind: 'modelType', offset, fieldName, replacementStartOffset };
 }
 
+const declarationCast = any(
+  ModelDeclarationAst.cast,
+  CompositeTypeDeclarationAst.cast,
+  TypesBlockAst.cast,
+  GenericBlockDeclarationAst.cast,
+  NamespaceDeclarationAst.cast,
+);
+
+type DeclarationAst = NonNullable<ReturnType<typeof declarationCast>>;
+
 function classifyDeclarationKeyword(input: {
   readonly node: SyntaxNode | undefined;
   readonly offset: number;
-  readonly at: TokenAtOffset;
   readonly replacementStartOffset: number;
 }): DeclarationKeywordCompletionContext | undefined {
-  if (isInsideNonDeclarationKeywordBody(input.node, input.offset)) {
-    return undefined;
-  }
-
+  const declaration = input.node?.findAncestor(declarationCast);
   const namespace = input.node?.findAncestor(NamespaceDeclarationAst.cast);
-  const scope = blockBodyContainsOffset(namespace, input.offset) ? 'namespace' : 'document';
+  const inNamespaceBody = blockBodyContainsOffset(namespace, input.offset);
 
-  const prefixToken = cursorIdentifier(input.at, input.offset);
-  if (!declarationKeywordAllowed(prefixToken, namespace, input)) {
+  if (
+    declaration !== undefined &&
+    !canBeginDeclaration(declaration, input.offset, inNamespaceBody)
+  ) {
     return undefined;
   }
 
   return {
     kind: 'declarationKeyword',
     offset: input.offset,
-    scope,
+    scope: inNamespaceBody ? 'namespace' : 'document',
     replacementStartOffset: input.replacementStartOffset,
   };
 }
 
 /**
- * A declaration keyword may be completed where a new declaration can begin: at
- * the start of the document or namespace body, immediately after a previous
- * declaration's closing `}`, or right after the enclosing namespace's opening
- * brace. Newlines are trivia and play no role — `model A {} model B {}` is valid
- * PSL on a single line.
+ * A declaration keyword may be completed where a new declaration can begin. With
+ * the cursor inside an established declaration that is only allowed when the
+ * declaration is still nascent (its sole significant child is the keyword), the
+ * cursor sits past its closing `}`, or it is a namespace body offering a fresh
+ * slot for a nested declaration.
  */
-function declarationKeywordAllowed(
-  prefixToken: SyntaxToken | undefined,
-  namespace: NamespaceDeclarationAst | undefined,
-  input: { readonly offset: number; readonly at: TokenAtOffset },
+function canBeginDeclaration(
+  declaration: DeclarationAst,
+  offset: number,
+  inNamespaceBody: boolean,
 ): boolean {
-  const previous =
-    prefixToken !== undefined
-      ? previousNonTriviaToken(prefixToken)
-      : previousSignificantToken(input.at, input.offset);
-  if (previous === undefined) {
-    return true;
+  let significantChildren = 0;
+  for (const child of declaration.syntax.children()) {
+    if (!(child instanceof SyntaxToken) || !isTrivia(child)) {
+      significantChildren++;
+    }
   }
-  if (previous.kind === 'RBrace') {
-    return true;
-  }
-  const lbrace = namespace?.lbrace();
-  return lbrace !== undefined && lbrace.offset === previous.offset;
-}
-
-function isInsideNonDeclarationKeywordBody(node: SyntaxNode | undefined, offset: number): boolean {
-  return blockBodyContainsOffset(
-    node?.findAncestor(
-      any(
-        ModelDeclarationAst.cast,
-        CompositeTypeDeclarationAst.cast,
-        TypesBlockAst.cast,
-        GenericBlockDeclarationAst.cast,
-      ),
-    ),
-    offset,
-  );
+  const keywordOnly = significantChildren === 1;
+  const rbrace = declaration.rbrace();
+  const pastRbrace = rbrace !== undefined && offset >= rbrace.endOffset;
+  const freshNamespaceSlot = declaration instanceof NamespaceDeclarationAst && inNamespaceBody;
+  return keywordOnly || pastRbrace || freshNamespaceSlot;
 }
 
 function blockBodyContainsOffset(block: BracedBlock | undefined, offset: number): boolean {
