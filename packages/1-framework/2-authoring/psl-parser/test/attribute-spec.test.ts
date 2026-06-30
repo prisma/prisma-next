@@ -151,21 +151,26 @@ describe('interpretAttribute named binding', () => {
   });
 });
 
-describe('interpretAttribute positional-or-named alias', () => {
-  it('merges a positional and named value that agree', () => {
-    const { node, ctx } = fieldAttr('@rel("Posts", name: "Posts")');
+describe('interpretAttribute positional-or-named duplicate', () => {
+  it('rejects a key supplied both positionally and by name even when the values agree', () => {
+    const { node, ctx } = fieldAttr('@rel("Foo", name: "Foo")');
     const spec = fieldAttribute('rel', {
       positional: [{ key: 'name', type: optional(str()) }],
       named: { name: optional(str()) },
+      diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
     });
 
     const result = interpretAttribute(node, spec, ctx);
 
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ name: 'Posts' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
+      expect(result.failure[0]?.span).toEqual(nodePslSpan(node.syntax, ctx.sourceFile));
+    }
   });
 
-  it('reports a conflict when positional and named values disagree', () => {
+  it('rejects a key supplied both positionally and by name when the values disagree', () => {
     const { node, ctx } = fieldAttr('@rel("A", name: "B")');
     const spec = fieldAttribute('rel', {
       positional: [{ key: 'name', type: optional(str()) }],
@@ -180,6 +185,41 @@ describe('interpretAttribute positional-or-named alias', () => {
       expect(result.failure).toHaveLength(1);
       expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
       expect(result.failure[0]?.span).toEqual(nodePslSpan(node.syntax, ctx.sourceFile));
+    }
+  });
+});
+
+describe('interpretAttribute duplicate named arguments', () => {
+  it('rejects a named key supplied twice with differing values, anchored to the duplicate', () => {
+    const { node, ctx } = fieldAttr('@rel(name: "A", name: "B")');
+    const spec = fieldAttribute('rel', {
+      named: { name: optional(str()) },
+      diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
+    });
+
+    const result = interpretAttribute(node, spec, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
+      expect(result.failure[0]?.span).not.toEqual(nodePslSpan(node.syntax, ctx.sourceFile));
+    }
+  });
+
+  it('rejects a named key supplied twice even when the values are equal', () => {
+    const { node, ctx } = fieldAttr('@rel(name: "A", name: "A")');
+    const spec = fieldAttribute('rel', {
+      named: { name: optional(str()) },
+      diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
+    });
+
+    const result = interpretAttribute(node, spec, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
     }
   });
 });

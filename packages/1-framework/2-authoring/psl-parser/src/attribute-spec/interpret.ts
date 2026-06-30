@@ -52,7 +52,17 @@ export function interpretAttribute<Out>(
       );
       continue;
     }
-    if (namedSeen.has(key)) continue;
+    if (namedSeen.has(key)) {
+      diagnostics.push(
+        diagnostic(
+          code,
+          `Attribute "${spec.name}" received duplicate argument "${key}"`,
+          ctx,
+          nodePslSpan(arg.syntax, ctx.sourceFile),
+        ),
+      );
+      continue;
+    }
     namedSeen.add(key);
     const result = parseArgValue(arg, argTypeOf(param), leafCtx, diagnostics, code);
     if (result.ok) namedParsed.set(key, result.value);
@@ -105,24 +115,14 @@ export function interpretAttribute<Out>(
     const fromNamed = namedSeen.has(key);
 
     if (fromPositional && fromNamed) {
-      const hasPositional = positionalParsed.has(key);
-      const hasNamed = namedParsed.has(key);
-      if (
-        hasPositional &&
-        hasNamed &&
-        !argValuesEqual(positionalParsed.get(key), namedParsed.get(key))
-      ) {
-        diagnostics.push(
-          diagnostic(
-            code,
-            `Attribute "${spec.name}" has conflicting positional and named values for "${key}"`,
-            ctx,
-            attributeSpan,
-          ),
-        );
-      }
-      if (hasNamed) output[key] = namedParsed.get(key);
-      else if (hasPositional) output[key] = positionalParsed.get(key);
+      diagnostics.push(
+        diagnostic(
+          code,
+          `Attribute "${spec.name}" received duplicate values for "${key}" both positionally and by name`,
+          ctx,
+          attributeSpan,
+        ),
+      );
       return;
     }
     if (fromNamed) {
@@ -215,24 +215,4 @@ function diagnostic(
   span: PslSpan,
 ): PslDiagnostic {
   return { code, message, sourceId: ctx.sourceId, span };
-}
-
-function argValuesEqual(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((element, i) => argValuesEqual(element, b[i]));
-  }
-  if (isPlainRecord(a) && isPlainRecord(b)) {
-    const aKeys = Object.keys(a);
-    const bKeys = Object.keys(b);
-    return (
-      aKeys.length === bKeys.length &&
-      aKeys.every((key) => Object.hasOwn(b, key) && argValuesEqual(a[key], b[key]))
-    );
-  }
-  return false;
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
