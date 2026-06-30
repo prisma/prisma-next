@@ -102,13 +102,15 @@ export function classifyPslCompletionContext(
     return UNSUPPORTED;
   }
 
-  // Anchor on the significant token that gives the cursor its context and
-  // navigate outward via `token.parent` rather than scanning the whole tree.
-  const contextNode = contextToken(at, offset)?.parent;
-
   // The edit replaces the identifier under the cursor, or is empty when the
   // cursor sits in trivia.
-  const replacementStartOffset = cursorIdentifier(at, offset)?.offset ?? offset;
+  const edit = cursorIdentifier(at, offset);
+
+  // Anchor on the significant token that gives the cursor its context and
+  // navigate outward via `token.parent` rather than scanning the whole tree.
+  const context = contextToken(at, edit);
+  const contextNode = context?.parent;
+  const replacementStartOffset = edit?.offset ?? offset;
 
   const declarationKeywordContext = classifyDeclarationKeyword({
     node: contextNode,
@@ -122,6 +124,7 @@ export function classifyPslCompletionContext(
   const genericBlockContext = classifyGenericBlockParameter({
     offset,
     at,
+    contextToken: context,
     replacementStartOffset,
   });
   if (genericBlockContext !== undefined) {
@@ -331,6 +334,7 @@ function blockBodyContainsOffset(block: BracedBlock | undefined, offset: number)
 function classifyGenericBlockParameter(input: {
   readonly offset: number;
   readonly at: TokenAtOffset;
+  readonly contextToken: SyntaxToken | undefined;
   readonly replacementStartOffset: number;
 }): PslCompletionContext | undefined {
   // Whether the cursor sits in a key, value, or attribute slot is a structural
@@ -362,7 +366,7 @@ function classifyGenericBlockParameter(input: {
 
   // Value position: the cursor follows a `=`. The position is now classified
   // distinctly from keys; populating value candidates is the provider's concern.
-  if (contextToken(input.at, input.offset)?.kind === 'Equals') {
+  if (input.contextToken?.kind === 'Equals') {
     return {
       kind: 'genericBlockValue',
       offset: input.offset,
@@ -432,8 +436,7 @@ function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
 
 /** The significant token preceding the cursor — the in-progress edit identifier
  *  is skipped, so the result is the token that gives the cursor its context. */
-function contextToken(at: TokenAtOffset, offset: number): SyntaxToken | undefined {
-  const edit = cursorIdentifier(at, offset);
+function contextToken(at: TokenAtOffset, edit: SyntaxToken | undefined): SyntaxToken | undefined {
   const start = edit !== undefined ? edit.prevToken : at.leftBiased();
   return start === undefined ? undefined : skipTriviaToken(start, 'prev');
 }
