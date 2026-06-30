@@ -8,7 +8,7 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { nodePslSpan } from '../resolve';
 import type { FieldAttributeAst, ModelAttributeAst } from '../syntax/ast/attributes';
 import type { AttributeArgAst } from '../syntax/ast/expressions';
-import type { ArgType, AttributeSpec, InterpretCtx, OptionalParam, Param } from './types';
+import type { ArgType, AttributeSpec, InterpretCtx, OptionalArgType, Param } from './types';
 
 const DEFAULT_STRUCTURAL_CODE: PslDiagnosticCode = 'PSL_INVALID_ATTRIBUTE_SYNTAX';
 
@@ -64,7 +64,7 @@ export function interpretAttribute<Out>(
       continue;
     }
     namedSeen.add(key);
-    const result = parseArgValue(arg, argTypeOf(param), leafCtx, diagnostics, code);
+    const result = parseArgValue(arg, param, leafCtx, diagnostics, code);
     if (result.ok) namedParsed.set(key, result.value);
   }
 
@@ -76,7 +76,7 @@ export function interpretAttribute<Out>(
     if (arg === undefined) continue;
     index += 1;
     positionalSeen.add(param.key);
-    const result = parseArgValue(arg, argTypeOf(param.type), leafCtx, diagnostics, code);
+    const result = parseArgValue(arg, param.type, leafCtx, diagnostics, code);
     if (result.ok) positionalParsed.set(param.key, result.value);
   }
   if (index < positionalArgs.length) {
@@ -124,7 +124,7 @@ export function interpretAttribute<Out>(
 
     const effective = namedParam ?? positionalParam;
     if (effective === undefined) return;
-    if (isOptionalParam(effective)) {
+    if (isOptionalArgType(effective)) {
       if (effective.hasDefault) output[key] = effective.defaultValue;
       return;
     }
@@ -188,12 +188,8 @@ function parseArgValue(
   return result;
 }
 
-function isOptionalParam(param: Param<unknown>): param is OptionalParam<unknown> {
+function isOptionalArgType(param: Param<unknown>): param is OptionalArgType<unknown> {
   return 'optional' in param && param.optional === true;
-}
-
-function argTypeOf(param: Param<unknown>): ArgType<unknown> {
-  return isOptionalParam(param) ? param.type : param;
 }
 
 function diagnostic(
