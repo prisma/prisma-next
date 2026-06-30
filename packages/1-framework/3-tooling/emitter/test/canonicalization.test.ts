@@ -137,6 +137,66 @@ describe('canonicalization', () => {
     expect(updatedAt['nullable']).toBe(true);
   });
 
+  it('preserves literal default value false (falsy guard)', () => {
+    const ir = createTestContract({
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            is_active: {
+              codecId: 'pg/bool@1',
+              nativeType: 'bool',
+              nullable: false,
+              default: { kind: 'literal', value: false },
+            },
+            is_published: {
+              codecId: 'pg/bool@1',
+              nativeType: 'bool',
+              nullable: false,
+              default: { kind: 'literal', value: true },
+            },
+          },
+        },
+      }),
+    });
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = tablesFromCanonicalStorage(storage);
+    const user = tables['user'] as Record<string, unknown>;
+    const columns = user['columns'] as Record<string, unknown>;
+    const isActive = columns['is_active'] as Record<string, unknown>;
+    const isPublished = columns['is_published'] as Record<string, unknown>;
+    expect(isActive['default']).toEqual({ kind: 'literal', value: false });
+    expect(isPublished['default']).toEqual({ kind: 'literal', value: true });
+  });
+
+  it('preserves literal default value 0 (falsy guard)', () => {
+    const ir = createTestContract({
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            view_count: {
+              codecId: 'pg/int4@1',
+              nativeType: 'int4',
+              nullable: false,
+              default: { kind: 'literal', value: 0 },
+            },
+          },
+        },
+      }),
+    });
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = tablesFromCanonicalStorage(storage);
+    const user = tables['user'] as Record<string, unknown>;
+    const columns = user['columns'] as Record<string, unknown>;
+    const viewCount = columns['view_count'] as Record<string, unknown>;
+    expect(viewCount['default']).toEqual({ kind: 'literal', value: 0 });
+  });
+
   it('preserves nullable:true for columns with defaults', () => {
     const ir = createTestContract({
       storage: unboundNamespaceTables({
