@@ -150,7 +150,7 @@ model Post {
   id       ObjectId @id @map("_id")
   title    String
   content  String?
-  author   User     @relation(fields: [authorId], references: [id])
+  author   User     @relation(from: [authorId], to: [id])
   authorId ObjectId
   @@map("posts")
 }

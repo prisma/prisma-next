@@ -60,6 +60,7 @@ import {
   parseIndexFieldList,
   parseQuotedStringLiteral,
   parseRelationAttribute,
+  resolveTargetIdFieldNames,
 } from './psl-helpers';
 
 export interface InterpretPslDocumentToMongoContractInput {
@@ -1001,9 +1002,39 @@ export function interpretPslDocumentToMongoContract(
 
     for (const field of Object.values(pslModel.fields)) {
       if (isRelationField(field, modelNames)) {
-        const relation = parseRelationAttribute(field.attributes);
+        const diagnosticsBefore = diagnostics.length;
+        const relation = parseRelationAttribute({
+          attributes: field.attributes,
+          modelName: pslModel.name,
+          fieldName: field.name,
+          sourceId,
+          diagnostics,
+        });
+        if (diagnostics.length > diagnosticsBefore) {
+          // The relation attribute was rejected (legacy fields:/references:, a
+          // to: without a from:, a malformed value). The pushed diagnostic fails
+          // the interpret; the field carries no usable FK or backrelation shape.
+          continue;
+        }
 
-        if (field.list || !(relation?.fields && relation?.references)) {
+        const targetModel = allModels.find((m) => m.name === field.typeName);
+
+        let references = relation?.references;
+        if (relation?.fields && relation.referencesInferred) {
+          const targetIdFields = targetModel ? resolveTargetIdFieldNames(targetModel) : undefined;
+          if (!targetIdFields) {
+            diagnostics.push({
+              code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+              message: `Relation field "${pslModel.name}.${field.name}" omits to: but target model "${field.typeName}" declares no @id to infer the referenced field(s) from`,
+              sourceId,
+              span: field.span,
+            });
+            continue;
+          }
+          references = targetIdFields;
+        }
+
+        if (field.list || !(relation?.fields && references)) {
           backrelationCandidates.push({
             modelName: pslModel.name,
             fieldName: field.name,
@@ -1015,33 +1046,30 @@ export function interpretPslDocumentToMongoContract(
           continue;
         }
 
-        if (relation?.fields && relation?.references) {
-          const localMapped = relation.fields.map((f) => fieldMappings.pslNameToMapped.get(f) ?? f);
+        const localMapped = relation.fields.map((f) => fieldMappings.pslNameToMapped.get(f) ?? f);
 
-          const targetModel = allModels.find((m) => m.name === field.typeName);
-          const targetFieldMappings = targetModel ? resolveFieldMappings(targetModel) : undefined;
-          const targetMapped = relation.references.map(
-            (f) => targetFieldMappings?.pslNameToMapped.get(f) ?? f,
-          );
+        const targetFieldMappings = targetModel ? resolveFieldMappings(targetModel) : undefined;
+        const targetMapped = references.map(
+          (f) => targetFieldMappings?.pslNameToMapped.get(f) ?? f,
+        );
 
-          relations[field.name] = {
-            to: mongoCrossRef(field.typeName),
-            cardinality: 'N:1' as const,
-            on: {
-              localFields: localMapped,
-              targetFields: targetMapped,
-            },
-          };
-
-          allFkRelations.push({
-            declaringModel: pslModel.name,
-            fieldName: field.name,
-            targetModel: field.typeName,
-            ...ifDefined('relationName', relation.relationName),
+        relations[field.name] = {
+          to: mongoCrossRef(field.typeName),
+          cardinality: 'N:1' as const,
+          on: {
             localFields: localMapped,
             targetFields: targetMapped,
-          });
-        }
+          },
+        };
+
+        allFkRelations.push({
+          declaringModel: pslModel.name,
+          fieldName: field.name,
+          targetModel: field.typeName,
+          ...(relation.relationName !== undefined ? { relationName: relation.relationName } : {}),
+          localFields: localMapped,
+          targetFields: targetMapped,
+        });
         continue;
       }
 
@@ -1155,7 +1183,7 @@ export function interpretPslDocumentToMongoContract(
     if (matches.length === 0) {
       diagnostics.push({
         code: 'PSL_ORPHANED_BACKRELATION',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.fieldName}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
+        message: `Backrelation list field "${candidate.modelName}.${candidate.fieldName}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(from: [...], to: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
         sourceId,
         span: candidate.field.span,
       });
