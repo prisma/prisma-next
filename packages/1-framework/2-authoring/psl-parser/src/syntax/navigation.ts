@@ -56,11 +56,8 @@ export function nonTriviaSibling(
  */
 export function previousNonTriviaToken(element: SyntaxElement): SyntaxToken | undefined {
   const start = element instanceof SyntaxToken ? element : element.firstToken;
-  if (start === undefined) return undefined;
-  for (let prev = start.prevToken; prev !== undefined; prev = prev.prevToken) {
-    if (!isTrivia(prev)) return prev;
-  }
-  return undefined;
+  const prev = start?.prevToken;
+  return prev === undefined ? undefined : skipTriviaToken(prev, 'prev');
 }
 
 function step(element: SyntaxElement, direction: Direction): SyntaxElement | undefined {
