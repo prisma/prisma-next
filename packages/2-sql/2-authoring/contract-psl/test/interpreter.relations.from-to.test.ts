@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  createTestSqlNamespace,
   modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,

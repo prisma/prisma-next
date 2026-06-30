@@ -31,6 +31,8 @@ import { type EnumTypeHandle, enumType } from '@prisma-next/sql-contract-ts/cont
 import { blindCast } from '@prisma-next/utils/casts';
 import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 
+export { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
+
 function testEnumFactory(
   block: PslExtensionBlock,
   ctx: AuthoringEntityContext,

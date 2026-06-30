@@ -396,7 +396,7 @@ model Post {
 model Post {
   id Int @id
   userId Int
-  user User @relation(fields: [userId, userId], references: [id])
+  user User @relation(from: [userId, userId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
