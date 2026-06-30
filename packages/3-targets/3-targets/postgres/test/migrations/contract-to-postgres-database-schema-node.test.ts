@@ -136,6 +136,50 @@ describe('contractToPostgresDatabaseSchemaNode', () => {
     expect(root.existingSchemas).toEqual([]);
   });
 
+  it('projects same-named tables in different schemas into their own namespace nodes', () => {
+    const thingTable = () =>
+      new StorageTable({
+        columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      });
+    const contract: PostgresContract = {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:same-name-cross-schema'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:same-name-cross-schema'),
+        namespaces: {
+          public: new PostgresSchema({
+            id: 'public',
+            entries: { table: { thing: thingTable() } },
+          }),
+          auth: new PostgresSchema({
+            id: 'auth',
+            entries: { table: { thing: thingTable() } },
+          }),
+        },
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+
+    const root = contractToPostgresDatabaseSchemaNode(contract, projectionOptions);
+
+    expect(Object.keys(root.namespaces).sort()).toEqual(['auth', 'public']);
+    expect(Object.keys(root.namespaces['public']!.tables)).toEqual(['thing']);
+    expect(Object.keys(root.namespaces['auth']!.tables)).toEqual(['thing']);
+    // The two same-named tables are distinct nodes in distinct namespaces.
+    expect(root.namespaces['public']!.tables['thing']).not.toBe(
+      root.namespaces['auth']!.tables['thing'],
+    );
+  });
+
   it('throws when a policy references a table absent from its namespace', () => {
     const orphan = new PostgresRlsPolicy({
       name: 'read_orphan_deadbeef',

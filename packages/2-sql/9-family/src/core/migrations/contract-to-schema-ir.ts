@@ -360,6 +360,54 @@ export interface ContractToSchemaIROptions {
  *
  * Returns an empty schema IR when `contract` is `null` (new project).
  */
+/**
+ * Converts the tables of a single namespace into a `SqlSchemaIR`, keyed by
+ * table name within that namespace. Unlike {@link contractToSchemaIR}, which
+ * flattens every namespace's tables into one bare-keyed record (and throws on a
+ * cross-namespace name collision), this scopes the table iteration to one
+ * namespace so the same table name can exist in two schemas.
+ *
+ * The full `storage` is still passed to `convertTable`, so value-set / enum /
+ * type resolution that legitimately spans namespaces is unaffected. Foreign
+ * keys are built purely from the FK descriptor (`fk.target`), so cross-namespace
+ * FKs survive per-namespace conversion. The `annotations` block (storage-type
+ * derived) is omitted here — the per-namespace tree consumer reads only the
+ * per-table fields.
+ */
+export function contractNamespaceToSchemaIR(
+  storage: SqlStorage,
+  namespaceId: string,
+  options: ContractToSchemaIROptions,
+): SqlSchemaIR {
+  if (options.annotationNamespace.length === 0) {
+    throw new Error('annotationNamespace must be a non-empty string');
+  }
+  const namespace = storage.namespaces[namespaceId];
+  if (!namespace) {
+    return { tables: {} };
+  }
+  const storageTypes: ResolvedStorageTypes = {
+    ...((storage.types ?? {}) as ResolvedStorageTypes),
+  };
+  const tables: Record<string, SqlTableIR> = {};
+  for (const [tableName, tableDefRaw] of Object.entries(namespace.entries.table ?? {})) {
+    if (!isStorageTable(tableDefRaw)) {
+      throw new Error(
+        `contractNamespaceToSchemaIR: expected StorageTable at namespaces.${namespaceId}.entries.table.${tableName}`,
+      );
+    }
+    tables[tableName] = convertTable(
+      tableName,
+      tableDefRaw,
+      storageTypes,
+      options.expandNativeType,
+      options.renderDefault,
+      storage,
+    );
+  }
+  return { tables };
+}
+
 export function contractToSchemaIR(
   contract: Contract<SqlStorage> | null,
   options: ContractToSchemaIROptions,

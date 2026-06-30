@@ -1,5 +1,5 @@
 import type { ContractToSchemaIROptions } from '@prisma-next/family-sql/control';
-import { contractToSchemaIR } from '@prisma-next/family-sql/control';
+import { contractNamespaceToSchemaIR } from '@prisma-next/family-sql/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresContract } from '../postgres-schema';
@@ -51,8 +51,6 @@ export function contractToPostgresDatabaseSchemaNode(
     });
   }
 
-  const sqlIr = contractToSchemaIR(contract, options);
-
   const namespaces: Record<string, PostgresNamespaceSchemaNode> = {};
   const roles: PostgresRoleSchemaNode[] = [];
   const ownedSchemas: string[] = [];
@@ -61,6 +59,11 @@ export function contractToPostgresDatabaseSchemaNode(
     if (!isPostgresSchema(ns)) continue;
     const ddlSchema = resolveDdlSchemaForNamespaceStorage(contract.storage, ns.id);
     ownedSchemas.push(ddlSchema);
+
+    // Convert only THIS namespace's tables (passing the full storage for
+    // type/value-set/enum resolution that spans namespaces), so the same table
+    // name can exist in two schemas without colliding in a bare-keyed record.
+    const sqlTables = contractNamespaceToSchemaIR(contract.storage, ns.id, options).tables;
 
     const policiesByTable = new Map<string, PostgresPolicySchemaNode[]>();
     for (const policy of Object.values(ns.policy)) {
@@ -71,7 +74,7 @@ export function contractToPostgresDatabaseSchemaNode(
 
     const tables: Record<string, PostgresTableSchemaNode> = {};
     for (const tableName of Object.keys(ns.table)) {
-      const sqlTable = sqlIr.tables[tableName];
+      const sqlTable = sqlTables[tableName];
       if (sqlTable === undefined) continue;
       tables[tableName] = new PostgresTableSchemaNode({
         name: sqlTable.name,
