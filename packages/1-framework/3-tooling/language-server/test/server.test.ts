@@ -2,6 +2,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { pathToFileURL } from 'node:url';
+import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
 import { buildSymbolTable, type SymbolTable } from '@prisma-next/psl-parser';
 import type { FormatOptions } from '@prisma-next/psl-parser/format';
 import { type ParseDiagnostic, parse } from '@prisma-next/psl-parser/syntax';
@@ -9,6 +10,9 @@ import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   type ClientCapabilities,
+  type CompletionItem,
+  type CompletionList,
+  CompletionRequest,
   createConnection,
   type Diagnostic,
   DiagnosticSeverity,
@@ -21,8 +25,10 @@ import {
   InitializedNotification,
   InitializeRequest,
   type InitializeResult,
+  InsertTextFormat,
   LogMessageNotification,
   MessageType,
+  type Position,
   PublishDiagnosticsNotification,
   type Range,
   type RegistrationParams,
@@ -74,16 +80,32 @@ const unformattedPsl = 'model User {\nid Int\n}';
 const formattedPsl = 'model User {\n  id Int\n}\n';
 
 const scalarTypes = ['String', 'Int', 'Boolean', 'DateTime'] as const;
+const nameSnippetPlaceholder = '$' + '{1:Name}';
+
+const pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace = {
+  policy: {
+    kind: 'pslBlock',
+    keyword: 'policy',
+    discriminator: 'fixture-policy',
+    name: { required: true },
+    parameters: {
+      on: { kind: 'ref', refKind: 'model', scope: 'same-space' },
+      where: { kind: 'value', codecId: 'fixture/text@1' },
+      mode: { kind: 'option', values: ['permissive', 'restrictive'] },
+    },
+  },
+};
 
 function resolutionForInputs(
   inputs: readonly string[],
   formatter?: FormatOptions,
+  descriptors: AuthoringPslBlockDescriptorNamespace = {},
 ): ConfigResolutionWithFormatter {
   const resolution = {
     inputs: resolveSchemaInputs({
       contract: { source: { sourceFormat: 'psl', inputs } },
     }),
-    controlStack: { scalarTypes: [...scalarTypes], pslBlockDescriptors: {} },
+    controlStack: { scalarTypes: [...scalarTypes], pslBlockDescriptors: descriptors },
   };
   return formatter === undefined ? resolution : { ...resolution, formatter };
 }
@@ -96,6 +118,8 @@ function emptyResolution(): ConfigResolution {
 }
 
 const resolveToSchema: ResolveInputs = async () => resolutionForInputs([schemaPath]);
+const resolveToSchemaWithPslBlockDescriptors: ResolveInputs = async () =>
+  resolutionForInputs([schemaPath], undefined, pslBlockDescriptors);
 
 function resolveToSchemaWithFormatter(formatter: FormatOptions): ResolveInputs {
   return async () => resolutionForInputs([schemaPath], formatter);
@@ -129,6 +153,10 @@ function parseAndSymbolTableDiagnostics(source: string): {
 
 const watchedFilesCapabilities: ClientCapabilities = {
   workspace: { didChangeWatchedFiles: { dynamicRegistration: true } },
+};
+
+const snippetCompletionCapabilities: ClientCapabilities = {
+  textDocument: { completion: { completionItem: { snippetSupport: true } } },
 };
 
 interface Harness {
@@ -388,6 +416,43 @@ function semanticTokenChunks(tokens: SemanticTokens | null): readonly (readonly 
   return chunks;
 }
 
+function requestCompletion(
+  harness: Harness,
+  uri: string,
+  position: Position,
+): Promise<CompletionItem[] | CompletionList | null> {
+  return harness.client.sendRequest(CompletionRequest.type, {
+    textDocument: { uri },
+    position,
+  });
+}
+
+function completionItems(
+  result: CompletionItem[] | CompletionList | null,
+): readonly CompletionItem[] {
+  if (result === null) {
+    return [];
+  }
+  return Array.isArray(result) ? result : result.items;
+}
+
+function sourceWithCursor(markedSource: string): {
+  readonly source: string;
+  readonly position: Position;
+} {
+  const cursorOffset = markedSource.indexOf('|');
+  if (cursorOffset < 0) {
+    throw new Error('Missing cursor marker');
+  }
+  const prefix = markedSource.slice(0, cursorOffset);
+  const source = `${prefix}${markedSource.slice(cursorOffset + 1)}`;
+  const lines = prefix.split('\n');
+  return {
+    source,
+    position: { line: lines.length - 1, character: (lines[lines.length - 1] ?? '').length },
+  };
+}
+
 function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
   let resolvePromise: (value: T) => void = () => undefined;
   const promise = new Promise<T>((resolve) => {
@@ -409,7 +474,7 @@ afterEach(async () => {
 });
 
 describe('language server', { timeout: timeouts.databaseOperation }, () => {
-  it('answers initialize and advertises text-document features', async () => {
+  it('answers initialize and advertises text-document features plus completion support', async () => {
     harness = startHarness(resolveToSchema);
     const result = await harness.initialize();
     expect(result.capabilities.textDocumentSync).toBeDefined();
@@ -420,6 +485,171 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
       full: true,
       range: true,
     });
+    expect(result.capabilities.completionProvider).toEqual({ triggerCharacters: ['.'] });
+  });
+
+  it('returns model field type completions for configured PSL inputs', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor(
+      [
+        'model User {',
+        '  id Int @id',
+        '}',
+        '',
+        'type Address {',
+        '  street String',
+        '}',
+        '',
+        'model Post {',
+        '  id Int @id',
+        '  author |',
+        '}',
+      ].join('\n'),
+    );
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items.map((item) => item.label)).toEqual([
+      'Boolean',
+      'DateTime',
+      'Int',
+      'String',
+      'Post',
+      'User',
+      'Address',
+    ]);
+  });
+
+  it('refreshes completion artifacts from the current buffer before classifying', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const initial = ['model Post {', '  author |', '}'].join('\n');
+    const updated = sourceWithCursor(
+      ['model User {', '  id Int @id', '}', '', 'model Post {', '  author U|', '}'].join('\n'),
+    );
+    openDocument(harness, schemaUri, initial);
+    await harness.waitForDiagnostics(schemaUri);
+    await harness.waitForDiagnosticsCount(schemaUri, 2);
+
+    const republished = harness.waitForDiagnosticsCount(schemaUri, 3);
+    harness.client.sendNotification(DidChangeTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri, version: 2 },
+      contentChanges: [{ text: updated.source }],
+    });
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, updated.position));
+    expect(items.map((item) => item.label)).toEqual([
+      'Boolean',
+      'DateTime',
+      'Int',
+      'String',
+      'Post',
+      'User',
+    ]);
+    await republished;
+  });
+
+  it('returns generic block parameter completions for configured PSL descriptors', async () => {
+    harness = startHarness(resolveToSchemaWithPslBlockDescriptors);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor(['policy UserAccess {', '  wh|', '}'].join('\n'));
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items.map((item) => item.label)).toEqual(['on', 'where', 'mode']);
+  });
+
+  it('returns declaration keyword completions with plain-text edits by default', async () => {
+    harness = startHarness(resolveToSchemaWithPslBlockDescriptors);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor('|');
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items.map((item) => item.label)).toEqual([
+      'model',
+      'type',
+      'types',
+      'namespace',
+      'policy',
+    ]);
+    expect(items.find((item) => item.label === 'model')).toMatchObject({
+      textEdit: { newText: 'model ' },
+    });
+    expect(items.find((item) => item.label === 'model')?.insertTextFormat).toBeUndefined();
+  });
+
+  it('returns declaration keyword snippets when the client supports snippets', async () => {
+    harness = startHarness(resolveToSchemaWithPslBlockDescriptors, snippetCompletionCapabilities);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor('|');
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items.find((item) => item.label === 'model')).toMatchObject({
+      insertTextFormat: InsertTextFormat.Snippet,
+      textEdit: { newText: `model ${nameSnippetPlaceholder} {\n  $0\n}` },
+    });
+    expect(items.find((item) => item.label === 'policy')).toMatchObject({
+      insertTextFormat: InsertTextFormat.Snippet,
+      textEdit: { newText: `policy ${nameSnippetPlaceholder} {\n  $0\n}` },
+    });
+  });
+
+  it('returns namespace-body declaration keywords without document-only keywords', async () => {
+    harness = startHarness(resolveToSchemaWithPslBlockDescriptors);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor(['namespace feature {', '  |', '}'].join('\n'));
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items.map((item) => item.label)).toEqual(['model', 'type', 'policy']);
+    expect(items.map((item) => item.label)).not.toContain('types');
+    expect(items.map((item) => item.label)).not.toContain('namespace');
+  });
+
+  it('returns no completion items for unconfigured PSL documents', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const otherUri = pathToFileURL(join(root, 'not-a-schema.psl')).toString();
+    const { source, position } = sourceWithCursor(
+      ['model User {', '  id Int @id', '}', '', 'model Post {', '  author |', '}'].join('\n'),
+    );
+    openDocument(harness, otherUri, source);
+    expect(await harness.waitForDiagnostics(otherUri)).toEqual([]);
+
+    const items = completionItems(await requestCompletion(harness, otherUri, position));
+    expect(items).toEqual([]);
+  });
+
+  it('returns no completion items for ordinary field attribute contexts', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor(['model User {', '  id Int @|', '}'].join('\n'));
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items).toEqual([]);
+  });
+
+  it('returns no completion items for ordinary model attribute contexts', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor(
+      ['model User {', '  id Int @id', '  @@|', '}'].join('\n'),
+    );
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items).toEqual([]);
   });
 
   it('publishes parser diagnostics for an opened configured PSL input', async () => {

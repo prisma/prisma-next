@@ -28,6 +28,7 @@ import {
 import { IdentifierAst } from '../../src/syntax/ast/identifier';
 import { QualifiedNameAst } from '../../src/syntax/ast/qualified-name';
 import { TypeAnnotationAst } from '../../src/syntax/ast/type-annotation';
+import { any } from '../../src/syntax/ast-helpers';
 import { GreenNodeBuilder } from '../../src/syntax/green-builder';
 import { createSyntaxTree, type SyntaxNode } from '../../src/syntax/red';
 import type { SyntaxKind } from '../../src/syntax/syntax-kind';
@@ -59,6 +60,39 @@ describe('IdentifierAst', () => {
     const green = b.finishNode();
     const root = createSyntaxTree(green);
     expect(IdentifierAst.cast(root)).toBeUndefined();
+  });
+});
+
+describe('any', () => {
+  it('returns the result of the first matching cast', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('ModelDeclaration');
+    const model = createSyntaxTree(b.finishNode());
+    const first = (node: SyntaxNode) => node.kind;
+    const second = (node: SyntaxNode) => node.offset;
+    expect(any(first, second)(model)).toBe('ModelDeclaration');
+  });
+
+  it('classifies different node kinds through the combined predicate', () => {
+    const classify = any(ModelDeclarationAst.cast, FieldDeclarationAst.cast);
+
+    const modelBuilder = new GreenNodeBuilder();
+    modelBuilder.startNode('ModelDeclaration');
+    const model = createSyntaxTree(modelBuilder.finishNode());
+
+    const fieldBuilder = new GreenNodeBuilder();
+    fieldBuilder.startNode('FieldDeclaration');
+    const field = createSyntaxTree(fieldBuilder.finishNode());
+
+    expect(classify(model)).toBeInstanceOf(ModelDeclarationAst);
+    expect(classify(field)).toBeInstanceOf(FieldDeclarationAst);
+  });
+
+  it('returns undefined when no cast matches', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('Document');
+    const document = createSyntaxTree(b.finishNode());
+    expect(any(ModelDeclarationAst.cast, FieldDeclarationAst.cast)(document)).toBeUndefined();
   });
 });
 
@@ -1178,6 +1212,53 @@ describe('QualifiedNameAst', () => {
     expect(qn.namespace()?.token()?.text).toBe('auth');
     expect(qn.identifier()?.token()?.text).toBe('User');
     expect(qn.path()).toEqual(['supabase', 'auth', 'User']);
+  });
+
+  it('reads a colon-prefixed space:name without a namespace', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'supabase');
+    b.token('Colon', ':');
+    ident(b, 'User');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.space()?.token()?.text).toBe('supabase');
+    expect(qn.namespace()).toBeUndefined();
+    expect(qn.identifier()?.token()?.text).toBe('User');
+  });
+
+  it('reads a trailing dot as a namespace with no name', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'auth');
+    b.token('Dot', '.');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.space()).toBeUndefined();
+    expect(qn.namespace()?.token()?.text).toBe('auth');
+    expect(qn.identifier()).toBeUndefined();
+  });
+
+  it('reads a trailing dot after a space as namespace with no name', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'supabase');
+    b.token('Colon', ':');
+    ident(b, 'auth');
+    b.token('Dot', '.');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.space()?.token()?.text).toBe('supabase');
+    expect(qn.namespace()?.token()?.text).toBe('auth');
+    expect(qn.identifier()).toBeUndefined();
+  });
+
+  it('reads a trailing colon as a space with no name', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'supabase');
+    b.token('Colon', ':');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.space()?.token()?.text).toBe('supabase');
+    expect(qn.namespace()).toBeUndefined();
+    expect(qn.identifier()).toBeUndefined();
   });
 
   it('flags a second dot or colon as over-qualified', () => {
