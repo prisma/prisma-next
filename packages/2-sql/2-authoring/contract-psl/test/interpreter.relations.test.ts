@@ -345,10 +345,8 @@ model Post {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining(
-            'Relation field "Post.user" references unknown field "Post.missingUserId"',
-          ),
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: expect.stringContaining('Field "missingUserId" does not exist on model "Post"'),
         }),
       ]),
     );
@@ -381,10 +379,8 @@ model Post {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining(
-            'Relation field "Post.user" references unknown field "User.missingId"',
-          ),
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: expect.stringContaining('Field "missingId" does not exist on model "User"'),
         }),
       ]),
     );

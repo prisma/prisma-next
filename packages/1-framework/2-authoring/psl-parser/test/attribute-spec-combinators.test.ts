@@ -124,19 +124,41 @@ describe('enumOf', () => {
 });
 
 describe('fieldRef', () => {
-  it('returns the bare identifier name', () => {
-    const { expr, ctx } = argOf('title');
+  it('resolves a field that exists on the self model', () => {
+    const { expr, ctx } = argOf('id');
 
     const result = fieldRef('self').parse(expr, ctx);
 
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toBe('title');
+    if (result.ok) expect(result.value).toBe('id');
   });
 
-  it('returns the name without emitting an existence diagnostic for an unknown field', () => {
+  it('emits an existence diagnostic for a field missing from the self model', () => {
     const { expr, ctx } = argOf('ghostField');
 
     const result = fieldRef('self').parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('resolves a field against the referenced model when it is in scope', () => {
+    const { expr, ctx } = argOf('id');
+    const referencedCtx: InterpretCtx = { ...ctx, resolveReferencedModel: () => ctx.selfModel };
+
+    const result = fieldRef('referenced').parse(expr, referencedCtx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe('id');
+  });
+
+  it('carries a referenced name through when the referenced model is out of scope', () => {
+    const { expr, ctx } = argOf('ghostField');
+
+    const result = fieldRef('referenced').parse(expr, ctx);
 
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toBe('ghostField');
