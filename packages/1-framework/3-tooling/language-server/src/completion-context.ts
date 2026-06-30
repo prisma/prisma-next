@@ -7,14 +7,12 @@ import {
   FieldAttributeAst,
   FieldDeclarationAst,
   GenericBlockDeclarationAst,
-  isTrivia,
   KeyValuePairAst,
   ModelAttributeAst,
   ModelDeclarationAst,
   NamespaceDeclarationAst,
   nonTriviaSibling,
   type Position,
-  previousNonTriviaToken,
   type QualifiedNameAst,
   type SourceFile,
   type SyntaxNode,
@@ -104,9 +102,9 @@ export function classifyPslCompletionContext(
     return UNSUPPORTED;
   }
 
-  // Anchor on the token left of the cursor and navigate outward via
-  // `token.parent` rather than scanning the whole tree.
-  const contextNode = at.leftBiased()?.parent;
+  // Anchor on the significant token that gives the cursor its context and
+  // navigate outward via `token.parent` rather than scanning the whole tree.
+  const contextNode = contextToken(at, offset)?.parent;
 
   // The edit replaces the identifier under the cursor, or is empty when the
   // cursor sits in trivia.
@@ -122,7 +120,6 @@ export function classifyPslCompletionContext(
   }
 
   const genericBlockContext = classifyGenericBlockParameter({
-    node: contextNode,
     offset,
     at,
     replacementStartOffset,
@@ -131,7 +128,7 @@ export function classifyPslCompletionContext(
     return genericBlockContext;
   }
 
-  const field = fieldForTypeSlot(contextNode, at);
+  const field = fieldForTypeSlot(contextNode);
   if (field === undefined) {
     return UNSUPPORTED;
   }
@@ -150,26 +147,14 @@ export function classifyPslCompletionContext(
 }
 
 /**
- * Locates the field whose type position the cursor occupies. A present type or
- * attribute keeps the cursor anchored inside the field, so the node ancestry
- * resolves it directly. A typeless field emits no `TypeAnnotation`, so its
- * trailing trivia belongs to the enclosing block instead; there the field is
- * the owner of the nearest significant token to the left.
+ * Locates the field whose type position the cursor occupies. The context token
+ * climbs to the field whether the cursor sits inside a present type (the type
+ * identifier's predecessor still belongs to the field) or in the empty type slot
+ * of a typeless field (whose trailing trivia lives in the enclosing block, so
+ * the nearest significant token to the left is the field's own name).
  */
-function fieldForTypeSlot(
-  contextNode: SyntaxNode | undefined,
-  at: TokenAtOffset,
-): FieldDeclarationAst | undefined {
-  const direct = contextNode?.findAncestor(FieldDeclarationAst.cast);
-  if (direct !== undefined) {
-    return direct;
-  }
-  const left = at.leftBiased();
-  if (left === undefined) {
-    return undefined;
-  }
-  const significant = isTrivia(left) ? skipTriviaToken(left, 'prev') : left;
-  return significant?.parent.findAncestor(FieldDeclarationAst.cast);
+function fieldForTypeSlot(contextNode: SyntaxNode | undefined): FieldDeclarationAst | undefined {
+  return contextNode?.findAncestor(FieldDeclarationAst.cast);
 }
 
 /**
@@ -323,8 +308,8 @@ function canBeginDeclaration(
   if (keywordOnly) {
     return true;
   }
-  if (declaration instanceof NamespaceDeclarationAst) {
-    return inNamespaceBody;
+  if (declaration instanceof NamespaceDeclarationAst && inNamespaceBody) {
+    return true;
   }
   const rbrace = declaration.rbrace();
   return rbrace !== undefined && offset >= rbrace.endOffset;
@@ -344,17 +329,20 @@ function blockBodyContainsOffset(block: BracedBlock | undefined, offset: number)
 }
 
 function classifyGenericBlockParameter(input: {
-  readonly node: SyntaxNode | undefined;
   readonly offset: number;
   readonly at: TokenAtOffset;
   readonly replacementStartOffset: number;
 }): PslCompletionContext | undefined {
-  const block = input.node?.findAncestor(GenericBlockDeclarationAst.cast);
+  // Whether the cursor sits in a key, value, or attribute slot is a structural
+  // question, so it anchors on the cursor's own node — including any in-progress
+  // identifier — rather than the edit-skipped `contextToken` used for gaps.
+  const node = input.at.leftBiased()?.parent;
+  const block = node?.findAncestor(GenericBlockDeclarationAst.cast);
   if (block === undefined) {
     return undefined;
   }
 
-  if (hasUnsupportedAncestor(input.node)) {
+  if (hasUnsupportedAncestor(node)) {
     return UNSUPPORTED;
   }
 
@@ -362,7 +350,7 @@ function classifyGenericBlockParameter(input: {
     return UNSUPPORTED;
   }
 
-  const field = input.node?.findAncestor(FieldDeclarationAst.cast);
+  const field = node?.findAncestor(FieldDeclarationAst.cast);
   if (field?.syntax.isInside(input.offset)) {
     return UNSUPPORTED;
   }
@@ -374,7 +362,7 @@ function classifyGenericBlockParameter(input: {
 
   // Value position: the cursor follows a `=`. The position is now classified
   // distinctly from keys; populating value candidates is the provider's concern.
-  if (previousSignificantToken(input.at, input.offset)?.kind === 'Equals') {
+  if (contextToken(input.at, input.offset)?.kind === 'Equals') {
     return {
       kind: 'genericBlockValue',
       offset: input.offset,
@@ -383,7 +371,7 @@ function classifyGenericBlockParameter(input: {
     };
   }
 
-  const activePair = activeKeyValuePair(input.node, input.offset);
+  const activePair = activeKeyValuePair(node, input.offset);
   if (activePair !== undefined && isAfterEquals(activePair, input.offset)) {
     return UNSUPPORTED;
   }
@@ -442,13 +430,12 @@ function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
   );
 }
 
-/** The nearest non-trivia token ending at or before the cursor. */
-function previousSignificantToken(at: TokenAtOffset, offset: number): SyntaxToken | undefined {
-  const left = at.leftBiased();
-  if (left === undefined) {
-    return undefined;
-  }
-  return left.endOffset <= offset && !isTrivia(left) ? left : previousNonTriviaToken(left);
+/** The significant token preceding the cursor — the in-progress edit identifier
+ *  is skipped, so the result is the token that gives the cursor its context. */
+function contextToken(at: TokenAtOffset, offset: number): SyntaxToken | undefined {
+  const edit = cursorIdentifier(at, offset);
+  const start = edit !== undefined ? edit.prevToken : at.leftBiased();
+  return start === undefined ? undefined : skipTriviaToken(start, 'prev');
 }
 
 /** The identifier token the cursor is editing, if any. */
