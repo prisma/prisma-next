@@ -19,6 +19,8 @@ import { createPostgresMigrationRunner } from '../core/migrations/runner';
 import { PostgresContractSerializer } from '../core/postgres-contract-serializer';
 import type { PostgresContract } from '../core/postgres-schema';
 import { PostgresSchemaVerifier } from '../core/postgres-schema-verifier';
+import { inferPostgresPslContract } from '../core/psl-infer/infer-psl-contract';
+import { PostgresDatabaseSchemaNode } from '../core/schema-ir/postgres-database-schema-node';
 
 function buildNativeTypeExpander(
   frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>,
@@ -52,6 +54,10 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     ...postgresTargetDescriptorMeta,
     contractSerializer: new PostgresContractSerializer(),
     schemaVerifier: new PostgresSchemaVerifier(),
+    inferPslContract(schema) {
+      PostgresDatabaseSchemaNode.assert(schema);
+      return inferPostgresPslContract(PostgresDatabaseSchemaNode.ensure(schema));
+    },
     migrations: {
       createPlanner(adapter: SqlControlAdapter<'postgres'>) {
         return createPostgresMigrationPlanner(adapter);

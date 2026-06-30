@@ -2,7 +2,7 @@ import { flatPslModels } from '@prisma-next/framework-components/psl-ast';
 import { printPsl } from '@prisma-next/psl-printer';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { sqlSchemaIrToPslAst } from '../../src/core/psl-contract-infer/sql-schema-ir-to-psl-ast';
+import { inferPslAstFromFlat as sqlSchemaIrToPslAst } from './fixtures';
 
 function ir(partial: Partial<SqlSchemaIR> & Pick<SqlSchemaIR, 'tables'>): SqlSchemaIR {
   return {
@@ -10,7 +10,7 @@ function ir(partial: Partial<SqlSchemaIR> & Pick<SqlSchemaIR, 'tables'>): SqlSch
   };
 }
 
-describe('sqlSchemaIrToPslAst', () => {
+describe('inferPostgresPslContract', () => {
   it('produces a model for a single table with PK and unique', () => {
     const schemaIR = ir({
       tables: {

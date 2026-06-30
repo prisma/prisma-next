@@ -54,7 +54,6 @@ import type {
   SqlControlExtensionDescriptor,
 } from './migrations/types';
 import { sqlOperationsToPreview } from './operation-preview';
-import { sqlSchemaIrToPslAst } from './psl-contract-infer/sql-schema-ir-to-psl-ast';
 import { namespaceSchemaNodes, verifySqlSchemaTree } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds } from './verify';
 
@@ -535,6 +534,13 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       };
     }
   ).contractSerializer;
+  // Database→PSL inference is target logic (it owns the dialect type/default
+  // maps and walks its own schema tree), so it is read off the descriptor like
+  // `contractSerializer`. Absent for targets without `contract infer` (Mongo).
+  const targetInferPslContract = blindCast<
+    { readonly inferPslContract?: (schema: SqlSchemaIRNode) => PslDocumentAst },
+    'reading the optional target-descriptor inferPslContract hook'
+  >(target).inferPslContract;
   const deserializeWithTargetSerializer = (contractOrJson: unknown): Contract<SqlStorage> => {
     const serializer = targetSerializer ?? new SqlContractSerializer();
     const json =
@@ -911,7 +917,12 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
 
     inferPslContract(schemaIR: SqlSchemaIRNode): PslDocumentAst {
-      return sqlSchemaIrToPslAst(schemaIR);
+      if (!targetInferPslContract) {
+        throw new Error(
+          `Target "${target.targetId}" does not support contract infer (no inferPslContract on its descriptor).`,
+        );
+      }
+      return targetInferPslContract(schemaIR);
     },
 
     lowerAst(

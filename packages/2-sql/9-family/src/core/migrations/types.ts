@@ -21,6 +21,7 @@ import type {
   SchemaIssue,
   SchemaVerifier,
 } from '@prisma-next/framework-components/control';
+import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
 import type {
   SqlControlDriverInstance,
@@ -482,6 +483,16 @@ export interface SqlControlTargetDescriptor<
    * the base, the target-specific dispatch on the subclass.
    */
   readonly schemaVerifier: SchemaVerifier<TContract, SqlSchemaIR>;
+  /**
+   * Database→PSL inference: walks the target's introspected schema tree into a
+   * `PslDocumentAst` for `contract infer`. Target logic (it owns the dialect
+   * type/default maps), so it lives on the descriptor beside `contractSerializer`
+   * — not in the family. Optional: targets that do not support `contract infer`
+   * (Mongo) omit it, and the family instance throws when it is absent. The param
+   * is the family-base node so the interface stays target-agnostic; the impl
+   * narrows to its own tree root.
+   */
+  readonly inferPslContract?: (schema: SqlSchemaIRNode) => PslDocumentAst;
   createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }

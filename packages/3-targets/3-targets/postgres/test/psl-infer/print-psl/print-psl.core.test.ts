@@ -1,11 +1,6 @@
-import { printPsl } from '@prisma-next/psl-printer';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { sqlSchemaIrToPslAst } from '../../../src/core/psl-contract-infer/sql-schema-ir-to-psl-ast';
-
-function printPslFromSql(schemaIR: SqlSchemaIR): string {
-  return printPsl(sqlSchemaIrToPslAst(schemaIR));
-}
+import { printPslFromFlat as printPslFromSql } from '../fixtures';
 
 describe('printPsl', () => {
   it('empty schema', () => {

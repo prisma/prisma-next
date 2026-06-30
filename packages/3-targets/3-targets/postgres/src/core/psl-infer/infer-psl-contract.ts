@@ -1,5 +1,20 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
+  DefaultMappingOptions,
+  PslNativeTypeAttribute,
+  PslPrinterOptions,
+  PslTypeMap,
+  RelationField,
+} from '@prisma-next/family-sql/psl-infer';
+import {
+  inferRelations,
+  mapDefault,
+  parseRawDefault,
+  toFieldName,
+  toModelName,
+  toNamedTypeName,
+} from '@prisma-next/family-sql/psl-infer';
+import type {
   PslAttribute,
   PslAttributeArgument,
   PslDocumentAst,
@@ -17,19 +32,9 @@ import {
   UNSPECIFIED_PSL_NAMESPACE_ID,
 } from '@prisma-next/framework-components/psl-ast';
 import type { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
-import type { DefaultMappingOptions } from './default-mapping';
-import { mapDefault } from './default-mapping';
-import { toFieldName, toModelName, toNamedTypeName } from './name-transforms';
+import type { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { createPostgresDefaultMapping } from './postgres-default-mapping';
-import { createPostgresTypeMap, extractEnumInfo } from './postgres-type-map';
-import type {
-  PslNativeTypeAttribute,
-  PslPrinterOptions,
-  PslTypeMap,
-  RelationField,
-} from './printer-config';
-import { parseRawDefault } from './raw-default-parser';
-import { inferRelations } from './relation-inference';
+import { createPostgresTypeMap } from './postgres-type-map';
 
 const SYNTHETIC_SPAN: PslSpan = {
   start: { offset: 0, line: 1, column: 1 },
@@ -72,16 +77,28 @@ type TopLevelNameResult = {
 };
 
 /**
- * Converts a SQL schema IR into a PSL AST suitable for `printPsl`.
+ * Infers a PSL AST (for `printPsl`) from an introspected Postgres schema tree.
  *
- * This function owns all SQL-specific concerns: native type mapping (Postgres),
- * relation inference from foreign keys, enum extraction, and raw default parsing.
- * The output is a fully-formed `PslDocumentAst` with synthetic spans.
+ * Target-owned inference: it walks the `PostgresDatabaseSchemaNode` tree and
+ * owns the Postgres dialect knowledge — the native type map and default map.
+ * Relation inference, name transforms, generic default mapping, and raw-default
+ * parsing are shape-neutral utilities imported from the SQL family.
+ *
+ * This slice emits relational-only PSL, byte-identical to the prior flat
+ * inference: the tree's tables (across its namespaces — `contract infer`
+ * introspects a single live namespace) are gathered into the model set and
+ * emitted as one `UNSPECIFIED_PSL_NAMESPACE_ID` bucket. Top-level entities
+ * (policies/roles → PSL extension blocks) are a later slice.
  */
-export function sqlSchemaIrToPslAst(schemaIR: SqlSchemaIR): PslDocumentAst {
-  const enumInfo = extractEnumInfo(schemaIR.annotations);
-  if (enumInfo.typeNames.size > 0) {
-    const names = [...enumInfo.typeNames].join(', ');
+export function inferPostgresPslContract(tree: PostgresDatabaseSchemaNode): PslDocumentAst {
+  const namespaces = Object.values(tree.namespaces);
+
+  // Native Postgres enums (CREATE TYPE … AS ENUM) are not adoptable by
+  // `contract infer`; throw an actionable diagnostic naming the type(s). Enum
+  // names live on each namespace node's `nativeEnumTypeNames`.
+  const enumTypeNames = [...new Set(namespaces.flatMap((ns) => ns.nativeEnumTypeNames))];
+  if (enumTypeNames.length > 0) {
+    const names = enumTypeNames.join(', ');
     throw new Error(
       `contract infer: the database contains native Postgres enum type(s): ${names}. ` +
         'Native Postgres enums (CREATE TYPE … AS ENUM) are not adoptable by contract infer. ' +
@@ -90,6 +107,19 @@ export function sqlSchemaIrToPslAst(schemaIR: SqlSchemaIR): PslDocumentAst {
         'surface generates the required check automatically.',
     );
   }
+
+  // Gather the tree's tables into the flat `{ tables }` the relational document
+  // builder walks. This replaces the old flat `.tables` iteration; it does not
+  // reintroduce a stored flat schema — it is a read-only projection for PSL
+  // emission over a single introspected namespace.
+  const tables: Record<string, SqlTableIR> = {};
+  for (const namespace of namespaces) {
+    for (const [tableName, table] of Object.entries(namespace.tables)) {
+      tables[tableName] = table;
+    }
+  }
+  const schemaIR: SqlSchemaIR = { tables };
+
   const options: PslPrinterOptions = {
     typeMap: createPostgresTypeMap(new Set()),
     defaultMapping: createPostgresDefaultMapping(),

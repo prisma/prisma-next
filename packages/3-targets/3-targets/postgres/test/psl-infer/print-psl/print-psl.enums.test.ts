@@ -1,8 +1,8 @@
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { sqlSchemaIrToPslAst } from '../../../src/core/psl-contract-infer/sql-schema-ir-to-psl-ast';
+import { inferPslAstFromFlat as sqlSchemaIrToPslAst } from '../fixtures';
 
-describe('sqlSchemaIrToPslAst — native enum diagnostic', () => {
+describe('inferPostgresPslContract — native enum diagnostic', () => {
   it('throws when the schema contains a nativeEnumTypeNames annotation', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {
