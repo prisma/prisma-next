@@ -311,7 +311,7 @@ model Post {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_UNSUPPORTED_REFERENTIAL_ACTION',
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
           sourceId: 'schema.prisma',
         }),
       ]),
@@ -345,10 +345,8 @@ model Post {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining(
-            'Relation field "Post.user" references unknown field "Post.missingUserId"',
-          ),
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: expect.stringContaining('Field "missingUserId" does not exist on model "Post"'),
         }),
       ]),
     );
@@ -381,10 +379,42 @@ model Post {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining(
-            'Relation field "Post.user" references unknown field "User.missingId"',
-          ),
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: expect.stringContaining('Field "missingId" does not exist on model "User"'),
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics when relation fields repeats a column name', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model User {
+  id Int @id
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [userId, userId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: expect.stringContaining('Duplicate'),
         }),
       ]),
     );
