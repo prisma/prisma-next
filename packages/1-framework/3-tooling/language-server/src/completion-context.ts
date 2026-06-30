@@ -105,14 +105,14 @@ export function classifyPslCompletionContext(
   // cursor sits in trivia.
   const edit = cursorIdentifier(at, offset);
 
-  // Anchor on the significant token that gives the cursor its context and
-  // navigate outward via `token.parent` rather than scanning the whole tree.
-  const context = contextToken(at, edit);
-  const contextNode = context?.parent;
+  // Anchor on the significant token preceding the cursor and navigate outward
+  // via `token.parent` rather than scanning the whole tree.
+  const preceding = precedingToken(at, edit);
+  const precedingNode = preceding?.parent;
   const replacementStartOffset = edit?.offset ?? offset;
 
   const declarationKeywordContext = classifyDeclarationKeyword({
-    node: contextNode,
+    node: precedingNode,
     offset,
     replacementStartOffset,
   });
@@ -123,14 +123,14 @@ export function classifyPslCompletionContext(
   const genericBlockContext = classifyGenericBlockParameter({
     offset,
     at,
-    contextToken: context,
+    precedingToken: preceding,
     replacementStartOffset,
   });
   if (genericBlockContext !== undefined) {
     return genericBlockContext;
   }
 
-  const field = fieldForTypeSlot(contextNode);
+  const field = fieldForTypeSlot(precedingNode);
   if (field === undefined) {
     return UNSUPPORTED;
   }
@@ -145,26 +145,26 @@ export function classifyPslCompletionContext(
     field,
     offset,
     replacementStartOffset,
-    context,
+    precedingToken: preceding,
   });
 }
 
 /**
- * Locates the field whose type position the cursor occupies. The context token
+ * Locates the field whose type position the cursor occupies. The preceding token
  * climbs to the field whether the cursor sits inside a present type (the type
  * identifier's predecessor still belongs to the field) or in the empty type slot
  * of a typeless field (whose trailing trivia lives in the enclosing block, so
  * the nearest significant token to the left is the field's own name).
  */
-function fieldForTypeSlot(contextNode: SyntaxNode | undefined): FieldDeclarationAst | undefined {
-  return contextNode?.findAncestor(FieldDeclarationAst.cast);
+function fieldForTypeSlot(precedingNode: SyntaxNode | undefined): FieldDeclarationAst | undefined {
+  return precedingNode?.findAncestor(FieldDeclarationAst.cast);
 }
 
 function classifyModelFieldType(input: {
   readonly field: FieldDeclarationAst;
   readonly offset: number;
   readonly replacementStartOffset: number;
-  readonly context: SyntaxToken | undefined;
+  readonly precedingToken: SyntaxToken | undefined;
 }): PslCompletionContext {
   const fieldName = input.field.name();
   if (fieldName === undefined) {
@@ -181,7 +181,10 @@ function classifyModelFieldType(input: {
 
   const typeAnnotation = input.field.typeAnnotation();
   if (typeAnnotation === undefined) {
-    if (input.context !== undefined && fieldName.syntax.isInside(input.context.offset)) {
+    if (
+      input.precedingToken !== undefined &&
+      fieldName.syntax.isInside(input.precedingToken.offset)
+    ) {
       return {
         kind: 'modelType',
         offset: input.offset,
@@ -318,12 +321,12 @@ function blockBodyContainsOffset(block: BracedBlock | undefined, offset: number)
 function classifyGenericBlockParameter(input: {
   readonly offset: number;
   readonly at: TokenAtOffset;
-  readonly contextToken: SyntaxToken | undefined;
+  readonly precedingToken: SyntaxToken | undefined;
   readonly replacementStartOffset: number;
 }): PslCompletionContext | undefined {
   // Whether the cursor sits in a key, value, or attribute slot is a structural
   // question, so it anchors on the cursor's own node — including any in-progress
-  // identifier — rather than the edit-skipped `contextToken` used for gaps.
+  // identifier — rather than the edit-skipped `precedingToken` used for gaps.
   const node = input.at.leftBiased()?.parent;
   const block = node?.findAncestor(GenericBlockDeclarationAst.cast);
   if (block === undefined) {
@@ -350,7 +353,7 @@ function classifyGenericBlockParameter(input: {
 
   // Value position: the cursor follows a `=`. The position is now classified
   // distinctly from keys; populating value candidates is the provider's concern.
-  if (input.contextToken?.kind === 'Equals') {
+  if (input.precedingToken?.kind === 'Equals') {
     return {
       kind: 'genericBlockValue',
       offset: input.offset,
@@ -419,8 +422,8 @@ function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {
 }
 
 /** The significant token preceding the cursor — the in-progress edit identifier
- *  is skipped, so the result is the token that gives the cursor its context. */
-function contextToken(at: TokenAtOffset, edit: SyntaxToken | undefined): SyntaxToken | undefined {
+ *  is skipped, so the result is the token the classifier anchors on. */
+function precedingToken(at: TokenAtOffset, edit: SyntaxToken | undefined): SyntaxToken | undefined {
   const start = edit !== undefined ? edit.prevToken : at.leftBiased();
   return start === undefined ? undefined : skipTriviaToken(start, 'prev');
 }
