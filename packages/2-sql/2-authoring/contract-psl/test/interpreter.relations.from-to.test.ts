@@ -28,9 +28,9 @@ function interpret(schema: string) {
 type RelationModels = Record<string, { relations?: Record<string, unknown> }>;
 
 describe('interpretPslDocumentToSqlContract from/to relation vocabulary', () => {
-  describe('backward-compat equivalence', () => {
-    it('lowers legacy fields/references and canonical from/to to byte-identical contracts', () => {
-      const legacy = interpret(`model User {
+  describe('legacy fields/references rejection', () => {
+    it('rejects @relation(fields:, references:) with a guiding diagnostic', () => {
+      const result = interpret(`model User {
   id Int @id
   posts Post[]
 }
@@ -41,7 +41,21 @@ model Post {
   user User @relation(fields: [userId], references: [id])
 }
 `);
-      const canonical = interpret(`model User {
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_LEGACY_FIELDS_REFERENCES',
+            message: expect.stringContaining('use from:/to:'),
+          }),
+        ]),
+      );
+    });
+
+    it('rejects a lone legacy fields: argument', () => {
+      const result = interpret(`model User {
   id Int @id
   posts Post[]
 }
@@ -49,50 +63,35 @@ model Post {
 model Post {
   id Int @id
   userId Int
-  user User @relation(from: [userId], to: [id])
+  user User @relation(fields: [userId])
 }
 `);
 
-      expect(legacy.ok).toBe(true);
-      expect(canonical.ok).toBe(true);
-      if (!legacy.ok || !canonical.ok) return;
-      expect(canonical.value).toEqual(legacy.value);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'PSL_LEGACY_FIELDS_REFERENCES' })]),
+      );
     });
 
-    it('lowers a composite legacy relation and its from/to spelling to identical contracts', () => {
-      const legacy = interpret(`model Account {
-  tenantId Int
-  number Int
-  memberships Membership[]
-  @@id([tenantId, number])
+    it('rejects a lone legacy references: argument', () => {
+      const result = interpret(`model User {
+  id Int @id
+  posts Post[]
 }
 
-model Membership {
+model Post {
   id Int @id
-  accountTenantId Int
-  accountNumber Int
-  account Account @relation(fields: [accountTenantId, accountNumber], references: [tenantId, number])
-}
-`);
-      const canonical = interpret(`model Account {
-  tenantId Int
-  number Int
-  memberships Membership[]
-  @@id([tenantId, number])
-}
-
-model Membership {
-  id Int @id
-  accountTenantId Int
-  accountNumber Int
-  account Account @relation(from: [accountTenantId, accountNumber], to: [tenantId, number])
+  userId Int
+  user User @relation(references: [id])
 }
 `);
 
-      expect(legacy.ok).toBe(true);
-      expect(canonical.ok).toBe(true);
-      if (!legacy.ok || !canonical.ok) return;
-      expect(canonical.value).toEqual(legacy.value);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'PSL_LEGACY_FIELDS_REFERENCES' })]),
+      );
     });
   });
 
@@ -224,16 +223,14 @@ model Post {
       expect(bare.value).toEqual(bracketed.value);
     });
 
-    // A redundant `Model.` qualifier on `to:` (e.g. `to: Post.id`) is the
-    // spec's tolerated form, but the PSL expression grammar does not parse a
-    // member-access value: `parseIdentifierExpr` consumes only the head `Ident`
-    // and the trailing `.field` is dropped before the resolver sees the
-    // argument (no diagnostic). Accepting the qualifier therefore needs a
-    // grammar change in @prisma-next/psl-parser, which is out of this dispatch's
-    // scope. The resolver's qualifier-stripping is in place for when the
-    // grammar carries the dotted value; this test pins the present boundary so a
-    // future grammar slice has a regression anchor.
-    it('drops a member-access to: value at the grammar layer today (qualifier deferred)', () => {
+    // The PSL expression grammar does not carry a member-access argument value:
+    // `parseIdentifierExpr` consumes only the head identifier, so the trailing
+    // `.field` of `to: User.id` never reaches the resolver. The named-argument
+    // lookup then sees no plain `to:` value, treats `to:` as omitted, and infers
+    // the referenced columns from the target's `@id` — lowering identically to
+    // the bare unqualified spelling. This pins the present grammar boundary as a
+    // regression anchor for a future slice that carries the dotted value.
+    it('infers the target @id for a member-access to: value (qualifier dropped at the grammar layer)', () => {
       const qualified = interpret(`model User {
   id Int @id
   posts Post[]
@@ -245,18 +242,30 @@ model Post {
   user User @relation(from: userId, to: User.id)
 }
 `);
+      const inferred = interpret(`model User {
+  id Int @id
+  posts Post[]
+}
 
-      // `to: User.id` parses as `to: User`, which names no field on User, so
-      // resolution fails rather than tolerating the qualifier.
-      expect(qualified.ok).toBe(false);
-      if (qualified.ok) return;
-      expect(qualified.failure.diagnostics).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            message: expect.stringContaining('unknown field "User.User"'),
-          }),
-        ]),
-      );
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(from: userId)
+}
+`);
+
+      expect(qualified.ok).toBe(true);
+      expect(inferred.ok).toBe(true);
+      if (!qualified.ok || !inferred.ok) return;
+      expect(qualified.value).toEqual(inferred.value);
+
+      const models = modelsOf(qualified.value) as RelationModels;
+      expect(models['Post']?.relations).toMatchObject({
+        user: {
+          cardinality: 'N:1',
+          on: { localFields: ['userId'], targetFields: ['id'] },
+        },
+      });
     });
   });
 
@@ -271,28 +280,6 @@ model Post {
   id Int @id
   userId Int
   user User @relation(to: [id])
-}
-`);
-
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.failure.diagnostics).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ code: 'PSL_INVALID_RELATION_ATTRIBUTE' }),
-        ]),
-      );
-    });
-
-    it('rejects a legacy references: without a fields:', () => {
-      const result = interpret(`model User {
-  id Int @id
-  posts Post[]
-}
-
-model Post {
-  id Int @id
-  userId Int
-  user User @relation(references: [id])
 }
 `);
 
@@ -329,26 +316,25 @@ model Post {
   });
 
   describe('self-referential from/to', () => {
-    it('resolves a self-referential from/to relation like the legacy spelling', () => {
-      const canonical = interpret(`model Employee {
+    it('resolves a named self-referential from/to relation, inferring to: from @id', () => {
+      const result = interpret(`model Employee {
   id Int @id
   managerId Int?
   manager Employee? @relation("Manages", from: managerId)
   reports Employee[] @relation("Manages")
 }
 `);
-      const legacy = interpret(`model Employee {
-  id Int @id
-  managerId Int?
-  manager Employee? @relation("Manages", fields: [managerId], references: [id])
-  reports Employee[] @relation("Manages")
-}
-`);
 
-      expect(canonical.ok).toBe(true);
-      expect(legacy.ok).toBe(true);
-      if (!canonical.ok || !legacy.ok) return;
-      expect(canonical.value).toEqual(legacy.value);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const models = modelsOf(result.value) as RelationModels;
+      expect(models['Employee']?.relations).toMatchObject({
+        manager: {
+          cardinality: 'N:1',
+          on: { localFields: ['managerId'], targetFields: ['id'] },
+        },
+      });
     });
   });
 });

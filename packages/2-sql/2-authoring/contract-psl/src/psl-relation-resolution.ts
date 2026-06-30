@@ -35,10 +35,10 @@ export type ParsedRelationAttribute = {
   readonly fields?: readonly string[];
   readonly references?: readonly string[];
   /**
-   * Set when local FK fields are declared (`from:`/`fields:`) but the
-   * referenced key is omitted (`to:`/`references:` absent). The caller resolves
-   * the referenced columns from the target model's `@id`. `references` stays
-   * undefined in this case; the two never co-occur.
+   * Set when local FK fields are declared (`from:`) but the referenced key is
+   * omitted (`to:` absent). The caller resolves the referenced columns from the
+   * target model's `@id`. `references` stays undefined in this case; the two
+   * never co-occur.
    */
   readonly referencesInferred?: true;
   readonly constraintName?: string;
@@ -47,10 +47,9 @@ export type ParsedRelationAttribute = {
 };
 
 /**
- * Parses a single `@relation` directional argument value (`from:`/`to:` or
- * their legacy `fields:`/`references:` aliases). A single field may be bare
- * (`from: userId`) or bracketed (`from: [userId]`); composites must be
- * bracketed (`from: [a, b]`).
+ * Parses a single `@relation` directional argument value (`from:`/`to:`). A
+ * single field may be bare (`from: userId`) or bracketed (`from: [userId]`);
+ * composites must be bracketed (`from: [a, b]`).
  *
  * A redundant model qualifier on `to:` (`to: Post.id`) is stripped to its bare
  * column name so it lowers identically to the unqualified spelling. The PSL
@@ -170,12 +169,19 @@ export function parseRelationAttribute(input: {
     if (arg.kind === 'positional') {
       continue;
     }
+    if (arg.name === 'fields' || arg.name === 'references') {
+      input.diagnostics.push({
+        code: 'PSL_LEGACY_FIELDS_REFERENCES',
+        message: `Relation field "${input.modelName}.${input.fieldName}" uses @relation(fields:/references:), which is no longer supported — use from:/to: instead`,
+        sourceId: input.sourceId,
+        span: arg.span,
+      });
+      return undefined;
+    }
     if (
       arg.name !== 'name' &&
       arg.name !== 'from' &&
       arg.name !== 'to' &&
-      arg.name !== 'fields' &&
-      arg.name !== 'references' &&
       arg.name !== 'map' &&
       arg.name !== 'onDelete' &&
       arg.name !== 'onUpdate'
@@ -233,13 +239,9 @@ export function parseRelationAttribute(input: {
     return undefined;
   }
 
-  // `from:`/`to:` are the canonical local-fields/referenced-key arguments;
-  // legacy `fields:`/`references:` are accepted as input aliases that lower to
-  // the same result. The two spellings are never mixed on one relation.
-  const fromRaw =
-    getNamedArgument(input.attribute, 'from') ?? getNamedArgument(input.attribute, 'fields');
-  const toRaw =
-    getNamedArgument(input.attribute, 'to') ?? getNamedArgument(input.attribute, 'references');
+  // `from:`/`to:` are the only local-fields/referenced-key arguments.
+  const fromRaw = getNamedArgument(input.attribute, 'from');
+  const toRaw = getNamedArgument(input.attribute, 'to');
   if (!fromRaw && toRaw) {
     input.diagnostics.push({
       code: 'PSL_INVALID_RELATION_ATTRIBUTE',
@@ -624,7 +626,7 @@ export function applyBackrelationCandidates(input: {
       }
       input.diagnostics.push({
         code: 'PSL_ORPHANED_BACKRELATION_LIST',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
+        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(from: [...], to: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
         sourceId: input.sourceId,
         span: candidate.field.span,
       });
