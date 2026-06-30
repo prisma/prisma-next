@@ -11,7 +11,6 @@ import {
   ModelAttributeAst,
   ModelDeclarationAst,
   NamespaceDeclarationAst,
-  nonTriviaSibling,
   type Position,
   type QualifiedNameAst,
   type SourceFile,
@@ -146,6 +145,7 @@ export function classifyPslCompletionContext(
     field,
     offset,
     replacementStartOffset,
+    context,
   });
 }
 
@@ -160,24 +160,11 @@ function fieldForTypeSlot(contextNode: SyntaxNode | undefined): FieldDeclaration
   return contextNode?.findAncestor(FieldDeclarationAst.cast);
 }
 
-/**
- * The upper bound of a typeless field's empty type slot: the first attribute
- * when present, otherwise the next significant token after the field (the
- * following member or the block's closing brace), since a typeless field's
- * trailing trivia lives in the enclosing block.
- */
-function emptyTypeSlotEnd(field: FieldDeclarationAst): number {
-  for (const attribute of field.attributes()) {
-    return attribute.syntax.offset;
-  }
-  const nextSignificant = nonTriviaSibling(field.syntax, 'next');
-  return nextSignificant?.offset ?? field.syntax.endOffset;
-}
-
 function classifyModelFieldType(input: {
   readonly field: FieldDeclarationAst;
   readonly offset: number;
   readonly replacementStartOffset: number;
+  readonly context: SyntaxToken | undefined;
 }): PslCompletionContext {
   const fieldName = input.field.name();
   if (fieldName === undefined) {
@@ -188,16 +175,13 @@ function classifyModelFieldType(input: {
     return UNSUPPORTED;
   }
 
-  const fieldNameEnd = fieldName.syntax.endOffset;
-
   if (fieldName.syntax.isInside(input.offset)) {
     return UNSUPPORTED;
   }
 
   const typeAnnotation = input.field.typeAnnotation();
   if (typeAnnotation === undefined) {
-    const slotEnd = emptyTypeSlotEnd(input.field);
-    if (input.offset > fieldNameEnd && input.offset <= slotEnd) {
+    if (input.context !== undefined && fieldName.syntax.isInside(input.context.offset)) {
       return {
         kind: 'modelType',
         offset: input.offset,

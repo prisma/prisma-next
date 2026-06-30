@@ -123,6 +123,14 @@ describe('classifyPslCompletionContext', () => {
     expectUnsupported(['model Post {', '  author @id|', '}'].join('\n'));
   });
 
+  it('returns unsupported when the cursor sits inside a typeless field attribute', () => {
+    expectUnsupported(['model Post {', '  author @i|d', '}'].join('\n'));
+  });
+
+  it('does not treat the cursor glued to the field name as a type slot', () => {
+    expectUnsupported(['model Post {', '  author|', '}'].join('\n'));
+  });
+
   it('classifies a partial bare model field type prefix', () => {
     const context = classify(['model Post {', '  reviewer U|', '}'].join('\n'));
 
