@@ -262,7 +262,7 @@ model Post {
   id        ObjectId @id @map("_id")
   title     String
   authorId  ObjectId
-  author    User @relation(fields: [authorId], references: [id])
+  author    User @relation(from: [authorId], to: [id])
   @@map("posts")
 }
 `,

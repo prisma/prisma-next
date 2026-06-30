@@ -22,7 +22,7 @@ model Post {
   kind      String
   authorId  ObjectId
   createdAt DateTime
-  author    User     @relation(fields: [authorId], references: [id])
+  author    User     @relation(from: [authorId], to: [id])
 
   @@discriminator(kind)
   @@index([authorId])
