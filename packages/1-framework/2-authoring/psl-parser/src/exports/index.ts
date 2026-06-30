@@ -54,7 +54,7 @@ export type {
   InferAttr,
   InterpretCtx,
   NamedOut,
-  OptionalParam,
+  OptionalArgType,
   OutOf,
   Param,
   PositionalParam,

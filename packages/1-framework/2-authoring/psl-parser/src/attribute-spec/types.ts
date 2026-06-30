@@ -58,16 +58,20 @@ export interface InterpretCtx {
   readonly field?: FieldSymbol;
 }
 
-/** An optional parameter, optionally carrying a default applied when the argument is absent. */
-export interface OptionalParam<T> {
+/**
+ * An optional parameter: a flavoured `ArgType` carrying the optionality marker
+ * and, when `hasDefault`, the default value applied when the argument is absent.
+ * Because it extends `ArgType`, the engine parses it directly and detects
+ * optionality from the `optional` marker.
+ */
+export interface OptionalArgType<T> extends ArgType<T> {
   readonly optional: true;
-  readonly type: ArgType<T>;
   readonly hasDefault: boolean;
   readonly defaultValue?: T;
 }
 
-/** A parameter is a bare `ArgType` (required) or an `optional(...)` wrapper. */
-export type Param<T> = ArgType<T> | OptionalParam<T>;
+/** A parameter slot's arg type; an `optional(...)` param is a flavoured `ArgType`. */
+export type Param<T> = ArgType<T>;
 
 export interface PositionalParam<T = unknown> {
   /** The output key this slot writes into. */
@@ -89,17 +93,16 @@ export interface AttributeSpec<Out> {
   readonly diagnosticCode?: PslDiagnosticCode;
 }
 
-export type OutOf<P> =
-  P extends OptionalParam<infer T> ? T : P extends ArgType<infer T> ? T : never;
+export type OutOf<P> = P extends ArgType<infer T> ? T : never;
 
 export type NamedOut<N extends Record<string, Param<unknown>>> = Simplify<
-  { [K in keyof N as N[K] extends OptionalParam<unknown> ? never : K]: OutOf<N[K]> } & {
-    [K in keyof N as N[K] extends OptionalParam<unknown> ? K : never]?: OutOf<N[K]>;
+  { [K in keyof N as N[K] extends OptionalArgType<unknown> ? never : K]: OutOf<N[K]> } & {
+    [K in keyof N as N[K] extends OptionalArgType<unknown> ? K : never]?: OutOf<N[K]>;
   }
 >;
 
 type PosEntryObject<E extends PositionalParam> =
-  E['type'] extends OptionalParam<unknown>
+  E['type'] extends OptionalArgType<unknown>
     ? { [K in E['key']]?: OutOf<E['type']> }
     : { [K in E['key']]: OutOf<E['type']> };
 
