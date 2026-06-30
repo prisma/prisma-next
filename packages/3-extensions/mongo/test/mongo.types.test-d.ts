@@ -3,10 +3,12 @@ import type { ProfileHashBase, StorageHashBase } from '@prisma-next/contract/typ
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mongo-contract';
 import type { CreateInput, IncludedRow, MongoCollection, NoIncludes } from '@prisma-next/mongo-orm';
+import type { MongoExecutionContext } from '@prisma-next/mongo-runtime';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../../../2-mongo-family/1-foundation/mongo-contract/test/fixtures/orm-contract';
 import { defineContract, enumType, field, member, model } from '../src/exports/contract-builder';
 import type { MongoClient } from '../src/runtime/mongo';
+import type { MongoStaticContext } from '../src/static/mongo-static';
 
 type UserRow = IncludedRow<Contract, 'User', NoIncludes>;
 
@@ -208,4 +210,28 @@ test('R5: create() accepts an in-union literal, rejects an out-of-union literal'
     tags: [],
     moodTags: null,
   });
+});
+
+// db.context type tests
+
+declare const contextDb: MongoClient<Contract>;
+declare const staticCtx: MongoStaticContext<Contract>;
+
+test('MongoClient exposes context typed as MongoExecutionContext<TContract>', () => {
+  expectTypeOf<(typeof contextDb)['context']>().toMatchTypeOf<MongoExecutionContext<Contract>>();
+});
+
+test('db.context.contract is typed as TContract (not unknown)', () => {
+  expectTypeOf<(typeof contextDb)['context']['contract']>().toEqualTypeOf<Contract>();
+});
+
+// MongoStaticContext type tests
+
+test('MongoStaticContext carries the right members', () => {
+  expectTypeOf<(typeof staticCtx)['context']>().toMatchTypeOf<MongoExecutionContext<Contract>>();
+  expectTypeOf<(typeof staticCtx)['contract']>().toEqualTypeOf<Contract>();
+});
+
+test('MongoStaticContext.context.contract is TContract (not unknown)', () => {
+  expectTypeOf<(typeof staticCtx)['context']['contract']>().toEqualTypeOf<Contract>();
 });
