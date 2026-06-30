@@ -141,12 +141,23 @@ types.
    per-value `codecLookup.renderValueType(value, side)`, joined with `|`, falling back to the
    codec output type where it returns `undefined`. Delete `renderValueSetLiteral` /
    `renderValueSetUnionBase`.
-3. **Domain field, emit** — [domain-type-generation.ts](packages/1-framework/3-tooling/emitter/src/domain-type-generation.ts):
-   **delete** the enum override branch (lines 323-333) and `renderEnumValueUnion` /
-   `renderEnumMemberLiteral` / `DomainEnumLookup`. A field's type derives from its column via
-   the existing field→column mapping (`storage.fields.<field>.column`); `FieldOutputTypes`
-   resolves to the same value-set+codec computation the column uses. No field-level
-   domain-enum typing ref remains.
+3. **Domain field, emit (family-supplied resolver — the boundary-correct shape).** The
+   framework's [generate-contract-dts.ts](packages/1-framework/3-tooling/emitter/src/generate-contract-dts.ts)
+   is the **sole** generator of `export type FieldOutputTypes`, for **both** families (Mongo
+   has no own generation), and it **must not read storage** (the framework-holds-no-storage
+   boundary — the same invariant the native-enum work depends on). So the hardcoded
+   `DomainEnumLookup` + override branch in [domain-type-generation.ts](packages/1-framework/3-tooling/emitter/src/domain-type-generation.ts)
+   (lines 323-333, `renderEnumValueUnion` / `renderEnumMemberLiteral`) is **replaced** by a
+   **family-supplied** per-field permitted-values resolver — a new `EmissionSpi` hook
+   returning `{ encodedValues, codecId }`, mirroring the existing `resolveFieldTypeParams`
+   hook. The framework calls it and renders the union via `renderValueType`; no hook value →
+   the codec channel type. The framework reads no storage.
+   - **SQL** implements the hook as field → column → value-set (storage-side, where SQL may
+     legitimately read storage). The domain enum is no longer an SQL typing input.
+   - **Mongo** supplies an **interim** resolver reading `domain.enum` members — its only
+     permitted-values source until its value set lands ([TML-2953](https://linear.app/prisma-company/issue/TML-2953/mongo-store-enum-values-the-same-way-sql-does)).
+     This keeps Mongo's emitted types **byte-identical**; TML-2953 deletes the interim
+     resolver when the Mongo value set replaces it.
 4. **No-emit** — [contract-types.ts](packages/2-sql/2-authoring/contract-ts/src/contract-types.ts):
    **no change required.** `EnumValueUnion` already propagates the authored `Values` and is
    the model-correct reference behavior. Obligation: cross-check it still agrees with the
@@ -169,9 +180,12 @@ types.
   rendering a stored value directly. Every enum-restricted emit type goes through
   `renderValueType`. Grep guard: no caller renders `valueSet.values` / enum member values to
   TS literals outside the codec seam.
-- **A2 — Domain enum is not a typing input.** The enum override in `domain-type-generation.ts`
-  and `DomainEnumLookup` are deleted. No code reads `domain…enum` to produce a TS type.
-  `db.enums` runtime behavior unchanged.
+- **A2 — Domain enum is not a typing input (SQL now; repo-wide after TML-2953).** The
+  hardcoded override + `DomainEnumLookup` are gone; typing flows through the family-supplied
+  resolver + `renderValueType`. No **SQL** code reads `domain…enum` to produce a TS type.
+  Mongo's *interim* resolver still reads `domain.enum` members until [TML-2953](https://linear.app/prisma-company/issue/TML-2953/mongo-store-enum-values-the-same-way-sql-does)
+  replaces it — so the repo-wide form of this holds only after that lands. `db.enums` runtime
+  behavior unchanged.
 - **A3 — One model, three surfaces.** SQL column, SQL/ORM field, and (per spec, via TML-2953)
   Mongo document field all resolve their enum type from `(value set, codec)`. The SQL field
   derives from its column via `storage.fields`.
