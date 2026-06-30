@@ -193,6 +193,57 @@ describe('SyntaxNode.nextSibling / prevSibling', () => {
   });
 });
 
+describe('SyntaxElement.index', () => {
+  it('assigns 0 to the root and increasing indices along the sibling chain', () => {
+    const root = createSyntaxTree(buildSampleTree());
+    expect(root.index).toBe(0);
+
+    const model = firstNodeOfKind(root, 'ModelDeclaration');
+    const first = model.firstChild;
+    expect(first).toBeDefined();
+    expect(first?.index).toBe(0);
+
+    const indices: number[] = [];
+    for (let el = first; el !== undefined; el = el.nextSiblingOrToken) {
+      indices.push(el.index);
+    }
+    const expected = Array.from(model.children(), (_, i) => i);
+    expect(indices).toEqual(expected);
+  });
+
+  it('distinguishes a zero-width child from its offset-colliding neighbour', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('Document');
+    b.startNode('Identifier');
+    b.token('Ident', 'A');
+    b.finishNode();
+    b.startNode('TypeAnnotation'); // empty, zero-width at offset 1
+    b.finishNode();
+    b.startNode('Identifier');
+    b.token('Ident', 'B');
+    b.finishNode();
+    const root = createSyntaxTree(b.finishNode());
+
+    const children = Array.from(root.children());
+    const empty = children[1];
+    const second = children[2];
+    expect(empty).toBeInstanceOf(SyntaxNode);
+    expect(second).toBeInstanceOf(SyntaxNode);
+    // The zero-width node and its neighbour share a start offset...
+    expect(empty?.offset).toBe(1);
+    expect(second?.offset).toBe(1);
+    // ...but distinct indices let navigation step between them unambiguously.
+    expect(empty?.index).toBe(1);
+    expect(second?.index).toBe(2);
+    if (empty instanceof SyntaxNode && second instanceof SyntaxNode) {
+      expect(empty.nextSibling?.index).toBe(2);
+      expect(empty.nextSibling?.kind).toBe('Identifier');
+      expect(second.prevSibling?.index).toBe(1);
+      expect(second.prevSibling?.kind).toBe('TypeAnnotation');
+    }
+  });
+});
+
 describe('SyntaxNode.textLength', () => {
   it('returns total text length of the subtree', () => {
     const source = 'model User {\n  id Int @id\n}';
