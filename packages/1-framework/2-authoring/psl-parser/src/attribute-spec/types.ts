@@ -1,17 +1,9 @@
 import type { PslDiagnostic, PslDiagnosticCode } from '@prisma-next/framework-components/psl-ast';
 import type { Result } from '@prisma-next/utils/result';
+import type { Simplify, UnionToIntersection } from '@prisma-next/utils/types';
 import type { SourceFile } from '../source-file';
 import type { FieldSymbol, ModelSymbol, SymbolTable } from '../symbol-table';
 import type { ExpressionAst } from '../syntax/ast/expressions';
-
-/** Flattens an intersection of mapped types into a single readable object type. */
-type Simplify<T> = { [K in keyof T]: T[K] } & {};
-
-type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (
-  k: infer I,
-) => void
-  ? I
-  : never;
 
 export type AttributeLevel = 'field' | 'model' | 'block';
 
