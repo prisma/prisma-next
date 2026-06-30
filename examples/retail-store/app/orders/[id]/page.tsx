@@ -4,7 +4,7 @@ import { Badge } from '../../../src/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../src/components/ui/card';
 import { Separator } from '../../../src/components/ui/separator';
 import { getOrderWithUser } from '../../../src/data/orders';
-import { getDb } from '../../../src/db-singleton';
+import { getDb } from '../../../src/db';
 import { getAuthUserId } from '../../../src/lib/auth';
 import { OrderStatusButtons } from './order-status-buttons';
 

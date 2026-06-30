@@ -9,6 +9,7 @@ import {
   getUserOrders,
   updateOrderStatus,
 } from '../src/data/orders';
+import { enums } from '../src/enums';
 import { setupTestDb } from './setup';
 
 const ITEM_A = {
@@ -50,7 +51,7 @@ describe('API flow: order ownership (auth guard)', {
       userId: alice._id,
       items: [ITEM_A],
       shippingAddress: '123 Main St',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -83,7 +84,7 @@ describe('API flow: order ownership (auth guard)', {
       userId: alice._id,
       items: [ITEM_A],
       shippingAddress: '123 Main St',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -91,7 +92,7 @@ describe('API flow: order ownership (auth guard)', {
       userId: bob._id,
       items: [ITEM_B],
       shippingAddress: '456 Oak Ave',
-      type: 'bopis',
+      type: enums.OrderType.members.Pickup,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -115,7 +116,7 @@ describe('API flow: order ownership (auth guard)', {
       userId: alice._id,
       items: [ITEM_A],
       shippingAddress: '123 Main St',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -123,7 +124,7 @@ describe('API flow: order ownership (auth guard)', {
       userId: alice._id,
       items: [ITEM_B],
       shippingAddress: '456 Oak Ave',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -167,7 +168,7 @@ describe('API flow: checkout (cart → order → clear)', {
         image: { url: item.image.url },
       })),
       shippingAddress: '789 Elm Blvd',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -203,7 +204,7 @@ describe('API flow: checkout (cart → order → clear)', {
         image: { url: item.image.url },
       })),
       shippingAddress: '101 Pine',
-      type: 'bopis',
+      type: enums.OrderType.members.Pickup,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -232,7 +233,7 @@ describe('API flow: order status progression', {
       userId: user._id,
       items: [ITEM_A],
       shippingAddress: '200 Cedar',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date('2026-04-01T10:00:00Z') }],
     });
 
@@ -276,7 +277,7 @@ describe('API flow: order status progression', {
       userId: user._id,
       items: [ITEM_A],
       shippingAddress: '300 Maple',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 

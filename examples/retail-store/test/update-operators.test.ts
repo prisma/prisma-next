@@ -2,6 +2,7 @@ import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { addToCart, getCartByUserId, removeFromCart, upsertCart } from '../src/data/carts';
 import { createOrder, getOrderById, updateOrderStatus } from '../src/data/orders';
+import { enums } from '../src/enums';
 import { setupTestDb } from './setup';
 
 describe('array update operators', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
@@ -95,7 +96,7 @@ describe('array update operators', { timeout: timeouts.spinUpMongoMemoryServer }
         },
       ],
       shippingAddress: '123 St',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date('2026-03-01T10:00:00Z') }],
     });
 

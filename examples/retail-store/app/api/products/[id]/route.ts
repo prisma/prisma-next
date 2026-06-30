@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { findProductById } from '../../../../src/data/products';
-import { getDb } from '../../../../src/db-singleton';
+import { getDb } from '../../../../src/db';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
