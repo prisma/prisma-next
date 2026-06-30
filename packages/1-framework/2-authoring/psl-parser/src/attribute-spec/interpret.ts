@@ -12,11 +12,19 @@ import type { ArgType, AttributeSpec, InterpretCtx, OptionalArgType, Param } fro
 
 const DEFAULT_STRUCTURAL_CODE: PslDiagnosticCode = 'PSL_INVALID_ATTRIBUTE_SYNTAX';
 
+/** How an output key was bound, so a later collision is reported as the right kind. */
+type Origin = 'positional' | 'named';
+
 /**
- * Interprets an attribute node against its spec: binds positional arguments in
- * order and named arguments by key into one flat output keyspace, honours the
- * positional-or-named alias, rejects unknown named arguments, applies optional
- * defaults, then runs `refine`. Returns the spec-inferred output or diagnostics.
+ * Interprets an attribute node against its spec in a single pass over the source
+ * arguments. A positional argument binds to the next unconsumed positional
+ * slot's key; a named argument binds to its key. Both write into one flat output
+ * map guarded by one `seen` map: a key bound twice — whether positional-then-named
+ * (the alias) or a repeated named key — is reported inline and skipped. Unknown
+ * named keys and excess positional arguments are reported as they are
+ * encountered. After the pass, optional defaults fill absent keys, missing
+ * required keys are reported, then `refine` runs. Returns the spec-inferred
+ * output or the accumulated diagnostics.
  */
 export function interpretAttribute<Out>(
   attrNode: FieldAttributeAst | ModelAttributeAst,
@@ -28,100 +36,83 @@ export function interpretAttribute<Out>(
   const leafCtx: InterpretCtx = { ...ctx, diagnosticCode: code };
   const attributeSpan = nodePslSpan(attrNode.syntax, ctx.sourceFile);
 
-  const positionalArgs: AttributeArgAst[] = [];
-  const namedArgs: AttributeArgAst[] = [];
-  for (const arg of attrNode.argList()?.args() ?? []) {
-    if (arg.name() === undefined) positionalArgs.push(arg);
-    else namedArgs.push(arg);
-  }
+  const output: Record<string, unknown> = {};
+  const seen = new Map<string, Origin>();
+  let positionalSlot = 0;
+  let reportedExcess = false;
 
-  const namedSeen = new Set<string>();
-  const namedParsed = new Map<string, unknown>();
-  for (const arg of namedArgs) {
-    const key = arg.name()?.name();
-    if (key === undefined) continue;
-    const param = Object.hasOwn(spec.named, key) ? spec.named[key] : undefined;
+  for (const arg of attrNode.argList()?.args() ?? []) {
+    const name = arg.name()?.name();
+
+    if (name === undefined) {
+      const param = spec.positional[positionalSlot];
+      if (param === undefined) {
+        if (!reportedExcess) {
+          diagnostics.push(
+            diagnostic(
+              code,
+              `Attribute "${spec.name}" received too many positional arguments`,
+              ctx,
+              attributeSpan,
+            ),
+          );
+          reportedExcess = true;
+        }
+        continue;
+      }
+      positionalSlot += 1;
+      if (seen.has(param.key)) {
+        diagnostics.push(
+          duplicateDiagnostic(
+            param.key,
+            seen.get(param.key),
+            false,
+            spec.name,
+            ctx,
+            arg,
+            attributeSpan,
+            code,
+          ),
+        );
+        continue;
+      }
+      seen.set(param.key, 'positional');
+      const result = parseArgValue(arg, param.type, leafCtx, diagnostics, code);
+      if (result.ok) output[param.key] = result.value;
+      continue;
+    }
+
+    const param = Object.hasOwn(spec.named, name) ? spec.named[name] : undefined;
     if (param === undefined) {
       diagnostics.push(
         diagnostic(
           code,
-          `Attribute "${spec.name}" received unknown argument "${key}"`,
+          `Attribute "${spec.name}" received unknown argument "${name}"`,
           ctx,
           nodePslSpan(arg.syntax, ctx.sourceFile),
         ),
       );
       continue;
     }
-    if (namedSeen.has(key)) {
+    if (seen.has(name)) {
       diagnostics.push(
-        diagnostic(
-          code,
-          `Attribute "${spec.name}" received duplicate argument "${key}"`,
-          ctx,
-          nodePslSpan(arg.syntax, ctx.sourceFile),
-        ),
+        duplicateDiagnostic(name, seen.get(name), true, spec.name, ctx, arg, attributeSpan, code),
       );
       continue;
     }
-    namedSeen.add(key);
+    seen.set(name, 'named');
     const result = parseArgValue(arg, param, leafCtx, diagnostics, code);
-    if (result.ok) namedParsed.set(key, result.value);
+    if (result.ok) output[name] = result.value;
   }
 
-  const positionalSeen = new Set<string>();
-  const positionalParsed = new Map<string, unknown>();
-  let index = 0;
-  for (const param of spec.positional) {
-    const arg = positionalArgs[index];
-    if (arg === undefined) continue;
-    index += 1;
-    positionalSeen.add(param.key);
-    const result = parseArgValue(arg, param.type, leafCtx, diagnostics, code);
-    if (result.ok) positionalParsed.set(param.key, result.value);
-  }
-  if (index < positionalArgs.length) {
-    diagnostics.push(
-      diagnostic(
-        code,
-        `Attribute "${spec.name}" received too many positional arguments`,
-        ctx,
-        attributeSpan,
-      ),
-    );
-  }
-
-  const output: Record<string, unknown> = {};
-  const handled = new Set<string>();
-  const resolveKey = (
+  const finalized = new Set<string>();
+  const finalizeAbsentKey = (
     key: string,
     positionalParam: Param<unknown> | undefined,
     namedParam: Param<unknown> | undefined,
   ): void => {
-    if (handled.has(key)) return;
-    handled.add(key);
-    const fromPositional = positionalSeen.has(key);
-    const fromNamed = namedSeen.has(key);
-
-    if (fromPositional && fromNamed) {
-      diagnostics.push(
-        diagnostic(
-          code,
-          `Attribute "${spec.name}" received duplicate values for "${key}" both positionally and by name`,
-          ctx,
-          attributeSpan,
-        ),
-      );
-      return;
-    }
-    if (fromNamed) {
-      if (namedParsed.has(key)) output[key] = namedParsed.get(key);
-      return;
-    }
-    if (fromPositional) {
-      if (positionalParsed.has(key)) output[key] = positionalParsed.get(key);
-      return;
-    }
-
+    if (finalized.has(key) || seen.has(key)) return;
+    finalized.add(key);
     const effective = namedParam ?? positionalParam;
     if (effective === undefined) return;
     if (isOptionalArgType(effective)) {
@@ -140,10 +131,10 @@ export function interpretAttribute<Out>(
 
   for (const param of spec.positional) {
     const namedParam = Object.hasOwn(spec.named, param.key) ? spec.named[param.key] : undefined;
-    resolveKey(param.key, param.type, namedParam);
+    finalizeAbsentKey(param.key, param.type, namedParam);
   }
   for (const key of Object.keys(spec.named)) {
-    resolveKey(key, undefined, spec.named[key]);
+    finalizeAbsentKey(key, undefined, spec.named[key]);
   }
 
   if (diagnostics.length > 0) {
@@ -161,6 +152,38 @@ export function interpretAttribute<Out>(
     }
   }
   return ok(value);
+}
+
+/**
+ * Reports a key bound twice. A repeated named key is anchored to the offending
+ * argument; an alias collision between a positional and a named binding (in
+ * either order) is anchored to the whole attribute, keeping each error path's
+ * span no coarser than the previous engine.
+ */
+function duplicateDiagnostic(
+  key: string,
+  storedOrigin: Origin | undefined,
+  currentIsNamed: boolean,
+  attributeName: string,
+  ctx: InterpretCtx,
+  arg: AttributeArgAst,
+  attributeSpan: PslSpan,
+  code: PslDiagnosticCode,
+): PslDiagnostic {
+  if (currentIsNamed && storedOrigin === 'named') {
+    return diagnostic(
+      code,
+      `Attribute "${attributeName}" received duplicate argument "${key}"`,
+      ctx,
+      nodePslSpan(arg.syntax, ctx.sourceFile),
+    );
+  }
+  return diagnostic(
+    code,
+    `Attribute "${attributeName}" received duplicate values for "${key}" both positionally and by name`,
+    ctx,
+    attributeSpan,
+  );
 }
 
 function parseArgValue(
