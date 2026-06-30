@@ -12,12 +12,14 @@ import {
   ModelAttributeAst,
   ModelDeclarationAst,
   NamespaceDeclarationAst,
+  nonTriviaSibling,
   type Position,
   previousNonTriviaToken,
   type QualifiedNameAst,
   type SourceFile,
   type SyntaxNode,
   type SyntaxToken,
+  skipTriviaToken,
   type TokenAtOffset,
   TypesBlockAst,
 } from '@prisma-next/psl-parser/syntax';
@@ -129,7 +131,7 @@ export function classifyPslCompletionContext(
     return genericBlockContext;
   }
 
-  const field = contextNode?.findAncestor(FieldDeclarationAst.cast);
+  const field = fieldForTypeSlot(contextNode, at);
   if (field === undefined) {
     return UNSUPPORTED;
   }
@@ -145,6 +147,43 @@ export function classifyPslCompletionContext(
     offset,
     replacementStartOffset,
   });
+}
+
+/**
+ * Locates the field whose type position the cursor occupies. A present type or
+ * attribute keeps the cursor anchored inside the field, so the node ancestry
+ * resolves it directly. A typeless field emits no `TypeAnnotation`, so its
+ * trailing trivia belongs to the enclosing block instead; there the field is
+ * the owner of the nearest significant token to the left.
+ */
+function fieldForTypeSlot(
+  contextNode: SyntaxNode | undefined,
+  at: TokenAtOffset,
+): FieldDeclarationAst | undefined {
+  const direct = contextNode?.findAncestor(FieldDeclarationAst.cast);
+  if (direct !== undefined) {
+    return direct;
+  }
+  const left = at.leftBiased();
+  if (left === undefined) {
+    return undefined;
+  }
+  const significant = isTrivia(left) ? skipTriviaToken(left, 'prev') : left;
+  return significant?.parent.findAncestor(FieldDeclarationAst.cast);
+}
+
+/**
+ * The upper bound of a typeless field's empty type slot: the first attribute
+ * when present, otherwise the next significant token after the field (the
+ * following member or the block's closing brace), since a typeless field's
+ * trailing trivia lives in the enclosing block.
+ */
+function emptyTypeSlotEnd(field: FieldDeclarationAst): number {
+  for (const attribute of field.attributes()) {
+    return attribute.syntax.offset;
+  }
+  const nextSignificant = nonTriviaSibling(field.syntax, 'next');
+  return nextSignificant?.offset ?? field.syntax.endOffset;
 }
 
 function classifyModelFieldType(input: {
@@ -169,13 +208,8 @@ function classifyModelFieldType(input: {
 
   const typeAnnotation = input.field.typeAnnotation();
   if (typeAnnotation === undefined) {
-    return UNSUPPORTED;
-  }
-
-  const typeStart = typeAnnotation.syntax.offset;
-
-  if (typeAnnotation.syntax.textLength === 0) {
-    if (input.offset > fieldNameEnd && input.offset <= typeStart) {
+    const slotEnd = emptyTypeSlotEnd(input.field);
+    if (input.offset > fieldNameEnd && input.offset <= slotEnd) {
       return {
         kind: 'modelType',
         offset: input.offset,

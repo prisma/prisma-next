@@ -37,7 +37,7 @@ describe('offset tracking', () => {
     // start offset is only correct if every consumed token (the leading
     // segments and that trivia) advanced the running offset counter.
     const source = 'a.b\n.c';
-    const { diagnostics, cursor } = parse(source, parseTypeAnnotation);
+    const { diagnostics, cursor } = parseTypeAnnotationTree(source);
 
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
@@ -101,6 +101,21 @@ describe('recoverToSyncPoint', () => {
 function parse(source: string, run: (cursor: Cursor) => GreenNode) {
   const cursor = new Cursor(source);
   const node = run(cursor);
+  return { node, diagnostics: cursor.diagnostics, cursor };
+}
+
+// `parseTypeAnnotation` returns void and emits no node for an empty type, so
+// these well-formed cases are wrapped in a synthetic root to recover the
+// emitted `TypeAnnotation` subtree.
+function parseTypeAnnotationTree(source: string) {
+  const cursor = new Cursor(source);
+  cursor.startNode('Document');
+  parseTypeAnnotation(cursor);
+  const root = cursor.finishNode();
+  const node = root.children[0];
+  if (node === undefined || node.type !== 'node') {
+    throw new Error('expected parseTypeAnnotation to emit a TypeAnnotation node');
+  }
   return { node, diagnostics: cursor.diagnostics, cursor };
 }
 
@@ -311,7 +326,7 @@ describe('parseExpression well-formed', () => {
 describe('parseTypeAnnotation well-formed', () => {
   it('parses a bare reference', () => {
     const source = 'String';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -325,7 +340,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses a dot-qualified reference', () => {
     const source = 'auth.User';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -342,7 +357,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses a colon-prefixed cross-space reference with namespace and optional suffix', () => {
     const source = 'supabase:auth.User?';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -363,7 +378,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses a colon-prefixed reference without namespace', () => {
     const source = 'supabase:User';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -380,7 +395,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses an inline constructor call', () => {
     const source = 'Vector(1536)';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -400,7 +415,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses a namespace-qualified constructor call into a single FunctionCall chain', () => {
     const source = 'pgvector.Vector(1536)';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -423,7 +438,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses a qualified constructor with a named argument and an optional suffix', () => {
     const source = 'pgvector.Vector(length: 1536)?';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -451,7 +466,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses a list suffix', () => {
     const source = 'String[]';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -469,7 +484,7 @@ describe('parseTypeAnnotation well-formed', () => {
 describe('parseTypeAnnotation fault tolerance', () => {
   it('flags triple-dot over-qualification but still yields a subtree that round-trips', () => {
     const source = 'a.b.c';
-    const { node, diagnostics, cursor } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics, cursor } = parseTypeAnnotationTree(source);
 
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
@@ -486,7 +501,7 @@ describe('parseTypeAnnotation fault tolerance', () => {
 
   it('flags double-colon over-qualification but still yields a subtree', () => {
     const source = 'a:b:c';
-    const { node, diagnostics, cursor } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics, cursor } = parseTypeAnnotationTree(source);
 
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
@@ -503,7 +518,7 @@ describe('parseTypeAnnotation fault tolerance', () => {
 
   it('flags a trailing dot with no following segment', () => {
     const source = 'Int.';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
@@ -514,7 +529,7 @@ describe('parseTypeAnnotation fault tolerance', () => {
 
   it('flags a trailing colon with no following segment', () => {
     const source = 'supabase:';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
