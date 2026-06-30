@@ -49,6 +49,17 @@ describe('classifyPslCompletionContext', () => {
     });
   });
 
+  it('offers a declaration keyword immediately after a complete declaration', () => {
+    expect(classify('model A {}|')).toMatchObject({
+      kind: 'declarationKeyword',
+      scope: 'document',
+    });
+  });
+
+  it('returns unsupported mid-header of an incomplete declaration', () => {
+    expectUnsupported('model A|');
+  });
+
   it('classifies blank namespace-body declaration keyword positions', () => {
     const context = classify(['namespace auth {', '  |', '}'].join('\n'));
 
