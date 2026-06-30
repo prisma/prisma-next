@@ -35,11 +35,9 @@ export class SyntaxToken implements Token {
     return this.offset + this.textLength;
   }
 
-  /** Whether `offset` falls within this token, using the zero-width containment rule. */
+  /** Whether `offset` falls within this token, inclusive of both ends. */
   isInside(offset: number): boolean {
-    const start = this.offset;
-    const len = this.text.length;
-    return len === 0 ? offset === start : offset >= start && offset <= start + len;
+    return offset >= this.offset && offset <= this.endOffset;
   }
 
   isOutside(offset: number): boolean {
@@ -165,10 +163,9 @@ export class SyntaxNode {
     return this.offset + this.textLength;
   }
 
-  /** Whether `offset` falls within this node, using the zero-width containment rule. */
+  /** Whether `offset` falls within this node, inclusive of both ends. */
   isInside(offset: number): boolean {
-    const len = this.textLength;
-    return len === 0 ? offset === this.offset : offset >= this.offset && offset <= this.endOffset;
+    return offset >= this.offset && offset <= this.endOffset;
   }
 
   isOutside(offset: number): boolean {
@@ -279,8 +276,6 @@ export class SyntaxNode {
   /**
    * The token(s) at `offset`. The between-two-tokens case (offset exactly on a
    * token seam) is represented explicitly so callers can left/right bias.
-   * Consistent with the zero-width containment rule used by {@link containsOffset}:
-   * empty children are never the token at an offset.
    */
   tokenAtOffset(offset: number): TokenAtOffset {
     return tokenAtOffsetOf(this, offset);
@@ -289,8 +284,7 @@ export class SyntaxNode {
   /**
    * The smallest element fully containing the range `[start, end]`. At a seam
    * (and for empty ranges) the left-hand element is preferred, matching
-   * {@link containsOffset}'s zero-width rule (`textLength === 0` ⇒ contains only
-   * the empty range at `start`).
+   * {@link containsOffset}'s inclusive span.
    */
   coveringElement(start: number, end: number): SyntaxElement {
     let result: SyntaxElement = this;
@@ -318,20 +312,18 @@ function elementLength(el: SyntaxElement): number {
 }
 
 /**
- * Whether `el` contains `offset`. A zero-width element contains only the empty
- * position at its start (`textLength === 0` ⇒ `offset === start`); otherwise the
- * span is inclusive on both ends so a seam offset touches both neighbours.
+ * Whether `el` contains `offset`. The span is inclusive on both ends so a seam
+ * offset touches both neighbours.
  */
 function containsOffset(el: SyntaxElement, offset: number): boolean {
   const start = el.offset;
   const len = elementLength(el);
-  return len === 0 ? offset === start : offset >= start && offset <= start + len;
+  return offset >= start && offset <= start + len;
 }
 
 function containsRange(el: SyntaxElement, start: number, end: number): boolean {
   const elStart = el.offset;
   const len = elementLength(el);
-  if (len === 0) return start === elStart && end === elStart;
   return elStart <= start && end <= elStart + len;
 }
 
@@ -342,7 +334,6 @@ function tokenAtOffsetOf(el: SyntaxElement, offset: number): TokenAtOffset {
   let left: SyntaxElement | undefined;
   let right: SyntaxElement | undefined;
   for (const child of el.children()) {
-    if (elementLength(child) === 0) continue;
     if (!containsOffset(child, offset)) continue;
     if (left === undefined) {
       left = child;
