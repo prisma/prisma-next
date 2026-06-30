@@ -10,7 +10,7 @@ Each slice is named for what a developer can **rely on** when it merges; every D
 | --- | --- | --- | --- | --- |
 | 1 | `select-policies-dependable` | A SELECT policy is dependable end-to-end — create / edit-replaces / remove, drift fails `db verify`, proven in the Supabase example app. | ✅ merged | [TML-2868](https://linear.app/prisma-company/issue/TML-2868) · [#771](https://github.com/prisma/prisma-next/pull/771) |
 | 1.5 | `entity-kind-migration-seam` | Foundational: both diff sides are derived schema IRs, so `migration plan` emits RLS like every other command. | ✅ merged | [TML-2931](https://linear.app/prisma-company/issue/TML-2931) · [#868](https://github.com/prisma/prisma-next/pull/868) |
-| 2 | `schema-node-tree-restructure` | Foundational: a real `database → namespace → table → policy` node tree; inference moves to the Postgres target. Behavior-neutral. | 🚧 in progress | new ticket (TBD) |
+| 2 | `schema-node-tree-restructure` | Foundational: a real `database → namespace → table → policy` node tree; inference moves to the Postgres target. Behavior-neutral. | ✅ in review | [#894](https://github.com/prisma/prisma-next/pull/894) · ticket TBD |
 | 3 | `explicit-rls-control` | `@@rls` enablement, policy rename, per-table `managed`/`external` grading. | ⬜ | [TML-2869](https://linear.app/prisma-company/issue/TML-2869) |
 | 4 | `migration-support-for-roles` | A policy referencing a missing role fails verify (policy→role edge; dependency-graph seed). | ⬜ | new ticket (TBD) |
 | 5 | `support-all-rls-policy-types` | INSERT / UPDATE / DELETE / ALL policies, same lifecycle as SELECT. | ⬜ | [TML-2870](https://linear.app/prisma-company/issue/TML-2870) |
@@ -18,9 +18,11 @@ Each slice is named for what a developer can **rely on** when it merges; every D
 
 ## Not-yet-done slices
 
-### 2 — `schema-node-tree-restructure` (in progress)
+### 2 — `schema-node-tree-restructure` (in review — [#894](https://github.com/prisma/prisma-next/pull/894))
 
 Retire the conflated `PostgresSchemaIR` (it was a tree node, a schema, and the root at once). New single-purpose tree: **`PostgresDatabaseSchemaNode`** (root; holds roles) → **`PostgresNamespaceSchemaNode`** → **`PostgresTableSchemaNode`** → **`PostgresPolicySchemaNode`** / **`PostgresRoleSchemaNode`** leaves. Diff nodes are split from the authored Contract-IR entities (`PostgresRlsPolicy` / `PostgresRole` stay as the serialized entities). `introspect()` returns the root as a node; consumers `ensure` the target type and walk. Database→PSL inference moves onto the Postgres target (fixing a SQL-family layering violation). **No behavior change.** Spec + design: [`slices/schema-node-tree-restructure/`](slices/schema-node-tree-restructure/).
+
+**Landed:** verify, the planner, and the migration runner share one `diffDatabaseSchema` (returning `{ issues, schemaDiffIssues }` — the two issue types stay distinct until follow-on A); the expected-side projection builds per-namespace, so same-named tables across schemas (`public.thing` + `auth.thing`) now project instead of throwing; inference moved to the Postgres target descriptor. Residual: **D1** (PSL inference still gathers the tree to a flat document for today's single-namespace `contract infer` — tree-walk lands with the namespaced-PSL slice).
 
 ### 3 — `explicit-rls-control`
 
@@ -48,7 +50,7 @@ Top-level Postgres policy helpers taking the model handle (not a model-builder m
 ## Out of scope / follow-on projects
 
 - Role-ref **authoring** validation — roles are platform-provided; policies only reference them by name (slice 4 checks existence in the DB, nothing more).
-- **A** — port the legacy relational verifier onto the generic differ. **B** — dependency-aware planner ordering (slice 4's edges seed it). **C** — a generic project-from-contract / project-from-database registration surface, once a second node type needs the shared shape.
+- **A** — port the legacy relational verifier onto the generic differ (merges the two issue types `SchemaIssue` + `SchemaDiffIssue` into one). **B** — dependency-aware planner ordering (slice 4's edges seed it). **C** — a generic project-from-contract / project-from-database registration surface, once a second node type needs the shared shape. **D1** — walk the schema-node tree in PSL inference instead of gathering it to a flat document (lands with the namespaced-PSL / top-level-entities inference slice).
 
 ## Linear
 
