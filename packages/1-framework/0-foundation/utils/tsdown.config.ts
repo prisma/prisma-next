@@ -14,5 +14,6 @@ export default defineConfig({
     'src/exports/result.ts',
     'src/exports/redact-db-url.ts',
     'src/exports/simplify-deep.ts',
+    'src/exports/types.ts',
   ],
 });
