@@ -399,14 +399,24 @@ function parseParenArgs(cursor: Cursor): void {
   }
 }
 
-export function parseAttributeArg(cursor: Cursor): GreenNode {
+export function parseAttributeArg(cursor: Cursor): void {
+  const kind = cursor.peekKind();
+  if (
+    kind !== 'Ident' &&
+    kind !== 'StringLiteral' &&
+    kind !== 'NumberLiteral' &&
+    kind !== 'LBracket' &&
+    kind !== 'LBrace'
+  ) {
+    return;
+  }
   cursor.startNode('AttributeArg');
   if (cursor.peekKind() === 'Ident' && cursor.peekKind(1) === 'Colon') {
     parseIdentifier(cursor);
     cursor.bump();
   }
   parseArgValue(cursor);
-  return cursor.finishNode();
+  cursor.finishNode();
 }
 
 function parseArgValue(cursor: Cursor): void {

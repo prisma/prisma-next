@@ -119,6 +119,21 @@ function parseTypeAnnotationTree(source: string) {
   return { node, diagnostics: cursor.diagnostics, cursor };
 }
 
+// `parseAttributeArg` returns void and emits no node for an empty argument, so
+// these content-bearing cases are wrapped in a synthetic root to recover the
+// emitted `AttributeArg` subtree.
+function parseAttributeArgTree(source: string) {
+  const cursor = new Cursor(source);
+  cursor.startNode('Document');
+  parseAttributeArg(cursor);
+  const root = cursor.finishNode();
+  const node = root.children[0];
+  if (node === undefined || node.type !== 'node') {
+    throw new Error('expected parseAttributeArg to emit an AttributeArg node');
+  }
+  return { node, diagnostics: cursor.diagnostics, cursor };
+}
+
 describe('parseAttribute well-formed', () => {
   it('parses a simple field attribute', () => {
     const source = '@id';
@@ -197,7 +212,7 @@ describe('parseAttribute well-formed', () => {
 describe('parseAttributeArg well-formed', () => {
   it('parses a positional identifier argument', () => {
     const source = 'id';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "AttributeArg
@@ -210,7 +225,7 @@ describe('parseAttributeArg well-formed', () => {
 
   it('parses a named argument with a colon and array value', () => {
     const source = 'fields: [id]';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "AttributeArg
@@ -614,7 +629,7 @@ describe('parseAttribute fault tolerance', () => {
 describe('argument-position object literal', () => {
   it('parses an object literal argument into an ObjectLiteralExpr queryable via fields()', () => {
     const source = '{ a: 1, b: "x" }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
 
     expect(node.kind).toBe('AttributeArg');
     expect(greenText(node)).toBe(source);
@@ -634,7 +649,7 @@ describe('argument-position object literal', () => {
 
   it('parses a nested object literal recursively, round-tripping losslessly', () => {
     const source = '{ a: { b: 1 } }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
 
@@ -648,7 +663,7 @@ describe('argument-position object literal', () => {
 
   it('allows a trailing comma', () => {
     const source = '{ a: 1, }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
 
@@ -661,7 +676,7 @@ describe('argument-position object literal', () => {
 
   it('reports a missing colon but still yields a best-effort node and round-trips', () => {
     const source = '{ a 1 }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
@@ -673,7 +688,7 @@ describe('argument-position object literal', () => {
 
   it('reports a missing value but still yields a best-effort node and round-trips', () => {
     const source = '{ a: }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
@@ -682,7 +697,7 @@ describe('argument-position object literal', () => {
 
   it('reports an unterminated object literal anchored on the opening brace', () => {
     const source = '{ a: 1';
-    const { node, diagnostics, cursor } = parse(source, parseAttributeArg);
+    const { node, diagnostics, cursor } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
@@ -697,7 +712,7 @@ describe('argument-position object literal', () => {
 
   it('accepts a string-literal key, exposing the unquoted name', () => {
     const source = '{ "k": 1 }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source); // round-trip holds, object terminated
     expect(diagnostics).toEqual([]);
 
@@ -712,7 +727,7 @@ describe('argument-position object literal', () => {
 
   it('accepts a mix of identifier and string-literal keys with no diagnostics', () => {
     const source = '{ a: 1, "k": 2 }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source); // round-trip holds
     expect(diagnostics).toEqual([]);
 

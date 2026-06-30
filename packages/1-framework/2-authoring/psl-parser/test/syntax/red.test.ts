@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parse } from '../../src/parse';
 import { FieldDeclarationAst, ModelDeclarationAst } from '../../src/syntax/ast/declarations';
 import { GreenNodeBuilder } from '../../src/syntax/green-builder';
 import { createSyntaxTree, SyntaxNode, SyntaxToken, TokenAtOffset } from '../../src/syntax/red';
@@ -460,25 +461,6 @@ describe('SyntaxNode.tokenAtOffset', () => {
     expect(at.rightBiased()).toBeUndefined();
   });
 
-  it('skips a zero-width node sitting on the seam', () => {
-    const b = new GreenNodeBuilder();
-    b.startNode('Document');
-    b.startNode('Identifier');
-    b.token('Ident', 'A');
-    b.finishNode();
-    b.startNode('TypeAnnotation'); // empty, zero-width at offset 1
-    b.finishNode();
-    b.startNode('Identifier');
-    b.token('Ident', 'B');
-    b.finishNode();
-    const root = createSyntaxTree(b.finishNode());
-
-    const at = root.tokenAtOffset(1);
-    expect(at.isBetween).toBe(true);
-    expect(at.leftBiased()?.text).toBe('A');
-    expect(at.rightBiased()?.text).toBe('B');
-  });
-
   it('returns none for an empty document', () => {
     const b = new GreenNodeBuilder();
     b.startNode('Document');
@@ -595,4 +577,37 @@ describe('SyntaxNode.descendants', () => {
       'token:Ident', // B
     ]);
   });
+});
+
+describe('zero-width node precondition', () => {
+  // The red-tree navigation relies on no non-root node ever being zero-width:
+  // the only legitimately empty node is the root `Document` of an empty file,
+  // and a root is never reached as a child during descent. Malformed inputs
+  // are the cases historically prone to materializing empty placeholder nodes.
+  const sources = [
+    '',
+    'model User { id Int @id }',
+    'model A {',
+    'model A { id }',
+    'model A { id Int @default(,) }',
+    'model A { id Int @default() }',
+    'model A { id Int @foo(@) }',
+    'model A { vec Vector( }',
+    'model A { id @id }',
+    'type T = Vector(',
+    'enum E { A B',
+    'model A { id Int @default(autoincrement()) @',
+    'model A { name String @db. }',
+  ];
+
+  for (const source of sources) {
+    it(`emits no zero-width non-root node for ${JSON.stringify(source)}`, () => {
+      const { document } = parse(source);
+      for (const el of document.syntax.descendants()) {
+        if (el instanceof SyntaxNode && el.parent !== undefined) {
+          expect(el.textLength).toBeGreaterThan(0);
+        }
+      }
+    });
+  }
 });
