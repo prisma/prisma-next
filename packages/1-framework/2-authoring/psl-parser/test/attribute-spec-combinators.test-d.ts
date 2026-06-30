@@ -12,6 +12,11 @@ test('oneOf infers the union of its alternatives output types', () => {
   >();
 });
 
+test('oneOf with no alternatives is a compile error', () => {
+  // @ts-expect-error oneOf requires at least one alternative
+  oneOf();
+});
+
 test('list infers an array of its element type', () => {
   expectTypeOf(list(str())).toEqualTypeOf<ArgType<string[]>>();
 });
