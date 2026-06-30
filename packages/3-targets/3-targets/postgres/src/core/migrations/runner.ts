@@ -12,7 +12,6 @@ import type {
   SqlMigrationRunnerSuccessValue,
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
-import { namespaceSchemaNodes, verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { MigrationRunnerResult } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -23,8 +22,6 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
-import { parsePostgresDefault } from '../default-normalizer';
-import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 interface ApplyPlanSuccessValue {
@@ -124,38 +121,38 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       applyValue = applyResult.value;
     }
 
-    // Schema verification on app-space only — extension spaces don't
-    // own user-facing tables in the live schema, and `verifySqlSchema`
-    // matches the destination contract against the database, which
-    // would flag every app-space table as "extra" when called against
-    // an extension contract.
+    // Schema verification on app-space only — extension spaces don't own
+    // user-facing tables in the live schema, and the verify matches the
+    // destination contract against the database, which would flag every
+    // app-space table as "extra" when called against an extension contract.
+    //
+    // The runner is the third consumer of the one shared database-schema diff:
+    // it delegates to the family `verifySchema`, which runs the same
+    // per-namespace-paired diff (`diffDatabaseSchema` / `verifySqlSchemaTree`)
+    // the CLI verify and the planner use. No private per-namespace loop here —
+    // verifying the whole contract against one namespace node would falsely
+    // report tables in other schemas as missing.
     if (space === APP_SPACE_ID) {
       const schemaNode = await this.family.introspect({
         driver,
         contract: options.destinationContract,
       });
-      // `introspect` returns the target's schema-IR node (the Postgres tree
-      // root). The relational verify walks one per-schema namespace node at a
-      // time — never a flat merge of every namespace, which would collide
-      // same-named tables across schemas. Single-schema (the common case) is
-      // the sole namespace node; multi-schema contract scoping is CF-2.
-      for (const namespaceNode of namespaceSchemaNodes(schemaNode)) {
-        const schemaVerifyResult = verifySqlSchema({
-          contract: options.destinationContract,
-          schema: namespaceNode,
-          strict: options.strictVerification ?? true,
-          context: options.context ?? {},
-          typeMetadataRegistry: this.family.typeMetadataRegistry,
-          frameworkComponents: options.frameworkComponents,
-          normalizeDefault: parsePostgresDefault,
-          normalizeNativeType: normalizeSchemaNativeType,
+      const schemaVerifyResult = this.family.verifySchema({
+        contract: options.destinationContract,
+        schema: schemaNode,
+        strict: options.strictVerification ?? true,
+        frameworkComponents: options.frameworkComponents,
+      });
+      if (!schemaVerifyResult.ok) {
+        return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
+          why: 'The resulting database schema does not satisfy the destination contract.',
+          meta: {
+            issues: [
+              ...schemaVerifyResult.schema.issues,
+              ...schemaVerifyResult.schema.schemaDiffIssues,
+            ],
+          },
         });
-        if (!schemaVerifyResult.ok) {
-          return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
-            why: 'The resulting database schema does not satisfy the destination contract.',
-            meta: { issues: schemaVerifyResult.schema.issues },
-          });
-        }
       }
     }
 
