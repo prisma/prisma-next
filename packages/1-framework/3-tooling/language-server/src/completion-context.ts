@@ -17,7 +17,7 @@ import {
   type QualifiedNameAst,
   type SourceFile,
   type SyntaxNode,
-  SyntaxToken,
+  type SyntaxToken,
   type TokenAtOffset,
   TypesBlockAst,
 } from '@prisma-next/psl-parser/syntax';
@@ -273,28 +273,27 @@ function classifyDeclarationKeyword(input: {
 }
 
 /**
- * A declaration keyword may be completed where a new declaration can begin. With
- * the cursor inside an established declaration that is only allowed when the
- * declaration is still nascent (its sole significant child is the keyword), the
- * cursor sits past its closing `}`, or it is a namespace body offering a fresh
- * slot for a nested declaration.
+ * Whether a new declaration can begin at the cursor, given the nearest enclosing
+ * declaration. Allowed when that declaration is still nascent (only its keyword
+ * typed, no name or body yet), when it is a namespace whose body holds further
+ * declarations, or when the cursor sits past its closing `}`.
  */
 function canBeginDeclaration(
   declaration: DeclarationAst,
   offset: number,
   inNamespaceBody: boolean,
 ): boolean {
-  let significantChildren = 0;
-  for (const child of declaration.syntax.children()) {
-    if (!(child instanceof SyntaxToken) || !isTrivia(child)) {
-      significantChildren++;
-    }
+  const keywordOnly =
+    declaration.lbrace() === undefined &&
+    (declaration instanceof TypesBlockAst || declaration.name() === undefined);
+  if (keywordOnly) {
+    return true;
   }
-  const keywordOnly = significantChildren === 1;
+  if (declaration instanceof NamespaceDeclarationAst) {
+    return inNamespaceBody;
+  }
   const rbrace = declaration.rbrace();
-  const pastRbrace = rbrace !== undefined && offset >= rbrace.endOffset;
-  const freshNamespaceSlot = declaration instanceof NamespaceDeclarationAst && inNamespaceBody;
-  return keywordOnly || pastRbrace || freshNamespaceSlot;
+  return rbrace !== undefined && offset >= rbrace.endOffset;
 }
 
 function blockBodyContainsOffset(block: BracedBlock | undefined, offset: number): boolean {
