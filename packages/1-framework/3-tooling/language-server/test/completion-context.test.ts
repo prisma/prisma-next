@@ -60,6 +60,13 @@ describe('classifyPslCompletionContext', () => {
     expectUnsupported('model A|');
   });
 
+  it('offers a document-level declaration keyword on a fresh line after a closed namespace', () => {
+    expect(classify(['namespace auth {', '  model A {}', '}', '|'].join('\n'))).toMatchObject({
+      kind: 'declarationKeyword',
+      scope: 'document',
+    });
+  });
+
   it('classifies blank namespace-body declaration keyword positions', () => {
     const context = classify(['namespace auth {', '  |', '}'].join('\n'));
 
@@ -122,6 +129,13 @@ describe('classifyPslCompletionContext', () => {
     expect(context).toMatchObject({
       kind: 'modelType',
       fieldName: 'reviewer',
+    });
+  });
+
+  it('classifies the type position when the cursor sits inside a present field type', () => {
+    expect(classify(['model Post {', '  author In|t', '}'].join('\n'))).toMatchObject({
+      kind: 'modelType',
+      fieldName: 'author',
     });
   });
 
@@ -233,6 +247,20 @@ describe('classifyPslCompletionContext', () => {
 
   it('classifies generic block value positions after the equals sign', () => {
     expect(classify(['datasource db {', '  provider = |', '}'].join('\n'))).toMatchObject({
+      kind: 'genericBlockValue',
+      blockKeyword: 'datasource',
+    });
+  });
+
+  it('classifies a generic block value position flush against the equals sign', () => {
+    expect(classify(['datasource db {', '  provider =|', '}'].join('\n'))).toMatchObject({
+      kind: 'genericBlockValue',
+      blockKeyword: 'datasource',
+    });
+  });
+
+  it('classifies a partial generic block value prefix', () => {
+    expect(classify(['datasource db {', '  provider = fo|', '}'].join('\n'))).toMatchObject({
       kind: 'genericBlockValue',
       blockKeyword: 'datasource',
     });
