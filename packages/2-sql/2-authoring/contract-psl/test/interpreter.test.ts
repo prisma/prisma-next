@@ -216,14 +216,14 @@ model Post {
   id Int @id
   title String
   userId Int
-  author User @relation(fields: [userId], references: [id])
+  author User @relation(from: [userId], to: [id])
 }
 
 model Comment {
   id Int @id
   body String
   postId Int
-  post Post @relation(fields: [postId], references: [id])
+  post Post @relation(from: [postId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -433,7 +433,7 @@ model Comment {
 model Member {
   id Int @id @map("member_id")
   teamId Int @map("team_ref")
-  team Team @relation(fields: [teamId], references: [id])
+  team Team @relation(from: [teamId], to: [id])
   @@map("team_member")
   @@index([teamId])
   @@unique([teamId, id])

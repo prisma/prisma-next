@@ -15,7 +15,7 @@ model Post {
   authorId    Int
   title       String
   publishedAt DateTime?
-  author      User     @relation(fields: [authorId], references: [id])
+  author      User     @relation(from: [authorId], to: [id])
 
   @@map("posts")
 }
