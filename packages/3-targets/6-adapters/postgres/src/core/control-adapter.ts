@@ -11,7 +11,11 @@ import {
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
-import { APP_SPACE_ID, type SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import {
+  APP_SPACE_ID,
+  type VerifyDatabaseSchemaResult,
+} from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
@@ -59,11 +63,7 @@ import type {
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
-import {
-  contractToPostgresDatabaseSchemaNode,
-  diffPostgresSchema,
-  filterIssuesByOwnership,
-} from '@prisma-next/target-postgres/planner';
+import { diffPostgresDatabaseSchema } from '@prisma-next/target-postgres/planner';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
   PostgresDatabaseSchemaNode,
@@ -127,25 +127,20 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    */
   readonly normalizeNativeType = normalizeSchemaNativeType;
 
-  collectSchemaDiffIssues(
-    contract: Contract<SqlStorage>,
-    schema: SqlSchemaIRNode,
-  ): readonly SchemaDiffIssue[] {
-    PostgresDatabaseSchemaNode.assert(schema);
-    const expected = contractToPostgresDatabaseSchemaNode(
-      blindCast<
-        PostgresContract,
-        'collectSchemaDiffIssues is only called with a postgres contract'
-      >(contract),
-      { annotationNamespace: 'pg' },
-    );
-    const actual = PostgresDatabaseSchemaNode.ensure(schema);
-    const issues = diffPostgresSchema(expected, actual);
-    const expectedPolicyNamespaces = Object.values(expected.namespaces).flatMap((ns) =>
-      Object.values(ns.tables).flatMap((t) => t.policies.map((p) => p.namespaceId)),
-    );
-    const ownedSchemaNames = new Set([...expectedPolicyNamespaces, ...expected.existingSchemas]);
-    return filterIssuesByOwnership(issues, ownedSchemaNames);
+  diffDatabaseSchema(input: {
+    readonly contract: Contract<SqlStorage>;
+    readonly schema: SqlSchemaIRNode;
+    readonly strict: boolean;
+    readonly typeMetadataRegistry: ReadonlyMap<string, { readonly nativeType?: string }>;
+    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  }): VerifyDatabaseSchemaResult {
+    return diffPostgresDatabaseSchema({
+      contract: input.contract,
+      actualSchema: input.schema,
+      strict: input.strict,
+      typeMetadataRegistry: input.typeMetadataRegistry,
+      frameworkComponents: input.frameworkComponents,
+    });
   }
 
   bootstrapControlTableQueries(): readonly DdlNode[] {

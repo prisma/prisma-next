@@ -145,9 +145,23 @@ function contractWithPolicy(): Contract<SqlStorage> {
   };
 }
 
-describe('collectSchemaDiffIssues — RLS drift detection', () => {
+/**
+ * Runs the combined database-schema diff and returns only the policy
+ * (`schemaDiffIssues`) findings — the RLS drift these tests assert on.
+ */
+function policyDiffIssues(contract: Contract<SqlStorage>, schema: PostgresDatabaseSchemaNode) {
+  return controlAdapter.diffDatabaseSchema!({
+    contract,
+    schema,
+    strict: false,
+    typeMetadataRegistry: new Map(),
+    frameworkComponents: [],
+  }).schema.schemaDiffIssues;
+}
+
+describe('diffDatabaseSchema — RLS drift detection', () => {
   it('no contract policy + Prisma-managed DB policy → one extra diff issue', () => {
-    const issues = controlAdapter.collectSchemaDiffIssues!(
+    const issues = policyDiffIssues(
       emptyContractNoPolicies(),
       schemaWithPolicies([managedPolicy()]),
     );
@@ -158,7 +172,7 @@ describe('collectSchemaDiffIssues — RLS drift detection', () => {
   });
 
   it('no contract policy + external DB policy → one extra diff issue', () => {
-    const issues = controlAdapter.collectSchemaDiffIssues!(
+    const issues = policyDiffIssues(
       emptyContractNoPolicies(),
       schemaWithPolicies([externalPolicy()]),
     );
@@ -169,10 +183,7 @@ describe('collectSchemaDiffIssues — RLS drift detection', () => {
   });
 
   it('matching contract + DB policy → no issues', () => {
-    const issues = controlAdapter.collectSchemaDiffIssues!(
-      contractWithPolicy(),
-      schemaWithPolicies([managedPolicy()]),
-    );
+    const issues = policyDiffIssues(contractWithPolicy(), schemaWithPolicies([managedPolicy()]));
 
     expect(issues).toHaveLength(0);
   });

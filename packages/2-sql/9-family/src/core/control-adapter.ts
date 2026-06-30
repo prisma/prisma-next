@@ -3,10 +3,11 @@ import type {
   ContractMarkerRecord,
   LedgerEntryRecord,
 } from '@prisma-next/contract/types';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlAdapterInstance,
   ControlStack,
-  SchemaDiffIssue,
+  VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
@@ -199,16 +200,22 @@ export interface SqlControlAdapter<TTarget extends string = string>
   readonly normalizeNativeType?: NativeTypeNormalizer;
 
   /**
-   * Optional hook for collecting target-specific diff issues during schema
-   * verification. Called after the relational SQL verification pass; returns
-   * generic `SchemaDiffIssue[]` (coordinate + outcome + message — no target
-   * naming) that are folded into `VerifyDatabaseSchemaResult.schema.schemaDiffIssues`
-   * and counted as failures when non-empty.
+   * The single combined database-schema diff the migration planner and the
+   * schema verify both run for this target — the relational diff (table /
+   * column / constraint findings as `SchemaIssue[]`, with the verification-tree
+   * `root`/`counts`) plus the target's structural diff (e.g. Postgres RLS policy
+   * presence as `SchemaDiffIssue[]`), each computed once. Returns a
+   * `VerifyDatabaseSchemaResult` whose `schema` carries both shapes — exactly the
+   * existing verify-result schema shape. Optional: targets without a structural
+   * diff (SQLite) omit it, and the family verify runs the relational diff alone.
    */
-  collectSchemaDiffIssues?(
-    contract: Contract<SqlStorage>,
-    schema: SqlSchemaIRNode,
-  ): readonly SchemaDiffIssue[];
+  diffDatabaseSchema?(input: {
+    readonly contract: Contract<SqlStorage>;
+    readonly schema: SqlSchemaIRNode;
+    readonly strict: boolean;
+    readonly typeMetadataRegistry: ReadonlyMap<string, { readonly nativeType?: string }>;
+    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  }): VerifyDatabaseSchemaResult;
 
   /**
    * Ordered DDL queries that bootstrap marker/ledger control tables for migration

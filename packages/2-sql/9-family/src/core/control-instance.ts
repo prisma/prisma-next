@@ -693,33 +693,44 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     }): VerifyDatabaseSchemaResult {
       const contract = deserializeWithTargetSerializer(options.contract) as Contract<SqlStorage>;
       const controlAdapter = getControlAdapter();
-      // Verify owns no namespace pairing of its own: it runs the same shared
-      // per-namespace-paired relational verify the migration planner runs
-      // (`verifySqlSchemaTree`) and rejects when the combined issues are
-      // non-empty. The target's `contractToSchema` projection resolves each
-      // contract namespace to its DDL schema, matched by identity to the actual
-      // tree's namespaces.
-      const sqlResult = verifySqlSchemaTree({
-        contract,
-        actualSchema: options.schema,
-        buildExpectedSchema: (scopedContract) =>
-          buildTargetSchema(target, scopedContract, options.frameworkComponents),
-        strict: options.strict,
-        typeMetadataRegistry,
-        frameworkComponents: options.frameworkComponents,
-        ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
-        ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
-      });
-      // The target's RLS diff machinery ensures and walks the tree root, so it
-      // receives the node unchanged (not the per-namespace relational view).
-      const rawSchemaDiffIssues =
-        controlAdapter.collectSchemaDiffIssues?.(contract, options.schema) ?? [];
+      // Verify runs the one combined database-schema diff the migration planner
+      // runs — `controlAdapter.diffDatabaseSchema` (relational columns + target
+      // structural diff, per-namespace-paired) — and rejects when the result is
+      // non-empty. Verify composes no strategies itself. A target without a
+      // structural diff (SQLite) has no `diffDatabaseSchema`; fall back to the
+      // relational diff alone (its only schema diff).
+      const sqlResult = controlAdapter.diffDatabaseSchema
+        ? controlAdapter.diffDatabaseSchema({
+            contract,
+            schema: options.schema,
+            strict: options.strict,
+            typeMetadataRegistry,
+            frameworkComponents: options.frameworkComponents,
+          })
+        : verifySqlSchemaTree({
+            contract,
+            actualSchema: options.schema,
+            buildExpectedSchema: (scopedContract) =>
+              buildTargetSchema(target, scopedContract, options.frameworkComponents),
+            strict: options.strict,
+            typeMetadataRegistry,
+            frameworkComponents: options.frameworkComponents,
+            ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
+            ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
+          });
+      // Control-policy suppression of the structural (e.g. RLS policy) diff
+      // issues is a verify-side post-step — the combined diff returns them
+      // ownership-filtered, and a suppressed control policy drops them here.
       const schemaDiffIssues = filterSchemaDiffIssues(
-        rawSchemaDiffIssues,
+        sqlResult.schema.schemaDiffIssues,
         contract.defaultControlPolicy,
       );
-      if (schemaDiffIssues.length === 0) return sqlResult;
-      const totalFails = sqlResult.schema.counts.fail + schemaDiffIssues.length;
+      const relationalFails = sqlResult.schema.counts.fail;
+      if (schemaDiffIssues.length === 0) {
+        if (schemaDiffIssues === sqlResult.schema.schemaDiffIssues) return sqlResult;
+        return { ...sqlResult, schema: { ...sqlResult.schema, schemaDiffIssues } };
+      }
+      const totalFails = relationalFails + schemaDiffIssues.length;
       return {
         ...sqlResult,
         ok: false,
@@ -1081,8 +1092,8 @@ function buildTargetSchema(
 }
 
 /**
- * Filters schema diff issues (from `collectSchemaDiffIssues`) through the
- * contract's `defaultControlPolicy`. Issues whose outcome maps to a suppressed
+ * Filters the structural schema-diff issues (from `diffDatabaseSchema`) through
+ * the contract's `defaultControlPolicy`. Issues whose outcome maps to a suppressed
  * category under the effective policy are removed. This mirrors the control-policy
  * filtering applied by `verifySqlSchema` for table/column-level findings.
  *
