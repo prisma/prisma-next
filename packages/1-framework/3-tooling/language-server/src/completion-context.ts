@@ -55,7 +55,7 @@ export interface GenericBlockKeyCompletionContext {
   readonly offset: number;
   readonly blockKeyword: string;
   readonly replacementStartOffset: number;
-  readonly existingParameterNames: readonly string[];
+  readonly block: GenericBlockDeclarationAst;
 }
 
 export interface GenericBlockValueCompletionContext {
@@ -372,7 +372,7 @@ function classifyGenericBlockParameter(input: {
     offset: input.offset,
     blockKeyword: keyword,
     replacementStartOffset: input.replacementStartOffset,
-    existingParameterNames: existingParameterNames(block, activePair),
+    block,
   };
 }
 
@@ -390,27 +390,6 @@ function activeKeyValuePair(
 function isAfterEquals(pair: KeyValuePairAst, offset: number): boolean {
   const equals = pair.equals();
   return equals !== undefined && offset > equals.offset;
-}
-
-function existingParameterNames(
-  block: GenericBlockDeclarationAst,
-  activePair: KeyValuePairAst | undefined,
-): readonly string[] {
-  const names: string[] = [];
-  for (const entry of block.entries()) {
-    if (activePair !== undefined && sameSpan(entry.syntax, activePair.syntax)) {
-      continue;
-    }
-    const name = entry.key()?.name();
-    if (name !== undefined) {
-      names.push(name);
-    }
-  }
-  return names;
-}
-
-function sameSpan(left: SyntaxNode, right: SyntaxNode): boolean {
-  return left.offset === right.offset && left.textLength === right.textLength;
 }
 
 function hasUnsupportedAncestor(node: SyntaxNode | undefined): boolean {

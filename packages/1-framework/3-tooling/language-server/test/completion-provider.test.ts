@@ -400,6 +400,12 @@ describe('providePslCompletionItems', () => {
     });
   });
 
+  it('still offers the in-progress key while excluding an already-present sibling key', () => {
+    const { items } = complete(['policy Rule {', '  where = "x"', '  on|', '}'].join('\n'));
+
+    expect(items.map((item) => item.label)).toEqual(['on', 'mode', 'using']);
+  });
+
   it('returns no generic block parameter completions without a matching descriptor', () => {
     const { items } = complete(['extension Rule {', '  |', '}'].join('\n'));
 

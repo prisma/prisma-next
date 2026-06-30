@@ -7,7 +7,7 @@ import {
   type NamespaceSymbol,
   type SymbolTable,
 } from '@prisma-next/psl-parser';
-import type { SourceFile } from '@prisma-next/psl-parser/syntax';
+import type { GenericBlockDeclarationAst, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { type CompletionItem, CompletionItemKind, InsertTextFormat } from 'vscode-languageserver';
 import type {
   DeclarationKeywordCompletionContext,
@@ -229,7 +229,7 @@ function provideGenericBlockKeyCompletionItems(
     return [];
   }
 
-  const existing = new Set(context.existingParameterNames);
+  const existing = existingGenericBlockParameterNames(context.block, context.offset);
   const replacementRange = {
     start: sourceFile.positionAt(context.replacementStartOffset),
     end: sourceFile.positionAt(context.offset),
@@ -248,6 +248,23 @@ function provideGenericBlockKeyCompletionItems(
         newText: parameterName,
       },
     }));
+}
+
+function existingGenericBlockParameterNames(
+  block: GenericBlockDeclarationAst,
+  cursorOffset: number,
+): Set<string> {
+  const names = new Set<string>();
+  for (const entry of block.entries()) {
+    if (!entry.syntax.isOutside(cursorOffset)) {
+      continue;
+    }
+    const name = entry.key()?.name();
+    if (name !== undefined) {
+      names.add(name);
+    }
+  }
+  return names;
 }
 
 function provideModelTypeCompletionItems(
