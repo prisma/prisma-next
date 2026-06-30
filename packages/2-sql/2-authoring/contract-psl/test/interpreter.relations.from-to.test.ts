@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  createTestSqlNamespace,
   modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
@@ -12,6 +13,7 @@ const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
+  createNamespace: createTestSqlNamespace,
 } as const;
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
@@ -223,15 +225,14 @@ model Post {
       expect(bare.value).toEqual(bracketed.value);
     });
 
-    // The PSL expression grammar does not carry a member-access argument value:
-    // `parseIdentifierExpr` consumes only the head identifier, so the trailing
-    // `.field` of `to: User.id` never reaches the resolver. The named-argument
-    // lookup then sees no plain `to:` value, treats `to:` as omitted, and infers
-    // the referenced columns from the target's `@id` — lowering identically to
-    // the bare unqualified spelling. This pins the present grammar boundary as a
-    // regression anchor for a future slice that carries the dotted value.
-    it('infers the target @id for a member-access to: value (qualifier dropped at the grammar layer)', () => {
-      const qualified = interpret(`model User {
+    // The PSL expression grammar carries no member-access argument value:
+    // `parseIdentifierExpr` consumes only the head identifier, so `to: User.id`
+    // reaches the resolver as the bare field name `User`. The resolver looks for
+    // a column named `User` on the target model `User`, finds none, and rejects
+    // the relation. A later slice teaches the grammar the dotted value and turns
+    // this into the supported `to: Model.column` qualifier.
+    it('rejects a member-access to: value (grammar reads only the head identifier)', () => {
+      const result = interpret(`model User {
   id Int @id
   posts Post[]
 }
@@ -242,30 +243,17 @@ model Post {
   user User @relation(from: userId, to: User.id)
 }
 `);
-      const inferred = interpret(`model User {
-  id Int @id
-  posts Post[]
-}
 
-model Post {
-  id Int @id
-  userId Int
-  user User @relation(from: userId)
-}
-`);
-
-      expect(qualified.ok).toBe(true);
-      expect(inferred.ok).toBe(true);
-      if (!qualified.ok || !inferred.ok) return;
-      expect(qualified.value).toEqual(inferred.value);
-
-      const models = modelsOf(qualified.value) as RelationModels;
-      expect(models['Post']?.relations).toMatchObject({
-        user: {
-          cardinality: 'N:1',
-          on: { localFields: ['userId'], targetFields: ['id'] },
-        },
-      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            message: expect.stringContaining('unknown field "User.User"'),
+          }),
+        ]),
+      );
     });
   });
 
