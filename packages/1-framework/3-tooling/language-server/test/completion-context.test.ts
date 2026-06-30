@@ -105,6 +105,17 @@ describe('classifyPslCompletionContext', () => {
     });
   });
 
+  it('bounds the empty type slot at a field attribute', () => {
+    expect(classify(['model Post {', '  author |@id', '}'].join('\n'))).toMatchObject({
+      kind: 'modelType',
+      fieldName: 'author',
+    });
+  });
+
+  it('returns unsupported once the cursor is past a field attribute on a typeless field', () => {
+    expectUnsupported(['model Post {', '  author @id|', '}'].join('\n'));
+  });
+
   it('classifies a partial bare model field type prefix', () => {
     const context = classify(['model Post {', '  reviewer U|', '}'].join('\n'));
 

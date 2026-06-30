@@ -435,8 +435,16 @@ export function parseAttribute(cursor: Cursor): GreenNode {
   return cursor.finishNode();
 }
 
-/** A type annotation: `QualifiedName (argList)? ([])? (?)?`, e.g. `pgvector.Vector(1536)[]?`. */
-export function parseTypeAnnotation(cursor: Cursor): GreenNode {
+/**
+ * A type annotation: `QualifiedName (argList)? ([])? (?)?`, e.g.
+ * `pgvector.Vector(1536)[]?`. When the field has no type, no node is emitted —
+ * a missing type is the absence of a `TypeAnnotation`, not a zero-width one.
+ */
+export function parseTypeAnnotation(cursor: Cursor): void {
+  const kind = cursor.peekKind();
+  if (kind !== 'Ident' && kind !== 'LBracket' && kind !== 'Question') {
+    return;
+  }
   cursor.startNode('TypeAnnotation');
   if (cursor.peekKind() === 'Ident') {
     parseQualifiedName(cursor);
@@ -453,7 +461,7 @@ export function parseTypeAnnotation(cursor: Cursor): GreenNode {
   if (cursor.peekKind() === 'Question') {
     cursor.bump();
   }
-  return cursor.finishNode();
+  cursor.finishNode();
 }
 
 type MemberParser = (cursor: Cursor) => void;
