@@ -117,7 +117,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   apps/lsp-playground:
     dependencies:
@@ -125,8 +125,8 @@ importers:
         specifier: ^25.1.2
         version: 25.1.2
       '@codingame/monaco-vscode-editor-service-override':
-        specifier: ^25.1.2
-        version: 25.1.2
+        specifier: ^33.0.9
+        version: 33.0.9
       '@codingame/monaco-vscode-files-service-override':
         specifier: ^25.1.2
         version: 25.1.2
@@ -284,7 +284,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   examples/bundle-size:
     dependencies:
@@ -372,7 +372,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
       wrangler:
         specifier: 4.91.0
         version: 4.91.0(@cloudflare/workers-types@4.20260515.1)
@@ -427,7 +427,7 @@ importers:
         version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   examples/mongo-demo:
     dependencies:
@@ -521,7 +521,7 @@ importers:
         version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   examples/multi-extension-monorepo:
     dependencies:
@@ -573,7 +573,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   examples/paradedb-demo:
     dependencies:
@@ -655,7 +655,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   examples/prisma-next-cloudflare-worker:
     dependencies:
@@ -701,7 +701,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 0.16.6
-        version: 0.16.6(@cloudflare/workers-types@4.20260515.1)(@vitest/runner@4.1.8)(@vitest/snapshot@4.1.8)(vitest@4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)))
+        version: 0.16.6(@cloudflare/workers-types@4.20260515.1)(@vitest/runner@4.1.8)(@vitest/snapshot@4.1.8)(vitest@4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)))
       '@cloudflare/workers-types':
         specifier: 4.20260515.1
         version: 4.20260515.1
@@ -731,7 +731,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
       wrangler:
         specifier: 4.91.0
         version: 4.91.0(@cloudflare/workers-types@4.20260515.1)
@@ -867,7 +867,7 @@ importers:
         version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   examples/prisma-next-demo-sqlite:
     dependencies:
@@ -1046,7 +1046,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   examples/react-router-demo:
     dependencies:
@@ -1152,7 +1152,7 @@ importers:
         version: 6.1.1(typescript@5.9.3)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   examples/retail-store:
     dependencies:
@@ -1282,7 +1282,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   examples/supabase:
     dependencies:
@@ -1355,7 +1355,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/0-config/tsconfig: {}
 
@@ -1403,7 +1403,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/0-foundation/utils:
     devDependencies:
@@ -1421,7 +1421,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/1-core/config:
     dependencies:
@@ -1455,7 +1455,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/1-core/errors:
     dependencies:
@@ -1480,7 +1480,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/1-core/framework-components:
     dependencies:
@@ -1517,7 +1517,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/1-core/operations:
     devDependencies:
@@ -1538,7 +1538,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/1-core/ts-render:
     devDependencies:
@@ -1556,7 +1556,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/2-authoring/contract:
     dependencies:
@@ -1581,7 +1581,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/2-authoring/ids:
     dependencies:
@@ -1612,7 +1612,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/2-authoring/psl-parser:
     dependencies:
@@ -1637,7 +1637,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/2-authoring/psl-printer:
     dependencies:
@@ -1665,7 +1665,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/3-tooling/cli:
     dependencies:
@@ -1783,7 +1783,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/3-tooling/cli-telemetry:
     dependencies:
@@ -1823,7 +1823,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/3-tooling/config-loader:
     dependencies:
@@ -1866,7 +1866,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/3-tooling/emitter:
     dependencies:
@@ -1912,7 +1912,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/3-tooling/language-server:
     dependencies:
@@ -1958,7 +1958,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/3-tooling/migration:
     dependencies:
@@ -1998,7 +1998,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/1-framework/3-tooling/prisma-next:
     dependencies:
@@ -2123,7 +2123,7 @@ importers:
         version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/1-foundation/mongo-codec:
     dependencies:
@@ -2154,7 +2154,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/1-foundation/mongo-contract:
     dependencies:
@@ -2194,7 +2194,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/1-foundation/mongo-value:
     dependencies:
@@ -2216,7 +2216,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/2-authoring/contract-psl:
     dependencies:
@@ -2265,7 +2265,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/2-authoring/contract-ts:
     dependencies:
@@ -2308,7 +2308,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/3-tooling/emitter:
     dependencies:
@@ -2342,7 +2342,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/3-tooling/mongo-schema-ir:
     dependencies:
@@ -2376,7 +2376,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/4-query/query-ast:
     dependencies:
@@ -2413,7 +2413,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/5-query-builders/orm:
     dependencies:
@@ -2474,7 +2474,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/5-query-builders/query-builder:
     dependencies:
@@ -2508,7 +2508,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/6-transport/mongo-lowering:
     dependencies:
@@ -2539,7 +2539,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/6-transport/mongo-wire:
     dependencies:
@@ -2567,7 +2567,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/7-runtime:
     dependencies:
@@ -2637,7 +2637,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-mongo-family/9-family:
     dependencies:
@@ -2704,7 +2704,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-sql/1-core/contract:
     dependencies:
@@ -2738,7 +2738,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-sql/1-core/errors:
     devDependencies:
@@ -2759,7 +2759,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-sql/1-core/operations:
     dependencies:
@@ -2793,7 +2793,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-sql/1-core/schema-ir:
     dependencies:
@@ -2821,7 +2821,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-sql/2-authoring/contract-psl:
     dependencies:
@@ -2873,7 +2873,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-sql/2-authoring/contract-ts:
     dependencies:
@@ -2928,7 +2928,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-sql/3-tooling/emitter:
     dependencies:
@@ -2965,7 +2965,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-sql/4-lanes/query-builder:
     devDependencies:
@@ -2992,7 +2992,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-sql/4-lanes/relational-core:
     dependencies:
@@ -3044,7 +3044,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-sql/4-lanes/sql-builder:
     dependencies:
@@ -3096,7 +3096,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-sql/5-runtime:
     dependencies:
@@ -3151,7 +3151,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/2-sql/9-family:
     dependencies:
@@ -3227,7 +3227,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-extensions/arktype-json:
     dependencies:
@@ -3276,7 +3276,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-extensions/middleware-cache:
     dependencies:
@@ -3301,7 +3301,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-extensions/mongo:
     dependencies:
@@ -3383,7 +3383,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-extensions/paradedb:
     dependencies:
@@ -3450,7 +3450,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-extensions/pgvector:
     dependencies:
@@ -3526,7 +3526,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-extensions/postgis:
     dependencies:
@@ -3602,7 +3602,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-extensions/postgres:
     dependencies:
@@ -3684,7 +3684,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-extensions/sql-orm-client:
     dependencies:
@@ -3760,7 +3760,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-extensions/sqlite:
     dependencies:
@@ -3833,7 +3833,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-extensions/supabase:
     dependencies:
@@ -3933,7 +3933,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-mongo-target/1-mongo-target:
     dependencies:
@@ -4024,7 +4024,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-mongo-target/2-mongo-adapter:
     dependencies:
@@ -4112,7 +4112,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-mongo-target/3-mongo-driver:
     dependencies:
@@ -4155,7 +4155,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-targets/3-targets/postgres:
     dependencies:
@@ -4231,7 +4231,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-targets/3-targets/sqlite:
     dependencies:
@@ -4298,7 +4298,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-targets/6-adapters/postgres:
     dependencies:
@@ -4383,7 +4383,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-targets/6-adapters/sqlite:
     dependencies:
@@ -4465,7 +4465,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-targets/7-drivers/postgres:
     dependencies:
@@ -4529,7 +4529,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   packages/3-targets/7-drivers/sqlite:
     dependencies:
@@ -4575,7 +4575,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   test/e2e/framework:
     dependencies:
@@ -4681,7 +4681,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   test/integration:
     dependencies:
@@ -4871,7 +4871,7 @@ importers:
         version: vite@8.0.9(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   test/integration/test/fixtures/cli/cli-e2e-test-app:
     dependencies:
@@ -5046,7 +5046,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+        version: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
 packages:
 
@@ -5406,8 +5406,14 @@ packages:
   '@codingame/monaco-vscode-api@25.1.2':
     resolution: {integrity: sha512-K04QcQA+Zb0KXucBAK/BGCT5dldiwIqdUbBQq7yuLvBLbof3cP1WSUuxasMHGYwM0MWyzIAsDtyAYMS7is8ZuA==}
 
+  '@codingame/monaco-vscode-api@33.0.9':
+    resolution: {integrity: sha512-cMyAY0gJmBOSU1n9sYJI57LXU2fwNYcPnpTdHgS5qIfJL/cVvBjlmqRrQSpmS0Q1vHcIELVgTn9WKegdE5581Q==}
+
   '@codingame/monaco-vscode-base-service-override@25.1.2':
     resolution: {integrity: sha512-OwYs6h1ATUAeMmX+Q1c8esTG7GLMqniBs+fLEr1/9b/ciY485ArKo5UvrUxVPDtRNy/7F06vRW9IUCq9iKP14w==}
+
+  '@codingame/monaco-vscode-base-service-override@33.0.9':
+    resolution: {integrity: sha512-aLJaaxVGh+x3EQ3AUFAAYo91ohw2x6yzM/w1Iy/SRxb1biXwuE2GIhRR7WR1MdUwv8JWaEIdrTC3J/pLDp9h3g==}
 
   '@codingame/monaco-vscode-bulk-edit-service-override@25.1.2':
     resolution: {integrity: sha512-+EfSzjiFakCf0IIJKPZrHVGioq5N8GBsp51bXuKBR5J/B58cUaJY0Dc12PNTSpgAusAGOppUIOSBqUk4F/7IaQ==}
@@ -5421,8 +5427,14 @@ packages:
   '@codingame/monaco-vscode-editor-service-override@25.1.2':
     resolution: {integrity: sha512-EadvDCyWdgxOPmaIvbcVVDNjTUYuKdjYWwKbPbbcTs9t4z1/DjdE7mV3ZdT6aGh5m6zkEEUOi143l27Y5eRt+Q==}
 
+  '@codingame/monaco-vscode-editor-service-override@33.0.9':
+    resolution: {integrity: sha512-qWECC52sCXlXqlE7dlDd6nZ4L43MK7T+LpVw0yOhqRANDEs7mMAN3pSQnU0Td3RR3LDnSZ8xX3Bxl+FReoQvkw==}
+
   '@codingame/monaco-vscode-environment-service-override@25.1.2':
     resolution: {integrity: sha512-8GoD3lk0CN0dIMZOrZNS/i8RCaF1YSQ6nmrf+rqneOSHG9S382EnsZZD69d4+i7JnoeyttO7Kr9KH8WOhRV6OA==}
+
+  '@codingame/monaco-vscode-environment-service-override@33.0.9':
+    resolution: {integrity: sha512-ol20jRZxAJ1dAEAC3VejLBo/7T3IgQ+Kd6eiCA4Axt7nt94yivphwBk9Akg/tLovFpL1uOwVgogvGpg0hYcYPA==}
 
   '@codingame/monaco-vscode-extension-api@25.1.2':
     resolution: {integrity: sha512-SJW/YOhjo+9MXEyzMwQMUWdJVR3Llc6pTq5JQqs6Y30v73gTrpLqtzbd9FNdCuQR8S6bUk5ScH8GL4QrVuL5FA==}
@@ -5430,11 +5442,20 @@ packages:
   '@codingame/monaco-vscode-extensions-service-override@25.1.2':
     resolution: {integrity: sha512-rTTZW2biPxcg+JumhVf2L+38C5ptvNNxiJlwz39VfXFEh6qOHtAsIMy7vIXa0uGg5/y8DNp0SnOQJP/RKhLYZA==}
 
+  '@codingame/monaco-vscode-extensions-service-override@33.0.9':
+    resolution: {integrity: sha512-g2UmGXHtddXmLEt85lYDLeMw8OSEFABOEP6OCxKn4TJLM02GKNbosSoAxfo9AEO+rzSvmu8xNAW7VNEjWVnxwQ==}
+
   '@codingame/monaco-vscode-files-service-override@25.1.2':
     resolution: {integrity: sha512-TenLLAFIwY7keZFF8e3beUn7OVfnNINR5Noi4PVrjeeTcy6FuNH6Jghdul2JwpRAkvyJLdFMvomE2jlT6F03jQ==}
 
+  '@codingame/monaco-vscode-files-service-override@33.0.9':
+    resolution: {integrity: sha512-Gc4yvM68rECU38cjGcuzwBYXXZM3tf4D71vBJzNxztqSE0V5n+h2/UbcLmLwfY/6cLfT+Oc4IY8X2yWHNFweDA==}
+
   '@codingame/monaco-vscode-host-service-override@25.1.2':
     resolution: {integrity: sha512-lgaalpA9CUQW7i0bBwgBOK0DQNDvOo3QO3p6Rz6yVsHpgA4iMqq2d11dBDUKvuQSwIHPRu8CMHCqhQk/BQN/YA==}
+
+  '@codingame/monaco-vscode-host-service-override@33.0.9':
+    resolution: {integrity: sha512-DkDzv6ijQU1udBhA4LB4OIMpPPoP3ktXCD7JWgwIwHifeIQzlgRMvzgKcMtWz/H4sSZYNHlBuJMgchmfLFTLig==}
 
   '@codingame/monaco-vscode-keybindings-service-override@25.1.2':
     resolution: {integrity: sha512-cp/gGyTvCTAzCYnQm0HJykXJRB0Huz8Lvq60lj5LutgWcb8S3w6dOB2Houm8dHoeUm/jOko8SQNIP8hzWN92Zw==}
@@ -5487,6 +5508,9 @@ packages:
   '@codingame/monaco-vscode-layout-service-override@25.1.2':
     resolution: {integrity: sha512-SxBGcMK3RgkGtUn7ZDl7dCoyNW0CWFQ/bfSRYUY06A0IA4JNS5jq1lhof57d0WXewm+5l8w1Spr/vMsfx1c9ig==}
 
+  '@codingame/monaco-vscode-layout-service-override@33.0.9':
+    resolution: {integrity: sha512-akQ+0l9kCGrwr6fgk9q2ZdvvQcBPshkhc3Jw3W1LCVeN2p5A6dObkuem6hKhptyAgtLsOJmG9MmBxDu631UTvw==}
+
   '@codingame/monaco-vscode-localization-service-override@25.1.2':
     resolution: {integrity: sha512-QLj62A8XDOIQW3KjsZlNxs+sfsNNHYxWMjQMwZu/y2Vw3IIHGly2Lpn4t4SFbeaBHJQJy4i5s7NpzlbF9MbEzQ==}
 
@@ -5501,6 +5525,9 @@ packages:
 
   '@codingame/monaco-vscode-quickaccess-service-override@25.1.2':
     resolution: {integrity: sha512-7IIrXnwHiF3w9d9p9kspEUz/LCibMLUztmRpGdZQfFtWBJw043q7rk8V1O42KdXr1hVg9IR5vfffwjy9nbiiUg==}
+
+  '@codingame/monaco-vscode-quickaccess-service-override@33.0.9':
+    resolution: {integrity: sha512-XEpmz3g1m9m6PS5Gf3Bho2hmotcg0MgO1wFwvwjH6CxZ131F6tkdWJvDWsVOyV34HXJ9HOIgNa04bwbDNxguyw==}
 
   '@codingame/monaco-vscode-textmate-service-override@25.1.2':
     resolution: {integrity: sha512-AL0FtSQBW+1vtoXYQvUqB2hfWojpK73Kq/n6KuNXxjLF/XBJ5FpeeZDfrBfwhWPPoHuBTsaFUCQy4L8xQgbVlA==}
@@ -8382,6 +8409,9 @@ packages:
   dompurify@3.3.1:
     resolution: {integrity: sha512-qkdCKzLNtrgPFP1Vo+98FRzJnBRGe4ffyCea9IwHB1fyxPOeNTHpLKYGd4Uk9xvNoH0ZoOjwZxNptyMwqrId1Q==}
 
+  dompurify@3.4.5:
+    resolution: {integrity: sha512-OrwIBKsdNSVEeubdJ1HBv/wNENRM9ytAVCv7YXt//A3vPdVMNuACRqK9mXCGCBW2ln7BT/A4X0jXHo2Gu89miA==}
+
   dotenv@17.4.2:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
@@ -10209,6 +10239,7 @@ packages:
   tsconfck@3.1.6:
     resolution: {integrity: sha512-ks6Vjr/jEw0P1gmOVwutM3B7fWxoWBL2KRDb1JfqGVawBmO5UsvmWOQFGHBPl5yxYz4eERr19E6L7NMv+Fej4w==}
     engines: {node: ^18 || >=20}
+    deprecated: unmaintained
     hasBin: true
     peerDependencies:
       typescript: ^5.0.0
@@ -11125,14 +11156,14 @@ snapshots:
     optionalDependencies:
       workerd: 1.20260515.1
 
-  '@cloudflare/vitest-pool-workers@0.16.6(@cloudflare/workers-types@4.20260515.1)(@vitest/runner@4.1.8)(@vitest/snapshot@4.1.8)(vitest@4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)))':
+  '@cloudflare/vitest-pool-workers@0.16.6(@cloudflare/workers-types@4.20260515.1)(@vitest/runner@4.1.8)(@vitest/snapshot@4.1.8)(vitest@4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)))':
     dependencies:
       '@vitest/runner': 4.1.8
       '@vitest/snapshot': 4.1.8
       cjs-module-lexer: 1.4.3
       esbuild: 0.27.3
       miniflare: 4.20260515.0
-      vitest: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
+      vitest: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
       wrangler: 4.92.0(@cloudflare/workers-types@4.20260515.1)
       zod: 3.25.76
     transitivePeerDependencies:
@@ -11186,9 +11217,27 @@ snapshots:
       jschardet: 3.1.4
       marked: 14.0.0
 
+  '@codingame/monaco-vscode-api@33.0.9':
+    dependencies:
+      '@codingame/monaco-vscode-base-service-override': 33.0.9
+      '@codingame/monaco-vscode-environment-service-override': 33.0.9
+      '@codingame/monaco-vscode-extensions-service-override': 33.0.9
+      '@codingame/monaco-vscode-files-service-override': 33.0.9
+      '@codingame/monaco-vscode-host-service-override': 33.0.9
+      '@codingame/monaco-vscode-layout-service-override': 33.0.9
+      '@codingame/monaco-vscode-quickaccess-service-override': 33.0.9
+      '@vscode/iconv-lite-umd': 0.7.1
+      dompurify: 3.4.5
+      jschardet: 3.1.4
+      marked: 14.0.0
+
   '@codingame/monaco-vscode-base-service-override@25.1.2':
     dependencies:
       '@codingame/monaco-vscode-api': 25.1.2
+
+  '@codingame/monaco-vscode-base-service-override@33.0.9':
+    dependencies:
+      '@codingame/monaco-vscode-api': 33.0.9
 
   '@codingame/monaco-vscode-bulk-edit-service-override@25.1.2':
     dependencies:
@@ -11207,9 +11256,17 @@ snapshots:
     dependencies:
       '@codingame/monaco-vscode-api': 25.1.2
 
+  '@codingame/monaco-vscode-editor-service-override@33.0.9':
+    dependencies:
+      '@codingame/monaco-vscode-api': 33.0.9
+
   '@codingame/monaco-vscode-environment-service-override@25.1.2':
     dependencies:
       '@codingame/monaco-vscode-api': 25.1.2
+
+  '@codingame/monaco-vscode-environment-service-override@33.0.9':
+    dependencies:
+      '@codingame/monaco-vscode-api': 33.0.9
 
   '@codingame/monaco-vscode-extension-api@25.1.2':
     dependencies:
@@ -11221,13 +11278,26 @@ snapshots:
       '@codingame/monaco-vscode-api': 25.1.2
       '@codingame/monaco-vscode-files-service-override': 25.1.2
 
+  '@codingame/monaco-vscode-extensions-service-override@33.0.9':
+    dependencies:
+      '@codingame/monaco-vscode-api': 33.0.9
+      '@codingame/monaco-vscode-files-service-override': 33.0.9
+
   '@codingame/monaco-vscode-files-service-override@25.1.2':
     dependencies:
       '@codingame/monaco-vscode-api': 25.1.2
 
+  '@codingame/monaco-vscode-files-service-override@33.0.9':
+    dependencies:
+      '@codingame/monaco-vscode-api': 33.0.9
+
   '@codingame/monaco-vscode-host-service-override@25.1.2':
     dependencies:
       '@codingame/monaco-vscode-api': 25.1.2
+
+  '@codingame/monaco-vscode-host-service-override@33.0.9':
+    dependencies:
+      '@codingame/monaco-vscode-api': 33.0.9
 
   '@codingame/monaco-vscode-keybindings-service-override@25.1.2':
     dependencies:
@@ -11299,6 +11369,10 @@ snapshots:
     dependencies:
       '@codingame/monaco-vscode-api': 25.1.2
 
+  '@codingame/monaco-vscode-layout-service-override@33.0.9':
+    dependencies:
+      '@codingame/monaco-vscode-api': 33.0.9
+
   '@codingame/monaco-vscode-localization-service-override@25.1.2':
     dependencies:
       '@codingame/monaco-vscode-api': 25.1.2
@@ -11319,6 +11393,10 @@ snapshots:
   '@codingame/monaco-vscode-quickaccess-service-override@25.1.2':
     dependencies:
       '@codingame/monaco-vscode-api': 25.1.2
+
+  '@codingame/monaco-vscode-quickaccess-service-override@33.0.9':
+    dependencies:
+      '@codingame/monaco-vscode-api': 33.0.9
 
   '@codingame/monaco-vscode-textmate-service-override@25.1.2':
     dependencies:
@@ -13621,6 +13699,10 @@ snapshots:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
+  dompurify@3.4.5:
+    optionalDependencies:
+      '@types/trusted-types': 2.0.7
+
   dotenv@17.4.2: {}
 
   dts-resolver@3.0.0: {}
@@ -15858,35 +15940,6 @@ snapshots:
       tsx: 4.22.4
       yaml: 2.8.4
 
-  vitest@4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)):
-    dependencies:
-      '@vitest/expect': 4.1.8
-      '@vitest/mocker': 4.1.8(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
-      '@vitest/pretty-format': 4.1.8
-      '@vitest/runner': 4.1.8
-      '@vitest/snapshot': 4.1.8
-      '@vitest/spy': 4.1.8
-      '@vitest/utils': 4.1.8
-      es-module-lexer: 2.1.0
-      expect-type: 1.3.0
-      magic-string: 0.30.21
-      obug: 2.1.2
-      pathe: 2.0.3
-      picomatch: 4.0.4
-      std-env: 4.1.0
-      tinybench: 2.9.0
-      tinyexec: 1.2.4
-      tinyglobby: 0.2.17
-      tinyrainbow: 3.1.0
-      vite: 8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)
-      why-is-node-running: 2.3.0
-    optionalDependencies:
-      '@types/node': 25.9.1
-      '@vitest/coverage-v8': 4.1.6(vitest@4.1.8)
-      jsdom: 29.1.1(@noble/hashes@2.2.0)
-    transitivePeerDependencies:
-      - msw
-
   vitest@4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)):
     dependencies:
       '@vitest/expect': 4.1.8
@@ -15916,7 +15969,7 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
-  vitest@4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)):
+  vitest@4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)):
     dependencies:
       '@vitest/expect': 4.1.8
       '@vitest/mocker': 4.1.8(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
