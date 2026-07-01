@@ -2,14 +2,14 @@
 import { MigrationCLI } from '@prisma-next/cli/migration-cli';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { collMod } from '@prisma-next/target-mongo/migration';
+import type { Contract as End } from './end-contract';
+import endContract from './end-contract.json' with { type: 'json' };
+import type { Contract as Start } from './start-contract';
+import startContract from './start-contract.json' with { type: 'json' };
 
-class M extends Migration {
-  override describe() {
-    return {
-      from: 'sha256:2827cbad7293fe13a4fb2aab60a55d3cddd856a86d1f6ccea6e11519faacff92',
-      to: 'sha256:250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d',
-    };
-  }
+class M extends Migration<Start, End> {
+  override readonly startContractJson = startContract;
+  override readonly endContractJson = endContract;
 
   override get operations() {
     return [
