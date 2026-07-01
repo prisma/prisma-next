@@ -13,7 +13,6 @@ import {
   plannerFailure,
 } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
-import { namespaceSchemaNodes } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   MigrationPlanner,
@@ -23,7 +22,7 @@ import type {
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresRlsPolicy } from '../postgres-rls-policy';
@@ -387,15 +386,11 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
  * by bare name, so only one namespace's tables can be probed at a time.
  */
 function relationalNamespaceNode(
-  schema: SqlSchemaIRNode,
+  schema: PostgresDatabaseSchemaNode,
   schemaName: string,
 ): SqlSchemaIR | undefined {
-  const namespaceNodes = namespaceSchemaNodes(schema);
-  const byName = namespaceNodes.find(
-    (node) =>
-      blindCast<{ readonly schemaName?: string }, 'reading the namespace node schema name'>(node)
-        .schemaName === schemaName,
-  );
+  const namespaceNodes = Object.values(PostgresDatabaseSchemaNode.ensure(schema).namespaces);
+  const byName = namespaceNodes.find((node) => node.schemaName === schemaName);
   return byName ?? namespaceNodes[0];
 }
 
