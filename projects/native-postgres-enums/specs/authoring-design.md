@@ -122,10 +122,13 @@ native_enum <HandleName> {
 
 - `<HandleName>` is the authoring identifier fields reference (`pg.enum(HandleName)`), and the
   contract entity name. Like a model name.
-- The body is a **variadic** `memberName = "value"` list — the enum's members. `memberName`
-  is the code identifier surfaced on `db.native_enums.…members`; `"value"` is the string stored in
-  the Postgres type and on the wire. For most native enums (and all of Supabase's)
-  `memberName === value`; the two-token form is kept so an authored enum may diverge them.
+- The body is a **variadic** `memberName = "value"` list — the enum's members, reusing the
+  existing variadic block mechanism (the SQL `enum` block, §2.2). `memberName` is the code
+  identifier surfaced on `db.native_enums.…members`; `"value"` is the string stored in the
+  Postgres type and on the wire. Members are **always** authored as explicit `key = value`
+  pairs — there is no name-only shorthand (a bare member is a diagnostic), enforced by the
+  lowering factory. For all of Supabase's enums `memberName === value`, but both tokens are
+  always written.
 - `@@map` gives the Postgres type name (snake_case), mirroring how models `@@map` to table
   names. Required for adoption/external where the DB type name is fixed; defaults to
   `snake_case(HandleName)` when omitted.
@@ -136,7 +139,9 @@ native_enum <HandleName> {
 
 ### 2.2 The PSL block descriptor (parser)
 
-A new entry in `postgresAuthoringPslBlockDescriptors` (sibling of `policy_select`):
+A new entry in `postgresAuthoringPslBlockDescriptors`, reusing the **existing** variadic-block
+mechanism — the same shape the SQL family's `enum` block already ships
+([2-sql/9-family/src/core/authoring-entity-types.ts:169](../../../packages/2-sql/9-family/src/core/authoring-entity-types.ts:169)):
 
 ```ts
 native_enum: {
@@ -144,15 +149,17 @@ native_enum: {
   keyword: 'native_enum',
   discriminator: 'postgres-enum',
   name: { required: true },
-  members: { kind: 'variadic-members', value: { kind: 'value', codecId: 'pg/text@1' } },
-  // @@map handled by the existing map-attribute path
+  parameters: {},              // no fixed keys
+  variadicParameters: true,    // open `memberName = "value"` body — EXISTING flag
 }
 ```
 
-**New capability required:** today block descriptors declare a *fixed* set of `parameters`
-(`policy_select` has `target`/`roles`/`using`). `native_enum`'s body is an **open** member
-list, so the block-descriptor mechanism needs a **variadic-members mode** — arbitrary keys,
-each a `pg/text@1`-encoded value. This is the first of the three genuinely-new pieces (§7).
+**Not new capability.** `AuthoringPslBlockDescriptor.variadicParameters`
+([framework-authoring.ts:225](../../../packages/1-framework/1-core/framework-components/src/shared/framework-authoring.ts:225))
+already opens a block body to an arbitrary `key = value` list: the parser accepts every entry
+generically, and the validator skips unknown-key rejection when the flag is set. The SQL/Mongo
+`enum` block is a shipping instance. `native_enum` reuses it verbatim; the lowering factory
+(§2.3) turns members into the entity — and rejects a bare (value-less) member (§2.1).
 
 ### 2.3 The entity type + lowering (interpreter)
 
@@ -218,8 +225,8 @@ column: { codecId: 'pg/enum@1', typeParams: { ref: <native_enum coordinate> }, n
 - **encode/decode:** text passthrough (`encode('aal1') → 'aal1'`, `decode('aal1') → 'aal1'`).
   No runtime value-validation (the type + compile-time union enforce; the parent project
   ruled out a third runtime check).
-- **the param is an entity ref**, not a literal — the second genuinely-new piece (§7). ADR-208
-  params are literals (`{length:1536}`); `pg.enum`'s `typeParams.ref` is a
+- **the param is an entity ref**, not a literal (§7). ADR-208 params are literals
+  (`{length:1536}`); `pg.enum`'s `typeParams.ref` is a
   `{plane, entityKind:'native_enum', namespaceId, entityName}` coordinate the codec resolves.
 
 ### 3.2 What the codec resolves the ref for
@@ -239,33 +246,37 @@ Resolving `typeParams.ref` → the `native_enum` entity yields:
   carrying `codecId`, `typeParams.ref`, and `nativeType`, exactly as `vector(1536)` returns one
   carrying `{length}`.
 
-## 4. The dynamic `nativeType` and the cast — the one hard new piece
+## 4. The `nativeType` cast — the adapter's existing mechanism, one small wiring change
 
-### 4.1 Why static meta can't hold it
+The adapter **already** casts bound parameters by `nativeType`: `renderTypedParam`
+([sql-renderer.ts:72](../../../packages/3-targets/6-adapters/postgres/src/core/sql-renderer.ts:72))
+emits `$N::<T>` when a `nativeType` is outside the inferrable allow-list. The only gap is
+*which* `nativeType` it reads.
 
-The cast policy (`renderTypedParam(index, codecId, codecLookup)`, ADR 205) emits `$N::<T>`
-when a codec's `meta.db.sql.postgres.nativeType` is outside the inferrable allow-list. That
-`nativeType` is **static per codec-id**. `pg.enum@1` is **one codec-id** used for **many**
-Postgres types (`aal_level`, `factor_type`, …), so a single static `nativeType` cannot serve
-it. ADR 205 anticipated exactly this and **deferred** it: *"`pg/enum@1` has no static
-`nativeType` — the type name is per-column… a future `LowererContext`-borne variant."*
+### 4.1 The gap
 
-### 4.2 The mechanism
+Today `renderTypedParam` reads a **static, per-codec-id** value
+(`codecLookup.metaFor(codecId).db.sql.postgres.nativeType`), and the per-column `nativeType` is
+**dropped when the `CodecRef` is built** — `codecRefForStorageColumn`
+([relational-core/src/codec-ref-for-column.ts:22](../../../packages/2-sql/4-lanes/relational-core/src/codec-ref-for-column.ts:22))
+reads `typeRef`/`typeParams`/`codecId`/`many` but never `columnDef.nativeType`. `pg/enum@1` is
+**one** codec id serving **many** Postgres types (`aal_level`, `factor_type`, …), so a static
+per-codec-id value cannot serve it — the per-column value must reach the cast.
 
-`nativeType` becomes a **per-instance** property on the `pg.enum` codec, resolved from
-`typeParams.ref` (the `native_enum`'s `typeName`). The cast chokepoint reads the **resolved
-codec instance's** `nativeType`, not the static descriptor meta:
+### 4.2 The wiring (small, local)
 
-- every AST node already carries `codec: CodecRef` and resolves an instance via
-  `AstCodecResolver` (ADR 212), content-keyed on `codecId` + `typeParams`.
-- `renderTypedParam` (or its effective-nativeType lookup) prefers the **instance** `nativeType`
-  when present, falling back to static descriptor meta for all other codecs.
-- `aal_level` is not in `POSTGRES_INFERRABLE_NATIVE_TYPES`, so the renderer emits `$N::aal_level`.
+Two hops, threading one already-known string (`StorageColumn.nativeType`):
 
-This is additive — `vector`/`jsonb`/text keep using static meta. It is the "move `nativeType`
-to the instance" capability discussed during shaping, and the crux of this project. Cast
-target may need schema-qualification for non-`public` types (`$N::auth.aal_level`); the
-resolved `native_enum` carries its `namespaceId`, so the renderer has what it needs.
+1. `codecRefForStorageColumn` stamps `columnDef.nativeType` onto the `CodecRef` it builds.
+2. `renderTypedParam` (via `renderParamRef`) **prefers a ref-carried `nativeType`** over the
+   static `metaFor(codecId)` meta; every other codec (`vector`/`jsonb`/text) is unaffected.
+
+`aal_level` is not in `POSTGRES_INFERRABLE_NATIVE_TYPES`, so the renderer emits `$N::aal_level`
+(schema-qualified for non-`public` types — the resolved `native_enum` carries its
+`namespaceId`). Additive and confined to the Postgres adapter + the `CodecRef` builder.
+(Equivalently, the value stamped can be the `pg.enum` codec's per-instance `nativeType`
+resolved from its ref — same result; the point is the cast reads the per-column value, not the
+static codec meta.)
 
 ## 5. Typing, `db.native_enums`, enforcement — all downstream, all reused/derived
 
@@ -304,18 +315,20 @@ type.
 
 ## 7. What is genuinely new vs reused
 
-**New (four pieces):**
-1. **Variadic-members block descriptor** (§2.2) — open `name = "value"` body, vs RLS's fixed params.
-2. **Codec param = an entity ref** (§3.1) — `pg.enum`'s `typeParams.ref` resolves a `native_enum`, vs ADR-208 literal params.
-3. **Dynamic (per-instance) `nativeType` in the cast policy** (§4) — the ADR-205-deferred capability; the piece that needs new machinery.
-4. **The `db.native_enums` facade root** (§5) — a Postgres-only sibling of `db.enums`, built from the `native_enum` members. New code, but confined to the Postgres facade; reuses the `EnumAccessor` shape.
+**New (small; all via existing mechanisms):**
+1. **The `pg/enum@1` codec** (§3) — a parameterized text codec whose param is a `native_enum` ref (vs ADR-208 literal params); resolves the ref for its per-instance `nativeType` + values.
+2. **Per-column `nativeType` to the cast** (§4) — stamp `columnDef.nativeType` on the `CodecRef`; `renderTypedParam` prefers it. Small, local to the adapter + `CodecRef` builder.
+3. **The `db.native_enums` facade root** (§5) — a Postgres-only sibling of `db.enums`, built from the `native_enum` members; reuses the `EnumAccessor` shape.
 
-**Reused (everything else):**
+Plus the `native_enum` pack-entity contribution itself (an `entityTypes` entry + a lowering factory) — new code, but the *mechanism* (pack entity + variadic block) is entirely reused.
+
+**Reused (the rest):**
+- the variadic PSL block mechanism (`variadicParameters`; the SQL `enum` block is the template) — §2.2, **not new**.
 - pack-contributed-entity authoring (entityTypes + block descriptors + lowering factory) — RLS template.
-- top-level `DiffableNode` + generic differ + `control` grading — RLS template (phase 2).
+- top-level `DiffableNode` + generic differ + `control` grading — RLS template (deferred managed phase).
 - parameterized-codec plumbing (ADR 208), `AstCodecResolver` (ADR 212).
 - value-set typing (`StorageColumnTypes`, TML-2886, landed; codec-refined by TML-2952/2953), the `EnumAccessor` mechanics, declaration-order arrays.
-- **No custom seams.** No bespoke storage-entity registration; the old native-enum residue (`postgres-enum-type-schema.ts`, dead `ISSUE_KIND_ORDER` keys) is **deleted, not reclaimed** — `native_enum` rides the generic entity mechanism.
+- **No custom seams.** No bespoke storage-entity registration; the old native-enum validator residue (`postgres-enum-type-schema.ts`) is **deleted, not reclaimed** — `native_enum` rides the generic entity mechanism. (The `ISSUE_KIND_ORDER` `type_*`/`enum_values_changed` keys are live generic infra, kept.)
 
 ## 8. End-to-end lowering pipeline
 
@@ -340,22 +353,18 @@ contract.
 
 ## 9. Phasing
 
-- **Phase 1 (external, no DDL).** §2 (native_enum entity representation, `external`), §3
-  (`pg.enum` codec), §4 (dynamic-nativeType cast), §5 (typing / `db.native_enums`; enforcement =
-  the pre-existing type). Cuts all migration machinery. Plus adoption (contract-infer emits a
-  `native_enum` block instead of throwing).
-- **Phase 2 (managed).** The `PostgresNativeEnum` `DiffableNode` + `PostgresSchemaIR`
-  projection + generic-differ integration + the four ops (`CREATE TYPE`, `DROP TYPE`,
-  `ALTER TYPE … ADD VALUE`, `ALTER TYPE … RENAME VALUE`); remove/reorder refused with a
-  diagnostic. Parallel-safe with TML-2952/2953 (`../spec.md`).
+- **MVP (external Supabase, no DDL).** §2 (`native_enum` entity, `external`), §3 (`pg.enum`
+  codec), §4 (the cast wiring), §5 (typing / `db.native_enums`; enforcement = the pre-existing
+  type). Ships **no migration machinery** — external enums are never diffed. See
+  [`../plan.md`](../plan.md).
+- **Deferred (managed, separate project).** The `PostgresNativeEnum` `DiffableNode` +
+  `PostgresSchemaIR` projection + order-aware generic-differ integration + three ops
+  (`CREATE TYPE`, `DROP TYPE`, `ALTER TYPE … ADD VALUE`); rename/remove/reorder refused with a
+  diagnostic. Plus adoption (contract-infer emits a **`managed`** `native_enum`). Parallel-safe
+  with TML-2952/2953. Full design: [`migration-design.md`](migration-design.md).
 
-## 10. Open questions (genuine)
+## 10. Open questions
 
-1. **Adopted-enum grade.** contract-infer emits `native_enum` on adoption — `external`
-   (observe-only, cheap) or `managed`? Leaning `external` first, manual promote later.
-2. **Variadic-members descriptor shape.** The exact `pslBlock` descriptor extension for an
-   open member list (§2.2) — settled at slice-1 planning; the requirement is fixed, the
-   descriptor encoding is not.
-3. **`memberName === value` enforcement.** Whether the two-token member form may diverge
-   name from value for native enums, or is constrained to `name === value` (all real cases).
-   Leaning: allow divergence (name is db.native_enums-only; value is the type label), no constraint.
+None — all shaping questions are settled: adopted enums are `managed` (all inference is
+managed); the variadic block mechanism is reused, not new (§2.2); members are always
+`key = value`, no shorthand (§2.1).
