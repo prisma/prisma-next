@@ -51,6 +51,12 @@ export interface CodecLookup {
   renderOutputTypeFor(id: string, params: Record<string, unknown>): string | undefined;
   /** Codec-id-keyed `renderInputType` renderer for the `contract.d.ts` input position. Optional so existing lookups need not provide it; returns `undefined` when the codec renders no custom input type or the id is unknown. */
   renderInputTypeFor?(id: string, params: Record<string, unknown>): string | undefined;
+  /** Codec-id-keyed `renderValueLiteral` renderer for the emit path (`side`: `output` = read type, `input` = create/update type). Optional so existing lookups need not provide it; returns `undefined` when the codec's output isn't literal-expressible or the id is unknown. */
+  renderValueLiteralFor?(
+    id: string,
+    value: JsonValue,
+    side: 'output' | 'input',
+  ): string | undefined;
 }
 
 /**

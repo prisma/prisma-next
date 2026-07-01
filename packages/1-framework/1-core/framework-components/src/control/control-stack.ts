@@ -1,3 +1,4 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { Codec } from '../shared/codec';
 import type { AnyCodecDescriptor } from '../shared/codec-descriptor';
@@ -310,6 +311,10 @@ export function extractCodecLookup(
     string,
     (params: Record<string, unknown>) => string | undefined
   >();
+  const valueLiteralRenderersById = new Map<
+    string,
+    (value: JsonValue, side: 'output' | 'input') => string | undefined
+  >();
   const owners = new Map<string, string>();
   for (const descriptor of descriptors) {
     const codecTypes = descriptor.types?.codecTypes;
@@ -336,6 +341,9 @@ export function extractCodecLookup(
       }
       if (typeof codecDescriptor.renderInputType === 'function') {
         inputRenderersById.set(codecDescriptor.codecId, codecDescriptor.renderInputType);
+      }
+      if (typeof codecDescriptor.renderValueLiteral === 'function') {
+        valueLiteralRenderersById.set(codecDescriptor.codecId, codecDescriptor.renderValueLiteral);
       }
       // Materialize a representative `Codec` instance for `byId.get()` so consumers reading the lookup's instance side (e.g. SQL renderer's cast-policy lookup, or the contract emitter's literal-default `encodeJson` resolver) keep finding the codec.
       //
@@ -376,6 +384,7 @@ export function extractCodecLookup(
     metaFor: (id) => metaById.get(id),
     renderOutputTypeFor: (id, params) => renderersById.get(id)?.(params),
     renderInputTypeFor: (id, params) => inputRenderersById.get(id)?.(params),
+    renderValueLiteralFor: (id, value, side) => valueLiteralRenderersById.get(id)?.(value, side),
   };
 }
 

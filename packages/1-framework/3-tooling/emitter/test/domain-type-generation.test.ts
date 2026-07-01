@@ -9,8 +9,8 @@ import type { TypesImportSpec } from '@prisma-next/framework-components/emission
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  type DomainEnumLookup,
   deduplicateImports,
+  type FieldValueSetResolver,
   generateBothFieldTypesMaps,
   generateCodecTypeIntersection,
   generateContractFieldDescriptor,
@@ -27,11 +27,31 @@ import {
   generateValueObjectsDescriptorType,
   generateValueObjectType,
   generateValueObjectTypeAliases,
+  renderValueSetType,
   resolveFieldType,
   serializeExecutionType,
   serializeObjectKey,
   serializeValue,
 } from '../src/domain-type-generation';
+
+/**
+ * Mirrors the real primitive codecs' `renderValueLiteral`: identity codecs render the encoded value
+ * directly as a literal. Tests pass this so the value-set field emit produces literal unions.
+ */
+function literalCodecLookup(): CodecLookup {
+  const renderPrimitiveLiteral = (value: unknown): string | undefined => {
+    if (typeof value === 'string') return serializeValue(value);
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return undefined;
+  };
+  return {
+    get: () => undefined,
+    targetTypesFor: () => undefined,
+    metaFor: () => undefined,
+    renderOutputTypeFor: () => undefined,
+    renderValueLiteralFor: (_id, value) => renderPrimitiveLiteral(value),
+  };
+}
 
 describe('serializeValue', () => {
   it('serializes null', () => {
@@ -1162,8 +1182,8 @@ describe('resolveFieldType', () => {
   });
 });
 
-describe('generateBothFieldTypesMaps with domainEnumLookup', () => {
-  it('narrows a scalar enum field to its domain-enum members on both sides', () => {
+describe('generateBothFieldTypesMaps with resolveFieldValueSet', () => {
+  it('narrows a scalar enum field to its value-set members on both sides', () => {
     const models: Record<string, ContractModel> = {
       Post: {
         fields: {
@@ -1186,18 +1206,16 @@ describe('generateBothFieldTypesMaps with domainEnumLookup', () => {
         storage: {},
       },
     };
-    const domainEnumLookup: DomainEnumLookup = (ref) =>
-      ref.entityName === 'Priority'
-        ? {
-            codecId: 'pg/text@1',
-            members: [
-              { name: 'Low', value: 'low' },
-              { name: 'High', value: 'high' },
-              { name: 'Urgent', value: 'urgent' },
-            ],
-          }
+    const resolveFieldValueSet: FieldValueSetResolver = (_modelName, fieldName) =>
+      fieldName === 'priority'
+        ? { encodedValues: ['low', 'high', 'urgent'], codecId: 'pg/text@1' }
         : undefined;
-    const result = generateBothFieldTypesMaps(models, undefined, undefined, domainEnumLookup);
+    const result = generateBothFieldTypesMaps(
+      models,
+      literalCodecLookup(),
+      undefined,
+      resolveFieldValueSet,
+    );
     expect(result.output).toContain("readonly priority: 'low' | 'high' | 'urgent'");
     expect(result.input).toContain("readonly priority: 'low' | 'high' | 'urgent'");
     expect(result.output).toContain("readonly title: CodecTypes['pg/text@1']['output']");
@@ -1216,7 +1234,12 @@ describe('generateBothFieldTypesMaps with domainEnumLookup', () => {
         storage: {},
       },
     };
-    const result = generateBothFieldTypesMaps(models, undefined, undefined, () => undefined);
+    const result = generateBothFieldTypesMaps(
+      models,
+      literalCodecLookup(),
+      undefined,
+      () => undefined,
+    );
     expect(result.output).toContain("readonly title: CodecTypes['pg/text@1']['output']");
   });
 });
@@ -1284,7 +1307,7 @@ describe('generateBothFieldTypesMaps with resolveFieldTypeParams', () => {
   });
 });
 
-describe('resolveFieldType domain-enum narrowing edge cases', () => {
+describe('resolveFieldType value-set narrowing edge cases', () => {
   const priorityRef = {
     plane: 'domain' as const,
     namespaceId: 'public',
@@ -1292,38 +1315,30 @@ describe('resolveFieldType domain-enum narrowing edge cases', () => {
     entityName: 'Priority',
   };
 
-  it('renders numeric enum members as plain literals', () => {
+  it('renders numeric value-set members as plain literals', () => {
     const field: ContractField = {
       nullable: false,
       type: { kind: 'scalar', codecId: 'pg/int4@1' },
       valueSet: priorityRef,
     };
-    const lookup: DomainEnumLookup = () => ({
+    const result = resolveFieldType(field, literalCodecLookup(), undefined, {
+      encodedValues: [1, 10],
       codecId: 'pg/int4@1',
-      members: [
-        { name: 'Low', value: 1 },
-        { name: 'High', value: 10 },
-      ],
     });
-    const result = resolveFieldType(field, undefined, undefined, lookup);
     expect(result.output).toBe('1 | 10');
     expect(result.input).toBe('1 | 10');
   });
 
-  it('renders boolean enum members as plain literals', () => {
+  it('renders boolean value-set members as plain literals', () => {
     const field: ContractField = {
       nullable: false,
       type: { kind: 'scalar', codecId: 'pg/bool@1' },
       valueSet: priorityRef,
     };
-    const lookup: DomainEnumLookup = () => ({
+    const result = resolveFieldType(field, literalCodecLookup(), undefined, {
+      encodedValues: [true, false],
       codecId: 'pg/bool@1',
-      members: [
-        { name: 'On', value: true },
-        { name: 'Off', value: false },
-      ],
     });
-    const result = resolveFieldType(field, undefined, undefined, lookup);
     expect(result.output).toBe('true | false');
   });
 
@@ -1333,52 +1348,51 @@ describe('resolveFieldType domain-enum narrowing edge cases', () => {
       type: { kind: 'scalar', codecId: 'pg/text@1' },
       valueSet: priorityRef,
     };
-    const lookup: DomainEnumLookup = () => ({
+    const result = resolveFieldType(field, literalCodecLookup(), undefined, {
+      encodedValues: ['low'],
       codecId: 'pg/text@1',
-      members: [{ name: 'Low', value: 'low' }],
     });
-    const result = resolveFieldType(field, undefined, undefined, lookup);
     expect(result.output).toBe("'low' | null");
     expect(result.input).toBe("'low' | null");
   });
 
-  it('falls through to the codec channel when the lookup returns undefined', () => {
+  it('falls through to the codec channel when no resolved value-set is supplied', () => {
     const field: ContractField = {
       nullable: false,
       type: { kind: 'scalar', codecId: 'pg/text@1' },
       valueSet: priorityRef,
     };
-    const lookup: DomainEnumLookup = () => undefined;
-    const result = resolveFieldType(field, undefined, undefined, lookup);
+    const result = resolveFieldType(field, literalCodecLookup(), undefined, undefined);
     expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
   });
 
-  it('falls through to the codec channel when the enum has no members', () => {
+  it('falls through to the codec channel when the value set is empty', () => {
     const field: ContractField = {
       nullable: false,
       type: { kind: 'scalar', codecId: 'pg/text@1' },
       valueSet: priorityRef,
     };
-    const lookup: DomainEnumLookup = () => ({ codecId: 'pg/text@1', members: [] });
-    const result = resolveFieldType(field, undefined, undefined, lookup);
+    const result = resolveFieldType(field, literalCodecLookup(), undefined, {
+      encodedValues: [],
+      codecId: 'pg/text@1',
+    });
     expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
   });
 
-  it('falls through to the codec channel when a member value is non-scalar', () => {
+  it('falls through to the codec channel when a value is non-literal-expressible', () => {
     const field: ContractField = {
       nullable: false,
       type: { kind: 'scalar', codecId: 'pg/jsonb@1' },
       valueSet: priorityRef,
     };
-    const lookup: DomainEnumLookup = () => ({
+    const result = resolveFieldType(field, literalCodecLookup(), undefined, {
+      encodedValues: [{ nested: 1 }],
       codecId: 'pg/jsonb@1',
-      members: [{ name: 'Obj', value: { nested: 1 } }],
     });
-    const result = resolveFieldType(field, undefined, undefined, lookup);
     expect(result.output).toBe("CodecTypes['pg/jsonb@1']['output']");
   });
 
-  it('does not narrow non-scalar (union) fields even with a valueSet present', () => {
+  it('does not narrow non-scalar (union) fields even with a resolved value-set present', () => {
     const field: ContractField = {
       nullable: false,
       type: {
@@ -1390,20 +1404,41 @@ describe('resolveFieldType domain-enum narrowing edge cases', () => {
       },
       valueSet: priorityRef,
     };
-    // The lookup would narrow if the narrowing code ran, so this proves the
-    // non-scalar-kind guard (and not a missing-lookup short-circuit) is what
-    // keeps the union shape intact.
-    const lookup: DomainEnumLookup = () => ({
+    const result = resolveFieldType(field, literalCodecLookup(), undefined, {
+      encodedValues: ['low', 'high'],
       codecId: 'pg/text@1',
-      members: [
-        { name: 'Low', value: 'low' },
-        { name: 'High', value: 'high' },
-      ],
     });
-    const result = resolveFieldType(field, undefined, undefined, lookup);
     expect(result.output).toBe("CodecTypes['pg/text@1']['output'] | AddressOutput");
     expect(result.input).toBe("CodecTypes['pg/text@1']['input'] | AddressInput");
     expect(result.output).not.toContain("'low'");
+  });
+});
+
+describe('renderValueSetType', () => {
+  it('renders a literal union via the codec renderValueLiteral', () => {
+    expect(renderValueSetType(['low', 'high'], 'pg/text@1', 'output', literalCodecLookup())).toBe(
+      "'low' | 'high'",
+    );
+  });
+
+  it('returns undefined for an empty value set', () => {
+    expect(renderValueSetType([], 'pg/text@1', 'output', literalCodecLookup())).toBeUndefined();
+  });
+
+  it('returns undefined when the lookup has no renderValueLiteralFor', () => {
+    const lookup: CodecLookup = {
+      get: () => undefined,
+      targetTypesFor: () => undefined,
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => undefined,
+    };
+    expect(renderValueSetType(['low'], 'pg/text@1', 'output', lookup)).toBeUndefined();
+  });
+
+  it('returns undefined when any value is not literal-expressible', () => {
+    expect(
+      renderValueSetType([{ nested: 1 }], 'pg/jsonb@1', 'output', literalCodecLookup()),
+    ).toBeUndefined();
   });
 });
 

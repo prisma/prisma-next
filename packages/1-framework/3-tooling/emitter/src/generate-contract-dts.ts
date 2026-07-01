@@ -3,7 +3,6 @@ import type {
   ContractEnum,
   ContractModelBase,
   ContractValueObject,
-  ValueSetRef,
 } from '@prisma-next/contract/types';
 import { DomainNamespaceResolutionError } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
@@ -14,7 +13,6 @@ import type {
 } from '@prisma-next/framework-components/emission';
 import { blindCast } from '@prisma-next/utils/casts';
 import {
-  type DomainEnumLookup,
   deduplicateImports,
   generateCodecTypeIntersection,
   generateFieldTypesMapsByNamespace,
@@ -152,16 +150,10 @@ export function generateContractDts(
         emitter.resolveFieldTypeParams?.(modelName, fieldName, model, contract)
     : undefined;
 
-  const domainEnumLookup: DomainEnumLookup = (ref: ValueSetRef) => {
-    if (ref.entityKind !== 'enum') return undefined;
-    const ns = contract.domain.namespaces[ref.namespaceId];
-    if (!ns) return undefined;
-    const enumBlock = blindCast<
-      Record<string, ContractEnum> | undefined,
-      'ns.enum is an optional ContractEnum record in the emitted IR'
-    >(ns.enum);
-    return enumBlock?.[ref.entityName];
-  };
+  const resolveFieldValueSet = emitter.resolveFieldValueSet
+    ? (modelName: string, fieldName: string, model: ContractModelBase) =>
+        emitter.resolveFieldValueSet?.(modelName, fieldName, model, contract)
+    : undefined;
 
   const namespaceModelsForFieldTypes = namespaceEntries.map(
     ([nsId, ns]) => [nsId, ns.models] as const,
@@ -171,7 +163,7 @@ export function generateContractDts(
     namespaceModelsForFieldTypes,
     codecLookup,
     resolveFieldTypeParams,
-    domainEnumLookup,
+    resolveFieldValueSet,
   );
 
   const extraTypeExports = emitter.getStorageTypeExports?.(contract, codecLookup);

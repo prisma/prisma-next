@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
 import { describe, expect, it } from 'vitest';
 import { generateContractDts } from '../src/generate-contract-dts';
@@ -9,6 +10,21 @@ const HASHES = {
   storageHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
   profileHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
 };
+
+function literalCodecLookup(): CodecLookup {
+  return {
+    get: () => undefined,
+    targetTypesFor: () => undefined,
+    metaFor: () => undefined,
+    renderOutputTypeFor: () => undefined,
+    renderValueLiteralFor: (_id, value) =>
+      typeof value === 'string'
+        ? `'${value}'`
+        : typeof value === 'number' || typeof value === 'boolean'
+          ? String(value)
+          : undefined,
+  };
+}
 
 function makeEnumContract(opts: {
   valueSet: {
@@ -76,8 +92,11 @@ describe('generateContractDts SPI hook plumbing', () => {
   });
 });
 
-describe('generateContractDts domainEnumLookup wiring', () => {
-  it('narrows a domain-enum-valueSet field to the literal union from the enum block', () => {
+describe('generateContractDts resolveFieldValueSet wiring', () => {
+  const priorityResolver: EmissionSpi['resolveFieldValueSet'] = (_m, fieldName) =>
+    fieldName === 'priority' ? { encodedValues: ['low', 'high'], codecId: 'pg/text@1' } : undefined;
+
+  it('narrows an enum field to the literal union supplied by the SPI resolver', () => {
     const contract = makeEnumContract({
       valueSet: {
         plane: 'domain',
@@ -87,11 +106,39 @@ describe('generateContractDts domainEnumLookup wiring', () => {
       },
       includeEnumBlock: true,
     });
-    const dts = generateContractDts(contract, createMockSpi(), [], HASHES);
+    const dts = generateContractDts(
+      contract,
+      createMockSpi({ resolveFieldValueSet: priorityResolver }),
+      [],
+      HASHES,
+      undefined,
+      literalCodecLookup(),
+    );
     expect(dts).toContain("readonly priority: 'low' | 'high'");
   });
 
-  it('does not narrow a storage-plane valueSet (entityKind: "valueSet")', () => {
+  it('does not narrow when the SPI supplies no resolveFieldValueSet hook', () => {
+    const contract = makeEnumContract({
+      valueSet: {
+        plane: 'domain',
+        namespaceId: 'public',
+        entityKind: 'enum',
+        entityName: 'Priority',
+      },
+      includeEnumBlock: true,
+    });
+    const dts = generateContractDts(
+      contract,
+      createMockSpi(),
+      [],
+      HASHES,
+      undefined,
+      literalCodecLookup(),
+    );
+    expect(dts).toContain("readonly priority: CodecTypes['pg/text@1']['output']");
+  });
+
+  it('falls back to the codec channel when the resolver returns undefined for the field', () => {
     const contract = makeEnumContract({
       valueSet: {
         plane: 'storage',
@@ -101,25 +148,18 @@ describe('generateContractDts domainEnumLookup wiring', () => {
       },
       includeEnumBlock: true,
     });
-    const dts = generateContractDts(contract, createMockSpi(), [], HASHES);
+    const dts = generateContractDts(
+      contract,
+      createMockSpi({ resolveFieldValueSet: () => undefined }),
+      [],
+      HASHES,
+      undefined,
+      literalCodecLookup(),
+    );
     expect(dts).toContain("readonly priority: CodecTypes['pg/text@1']['output']");
   });
 
-  it('returns undefined when the referenced namespace is missing from the domain', () => {
-    const contract = makeEnumContract({
-      valueSet: {
-        plane: 'domain',
-        namespaceId: 'no-such-ns',
-        entityKind: 'enum',
-        entityName: 'Priority',
-      },
-      includeEnumBlock: true,
-    });
-    const dts = generateContractDts(contract, createMockSpi(), [], HASHES);
-    expect(dts).toContain("readonly priority: CodecTypes['pg/text@1']['output']");
-  });
-
-  it('returns undefined when the referenced enum is absent from the namespace block', () => {
+  it('falls back to the codec channel when no codec lookup is supplied', () => {
     const contract = makeEnumContract({
       valueSet: {
         plane: 'domain',
@@ -127,9 +167,14 @@ describe('generateContractDts domainEnumLookup wiring', () => {
         entityKind: 'enum',
         entityName: 'Priority',
       },
-      includeEnumBlock: false,
+      includeEnumBlock: true,
     });
-    const dts = generateContractDts(contract, createMockSpi(), [], HASHES);
+    const dts = generateContractDts(
+      contract,
+      createMockSpi({ resolveFieldValueSet: priorityResolver }),
+      [],
+      HASHES,
+    );
     expect(dts).toContain("readonly priority: CodecTypes['pg/text@1']['output']");
   });
 });

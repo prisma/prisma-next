@@ -8,6 +8,7 @@
  * The factory's method-level generic is the load-bearing piece for literal preservation: per-codec column helpers invoke `descriptor.factory(...)` *directly*, and the direct call binds the generic at its call site. Type extraction (`ReturnType<D['factory']>`, structural matching) widens method generics to their constraint — that's why the column-helper surface is per-codec, not polymorphic.
  */
 
+import type { JsonValue } from '@prisma-next/contract/types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Codec } from './codec';
 import {
@@ -45,6 +46,17 @@ export interface CodecDescriptor<P = void> {
   readonly renderOutputType?: (params: P) => string | undefined;
   /** Emit-path string renderer for the `contract.d.ts` *input* position (create/update values). Returns the TypeScript input type expression for given params. Optional; absent renderers fall back to the codec's base input type. A codec supplies this when its write type is narrower than the generic codec input — e.g. an enum whose input should be the literal member union, not `string`. */
   readonly renderInputType?: (params: P) => string | undefined;
+  /**
+   * Given one stored (codec-encoded) value, return the TypeScript literal type to print for it
+   * (e.g. `'low'`, `1`), or `undefined` if this codec's output isn't literal-expressible (e.g. a
+   * Date-output codec).
+   *
+   * `value` is the `encodeJson` form stored in the value set. `side` selects which type to print:
+   * `output` = the read/SELECT type; `input` = the create/update type. Most codecs render the same
+   * literal for both, but a codec whose read and write types differ can render per side. Called once
+   * per permitted value; the caller joins the results with `|`.
+   */
+  readonly renderValueLiteral?: (value: JsonValue, side: 'output' | 'input') => string | undefined;
   /** The curried higher-order codec. For non-parameterized codecs, the factory is constant — every call returns the same shared codec instance. For parameterized codecs, the factory is called once per `storage.types` instance (or once per inline-`typeParams` column), with `ctx` carrying the column set the resulting codec serves. */
   readonly factory: (params: P) => (ctx: CodecInstanceContext) => Codec;
 }
@@ -82,6 +94,9 @@ export abstract class CodecDescriptorImpl<TParams = void> implements CodecDescri
 
   /** Optional emit-path string renderer for the `contract.d.ts` input position. Returns the TypeScript input type expression for the given params; supplied when the write type is narrower than the generic codec input (e.g. an enum's literal member union). */
   renderInputType?(params: TParams): string | undefined;
+
+  /** Optional emit-path renderer for a single stored value. See {@link CodecDescriptor.renderValueLiteral}. */
+  renderValueLiteral?(value: JsonValue, side: 'output' | 'input'): string | undefined;
 
   /**
    * Materialize a curried codec factory for the given params. Concrete subclasses override with a typed return type (e.g. `factory<N>(params: { length: N }): (ctx) => VectorCodec<N>`); per-codec helpers read the typed return at the *direct* call site, which is what preserves method-level generics. Type extraction (e.g. `ReturnType<D['factory']>`) widens method generics to their constraint — that's why the column-helper surface is per-codec, not polymorphic.
