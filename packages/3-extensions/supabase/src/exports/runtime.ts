@@ -4,7 +4,9 @@ export default supabaseRuntimeDescriptor;
 
 export type {
   RoleBoundDb,
+  ServiceRoleDb,
   SupabaseDb,
+  SupabaseInternalDb,
   SupabaseOptions,
   SupabaseOptionsWithContract,
   SupabaseOptionsWithContractJson,

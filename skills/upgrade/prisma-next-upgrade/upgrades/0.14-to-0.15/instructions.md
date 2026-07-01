@@ -73,6 +73,15 @@ kind rename. Re-emit picks up the new contract shape automatically; no consumer
 action required. Incidental substrate diff only.
 -->
 
+<!--
+TML-2503 (extension-supabase slice D): the `examples/supabase` diff adds two new
+integration/type tests exercising the additive `db.asServiceRole().supabase.{sql,orm}`
+admin surface — a secondary root for reading Supabase-internal `auth.*`/`storage.*`
+tables as `service_role`. App authors are unaffected: the admin root is additive, and
+the primary `db.asServiceRole().sql`/`.orm` surface (plus `asUser`/`asAnon`) is
+unchanged. No user action. Incidental substrate diff only.
+-->
+
 # Upgrade 0.14 → 0.15
 
 No consumer-facing action is required for this transition.

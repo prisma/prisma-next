@@ -19,6 +19,7 @@ Explicit list of things we've decided are **not** part of the Supabase integrati
 - **`observed` policy in v0.1.** Possibly drop to ship only `managed / tolerated / external` if the design pressure pushes that way. Decided when the control-policy spec is settled; the four-policy story is the working assumption.
 - **RPC / Postgres function call surface.** No typed `rpc('fn_name', args)` equivalent. Not a regression from the status quo (users don't have this without Prisma Next either); raw SQL escape hatch is the v0.1 fallback.
 - **`CREATE EXTENSION` statements.** Handled by target-specific extension packs (e.g., the existing pgvector extension). Not a Supabase-specific concern.
+- **Runtime bound to the aggregate contract (the principled multi-root design).** Admin access to Supabase-internal tables ships as a *secondary root* — `db.asServiceRole().supabase.{sql,orm}`, implemented as two contract-bound runtimes sharing one pool ([decision C15](decisions.md)). That's the pragmatic interim. The principled end state is a single `Runtime` bound to the **aggregate contract** (the composed app + extension contract spaces) that serves all roots natively — and would be the substrate real cross-space querying rides on. Deferred; not v0.1.
 
 ## Stretch goals (in-scope if time permits)
 
