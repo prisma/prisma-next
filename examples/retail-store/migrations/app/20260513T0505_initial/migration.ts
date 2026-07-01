@@ -3,10 +3,10 @@ import { MigrationCLI } from '@prisma-next/cli/migration-cli';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { createCollection, createIndex } from '@prisma-next/target-mongo/migration';
 import type { Contract as End } from './end-contract';
-import endContractJson from './end-contract.json' with { type: 'json' };
+import endContract from './end-contract.json' with { type: 'json' };
 
 class M extends Migration<never, End> {
-  override readonly endContractJson = endContractJson;
+  override readonly endContractJson = endContract;
 
   override get operations() {
     return [
