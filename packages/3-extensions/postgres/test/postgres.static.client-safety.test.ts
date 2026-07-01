@@ -5,15 +5,19 @@
  * relative imports within a package AND value imports of @prisma-next/*
  * packages into their own source (resolved via each consumer's own
  * node_modules, since pnpm links workspace packages per-consumer rather
- * than at the repo root). Asserts that no reachable value import is
- * pg or @prisma-next/driver-postgres. `import type` / `export type`
- * specifiers are skipped: they're erased at build time and can't leak
- * the driver into a bundle.
+ * than at the repo root). Package exports are resolved for both string
+ * and conditional-object forms, and for both dist/<name>.mjs and
+ * dist/exports/<name>.mjs layouts. Asserts that no reachable value
+ * import is pg or @prisma-next/driver-postgres. `import type` /
+ * `export type` specifiers are skipped: they're erased at build time
+ * and can't leak the driver into a bundle. `require()` and dynamic
+ * `import()` calls are treated as value imports.
  */
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { timeouts } from '@prisma-next/test-utils';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../');
 const FORBIDDEN = ['pg', '@prisma-next/driver-postgres'];
@@ -25,16 +29,25 @@ interface ImportSpecifier {
 }
 
 function extractImports(source: string): ImportSpecifier[] {
-  const re =
+  const staticRe =
     /(?:^|\n)\s*(import|export)\s+(type\s+)?[^'"]*?from\s*['"]([^'"]+)['"]|(?:^|\n)\s*(import|export)\s+(type\s+)?['"]([^'"]+)['"]/g;
   const result: ImportSpecifier[] = [];
-  let match = re.exec(source);
+  let match = staticRe.exec(source);
   while (match !== null) {
     const specifier = match[3] ?? match[6];
     const typeOnly = Boolean(match[2] ?? match[5]);
     if (specifier) result.push({ specifier, typeOnly });
-    match = re.exec(source);
+    match = staticRe.exec(source);
   }
+
+  const dynamicRe = /\b(?:require|await\s+import)\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+  match = dynamicRe.exec(source);
+  while (match !== null) {
+    const specifier = match[1];
+    if (specifier) result.push({ specifier, typeOnly: false });
+    match = dynamicRe.exec(source);
+  }
+
   return result;
 }
 
@@ -62,6 +75,22 @@ function findPackageDir(fromDir: string, pkgName: string): string | null {
   }
 }
 
+function conditionTarget(target: object, condition: string): unknown {
+  return condition in target ? Reflect.get(target, condition) : undefined;
+}
+
+function distPathForExportTarget(target: unknown): string | null {
+  if (typeof target === 'string') return target;
+  if (target !== null && typeof target === 'object') {
+    const preferred =
+      conditionTarget(target, 'import') ??
+      conditionTarget(target, 'node') ??
+      conditionTarget(target, 'default');
+    if (typeof preferred === 'string') return preferred;
+  }
+  return null;
+}
+
 function sourceEntryForSubpath(pkgDir: string, subpath: string): string | null {
   const packageJsonPath = join(pkgDir, 'package.json');
   if (!existsSync(packageJsonPath)) return null;
@@ -72,11 +101,10 @@ function sourceEntryForSubpath(pkgDir: string, subpath: string): string | null {
   if (!exportsMap) return null;
 
   const exportKey = subpath === '' ? '.' : `./${subpath}`;
-  const target = exportsMap[exportKey];
-  const distPath = typeof target === 'string' ? target : null;
+  const distPath = distPathForExportTarget(exportsMap[exportKey]);
   if (!distPath) return null;
 
-  const distMatch = /dist\/(.+)\.mjs$/.exec(distPath);
+  const distMatch = /dist\/(?:exports\/)?(.+)\.mjs$/.exec(distPath);
   if (!distMatch) return null;
   const entryName = distMatch[1];
 
@@ -141,9 +169,19 @@ function collectReachable(entrypoint: string): {
 }
 
 describe('@prisma-next/postgres/static client-safety', () => {
-  it('the /static module graph has no value import of a driver package', () => {
+  let reachable: ReturnType<typeof collectReachable>;
+
+  beforeAll(() => {
     const entry = join(ROOT, 'src/exports/static.ts');
-    const { valueImportsBySpecifier } = collectReachable(entry);
+    reachable = collectReachable(entry);
+  }, timeouts.typeScriptCompilation);
+
+  it('walks a non-trivial number of files', () => {
+    expect(reachable.files.size).toBeGreaterThan(100);
+  });
+
+  it('the /static module graph has no value import of a driver package', () => {
+    const { valueImportsBySpecifier } = reachable;
 
     for (const forbidden of FORBIDDEN) {
       const importers = valueImportsBySpecifier.get(forbidden);
