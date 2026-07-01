@@ -2,7 +2,10 @@ import {
   computeContentHash,
   normalizePredicate,
 } from '@prisma-next/target-postgres/rls-canonicalize';
-import { isPostgresSchemaIR, PostgresRlsPolicy } from '@prisma-next/target-postgres/types';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresPolicySchemaNode,
+} from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createDriver,
@@ -57,11 +60,11 @@ describe.sequential('RLS introspection', () => {
     );
 
     const schema = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(schema);
 
-    expect(isPostgresSchemaIR(schema)).toBe(true);
-    if (!isPostgresSchemaIR(schema)) return;
-
-    const { rlsPolicies } = schema;
+    const rlsPolicies = Object.values(schema.namespaces['public']!.tables).flatMap(
+      (t) => t.policies,
+    );
 
     expect(rlsPolicies).toBeDefined();
     expect(Array.isArray(rlsPolicies)).toBe(true);
@@ -69,7 +72,7 @@ describe.sequential('RLS introspection', () => {
 
     const policy = rlsPolicies.find((p) => p.tableName === 'posts');
     expect(policy).toBeDefined();
-    expect(policy).toBeInstanceOf(PostgresRlsPolicy);
+    expect(policy).toBeInstanceOf(PostgresPolicySchemaNode);
 
     // Introspect reads policyname verbatim from pg_policies — no hash recompute.
     expect(policy!.name).toBe(wireName);
@@ -85,9 +88,7 @@ describe.sequential('RLS introspection', () => {
     timeout: testTimeout,
   }, async () => {
     const schema = await familyInstance.introspect({ driver: driver! });
-
-    expect(isPostgresSchemaIR(schema)).toBe(true);
-    if (!isPostgresSchemaIR(schema)) return;
+    PostgresDatabaseSchemaNode.assert(schema);
 
     const { roles } = schema;
 

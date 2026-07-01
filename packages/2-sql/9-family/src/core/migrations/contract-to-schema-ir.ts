@@ -1,6 +1,7 @@
 import type { ColumnDefault, Contract, JsonValue } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
 import {
+  assertStorageTable,
   type CheckConstraint,
   type ForeignKey,
   type Index,
@@ -360,6 +361,48 @@ export interface ContractToSchemaIROptions {
  *
  * Returns an empty schema IR when `contract` is `null` (new project).
  */
+/**
+ * Converts the tables of a single namespace into a `SqlSchemaIR`, keyed by
+ * table name within that namespace. Unlike {@link contractToSchemaIR}, which
+ * flattens every namespace's tables into one bare-keyed record (and throws on a
+ * cross-namespace name collision), this scopes the table iteration to one
+ * namespace so the same table name can exist in two schemas.
+ *
+ * The full `storage` is still passed to `convertTable`, so value-set / enum /
+ * type resolution that legitimately spans namespaces is unaffected. Foreign
+ * keys are built purely from the FK descriptor (`fk.target`), so cross-namespace
+ * FKs survive per-namespace conversion. The `annotations` block (storage-type
+ * derived) is omitted here — the per-namespace tree consumer reads only the
+ * per-table fields.
+ */
+export function contractNamespaceToSchemaIR(
+  storage: SqlStorage,
+  namespaceId: string,
+  options: ContractToSchemaIROptions,
+): SqlSchemaIR {
+  if (options.annotationNamespace.length === 0) {
+    throw new Error('annotationNamespace must be a non-empty string');
+  }
+  const namespace = storage.namespaces[namespaceId];
+  if (!namespace) {
+    return { tables: {} };
+  }
+  const storageTypes: ResolvedStorageTypes = { ...(storage.types ?? {}) };
+  const tables: Record<string, SqlTableIR> = {};
+  for (const [tableName, tableDefRaw] of Object.entries(namespace.entries.table ?? {})) {
+    assertStorageTable(tableDefRaw, `namespaces.${namespaceId}.entries.table.${tableName}`);
+    tables[tableName] = convertTable(
+      tableName,
+      tableDefRaw,
+      storageTypes,
+      options.expandNativeType,
+      options.renderDefault,
+      storage,
+    );
+  }
+  return { tables };
+}
+
 export function contractToSchemaIR(
   contract: Contract<SqlStorage> | null,
   options: ContractToSchemaIROptions,
@@ -373,17 +416,11 @@ export function contractToSchemaIR(
   }
 
   const storage = contract.storage;
-  const storageTypes: ResolvedStorageTypes = {
-    ...((storage.types ?? {}) as ResolvedStorageTypes),
-  };
+  const storageTypes: ResolvedStorageTypes = { ...(storage.types ?? {}) };
   const tables: Record<string, SqlTableIR> = {};
   for (const ns of Object.values(storage.namespaces)) {
     for (const [tableName, tableDefRaw] of Object.entries(ns.entries.table ?? {})) {
-      if (!isStorageTable(tableDefRaw)) {
-        throw new Error(
-          `contractToSchemaIR: expected StorageTable at namespaces.${ns.id}.entries.table.${tableName}`,
-        );
-      }
+      assertStorageTable(tableDefRaw, `namespaces.${ns.id}.entries.table.${tableName}`);
       const tableDef = tableDefRaw;
       if (tables[tableName] !== undefined) {
         throw new Error(
@@ -420,7 +457,7 @@ function deriveAnnotations(
 ): SqlAnnotations | undefined {
   const storageTypes: Record<string, StorageTypeInstance> = {};
 
-  for (const typeInstance of Object.values((storage.types ?? {}) as ResolvedStorageTypes)) {
+  for (const typeInstance of Object.values(storage.types ?? {})) {
     if (isStorageTypeInstance(typeInstance)) {
       storageTypes[typeInstance.nativeType] = typeInstance;
     }

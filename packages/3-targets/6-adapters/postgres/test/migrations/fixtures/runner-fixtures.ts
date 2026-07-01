@@ -21,7 +21,10 @@ import { buildControlTableBootstrapQueries } from '@prisma-next/target-postgres/
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
-import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import {
+  PostgresDatabaseSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf, createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { createPostgresBuiltinCodecLookup } from '../../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../../src/core/control-adapter';
@@ -61,13 +64,11 @@ export const contract: Contract<SqlStorage> = {
   meta: {},
 };
 
-export const emptySchema = new PostgresSchemaIR({
-  tables: {},
-  pgSchemaName: 'public',
-  pgVersion: 'unknown',
+export const emptySchema = new PostgresDatabaseSchemaNode({
+  namespaces: {},
   roles: [],
   existingSchemas: ['public'],
-  nativeEnumTypeNames: [],
+  pgVersion: 'unknown',
 });
 
 const controlStack = createControlStack({

@@ -56,6 +56,23 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, string>>;
   }): VerifyDatabaseSchemaResult;
 
+  /**
+   * Prunes the introspected live schema to the slice claimed by one aggregate
+   * member, given the entity names owned by the other members. The framework
+   * touches no storage shape: the aggregate verifier/planner call this so the
+   * per-space verify doesn't see sibling members' entities as extras. Only the
+   * family knows its introspected shape (SQL's flat/namespaced `SqlSchemaIRNode`,
+   * Mongo's `collections`).
+   */
+  projectSchemaToMember(schema: TSchemaIR, ownedByOtherNames: ReadonlySet<string>): TSchemaIR;
+
+  /**
+   * Lists the bare names of every top-level entity in the introspected live
+   * schema. Used by the aggregate verifier's orphan detection. Family-provided
+   * for the same reason as {@link projectSchemaToMember}.
+   */
+  listSchemaEntityNames(schema: TSchemaIR): readonly string[];
+
   sign(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;
     readonly contract: unknown;

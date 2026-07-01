@@ -3,7 +3,7 @@ import type {
   PslNativeTypeAttribute,
   PslTypeMap,
   PslTypeResolution,
-} from './printer-config';
+} from '@prisma-next/family-sql/psl-infer';
 
 const POSTGRES_TO_PSL: Record<string, string> = {
   text: 'String',

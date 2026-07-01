@@ -2,9 +2,9 @@ import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { DefaultMappingOptions } from './default-mapping';
 
 /**
- * Internal printer-shaped configuration, used by the SQL family's
- * `sqlSchemaIrToPslAst` helper (M2). The framework-level psl-printer no longer
- * exposes these — they're consumed only inside the SQL family.
+ * Printer-shaped configuration for database→PSL inference: dialect-neutral types
+ * the SQL family exports and the target's inference (which owns the dialect maps)
+ * consumes.
  */
 
 export type PslNativeTypeAttribute = {

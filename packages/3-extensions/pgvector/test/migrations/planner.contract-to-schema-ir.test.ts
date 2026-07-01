@@ -26,7 +26,12 @@ import {
 import { postgresRenderDefault } from '@prisma-next/target-postgres/control';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
-import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  PostgresTableSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
@@ -92,23 +97,42 @@ function createTestContract(
 }
 
 // Carry the contract's enum native-type names in `nativeEnumTypeNames` (the
-// `PostgresSchemaIR` field that records which enum types already exist — the
-// signal the enum `planTypeOperations` hook reads to decide whether to emit a
-// `CREATE TYPE`).
+// `PostgresNamespaceSchemaNode` field that records which enum types already
+// exist — the signal the enum `planTypeOperations` hook reads to decide
+// whether to emit a `CREATE TYPE`).
 function contractToSchemaIR(
   contract: Contract<SqlStorage> | null,
   options?: Omit<Parameters<typeof contractToSchemaIRImpl>[1], 'annotationNamespace'>,
-): PostgresSchemaIR {
+): PostgresDatabaseSchemaNode {
   const sqlIr = contractToSchemaIRImpl(contract, { annotationNamespace: 'pg', ...options });
   const nativeEnumTypeNames =
     contract === null ? [] : Object.values(contract.storage.types ?? {}).map((t) => t.nativeType);
-  return new PostgresSchemaIR({
-    tables: sqlIr.tables,
-    pgSchemaName: 'public',
-    pgVersion: '',
+  const tables = Object.fromEntries(
+    Object.entries(sqlIr.tables).map(([name, t]) => [
+      name,
+      new PostgresTableSchemaNode({
+        name: t.name,
+        columns: t.columns,
+        foreignKeys: t.foreignKeys,
+        uniques: t.uniques,
+        indexes: t.indexes,
+        ...(t.primaryKey !== undefined ? { primaryKey: t.primaryKey } : {}),
+        ...(t.annotations !== undefined ? { annotations: t.annotations } : {}),
+        ...(t.checks !== undefined ? { checks: t.checks } : {}),
+      }),
+    ]),
+  );
+  return new PostgresDatabaseSchemaNode({
+    namespaces: {
+      public: new PostgresNamespaceSchemaNode({
+        schemaName: 'public',
+        tables,
+        nativeEnumTypeNames,
+      }),
+    },
     roles: [],
     existingSchemas: [],
-    nativeEnumTypeNames,
+    pgVersion: '',
   });
 }
 
@@ -695,10 +719,13 @@ function createAdapterHooksComponent(): TargetBoundComponentDescriptor<'sql', st
       const values = typeInstance.typeParams?.['values'] as string[] | undefined;
       if (!values || values.length === 0) return { operations: [] };
 
-      // The "enum already exists" signal lives in `nativeEnumTypeNames` on a
-      // `PostgresSchemaIR` (the production-shaped field a real hook reads).
-      const existingEnumTypes =
-        schema instanceof PostgresSchemaIR ? schema.nativeEnumTypeNames : [];
+      // The "enum already exists" signal lives in `nativeEnumTypeNames` on the
+      // per-schema `PostgresNamespaceSchemaNode`. The strategy layer hands the
+      // hook that namespace node (the per-schema `SqlSchemaIR` shape), so read
+      // the field directly off it.
+      const existingEnumTypes = PostgresNamespaceSchemaNode.is(schema)
+        ? schema.nativeEnumTypeNames
+        : [];
 
       if (existingEnumTypes.includes(typeInstance.nativeType)) {
         return { operations: [] };

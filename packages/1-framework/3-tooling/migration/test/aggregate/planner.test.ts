@@ -21,6 +21,19 @@ const POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening'],
 };
 
+// Flat-`tables` schema-shape pruning standing in for a family's callback. The
+// planner is family-agnostic: it threads this into the synth strategy and never
+// inspects the schema shape itself.
+const STUB_PROJECT = (schema: unknown, ownedByOtherNames: ReadonlySet<string>): unknown => {
+  const s = schema as { tables?: Record<string, unknown> };
+  if (typeof s !== 'object' || s === null || typeof s.tables !== 'object') return schema;
+  const pruned: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(s.tables)) {
+    if (!ownedByOtherNames.has(name)) pruned[name] = value;
+  }
+  return { ...s, tables: pruned };
+};
+
 function makeMember(args: {
   spaceId: string;
   contract?: Contract;
@@ -108,6 +121,7 @@ describe('planMigration', () => {
       frameworkComponents: [],
       callerPolicy: { ignoreGraphFor: new Set(['app']) },
       operationPolicy: POLICY,
+      projectSchemaToMember: STUB_PROJECT,
     });
 
     expect(result.ok).toBe(true);
@@ -145,6 +159,7 @@ describe('planMigration', () => {
       frameworkComponents: [],
       callerPolicy: { ignoreGraphFor: new Set(['app']) },
       operationPolicy: POLICY,
+      projectSchemaToMember: STUB_PROJECT,
     });
 
     expect(result.ok).toBe(true);
@@ -183,6 +198,7 @@ describe('planMigration', () => {
       frameworkComponents: [],
       callerPolicy: { ignoreGraphFor: new Set(['app']) },
       operationPolicy: POLICY,
+      projectSchemaToMember: STUB_PROJECT,
     });
 
     expect(result.ok).toBe(true);
@@ -217,6 +233,7 @@ describe('planMigration', () => {
       // policy conflict.
       callerPolicy: { ignoreGraphFor: new Set(['app', 'cipherstash']) },
       operationPolicy: POLICY,
+      projectSchemaToMember: STUB_PROJECT,
     });
 
     expect(result.ok).toBe(false);
@@ -255,6 +272,7 @@ describe('planMigration', () => {
       // graph-walk can't satisfy its non-empty invariants.
       callerPolicy: { ignoreGraphFor: new Set(['app']) },
       operationPolicy: POLICY,
+      projectSchemaToMember: STUB_PROJECT,
     });
 
     expect(result.ok).toBe(false);
@@ -285,6 +303,7 @@ describe('planMigration', () => {
       frameworkComponents: [],
       callerPolicy: { ignoreGraphFor: new Set(['app']) },
       operationPolicy: POLICY,
+      projectSchemaToMember: STUB_PROJECT,
     });
 
     expect(result.ok).toBe(false);

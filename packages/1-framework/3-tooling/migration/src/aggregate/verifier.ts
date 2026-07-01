@@ -3,7 +3,11 @@ import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { requireHeadRef } from './aggregate';
 import type { ContractMarkerRecordLike } from './marker-types';
-import { projectSchemaToSpace } from './project-schema-to-space';
+import {
+  type ListSchemaEntityNames,
+  type ProjectSchemaToMember,
+  projectSchemaToSpace,
+} from './project-schema-to-space';
 import type { ContractSpaceAggregate, ContractSpaceMember } from './types';
 
 /**
@@ -34,6 +38,15 @@ export interface VerifierInput<TSchemaResult> {
     member: ContractSpaceMember,
     mode: 'strict' | 'lenient',
   ) => TSchemaResult;
+  /**
+   * Caller-supplied schema-shape callbacks. The framework touches no storage
+   * shape: `projectSchemaToMember` prunes the live schema to a member's slice,
+   * and `listEntityNames` enumerates the live entity names for orphan
+   * detection. The families provide both (each knows how its own introspected
+   * schema is shaped); the CLI wires them.
+   */
+  readonly projectSchemaToMember: ProjectSchemaToMember;
+  readonly listEntityNames: ListSchemaEntityNames;
 }
 
 /**
@@ -131,7 +144,15 @@ export function verifyMigration<TSchemaResult>(
 function runVerifyMigration<TSchemaResult>(
   input: VerifierInput<TSchemaResult>,
 ): VerifierOutput<TSchemaResult> {
-  const { aggregate, markersBySpaceId, schemaIntrospection, mode, verifySchemaForMember } = input;
+  const {
+    aggregate,
+    markersBySpaceId,
+    schemaIntrospection,
+    mode,
+    verifySchemaForMember,
+    projectSchemaToMember,
+    listEntityNames,
+  } = input;
   const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
   const memberSpaceIds = new Set(allMembers.map((m) => m.spaceId));
 
@@ -178,7 +199,12 @@ function runVerifyMigration<TSchemaResult>(
   const schemaPerSpace = new Map<string, TSchemaResult>();
   for (const member of allMembers) {
     const others = allMembers.filter((m) => m.spaceId !== member.spaceId);
-    const projected = projectSchemaToSpace(schemaIntrospection, member, others);
+    const projected = projectSchemaToSpace(
+      schemaIntrospection,
+      member,
+      others,
+      projectSchemaToMember,
+    );
     schemaPerSpace.set(member.spaceId, verifySchemaForMember(projected, member, mode));
   }
 
@@ -189,24 +215,24 @@ function runVerifyMigration<TSchemaResult>(
     },
     schemaCheck: {
       perSpace: schemaPerSpace,
-      orphanElements: detectOrphanElements(schemaIntrospection, allMembers),
+      orphanElements: detectOrphanElements(schemaIntrospection, allMembers, listEntityNames),
     },
   });
 }
 
 /**
- * Live tables not claimed by any aggregate member. Duck-typed against
- * the introspected schema's `tables` map; schemas whose shape doesn't
- * match return an empty list (consistent with
- * {@link projectSchemaToSpace}'s fall-through).
+ * Live entities not claimed by any aggregate member. The live entity names come
+ * from the family-provided {@link ListSchemaEntityNames} callback; the claimed
+ * names come from each member's contract storage via {@link elementCoordinates}
+ * (target-agnostic). The framework never inspects the schema shape.
  */
 function detectOrphanElements(
   schemaIntrospection: unknown,
   members: ReadonlyArray<ContractSpaceMember>,
+  listEntityNames: ListSchemaEntityNames,
 ): readonly OrphanElement[] {
-  if (typeof schemaIntrospection !== 'object' || schemaIntrospection === null) return [];
-  const liveTables = (schemaIntrospection as { readonly tables?: unknown }).tables;
-  if (typeof liveTables !== 'object' || liveTables === null) return [];
+  const liveTableNames = listEntityNames(schemaIntrospection);
+  if (liveTableNames.length === 0) return [];
 
   const claimedTables = new Set<string>();
   for (const member of members) {
@@ -217,7 +243,7 @@ function detectOrphanElements(
   }
 
   const orphans: OrphanElement[] = [];
-  for (const tableName of Object.keys(liveTables as Record<string, unknown>)) {
+  for (const tableName of liveTableNames) {
     if (!claimedTables.has(tableName)) {
       orphans.push({ kind: 'table', name: tableName });
     }

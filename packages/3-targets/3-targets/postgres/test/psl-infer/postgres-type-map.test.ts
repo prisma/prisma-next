@@ -3,7 +3,7 @@ import {
   createPostgresTypeMap,
   extractEnumDefinitions,
   extractEnumTypeNames,
-} from '../../src/core/psl-contract-infer/postgres-type-map';
+} from '../../src/core/psl-infer/postgres-type-map';
 
 describe('createPostgresTypeMap', () => {
   const typeMap = createPostgresTypeMap();

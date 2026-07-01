@@ -74,3 +74,12 @@ export function isStorageTable(value: unknown): value is StorageTable {
   if (typeof value !== 'object' || value === null) return false;
   return 'columns' in value && 'uniques' in value && 'indexes' in value && 'foreignKeys' in value;
 }
+
+export function assertStorageTable(
+  value: unknown,
+  coordinate: string,
+): asserts value is StorageTable {
+  if (!isStorageTable(value)) {
+    throw new Error(`Expected a StorageTable at ${coordinate}`);
+  }
+}

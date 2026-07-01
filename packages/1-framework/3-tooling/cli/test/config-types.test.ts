@@ -62,6 +62,8 @@ describe('defineConfig', () => {
           },
           timings: { total: 0 },
         }),
+        projectSchemaToMember: (schema: unknown) => schema,
+        listSchemaEntityNames: () => [],
         sign: async () => ({
           ok: true,
           summary: 'test',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
+import { verifySqlSchema } from '../src/core/diff/sql-schema-diff';
 import {
   createContractTable,
   createMockPostgresComponent,

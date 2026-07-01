@@ -1,18 +1,19 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { isPostgresSchema } from '../postgres-schema';
-import { isPostgresSchemaIR } from './postgres-schema-ir';
 
+/**
+ * Resolves a namespace coordinate to its live DDL schema name. Named
+ * Postgres namespaces dispatch to `ddlSchemaName(storage)`; the unbound
+ * sentinel resolves to `public` (the search-path default for offline
+ * planning); bare object payloads fall back to the coordinate itself.
+ */
 export function resolveDdlSchemaForNamespaceStorage(
   storage: SqlStorage,
   namespaceId: string,
-  schemaIr?: SqlSchemaIR,
 ): string {
   if (namespaceId === UNBOUND_NAMESPACE_ID) {
-    return (
-      (schemaIr && isPostgresSchemaIR(schemaIr) ? schemaIr.pgSchemaName : undefined) ?? 'public'
-    );
+    return 'public';
   }
   const namespace = storage.namespaces[namespaceId];
   if (namespace && isPostgresSchema(namespace)) {

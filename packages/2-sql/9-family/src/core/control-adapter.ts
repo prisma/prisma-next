@@ -1,14 +1,9 @@
-import type {
-  Contract,
-  ContractMarkerRecord,
-  LedgerEntryRecord,
-} from '@prisma-next/contract/types';
+import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import type {
   ControlAdapterInstance,
   ControlStack,
-  SchemaDiffIssue,
 } from '@prisma-next/framework-components/control';
-import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   DdlNode,
@@ -16,8 +11,8 @@ import type {
   LowererContext,
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/verify-sql-schema';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import type { DefaultNormalizer, NativeTypeNormalizer } from './diff/sql-schema-diff';
 
 /**
  * Structural interface for anything that can lower a SQL/DDL AST node to a
@@ -162,22 +157,27 @@ export interface SqlControlAdapter<TTarget extends string = string>
   ): Promise<void>;
 
   /**
-   * Introspects a database schema and returns a raw SqlSchemaIR.
+   * Introspects a database schema and returns the target's schema-IR node.
    *
    * This is a pure schema discovery operation that queries the database catalog
    * and returns the schema structure without type mapping or contract enrichment.
    * Type mapping and enrichment are handled separately by enrichment helpers.
    *
+   * The return type is the family-base `SqlSchemaIRNode` so each target returns
+   * its own node shape: SQLite returns a flat `SqlSchemaIR`, Postgres returns a
+   * `PostgresDatabaseSchemaNode` tree root. Consumers `ensure` the concrete
+   * target type before walking it.
+   *
    * @param driver - ControlDriverInstance instance for executing queries (target-specific)
    * @param contract - Optional contract for contract-guided introspection (filtering, optimization)
    * @param schema - Schema name to introspect (defaults to 'public')
-   * @returns Promise resolving to SqlSchemaIR representing the live database schema
+   * @returns Promise resolving to the live database schema node
    */
   introspect(
     driver: SqlControlDriverInstance<TTarget>,
     contract?: unknown,
     schema?: string,
-  ): Promise<SqlSchemaIR>;
+  ): Promise<SqlSchemaIRNode>;
 
   /**
    * Optional target-specific normalizer for raw database default expressions.
@@ -192,18 +192,6 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * before comparison with contract native types during schema verification.
    */
   readonly normalizeNativeType?: NativeTypeNormalizer;
-
-  /**
-   * Optional hook for collecting target-specific diff issues during schema
-   * verification. Called after the relational SQL verification pass; returns
-   * generic `SchemaDiffIssue[]` (coordinate + outcome + message — no target
-   * naming) that are folded into `VerifyDatabaseSchemaResult.schema.schemaDiffIssues`
-   * and counted as failures when non-empty.
-   */
-  collectSchemaDiffIssues?(
-    contract: Contract<SqlStorage>,
-    schema: SqlSchemaIR,
-  ): readonly SchemaDiffIssue[];
 
   /**
    * Ordered DDL queries that bootstrap marker/ledger control tables for migration

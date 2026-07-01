@@ -15,7 +15,7 @@ import type {
   SqlPlannerConflict,
   SqlPlannerConflictLocation,
 } from '@prisma-next/family-sql/control';
-import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
+import { arraysEqual } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type {

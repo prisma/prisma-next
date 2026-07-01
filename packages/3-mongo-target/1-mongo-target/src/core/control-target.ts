@@ -9,7 +9,10 @@ import type {
   MongoControlFamilyInstance,
   MongoControlTargetDescriptor,
 } from '@prisma-next/family-mongo/control';
-import { contractToMongoSchemaIR } from '@prisma-next/family-mongo/control';
+import {
+  contractToMongoSchemaIR,
+  mongoProjectSchemaToMember,
+} from '@prisma-next/family-mongo/control';
 import type { MongoControlAdapter } from '@prisma-next/family-mongo/control-adapter';
 import type {
   MigrationRunner,
@@ -121,7 +124,12 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
               // before handing it to `verifyMongoSchema` (which
               // depends on the class's `collectionNames` /
               // `collection(name)` accessors).
-              const projected = projectSchemaToSpace(schema, member, others) as {
+              const projected = projectSchemaToSpace(
+                schema,
+                member,
+                others,
+                mongoProjectSchemaToMember,
+              ) as {
                 readonly collections: ReadonlyArray<MongoSchemaCollection>;
               };
               return new MongoSchemaIR(projected.collections);

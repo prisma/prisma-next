@@ -22,6 +22,7 @@ export type {
 } from '../core/migrations/contract-to-schema-ir';
 // Contract → SchemaIR conversion for offline migration planning
 export {
+  contractNamespaceToSchemaIR,
   contractToSchemaIR,
   detectDestructiveChanges,
   resolveValueSetValues,

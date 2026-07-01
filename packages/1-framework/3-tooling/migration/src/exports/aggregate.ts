@@ -23,7 +23,12 @@ export {
   type PlannerSuccess,
   planMigration,
 } from '../aggregate/planner';
-export { projectSchemaToSpace } from '../aggregate/project-schema-to-space';
+export {
+  collectOwnedNames,
+  type ListSchemaEntityNames,
+  type ProjectSchemaToMember,
+  projectSchemaToSpace,
+} from '../aggregate/project-schema-to-space';
 export {
   type GraphWalkOutcome,
   type GraphWalkStrategyInputs,

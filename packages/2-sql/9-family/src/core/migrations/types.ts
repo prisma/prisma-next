@@ -20,7 +20,9 @@ import type {
   OpFactoryCall,
   SchemaIssue,
   SchemaVerifier,
+  VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
 import type {
   SqlControlDriverInstance,
@@ -30,7 +32,7 @@ import type {
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlAdapter } from '../control-adapter';
 import type { SqlControlFamilyInstance } from '../control-instance';
@@ -308,7 +310,12 @@ export type SqlPlannerResult<TTargetDetails> =
 
 export interface SqlMigrationPlannerPlanOptions {
   readonly contract: Contract<SqlStorage>;
-  readonly schema: SqlSchemaIR;
+  /**
+   * The "from"/live schema as the target's introspected node (SQLite a flat
+   * `SqlSchemaIR`, Postgres a `PostgresDatabaseSchemaNode` root). Structure-aware
+   * consumers narrow the concrete shape before walking it.
+   */
+  readonly schema: SqlSchemaIRNode;
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
   /**
@@ -476,8 +483,35 @@ export interface SqlControlTargetDescriptor<
    * the base, the target-specific dispatch on the subclass.
    */
   readonly schemaVerifier: SchemaVerifier<TContract, SqlSchemaIR>;
+  /**
+   * Database→PSL inference for `contract infer`. Target logic (owns the dialect
+   * maps), so it lives on the descriptor. Optional: targets without `contract
+   * infer` (Mongo) omit it, and the family instance throws when it is absent.
+   */
+  readonly inferPslContract?: (schema: SqlSchemaIRNode) => PslDocumentAst;
+  /**
+   * The single combined database-schema diff of two derived representations —
+   * the target's black-box comparison. Every SQL target provides it (Postgres
+   * returns relational + policy issues; SQLite returns relational only). It is
+   * schema logic on the target, not database I/O, so it lives here rather than
+   * on the control adapter. How it computes the two issue sets is private.
+   */
+  readonly diffDatabaseSchema: (input: DiffDatabaseSchemaInput) => VerifyDatabaseSchemaResult;
   createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
+}
+
+/**
+ * Inputs to a target descriptor's {@link SqlControlTargetDescriptor.diffDatabaseSchema}:
+ * the contract (the expected side derives from it), the introspected actual
+ * schema node, and the resolution context the relational diff needs.
+ */
+export interface DiffDatabaseSchemaInput {
+  readonly contract: Contract<SqlStorage>;
+  readonly schema: SqlSchemaIRNode;
+  readonly strict: boolean;
+  readonly typeMetadataRegistry: ReadonlyMap<string, { readonly nativeType?: string }>;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 export interface CreateSqlMigrationPlanOptions<TTargetDetails> {

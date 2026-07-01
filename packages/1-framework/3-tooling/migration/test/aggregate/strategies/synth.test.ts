@@ -17,6 +17,17 @@ const POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening'],
 };
 
+// Flat-`tables` schema-shape pruning standing in for a family's callback.
+const STUB_PROJECT = (schema: unknown, ownedByOtherNames: ReadonlySet<string>): unknown => {
+  const s = schema as { tables?: Record<string, unknown> };
+  if (typeof s !== 'object' || s === null || typeof s.tables !== 'object') return schema;
+  const pruned: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(s.tables)) {
+    if (!ownedByOtherNames.has(name)) pruned[name] = value;
+  }
+  return { ...s, tables: pruned };
+};
+
 const STUB_ADAPTER: ControlAdapterInstance<'sql', 'postgres'> =
   {} as unknown as ControlAdapterInstance<'sql', 'postgres'>;
 
@@ -89,6 +100,7 @@ describe('synthStrategy', () => {
       migrations: stubMigrations,
       frameworkComponents: [],
       operationPolicy: POLICY,
+      projectSchemaToMember: STUB_PROJECT,
     });
 
     expect(outcome.kind).toBe('ok');
@@ -143,6 +155,7 @@ describe('synthStrategy', () => {
       migrations: stubMigrations,
       frameworkComponents: [],
       operationPolicy: POLICY,
+      projectSchemaToMember: STUB_PROJECT,
     });
 
     expect(outcome.kind).toBe('failure');

@@ -284,6 +284,13 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
       schemaIntrospection: { tables: { user: { columns: {} }, test_box: { columns: {} } } },
       mode: 'lenient',
       verifySchemaForMember: () => ({ ok: true }),
+      projectSchemaToMember: (schema) => schema,
+      listEntityNames: (schema) => {
+        const s = schema as { tables?: Record<string, unknown> };
+        return typeof s === 'object' && s !== null && typeof s.tables === 'object'
+          ? Object.keys(s.tables)
+          : [];
+      },
     });
     expect(verifyResult.ok).toBe(true);
     if (!verifyResult.ok) return;

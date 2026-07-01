@@ -12,7 +12,8 @@ import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import {
-  PostgresSchemaIR,
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
   PostgresUnboundSchema,
   postgresCreateNamespace,
 } from '@prisma-next/target-postgres/types';
@@ -23,13 +24,17 @@ import pgvectorDescriptor from '../../src/exports/control';
 
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
-const emptySchema = new PostgresSchemaIR({
-  tables: {},
-  pgSchemaName: 'public',
-  pgVersion: '',
+const emptySchema = new PostgresDatabaseSchemaNode({
+  namespaces: {
+    public: new PostgresNamespaceSchemaNode({
+      schemaName: 'public',
+      tables: {},
+      nativeEnumTypeNames: [],
+    }),
+  },
   roles: [],
   existingSchemas: [],
-  nativeEnumTypeNames: [],
+  pgVersion: '',
 });
 
 describe('PostgresMigrationPlanner - storage types', () => {

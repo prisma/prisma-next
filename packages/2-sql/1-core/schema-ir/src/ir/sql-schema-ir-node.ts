@@ -22,6 +22,15 @@ import { IRNodeBase } from '@prisma-next/framework-components/ir';
 export abstract class SqlSchemaIRNode extends IRNodeBase {
   readonly kind?: string;
 
+  /**
+   * Enumerable discriminant identifying which node this is (database /
+   * namespace / table / policy / role). Target concretions set a unique value;
+   * the `.is`/`.assert`/`.ensure` guards compare against it. Unlike `kind`, it
+   * is enumerable, so it survives the `projectSchemaToSpace` spread that
+   * flattens the tree into plain objects.
+   */
+  readonly nodeKind?: string;
+
   constructor() {
     super();
     Object.defineProperty(this, 'kind', {
