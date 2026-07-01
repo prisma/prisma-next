@@ -1,7 +1,25 @@
 ---
 from: "0.14"
 to: "0.15"
-changes: []
+changes:
+  - id: migration-addcheckconstraint-payload
+    summary: |
+      The migration builder's `this.addCheckConstraint({...})` call now takes a
+      discriminated `payload` instead of top-level `column` + `values`. A committed
+      migration that adds an enum value-set check must move `column`/`values` under
+      `payload: { kind: 'valueSet', column, values }`:
+        - this.addCheckConstraint({ schema, table, constraint, column: 'kind', values: ['a', 'b'] })
+        + this.addCheckConstraint({ schema, table, constraint, payload: { kind: 'valueSet', column: 'kind', values: ['a', 'b'] } })
+      The unified call also accepts `payload: { kind: 'expression', expression }` for
+      arbitrary CHECK predicates (e.g. scalar-array element-non-null constraints),
+      which the planner now emits and drift-verifies through this same path.
+      Re-running `prisma-next contract emit` / migration generation produces the new
+      shape automatically; only hand-preserved migration files need the edit.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "addCheckConstraint("
+      anyMatch: true
 ---
 
 <!--
@@ -75,9 +93,12 @@ action required. Incidental substrate diff only.
 
 # Upgrade 0.14 → 0.15
 
-No consumer-facing action is required for this transition.
+The one consumer-facing change is the migration builder's `addCheckConstraint`
+signature (see `migration-addcheckconstraint-payload` above): hand-preserved
+migration files that add an enum value-set check must move `column`/`values` under
+a `payload: { kind: 'valueSet', … }` wrapper. Re-generation emits the new shape.
 
-The diff under `examples/` (and the example migration snapshots) is incidental —
+The remaining diff under `examples/` (and the example migration snapshots) is incidental —
 emitted contract artefacts (`contract.json` / `contract.d.ts`) were regenerated
 for two internal substrate changes:
 
