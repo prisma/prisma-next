@@ -193,8 +193,8 @@ suppression logic, just the grade.**
 tree). A `native_enum` entity lives at `storage.namespaces[ns].entries.native_enum[name]`
 (authoring-design.md §2.4), so it **is** part of `storageHash` — its members are part of the
 migration identity (ADR 199). This is why the permitted values live in storage, not domain
-(`../spec.md` "Why the value-set lives in storage"): the planner derives the expected type
-from storage alone, with no `domain` reference.
+(`../spec.md` "Why the native_enum entity lives in storage"): the planner derives the expected
+type from storage alone, with no `domain` reference.
 
 External enums are recorded in `storage.entries` too (so columns can reference them, casts can
 name them, `db.native_enums` can read them) and therefore feed `storageHash` — but they are

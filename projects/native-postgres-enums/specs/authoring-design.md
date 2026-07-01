@@ -9,7 +9,7 @@ Grounded in the current machinery (all verified on `main`):
 - the PSL generic extension block `kw [name] { key = value }` ([psl-parser syntax-kind.ts](../../../packages/1-framework/2-authoring/psl-parser/src/syntax/syntax-kind.ts)).
 - parameterized codecs (ADR 208) referenced via `field.column(vector(1536))` / a PSL function-call field type.
 - the SQL cast policy `renderTypedParam` reading **static** `meta.db.sql.postgres.nativeType` per codec-id ([adapter-postgres sql-renderer.ts](../../../packages/3-targets/6-adapters/postgres/src/core/sql-renderer.ts), ADR 205).
-- the value-set + codec typing machinery (TML-2886 / TML-2952/2953).
+- the parameterized-codec typing machinery — `renderOutputType` (the `vector(N)` path).
 
 ## 0. One construct, not two
 
@@ -18,8 +18,8 @@ A native Postgres enum is authored with **one construct**: a pack-contributed
 is **no "domain enum realized as native"** path — a native enum is a Postgres *type*, not a
 domain enum (see `../spec.md` "Decision"). The `native_enum` entity provides everything the
 app needs: its members drive a new **`db.native_enums`** facade root (a Postgres-only sibling
-of `db.enums`, §5), its values derive the value-set that drives typing and (in phase 2) the
-`CREATE TYPE`.
+of `db.enums`, §5) and are baked into the `pg.enum` codec's params (which drives typing, §5);
+the managed phase renders `CREATE TYPE` from them. There is **no value-set** on the native path.
 
 The two cases differ only in **control grade** and **who owns the type**, not in the
 authoring surface:
@@ -49,7 +49,7 @@ namespace auth {
 
   model AuthSession {
     id  Uuid            @id
-    aal pg.enum(AalLevel)       // field bound to the pg.enum codec, parameterized by the ref
+    aal pg.enum(AalLevel)       // field bound to the pg.enum codec (values baked from the block)
     @@map("sessions")
   }
 }
@@ -71,25 +71,18 @@ namespace auth {
     }
   },
 
-  "valueSet": {                                   // DERIVED from native_enum.members[].value
-    "AalLevel": { "kind": "valueSet", "values": ["aal1", "aal2", "aal3"] }
-  },
-
   "table": { "sessions": { "columns": {
     "aal": {
-      "nativeType": "aal_level",
+      "nativeType": "aal_level",                             // → the $N::aal_level cast
       "codecId": "pg/enum@1",
-      "typeParams": { "ref": { "plane": "storage", "entityKind": "native_enum",
-                               "namespaceId": "auth", "entityName": "AalLevel" } },
-      "nullable": false,
-      "valueSet": { "plane": "storage", "entityKind": "valueSet",
-                    "namespaceId": "auth", "entityName": "AalLevel" }
+      "typeParams": { "values": ["aal1", "aal2", "aal3"] },  // → typing (the value union)
+      "nullable": false
     }
   } } }
 } } } }
 ```
 
-**Generated read query** (the cast comes from the codec's *dynamic* `nativeType`):
+**Generated read query** (the cast comes from the column's per-instance `nativeType`):
 
 ```sql
 SELECT "aal" FROM "auth"."sessions" WHERE "id" = $1::uuid
@@ -189,14 +182,13 @@ none. Lives at `storage.namespaces[ns].entries.native_enum[HandleName]`, kind
 Composed into the pack via `composeSqlEntityKinds([…, nativeEnumEntityKind])`; validator +
 serializer alongside `policy`/`role`. (Phase-2 concern; §3 of `../spec.md`.)
 
-### 2.5 The derived value-set
+### 2.5 No value-set
 
-At contract-build/emit, the `native_enum` entity's `members[].value` list derives a
-**value-set** (`storage.namespaces[ns].entries.valueSet[HandleName]`, kind `valueSet`,
-`values` in declaration order) — the *same* canonical structure a check enum has (TML-2952/2953).
-The value-set is what typing and enforcement-source read. The value-on-both-sides redundancy
-(native_enum members + value-set values) is the intentional, emitter-guaranteed cross-level
-redundancy (ADR 172).
+Native enums do **not** derive a value-set (that is the check-enum path). The entity's members
+are the single source: they drive `db.native_enums` (§5), and their values are baked into the
+`pg.enum` codec's `typeParams` at authoring time (§3.3) — which is what drives typing. The
+value-on-both-sides redundancy (entity members + baked codec params) is the intentional,
+emitter-guaranteed cross-level redundancy (ADR 172).
 
 ### 2.6 TS surface (mirror; byte-identical contract)
 
@@ -214,37 +206,42 @@ states this invariant). The TS mirror:
 ### 3.1 What it is
 
 A **new parameterized codec**, id `pg/enum@1` (the old value-blind `pg/enum@1` was deleted in
-the TML-2853 cutover; this re-introduces a correct one). It is a text codec (enum values are
-text on the wire) whose **parameter is a reference to a `native_enum` entity**:
+the TML-2853 cutover; this re-introduces a correct one), built on the **`vector(N)` template**.
+It is a text codec (enum values are text on the wire) whose **params carry the enum's values**
+(and its type name), baked from the `native_enum` block at authoring time:
 
 ```
 field:  aal pg.enum(AalLevel)
-column: { codecId: 'pg/enum@1', typeParams: { ref: <native_enum coordinate> }, nativeType: 'aal_level' }
+column: { codecId: 'pg/enum@1', typeParams: { values: ['aal1','aal2','aal3'] }, nativeType: 'aal_level' }
 ```
 
 - **encode/decode:** text passthrough (`encode('aal1') → 'aal1'`, `decode('aal1') → 'aal1'`).
   No runtime value-validation (the type + compile-time union enforce; the parent project
   ruled out a third runtime check).
-- **the param is an entity ref**, not a literal (§7). ADR-208 params are literals
-  (`{length:1536}`); `pg.enum`'s `typeParams.ref` is a
-  `{plane, entityKind:'native_enum', namespaceId, entityName}` coordinate the codec resolves.
+- **typing:** `renderOutputType({ values })` → the value union (§5), exactly as `vector`'s
+  `renderOutputType` → `Vector<N>`.
+- **`nativeType`** = the type name (`aal_level`), carried on the column — drives the `::type`
+  cast (§4).
 
-### 3.2 What the codec resolves the ref for
+### 3.2 What authoring resolution yields
 
-Resolving `typeParams.ref` → the `native_enum` entity yields:
-1. the **type name** (`typeName`, e.g. `aal_level`) → the codec instance's **dynamic
-   `nativeType`** (§4) → the `::aal_level` cast.
-2. the **values** (`members[].value`) → the value-set → the value-union typing (§5).
+Resolving `pg.enum(AalLevel)` → the `native_enum` entity at authoring time (§3.3) bakes two
+things onto the column:
+1. the **type name** (`typeName`, e.g. `aal_level`) → the column's `nativeType` → the
+   `::aal_level` cast (§4).
+2. the **values** (`members[].value`) → the codec's `typeParams.values` → the value-union
+   typing (§5).
 
 ### 3.3 Field-type resolution
 
-- **PSL:** `pg.enum(AalLevel)` is a function-call field type. The field-type resolver
-  recognizes the `pg.enum(<ref>)` form, resolves `<ref>` to the `native_enum` entity's
-  coordinate, and produces the column `{ codecId:'pg/enum@1', typeParams:{ref}, nativeType }`
-  (nativeType stamped from the resolved `typeName`).
+- **PSL:** `pg.enum(AalLevel)` is a function-call field type. **Postgres-specific** field
+  lowering recognizes the `pg.enum(<ref>)` form, resolves `<ref>` to the `native_enum` block in
+  the same document, and **bakes** its values + type name into the column: `{ codecId:
+  'pg/enum@1', typeParams: { values }, nativeType }`. (Not the generic declarative
+  type-constructor template — that only maps scalar literals into `typeParams`, not entity refs.)
 - **TS:** `field.column(pg.enum(AalLevel))` — `pg.enum(handle)` returns a `ColumnTypeDescriptor`
-  carrying `codecId`, `typeParams.ref`, and `nativeType`, exactly as `vector(1536)` returns one
-  carrying `{length}`.
+  carrying `codecId`, `typeParams: { values }`, and `nativeType`, the way `vector(1536)` returns
+  one carrying `{ length }`.
 
 ## 4. The `nativeType` cast — the adapter's existing mechanism, one small wiring change
 
@@ -280,17 +277,13 @@ static codec meta.)
 
 ## 5. Typing, `db.native_enums`, enforcement — all downstream, all reused/derived
 
-- **Typing (value union) — no new typing code.** The column carries a `valueSet` reference,
-  and the SQL query-builder/ORM read the union from it. This lands **today**: the landed
-  `StorageColumnTypes` (TML-2886, [2-sql/3-tooling/emitter/src/index.ts](../../../packages/2-sql/3-tooling/emitter/src/index.ts))
-  computes a column's type from the storage value-set (`computeColumnType` →
-  `renderValueSetUnionBase`), so a `pg.enum` column is `'aal1' | 'aal2' | 'aal3'` with no
-  domain enum and no native-specific path. The enum-typing-via-codec refactor (TML-2952/2953)
-  later re-routes that same union through the codec (`renderValueType`); because enum codecs
-  are text/identity the union is unchanged, so this is refinement, not a dependency. **The
-  domain-plane `FieldOutputTypes` path (`resolveFieldType`/`domainEnumLookup`) is *not*
-  involved** — that reads the domain enum, which a native enum does not have. The no-emit
-  (`typeof contract`) path resolves the union from the authored handle values, as for any enum.
+- **Typing (value union) — parameterized-codec typing.** The `pg.enum` codec's output type is
+  the value union from its `typeParams.values` — the `vector(N)` mechanism. Emit:
+  `computeColumnType`'s codec-refined branch calls `renderOutputTypeFor` → the codec's
+  `renderOutputType({ values })`. No-emit (`typeof contract`): `CodecChannelType` applies the
+  codec's parameterized output type. **No value-set, no `EnumTypeHandle`, no dependency on
+  TML-2952/2953.** The domain-plane `FieldOutputTypes` path is not involved (a native enum has
+  no domain enum). Full detail: [`querying-design.md`](querying-design.md) §2.
 - **`db.native_enums` — a new Postgres-only facade root.** Native-enum members are surfaced
   through a **new `db.native_enums`** accessor: a sibling of `db.enums` composed into the
   Postgres client facade only ([3-extensions/postgres/src/runtime/postgres.ts](../../../packages/3-extensions/postgres/src/runtime/postgres.ts)).
@@ -301,14 +294,16 @@ static codec meta.)
   enums never appear in it. This is the only new read-side code, and it touches nothing outside
   the Postgres facade.
 - **Enforcement.** The native **type** enforces membership. External: the type already
-  exists. Phase 2: `CREATE TYPE … AS ENUM (<values in declaration order>)`, values taken from
-  the value-set/members. **No `CHECK` is written to the table** (contrast the check strategy).
+  exists. Managed phase: `CREATE TYPE … AS ENUM (<values in declaration order>)`, values taken
+  from the entity's members. **No `CHECK` is written to the table** (contrast the check
+  strategy).
 
 ## 6. Ordering
 
 Postgres enum sort order is the *declaration* order of the values. `native_enum`'s member
-order is preserved (ordered arrays) through: block → IR `members` → value-set `values` →
-`CREATE TYPE … AS ENUM (…)`. Declaration-order `ORDER BY` on a native-enum column uses the
+order is preserved (ordered arrays) through: block → IR `members` → the codec's
+`typeParams.values` (and, managed phase, `CREATE TYPE … AS ENUM (…)`). Declaration-order
+`ORDER BY` on a native-enum column uses the
 native type's own ordering (no `array_position` rewrite needed — unlike the text+check
 strategy, the native type *is* ordered), so `ORDER BY aal` sorts `aal1 < aal2 < aal3` by the
 type.
@@ -316,7 +311,7 @@ type.
 ## 7. What is genuinely new vs reused
 
 **New (small; all via existing mechanisms):**
-1. **The `pg/enum@1` codec** (§3) — a parameterized text codec whose param is a `native_enum` ref (vs ADR-208 literal params); resolves the ref for its per-instance `nativeType` + values.
+1. **The `pg/enum@1` codec** (§3) — a parameterized text codec (the `vector(N)` template) whose params carry the enum's values (baked at authoring); `renderOutputType` is the value union.
 2. **Per-column `nativeType` to the cast** (§4) — stamp `columnDef.nativeType` on the `CodecRef`; `renderTypedParam` prefers it. Small, local to the adapter + `CodecRef` builder.
 3. **The `db.native_enums` facade root** (§5) — a Postgres-only sibling of `db.enums`, built from the `native_enum` members; reuses the `EnumAccessor` shape.
 
@@ -327,25 +322,22 @@ Plus the `native_enum` pack-entity contribution itself (an `entityTypes` entry +
 - pack-contributed-entity authoring (entityTypes + block descriptors + lowering factory) — RLS template.
 - top-level `DiffableNode` + generic differ + `control` grading — RLS template (deferred managed phase).
 - parameterized-codec plumbing (ADR 208), `AstCodecResolver` (ADR 212).
-- value-set typing (`StorageColumnTypes`, TML-2886, landed; codec-refined by TML-2952/2953), the `EnumAccessor` mechanics, declaration-order arrays.
+- parameterized-codec typing (`renderOutputType` emit + `CodecChannelType` no-emit — the `vector(N)` path), the `EnumAccessor` mechanics, declaration-order arrays.
 - **No custom seams.** No bespoke storage-entity registration; the old native-enum validator residue (`postgres-enum-type-schema.ts`) is **deleted, not reclaimed** — `native_enum` rides the generic entity mechanism. (The `ISSUE_KIND_ORDER` `type_*`/`enum_values_changed` keys are live generic infra, kept.)
 
 ## 8. End-to-end lowering pipeline
 
 ```
 PSL  native_enum block ──parser(block descriptor, §2.2)──▶ parsed extension block
-     pg.enum(Ref) field ──field-type resolver(§3.3)──────▶ column {codecId, typeParams.ref, nativeType}
+     pg.enum(Ref) field ──field lowering (§3.3)───────────▶ column {codecId, typeParams.values, nativeType}
         │
         ▼ interpreter (entity factory §2.3)
    native_enum IR node (typeName, ordered members, control)   [storage.entries.native_enum]
         │
-        ▼ contract build/emit (§2.5)
-   derived value-set (ordered values)                          [storage.entries.valueSet]
-        │
-        ├─▶ typing:      value-set → union (StorageColumnTypes today; codec renderValueType later)  [contract.d.ts / no-emit]
+        ├─▶ typing:      pg.enum codec renderOutputType({values}) → union   [emit + no-emit]  (§5)
         ├─▶ db.native_enums: native_enum members → EnumAccessor (new Postgres-only facade root; db.enums unchanged)
-        ├─▶ cast:        pg.enum instance nativeType (from ref) → $N::type  (§4)
-        └─▶ enforcement: phase 1 none (external) · phase 2 CREATE TYPE from values  (§5)
+        ├─▶ cast:        column nativeType → $N::type  (§4)
+        └─▶ enforcement: external = pre-existing type · managed = CREATE TYPE from members  (§5)
 ```
 
 TS path (`helpers.nativeEnum` + `field.column(pg.enum(handle))`) lowers to the byte-identical
