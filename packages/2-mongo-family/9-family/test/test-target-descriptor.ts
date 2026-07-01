@@ -14,6 +14,16 @@ export const stubMongoTargetDescriptor: ControlTargetDescriptor<'mongo', 'mongo'
   familyId: 'mongo',
   targetId: 'mongo',
   version: '0.0.1',
+  // Tests using this stub reject before any real serialization runs (the
+  // family instance deserializes contracts itself, not via this slot).
+  contractSerializer: {
+    deserializeContract() {
+      throw new Error('stubMongoTargetDescriptor has no contract serializer');
+    },
+    serializeContract() {
+      throw new Error('stubMongoTargetDescriptor has no contract serializer');
+    },
+  },
   create() {
     return { familyId: 'mongo', targetId: 'mongo' };
   },

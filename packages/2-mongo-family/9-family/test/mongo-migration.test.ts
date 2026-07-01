@@ -1,3 +1,4 @@
+import type { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { describe, expect, it } from 'vitest';
 import { MongoMigration } from '../src/core/mongo-migration';
 import type { Contract } from './fixtures/migration-end-contract.d';
@@ -68,6 +69,10 @@ describe('MongoMigration view getters', () => {
         return [];
       }
     }
-    expect(() => new NoContract().endContract).toThrow(/no endContractJson/);
+    expect(() => new NoContract().endContract).toThrowError(
+      expect.objectContaining({
+        code: 'MIGRATION.CONTRACT_VIEW_MISSING',
+      }) as unknown as MigrationToolsError,
+    );
   });
 });

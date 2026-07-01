@@ -1,3 +1,4 @@
+import type { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { describe, expect, it } from 'vitest';
 import { SqliteMigration } from '../src/core/migrations/sqlite-migration';
 import type { Contract } from './fixtures/sqlite-contract.d';
@@ -70,6 +71,10 @@ describe('SqliteMigration view getters', () => {
         return [];
       }
     }
-    expect(() => new NoContract().endContract).toThrow(/no endContractJson/);
+    expect(() => new NoContract().endContract).toThrowError(
+      expect.objectContaining({
+        code: 'MIGRATION.CONTRACT_VIEW_MISSING',
+      }) as unknown as MigrationToolsError,
+    );
   });
 });
