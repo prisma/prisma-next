@@ -22,7 +22,7 @@ Each slice is named for what a developer can **rely on** when it merges; every D
 
 Retire the conflated `PostgresSchemaIR` (it was a tree node, a schema, and the root at once). New single-purpose tree: **`PostgresDatabaseSchemaNode`** (root; holds roles) → **`PostgresNamespaceSchemaNode`** → **`PostgresTableSchemaNode`** → **`PostgresPolicySchemaNode`** / **`PostgresRoleSchemaNode`** leaves. Diff nodes are split from the authored Contract-IR entities (`PostgresRlsPolicy` / `PostgresRole` stay as the serialized entities). `introspect()` returns the root as a node; consumers `ensure` the target type and walk. Database→PSL inference moves onto the Postgres target (fixing a SQL-family layering violation). **No behavior change.** Spec + design: [`slices/schema-node-tree-restructure/`](slices/schema-node-tree-restructure/).
 
-**Landed:** verify, the planner, and the migration runner share one `diffDatabaseSchema` (returning `{ issues, schemaDiffIssues }` — the two issue types stay distinct until follow-on A); the expected-side projection builds per-namespace, so same-named tables across schemas (`public.thing` + `auth.thing`) now project instead of throwing; inference moved to the Postgres target descriptor. Residual: **D1** (PSL inference still gathers the tree to a flat document for today's single-namespace `contract infer` — tree-walk lands with the namespaced-PSL slice).
+**Landed:** verify, the planner, and the migration runner share one `diffDatabaseSchema` (returning `{ issues, schemaDiffIssues }` — the two issue types stay distinct until follow-on A); the expected-side projection builds per-namespace, so same-named tables across schemas (`public.thing` + `auth.thing`) now project instead of throwing; inference moved to the Postgres target descriptor. Residual: **D1** (PSL inference still gathers the tree to a flat document for today's single-namespace `contract infer`; a fail-loud throw guards the same-name collision — tree-walk tracked in [TML-2958](https://linear.app/prisma-company/issue/TML-2958)).
 
 ### 3 — `explicit-rls-control`
 
@@ -50,7 +50,7 @@ Top-level Postgres policy helpers taking the model handle (not a model-builder m
 ## Out of scope / follow-on projects
 
 - Role-ref **authoring** validation — roles are platform-provided; policies only reference them by name (slice 4 checks existence in the DB, nothing more).
-- **A** — port the legacy relational verifier onto the generic differ (merges the two issue types `SchemaIssue` + `SchemaDiffIssue` into one). **B** — dependency-aware planner ordering (slice 4's edges seed it). **C** — a generic project-from-contract / project-from-database registration surface, once a second node type needs the shared shape. **D1** — walk the schema-node tree in PSL inference instead of gathering it to a flat document (lands with the namespaced-PSL / top-level-entities inference slice).
+- **A** — port the legacy relational verifier onto the generic differ (merges the two issue types `SchemaIssue` + `SchemaDiffIssue` into one). **B** — dependency-aware planner ordering (slice 4's edges seed it). **C** — a generic project-from-contract / project-from-database registration surface, once a second node type needs the shared shape. **D1** ([TML-2958](https://linear.app/prisma-company/issue/TML-2958)) — walk the schema-node tree in PSL inference instead of gathering it to a flat document; a fail-loud throw guards the same-name collision until then. (No planned slice owns this — it is not the RLS slices 3–6.)
 
 ## Linear
 
