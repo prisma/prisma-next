@@ -10,7 +10,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { ContractMarkerRecordLike } from '../marker-types';
 import type { PerSpacePlan } from '../planner-types';
-import { projectSchemaToSpace } from '../project-schema-to-space';
+import { type ProjectSchemaToMember, projectSchemaToSpace } from '../project-schema-to-space';
 import { buildSynthMigrationEdge } from '../synth-migration-edge';
 import type { ContractSpaceMember } from '../types';
 
@@ -28,6 +28,7 @@ export interface SynthStrategyInputs<TFamilyId extends string, TTargetId extends
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly operationPolicy: MigrationOperationPolicy;
+  readonly projectSchemaToMember: ProjectSchemaToMember;
 }
 
 export type SynthStrategyOutcome =
@@ -73,6 +74,7 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
     input.schemaIntrospection,
     input.member,
     input.otherMembers,
+    input.projectSchemaToMember,
   );
 
   const planner = input.migrations.createPlanner(input.adapter);

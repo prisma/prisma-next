@@ -58,6 +58,24 @@ const STUB_VERIFY = (
   return { tablesSeen: Object.keys(schema.tables).sort() };
 };
 
+// Flat-`tables` schema-shape callbacks standing in for a family's. The verifier
+// is family-agnostic: it only calls these, never inspects the shape itself.
+const STUB_PROJECT = (schema: unknown, ownedByOtherNames: ReadonlySet<string>): unknown => {
+  const s = schema as { tables?: Record<string, unknown> };
+  if (typeof s !== 'object' || s === null || typeof s.tables !== 'object') return schema;
+  const pruned: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(s.tables)) {
+    if (!ownedByOtherNames.has(name)) pruned[name] = value;
+  }
+  return { ...s, tables: pruned };
+};
+
+const STUB_LIST = (schema: unknown): readonly string[] => {
+  const s = schema as { tables?: Record<string, unknown> };
+  if (typeof s !== 'object' || s === null || typeof s.tables !== 'object') return [];
+  return Object.keys(s.tables);
+};
+
 describe('verifyMigration', () => {
   describe('markerCheck', () => {
     it('reports `absent` when the member has no marker row', () => {
@@ -70,6 +88,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: { tables: {} },
         mode: 'strict',
         verifySchemaForMember: STUB_VERIFY,
+        projectSchemaToMember: STUB_PROJECT,
+        listEntityNames: STUB_LIST,
       });
       expect(result.ok).toBe(true);
       expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({ kind: 'absent' });
@@ -92,6 +112,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: { tables: {} },
         mode: 'strict',
         verifySchemaForMember: STUB_VERIFY,
+        projectSchemaToMember: STUB_PROJECT,
+        listEntityNames: STUB_LIST,
       });
       expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({ kind: 'ok' });
     });
@@ -109,6 +131,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: { tables: {} },
         mode: 'strict',
         verifySchemaForMember: STUB_VERIFY,
+        projectSchemaToMember: STUB_PROJECT,
+        listEntityNames: STUB_LIST,
       });
       expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({
         kind: 'hashMismatch',
@@ -137,6 +161,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: { tables: {} },
         mode: 'strict',
         verifySchemaForMember: STUB_VERIFY,
+        projectSchemaToMember: STUB_PROJECT,
+        listEntityNames: STUB_LIST,
       });
       expect(result.assertOk().markerCheck.perSpace.get('cipher')).toEqual({
         kind: 'missingInvariants',
@@ -159,6 +185,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: { tables: {} },
         mode: 'strict',
         verifySchemaForMember: STUB_VERIFY,
+        projectSchemaToMember: STUB_PROJECT,
+        listEntityNames: STUB_LIST,
       });
       expect(result.assertOk().markerCheck.orphanMarkers.map((o) => o.spaceId)).toEqual([
         'cipher',
@@ -198,6 +226,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: liveSchema,
         mode: 'strict',
         verifySchemaForMember: STUB_VERIFY,
+        projectSchemaToMember: STUB_PROJECT,
+        listEntityNames: STUB_LIST,
       });
 
       const schemaCheck = result.assertOk().schemaCheck;
@@ -238,6 +268,8 @@ describe('verifyMigration', () => {
         // caller (db verify) decides whether to treat them as errors.
         mode: 'lenient',
         verifySchemaForMember: STUB_VERIFY,
+        projectSchemaToMember: STUB_PROJECT,
+        listEntityNames: STUB_LIST,
       });
 
       expect(result.assertOk().schemaCheck.orphanElements).toEqual([
@@ -269,6 +301,8 @@ describe('verifyMigration', () => {
         },
         mode: 'strict',
         verifySchemaForMember: STUB_VERIFY,
+        projectSchemaToMember: STUB_PROJECT,
+        listEntityNames: STUB_LIST,
       });
 
       expect(result.assertOk().schemaCheck.orphanElements).toEqual([]);
@@ -287,6 +321,8 @@ describe('verifyMigration', () => {
         verifySchemaForMember: () => {
           throw new Error('introspection broke');
         },
+        projectSchemaToMember: STUB_PROJECT,
+        listEntityNames: STUB_LIST,
       });
 
       expect(result.ok).toBe(false);
@@ -296,7 +332,7 @@ describe('verifyMigration', () => {
       });
     });
 
-    it('returns notOk(introspectionFailure) when projectSchemaToSpace throws via a malformed schema', () => {
+    it('returns notOk(introspectionFailure) when a shape callback throws via a malformed schema', () => {
       const aggregate = makeAggregate({
         app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
       });
@@ -313,6 +349,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: exploding,
         mode: 'strict',
         verifySchemaForMember: STUB_VERIFY,
+        projectSchemaToMember: STUB_PROJECT,
+        listEntityNames: STUB_LIST,
       });
 
       expect(result.ok).toBe(false);
@@ -334,6 +372,8 @@ describe('verifyMigration', () => {
           observedMode = mode;
           return { tablesSeen: [] };
         },
+        projectSchemaToMember: STUB_PROJECT,
+        listEntityNames: STUB_LIST,
       });
 
       expect(observedMode).toBe('lenient');

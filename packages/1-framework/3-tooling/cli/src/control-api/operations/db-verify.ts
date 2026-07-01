@@ -116,6 +116,21 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
     schemaIntrospection,
     mode: options.mode,
     verifySchemaForMember: createPerMemberVerifier(options),
+    projectSchemaToMember: (schema, ownedByOtherNames) =>
+      familyInstance.projectSchemaToMember(
+        blindCast<
+          never,
+          'family TSchemaIR is opaque to the CLI; schema is passed straight through'
+        >(schema),
+        ownedByOtherNames,
+      ),
+    listEntityNames: (schema) =>
+      familyInstance.listSchemaEntityNames(
+        blindCast<
+          never,
+          'family TSchemaIR is opaque to the CLI; schema is passed straight through'
+        >(schema),
+      ),
   });
   return finaliseVerifyResult({ verifyResult, aggregate, skipMarker, onProgress });
 }

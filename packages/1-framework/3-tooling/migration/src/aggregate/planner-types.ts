@@ -12,6 +12,7 @@ import type {
 import type { Result } from '@prisma-next/utils/result';
 import type { PathDecision } from '../migration-graph';
 import type { ContractMarkerRecordLike } from './marker-types';
+import type { ProjectSchemaToMember } from './project-schema-to-space';
 import type { ContractSpaceAggregate } from './types';
 
 /**
@@ -81,6 +82,11 @@ export interface PlannerInput<TFamilyId extends string, TTargetId extends string
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly callerPolicy: CallerPolicy;
   readonly operationPolicy: MigrationOperationPolicy;
+  /**
+   * Family-provided callback that prunes the live schema to a member's slice.
+   * Threaded into the synth strategy; the planner never touches the shape.
+   */
+  readonly projectSchemaToMember: ProjectSchemaToMember;
 }
 
 /**

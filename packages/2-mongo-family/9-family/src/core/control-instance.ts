@@ -26,12 +26,14 @@ import {
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
-import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
+import type { MongoSchemaCollection } from '@prisma-next/mongo-schema-ir';
+import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { MongoControlAdapter, MongoControlAdapterDescriptor } from './control-adapter';
 import type { MongoControlExtensionDescriptor } from './control-types';
 import { MongoContractSerializer } from './ir/mongo-contract-serializer';
 import { mongoOperationsToPreview } from './operation-preview';
+import { mongoListSchemaEntityNames, mongoProjectSchemaToMember } from './schema-shape';
 import { mongoSchemaToView } from './schema-to-view';
 import { verifyMongoSchema } from './schema-verify/verify-mongo-schema';
 
@@ -278,6 +280,20 @@ export function createMongoFamilyInstance(controlStack: ControlStack): MongoCont
         strict: options.strict,
         frameworkComponents: options.frameworkComponents,
       });
+    },
+
+    projectSchemaToMember(
+      schema: MongoSchemaIR,
+      ownedByOtherNames: ReadonlySet<string>,
+    ): MongoSchemaIR {
+      const projected = mongoProjectSchemaToMember(schema, ownedByOtherNames) as {
+        readonly collections: ReadonlyArray<MongoSchemaCollection>;
+      };
+      return new MongoSchemaIR(projected.collections);
+    },
+
+    listSchemaEntityNames(schema: MongoSchemaIR): readonly string[] {
+      return mongoListSchemaEntityNames(schema);
     },
 
     async sign(options): Promise<SignDatabaseResult> {
