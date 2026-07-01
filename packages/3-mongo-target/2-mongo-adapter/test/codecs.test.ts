@@ -1,5 +1,5 @@
 import { createOperationRegistry } from '@prisma-next/operations';
-import { ObjectId } from 'mongodb';
+import { ObjectId } from 'bson';
 import { describe, expect, it } from 'vitest';
 import { MONGO_DOUBLE_CODEC_ID, MONGO_VECTOR_CODEC_ID } from '../src/core/codec-ids';
 import {

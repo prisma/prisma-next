@@ -2,10 +2,11 @@ import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { isRuntimeError } from '@prisma-next/framework-components/runtime';
 import { mongoCodec, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   createMongoExecutionContext,
   createMongoExecutionStack,
+  type MongoExecutionContext,
   type MongoRuntimeExtensionDescriptor,
 } from '../src/mongo-execution-stack';
 
@@ -145,6 +146,17 @@ describe('createMongoExecutionContext', () => {
     expect(Object.isFrozen(context)).toBe(true);
     expect(context.contract).toBe(contract);
     expect(context.stack).toBe(stack);
+  });
+
+  it('preserves the TContract type on context.contract (no unknown widening)', () => {
+    const stack = createMongoExecutionStack({
+      target: mongoRuntimeTarget,
+      adapter: mongoRuntimeAdapter,
+    });
+    const contract = { target: 'mongo' as const, storageHash: 'sha256:test' };
+    const context = createMongoExecutionContext({ contract, stack });
+    expectTypeOf(context).toMatchTypeOf<MongoExecutionContext<typeof contract>>();
+    expectTypeOf(context.contract).toEqualTypeOf<typeof contract>();
   });
 });
 

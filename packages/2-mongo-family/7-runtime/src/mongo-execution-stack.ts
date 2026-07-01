@@ -111,16 +111,19 @@ export interface MongoCodecLookup {
  *
  * Mirrors SQL's `ExecutionContext` in role; Mongo's flavour is leaner because there are no parameterised codecs, JSON-schema validators, or mutation-default generators in scope yet.
  */
-export interface MongoExecutionContext<TTargetId extends string = 'mongo'> {
-  readonly contract: unknown;
+export interface MongoExecutionContext<TContract = unknown, TTargetId extends string = 'mongo'> {
+  readonly contract: TContract;
   readonly codecs: MongoCodecLookup;
   readonly stack: MongoExecutionStack<TTargetId>;
 }
 
-export function createMongoExecutionContext<TTargetId extends string = 'mongo'>(options: {
-  readonly contract: unknown;
+export function createMongoExecutionContext<
+  TContract = unknown,
+  TTargetId extends string = 'mongo',
+>(options: {
+  readonly contract: TContract;
   readonly stack: MongoExecutionStack<TTargetId>;
-}): MongoExecutionContext<TTargetId> {
+}): MongoExecutionContext<TContract, TTargetId> {
   const registry = newMongoCodecRegistry();
   const owners = new Map<string, string>();
 
