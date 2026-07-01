@@ -112,9 +112,22 @@ export function inferPostgresPslContract(tree: PostgresDatabaseSchemaNode): PslD
   // builder walks. This replaces the old flat `.tables` iteration; it does not
   // reintroduce a stored flat schema — it is a read-only projection for PSL
   // emission over a single introspected namespace.
+  //
+  // Multi-namespace PSL inference (per-namespace `namespace { … }` output) is not
+  // supported yet — `contract infer` introspects a single namespace and emits one
+  // flat `__unspecified__` bucket. Until the per-namespace tree-walk lands, a
+  // same-named table in two schemas has no unambiguous single-bucket model, so
+  // throw rather than silently dropping one.
   const tables: Record<string, SqlTableIR> = {};
   for (const namespace of namespaces) {
     for (const [tableName, table] of Object.entries(namespace.tables)) {
+      if (tables[tableName] !== undefined) {
+        throw new Error(
+          `contract infer: duplicate table name "${tableName}" across schemas is not yet supported ` +
+            '(single-namespace PSL inference emits one flat bucket; multi-namespace `namespace { … }` ' +
+            'output is a later slice).',
+        );
+      }
       tables[tableName] = table;
     }
   }

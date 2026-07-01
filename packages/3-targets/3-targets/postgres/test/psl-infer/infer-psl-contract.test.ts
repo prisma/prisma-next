@@ -2,6 +2,10 @@ import { flatPslModels } from '@prisma-next/framework-components/psl-ast';
 import { printPsl } from '@prisma-next/psl-printer';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
+import { inferPostgresPslContract } from '../../src/core/psl-infer/infer-psl-contract';
+import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
+import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
+import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 import { inferPslAstFromFlat as sqlSchemaIrToPslAst } from './fixtures';
 
 function ir(partial: Partial<SqlSchemaIR> & Pick<SqlSchemaIR, 'tables'>): SqlSchemaIR {
@@ -263,5 +267,36 @@ describe('inferPostgresPslContract', () => {
       }
       "
     `);
+  });
+
+  it('throws on same-named tables in different schemas (single-namespace stopgap)', () => {
+    const thingNode = (schemaName: string) =>
+      new PostgresNamespaceSchemaNode({
+        schemaName,
+        tables: {
+          thing: new PostgresTableSchemaNode({
+            name: 'thing',
+            columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+            policies: [],
+          }),
+        },
+        nativeEnumTypeNames: [],
+      });
+    const tree = new PostgresDatabaseSchemaNode({
+      namespaces: { public: thingNode('public'), auth: thingNode('auth') },
+      roles: [],
+      existingSchemas: ['public', 'auth'],
+      pgVersion: '',
+    });
+
+    // The same table name in two schemas has no unambiguous single-bucket model:
+    // throw rather than silently dropping one namespace's table.
+    expect(() => inferPostgresPslContract(tree)).toThrow(
+      /duplicate table name "thing" across schemas is not yet supported/i,
+    );
   });
 });
