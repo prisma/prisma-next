@@ -32,7 +32,9 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { createRemoteJWKSet, type JWTVerifyResult, jwtVerify } from 'jose';
 import type { Client } from 'pg';
 import { Pool } from 'pg';
+import extensionContractJson from '../contract/contract.json' with { type: 'json' };
 import { supabaseRuntimeDescriptor } from './descriptor';
+import type { SupabaseExtensionContract } from './ext-contract-type';
 import type { SupabaseRoleBinding, SupabaseRuntime } from './supabase-runtime';
 import { SupabaseRuntimeImpl } from './supabase-runtime';
 
@@ -71,12 +73,40 @@ export interface RoleBoundDb<TContract extends Contract<SqlStorage>> {
   transaction<R>(fn: (tx: TransactionContext) => PromiseLike<R>): Promise<R>;
 }
 
+/**
+ * Query surface for the Supabase-internal contract (`auth`, `storage`). Exposed
+ * as a separate secondary root — never merged into the app contract — and only
+ * reachable through `service_role`, the one role with grants on those schemas
+ * over a direct Postgres connection.
+ *
+ * Deliberately omits `transaction` (which {@link RoleBoundDb} has): the primary
+ * app root and this secondary root are served by separate runtimes that do not
+ * share one pinned connection, so a transaction spanning both is out of scope for v1.
+ */
+export interface SupabaseInternalDb {
+  readonly sql: Db<SupabaseExtensionContract>;
+  readonly orm: OrmClient<SupabaseExtensionContract>;
+  execute<Row>(
+    plan: (SqlExecutionPlan<Row> | SqlQueryPlan<Row>) & { readonly _row?: Row },
+    options?: RuntimeExecuteOptions,
+  ): AsyncIterableResult<Row>;
+}
+
+/**
+ * The `service_role` db: the app-contract role-bound surface (its `.sql` / `.orm`
+ * are app-only, exactly like `asUser` / `asAnon`), plus a `.supabase` secondary
+ * root for the Supabase-internal namespaces.
+ */
+export type ServiceRoleDb<TContract extends Contract<SqlStorage>> = RoleBoundDb<TContract> & {
+  readonly supabase: SupabaseInternalDb;
+};
+
 export interface SupabaseDb<TContract extends Contract<SqlStorage>> {
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<SupabaseTargetId>;
   asUser(jwt: string): Promise<RoleBoundDb<TContract>>;
   asAnon(): RoleBoundDb<TContract>;
-  asServiceRole(): RoleBoundDb<TContract>;
+  asServiceRole(): ServiceRoleDb<TContract>;
   close(): Promise<void>;
   [Symbol.asyncDispose](): Promise<void>;
 }
@@ -199,6 +229,20 @@ function withSupabaseDescriptor(
     : [...packs, supabaseRuntimeDescriptor];
 }
 
+/**
+ * Deserializes the Supabase extension's own emitted contract into a runtime
+ * contract: namespaces hydrate into `PostgresSchema` instances (with
+ * `qualifyTable`), and `typeRef` columns (`Timestamptz`, `Uuid`) resolve
+ * through the codec registry. Exposed only via `service_role`'s `.supabase`
+ * secondary root — never merged into the app contract.
+ */
+function buildExtensionContract(): SupabaseExtensionContract {
+  return blindCast<
+    SupabaseExtensionContract,
+    'deserializeContract hydrates JSON namespaces into PostgresSchema instances with qualifyTable'
+  >(contractSerializer.deserializeContract(extensionContractJson));
+}
+
 export default async function supabase<TContract extends Contract<SqlStorage>>(
   options: SupabaseOptionsWithContract<TContract>,
 ): Promise<SupabaseDb<TContract>>;
@@ -256,18 +300,20 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
     }
   }
 
-  function buildRoleBoundDb(binding: SupabaseRoleBinding): RoleBoundDb<TContract> {
-    const roleSql: Db<TContract> = sql<TContract>({ context, rawCodecInferer });
-    const roleOrm: OrmClient<TContract> = orm({
+  function buildRoleBoundDbWithContext<C extends Contract<SqlStorage>>(
+    binding: SupabaseRoleBinding,
+    roleContext: ExecutionContext<C>,
+    roleRuntime: SupabaseRuntime & SupabaseRuntimeImpl<C>,
+  ): RoleBoundDb<C> {
+    const roleSql: Db<C> = sql<C>({ context: roleContext, rawCodecInferer });
+    const roleOrm: OrmClient<C> = orm({
       runtime: {
         execute(plan) {
-          return runtime.executeWithRole(plan, binding);
+          return roleRuntime.executeWithRole(plan, binding);
         },
-        // connection() returns a role session; this is the enforcement path for ORM scope
-        // operations (mutations, includes) — every statement runs role-bound.
-        connection: () => runtime.openRoleSession(binding),
+        connection: () => roleRuntime.openRoleSession(binding),
       },
-      context,
+      context: roleContext,
     });
 
     return {
@@ -278,13 +324,56 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
         plan: (SqlExecutionPlan<Row> | SqlQueryPlan<Row>) & { readonly _row?: Row },
         execOptions?: RuntimeExecuteOptions,
       ): AsyncIterableResult<Row> {
-        return runtime.executeWithRole<Row>(plan, binding, execOptions);
+        return roleRuntime.executeWithRole<Row>(plan, binding, execOptions);
       },
       transaction<R>(fn: (tx: TransactionContext) => PromiseLike<R>): Promise<R> {
-        return withTransaction({ connection: () => runtime.openRoleSession(binding) }, fn);
+        return withTransaction({ connection: () => roleRuntime.openRoleSession(binding) }, fn);
       },
     };
   }
+
+  function buildRoleBoundDb(binding: SupabaseRoleBinding): RoleBoundDb<TContract> {
+    return buildRoleBoundDbWithContext(binding, context, runtime);
+  }
+
+  const serviceRoleBinding: SupabaseRoleBinding = { role: 'service_role', claims: {} };
+
+  // The Supabase-internal contract (auth/storage) as a separate secondary root.
+  // It is contract-bound: a plan built against it carries the extension's
+  // storageHash, so it must run on a runtime bound to the extension contract —
+  // the app runtime would reject it (PLAN.HASH_MISMATCH). This runtime shares
+  // the same driver (one pool, no second connection) and disables marker
+  // verification: the extension contract is external and owns no app-space
+  // marker, so its hashes must not be checked against the DB marker.
+  const extContract = buildExtensionContract();
+  const extContext = createExecutionContext({ contract: extContract, stack });
+  const extRuntime: SupabaseRuntime & SupabaseRuntimeImpl<SupabaseExtensionContract> =
+    new SupabaseRuntimeImpl({
+      context: extContext,
+      adapter: stackInstance.adapter,
+      driver,
+      verifyMarker: false,
+      ...ifDefined('middleware', options.middleware),
+    });
+
+  const supabaseInternal: SupabaseInternalDb = {
+    sql: sql<SupabaseExtensionContract>({ context: extContext, rawCodecInferer }),
+    orm: orm({
+      runtime: {
+        execute(plan) {
+          return extRuntime.executeWithRole(plan, serviceRoleBinding);
+        },
+        connection: () => extRuntime.openRoleSession(serviceRoleBinding),
+      },
+      context: extContext,
+    }),
+    execute<Row>(
+      plan: (SqlExecutionPlan<Row> | SqlQueryPlan<Row>) & { readonly _row?: Row },
+      execOptions?: RuntimeExecuteOptions,
+    ): AsyncIterableResult<Row> {
+      return extRuntime.executeWithRole<Row>(plan, serviceRoleBinding, execOptions);
+    },
+  };
 
   async function closeDb(): Promise<void> {
     if (closed) return;
@@ -315,8 +404,9 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
       return buildRoleBoundDb({ role: 'anon', claims: {} });
     },
 
-    asServiceRole(): RoleBoundDb<TContract> {
-      return buildRoleBoundDb({ role: 'service_role', claims: {} });
+    asServiceRole(): ServiceRoleDb<TContract> {
+      const roleBound = buildRoleBoundDbWithContext(serviceRoleBinding, context, runtime);
+      return { ...roleBound, supabase: supabaseInternal };
     },
 
     close: closeDb,

@@ -46,6 +46,16 @@ test('emitted contract.d.ts types Post.priority as the value union, not string',
   expectTypeOf<PriorityOutput>().not.toEqualTypeOf<string>();
 });
 
+// Emit vs no-emit agreement. The emitted `FieldOutputTypes` enum field type
+// (produced on the emit path via the codec seam) must equal the enum's authored
+// value union carried by `db.enums` (the no-emit reference — the authored member
+// values propagated without serialization). Same enum, both paths, one union.
+test('emitted Post.priority field type equals the no-emit db.enums value union', () => {
+  type EmittedPriority = FieldOutputTypes['public']['Post']['priority'];
+  type NoEmitPriorityValues = EnumValues<typeof db.enums.public.Priority>;
+  expectTypeOf<EmittedPriority>().toEqualTypeOf<NoEmitPriorityValues>();
+});
+
 test('emitted contract: db.sql.public.post SELECT priority yields the value union', () => {
   const plan = db.sql.public.post.select('id', 'priority').build();
   type Row = ResultType<typeof plan>;

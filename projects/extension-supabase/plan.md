@@ -67,15 +67,17 @@ Current state of the example:
 
 **Non-blocking follow-on:** enum-typed `auth.*` columns (enums-as-domain-concept project) can attach to this slice or land later.
 
-### Slice D — Explicit `auth.users` namespace query in the example
+### Slice D — `service_role` queries Supabase-internal namespaces via a secondary `db.supabase` root
 
-**Gate:** functionally unblocked (TML-2816 #778 + #803 merged on main). Formal launch gate: explicit-namespace-dsl project close-out.
+**Gate:** none — facade composition, independent of postgres-rls #771. (Reframed from "explicit `auth.users` query off the app db": that doesn't work and isn't meant to — cross-space *querying* off the app db was deliberately not built, and only `service_role` has `auth.*` grants. See decision [C15](../supabase-integration/decisions.md). Slice contract: [`slices/d-service-role-internal-namespaces/spec.md`](slices/d-service-role-internal-namespaces/spec.md).)
 
-**Goal:** the example's `examples/supabase` demonstrates explicit namespace qualification in a query against `auth.users` (e.g. `sql.from('auth.users')` or the ORM equivalent), proving the cross-namespace query surface works end-to-end with the Supabase contract.
+**Goal:** `db.asServiceRole().supabase.sql.auth.users` / `.orm.auth.AuthUser` (and `storage.*`) is queryable via a **secondary `db.supabase` root** — the extension contract's own intact `ExecutionContext` + a second runtime sharing the app driver/pool + `service_role` session (marker-verify off), **not a contract merge**. `asServiceRole().sql`/`.orm` stay app-contract-only; `asUser`/`asAnon` have no `.supabase`.
 
 **DoD tasks:**
-- [ ] Add one handler or integration test that queries `auth.users` by explicit namespace.
-- [ ] Confirm the namespace qualification lower path works in the example's CI test.
+- [ ] `db.asServiceRole().supabase.{sql,orm}` expose `auth`/`storage` (extension contract); `asServiceRole().sql`/`.orm` stay app-only; `asUser`/`asAnon` have no `.supabase`.
+- [ ] Integration test: `asServiceRole().supabase.sql.auth.users` + `.orm.auth.AuthUser` read a seeded row, emitted SQL targets `"auth"."users"`, and `current_setting('role')` is `service_role`.
+- [ ] Type-level test (against the app contract): `asServiceRole().supabase.{sql,orm}` carry `auth`/`storage`; the primary `asServiceRole().sql` does not; `asAnon()`/`asUser()` have no `.supabase`.
+- [ ] `overview.md` + decision [C15](../supabase-integration/decisions.md) reflect the secondary-root surface (done in this slice).
 
 ### Slice E — Docs + real-Supabase acceptance + close-out
 

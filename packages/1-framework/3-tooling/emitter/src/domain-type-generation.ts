@@ -1,12 +1,10 @@
 import type {
-  ContractEnum,
   ContractField,
   ContractManyToManyRelation,
   ContractModelBase,
   ContractValueObject,
   CrossReference,
   JsonValue,
-  ValueSetRef,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
@@ -291,20 +289,43 @@ export type FieldTypeParamsResolver = (
   model: ContractModelBase,
 ) => Record<string, unknown> | undefined;
 
-export type DomainEnumLookup = (ref: ValueSetRef) => ContractEnum | undefined;
+/**
+ * A field's permitted values (codec-encoded) plus the codec that types them, as supplied by the
+ * family-specific {@link EmissionSpi.resolveFieldValueSet}. The framework renders these into a TS
+ * literal union through the codec seam ({@link renderValueSetType}).
+ */
+export type ResolvedFieldValueSet = {
+  readonly encodedValues: readonly JsonValue[];
+  readonly codecId: string;
+};
 
-function renderEnumMemberLiteral(value: JsonValue): string | undefined {
-  if (typeof value === 'string') return serializeValue(value);
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  return undefined;
-}
+export type FieldValueSetResolver = (
+  modelName: string,
+  fieldName: string,
+  model: ContractModelBase,
+) => ResolvedFieldValueSet | undefined;
 
-function renderEnumValueUnion(values: readonly JsonValue[]): string | undefined {
-  if (values.length === 0) return undefined;
+/**
+ * Renders a value set (a field/column's permitted values, codec-encoded) into a TS literal union by
+ * routing **each** value through the codec's `renderValueLiteral` — the seam owned by the codec, not
+ * a generic serializer. `side`: `output` = read type, `input` = create/update type.
+ *
+ * Returns `undefined` — signalling the caller to fall back to the codec's full output type — when
+ * the lookup is absent, has no `renderValueLiteralFor`, the value set is empty, or **any** value
+ * isn't literal-expressible. A caller that needs column and field types to agree shares this so both
+ * compute the union identically.
+ */
+export function renderValueSetType(
+  values: readonly JsonValue[],
+  codecId: string,
+  side: 'output' | 'input',
+  codecLookup: CodecLookup | undefined,
+): string | undefined {
+  if (values.length === 0 || codecLookup?.renderValueLiteralFor === undefined) return undefined;
   const literals: string[] = [];
   for (const value of values) {
-    const lit = renderEnumMemberLiteral(value);
-    if (lit === undefined) return undefined;
+    const lit = codecLookup.renderValueLiteralFor(codecId, value, side);
+    if (lit === undefined || !isSafeTypeExpression(lit)) return undefined;
     literals.push(lit);
   }
   return literals.join(' | ');
@@ -314,21 +335,29 @@ export function resolveFieldType(
   field: ContractField,
   codecLookup?: CodecLookup,
   resolvedTypeParams?: Record<string, unknown>,
-  domainEnumLookup?: DomainEnumLookup,
+  resolvedValueSet?: ResolvedFieldValueSet,
 ): ResolvedFieldType {
   const { type } = field;
 
   switch (type.kind) {
     case 'scalar': {
-      if (field.valueSet?.entityKind === 'enum' && domainEnumLookup) {
-        const domainEnum = domainEnumLookup(field.valueSet);
-        const union = domainEnum
-          ? renderEnumValueUnion(domainEnum.members.map((m) => m.value))
-          : undefined;
-        if (union !== undefined && isSafeTypeExpression(union)) {
+      if (resolvedValueSet) {
+        const output = renderValueSetType(
+          resolvedValueSet.encodedValues,
+          resolvedValueSet.codecId,
+          'output',
+          codecLookup,
+        );
+        const input = renderValueSetType(
+          resolvedValueSet.encodedValues,
+          resolvedValueSet.codecId,
+          'input',
+          codecLookup,
+        );
+        if (output !== undefined && input !== undefined) {
           return {
-            output: applyModifiers(union, field),
-            input: applyModifiers(union, field),
+            output: applyModifiers(output, field),
+            input: applyModifiers(input, field),
           };
         }
       }
@@ -394,7 +423,7 @@ export function generateBothFieldTypesMaps(
   models: Record<string, ContractModelBase> | undefined,
   codecLookup?: CodecLookup,
   resolveFieldTypeParams?: FieldTypeParamsResolver,
-  domainEnumLookup?: DomainEnumLookup,
+  resolveFieldValueSet?: FieldValueSetResolver,
 ): ResolvedFieldType {
   if (!models || Object.keys(models).length === 0) {
     return { output: 'Record<string, never>', input: 'Record<string, never>' };
@@ -415,7 +444,8 @@ export function generateBothFieldTypesMaps(
           : undefined;
       const resolvedTypeParams =
         inlineTypeParams ?? resolveFieldTypeParams?.(modelName, fieldName, model);
-      const resolved = resolveFieldType(field, codecLookup, resolvedTypeParams, domainEnumLookup);
+      const resolvedValueSet = resolveFieldValueSet?.(modelName, fieldName, model);
+      const resolved = resolveFieldType(field, codecLookup, resolvedTypeParams, resolvedValueSet);
       const key = `readonly ${serializeObjectKey(fieldName)}`;
       outputFieldEntries.push(`${key}: ${resolved.output}`);
       inputFieldEntries.push(`${key}: ${resolved.input}`);
@@ -443,7 +473,7 @@ export function generateFieldTypesMapsByNamespace(
   namespaceModels: ReadonlyArray<readonly [string, Record<string, ContractModelBase>]>,
   codecLookup?: CodecLookup,
   resolveFieldTypeParams?: FieldTypeParamsResolver,
-  domainEnumLookup?: DomainEnumLookup,
+  resolveFieldValueSet?: FieldValueSetResolver,
 ): ResolvedFieldType {
   if (namespaceModels.length === 0) {
     return { output: 'Record<string, never>', input: 'Record<string, never>' };
@@ -456,7 +486,7 @@ export function generateFieldTypesMapsByNamespace(
       models,
       codecLookup,
       resolveFieldTypeParams,
-      domainEnumLookup,
+      resolveFieldValueSet,
     );
     const nsKey = `readonly ${serializeObjectKey(nsId)}`;
     outputNamespaceEntries.push(`${nsKey}: ${inner.output}`);

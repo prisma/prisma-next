@@ -5,6 +5,7 @@ import type {
   JsonValue,
 } from '@prisma-next/contract/types';
 import {
+  renderValueSetType,
   serializeNamespaceId,
   serializeObjectKey,
   serializeValue,
@@ -314,6 +315,46 @@ export const sqlEmission = {
     return column.typeParams;
   },
 
+  resolveFieldValueSet(
+    _modelName: string,
+    fieldName: string,
+    model: ContractModelBase,
+    contract: Contract,
+  ): { readonly encodedValues: readonly JsonValue[]; readonly codecId: string } | undefined {
+    const sqlModel = blindCast<
+      ContractModel<SqlModelStorage>,
+      'a sql-family model carries SqlModelStorage in storage'
+    >(model);
+    const storageField = sqlModel.storage?.fields?.[fieldName];
+    if (!storageField) return undefined;
+
+    const storage = blindCast<
+      SqlStorage | undefined,
+      'contract.storage is SqlStorage for sql family'
+    >(contract.storage);
+    if (!storage) return undefined;
+
+    const storageNamespaceId = sqlModel.storage.namespaceId;
+    if (!storageNamespaceId) return undefined;
+
+    const table = entityAt<StorageTable>(storage, {
+      namespaceId: storageNamespaceId,
+      entityKind: 'table',
+      entityName: sqlModel.storage.table,
+    });
+    const column = table?.columns[storageField.column];
+    if (!column?.valueSet) return undefined;
+
+    const valueSet = entityAt<StorageValueSet>(storage, {
+      namespaceId: column.valueSet.namespaceId,
+      entityKind: column.valueSet.entityKind,
+      entityName: column.valueSet.entityName,
+    });
+    if (!valueSet) return undefined;
+
+    return { encodedValues: valueSet.values, codecId: column.codecId };
+  },
+
   getStorageTypeExports(contract: Contract, codecLookup?: CodecLookup): string | undefined {
     const storage = blindCast<
       SqlStorage | undefined,
@@ -370,23 +411,6 @@ export const sqlEmission = {
   },
 } as const;
 
-function renderValueSetLiteral(value: JsonValue): string | undefined {
-  if (typeof value === 'string') return serializeValue(value);
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  return undefined;
-}
-
-function renderValueSetUnionBase(values: readonly JsonValue[]): string | undefined {
-  if (values.length === 0) return undefined;
-  const literals: string[] = [];
-  for (const v of values) {
-    const lit = renderValueSetLiteral(v);
-    if (lit === undefined) return undefined;
-    literals.push(lit);
-  }
-  return literals.join(' | ');
-}
-
 type ColumnTypeSide = 'output' | 'input';
 
 function columnTypeParams(
@@ -435,7 +459,9 @@ function computeColumnType(
       entityKind: column.valueSet.entityKind,
       entityName: column.valueSet.entityName,
     });
-    base = valueSet ? renderValueSetUnionBase(valueSet.values) : undefined;
+    base = valueSet
+      ? renderValueSetType(valueSet.values, column.codecId, side, codecLookup)
+      : undefined;
   }
   if (base === undefined) {
     base = renderRefinedCodecType(column, side, columnTypeParams(storage, column), codecLookup);
