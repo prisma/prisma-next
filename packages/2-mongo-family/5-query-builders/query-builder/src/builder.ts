@@ -65,7 +65,7 @@ import {
   type LookupResult,
 } from './lookup-builder';
 import type { FindAndModifyEnabled, LeadingMatch, UpdateEnabled } from './markers';
-import { pipelineSupportsFlatResultShape } from './pipeline-result-shape';
+import { computePipelineResultShape } from './pipeline-result-shape';
 import type { ModelArrayField, NestedDocShape } from './resolve-path';
 import { contractModelToMongoResultShape } from './result-shape';
 import type {
@@ -819,14 +819,12 @@ export class PipelineChain<
     const contractNarrow = this.#contract as MongoContract;
     let resultShape: MongoResultShape | undefined;
     if (modelName !== undefined) {
-      if (pipelineSupportsFlatResultShape(this.#state.stages)) {
-        const model = domainModelsAtDefaultNamespace(contractNarrow.domain)[modelName] as
-          | MongoModelDefinition
-          | undefined;
-        resultShape = model ? contractModelToMongoResultShape(model) : { kind: 'unknown' as const };
-      } else {
-        resultShape = { kind: 'unknown' as const };
-      }
+      const model = domainModelsAtDefaultNamespace(contractNarrow.domain)[modelName] as
+        | MongoModelDefinition
+        | undefined;
+      resultShape = model
+        ? computePipelineResultShape(this.#state.stages, contractModelToMongoResultShape(model))
+        : { kind: 'unknown' as const };
     }
     return {
       collection: this.#state.collection,

@@ -363,6 +363,20 @@ describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
       expect(results).toHaveLength(1);
       expect(results[0]).toMatchObject({ name: 'Laptop', upperCategory: 'ELECTRONICS' });
     });
+
+    it('decodes codec-mapped fields through a reshaping $project stage', async () => {
+      await seed();
+
+      const plan = products().project('_id', 'name').build();
+
+      const results = await exec(plan);
+      expect(results).toHaveLength(5);
+      const laptop = results.find((r) => r['name'] === 'Laptop')!;
+      expect(typeof laptop['_id']).toBe('string');
+      expect(laptop['_id']).not.toHaveProperty('_bsontype');
+      expect(typeof laptop['name']).toBe('string');
+      expect(laptop['name']).toBe('Laptop');
+    });
   });
 
   // ---------- Count ----------
