@@ -10,6 +10,7 @@ import {
   SqlSchemaIRNode,
   type SqlTableIRInput,
   SqlUniqueIR,
+  sqlCheckConstraintIR,
 } from '@prisma-next/sql-schema-ir/types';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
 
@@ -69,9 +70,7 @@ export class PostgresTableIR extends SqlSchemaIRNode implements DiffableNode {
     if (input.annotations !== undefined) this.annotations = input.annotations;
     if (input.checks !== undefined && input.checks.length > 0) {
       this.checks = Object.freeze(
-        input.checks.map((c) =>
-          c instanceof SqlCheckConstraintIR ? c : new SqlCheckConstraintIR(c),
-        ),
+        input.checks.map((c) => (c instanceof SqlCheckConstraintIR ? c : sqlCheckConstraintIR(c))),
       );
     }
     this.rlsPolicies = Object.freeze([...(input.rlsPolicies ?? [])]);

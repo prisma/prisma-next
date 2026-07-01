@@ -3,7 +3,6 @@ import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { CodecRef } from '../ast/codec-types';
 import type { AnyDdlColumnDefault } from '../ast/ddl-types';
 import {
-  CheckExpressionConstraint,
   DdlColumn,
   ForeignKeyConstraint,
   FunctionColumnDefault,
@@ -56,8 +55,4 @@ export function unique(
   options?: { readonly name?: string },
 ): UniqueConstraint {
   return new UniqueConstraint({ columns, ...options });
-}
-
-export function checkExpression(name: string, expression: string): CheckExpressionConstraint {
-  return new CheckExpressionConstraint({ name, expression });
 }

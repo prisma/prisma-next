@@ -17,10 +17,12 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   SqlCheckConstraintIR,
+  SqlCheckConstraintIRInput,
   SqlForeignKeyIR,
   SqlIndexIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
+import { SqlExpressionCheckIR, SqlValueSetCheckIR } from '@prisma-next/sql-schema-ir/types';
 import {
   emitIssueAndNodeUnderControlPolicy,
   emitIssueUnderControlPolicy,
@@ -678,6 +680,53 @@ function valueSetsEqual(a: readonly string[], b: readonly string[]): boolean {
 }
 
 /**
+ * Compares two canonical check predicates by strict string equality. Both sides
+ * are re-canonicalized to the identical predicate form (the projection emits it,
+ * the introspection recognizer re-canonicalizes `pg_get_constraintdef` back to
+ * it), so a byte-for-byte match is the correct equality.
+ */
+function expressionsEqual(a: string, b: string): boolean {
+  return a === b;
+}
+
+/** Human-readable label for a contract-projected check (expected side). */
+function contractCheckLabel(check: SqlCheckConstraintIRInput): string {
+  return check.kind === 'valueSet' ? check.permittedValues.join(', ') : check.expression;
+}
+
+/** Human-readable label for an introspected live check (actual side). */
+function liveCheckLabel(check: SqlCheckConstraintIR): string {
+  if (check instanceof SqlValueSetCheckIR) return check.permittedValues.join(', ');
+  if (check instanceof SqlExpressionCheckIR) return check.expression;
+  return '';
+}
+
+/** Predicate describing what a contract-projected check requires (for messages). */
+function contractCheckDescription(check: SqlCheckConstraintIRInput): string {
+  return check.kind === 'valueSet'
+    ? `column "${check.column}" IN (${check.permittedValues.join(', ')})`
+    : `CHECK (${check.expression})`;
+}
+
+/**
+ * Whether an introspected live check has the same content as the contract check.
+ * Cross-kind (e.g. contract expects a value-set, live is an expression) is never
+ * equal — a mismatch is reported so the planner can drop+recreate.
+ */
+export function checkContentEqual(
+  contractCheck: SqlCheckConstraintIRInput,
+  liveCheck: SqlCheckConstraintIR,
+): boolean {
+  if (contractCheck.kind === 'valueSet' && liveCheck instanceof SqlValueSetCheckIR) {
+    return valueSetsEqual(contractCheck.permittedValues, liveCheck.permittedValues);
+  }
+  if (contractCheck.kind === 'expression' && liveCheck instanceof SqlExpressionCheckIR) {
+    return expressionsEqual(contractCheck.expression, liveCheck.expression);
+  }
+  return false;
+}
+
+/**
  * Verifies check constraints match between contract-projected checks and
  * introspected live checks.
  *
@@ -696,11 +745,7 @@ function valueSetsEqual(a: readonly string[], b: readonly string[]): boolean {
  * verification (the normal path) does not complain about extra constraints.
  */
 export function verifyCheckConstraints(
-  contractChecks: ReadonlyArray<{
-    readonly name: string;
-    readonly column: string;
-    readonly permittedValues: readonly string[];
-  }>,
+  contractChecks: ReadonlyArray<SqlCheckConstraintIRInput>,
   schemaChecks: ReadonlyArray<SqlCheckConstraintIR>,
   tableName: string,
   namespaceId: string,
@@ -721,8 +766,8 @@ export function verifyCheckConstraints(
         table: tableName,
         namespaceId,
         indexOrConstraint: contractCheck.name,
-        expected: contractCheck.permittedValues.join(', '),
-        message: `Table "${tableName}" is missing check constraint "${contractCheck.name}" (column "${contractCheck.column}" IN (${contractCheck.permittedValues.join(', ')}))`,
+        expected: contractCheckLabel(contractCheck),
+        message: `Table "${tableName}" is missing check constraint "${contractCheck.name}" (${contractCheckDescription(contractCheck)})`,
       };
       emitIssueAndNodeUnderControlPolicy(
         tableControlPolicy,
@@ -741,15 +786,15 @@ export function verifyCheckConstraints(
         issues,
         nodes,
       );
-    } else if (!valueSetsEqual(contractCheck.permittedValues, liveCheck.permittedValues)) {
+    } else if (!checkContentEqual(contractCheck, liveCheck)) {
       const issue: SchemaIssue = {
         kind: 'check_mismatch',
         table: tableName,
         namespaceId,
         indexOrConstraint: contractCheck.name,
-        expected: contractCheck.permittedValues.join(', '),
-        actual: liveCheck.permittedValues.join(', '),
-        message: `Table "${tableName}" check constraint "${contractCheck.name}" has different permitted values: expected [${contractCheck.permittedValues.join(', ')}], got [${liveCheck.permittedValues.join(', ')}]`,
+        expected: contractCheckLabel(contractCheck),
+        actual: liveCheckLabel(liveCheck),
+        message: `Table "${tableName}" check constraint "${contractCheck.name}" differs: expected [${contractCheckLabel(contractCheck)}], got [${liveCheckLabel(liveCheck)}]`,
       };
       emitIssueAndNodeUnderControlPolicy(
         tableControlPolicy,
@@ -792,7 +837,7 @@ export function verifyCheckConstraints(
           table: tableName,
           namespaceId,
           indexOrConstraint: liveCheck.name,
-          actual: liveCheck.permittedValues.join(', '),
+          actual: liveCheckLabel(liveCheck),
           message: `Table "${tableName}" has extra check constraint "${liveCheck.name}" in database (not in contract)`,
         };
         emitIssueAndNodeUnderControlPolicy(

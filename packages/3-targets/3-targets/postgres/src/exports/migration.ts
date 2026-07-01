@@ -10,7 +10,6 @@ export { MigrationCLI } from '@prisma-next/cli/migration-cli';
 // directly. The planner emits an import from this same module.
 export { placeholder } from '@prisma-next/errors/migration';
 export {
-  checkExpression,
   col,
   fn,
   foreignKey,

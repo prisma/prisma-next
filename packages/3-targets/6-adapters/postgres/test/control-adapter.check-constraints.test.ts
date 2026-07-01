@@ -12,24 +12,32 @@ describe('parseCheckConstraintDef', () => {
     const result = parseCheckConstraintDef(
       "CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])))",
     );
-    expect(result).toEqual({ column: 'status', permittedValues: ['active', 'inactive'] });
+    expect(result).toEqual({
+      kind: 'valueSet',
+      column: 'status',
+      permittedValues: ['active', 'inactive'],
+    });
   });
 
   it('parses = ANY (ARRAY[...]) with a single value', () => {
     const result = parseCheckConstraintDef("CHECK ((role = ANY (ARRAY['admin'::text])))");
-    expect(result).toEqual({ column: 'role', permittedValues: ['admin'] });
+    expect(result).toEqual({ kind: 'valueSet', column: 'role', permittedValues: ['admin'] });
   });
 
   it('parses IN (...) shape', () => {
     const result = parseCheckConstraintDef("CHECK ((status IN ('draft', 'published')))");
-    expect(result).toEqual({ column: 'status', permittedValues: ['draft', 'published'] });
+    expect(result).toEqual({
+      kind: 'valueSet',
+      column: 'status',
+      permittedValues: ['draft', 'published'],
+    });
   });
 
   it('strips casts like ::character varying from array literals', () => {
     const result = parseCheckConstraintDef(
       "CHECK ((color = ANY (ARRAY['red'::character varying, 'blue'::character varying])))",
     );
-    expect(result).toEqual({ column: 'color', permittedValues: ['red', 'blue'] });
+    expect(result).toEqual({ kind: 'valueSet', column: 'color', permittedValues: ['red', 'blue'] });
   });
 
   it('returns undefined for a free-form predicate it cannot parse', () => {
@@ -47,12 +55,20 @@ describe('parseCheckConstraintDef', () => {
     const result = parseCheckConstraintDef(
       "CHECK ((last_name = ANY (ARRAY['O''Brien'::text, 'Smith'::text])))",
     );
-    expect(result).toEqual({ column: 'last_name', permittedValues: ["O'Brien", 'Smith'] });
+    expect(result).toEqual({
+      kind: 'valueSet',
+      column: 'last_name',
+      permittedValues: ["O'Brien", 'Smith'],
+    });
   });
 
   it('un-escapes doubled single-quotes in IN list values', () => {
     const result = parseCheckConstraintDef("CHECK ((last_name IN ('O''Brien', 'Smith')))");
-    expect(result).toEqual({ column: 'last_name', permittedValues: ["O'Brien", 'Smith'] });
+    expect(result).toEqual({
+      kind: 'valueSet',
+      column: 'last_name',
+      permittedValues: ["O'Brien", 'Smith'],
+    });
   });
 
   // F2: double-quoted (non-identifier) column names
@@ -60,12 +76,12 @@ describe('parseCheckConstraintDef', () => {
     const result = parseCheckConstraintDef(
       "CHECK ((\"my-col\" = ANY (ARRAY['a'::text, 'b'::text])))",
     );
-    expect(result).toEqual({ column: 'my-col', permittedValues: ['a', 'b'] });
+    expect(result).toEqual({ kind: 'valueSet', column: 'my-col', permittedValues: ['a', 'b'] });
   });
 
   it('parses a double-quoted column name in IN shape', () => {
     const result = parseCheckConstraintDef("CHECK ((\"my-col\" IN ('a', 'b')))");
-    expect(result).toEqual({ column: 'my-col', permittedValues: ['a', 'b'] });
+    expect(result).toEqual({ kind: 'valueSet', column: 'my-col', permittedValues: ['a', 'b'] });
   });
 
   // Composite predicates: must NOT match either shape
@@ -79,6 +95,52 @@ describe('parseCheckConstraintDef', () => {
   it('returns undefined for a composite predicate with IN and AND (IN shape)', () => {
     const result = parseCheckConstraintDef(
       "CHECK ((status IN ('draft', 'published') AND amount > 0))",
+    );
+    expect(result).toBeUndefined();
+  });
+
+  // Scalar-array element-non-null: array_position(col, NULL) IS NULL.
+  // Postgres stores an element-type cast on NULL and drops quotes on simple
+  // identifiers; the recognizer re-canonicalizes back to the projected form.
+  it('recognizes the element-non-null shape and re-canonicalizes the predicate (text[])', () => {
+    const result = parseCheckConstraintDef('CHECK ((array_position(tags, NULL::text) IS NULL))');
+    expect(result).toEqual({
+      kind: 'expression',
+      expression: 'array_position("tags", NULL) IS NULL',
+    });
+  });
+
+  it('re-canonicalizes with the element-type cast for a non-text array (integer[])', () => {
+    const result = parseCheckConstraintDef(
+      'CHECK ((array_position(scores, NULL::integer) IS NULL))',
+    );
+    expect(result).toEqual({
+      kind: 'expression',
+      expression: 'array_position("scores", NULL) IS NULL',
+    });
+  });
+
+  it('preserves quoting for a mixed-case element-non-null column', () => {
+    const result = parseCheckConstraintDef(
+      'CHECK ((array_position("myTags", NULL::text) IS NULL))',
+    );
+    expect(result).toEqual({
+      kind: 'expression',
+      expression: 'array_position("myTags", NULL) IS NULL',
+    });
+  });
+
+  it('recognizes the element-non-null shape without a NULL cast', () => {
+    const result = parseCheckConstraintDef('CHECK ((array_position(tags, NULL) IS NULL))');
+    expect(result).toEqual({
+      kind: 'expression',
+      expression: 'array_position("tags", NULL) IS NULL',
+    });
+  });
+
+  it('returns undefined for a different array_position predicate (not IS NULL)', () => {
+    const result = parseCheckConstraintDef(
+      'CHECK ((array_position(tags, NULL::text) IS NOT NULL))',
     );
     expect(result).toBeUndefined();
   });
@@ -136,6 +198,7 @@ describe('PostgresControlAdapter.introspect — check constraints', () => {
 
     expect(result.tables['post']?.checks).toEqual([
       {
+        kind: 'valueSet',
         name: 'post_status_check',
         column: 'status',
         permittedValues: ['draft', 'published'],

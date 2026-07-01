@@ -414,4 +414,57 @@ describe.sequential('native array columns DDL', () => {
       );
     }
   });
+
+  it('strict schema verification reports zero drift after migrating array columns', {
+    timeout: testTimeout,
+  }, async () => {
+    // L10 closure: the element-non-null CHECKs are now drift-managed like enum
+    // value-set checks, so a migrate → introspect → strict-verify round-trip
+    // must surface no check_missing/check_mismatch/check_removed drift for the
+    // array element guards. Under the old inline-CREATE-TABLE synthesis the
+    // introspected checks were unknown to the verifier and strict mode flagged
+    // them as check_removed.
+    const contract = buildArrayContract();
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+
+    const planResult = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents,
+      spaceId: APP_SPACE_ID,
+    });
+    if (planResult.kind !== 'success') throw new Error('planner failed');
+
+    await runner.execute({
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: APP_SPACE_ID,
+          plan: planResult.plan,
+          migrationEdges: synthEdges(planResult.plan),
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
+    });
+
+    const schema = await familyInstance.introspect({ driver: driver!, contract });
+    const verifyResult = familyInstance.verifySchema({
+      contract,
+      schema,
+      strict: true,
+      frameworkComponents,
+    });
+    if (!verifyResult.ok) {
+      throw new Error(
+        `strict verifySchema failed: ${JSON.stringify(verifyResult.schema.issues, null, 2)}`,
+      );
+    }
+    expect(verifyResult.schema.issues.filter((i) => i.kind.startsWith('check'))).toHaveLength(0);
+  });
 });

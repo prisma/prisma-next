@@ -168,8 +168,6 @@ function renderDdlConstraintAsTsCall(constraint: DdlTableConstraint): string {
       const nameOpt = constraint.name ? `, { name: ${jsonToTsSource(constraint.name)} }` : '';
       return `unique(${jsonToTsSource(constraint.columns)}${nameOpt})`;
     }
-    case 'check-expression':
-      return `checkExpression(${jsonToTsSource(constraint.name)}, ${jsonToTsSource(constraint.expression)})`;
   }
 }
 
@@ -184,7 +182,6 @@ function constraintImportSymbols(constraints: readonly DdlTableConstraint[] | un
     if (c.kind === 'primary-key') symbols.add('primaryKey');
     else if (c.kind === 'foreign-key') symbols.add('foreignKey');
     else if (c.kind === 'unique') symbols.add('unique');
-    else if (c.kind === 'check-expression') symbols.add('checkExpression');
   }
   return [...symbols];
 }
@@ -994,30 +991,44 @@ export class DropConstraintCall extends PostgresOpFactoryCallNode {
   }
 }
 
+/**
+ * Discriminated payload for a check constraint the planner adds:
+ *
+ * - `valueSet` — an enum-style `column IN (...)` restriction, and
+ * - `expression` — a canonical SQL predicate (the scalar-array element-non-null
+ *   guard), emitted verbatim into `CHECK (<expression>)`.
+ */
+export type AddCheckConstraintPayload =
+  | { readonly kind: 'valueSet'; readonly column: string; readonly values: readonly string[] }
+  | { readonly kind: 'expression'; readonly expression: string };
+
+function checkPayloadLabelSuffix(tableName: string, payload: AddCheckConstraintPayload): string {
+  return payload.kind === 'valueSet'
+    ? `on "${tableName}"."${payload.column}"`
+    : `on "${tableName}"`;
+}
+
 export class AddCheckConstraintCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'addCheckConstraint' as const;
   readonly operationClass = 'additive' as const;
   readonly schemaName: string;
   readonly tableName: string;
   readonly constraintName: string;
-  readonly column: string;
-  readonly values: readonly string[];
+  readonly payload: AddCheckConstraintPayload;
   readonly label: string;
 
   constructor(
     schemaName: string,
     tableName: string,
     constraintName: string,
-    column: string,
-    values: readonly string[],
+    payload: AddCheckConstraintPayload,
   ) {
     super();
     this.schemaName = schemaName;
     this.tableName = tableName;
     this.constraintName = constraintName;
-    this.column = column;
-    this.values = values;
-    this.label = `Add check constraint "${constraintName}" on "${tableName}"."${column}"`;
+    this.payload = payload;
+    this.label = `Add check constraint "${constraintName}" ${checkPayloadLabelSuffix(tableName, payload)}`;
     this.freeze();
   }
 
@@ -1031,14 +1042,13 @@ export class AddCheckConstraintCall extends PostgresOpFactoryCallNode {
       this.schemaName,
       this.tableName,
       this.constraintName,
-      this.column,
-      this.values,
+      this.payload,
       lowerer,
     );
   }
 
   renderTypeScript(): string {
-    return `this.addCheckConstraint({ ${constraintCallOptions(this.schemaName, this.tableName, this.constraintName)}, column: ${jsonToTsSource(this.column)}, values: ${jsonToTsSource(this.values)} })`;
+    return `this.addCheckConstraint({ ${constraintCallOptions(this.schemaName, this.tableName, this.constraintName)}, payload: ${jsonToTsSource(this.payload)} })`;
   }
 
   override importRequirements(): readonly ImportRequirement[] {

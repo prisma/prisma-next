@@ -10,6 +10,7 @@ import { errorPostgresMigrationStackMissing } from '../errors';
 import { PostgresContractView } from '../postgres-contract-view';
 import {
   AddCheckConstraintCall,
+  type AddCheckConstraintPayload,
   AddColumnCall,
   AddForeignKeyCall,
   AddPrimaryKeyCall,
@@ -232,8 +233,7 @@ export abstract class PostgresMigration<
     readonly schema: string;
     readonly table: string;
     readonly constraint: string;
-    readonly column: string;
-    readonly values: readonly string[];
+    readonly payload: AddCheckConstraintPayload;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
@@ -242,8 +242,7 @@ export abstract class PostgresMigration<
       options.schema,
       options.table,
       options.constraint,
-      options.column,
-      options.values,
+      options.payload,
     ).toOp(this.controlAdapter);
   }
 

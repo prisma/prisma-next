@@ -24,24 +24,27 @@ import type {
   MigrationOperationPolicy,
   SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
-import { resolveValueSetValues } from '@prisma-next/family-sql/control';
+import { projectContractChecks } from '@prisma-next/family-sql/control';
+import { checkContentEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
+  isStorageTable,
   type SqlStorage,
-  StorageTable,
+  type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { CodecRef, DdlColumn } from '@prisma-next/sql-relational-core/ast';
 import { col } from '@prisma-next/sql-relational-core/contract-free';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlCheckConstraintIRInput, SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonValue } from '@prisma-next/utils/json';
 import { isPostgresSchema } from '../postgres-schema';
 import {
   AddCheckConstraintCall,
+  type AddCheckConstraintPayload,
   AddColumnCall,
   AddNotNullColumnDirectCall,
   AddNotNullColumnWithTempDefaultCall,
@@ -348,37 +351,27 @@ export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ct
 };
 
 /**
- * Collects every check constraint from a table in the contract storage.
- * Returns an empty array when the table has no checks or the table is absent.
+ * Collects every check constraint a table requires — declared value-set checks
+ * plus the synthesized scalar-array element-non-null expression checks — using
+ * the shared projection so the planner agrees byte-for-byte with the verifier
+ * and expected-IR builder. Returns an empty array when the table is absent.
  */
 function collectContractChecks(
   storage: SqlStorage,
   namespaceId: string,
   tableName: string,
-): ReadonlyArray<{ name: string; column: string; permittedValues: readonly string[] }> {
+): ReadonlyArray<SqlCheckConstraintIRInput> {
   const ns = storage.namespaces[namespaceId];
   const tableRaw = ns !== undefined ? ns.entries.table?.[tableName] : undefined;
-  if (!(tableRaw instanceof StorageTable)) return [];
-  const checks = tableRaw.checks;
-  if (!checks || checks.length === 0) return [];
-  return checks.map((c) => ({
-    name: c.name,
-    column: c.column,
-    permittedValues: resolveValueSetValues(
-      c.valueSet,
-      storage,
-      `check "${c.name}" on "${tableName}"`,
-    ),
-  }));
+  if (!isStorageTable(tableRaw)) return [];
+  return projectContractChecks(tableRaw, tableName, storage);
 }
 
-/**
- * Compares two value arrays as unordered sets.
- */
-function checkValueSetsEqual(a: readonly string[], b: readonly string[]): boolean {
-  if (a.length !== b.length) return false;
-  const bSet = new Set(b);
-  return a.every((v) => bSet.has(v));
+/** Builds the `AddCheckConstraintCall` payload for a projected contract check. */
+function checkPayload(check: SqlCheckConstraintIRInput): AddCheckConstraintPayload {
+  return check.kind === 'valueSet'
+    ? { kind: 'valueSet', column: check.column, values: check.permittedValues }
+    : { kind: 'expression', expression: check.expression };
 }
 
 /**
@@ -418,20 +411,18 @@ export const checkConstraintPlanCallStrategy: CallMigrationStrategy = (issues, c
               ddlSchema,
               tableName,
               contractCheck.name,
-              contractCheck.column,
-              contractCheck.permittedValues,
+              checkPayload(contractCheck),
             ),
           );
           handledIssueKeys.add(issueKey);
-        } else if (!checkValueSetsEqual(contractCheck.permittedValues, liveCheck.permittedValues)) {
+        } else if (!checkContentEqual(contractCheck, liveCheck)) {
           calls.push(
             new DropCheckConstraintCall(ddlSchema, tableName, contractCheck.name),
             new AddCheckConstraintCall(
               ddlSchema,
               tableName,
               contractCheck.name,
-              contractCheck.column,
-              contractCheck.permittedValues,
+              checkPayload(contractCheck),
             ),
           );
           handledIssueKeys.add(issueKey);

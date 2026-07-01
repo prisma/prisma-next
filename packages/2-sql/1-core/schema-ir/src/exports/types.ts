@@ -3,6 +3,7 @@ export type {
   SqlAnnotations,
   SqlCheckConstraintIRInput,
   SqlColumnIRInput,
+  SqlExpressionCheckIRInput,
   SqlForeignKeyIRInput,
   SqlIndexIRInput,
   SqlReferentialAction,
@@ -12,16 +13,20 @@ export type {
   SqlTypeMetadata,
   SqlTypeMetadataRegistry,
   SqlUniqueIRInput,
+  SqlValueSetCheckIRInput,
 } from '../types';
 
 export {
   PrimaryKey,
   SqlCheckConstraintIR,
   SqlColumnIR,
+  SqlExpressionCheckIR,
   SqlForeignKeyIR,
   SqlIndexIR,
   SqlSchemaIR,
   SqlSchemaIRNode,
   SqlTableIR,
   SqlUniqueIR,
+  SqlValueSetCheckIR,
+  sqlCheckConstraintIR,
 } from '../types';

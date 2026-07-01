@@ -121,15 +121,13 @@ export default class M extends Migration<never, End> {
         schema: 'public',
         table: 'user',
         constraint: 'user_kind_check',
-        column: 'kind',
-        values: ['admin', 'user'],
+        payload: { kind: 'valueSet', column: 'kind', values: ['admin', 'user'] },
       }),
       this.addCheckConstraint({
         schema: 'public',
         table: 'post',
         constraint: 'post_priority_check',
-        column: 'priority',
-        values: ['low', 'high', 'urgent'],
+        payload: { kind: 'valueSet', column: 'priority', values: ['low', 'high', 'urgent'] },
       }),
       this.addForeignKey({
         schema: 'public',

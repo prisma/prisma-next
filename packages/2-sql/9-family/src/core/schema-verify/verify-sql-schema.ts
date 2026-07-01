@@ -29,7 +29,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
-import { resolveValueSetValues } from '../migrations/contract-to-schema-ir';
+import { projectContractChecks } from '../migrations/contract-to-schema-ir';
 import type { CodecControlHooks } from '../migrations/types';
 import { emitIssueAndNodeUnderControlPolicy } from './control-verify-emit';
 import { verifierDisposition } from './verifier-disposition';
@@ -591,11 +591,7 @@ function verifyTableChildren(options: {
   // Verify check constraints when the contract declares checks for this table OR
   // when strict mode is on (so extra live checks on zero-check tables are detected).
   // schemaTable.checks carries the introspected live checks (parsed value sets).
-  const contractCheckIRs = (contractTable.checks ?? []).map((c) => ({
-    name: c.name,
-    column: c.column,
-    permittedValues: resolveValueSetValues(c.valueSet, contractStorage, `check "${c.name}"`),
-  }));
+  const contractCheckIRs = projectContractChecks(contractTable, tableName, contractStorage);
   if (strict || contractCheckIRs.length > 0) {
     const checkStatuses = verifyCheckConstraints(
       contractCheckIRs,
