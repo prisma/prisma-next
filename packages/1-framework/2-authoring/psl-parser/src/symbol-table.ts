@@ -27,6 +27,7 @@ import type { SyntaxNode } from './syntax/red';
 export type {
   ResolvedAttribute,
   ResolvedAttributeArg,
+  ResolvedExpr,
   ResolvedTypeConstructorCall,
 } from './resolve';
 

@@ -82,7 +82,7 @@ describe('interpretPslDocumentToSqlContract scalar-list capability gating', () =
     });
   });
 
-  it('does not gate when no capability matrix is threaded (non-adapter authoring path)', () => {
+  it('rejects a scalar list against an empty capability matrix (fail-closed)', () => {
     const document = symbolTableInputFromParseArgs({
       schema: listSchema,
       sourceId: 'schema.prisma',
@@ -93,14 +93,17 @@ describe('interpretPslDocumentToSqlContract scalar-list capability gating', () =
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
+      capabilities: {},
       ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(modelsOf(result.value)).toMatchObject({
-      User: { fields: { tags: { many: true } } },
-    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'PSL_SCALAR_LIST_UNSUPPORTED_TARGET' }),
+      ]),
+    );
   });
 });

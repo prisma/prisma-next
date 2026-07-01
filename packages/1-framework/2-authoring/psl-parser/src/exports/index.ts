@@ -54,6 +54,7 @@ export type {
   NamespaceSymbol,
   ResolvedAttribute,
   ResolvedAttributeArg,
+  ResolvedExpr,
   ResolvedNamedTypeBinding,
   ResolvedTypeConstructorCall,
   ScalarSymbol,

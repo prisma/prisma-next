@@ -26,6 +26,7 @@ function createMongoTestContext(overrides?: Partial<ContractSourceContext>): Con
       generatorDescriptors: [],
     },
     resolvedInputs: [],
+    capabilities: {},
     ...overrides,
   };
 }

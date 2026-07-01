@@ -20,7 +20,11 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
   const interpretPslDocumentToSqlContract = (
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
-      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts' | 'createNamespace'
+      | 'target'
+      | 'scalarTypeDescriptors'
+      | 'composedExtensionContracts'
+      | 'createNamespace'
+      | 'capabilities'
     > &
       Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
@@ -29,6 +33,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
       ...input,
     });
   it('lowers supported default functions into execution and storage contract shapes', () => {
@@ -498,6 +503,7 @@ model UuidNativeBad {
       controlMutationDefaults: builtinControlMutationDefaults,
       authoringContributions: sqliteTemporalContributions,
       createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
 
     expect(result.ok).toBe(true);

@@ -23,6 +23,7 @@ import type {
   FieldSymbol,
   PslSpan,
   ResolvedAttribute,
+  ResolvedExpr,
   ResolvedTypeConstructorCall,
 } from '@prisma-next/psl-parser';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -706,82 +707,35 @@ export function parseDefaultLiteralValue(expression: string): ColumnDefault | un
 }
 
 /**
- * Result of parsing a list-field `@default(...)` expression:
+ * Result of interpreting a list-field `@default(...)` expression:
  * - `{ kind: 'array', value }` — an array-literal default (possibly empty)
  * - `{ kind: 'scalar' }` — a scalar literal where an array was expected
- * - `undefined` — not a literal at all (e.g. a function call like `now()`),
+ * - `undefined` — not an array of literals (e.g. a function call like `now()`),
  *   so the caller falls through to function-default handling.
  */
 type ListDefaultParse =
-  | { readonly kind: 'array'; readonly value: readonly (string | number | boolean | null)[] }
+  | { readonly kind: 'array'; readonly value: readonly (string | number | boolean)[] }
   | { readonly kind: 'scalar' }
   | undefined;
 
-function splitTopLevelArrayElements(body: string): readonly string[] {
-  const elements: string[] = [];
-  let depth = 0;
-  let quote: string | undefined;
-  let current = '';
-  for (let index = 0; index < body.length; index += 1) {
-    const character = body[index];
-    if (quote !== undefined) {
-      current += character;
-      if (character === '\\' && index + 1 < body.length) {
-        current += body[index + 1];
-        index += 1;
-      } else if (character === quote) {
-        quote = undefined;
-      }
-      continue;
-    }
-    if (character === '"' || character === "'") {
-      quote = character;
-      current += character;
-      continue;
-    }
-    if (character === '[' || character === '{' || character === '(') depth += 1;
-    if (character === ']' || character === '}' || character === ')') depth -= 1;
-    if (character === ',' && depth === 0) {
-      elements.push(current);
-      current = '';
-      continue;
-    }
-    current += character;
+function parseListDefaultExpression(expression: ResolvedExpr | undefined): ListDefaultParse {
+  if (expression === undefined) return undefined;
+  if (
+    expression.kind === 'string' ||
+    expression.kind === 'number' ||
+    expression.kind === 'boolean'
+  ) {
+    return { kind: 'scalar' };
   }
-  if (current.trim().length > 0) elements.push(current);
-  return elements;
-}
-
-function parseListDefaultLiteralValue(expression: string): ListDefaultParse {
-  const trimmed = expression.trim();
-  if (!trimmed.startsWith('[')) {
-    return parseDefaultLiteralValue(trimmed) ? { kind: 'scalar' } : undefined;
-  }
-  if (!trimmed.endsWith(']')) {
-    return undefined;
-  }
-  const body = trimmed.slice(1, -1).trim();
-  if (body.length === 0) {
-    return { kind: 'array', value: [] };
-  }
-  const elements: (string | number | boolean | null)[] = [];
-  for (const rawElement of splitTopLevelArrayElements(body)) {
-    const parsed = parseDefaultLiteralValue(rawElement.trim());
-    if (!parsed || parsed.kind !== 'literal') {
+  if (expression.kind !== 'array') return undefined;
+  const value: (string | number | boolean)[] = [];
+  for (const element of expression.elements) {
+    if (element.kind !== 'string' && element.kind !== 'number' && element.kind !== 'boolean') {
       return undefined;
     }
-    const value = parsed.value;
-    if (
-      typeof value !== 'string' &&
-      typeof value !== 'number' &&
-      typeof value !== 'boolean' &&
-      value !== null
-    ) {
-      return undefined;
-    }
-    elements.push(value);
+    value.push(element.value);
   }
-  return { kind: 'array', value: elements };
+  return { kind: 'array', value };
 }
 
 export function lowerDefaultForField(input: {
@@ -823,7 +777,7 @@ export function lowerDefaultForField(input: {
   }
 
   if (input.isList) {
-    const listParse = parseListDefaultLiteralValue(expressionEntry.value);
+    const listParse = parseListDefaultExpression(expressionEntry.expression);
     if (listParse?.kind === 'array') {
       return { defaultValue: { kind: 'literal', value: [...listParse.value] } };
     }

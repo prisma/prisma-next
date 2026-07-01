@@ -17,6 +17,7 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
+  capabilities: { sql: { scalarList: true } },
 } as const;
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();

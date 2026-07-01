@@ -5,16 +5,40 @@ import type {
   FieldAttributeAst,
   ModelAttributeAst,
 } from './syntax/ast/attributes';
-import type { ExpressionAst } from './syntax/ast/expressions';
+import {
+  ArrayLiteralAst,
+  BooleanLiteralExprAst,
+  type ExpressionAst,
+  FunctionCallAst,
+  NumberLiteralExprAst,
+  ObjectLiteralExprAst,
+  StringLiteralExprAst,
+} from './syntax/ast/expressions';
+import { IdentifierAst } from './syntax/ast/identifier';
 import type { QualifiedNameAst } from './syntax/ast/qualified-name';
 import type { TypeAnnotationAst } from './syntax/ast/type-annotation';
 import { printSyntax } from './syntax/ast-helpers';
 import type { SyntaxNode } from './syntax/red';
 
+/**
+ * A structurally decoded attribute-argument expression. Consumers that need the
+ * shape of an expression (e.g. array-literal `@default([...])`) read this instead
+ * of re-parsing the stringified {@link ResolvedAttributeArg.value}.
+ */
+export type ResolvedExpr =
+  | { readonly kind: 'string'; readonly value: string }
+  | { readonly kind: 'number'; readonly value: number }
+  | { readonly kind: 'boolean'; readonly value: boolean }
+  | { readonly kind: 'array'; readonly elements: readonly ResolvedExpr[] }
+  | { readonly kind: 'object' }
+  | { readonly kind: 'call'; readonly path: readonly string[] }
+  | { readonly kind: 'identifier'; readonly name: string };
+
 export interface ResolvedAttributeArg {
   readonly kind: 'positional' | 'named';
   readonly name?: string;
   readonly value: string;
+  readonly expression?: ResolvedExpr;
   readonly span: PslSpan;
 }
 
@@ -69,14 +93,53 @@ function readResolvedArgList(
   const args: ResolvedAttributeArg[] = [];
   for (const arg of argList.args()) {
     const name = arg.name()?.name();
+    const value = arg.value();
+    const expression = decodeExpression(value);
     args.push({
       kind: name !== undefined ? 'named' : 'positional',
       ...(name !== undefined ? { name } : {}),
-      value: renderExpression(arg.value()),
+      value: renderExpression(value),
+      ...(expression !== undefined ? { expression } : {}),
       span: nodePslSpan(arg.syntax, sourceFile),
     });
   }
   return args;
+}
+
+function decodeExpression(expression: ExpressionAst | undefined): ResolvedExpr | undefined {
+  if (expression === undefined) return undefined;
+  if (expression instanceof StringLiteralExprAst) {
+    const value = expression.value();
+    return value === undefined ? undefined : { kind: 'string', value };
+  }
+  if (expression instanceof NumberLiteralExprAst) {
+    const value = expression.value();
+    return value === undefined ? undefined : { kind: 'number', value };
+  }
+  if (expression instanceof BooleanLiteralExprAst) {
+    const value = expression.value();
+    return value === undefined ? undefined : { kind: 'boolean', value };
+  }
+  if (expression instanceof ArrayLiteralAst) {
+    const elements: ResolvedExpr[] = [];
+    for (const element of expression.elements()) {
+      const decoded = decodeExpression(element);
+      if (decoded === undefined) return undefined;
+      elements.push(decoded);
+    }
+    return { kind: 'array', elements };
+  }
+  if (expression instanceof FunctionCallAst) {
+    return { kind: 'call', path: expression.path() };
+  }
+  if (expression instanceof IdentifierAst) {
+    const name = expression.name();
+    return name === undefined ? undefined : { kind: 'identifier', name };
+  }
+  if (expression instanceof ObjectLiteralExprAst) {
+    return { kind: 'object' };
+  }
+  return undefined;
 }
 
 function attributeName(name: QualifiedNameAst | undefined): string {

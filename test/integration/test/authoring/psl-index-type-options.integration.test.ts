@@ -31,6 +31,7 @@ function interpret(schema: string) {
     composedExtensionPacks: [paradedbPack.id],
     composedExtensionPackRefs: [paradedbPack],
     createNamespace: postgresCreateNamespace,
+    capabilities: { sql: { scalarList: true } },
   });
 }
 
