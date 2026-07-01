@@ -66,6 +66,7 @@
     "./migration": "./dist/migration.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./serverless": "./dist/serverless.mjs",
+    "./static": "./dist/static.mjs",
     "./target": "./dist/target.mjs",
     "./package.json": "./package.json"
   },

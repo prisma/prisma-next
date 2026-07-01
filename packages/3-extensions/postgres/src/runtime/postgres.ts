@@ -1,5 +1,5 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contract/enum-accessor';
+import type { NamespacedEnums } from '@prisma-next/contract/enum-accessor';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
@@ -8,7 +8,6 @@ import type { Db } from '@prisma-next/sql-builder/types';
 import type { ExtractCodecTypes, SqlStorage } from '@prisma-next/sql-contract/types';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
 import type { CodecTypesBase, RawSqlTag } from '@prisma-next/sql-relational-core/expression';
-import { createRawSql } from '@prisma-next/sql-relational-core/expression';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   BindSiteParams,
@@ -23,15 +22,11 @@ import type {
   TransactionContext,
   VerifyMarkerOption,
 } from '@prisma-next/sql-runtime';
-import {
-  createExecutionContext,
-  createSqlExecutionStack,
-  withTransaction,
-} from '@prisma-next/sql-runtime';
+import { createSqlExecutionStack, withTransaction } from '@prisma-next/sql-runtime';
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
-import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Client, Pool } from 'pg';
+import { buildPostgresStaticContext } from '../static/postgres-static';
 import {
   type PostgresBinding,
   type PostgresBindingInput,
@@ -56,6 +51,7 @@ export interface PostgresClient<TContract extends Contract<SqlStorage>> {
   readonly enums: NamespacedEnums<TContract>;
   readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
+  readonly contract: TContract;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
   connect(bindingInput?: PostgresBindingInput): Promise<Runtime>;
   runtime(): Runtime;
@@ -160,20 +156,15 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
 ): PostgresClient<TContract> {
   const contract = resolveContract(options);
   let binding = resolveOptionalPostgresBinding(options);
+
+  const { context, sql, raw: rawSqlTag, enums } = buildPostgresStaticContext<TContract>(contract);
+
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
     driver: postgresDriver,
     extensionPacks: options.extensions ?? [],
   });
-
-  const context = createExecutionContext({
-    contract,
-    stack,
-  });
-
-  const rawCodecInferer = stack.adapter.rawCodecInferer;
-  const rawSqlTag: RawSqlTag = createRawSql(rawCodecInferer);
 
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
@@ -210,6 +201,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
       });
     return connectPromise;
   };
+
   const getRuntime = (): Runtime => {
     if (closed) {
       throw new Error('Postgres client is closed');
@@ -247,6 +239,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
 
     return runtimeInstance;
   };
+
   const orm: OrmClient<TContract> = ormBuilder({
     runtime: {
       execute(plan) {
@@ -259,19 +252,13 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     context,
   });
 
-  const sql: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
-
-  const enums = blindCast<
-    NamespacedEnums<TContract>,
-    'buildNamespacedEnums returns the namespace-keyed accessor map this contract types'
-  >(Object.freeze(buildNamespacedEnums(contract.domain)));
-
   return {
     sql,
     orm,
     enums,
     raw: rawSqlTag,
     context,
+    contract,
     stack,
 
     async connect(bindingInput) {
@@ -319,6 +306,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
 
     transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R> {
       return withTransaction(getRuntime(), (txCtx) => {
+        const rawCodecInferer = stack.adapter.rawCodecInferer;
         const txSql: Db<TContract> = sqlBuilder<TContract>({
           context,
           rawCodecInferer,

@@ -9,6 +9,7 @@ export default defineConfig({
     'src/exports/migration.ts',
     'src/exports/runtime.ts',
     'src/exports/serverless.ts',
+    'src/exports/static.ts',
     'src/exports/target.ts',
   ],
 });

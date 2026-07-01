@@ -61,6 +61,7 @@
     "./control": "./dist/control.mjs",
     "./migration": "./dist/migration.mjs",
     "./runtime": "./dist/runtime.mjs",
+    "./static": "./dist/static.mjs",
     "./package.json": "./package.json"
   },
   "engines": {
