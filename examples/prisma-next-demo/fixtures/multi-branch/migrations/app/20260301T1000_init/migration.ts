@@ -1,13 +1,10 @@
 #!/usr/bin/env -S node
 import { col, Migration, MigrationCLI, primaryKey } from '@prisma-next/postgres/migration';
+import type { Contract as End } from './end-contract';
+import endContract from './end-contract.json' with { type: 'json' };
 
-export default class M extends Migration {
-  override describe() {
-    return {
-      from: null,
-      to: 'sha256:789dd79ab5ab725be1b6ced088109b803a4d62f9874f932eb384a868d94360a4',
-    };
-  }
+export default class M extends Migration<never, End> {
+  override readonly endContractJson = endContract;
 
   override get operations() {
     return [
