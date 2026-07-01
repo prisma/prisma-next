@@ -126,3 +126,14 @@ additive members — `raw` (MongoRawClient) and `execute<Row>(plan)` (direct que
 execution without going through `runtime()`). Both additive; existing extension code
 is unaffected. No extension-author action required. Incidental substrate diff only.
 -->
+
+<!--
+TML-2503 (extension-supabase slice D): `@prisma-next/extension-supabase` gains a
+secondary `.supabase` admin root on `asServiceRole()` — new `ServiceRoleDb` /
+`SupabaseInternalDb` exports from `/runtime`, backed by the extension contract's own
+execution context plus a second runtime sharing the app pool + `service_role` session.
+Purely additive for extension authors — no other extension's API is affected, and no
+released surface changed (the `WithExtensionNamespaces` export existed only on this
+branch's earlier, unmerged merge-design revision and was removed before merge). No
+extension-author API change. Incidental substrate diff only.
+-->
