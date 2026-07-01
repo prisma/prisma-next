@@ -7,7 +7,7 @@ import type {
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
 import { type } from 'arktype';
-import { errorInvalidOperationEntry } from './errors';
+import { errorInvalidOperationEntry, errorMigrationContractViewMissing } from './errors';
 import { computeMigrationHash } from './hash';
 import { deriveProvidedInvariants } from './invariants';
 import type { MigrationMetadata } from './metadata';
@@ -17,18 +17,6 @@ import type { MigrationOps } from './package';
 export interface MigrationMeta {
   readonly from: string | null;
   readonly to: string;
-}
-
-/**
- * The minimal structural shape `describe()` reads off a migration's contract
- * JSON input: just `storage.storageHash`. A raw `contract.json` import
- * structurally satisfies this, so subclasses assign their JSON imports to
- * `startContractJson`/`endContractJson` WITHOUT a cast. The full `Start`/`End`
- * contract typing is applied downstream in the family bases' view getters (via
- * `<Family>ContractView.fromJson<…>`), not on these raw fields.
- */
-export interface ContractHashInput {
-  readonly storage: { readonly storageHash: string };
 }
 
 // `from` rejects empty strings to mirror `MigrationMetadataSchema` in
@@ -76,8 +64,14 @@ export abstract class Migration<
    * import). When set, the derived `describe()` reads `to` from its
    * `storage.storageHash`. Family bases build the typed `endContract` view from
    * it. Optional so `describe()`-overriding migrations (no contract) compile.
+   *
+   * Typed with a plain `storageHash: string`, not the branded
+   * `StorageHashBase`, so a raw `contract.json` import — whose `storageHash`
+   * is an untyped string literal — is assignable without a cast. The full
+   * `Start`/`End` contract typing is applied downstream in the family bases'
+   * view getters (via `<Family>ContractView.fromJson<…>`).
    */
-  readonly endContractJson?: ContractHashInput;
+  readonly endContractJson?: { readonly storage: { readonly storageHash: string } };
 
   /**
    * The migration's start-state contract JSON (the committed
@@ -85,7 +79,7 @@ export abstract class Migration<
    * derives to `null`). Family bases build the typed `startContract` view from
    * it.
    */
-  readonly startContractJson?: ContractHashInput;
+  readonly startContractJson?: { readonly storage: { readonly storageHash: string } };
 
   /**
    * Assembled `ControlStack` injected by the orchestrator (`runMigration`).
@@ -140,6 +134,49 @@ export abstract class Migration<
 
   get destination(): { readonly storageHash: string } {
     return { storageHash: this.describe().to };
+  }
+}
+
+/**
+ * Lazy-memoized `endContract` / `startContract` view accessors, one instance
+ * held per migration. Each target base (`MongoMigration`, `SqliteMigration`,
+ * `PostgresMigration`) creates one `MigrationContractViews` field from
+ * `this` — passing its own `<Family>ContractView.fromJson<…>` as `fromJson`
+ * and a name for error messages — and forwards its
+ * `endContract`/`startContract` getters to it.
+ *
+ * `endContract` throws `MIGRATION.CONTRACT_VIEW_MISSING` when the migration
+ * has no `endContractJson` (mirrors `describe()`'s own requirement).
+ * `startContract` returns `null` for a baseline migration (no
+ * `startContractJson`) instead of throwing.
+ */
+export class MigrationContractViews<TView> {
+  #endView?: TView;
+  #startView?: TView | null;
+
+  constructor(
+    private readonly migration: Migration,
+    private readonly className: string,
+    private readonly fromJson: (json: unknown) => TView,
+  ) {}
+
+  get endContract(): TView {
+    if (this.#endView === undefined) {
+      const json = this.migration.endContractJson;
+      if (json === undefined) {
+        throw errorMigrationContractViewMissing(this.className, 'endContract', 'endContractJson');
+      }
+      this.#endView = this.fromJson(json);
+    }
+    return this.#endView;
+  }
+
+  get startContract(): TView | null {
+    if (this.#startView === undefined) {
+      const json = this.migration.startContractJson;
+      this.#startView = json === undefined ? null : this.fromJson(json);
+    }
+    return this.#startView;
   }
 }
 

@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { MigrationMetadata } from '../src/metadata';
 import { buildMigrationArtifacts, Migration } from '../src/migration-base';
 
-describe('Migration', async () => {
-  describe('operations + describe() contract', async () => {
+describe('Migration', () => {
+  describe('operations + describe() contract', () => {
     it('subclasses expose operations via the getter and describe() metadata', async () => {
       class TestMigration extends Migration<{
         id: string;
@@ -76,7 +76,7 @@ describe('Migration', async () => {
     });
   });
 
-  describe('derived describe() from contract JSON', async () => {
+  describe('derived describe() from contract JSON', () => {
     const endJson = { storage: { storageHash: 'sha256:endhash' } };
     const startJson = { storage: { storageHash: 'sha256:starthash' } };
 
@@ -133,7 +133,7 @@ describe('Migration', async () => {
     });
   });
 
-  describe('constructor accepts and stores a ControlStack', async () => {
+  describe('constructor accepts and stores a ControlStack', () => {
     /**
      * The constructor injection contract is that a subclass (e.g.
      * `PostgresMigration`) can read `this.stack` to materialize whatever it
@@ -187,7 +187,7 @@ describe('Migration', async () => {
  * dry-run stdout output) lives in `@prisma-next/cli` and is exercised
  * there.
  */
-describe('buildMigrationArtifacts', async () => {
+describe('buildMigrationArtifacts', () => {
   function makeMigration(
     operations: unknown,
     meta: {

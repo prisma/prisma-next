@@ -3,6 +3,7 @@ import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control'
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { Migration as SqlMigration } from '@prisma-next/family-sql/migration';
 import type { ControlStack } from '@prisma-next/framework-components/control';
+import { MigrationContractViews } from '@prisma-next/migration-tools/migration';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import { errorPostgresMigrationStackMissing } from '../errors';
@@ -75,8 +76,16 @@ export abstract class PostgresMigration<
    */
   protected readonly controlAdapter: SqlControlAdapter<'postgres'> | undefined;
 
-  #endContract?: PostgresContractView<End>;
-  #startContract?: PostgresContractView<Start> | null;
+  #endView = new MigrationContractViews<PostgresContractView<End>>(
+    this,
+    'PostgresMigration',
+    (json) => PostgresContractView.fromJson<End>(json),
+  );
+  #startView = new MigrationContractViews<PostgresContractView<Start>>(
+    this,
+    'PostgresMigration',
+    (json) => PostgresContractView.fromJson<Start>(json),
+  );
 
   constructor(stack?: ControlStack<'sql', 'postgres'>) {
     super(stack);
@@ -90,35 +99,19 @@ export abstract class PostgresMigration<
 
   /**
    * The typed, schema-qualified Postgres view over this migration's end-state
-   * contract — `this.endContract.namespace.<schema>.table.<name>`, etc. Lazily
-   * built from `endContractJson` and memoized. Throws if no `endContractJson`
-   * was provided.
+   * contract — `this.endContract.namespace.<schema>.table.<name>`, etc. Throws
+   * if no `endContractJson` was provided.
    */
   get endContract(): PostgresContractView<End> {
-    if (this.#endContract === undefined) {
-      if (this.endContractJson === undefined) {
-        throw new Error(
-          'PostgresMigration.endContract: no endContractJson provided — set endContractJson to read the end-state contract view.',
-        );
-      }
-      this.#endContract = PostgresContractView.fromJson<End>(this.endContractJson);
-    }
-    return this.#endContract;
+    return this.#endView.endContract;
   }
 
   /**
    * The typed Postgres view over this migration's start-state contract, or
-   * `null` for a baseline migration (no `startContractJson`). Lazily built and
-   * memoized.
+   * `null` for a baseline migration (no `startContractJson`).
    */
   get startContract(): PostgresContractView<Start> | null {
-    if (this.#startContract === undefined) {
-      this.#startContract =
-        this.startContractJson === undefined
-          ? null
-          : PostgresContractView.fromJson<Start>(this.startContractJson);
-    }
-    return this.#startContract;
+    return this.#startView.startContract;
   }
 
   /**

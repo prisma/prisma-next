@@ -1,3 +1,4 @@
+import type { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { describe, expect, it } from 'vitest';
 import { PostgresMigration } from '../src/core/migrations/postgres-migration';
 import type { Contract } from './fixtures/namespaced-contract.d';
@@ -69,6 +70,10 @@ describe('PostgresMigration view getters', () => {
         return [];
       }
     }
-    expect(() => new NoContract().endContract).toThrow(/no endContractJson/);
+    expect(() => new NoContract().endContract).toThrowError(
+      expect.objectContaining({
+        code: 'MIGRATION.CONTRACT_VIEW_MISSING',
+      }) as unknown as MigrationToolsError,
+    );
   });
 });
