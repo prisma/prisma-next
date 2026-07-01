@@ -11,9 +11,9 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import { dataTransform, setValidation } from '@prisma-next/target-mongo/migration';
 import type { Contract as End } from './end-contract';
-import endContractJson from './end-contract.json' with { type: 'json' };
+import endContract from './end-contract.json' with { type: 'json' };
 import type { Contract as Start } from './start-contract';
-import startContractJson from './start-contract.json' with { type: 'json' };
+import startContract from './start-contract.json' with { type: 'json' };
 
 function existingProductsWithoutStatus(storageHash: string): MongoQueryPlan {
   return {
@@ -44,8 +44,8 @@ function backfillRun(storageHash: string): MongoQueryPlan {
 }
 
 class BackfillProductStatus extends Migration<Start, End> {
-  override readonly startContractJson = startContractJson;
-  override readonly endContractJson = endContractJson;
+  override readonly startContractJson = startContract;
+  override readonly endContractJson = endContract;
 
   // `migration new` records the contract delta as `from` → `to` but produces an
   // empty `operations` array; the author is responsible for declaring the work
