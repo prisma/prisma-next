@@ -12,7 +12,7 @@ import type {
   SqlMigrationRunnerSuccessValue,
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
-import { namespaceSchemaNodes, verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
+import { namespaceSchemaNodes, verifySqlSchema } from '@prisma-next/family-sql/diff';
 import type { MigrationRunnerResult } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';

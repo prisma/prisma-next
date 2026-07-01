@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { verifySqlSchemaTree } from '@prisma-next/family-sql/schema-verify';
+import { verifySqlSchemaTree } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';

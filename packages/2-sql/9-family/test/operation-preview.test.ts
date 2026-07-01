@@ -99,6 +99,7 @@ describe('SqlControlFamilyInstance OperationPreviewCapable', () => {
         familyId: 'sql',
         kind: 'target',
         types: { storage: [] },
+        diffDatabaseSchema: () => ({}),
       },
       adapter: {
         targetId: 'postgres',

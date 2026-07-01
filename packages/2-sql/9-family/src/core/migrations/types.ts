@@ -20,6 +20,7 @@ import type {
   OpFactoryCall,
   SchemaIssue,
   SchemaVerifier,
+  VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
@@ -493,8 +494,29 @@ export interface SqlControlTargetDescriptor<
    * narrows to its own tree root.
    */
   readonly inferPslContract?: (schema: SqlSchemaIRNode) => PslDocumentAst;
+  /**
+   * The single combined database-schema diff of two derived representations —
+   * the target's black-box comparison. Every SQL target provides it (Postgres
+   * returns relational + policy issues; SQLite returns relational only). It is
+   * schema logic on the target, not database I/O, so it lives here rather than
+   * on the control adapter. How it computes the two issue sets is private.
+   */
+  readonly diffDatabaseSchema: (input: DiffDatabaseSchemaInput) => VerifyDatabaseSchemaResult;
   createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
+}
+
+/**
+ * Inputs to a target descriptor's {@link SqlControlTargetDescriptor.diffDatabaseSchema}:
+ * the contract (the expected side derives from it), the introspected actual
+ * schema node, and the resolution context the relational diff needs.
+ */
+export interface DiffDatabaseSchemaInput {
+  readonly contract: Contract<SqlStorage>;
+  readonly schema: SqlSchemaIRNode;
+  readonly strict: boolean;
+  readonly typeMetadataRegistry: ReadonlyMap<string, { readonly nativeType?: string }>;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 export interface CreateSqlMigrationPlanOptions<TTargetDetails> {

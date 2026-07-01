@@ -48,13 +48,14 @@ import type { SqlSchemaIRNode, SqlTableIR } from '@prisma-next/sql-schema-ir/typ
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlControlAdapter } from './control-adapter';
+import { namespaceSchemaNodes } from './diff/sql-schema-diff';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
 import type {
+  DiffDatabaseSchemaInput,
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
 } from './migrations/types';
 import { sqlOperationsToPreview } from './operation-preview';
-import { namespaceSchemaNodes, verifySqlSchemaTree } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds } from './verify';
 
 function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
@@ -541,6 +542,20 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     { readonly inferPslContract?: (schema: SqlSchemaIRNode) => PslDocumentAst },
     'reading the optional target-descriptor inferPslContract hook'
   >(target).inferPslContract;
+  // The combined database-schema diff is a required target-descriptor operation:
+  // every SQL target provides it. Read it off the descriptor like the other
+  // target-owned hooks.
+  const diffDatabaseSchema = blindCast<
+    {
+      readonly diffDatabaseSchema?: (input: DiffDatabaseSchemaInput) => VerifyDatabaseSchemaResult;
+    },
+    'reading the required target-descriptor diffDatabaseSchema hook'
+  >(target).diffDatabaseSchema;
+  if (!diffDatabaseSchema) {
+    throw new Error(
+      `SQL target "${target.targetId}" is missing the required diffDatabaseSchema descriptor operation`,
+    );
+  }
   const deserializeWithTargetSerializer = (contractOrJson: unknown): Contract<SqlStorage> => {
     const serializer = targetSerializer ?? new SqlContractSerializer();
     const json =
@@ -698,32 +713,17 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
     }): VerifyDatabaseSchemaResult {
       const contract = deserializeWithTargetSerializer(options.contract) as Contract<SqlStorage>;
-      const controlAdapter = getControlAdapter();
-      // Verify runs the one combined database-schema diff the migration planner
-      // runs — `controlAdapter.diffDatabaseSchema` (relational columns + target
-      // structural diff, per-namespace-paired) — and rejects when the result is
-      // non-empty. Verify composes no strategies itself. A target without a
-      // structural diff (SQLite) has no `diffDatabaseSchema`; fall back to the
-      // relational diff alone (its only schema diff).
-      const sqlResult = controlAdapter.diffDatabaseSchema
-        ? controlAdapter.diffDatabaseSchema({
-            contract,
-            schema: options.schema,
-            strict: options.strict,
-            typeMetadataRegistry,
-            frameworkComponents: options.frameworkComponents,
-          })
-        : verifySqlSchemaTree({
-            contract,
-            actualSchema: options.schema,
-            buildExpectedSchema: (scopedContract) =>
-              buildTargetSchema(target, scopedContract, options.frameworkComponents),
-            strict: options.strict,
-            typeMetadataRegistry,
-            frameworkComponents: options.frameworkComponents,
-            ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
-            ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
-          });
+      // Verify is a thin consumer of the target's black-box diff: it introspects
+      // the actual schema (already in `options.schema`), calls the target's
+      // required `diffDatabaseSchema`, and rejects when a surviving issue is a
+      // failure. It composes no diffing itself and is blind to how the diff works.
+      const sqlResult = diffDatabaseSchema({
+        contract,
+        schema: options.schema,
+        strict: options.strict,
+        typeMetadataRegistry,
+        frameworkComponents: options.frameworkComponents,
+      });
       // Control-policy suppression of the structural (e.g. RLS policy) diff
       // issues is a verify-side post-step — the combined diff returns them
       // ownership-filtered, and a suppressed control policy drops them here.
@@ -1069,37 +1069,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       };
     },
   };
-}
-
-/**
- * Builds the target's expected schema tree from a contract via the descriptor's
- * `migrations.contractToSchema` hook (Postgres → a namespaced tree root; SQLite
- * → a flat schema). Read off `target`, like the other target-owned hooks.
- */
-function buildTargetSchema(
-  target: TargetDescriptor<'sql', string>,
-  contract: Contract<SqlStorage>,
-  frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>,
-): SqlSchemaIRNode {
-  const hook = blindCast<
-    {
-      readonly migrations?: {
-        readonly contractToSchema?: (
-          contract: Contract<SqlStorage> | null,
-          frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>,
-        ) => unknown;
-      };
-    },
-    'reading the target descriptor migrations.contractToSchema hook'
-  >(target).migrations?.contractToSchema;
-  if (!hook) {
-    throw new Error(
-      'SQL family verifySchema requires the target to expose migrations.contractToSchema',
-    );
-  }
-  return blindCast<SqlSchemaIRNode, 'contractToSchema returns the target schema-IR node'>(
-    hook(contract, frameworkComponents),
-  );
 }
 
 /**

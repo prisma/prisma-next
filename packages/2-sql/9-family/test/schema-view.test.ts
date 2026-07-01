@@ -1,8 +1,12 @@
-import type { ControlFamilyDescriptor } from '@prisma-next/framework-components/control';
+import type {
+  ControlFamilyDescriptor,
+  ControlTargetDescriptor,
+} from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
+import { stubTargetDiffDatabaseSchema } from './schema-verify.helpers';
 
 function createMockStack() {
   return createControlStack({
@@ -36,8 +40,9 @@ function createMockStack() {
         deserializeContract: (json) => json as never,
         serializeContract: (contract) => contract as never,
       },
+      diffDatabaseSchema: stubTargetDiffDatabaseSchema,
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
-    },
+    } as ControlTargetDescriptor<'sql', 'postgres'>,
     adapter: {
       kind: 'adapter',
       id: 'postgres',

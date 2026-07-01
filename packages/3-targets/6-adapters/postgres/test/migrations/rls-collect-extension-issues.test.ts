@@ -1,6 +1,7 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { diffPostgresDatabaseSchema } from '@prisma-next/target-postgres/planner';
 import {
   computeContentHash,
   normalizePredicate,
@@ -15,7 +16,6 @@ import {
 } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { controlAdapter } from './fixtures/runner-fixtures';
 
 const TABLE_NAME = 'items';
 const USING = '(owner_id = current_user_id())';
@@ -150,9 +150,9 @@ function contractWithPolicy(): Contract<SqlStorage> {
  * (`schemaDiffIssues`) findings — the RLS drift these tests assert on.
  */
 function policyDiffIssues(contract: Contract<SqlStorage>, schema: PostgresDatabaseSchemaNode) {
-  return controlAdapter.diffDatabaseSchema!({
+  return diffPostgresDatabaseSchema({
     contract,
-    schema,
+    actualSchema: schema,
     strict: false,
     typeMetadataRegistry: new Map(),
     frameworkComponents: [],

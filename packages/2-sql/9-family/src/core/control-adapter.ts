@@ -1,15 +1,9 @@
-import type {
-  Contract,
-  ContractMarkerRecord,
-  LedgerEntryRecord,
-} from '@prisma-next/contract/types';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import type {
   ControlAdapterInstance,
   ControlStack,
-  VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   DdlNode,
@@ -18,7 +12,7 @@ import type {
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
-import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/verify-sql-schema';
+import type { DefaultNormalizer, NativeTypeNormalizer } from './diff/sql-schema-diff';
 
 /**
  * Structural interface for anything that can lower a SQL/DDL AST node to a
@@ -198,24 +192,6 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * before comparison with contract native types during schema verification.
    */
   readonly normalizeNativeType?: NativeTypeNormalizer;
-
-  /**
-   * The single combined database-schema diff the migration planner and the
-   * schema verify both run for this target — the relational diff (table /
-   * column / constraint findings as `SchemaIssue[]`, with the verification-tree
-   * `root`/`counts`) plus the target's structural diff (e.g. Postgres RLS policy
-   * presence as `SchemaDiffIssue[]`), each computed once. Returns a
-   * `VerifyDatabaseSchemaResult` whose `schema` carries both shapes — exactly the
-   * existing verify-result schema shape. Optional: targets without a structural
-   * diff (SQLite) omit it, and the family verify runs the relational diff alone.
-   */
-  diffDatabaseSchema?(input: {
-    readonly contract: Contract<SqlStorage>;
-    readonly schema: SqlSchemaIRNode;
-    readonly strict: boolean;
-    readonly typeMetadataRegistry: ReadonlyMap<string, { readonly nativeType?: string }>;
-    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
-  }): VerifyDatabaseSchemaResult;
 
   /**
    * Ordered DDL queries that bootstrap marker/ledger control tables for migration

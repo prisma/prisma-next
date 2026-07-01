@@ -1,8 +1,4 @@
-import type {
-  Contract,
-  ContractMarkerRecord,
-  LedgerEntryRecord,
-} from '@prisma-next/contract/types';
+import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import {
   parseMarkerRowSafely,
   rethrowMarkerReadError,
@@ -11,15 +7,11 @@ import {
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import {
-  APP_SPACE_ID,
-  type VerifyDatabaseSchemaResult,
-} from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
-import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   CodecRef,
@@ -42,7 +34,6 @@ import type {
   SqlForeignKeyIR,
   SqlIndexIR,
   SqlReferentialAction,
-  SqlSchemaIRNode,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import {
@@ -63,7 +54,6 @@ import type {
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
-import { diffPostgresDatabaseSchema } from '@prisma-next/target-postgres/planner';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
   PostgresDatabaseSchemaNode,
@@ -126,22 +116,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * before comparison with contract native types.
    */
   readonly normalizeNativeType = normalizeSchemaNativeType;
-
-  diffDatabaseSchema(input: {
-    readonly contract: Contract<SqlStorage>;
-    readonly schema: SqlSchemaIRNode;
-    readonly strict: boolean;
-    readonly typeMetadataRegistry: ReadonlyMap<string, { readonly nativeType?: string }>;
-    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
-  }): VerifyDatabaseSchemaResult {
-    return diffPostgresDatabaseSchema({
-      contract: input.contract,
-      actualSchema: input.schema,
-      strict: input.strict,
-      typeMetadataRegistry: input.typeMetadataRegistry,
-      frameworkComponents: input.frameworkComponents,
-    });
-  }
 
   bootstrapControlTableQueries(): readonly DdlNode[] {
     return buildControlTableBootstrapQueries();
