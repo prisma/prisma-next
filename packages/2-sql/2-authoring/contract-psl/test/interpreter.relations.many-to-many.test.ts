@@ -356,18 +356,18 @@ model PostTag {
     expect(diagnostic?.message).toContain('@id');
   });
 
-  it('resolves self-referential junction lists disambiguated by relation name', () => {
+  it('resolves self-referential junction lists disambiguated by through: Junction.field', () => {
     const result = interpretSchema(`model User {
   id Int @id
-  following User[] @relation("follower")
-  followers User[] @relation("followee")
+  following User[] @relation(through: Follow.follower)
+  followers User[] @relation(through: Follow.followee)
 }
 
 model Follow {
   followerId Int
   followeeId Int
-  follower User @relation("follower", from: [followerId], to: [id])
-  followee User @relation("followee", from: [followeeId], to: [id])
+  follower User @relation(from: [followerId], to: [id])
+  followee User @relation(from: [followeeId], to: [id])
 
   @@id([followerId, followeeId])
 }
@@ -405,7 +405,7 @@ model Follow {
     });
   });
 
-  it('returns diagnostics for self-referential junction lists without a relation name', () => {
+  it('returns diagnostics for self-referential junction lists without a through: pin', () => {
     const result = interpretSchema(`model User {
   id Int @id
   follows User[]
@@ -414,8 +414,8 @@ model Follow {
 model Follow {
   followerId Int
   followeeId Int
-  follower User @relation("follower", from: [followerId], to: [id])
-  followee User @relation("followee", from: [followeeId], to: [id])
+  follower User @relation(from: [followerId], to: [id])
+  followee User @relation(from: [followeeId], to: [id])
 
   @@id([followerId, followeeId])
 }
@@ -434,24 +434,24 @@ model Follow {
     );
   });
 
-  it('lowers two distinct named many-to-many relations between the same pair through separate junctions', () => {
+  it('lowers two distinct many-to-many relations between the same pair through separate junctions', () => {
     const result = interpretSchema(`model User {
   id Int @id
-  ownedTags Tag[] @relation("owned")
-  watchedTags Tag[] @relation("watched")
+  ownedTags Tag[] @relation(through: TagOwnership)
+  watchedTags Tag[] @relation(through: TagWatch)
 }
 
 model Tag {
   id Int @id
-  owners User[] @relation("owned")
-  watchers User[] @relation("watched")
+  owners User[] @relation(through: TagOwnership)
+  watchers User[] @relation(through: TagWatch)
 }
 
 model TagOwnership {
   userId Int
   tagId Int
-  user User @relation("owned", from: [userId], to: [id])
-  tag Tag @relation("owned", from: [tagId], to: [id])
+  user User @relation(from: [userId], to: [id])
+  tag Tag @relation(from: [tagId], to: [id])
 
   @@id([userId, tagId])
 }
@@ -459,8 +459,8 @@ model TagOwnership {
 model TagWatch {
   userId Int
   tagId Int
-  user User @relation("watched", from: [userId], to: [id])
-  tag Tag @relation("watched", from: [tagId], to: [id])
+  user User @relation(from: [userId], to: [id])
+  tag Tag @relation(from: [tagId], to: [id])
 
   @@id([userId, tagId])
 }

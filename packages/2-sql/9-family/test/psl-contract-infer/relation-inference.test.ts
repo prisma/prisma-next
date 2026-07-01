@@ -48,6 +48,8 @@ describe('inferRelations', () => {
       typeName: 'Post',
       list: true,
     });
+    // An unambiguous 1:N back-relation carries no inverse pointer.
+    expect(userRelations![0]).not.toHaveProperty('inverseOf');
   });
 
   it('detects 1:1 when FK column has unique constraint', () => {
@@ -217,6 +219,12 @@ describe('inferRelations', () => {
       relationName: 'fk_receiver',
       fkName: 'fk_receiver',
     });
+
+    // Each back-relation on the parent points at the FK-side field it pairs with.
+    const userRelations = relationsByTable.get('user');
+    expect(userRelations).toHaveLength(2);
+    expect(userRelations![0]).toMatchObject({ inverseOf: 'sender' });
+    expect(userRelations![1]).toMatchObject({ inverseOf: 'receiver' });
   });
 
   it('falls back to generated relation names for unnamed duplicate FKs', () => {
@@ -287,12 +295,13 @@ describe('inferRelations', () => {
       optional: true,
       relationName: 'ParentCategories',
     });
-    // Back-relation field
+    // Back-relation field points at the FK-side relation field it pairs with.
     const backRel = relations!.find((r) => !r.fields);
     expect(backRel).toMatchObject({
       typeName: 'Category',
       list: true,
       relationName: 'ParentCategories',
+      inverseOf: 'parent',
     });
   });
 
