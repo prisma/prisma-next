@@ -126,3 +126,13 @@ additive members — `raw` (MongoRawClient) and `execute<Row>(plan)` (direct que
 execution without going through `runtime()`). Both additive; existing extension code
 is unaffected. No extension-author action required. Incidental substrate diff only.
 -->
+
+<!--
+TML-2955 (expose the static ExecutionContext symmetrically): the built-in target
+facades gain a client-safe `@prisma-next/{mongo,postgres,sqlite}/static` entrypoint
+(`<target>Static`) and expose `db.context` / `db.contract`. Internally, the mongo
+adapter codec now imports `ObjectId` from `bson` instead of `mongodb` so the static
+`ExecutionContext` is genuinely driver-free (client-bundle-safe). All additive /
+internal — no extension-author API or surface change; existing extensions are
+unaffected. No extension-author action required. Incidental substrate diff only.
+-->
