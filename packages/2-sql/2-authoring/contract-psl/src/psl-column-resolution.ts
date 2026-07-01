@@ -23,9 +23,15 @@ import type {
   FieldSymbol,
   PslSpan,
   ResolvedAttribute,
-  ResolvedExpr,
   ResolvedTypeConstructorCall,
 } from '@prisma-next/psl-parser';
+import {
+  ArrayLiteralAst,
+  BooleanLiteralExprAst,
+  type ExpressionAst,
+  NumberLiteralExprAst,
+  StringLiteralExprAst,
+} from '@prisma-next/psl-parser/syntax';
 import { blindCast } from '@prisma-next/utils/casts';
 
 import {
@@ -718,22 +724,28 @@ type ListDefaultParse =
   | { readonly kind: 'scalar' }
   | undefined;
 
-function parseListDefaultExpression(expression: ResolvedExpr | undefined): ListDefaultParse {
+function decodeLiteralElement(element: ExpressionAst): string | number | boolean | undefined {
+  if (element instanceof StringLiteralExprAst) return element.value();
+  if (element instanceof NumberLiteralExprAst) return element.value();
+  if (element instanceof BooleanLiteralExprAst) return element.value();
+  return undefined;
+}
+
+function parseListDefaultExpression(expression: ExpressionAst | undefined): ListDefaultParse {
   if (expression === undefined) return undefined;
   if (
-    expression.kind === 'string' ||
-    expression.kind === 'number' ||
-    expression.kind === 'boolean'
+    expression instanceof StringLiteralExprAst ||
+    expression instanceof NumberLiteralExprAst ||
+    expression instanceof BooleanLiteralExprAst
   ) {
     return { kind: 'scalar' };
   }
-  if (expression.kind !== 'array') return undefined;
+  if (!(expression instanceof ArrayLiteralAst)) return undefined;
   const value: (string | number | boolean)[] = [];
-  for (const element of expression.elements) {
-    if (element.kind !== 'string' && element.kind !== 'number' && element.kind !== 'boolean') {
-      return undefined;
-    }
-    value.push(element.value);
+  for (const element of expression.elements()) {
+    const decoded = decodeLiteralElement(element);
+    if (decoded === undefined) return undefined;
+    value.push(decoded);
   }
   return { kind: 'array', value };
 }
