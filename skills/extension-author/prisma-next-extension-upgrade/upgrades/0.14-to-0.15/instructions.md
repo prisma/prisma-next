@@ -35,6 +35,25 @@ changes:
         - "SqlUnboundNamespace"
         - "'sql-namespace'"
       anyMatch: true
+  - id: codec-render-value-literal-for-restricted-columns
+    summary: |
+      A field/column restricted to a value set (e.g. an enum) now derives its narrowed TS literal
+      union **through the codec**, not the framework's (now-deleted) domain-enum override. If your
+      extension authors a custom codec descriptor (`extends CodecDescriptorImpl`) used by a
+      restricted/enum column, implement `renderValueLiteral(value, side)` on it so the column narrows
+      to its value union; without it the column widens to the codec's output type
+      (`CodecTypes[id][side]`). If your extension builds a `CodecLookup` by hand and drives the
+      framework emitter (`generateContractDts`), expose `renderValueLiteralFor` so the emit path can
+      reach your descriptor's renderer. Framework-built lookups (via the CLI/build / control-stack)
+      already supply it — no action there. (`side`: `output` = the read/SELECT type, `input` = the
+      create/update type.)
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "CodecDescriptorImpl"
+        - "renderValueTypeFor"
+        - "renderOutputType"
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in

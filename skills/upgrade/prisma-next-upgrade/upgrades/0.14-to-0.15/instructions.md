@@ -102,3 +102,15 @@ order-type string literals with typed enum accessors via `buildNamespacedEnums` 
 changes affect the emitted contract shape; a re-emit picks them up automatically.
 No user action required. Incidental substrate diff only.
 -->
+
+<!--
+TML-2952 (this PR): route SQL enum/value-set column TS typing through the codec.
+A field/column restricted to a value set now derives its narrowed TS literal union
+by rendering each stored value through its codec, replacing the framework's
+(now-deleted) domain-enum override. The only `examples/` touch is a type test —
+`examples/prisma-next-demo/test/demo-dx.types.test.ts` — asserting the emitted
+`FieldOutputTypes` enum field equals the no-emit `typeof contract` value union
+(emit-vs-no-emit agreement). The emitted contract is byte-identical (`fixtures:check`
+clean; `contract.json`, `contract.d.ts`, and both hashes unchanged). No user action
+required. Incidental substrate diff only.
+-->
