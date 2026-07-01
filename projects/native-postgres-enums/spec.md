@@ -20,13 +20,15 @@ domain-authored enum:
   exists in the database — Supabase ships a large set of built-in native enums (owned
   externally, never created or altered by PN); a **ported** project has user-authored ones.
   **The type is the source.** PN represents it and *derives* what the app needs from it: the
-  **value-set** that drives typing, and a `db.enums`-style accessor (members where
-  name = value). There is no authored domain enum; the type is surfaced directly, and a
-  ported project's native enums must be *representable*, not rejected.
+  **value-set** that drives typing, and a **`db.native_enums`** accessor (a new Postgres-only
+  sibling of `db.enums`; members where name = value). There is no authored domain enum; the
+  type is surfaced directly, and a ported project's native enums must be *representable*, not
+  rejected.
 - **Authored (phase 2) — secondary.** A user **declares a managed `native_enum` directly**
   (the *same* authoring surface as the external case — see the authoring design). It is graded
   `managed`, so PN creates the type and migrates the cheap ops. The `native_enum`'s members
-  give `db.enums`; there is **no separate domain enum**. (There is no "realize a domain enum
+  give `db.native_enums` (the new Postgres-only accessor); there is **no separate domain
+  enum**, and `db.enums` (domain enums) is untouched. (There is no "realize a domain enum
   as native" path; converting an existing *check*-realized domain enum to native is a
   non-goal — a realization swap.)
 
@@ -78,15 +80,16 @@ cheap-ops-only form.
 ## The model (settled)
 
 The spine: a native enum is a storage **type**, authored as **one construct** — the
-`native_enum` pack entity (its members give `db.enums`; its values derive the value-set) —
-used on fields via the `pg.enum(<ref>)` codec. External vs managed is only the control grade
+`native_enum` pack entity (its members give `db.native_enums`; its values derive the
+value-set) — used on fields via the `pg.enum(<ref>)` codec. External vs managed is only the control grade
 (and whether PN creates the type). Crucially, **everything downstream of the permitted values
 reuses the same machinery as the check strategy** — the native-only pieces are exactly two:
 the managed type, and the cast. Full detail in [`specs/authoring-design.md`](specs/authoring-design.md).
 
 - **No separate domain enum.** The `native_enum` entity is both the app-facing enum (its
-  `members` drive `db.enums`) and the storage type — in *either* case (external or authored).
-  There is no `enumType`/domain-enum alongside it.
+  `members` drive a new Postgres-only `db.native_enums` accessor) and the storage type — in
+  *either* case (external or authored). There is no `enumType`/domain-enum alongside it, and
+  `db.enums` is unaffected.
 - **`native_enum` entity** (storage plane, `entries.native_enum[Name]`, kind
   `postgres-enum`, `typeName`, ordered `members[{name,value}]`, optional `control` grade) —
   does **two** jobs:
@@ -106,9 +109,16 @@ the managed type, and the cast. Full detail in [`specs/authoring-design.md`](spe
 
 **Downstream of the value-set it is all the regular-enum machinery:**
 
-- **Typing** — value-set + codec → value union, via TML-2952's `renderValueType`. *Identical*
-  to a check enum; there is no native-specific typing path. `db.enums` comes from the
-  `native_enum` entity's `members` (both cases).
+- **Typing** — the column's `valueSet` ref types it as the value union, landing **today** via
+  `StorageColumnTypes` (TML-2886, which reads the storage value-set); the enum-typing-via-codec
+  refactor (TML-2952/2953) later routes the same union through the codec (`renderValueType`) —
+  identical union (enum codecs are text/identity), so refinement not dependency. No native-
+  specific typing path, and the domain `FieldOutputTypes` path is not involved (native enums
+  have no domain enum).
+- **Runtime member access (`db.native_enums`)** — a **new Postgres-only facade root**, a
+  sibling of `db.enums` with the same accessor shape, built from the `native_enum` members and
+  composed into the Postgres client only. `db.enums` (domain enums) is unchanged; native enums
+  never appear in it.
 - **Enforcement** — a per-strategy *render* from the same value-set. **Native: the type
   itself enforces membership** (the `CREATE TYPE`'s value list is taken from the value-set);
   **no `CHECK`.** (Check → `CHECK (col IN (...))` from the value-set; Mongo → `$jsonSchema`
@@ -130,8 +140,9 @@ Two pieces (full detail — PSL + TS, block descriptor, codec, lowering — in
    `typeParams.ref`, and `nativeType` = the resolved type name.
 
 The `pg.enum` codec resolves its `native_enum` ref for (a) its **dynamic `nativeType`** → the
-`::<type>` cast, and (b) the values → the value-set → typing. `db.enums` comes from the
-`native_enum` members. **External:** the Supabase extension writes the `native_enum` block in
+`::<type>` cast, and (b) the values → the value-set → typing. `db.native_enums` (the new
+Postgres-only accessor) comes from the `native_enum` members; `db.enums` is unchanged.
+**External:** the Supabase extension writes the `native_enum` block in
 its `contract.prisma` (graded `external`); a user's field references it by name (the existing
 cross-namespace/space reference). **Authored (phase 2):** a user writes the same, graded
 `managed`.
@@ -189,8 +200,8 @@ namespace public {
 
 ```ts
 const p = await db.profiles.findOne({ where: { id } })
-p.role                            // 'admin' | 'member' | 'guest'   (not string)
-db.enums.public.UserRole.values   // readonly ['admin','member','guest']
+p.role                                  // 'admin' | 'member' | 'guest'   (not string)
+db.native_enums.public.UserRole.values  // readonly ['admin','member','guest']  (Postgres-only facade root)
 ```
 
 The values appearing in the `native_enum` entity, the derived `valueSet`, and (for Mongo,
@@ -210,10 +221,12 @@ Two enum kinds share the same downstream machinery via a **value-set**:
   `native_enum` entity → derived value-set + the `pg.enum` codec + the native type.
   Postgres-only. No `CHECK`; no separate domain enum.
 
-**Both derive the same value-set**, so everything downstream (typing, `db.enums`,
-enforcement-source) is shared; only the *construct* and the *enforcement render* differ. For a
-native enum, external vs managed is only the control grade + whether PN creates the type:
-Phase 1 external (the DB owns it), Phase 2 managed (PN creates it).
+**Both derive the same value-set**, so typing and the enforcement-source are shared. What
+differs is the *construct*, the *enforcement render*, and the *runtime accessor*: a
+check-realized domain enum surfaces on `db.enums`; a native enum surfaces on the new
+Postgres-only `db.native_enums`. For a native enum, external vs managed is only the control
+grade + whether PN creates the type: Phase 1 external (the DB owns it), Phase 2 managed (PN
+creates it).
 
 ### #1 — ContractIR representation (both phases)
 
@@ -254,12 +267,14 @@ is surfaced to the runner.
 
 ### #6 — Query / typing (both phases)
 
-A native-enum column reads/writes as the **value union** via the value-set + codec machinery
-(TML-2952's `StorageColumnTypes` / `renderValueType`) — *the same path a check enum uses*,
-sourcing the union from the derived value-set. `db.enums` comes from the `native_enum`
-entity's `members` (both cases). The no-emit (`typeof contract`) path propagates the
-authored handle values, as for any enum. The native-only addition is the codec-emitted
-`::type` **cast** in generated SQL.
+A native-enum column reads/writes as the **value union** from its `valueSet` ref — landing
+today via `StorageColumnTypes` (TML-2886), codec-refined later by the enum-typing-via-codec
+refactor (TML-2952/2953). *The same value-set path a check-realized column uses;* no native-
+specific typing code. Runtime member access is the new Postgres-only **`db.native_enums`**
+accessor (not `db.enums`, which stays domain-only). The no-emit (`typeof contract`) path
+propagates the authored handle values, as for any enum. The two native-only additions in the
+query path are the **`db.native_enums` facade root** and the codec-emitted `::type` **cast**
+in generated SQL. Full detail: [`specs/querying-design.md`](specs/querying-design.md).
 
 ## Relationship to the enum-typing refactor (TML-2952/2953) — parallel-safe
 
@@ -300,13 +315,14 @@ So the *physical* permitted values must live in storage (the value-set, and the
 - **R2 — Derive + reference.** The `native_enum` entity derives a `valueSet`; a field uses it
   via the `pg.enum(ref)` codec, so its column references the `valueSet` (typing) and carries
   `codecId: pg/enum@1` + `typeParams.ref` + `nativeType` (cast). No `CHECK`. There is no
-  separate domain enum; the `native_enum`'s members serve `db.enums`.
+  separate domain enum; the `native_enum`'s members serve `db.native_enums`.
 - **R3 — Surface (typed read).** A native-enum column reads as the value union (not `string`)
   in the query builder and ORM, emitted-contract and no-emit; typed input rejects out-of-set
   literals; generated SQL carries the `::type` cast where required.
-- **R4 — `db.enums` parity.** `db.enums.<ns>.<Name>` works identically regardless of
-  realization — always derived from the `native_enum` entity's `members` (name→value), in both
-  the external and authored cases.
+- **R4 — `db.native_enums` access.** `db.native_enums.<ns>.<Name>` (a new Postgres-only facade
+  root, sibling of `db.enums`) exposes each native enum's members (name→value), for both the
+  external and authored cases. `db.enums` (real-PN/domain enums) is unchanged and never
+  contains native enums.
 - **R5 — External grade.** `external`/`observed` native enums produce no DDL and no drift
   reports; the Supabase extension's `external` default applies to its contributed enums.
 - **R6 — Adopt (porting).** Contract-infer emits the `native_enum` representation for an
@@ -337,10 +353,16 @@ So the *physical* permitted values must live in storage (the value-set, and the
   extension-contribution seam landed — not the full RLS feature set.
 - **The value-set + codec typing machinery (TML-2886, TML-2952/2953).** Reused as-is for
   typing; parallel-safe (above).
-- **Cruft to retire, not reuse.** The uncomposed `postgres-enum` arktype validator; and note
-  `StorageColumn.typeRef` + `storage.types` is the **codec-alias** seam (vector/geometry) —
-  a different concept, *not* the native-enum join. The names-only `nativeEnumTypeNames`
-  introspection is superseded by #2's ordered-value introspection.
+- **Residue to delete (not reclaim) — no custom seams; that is the point.** Delete the dead
+  fragments of the removed TML-2853 native enum instead of building on them:
+  `packages/3-targets/3-targets/postgres/src/core/postgres-enum-type-schema.ts` (the
+  unregistered `PostgresEnumTypeSchema` validator — its docstring claims registration, but no
+  registration call exists) and any dead `ISSUE_KIND_ORDER` keys
+  (`type_missing`/`type_values_mismatch`/`enum_values_changed`) left from the old enum planner.
+  Leave live behavior alone — the contract-infer native-enum *rejection* test + message are
+  current correct behavior until phase 1 replaces them. Separately note `StorageColumn.typeRef`
+  + `storage.types` is the **codec-alias** seam (vector/geometry) — a different concept, *not*
+  the native-enum join.
 
 ## Open decisions (genuinely remaining)
 
