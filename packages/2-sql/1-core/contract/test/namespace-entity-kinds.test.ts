@@ -9,8 +9,7 @@ import {
 } from '../src/validators';
 
 // Synthetic pack-contributed schema used to test descriptor dispatch without
-// depending on a target-specific schema (PostgresEnumTypeSchema now lives in
-// the postgres target pack).
+// depending on a target-specific schema.
 const SyntheticPackEntrySchema = type({
   kind: "'synthetic-kind'",
   'name?': 'string',

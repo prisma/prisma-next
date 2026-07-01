@@ -353,16 +353,16 @@ So the *physical* permitted values must live in storage (the value-set, and the
   extension-contribution seam landed — not the full RLS feature set.
 - **The value-set + codec typing machinery (TML-2886, TML-2952/2953).** Reused as-is for
   typing; parallel-safe (above).
-- **Residue to delete (not reclaim) — no custom seams; that is the point.** Delete the dead
-  fragments of the removed TML-2853 native enum instead of building on them:
+- **Residue to delete (not reclaim) — no custom seams; that is the point.** Delete the one
+  dead fragment of the removed TML-2853 native enum instead of building on it:
   `packages/3-targets/3-targets/postgres/src/core/postgres-enum-type-schema.ts` (the
   unregistered `PostgresEnumTypeSchema` validator — its docstring claims registration, but no
-  registration call exists) and any dead `ISSUE_KIND_ORDER` keys
-  (`type_missing`/`type_values_mismatch`/`enum_values_changed`) left from the old enum planner.
-  Leave live behavior alone — the contract-infer native-enum *rejection* test + message are
-  current correct behavior until phase 1 replaces them. Separately note `StorageColumn.typeRef`
-  + `storage.types` is the **codec-alias** seam (vector/geometry) — a different concept, *not*
-  the native-enum join.
+  registration call exists). The `ISSUE_KIND_ORDER` keys
+  (`type_missing`/`type_values_mismatch`/`enum_values_changed`) were checked and are **live
+  generic infrastructure, not residue** — kept and reused. Leave live behavior alone — the
+  contract-infer native-enum *rejection* test + message are current correct behavior until
+  phase 1 replaces them. Separately note `StorageColumn.typeRef` + `storage.types` is the
+  **codec-alias** seam (vector/geometry) — a different concept, *not* the native-enum join.
 
 ## Open decisions (genuinely remaining)
 

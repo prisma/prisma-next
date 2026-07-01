@@ -156,8 +156,8 @@ use it, so no new ordering logic is needed:
   …`), alongside `createSchema`/`createExtension`.
 
 A native-enum create is a `type`/`dep` op, so it lands ahead of the table that references it.
-(These `type_*` ordering keys are leftover residue from the deleted machinery; the design
-**reuses the generic `dep`/type bucketing**, and any keys proven dead are deleted — §11.)
+(The `type_*` ordering keys are **live generic infrastructure**, verified in use by the current
+planner/verifier — not residue — so native-enum type ordering reuses them directly; see §11.)
 
 ## 7. Control grade — external Supabase enums emit no DDL
 
@@ -233,19 +233,21 @@ decision (`external` first; §14.2).
 ## 11. Residue to DELETE — no custom seams
 
 The point of the RLS-style generic mechanism is that a new entity needs **no bespoke
-plumbing**. The dead fragments of the removed TML-2853 native enum are **deleted, not
-reclaimed**:
+plumbing**. The dead residue of the removed TML-2853 native enum is **deleted, not
+reclaimed** — verified to be exactly one file:
 
 - **`packages/3-targets/3-targets/postgres/src/core/postgres-enum-type-schema.ts`** — the
   `PostgresEnumTypeSchema` arktype validator (`kind: 'postgres-enum'`, `values`, `control?`).
   Its docstring claims it is "registered against the 'type' entries key," but **no
-  registration call exists** anywhere; it is unimported dead code. Delete it. The phase-2
+  registration call exists** anywhere; it is unimported dead code. **Deleted.** The phase-2
   entity's validator is contributed fresh through the generic `postgresAuthoringEntityTypes`
   path (authoring-design.md §2.3), not this file.
-- **Dead `ISSUE_KIND_ORDER` keys** left from the old enum planner
-  (`type_values_mismatch`, `enum_values_changed`, and `type_missing` if unused) — delete any
-  proven unreferenced by live code. Native enums reuse the generic `dep`/`type` bucketing
-  (§6), not bespoke enum ordering keys.
+
+The `ISSUE_KIND_ORDER` keys `type_missing` / `type_values_mismatch` / `enum_values_changed`
+were checked and are **live generic infrastructure, not residue** — actively used by the
+planner's `mapIssueToCall`, the `isMissing` predicate, and the shared `SchemaIssue` union
+(`EnumValuesChangedIssue`, produced by the SQL-family verifier). Native-enum type diffing
+reuses them (§6); they are **kept**.
 
 **Do not** touch live behavior: the contract-infer native-enum rejection test + message (§10)
 are current correct behavior and are replaced *by phase 1*, not deleted now.
@@ -280,6 +282,3 @@ seams; no reclaimed residue.
    Settled at slice planning; the node shape and op set are fixed.
 2. **Adopted-enum grade (§10).** `external` (observe-only, matches phase 1, nearly free) vs
    `managed` (PN owns diff/migrate). Leaning `external` first, manual promote later.
-3. **Which `ISSUE_KIND_ORDER` keys are dead (§11).** Confirm each `type_*`/`enum_values_changed`
-   key is unreferenced by live code (e.g. pgvector's type creation may use `type_missing`)
-   before deleting — an implementation-time grep, not a design question.
