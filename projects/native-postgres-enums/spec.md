@@ -57,10 +57,12 @@ atomic-migration guarantee Prisma Next relies on. The user-facing rationale is t
 shareable explainer [`why-native-postgres-enums.md`](specs/why-native-postgres-enums.md)
 (migrate to `docs/` at close-out).
 
-**Scope consequence:** Prisma Next will support **add** and **rename**, and **never**
-auto-migrate **remove** or **reorder** — those stay user-managed (drop the type, create the
-replacement, `ALTER` the column by hand). This is what keeps the project clear of
-dependency-aware planner ordering and transaction-grouping.
+**Scope consequence:** Prisma Next auto-migrates **only add value** (a pure suffix-append),
+and **never** rename, remove, or reorder. Rename is cheap in Postgres but skipped anyway —
+detecting it means disambiguating rename from add+remove, which an order-aware diff cannot do
+cleanly; remove and reorder force a full-table rewrite. All three stay user-managed. This keeps
+the project clear of dependency-aware planner ordering and transaction-grouping — and the MVP
+(external Supabase enums) ships no migration ops at all.
 
 ## Two-phase roadmap
 
@@ -70,12 +72,12 @@ graded `external` (the Supabase extension's default `control` posture), so Prism
 emits **no DDL** for them. This cuts the entire migration half: no SchemaIR diff, no
 Contract→SchemaIR projection, no migration ops. Phase 1 is representation + typing only.
 
-**Phase 2 — Prisma Next creates and deletes native enums, plus the cheap ops.** A user
-declares a **managed** `native_enum`; Prisma Next `CREATE TYPE` / `DROP TYPE`s it and
-migrates it in place for **add value** and **rename value** only. Remove and reorder are
-diagnosed and refused with a pointer to the manual procedure — never planned. This adds the
-SchemaIR node, the projection, the diff integration, and the four migration ops, all in
-cheap-ops-only form.
+**Phase 2 (deferred, separate project — may never be built) — Prisma Next creates and deletes
+native enums, plus add value.** A user declares a **managed** `native_enum`; Prisma Next
+`CREATE TYPE` / `DROP TYPE`s it and migrates it in place for **add value only**. Rename, remove,
+and reorder are diagnosed and refused with a pointer to the manual procedure — never planned.
+This adds the SchemaIR node, the projection, the order-aware diff integration, and the three
+migration ops (create, delete, add value). The MVP (phase 1) does not include this.
 
 ## The model (settled)
 
@@ -256,14 +258,14 @@ mirroring `rlsPolicies`/`roles`); the generic differ reports missing / extra / m
 `external`/`observed` grade suppresses drift the same way it does for RLS, so phase-1
 externally-managed enums stay untouched even after phase 2.
 
-### #4 — Migration ops / factories (phase 2, cheap-ops-only)
+### #4 — Migration ops / factories (phase 2, add-value-only)
 
-`OpFactoryCall`s for **create** (`CREATE TYPE … AS ENUM`), **delete** (`DROP TYPE`), **add
-value** (`ALTER TYPE … ADD VALUE`), **rename value** (`ALTER TYPE … RENAME VALUE`). A
-value-removal or reorder diff is **refused with a diagnostic**, never lowered to an op.
-Ordering need is only "type before the column that uses it," which the planner's existing
-`'type'` → dependency bucket already models coarsely. `ADD VALUE`'s non-transactional caveat
-is surfaced to the runner.
+`OpFactoryCall`s for **create** (`CREATE TYPE … AS ENUM`), **delete** (`DROP TYPE`), and **add
+value** (`ALTER TYPE … ADD VALUE`) — three ops. Diffing is **order-aware**: the only accepted
+value change is a **pure suffix-append** → `ADD VALUE`; a rename, removal, or reorder diff is
+**refused with a diagnostic**, never lowered to an op. Ordering need is only "type before the
+column that uses it," which the planner's existing `'type'` → dependency bucket already models
+coarsely. `ADD VALUE`'s non-transactional caveat is surfaced to the runner.
 
 ### #6 — Query / typing (both phases)
 
@@ -326,12 +328,12 @@ So the *physical* permitted values must live in storage (the value-set, and the
 - **R5 — External grade.** `external`/`observed` native enums produce no DDL and no drift
   reports; the Supabase extension's `external` default applies to its contributed enums.
 - **R6 — Adopt (porting).** Contract-infer emits the `native_enum` representation for an
-  introspected native enum instead of throwing. *(Grade of adopted enums: Open decision.)*
+  introspected native enum instead of throwing, graded **`managed`** (all inference is managed).
 - **R7 — Create / delete (phase 2).** An author-selected native enum is created and dropped,
   ordered relative to the columns that use it, proven against a live database.
-- **R8 — Cheap ops (phase 2).** Add value and rename value migrate in place, no table
-  rewrite, verified against a database.
-- **R9 — Refuse the expensive ops (phase 2).** A remove/reorder diff is refused with a
+- **R8 — Add value (phase 2).** A pure suffix-append migrates in place (`ALTER TYPE … ADD
+  VALUE`), no table rewrite, verified against a database.
+- **R9 — Refuse the other ops (phase 2).** A rename, remove, or reorder diff is refused with a
   diagnostic, never planned (negative test).
 - **R10 — Verify (phase 2).** For managed native enums, the generic differ reports
   missing / extra / value mismatch against the live database.
@@ -364,20 +366,20 @@ So the *physical* permitted values must live in storage (the value-set, and the
   phase 1 replaces them. Separately note `StorageColumn.typeRef` + `storage.types` is the
   **codec-alias** seam (vector/geometry) — a different concept, *not* the native-enum join.
 
-## Open decisions (genuinely remaining)
+## Open decisions
 
-1. **Adopted-enum grade (R6).** Do enums from contract-infer come in `external` (observe-only,
-   matches phase 1, nearly free) or `managed` (PN owns diff/migrate)? Leaning `external` for
-   the first cut, with a manual promote-to-managed path later.
-2. **Phase-1 source.** Supabase enums enter the contract via the extension's authoring
-   (it declares them) and/or via introspection/adoption (porting). Both produce the same
-   `native_enum` entity; the slice settles which path phase 1 ships first.
+None remaining — shaping is complete.
 
-*(Settled during shaping: slot name `native_enum`; authoring is a `native_enum` pack block +
-the `pg.enum(ref)` codec (not `field.namedType`/`enumType`); the column carries a coordinate
-`valueSet` ref for typing (not the legacy `typeRef`/`storage.types`); native derives a
-value-set and reuses the shared typing/enforcement machinery; the type enforces with no
-`CHECK`; the cast uses the codec's dynamic `nativeType`; parallel-safe with TML-2952/2953.)*
+*(Settled during shaping: slot name `native_enum`; authoring is a `native_enum` pack block
+reusing the existing variadic-block mechanism + the `pg.enum(ref)` codec (not
+`field.namedType`/`enumType`); members are always `key = value` (no shorthand); the column
+carries a coordinate `valueSet` ref for typing (not the legacy `typeRef`/`storage.types`);
+native derives a value-set and reuses the shared typing machinery; runtime member access is a
+new Postgres-only `db.native_enums` facade root (both emitted + no-emit; `db.enums` unchanged);
+the type enforces with no `CHECK`; the cast is the adapter's existing `nativeType` mechanism
+(the per-column `nativeType` threaded onto the `CodecRef`); all inference is `managed`; Supabase
+enters via the extension declaring the enums; only add value — a pure suffix-append — is
+auto-migrated, rename/remove/reorder refused; parallel-safe with TML-2952/2953.)*
 
 ## Alternatives considered
 

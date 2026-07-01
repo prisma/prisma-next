@@ -17,9 +17,10 @@ is reclaimed** — native enums ride the generic RLS-style mechanism, no custom 
   phase cuts the entire migration half — no SchemaIR node, no projection, no ops.
 - **Phase 2 (managed):** PN owns the type's lifecycle through the **generic** diff → op
   pipeline that RLS policies/roles already use (§2–§6): a `PostgresNativeEnum` `DiffableNode`,
-  projected into `PostgresSchemaIR`, diffed by the generic differ, planned into four DDL ops
-  (`CREATE TYPE`, `DROP TYPE`, `ALTER TYPE … ADD VALUE`, `ALTER TYPE … RENAME VALUE`).
-  **Remove and reorder are refused with a diagnostic — never planned** (§5).
+  projected into `PostgresSchemaIR`, diffed by the generic differ, planned into three DDL ops
+  (`CREATE TYPE`, `DROP TYPE`, `ALTER TYPE … ADD VALUE`). **The only accepted value change is a
+  pure suffix-append (`ADD VALUE`); rename, remove, and reorder are refused with a diagnostic —
+  never planned** (§5).
 
 ## 1. Worked example
 
@@ -70,15 +71,18 @@ must diff, so it exposes them as children:
 - `id` = the type name (`user_role`, schema-qualified by namespace).
 - `isEqualTo(other)` = equal **ordered** members (catches a reorder as a node-level mismatch,
   since children are id-keyed and order-insensitive — §4).
-- `children()` = one child `DiffableNode` per member, so value **add/remove** surface as child
-  `missing`/`extra`.
+- `children()` = one child `DiffableNode` per member (ordinal-keyed), so an appended value
+  surfaces as a child `missing`, and any other change surfaces as a child `extra`/`mismatch` or
+  a node `mismatch`.
 - carries a `control` grade (§7) — the deleted `PostgresEnumType` carried `control?:
   ControlPolicy`, unlike `PostgresRole`/`PostgresRlsPolicy` which carry none.
 
-**Member identity is the open question (§14.1):** a member child keyed by its **value string**
-makes rename look like add+remove; keyed by **ordinal** makes rename a same-id mismatch but
-makes reorder look like a run of renames. This choice (and how it disambiguates rename vs
-reorder) is settled at slice planning; the node shape above is fixed regardless.
+**Diffing is order-aware and minimal (settled).** The only accepted change is a **pure
+suffix-append**: the DB's values are a prefix of the contract's, with one or more values added
+at the end → `ALTER TYPE … ADD VALUE` for each. **Any other difference — rename, removal, or
+reorder — is refused with a diagnostic**, never planned. This sidesteps rename-vs-add+remove
+ambiguity entirely: PN does not detect renames; a changed value string simply is not a
+suffix-append, so it is refused.
 
 ## 3. Contract → SchemaIR projection
 
@@ -112,13 +116,13 @@ Native-enum mapping (added to `planPostgresSchemaDiff`):
 | --- | --- | --- |
 | node `missing` | type in contract, not DB | **`CREATE TYPE … AS ENUM (values)`** |
 | node `extra` (+destructive) | type in DB, not contract | **`DROP TYPE`** |
-| child `missing` | value added in contract | **`ALTER TYPE … ADD VALUE`** (cheap, in-place) |
-| child `mismatch` (rename) | member renamed | **`ALTER TYPE … RENAME VALUE`** (cheap) — pending §2 identity |
-| child `extra` | value removed in contract | **refused** with a diagnostic — never an op |
-| node `mismatch`, children equal | values reordered | **refused** with a diagnostic — never an op |
+| pure suffix-append (DB values are a prefix of the contract's) | value(s) appended | **`ALTER TYPE … ADD VALUE`** for each (cheap, in-place) |
+| any other value difference (rename, removal, reorder) | — | **refused** with a diagnostic — never an op |
 
-The refusals are the project's core constraint (`../spec.md` "Why native enums are awkward"):
-remove and reorder force a full-table rewrite, so PN never plans them.
+The refusal is the project's core constraint (`../spec.md` "Why native enums are awkward"):
+only a pure suffix-append is cheap and unambiguous. Removal and reorder force a full-table
+rewrite; rename is skipped to keep diffing order-aware and free of rename-vs-add+remove
+ambiguity. All three are refused.
 
 ## 5. The DDL ops
 
@@ -127,8 +131,9 @@ op-factory-call + DDL-node mechanism (the RLS path — `operations/rls.ts:20` bu
 `PostgresCreatePolicy` node via `createPolicy` and lowers it through the adapter's
 `lowerToExecuteRequest`, [core/ddl/nodes.ts:160](../../../packages/3-targets/3-targets/postgres/src/core/ddl/nodes.ts:160),
 [contract-free/ddl.ts:85](../../../packages/3-targets/3-targets/postgres/src/contract-free/ddl.ts:85)),
-**not** a bespoke planner path. The four ops mirror the deleted `operations/enums.ts` shapes
-(recovered from `b25edd8ad~1`), reintroduced through the current op machinery:
+**not** a bespoke planner path. The three ops mirror the deleted `operations/enums.ts` shapes
+(recovered from `b25edd8ad~1`, minus `RENAME VALUE`), reintroduced through the current op
+machinery:
 
 - **create** — `CREATE TYPE <qual> AS ENUM (<values in declaration order>)`; values from the
   entity's ordered members.
@@ -137,9 +142,8 @@ op-factory-call + DDL-node mechanism (the RLS path — `operations/rls.ts:20` bu
   `ADD VALUE` cannot be used in the same transaction that first makes the value usable — this
   breaks the single-transaction migration guarantee, so the runner surfaces it (the op is its
   own statement, and the caveat is documented to the runner, per `../spec.md` #4).
-- **rename value** — `ALTER TYPE <qual> RENAME VALUE '<from>' TO '<to>'`. Cheap, no rewrite.
-
-Remove/reorder have **no op** — they are refused at the planner (§4), never lowered.
+Rename, remove, and reorder have **no op** — they are refused at the planner (§4), never
+lowered (only a pure suffix-append is accepted).
 
 ## 6. Ordering — type before column
 
@@ -226,9 +230,9 @@ read `pg_enum.enumsortorder` per type. On adoption, contract-infer **emits a `na
 block instead of throwing** — replacing the current rejection: the error prose *"Native
 Postgres enums (CREATE TYPE … AS ENUM) are not adoptable by contract infer"*
 ([2-sql/9-family/src/core/psl-contract-infer/sql-schema-ir-to-psl-ast.ts:87](../../../packages/2-sql/9-family/src/core/psl-contract-infer/sql-schema-ir-to-psl-ast.ts:87))
-and the integration test that asserts it are current correct behavior **until phase 1
-replaces them** (do not delete them pre-emptively — §11). Grade of adopted enums is an open
-decision (`external` first; §14.2).
+and the integration test that asserts it are current correct behavior **until adoption ships
+(the deferred managed phase)** (do not delete them pre-emptively — §11). Adopted enums are
+graded **`managed`** — all inference is managed; there is no observe-only adoption.
 
 ## 11. Residue to DELETE — no custom seams
 
@@ -255,9 +259,9 @@ are current correct behavior and are replaced *by phase 1*, not deleted now.
 ## 12. What is new vs reused (migration path)
 
 **New:** the `PostgresNativeEnum` node + its `enumTypes` projection into `PostgresSchemaIR`
-wired into `children()`; the four enum DDL ops; the enum-node branch in `planPostgresSchemaDiff`
-(create/drop/add/rename) with the remove/reorder refusal; enriched `pg_enum.enumsortorder`
-introspection + contract-infer emission.
+wired into `children()`; the three enum DDL ops; the enum-node branch in `planPostgresSchemaDiff`
+(create/drop/add-value, order-aware; rename/remove/reorder refused); enriched
+`pg_enum.enumsortorder` introspection + contract-infer emission (managed).
 
 **Reused:** the generic `DiffableNode` differ; `diffPostgresSchema`; the op-factory-call + DDL
 node + lowerer emission path; the `dep`/`type` ordering buckets; the `ControlPolicy`
@@ -266,19 +270,17 @@ seams; no reclaimed residue.
 
 ## 13. Phasing
 
-- **Phase 1 (external).** Cuts everything in §2–§6 and §9–§10-managed. Ships: the
-  `native_enum` contract representation graded `external` (authoring-design.md §2), so
-  `storageHash` records it (§8) and the control grade suppresses all DDL (§7); plus adoption
-  (§10) if that path ships first. Representation-only.
-- **Phase 2 (managed).** Adds the `PostgresNativeEnum` node (§2), the projection (§3), the diff
-  integration (§4), the four cheap-ops-only DDL ops (§5), and managed verify (§9). Remove and
-  reorder refused (§4). Parallel-safe with TML-2952/2953 (`../spec.md`).
+- **MVP (external).** Cuts everything in this doc — no SchemaIR node, no projection, no ops.
+  Ships only the `native_enum` contract representation graded `external` (authoring-design.md
+  §2); `storageHash` records it (§8), and since native enums are never diffed in the MVP,
+  `db verify` emits nothing for them for free. Representation + typing only
+  (see [`../plan.md`](../plan.md)).
+- **Deferred (managed, separate project).** Adds the `PostgresNativeEnum` node (§2), the
+  projection (§3), the order-aware diff integration (§4), the three DDL ops (§5), managed verify
+  (§9), and adoption (§10, emitting a `managed` enum). Rename/remove/reorder refused (§4).
+  Parallel-safe with TML-2952/2953. May never be built — do not start without a fresh triage.
 
-## 14. Open questions (genuine)
+## 14. Open questions
 
-1. **Member identity for diffing (§2).** Value-string identity (rename = add+remove) vs
-   ordinal identity (rename = mismatch, but reorder = run of renames). Determines how the
-   planner distinguishes `ADD VALUE` / `RENAME VALUE` / refuse-remove / refuse-reorder.
-   Settled at slice planning; the node shape and op set are fixed.
-2. **Adopted-enum grade (§10).** `external` (observe-only, matches phase 1, nearly free) vs
-   `managed` (PN owns diff/migrate). Leaning `external` first, manual promote later.
+None. Diffing is order-aware, suffix-append-only (§2/§4); rename/remove/reorder refused;
+adopted enums are `managed` (§10 — all inference is managed).
