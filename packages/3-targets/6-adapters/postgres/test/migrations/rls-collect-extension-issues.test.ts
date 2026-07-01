@@ -15,6 +15,7 @@ import {
   PostgresTableSchemaNode,
 } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 
 const TABLE_NAME = 'items';
@@ -62,8 +63,8 @@ function toPolicyNode(p: PostgresRlsPolicy): PostgresPolicySchemaNode {
     namespaceId: p.namespaceId,
     operation: p.operation,
     roles: [...p.roles],
-    ...(p.using !== undefined ? { using: p.using } : {}),
-    ...(p.withCheck !== undefined ? { withCheck: p.withCheck } : {}),
+    ...ifDefined('using', p.using),
+    ...ifDefined('withCheck', p.withCheck),
     permissive: p.permissive,
   });
 }

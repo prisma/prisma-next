@@ -1,6 +1,6 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import { type SqlAnnotations, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import {
   PostgresTableSchemaNode,
   type PostgresTableSchemaNodeInput,
@@ -21,19 +21,13 @@ export interface PostgresNamespaceSchemaNodeInput {
  *
  * `id` is the schema name. `isEqualTo` is identity — two namespace nodes are
  * equal iff their ids (schema names) match. `children()` returns the table
- * nodes.
- *
- * The `annotations.pg` bag mirrors what `PostgresSchemaIR` carried for the
- * per-schema slot (`schema` + `nativeEnumTypeNames`). `existingSchemas` is
- * database-level and belongs on `PostgresDatabaseSchemaNode`, not here.
- * The bag is carried only for legacy compatibility and will be retired with
- * the annotations bag (TML-2936).
+ * nodes. Per-schema metadata is carried on the typed `nativeEnumTypeNames`
+ * field, not an annotations bag.
  */
 export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.namespace;
   readonly schemaName: string;
   readonly tables: Readonly<Record<string, PostgresTableSchemaNode>>;
-  declare readonly annotations?: SqlAnnotations;
   readonly nativeEnumTypeNames: readonly string[];
 
   constructor(input: PostgresNamespaceSchemaNodeInput) {
@@ -50,14 +44,6 @@ export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements Diff
       ),
     );
     this.nativeEnumTypeNames = Object.freeze([...input.nativeEnumTypeNames]);
-    this.annotations = {
-      pg: {
-        schema: input.schemaName,
-        ...(input.nativeEnumTypeNames.length > 0 && {
-          nativeEnumTypeNames: input.nativeEnumTypeNames,
-        }),
-      },
-    };
     freezeNode(this);
   }
 

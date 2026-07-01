@@ -92,26 +92,14 @@ describe('PostgresNamespaceSchemaNode', () => {
     expect(node.tables['profiles']).toBe(tableA);
   });
 
-  it('annotations.pg carries schema and nativeEnumTypeNames', () => {
+  it('carries nativeEnumTypeNames as a typed field', () => {
     const node = new PostgresNamespaceSchemaNode(baseInput);
-    const pg = node.annotations?.['pg'] as Record<string, unknown> | undefined;
-    expect(pg?.['schema']).toBe('public');
-    expect(pg?.['nativeEnumTypeNames']).toEqual(['status_enum']);
+    expect(node.nativeEnumTypeNames).toEqual(['status_enum']);
   });
 
-  it('annotations.pg omits nativeEnumTypeNames when empty', () => {
-    const node = new PostgresNamespaceSchemaNode({
-      ...baseInput,
-      nativeEnumTypeNames: [],
-    });
-    const pg = node.annotations?.['pg'] as Record<string, unknown> | undefined;
-    expect(pg?.['nativeEnumTypeNames']).toBeUndefined();
-  });
-
-  it('annotations.pg does not carry existingSchemas (database-level field)', () => {
-    const node = new PostgresNamespaceSchemaNode(baseInput);
-    const pg = node.annotations?.['pg'] as Record<string, unknown> | undefined;
-    expect(pg?.['existingSchemas']).toBeUndefined();
+  it('nativeEnumTypeNames is empty when none are supplied', () => {
+    const node = new PostgresNamespaceSchemaNode({ ...baseInput, nativeEnumTypeNames: [] });
+    expect(node.nativeEnumTypeNames).toEqual([]);
   });
 
   it('instance is frozen', () => {

@@ -53,6 +53,7 @@ export type {
 } from '../types';
 export {
   applyFkDefaults,
+  assertStorageTable,
   CheckConstraint,
   CODEC_INSTANCE_KIND,
   DEFAULT_FK_CONSTRAINT,

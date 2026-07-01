@@ -14,11 +14,7 @@ export type {
   NativeTypeNormalizer,
   VerifySqlSchemaOptions,
 } from '../core/diff/sql-schema-diff';
-export {
-  namespaceSchemaNodes,
-  verifySqlSchema,
-  verifySqlSchemaTree,
-} from '../core/diff/sql-schema-diff';
+export { verifySqlSchema, verifySqlSchemaTree } from '../core/diff/sql-schema-diff';
 export {
   arraysEqual,
   isIndexSatisfied,

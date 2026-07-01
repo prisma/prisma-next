@@ -37,7 +37,12 @@ export {
   type SqlStorageTypeEntry,
 } from './ir/sql-storage';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';
-export { isStorageTable, StorageTable, type StorageTableInput } from './ir/storage-table';
+export {
+  assertStorageTable,
+  isStorageTable,
+  StorageTable,
+  type StorageTableInput,
+} from './ir/storage-table';
 export {
   CODEC_INSTANCE_KIND,
   isStorageTypeInstance,

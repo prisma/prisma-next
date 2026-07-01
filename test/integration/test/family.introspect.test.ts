@@ -192,12 +192,11 @@ describe('family instance introspect', () => {
     );
 
     it(
-      'includes Postgres annotations',
+      'carries per-namespace native enum type names',
       async () => {
         await withIntrospection(connectionString!, (schemaIR) => {
           const ns = schemaIR.namespaces['public']!;
-          expect(ns.annotations).toBeDefined();
-          expect(ns.annotations?.['pg']).toBeDefined();
+          expect(Array.isArray(ns.nativeEnumTypeNames)).toBe(true);
         });
       },
       timeouts.spinUpPpgDev,

@@ -28,6 +28,7 @@ import type { MongoContract } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import type { MongoSchemaCollection } from '@prisma-next/mongo-schema-ir';
 import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { MongoControlAdapter, MongoControlAdapterDescriptor } from './control-adapter';
 import type { MongoControlExtensionDescriptor } from './control-types';
@@ -286,9 +287,10 @@ export function createMongoFamilyInstance(controlStack: ControlStack): MongoCont
       schema: MongoSchemaIR,
       ownedByOtherNames: ReadonlySet<string>,
     ): MongoSchemaIR {
-      const projected = mongoProjectSchemaToMember(schema, ownedByOtherNames) as {
-        readonly collections: ReadonlyArray<MongoSchemaCollection>;
-      };
+      const projected = blindCast<
+        { readonly collections: ReadonlyArray<MongoSchemaCollection> },
+        'the Mongo shape pruner returns a { collections } object spread from MongoSchemaIR'
+      >(mongoProjectSchemaToMember(schema, ownedByOtherNames));
       return new MongoSchemaIR(projected.collections);
     },
 

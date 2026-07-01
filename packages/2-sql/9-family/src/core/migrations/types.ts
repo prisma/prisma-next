@@ -311,10 +311,9 @@ export type SqlPlannerResult<TTargetDetails> =
 export interface SqlMigrationPlannerPlanOptions {
   readonly contract: Contract<SqlStorage>;
   /**
-   * The "from"/live schema as the target's introspected node. SQLite returns a
-   * flat `SqlSchemaIR`; Postgres returns a `PostgresDatabaseSchemaNode` tree
-   * root. Structure-aware consumers (the differ, the relational verify glue)
-   * `ensure`/flatten the concrete shape before walking it.
+   * The "from"/live schema as the target's introspected node (SQLite a flat
+   * `SqlSchemaIR`, Postgres a `PostgresDatabaseSchemaNode` root). Structure-aware
+   * consumers narrow the concrete shape before walking it.
    */
   readonly schema: SqlSchemaIRNode;
   readonly policy: MigrationOperationPolicy;
@@ -485,13 +484,9 @@ export interface SqlControlTargetDescriptor<
    */
   readonly schemaVerifier: SchemaVerifier<TContract, SqlSchemaIR>;
   /**
-   * Database→PSL inference: walks the target's introspected schema tree into a
-   * `PslDocumentAst` for `contract infer`. Target logic (it owns the dialect
-   * type/default maps), so it lives on the descriptor beside `contractSerializer`
-   * — not in the family. Optional: targets that do not support `contract infer`
-   * (Mongo) omit it, and the family instance throws when it is absent. The param
-   * is the family-base node so the interface stays target-agnostic; the impl
-   * narrows to its own tree root.
+   * Database→PSL inference for `contract infer`. Target logic (owns the dialect
+   * maps), so it lives on the descriptor. Optional: targets without `contract
+   * infer` (Mongo) omit it, and the family instance throws when it is absent.
    */
   readonly inferPslContract?: (schema: SqlSchemaIRNode) => PslDocumentAst;
   /**

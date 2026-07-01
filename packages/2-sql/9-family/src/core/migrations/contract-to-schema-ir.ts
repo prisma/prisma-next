@@ -1,6 +1,7 @@
 import type { ColumnDefault, Contract, JsonValue } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
 import {
+  assertStorageTable,
   type CheckConstraint,
   type ForeignKey,
   type Index,
@@ -386,16 +387,10 @@ export function contractNamespaceToSchemaIR(
   if (!namespace) {
     return { tables: {} };
   }
-  const storageTypes: ResolvedStorageTypes = {
-    ...((storage.types ?? {}) as ResolvedStorageTypes),
-  };
+  const storageTypes: ResolvedStorageTypes = { ...(storage.types ?? {}) };
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDefRaw] of Object.entries(namespace.entries.table ?? {})) {
-    if (!isStorageTable(tableDefRaw)) {
-      throw new Error(
-        `contractNamespaceToSchemaIR: expected StorageTable at namespaces.${namespaceId}.entries.table.${tableName}`,
-      );
-    }
+    assertStorageTable(tableDefRaw, `namespaces.${namespaceId}.entries.table.${tableName}`);
     tables[tableName] = convertTable(
       tableName,
       tableDefRaw,
@@ -421,17 +416,11 @@ export function contractToSchemaIR(
   }
 
   const storage = contract.storage;
-  const storageTypes: ResolvedStorageTypes = {
-    ...((storage.types ?? {}) as ResolvedStorageTypes),
-  };
+  const storageTypes: ResolvedStorageTypes = { ...(storage.types ?? {}) };
   const tables: Record<string, SqlTableIR> = {};
   for (const ns of Object.values(storage.namespaces)) {
     for (const [tableName, tableDefRaw] of Object.entries(ns.entries.table ?? {})) {
-      if (!isStorageTable(tableDefRaw)) {
-        throw new Error(
-          `contractToSchemaIR: expected StorageTable at namespaces.${ns.id}.entries.table.${tableName}`,
-        );
-      }
+      assertStorageTable(tableDefRaw, `namespaces.${ns.id}.entries.table.${tableName}`);
       const tableDef = tableDefRaw;
       if (tables[tableName] !== undefined) {
         throw new Error(
@@ -468,7 +457,7 @@ function deriveAnnotations(
 ): SqlAnnotations | undefined {
   const storageTypes: Record<string, StorageTypeInstance> = {};
 
-  for (const typeInstance of Object.values((storage.types ?? {}) as ResolvedStorageTypes)) {
+  for (const typeInstance of Object.values(storage.types ?? {})) {
     if (isStorageTypeInstance(typeInstance)) {
       storageTypes[typeInstance.nativeType] = typeInstance;
     }

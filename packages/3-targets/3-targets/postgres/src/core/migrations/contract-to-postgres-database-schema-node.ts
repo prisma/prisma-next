@@ -8,8 +8,8 @@ import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schem
 import { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
 import { PostgresRoleSchemaNode } from '../schema-ir/postgres-role-schema-node';
-import { resolveDdlSchemaForNamespaceStorage } from '../schema-ir/postgres-schema-ir-annotations';
 import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
+import { resolveDdlSchemaForNamespaceStorage } from './resolve-ddl-schema';
 
 function toPolicyNode(policy: PostgresRlsPolicy, namespaceId: string): PostgresPolicySchemaNode {
   return new PostgresPolicySchemaNode({

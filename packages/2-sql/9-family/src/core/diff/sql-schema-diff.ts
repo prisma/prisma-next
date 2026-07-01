@@ -46,17 +46,13 @@ import {
 
 /**
  * Returns the per-schema namespace nodes of an introspected schema node, for
- * the relational verify and schema-view to consume one at a time.
- *
- * Structure-agnostic — it imports no target node class. A tree root that
- * exposes a `namespaces` record (Postgres) yields its namespace nodes; the
- * nodes are NEVER merged, so same-named tables in different schemas cannot
- * collide. A flat schema (SQLite, or a single namespace node) has no
- * `namespaces` and is its own single namespace, so it yields itself.
- * Duck-typing mirrors `projectSchemaToSpace`, which spreads these nodes into
- * plain objects, so the helper also handles spread-flattened input.
+ * the relational verify to consume one at a time. Structure-agnostic — imports
+ * no target node class. A root exposing a `namespaces` record (Postgres) yields
+ * its namespace nodes (never merged, so same-named tables in different schemas
+ * cannot collide); a flat schema (SQLite) is its own single namespace and
+ * yields itself. Handles spread-flattened input (own-enumerable fields survive).
  */
-export function namespaceSchemaNodes(schema: SqlSchemaIRNode): readonly SqlSchemaIR[] {
+function namespaceSchemaNodes(schema: SqlSchemaIRNode): readonly SqlSchemaIR[] {
   const obj = blindCast<
     { readonly namespaces?: Readonly<Record<string, SqlSchemaIR>> },
     'structural read of an own-enumerable namespaces record; survives the projectSchemaToSpace spread'

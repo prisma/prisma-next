@@ -8,6 +8,8 @@
  * `{ name, ... }`; the callbacks walk that array.
  */
 
+import { blindCast } from '@prisma-next/utils/casts';
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -60,7 +62,9 @@ function pruneCollectionsArray(
   schema: Record<string, unknown>,
   ownedByOthers: ReadonlySet<string>,
 ): unknown {
-  const source = schema['collections'] as ReadonlyArray<unknown>;
+  const source = blindCast<ReadonlyArray<unknown>, 'Array.isArray narrowed collections above'>(
+    schema['collections'],
+  );
   let removed = false;
   const pruned: unknown[] = [];
   for (const entry of source) {
@@ -81,7 +85,9 @@ function pruneCollectionsRecord(
   schema: Record<string, unknown>,
   ownedByOthers: ReadonlySet<string>,
 ): unknown {
-  const source = schema['collections'] as Record<string, unknown>;
+  const source = blindCast<Record<string, unknown>, 'isRecord narrowed collections above'>(
+    schema['collections'],
+  );
   let removed = false;
   const pruned: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(source)) {

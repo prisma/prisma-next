@@ -46,10 +46,7 @@ describe.sequential('array column introspection', () => {
     const result = await familyInstance.introspect({ driver: driver! });
     PostgresDatabaseSchemaNode.assert(result);
     const col = result.namespaces['public']!.tables['arr_test']?.columns['tags'];
-    expect(col).toBeDefined();
-    expect(col?.nativeType).toBe('text');
-    expect(col?.many).toBe(true);
-    expect(col?.nullable).toBe(false);
+    expect(col).toMatchObject({ nativeType: 'text', many: true, nullable: false });
   });
 
   it('int4[] column → nativeType:int4 + many:true', { timeout: testTimeout }, async () => {
@@ -58,9 +55,7 @@ describe.sequential('array column introspection', () => {
     const result = await familyInstance.introspect({ driver: driver! });
     PostgresDatabaseSchemaNode.assert(result);
     const col = result.namespaces['public']!.tables['arr_test']?.columns['scores'];
-    expect(col).toBeDefined();
-    expect(col?.nativeType).toBe('int4');
-    expect(col?.many).toBe(true);
+    expect(col).toMatchObject({ nativeType: 'int4', many: true });
   });
 
   it('nullable text[] column → many:true + nullable:true', { timeout: testTimeout }, async () => {
@@ -69,9 +64,7 @@ describe.sequential('array column introspection', () => {
     const result = await familyInstance.introspect({ driver: driver! });
     PostgresDatabaseSchemaNode.assert(result);
     const col = result.namespaces['public']!.tables['arr_test']?.columns['labels'];
-    expect(col).toBeDefined();
-    expect(col?.many).toBe(true);
-    expect(col?.nullable).toBe(true);
+    expect(col).toMatchObject({ many: true, nullable: true });
   });
 
   it('scalar text column carries no many property', { timeout: testTimeout }, async () => {

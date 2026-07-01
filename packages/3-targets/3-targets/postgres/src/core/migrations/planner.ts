@@ -29,7 +29,6 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
-import { resolveDdlSchemaForNamespaceStorage } from '../schema-ir/postgres-schema-ir-annotations';
 import {
   formatPostgresControlPolicySubjectLabel,
   resolvePostgresCallControlPolicySubject,
@@ -46,6 +45,7 @@ import {
 } from './op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
+import { resolveDdlSchemaForNamespaceStorage } from './resolve-ddl-schema';
 import { verifyPostgresNamespacePresence } from './verify-postgres-namespaces';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
