@@ -16,6 +16,7 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
+  capabilities: { sql: { scalarList: true } },
 } as const;
 
 describe('interpretPslDocumentToSqlContract extensions', () => {
@@ -585,6 +586,7 @@ namespace public {
       composedExtensionContracts: new Map(),
       authoringContributions,
       createNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
 
     expect(result.ok).toBe(true);

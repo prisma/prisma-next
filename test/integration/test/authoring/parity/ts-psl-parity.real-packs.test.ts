@@ -55,6 +55,7 @@ function interpretWithRealPacks(schema: string) {
     composedExtensionPacks: [pgvectorControl.id],
     composedExtensionPackRefs: [pgvectorPack],
     createNamespace: postgresCreateNamespace,
+    capabilities: stack.capabilities,
   });
 }
 

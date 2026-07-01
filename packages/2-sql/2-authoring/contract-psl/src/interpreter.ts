@@ -24,7 +24,11 @@ import {
   isAuthoringPslBlockDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import type {
+  CapabilityMatrix,
+  ExtensionPackRef,
+  TargetPackRef,
+} from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaultRegistry,
   ControlMutationDefaults,
@@ -129,6 +133,13 @@ export interface InterpretPslDocumentToSqlContractInput {
   readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespaceBase;
   readonly codecLookup?: CodecLookup;
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
+  /**
+   * Merged capability matrix from the control stack's
+   * `[target, adapter, ...extensionPacks]` descriptors. Authoring-time gating
+   * (e.g. scalar lists) reads `capabilities.sql?.scalarList`; an empty matrix
+   * fails closed and rejects gated features. The control stack always populates it.
+   */
+  readonly capabilities: CapabilityMatrix;
 }
 
 function buildComposedExtensionPackRefs(
@@ -443,6 +454,7 @@ interface BuildModelNodeInput {
   /** Resolved namespace id keyed by model name — used to stamp the target namespace on FKs. */
   readonly modelNamespaceIds: ReadonlyMap<string, string>;
   readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
+  readonly capabilities: CapabilityMatrix;
 }
 
 interface BuildModelNodeResult {
@@ -475,6 +487,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     sourceId,
     scalarTypeDescriptors: input.scalarTypeDescriptors,
     ...ifDefined('enumHandles', input.enumHandles),
+    capabilities: input.capabilities,
   });
 
   const inlineIdFields = resolvedFields.filter((field) => field.isId);
@@ -1151,6 +1164,9 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
           columnName: resolvedField.columnName,
           descriptor: resolvedField.descriptor,
           nullable: resolvedField.nullable,
+          ...(resolvedField.many && resolvedField.valueObjectTypeName === undefined
+            ? { many: true as const }
+            : {}),
           ...ifDefined('default', resolvedField.defaultValue),
           ...ifDefined('executionDefaults', resolvedField.executionDefaults),
           ...ifDefined('enumTypeHandle', enumHandle),
@@ -1917,6 +1933,7 @@ export function interpretPslDocumentToSqlContract(
       diagnostics,
       modelNamespaceIds,
       ...(enumHandlesByName.size > 0 ? { enumHandles: enumHandlesByName } : {}),
+      capabilities: input.capabilities,
     });
     modelNodes.push(
       namespaceId !== undefined ? { ...result.modelNode, namespaceId } : result.modelNode,

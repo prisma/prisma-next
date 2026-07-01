@@ -416,6 +416,7 @@ export function createPostgresTestContext(
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
     resolvedInputs: [],
+    capabilities: { sql: { scalarList: true } },
     ...overrides,
   };
 }
