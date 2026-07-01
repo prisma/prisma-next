@@ -2,33 +2,12 @@ import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contrac
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { createContract } from '@prisma-next/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import postgresStatic, { type PostgresStaticContext } from '../src/static/postgres-static';
-
-const mocks = vi.hoisted(() => ({
-  deserializeContract: vi.fn(),
-}));
-
-vi.mock('@prisma-next/target-postgres/runtime', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@prisma-next/target-postgres/runtime')>();
-  return {
-    ...actual,
-    PostgresContractSerializer: class {
-      deserializeContract(json: unknown) {
-        return mocks.deserializeContract(json);
-      }
-    },
-  };
-});
 
 const contract = createContract<SqlStorage>();
 
 describe('postgresStatic({ contractJson })', () => {
-  beforeEach(() => {
-    mocks.deserializeContract.mockReset();
-    mocks.deserializeContract.mockReturnValue(contract);
-  });
-
   it('returns context, contract, enums, sql, and raw', () => {
     const result = postgresStatic<typeof contract>({ contractJson: contract });
     expect(result.context).toBeDefined();
@@ -49,10 +28,12 @@ describe('postgresStatic({ contractJson })', () => {
     expect(result.context.contractCodecs).toBeDefined();
   });
 
-  it('passes the contractJson through the deserializer', () => {
-    const rawJson = { target: 'postgres' };
-    postgresStatic({ contractJson: rawJson });
-    expect(mocks.deserializeContract).toHaveBeenCalledWith(rawJson);
+  it('contract matches the deserialized contractJson', () => {
+    const result = postgresStatic<typeof contract>({ contractJson: contract });
+    expect(result.contract.target).toBe(contract.target);
+    expect(result.contract.targetFamily).toBe(contract.targetFamily);
+    expect(result.contract.domain).toEqual(contract.domain);
+    expect(result.contract.profileHash).toBe(contract.profileHash);
   });
 
   it('sql is a function (builder is present)', () => {

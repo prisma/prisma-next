@@ -30,7 +30,7 @@ import {
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Client, Pool } from 'pg';
-import { buildPostgresSurface } from '../static/postgres-surface';
+import { buildPostgresStaticContext } from '../static/postgres-static';
 import {
   type PostgresBinding,
   type PostgresBindingInput,
@@ -177,7 +177,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     sql,
     raw: rawSqlTag,
     enums,
-  } = buildPostgresSurface<TContract>(context, stack.adapter.rawCodecInferer);
+  } = buildPostgresStaticContext<TContract>(context, stack.adapter.rawCodecInferer);
 
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;

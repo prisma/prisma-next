@@ -33,7 +33,7 @@ import sqliteTarget, {
 } from '@prisma-next/target-sqlite/runtime';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { buildSqliteSurface, type SqliteSurface } from '../static/sqlite-surface';
+import { buildSqliteStaticContext, type SqliteStaticContext } from '../static/sqlite-static';
 import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';
 import { SqliteRuntimeImpl } from './sqlite-runtime';
 
@@ -58,13 +58,13 @@ export interface SqliteTransactionContext<TContract extends Contract<SqlStorage>
   extends TransactionContext {
   readonly sql: UnboundSql<TContract>;
   readonly orm: UnboundOrm<TContract>;
-  readonly enums: SqliteSurface<TContract>['enums'];
+  readonly enums: SqliteStaticContext<TContract>['enums'];
 }
 
 export interface SqliteClient<TContract extends Contract<SqlStorage>> {
   readonly sql: UnboundSql<TContract>;
   readonly orm: UnboundOrm<TContract>;
-  readonly enums: SqliteSurface<TContract>['enums'];
+  readonly enums: SqliteStaticContext<TContract>['enums'];
   readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
   readonly contract: TContract;
@@ -148,7 +148,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     sql,
     raw: rawSqlTag,
     enums,
-  }: SqliteSurface<TContract> = buildSqliteSurface<TContract>(
+  }: SqliteStaticContext<TContract> = buildSqliteStaticContext<TContract>(
     context,
     stack.adapter.rawCodecInferer,
   );

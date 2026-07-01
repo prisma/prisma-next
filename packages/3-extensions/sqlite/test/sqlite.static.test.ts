@@ -3,24 +3,8 @@ import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import { applicationDomainOf } from '@prisma-next/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import sqliteStatic, { type SqliteStaticContext } from '../src/static/sqlite-static';
-
-const mocks = vi.hoisted(() => ({
-  deserializeContract: vi.fn(),
-}));
-
-vi.mock('@prisma-next/target-sqlite/runtime', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@prisma-next/target-sqlite/runtime')>();
-  return {
-    ...actual,
-    SqliteContractSerializer: class {
-      deserializeContract(json: unknown) {
-        return mocks.deserializeContract(json);
-      }
-    },
-  };
-});
 
 const contract: Contract<SqlStorage> = {
   target: 'sqlite',
@@ -40,11 +24,6 @@ const contract: Contract<SqlStorage> = {
 };
 
 describe('sqliteStatic({ contractJson })', () => {
-  beforeEach(() => {
-    mocks.deserializeContract.mockReset();
-    mocks.deserializeContract.mockReturnValue(contract);
-  });
-
   it('returns context, contract, enums, sql, and raw', () => {
     const result = sqliteStatic<typeof contract>({ contractJson: contract });
     expect(result.context).toBeDefined();
@@ -65,10 +44,12 @@ describe('sqliteStatic({ contractJson })', () => {
     expect(result.context.contractCodecs).toBeDefined();
   });
 
-  it('passes the contractJson through the deserializer', () => {
-    const rawJson = { target: 'sqlite' };
-    sqliteStatic({ contractJson: rawJson });
-    expect(mocks.deserializeContract).toHaveBeenCalledWith(rawJson);
+  it('contract matches the deserialized contractJson', () => {
+    const result = sqliteStatic<typeof contract>({ contractJson: contract });
+    expect(result.contract.target).toBe(contract.target);
+    expect(result.contract.targetFamily).toBe(contract.targetFamily);
+    expect(result.contract.domain).toEqual(contract.domain);
+    expect(result.contract.profileHash).toBe(contract.profileHash);
   });
 
   it('sql is an object (unbound namespace builder)', () => {
