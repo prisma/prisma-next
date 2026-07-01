@@ -1,16 +1,15 @@
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
-import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contract/enum-accessor';
+import type { NamespacedEnums } from '@prisma-next/contract/enum-accessor';
 import type { Contract } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { sql } from '@prisma-next/sql-builder/runtime';
+import type { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RawSqlTag } from '@prisma-next/sql-relational-core/expression';
-import { createRawSql } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import sqliteTarget, { SqliteContractSerializer } from '@prisma-next/target-sqlite/runtime';
 import { blindCast } from '@prisma-next/utils/casts';
+import { buildSqliteSurface } from './sqlite-surface';
 
 type UnboundSql<TContract extends Contract<SqlStorage>> =
   Db<TContract>[typeof UNBOUND_NAMESPACE_ID];
@@ -33,16 +32,7 @@ export function buildSqliteStaticContext<TContract extends Contract<SqlStorage>>
     adapter: sqliteAdapter,
   });
   const context = createExecutionContext({ contract, stack });
-  const rawCodecInferer = stack.adapter.rawCodecInferer;
-  const sqlDb = blindCast<
-    UnboundSql<TContract>,
-    'the unbound namespace always exists on a sqlite builder output'
-  >(sql<TContract>({ context, rawCodecInferer })[UNBOUND_NAMESPACE_ID]);
-  const raw: RawSqlTag = createRawSql(rawCodecInferer);
-  const enums = blindCast<
-    UnboundEnums<TContract>,
-    'the unbound namespace always exists on a sqlite builder output'
-  >(Object.freeze(buildNamespacedEnums(contract.domain))[UNBOUND_NAMESPACE_ID]);
+  const { enums, sql: sqlDb, raw } = buildSqliteSurface(context, stack.adapter.rawCodecInferer);
   return { context, contract, enums, sql: sqlDb, raw };
 }
 

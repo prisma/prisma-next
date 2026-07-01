@@ -22,11 +22,15 @@ import type {
   TransactionContext,
   VerifyMarkerOption,
 } from '@prisma-next/sql-runtime';
-import { createSqlExecutionStack, withTransaction } from '@prisma-next/sql-runtime';
+import {
+  createExecutionContext,
+  createSqlExecutionStack,
+  withTransaction,
+} from '@prisma-next/sql-runtime';
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Client, Pool } from 'pg';
-import { buildPostgresStaticContext } from '../static/postgres-static';
+import { buildPostgresSurface } from '../static/postgres-surface';
 import {
   type PostgresBinding,
   type PostgresBindingInput,
@@ -157,14 +161,23 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
   const contract = resolveContract(options);
   let binding = resolveOptionalPostgresBinding(options);
 
-  const { context, sql, raw: rawSqlTag, enums } = buildPostgresStaticContext<TContract>(contract);
-
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
     driver: postgresDriver,
     extensionPacks: options.extensions ?? [],
   });
+
+  const context = createExecutionContext<TContract, PostgresTargetId>({
+    contract,
+    stack,
+    driver: postgresDriver,
+  });
+  const {
+    sql,
+    raw: rawSqlTag,
+    enums,
+  } = buildPostgresSurface<TContract>(context, stack.adapter.rawCodecInferer);
 
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;

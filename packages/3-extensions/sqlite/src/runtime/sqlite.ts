@@ -23,13 +23,17 @@ import type {
   TransactionContext,
   VerifyMarkerOption,
 } from '@prisma-next/sql-runtime';
-import { createSqlExecutionStack, withTransaction } from '@prisma-next/sql-runtime';
+import {
+  createExecutionContext,
+  createSqlExecutionStack,
+  withTransaction,
+} from '@prisma-next/sql-runtime';
 import sqliteTarget, {
   SqliteContractSerializer as SqlContractSerializer,
 } from '@prisma-next/target-sqlite/runtime';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { buildSqliteStaticContext, type SqliteStaticContext } from '../static/sqlite-static';
+import { buildSqliteSurface, type SqliteSurface } from '../static/sqlite-surface';
 import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';
 import { SqliteRuntimeImpl } from './sqlite-runtime';
 
@@ -54,13 +58,13 @@ export interface SqliteTransactionContext<TContract extends Contract<SqlStorage>
   extends TransactionContext {
   readonly sql: UnboundSql<TContract>;
   readonly orm: UnboundOrm<TContract>;
-  readonly enums: SqliteStaticContext<TContract>['enums'];
+  readonly enums: SqliteSurface<TContract>['enums'];
 }
 
 export interface SqliteClient<TContract extends Contract<SqlStorage>> {
   readonly sql: UnboundSql<TContract>;
   readonly orm: UnboundOrm<TContract>;
-  readonly enums: SqliteStaticContext<TContract>['enums'];
+  readonly enums: SqliteSurface<TContract>['enums'];
   readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
   readonly contract: TContract;
@@ -128,19 +132,26 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
   const contract = resolveContract(options);
   let binding = resolveOptionalSqliteBinding(options);
 
-  const {
-    context,
-    sql,
-    raw: rawSqlTag,
-    enums,
-  }: SqliteStaticContext<TContract> = buildSqliteStaticContext<TContract>(contract);
-
   const stack = createSqlExecutionStack({
     target: sqliteTarget,
     adapter: sqliteAdapter,
     driver: sqliteDriver,
     extensionPacks: options.extensions ?? [],
   });
+
+  const context = createExecutionContext<TContract, SqliteTargetId>({
+    contract,
+    stack,
+    driver: sqliteDriver,
+  });
+  const {
+    sql,
+    raw: rawSqlTag,
+    enums,
+  }: SqliteSurface<TContract> = buildSqliteSurface<TContract>(
+    context,
+    stack.adapter.rawCodecInferer,
+  );
 
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
