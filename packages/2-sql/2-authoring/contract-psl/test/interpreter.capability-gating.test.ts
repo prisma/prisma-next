@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
@@ -31,6 +32,7 @@ describe('interpretPslDocumentToSqlContract scalar-list capability gating', () =
       target: sqliteTarget,
       scalarTypeDescriptors: sqliteScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
+      createNamespace: createTestSqlNamespace,
       capabilities: sqliteCapabilities,
       ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
@@ -59,6 +61,7 @@ describe('interpretPslDocumentToSqlContract scalar-list capability gating', () =
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
+      createNamespace: createTestSqlNamespace,
       capabilities: postgresCapabilities,
       ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
@@ -89,6 +92,7 @@ describe('interpretPslDocumentToSqlContract scalar-list capability gating', () =
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
+      createNamespace: createTestSqlNamespace,
       ...document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
