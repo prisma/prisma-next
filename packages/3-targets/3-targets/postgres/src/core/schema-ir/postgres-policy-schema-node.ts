@@ -1,7 +1,9 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { RlsPolicyOperation } from '../postgres-rls-policy';
+import { PostgresSchemaNodeKind } from './schema-node-kinds';
 
 export interface PostgresPolicySchemaNodeInput {
   /** Full wire name: `<prefix>_<8hex>`. */
@@ -35,6 +37,7 @@ export interface PostgresPolicySchemaNodeInput {
  * bodies, because Postgres reprints them.
  */
 export class PostgresPolicySchemaNode extends SqlSchemaIRNode implements DiffableNode {
+  override readonly nodeKind = PostgresSchemaNodeKind.policy;
   readonly name: string;
   readonly prefix: string;
   readonly tableName: string;
@@ -68,22 +71,26 @@ export class PostgresPolicySchemaNode extends SqlSchemaIRNode implements Diffabl
   }
 
   isEqualTo(other: DiffableNode): boolean {
-    if (!PostgresPolicySchemaNode.is(other)) {
+    const node = blindCast<
+      SqlSchemaIRNode,
+      'every diff-tree node the differ pairs is a SqlSchemaIRNode; the guard rejects non-policy kinds'
+    >(other);
+    if (!PostgresPolicySchemaNode.is(node)) {
       throw new Error(
-        `PostgresPolicySchemaNode.isEqualTo: expected a PostgresPolicySchemaNode, got ${other.constructor?.name ?? typeof other}`,
+        `PostgresPolicySchemaNode.isEqualTo: expected a PostgresPolicySchemaNode, got nodeKind=${node.nodeKind ?? 'undefined'}`,
       );
     }
-    return this.name === other.name;
+    return this.id === node.id;
   }
 
-  static is(node: DiffableNode): node is PostgresPolicySchemaNode {
-    return node instanceof PostgresPolicySchemaNode;
+  static is(node: SqlSchemaIRNode): node is PostgresPolicySchemaNode {
+    return node.nodeKind === PostgresSchemaNodeKind.policy;
   }
 
-  static assert(node: DiffableNode | undefined): asserts node is PostgresPolicySchemaNode {
+  static assert(node: SqlSchemaIRNode | undefined): asserts node is PostgresPolicySchemaNode {
     if (node === undefined || !PostgresPolicySchemaNode.is(node)) {
       throw new Error(
-        `Expected a PostgresPolicySchemaNode, got ${node?.constructor?.name ?? typeof node}`,
+        `Expected a PostgresPolicySchemaNode, got nodeKind=${node?.nodeKind ?? 'undefined'}`,
       );
     }
   }

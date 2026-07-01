@@ -1,6 +1,8 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
+import { PostgresSchemaNodeKind } from './schema-node-kinds';
 
 export interface PostgresRoleSchemaNodeInput {
   readonly name: string;
@@ -22,6 +24,7 @@ export interface PostgresRoleSchemaNodeInput {
  * names — name-equality is role-equality for cluster-scoped objects.
  */
 export class PostgresRoleSchemaNode extends SqlSchemaIRNode implements DiffableNode {
+  override readonly nodeKind = PostgresSchemaNodeKind.role;
   readonly name: string;
   readonly namespaceId: string;
 
@@ -41,15 +44,19 @@ export class PostgresRoleSchemaNode extends SqlSchemaIRNode implements DiffableN
   }
 
   isEqualTo(other: DiffableNode): boolean {
-    if (!PostgresRoleSchemaNode.is(other)) {
+    const node = blindCast<
+      SqlSchemaIRNode,
+      'every diff-tree node the differ pairs is a SqlSchemaIRNode; the guard rejects non-role kinds'
+    >(other);
+    if (!PostgresRoleSchemaNode.is(node)) {
       throw new Error(
-        `PostgresRoleSchemaNode.isEqualTo: expected a PostgresRoleSchemaNode, got ${other.constructor?.name ?? typeof other}`,
+        `PostgresRoleSchemaNode.isEqualTo: expected a PostgresRoleSchemaNode, got nodeKind=${node.nodeKind ?? 'undefined'}`,
       );
     }
-    return this.name === other.name;
+    return this.id === node.id;
   }
 
-  static is(node: DiffableNode): node is PostgresRoleSchemaNode {
-    return node instanceof PostgresRoleSchemaNode;
+  static is(node: SqlSchemaIRNode): node is PostgresRoleSchemaNode {
+    return node.nodeKind === PostgresSchemaNodeKind.role;
   }
 }

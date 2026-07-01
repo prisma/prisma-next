@@ -187,7 +187,6 @@ describe('projectSchemaToSpace', () => {
       // per-schema namespace nodes (`namespaces[…].tables`) rather than a flat
       // `tables` record. The projector prunes inside each namespace.
       const schema = {
-        nodeTarget: 'postgres',
         nodeKind: 'postgres-database',
         namespaces: {
           public: {

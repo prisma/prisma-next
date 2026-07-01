@@ -41,10 +41,12 @@ describe('PostgresTableSchemaNode', () => {
     expect(table.id).toBe('orders');
   });
 
-  it('isEqualTo always returns true', () => {
+  it('isEqualTo matches by id (name), ignoring columns and policies', () => {
     const a = new PostgresTableSchemaNode({ ...tableInput, policies: [basePolicy] });
-    const b = new PostgresTableSchemaNode({ ...tableInput, policies: [] });
-    expect(a.isEqualTo(b)).toBe(true);
+    const same = new PostgresTableSchemaNode({ ...tableInput, policies: [] });
+    const other = new PostgresTableSchemaNode({ ...tableInput, name: 'other', policies: [] });
+    expect(a.isEqualTo(same)).toBe(true);
+    expect(a.isEqualTo(other)).toBe(false);
   });
 
   it('children() returns its policies', () => {

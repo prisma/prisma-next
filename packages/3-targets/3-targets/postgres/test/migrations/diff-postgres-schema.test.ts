@@ -1,6 +1,7 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { contractToPostgresDatabaseSchemaNode } from '../../src/core/migrations/contract-to-postgres-database-schema-node';
@@ -653,9 +654,11 @@ describe('diffPostgresSchema', () => {
 
     const issues = diffPostgresSchema(expected, actual);
 
-    expect(issues.every((i) => PostgresPolicySchemaNode.is(i.expected ?? i.actual ?? actual))).toBe(
-      true,
-    );
+    expect(
+      issues.every((i) =>
+        PostgresPolicySchemaNode.is((i.expected ?? i.actual ?? actual) as SqlSchemaIRNode),
+      ),
+    ).toBe(true);
     expect(issues).toHaveLength(2);
     // Path is [ 'database', schemaName, tableName, policyName ].
     const paths = issues.map((i) => i.path);

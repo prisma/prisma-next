@@ -1,4 +1,4 @@
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, expectTypeOf, it, test } from 'vitest';
 import { PostgresNamespaceSchemaNode } from '../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresPolicySchemaNode } from '../src/core/schema-ir/postgres-policy-schema-node';
@@ -46,10 +46,12 @@ describe('PostgresNamespaceSchemaNode', () => {
     expect(node.id).toBe('public');
   });
 
-  it('isEqualTo always returns true', () => {
+  it('isEqualTo matches by id (schema name)', () => {
     const a = new PostgresNamespaceSchemaNode(baseInput);
-    const b = new PostgresNamespaceSchemaNode({ ...baseInput, schemaName: 'other' });
-    expect(a.isEqualTo(b)).toBe(true);
+    const same = new PostgresNamespaceSchemaNode({ ...baseInput, nativeEnumTypeNames: [] });
+    const other = new PostgresNamespaceSchemaNode({ ...baseInput, schemaName: 'other' });
+    expect(a.isEqualTo(same)).toBe(true);
+    expect(a.isEqualTo(other)).toBe(false);
   });
 
   it('children() returns table nodes', () => {
@@ -70,7 +72,7 @@ describe('PostgresNamespaceSchemaNode', () => {
     const node = new PostgresNamespaceSchemaNode(baseInput);
     const children = node.children();
     for (const child of children) {
-      expect(PostgresRoleSchemaNode.is(child)).toBe(false);
+      expect(PostgresRoleSchemaNode.is(child as SqlSchemaIRNode)).toBe(false);
     }
   });
 

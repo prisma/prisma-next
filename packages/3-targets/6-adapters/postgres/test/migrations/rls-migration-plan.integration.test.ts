@@ -8,6 +8,7 @@ import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import {
   PostgresDatabaseSchemaNode,
   postgresCreateNamespace,
@@ -103,7 +104,7 @@ describe('migration plan emits RLS (offline, no live database)', () => {
     const fromSchema = postgresTargetDescriptor.migrations.contractToSchema(
       null,
       frameworkComponents,
-    );
+    ) as SqlSchemaIRNode;
     PostgresDatabaseSchemaNode.assert(fromSchema);
     expect(fromSchema).toBeInstanceOf(PostgresDatabaseSchemaNode);
     const allPolicies = Object.values(fromSchema.namespaces).flatMap((ns) =>

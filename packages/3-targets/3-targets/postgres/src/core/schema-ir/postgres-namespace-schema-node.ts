@@ -1,14 +1,11 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import {
-  type SqlAnnotations,
-  SqlSchemaIRNode,
-  type SqlSchemaTarget,
-} from '@prisma-next/sql-schema-ir/types';
+import { type SqlAnnotations, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import {
   PostgresTableSchemaNode,
   type PostgresTableSchemaNodeInput,
 } from './postgres-table-schema-node';
+import { PostgresSchemaNodeKind } from './schema-node-kinds';
 
 export interface PostgresNamespaceSchemaNodeInput {
   readonly schemaName: string;
@@ -22,8 +19,9 @@ export interface PostgresNamespaceSchemaNodeInput {
  * consumers (verifySqlSchema, the relational planner, toSchemaView) can
  * accept it unchanged in Unit 6.
  *
- * `id` is the schema name. `isEqualTo` is always true — namespace-level
- * attribute diffing is not needed yet. `children()` returns the table nodes.
+ * `id` is the schema name. `isEqualTo` is identity — two namespace nodes are
+ * equal iff their ids (schema names) match. `children()` returns the table
+ * nodes.
  *
  * The `annotations.pg` bag mirrors what `PostgresSchemaIR` carried for the
  * per-schema slot (`schema` + `nativeEnumTypeNames`). `existingSchemas` is
@@ -32,7 +30,7 @@ export interface PostgresNamespaceSchemaNodeInput {
  * the annotations bag (TML-2936).
  */
 export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements DiffableNode {
-  readonly nodeTarget: SqlSchemaTarget = 'postgres';
+  override readonly nodeKind = PostgresSchemaNodeKind.namespace;
   readonly schemaName: string;
   readonly tables: Readonly<Record<string, PostgresTableSchemaNode>>;
   declare readonly annotations?: SqlAnnotations;
@@ -67,15 +65,15 @@ export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements Diff
     return this.schemaName;
   }
 
-  isEqualTo(_other: DiffableNode): boolean {
-    return true;
+  isEqualTo(other: DiffableNode): boolean {
+    return this.id === other.id;
   }
 
   children(): readonly DiffableNode[] {
     return Object.values(this.tables);
   }
 
-  static is(node: unknown): node is PostgresNamespaceSchemaNode {
-    return node instanceof PostgresNamespaceSchemaNode;
+  static is(node: SqlSchemaIRNode): node is PostgresNamespaceSchemaNode {
+    return node.nodeKind === PostgresSchemaNodeKind.namespace;
   }
 }

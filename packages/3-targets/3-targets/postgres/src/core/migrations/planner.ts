@@ -15,6 +15,7 @@ import {
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
+  DiffableNode,
   MigrationPlanner,
   MigrationPlanWithAuthoringSurface,
   MigrationScaffoldContext,
@@ -22,7 +23,7 @@ import type {
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresRlsPolicy } from '../postgres-rls-policy';
@@ -301,34 +302,34 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       // encodes the body hash, so two policies sharing a local key (same name)
       // are always equal and isEqualTo never returns false.
       if (issue.outcome === 'missing') {
-        PostgresPolicySchemaNode.assert(issue.expected);
-        // issue.expected.namespaceId is the DDL schema name (resolved during projection);
+        const expected = asSchemaNode(issue.expected);
+        PostgresPolicySchemaNode.assert(expected);
+        // expected.namespaceId is the DDL schema name (resolved during projection);
         // this re-resolution is a no-op as long as PostgresSchema.ddlSchemaName() returns this.id.
         const schemaForTable = resolveDdlSchemaForNamespaceStorage(
           options.contract.storage,
-          issue.expected.namespaceId,
+          expected.namespaceId,
         );
-        const tableKey = `${schemaForTable}.${issue.expected.tableName}`;
+        const tableKey = `${schemaForTable}.${expected.tableName}`;
         if (!seenEnableTables.has(tableKey)) {
           seenEnableTables.add(tableKey);
-          calls.push(new EnableRowLevelSecurityCall(schemaForTable, issue.expected.tableName));
+          calls.push(new EnableRowLevelSecurityCall(schemaForTable, expected.tableName));
         }
         calls.push(
           new CreatePostgresRlsPolicyCall(
             schemaForTable,
-            issue.expected.tableName,
-            policyNodeToContractPolicy(issue.expected),
+            expected.tableName,
+            policyNodeToContractPolicy(expected),
           ),
         );
       } else if (issue.outcome === 'extra' && allowsDestructive) {
-        PostgresPolicySchemaNode.assert(issue.actual);
+        const actual = asSchemaNode(issue.actual);
+        PostgresPolicySchemaNode.assert(actual);
         const schemaForTable = resolveDdlSchemaForNamespaceStorage(
           options.contract.storage,
-          issue.actual.namespaceId,
+          actual.namespaceId,
         );
-        calls.push(
-          new DropPostgresRlsPolicyCall(schemaForTable, issue.actual.tableName, issue.actual.name),
-        );
+        calls.push(new DropPostgresRlsPolicyCall(schemaForTable, actual.tableName, actual.name));
       }
     }
 
@@ -373,6 +374,18 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     }
     return [...namespaceIssues, ...relationalIssues];
   }
+}
+
+// Every node in a diff issue produced from Postgres schema trees is a
+// `SqlSchemaIRNode`; the framework types issue nodes as the narrower
+// `DiffableNode`. The `PostgresPolicySchemaNode` guards downcast from
+// `SqlSchemaIRNode`, so bridge the framework type here.
+function asSchemaNode(node: DiffableNode | undefined): SqlSchemaIRNode | undefined {
+  if (node === undefined) return undefined;
+  return blindCast<
+    SqlSchemaIRNode,
+    'diff issues over Postgres schema trees carry SqlSchemaIRNode nodes'
+  >(node);
 }
 
 /**

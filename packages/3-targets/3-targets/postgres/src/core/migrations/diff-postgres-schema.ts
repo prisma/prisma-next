@@ -1,7 +1,18 @@
-import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import type { DiffableNode, SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { diffSchemas } from '@prisma-next/framework-components/control';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
+
+// Every node in a diff issue produced from Postgres schema trees is a
+// `SqlSchemaIRNode`; the framework types it as the narrower `DiffableNode`.
+function asSchemaNode(node: DiffableNode): SqlSchemaIRNode {
+  return blindCast<
+    SqlSchemaIRNode,
+    'diff issues over Postgres schema trees carry SqlSchemaIRNode nodes'
+  >(node);
+}
 
 // Renders a display-only reference string for the diff message. If policy
 // rendering grows, route it through the adapter's SQL renderer so the message
@@ -33,11 +44,13 @@ export function diffPostgresSchema(
   return issues
     .filter((i) => {
       const node = i.expected ?? i.actual;
-      return node !== undefined && PostgresPolicySchemaNode.is(node);
+      return node !== undefined && PostgresPolicySchemaNode.is(asSchemaNode(node));
     })
     .map((i) => {
-      const policy = i.expected ?? i.actual;
-      if (policy === undefined || !PostgresPolicySchemaNode.is(policy)) return i;
+      const node = i.expected ?? i.actual;
+      if (node === undefined) return i;
+      const policy = asSchemaNode(node);
+      if (!PostgresPolicySchemaNode.is(policy)) return i;
       return { ...i, message: `${i.outcome}: ${renderPostgresPolicyReference(policy)}` };
     });
 }
@@ -51,11 +64,10 @@ export function filterIssuesByOwnership(
   issues: readonly SchemaDiffIssue[],
   ownedSchemaNames: ReadonlySet<string>,
 ): readonly SchemaDiffIssue[] {
-  return issues.filter(
-    (i) =>
-      i.outcome !== 'extra' ||
-      (i.actual !== undefined &&
-        PostgresPolicySchemaNode.is(i.actual) &&
-        ownedSchemaNames.has(i.actual.namespaceId)),
-  );
+  return issues.filter((i) => {
+    if (i.outcome !== 'extra') return true;
+    if (i.actual === undefined) return false;
+    const policy = asSchemaNode(i.actual);
+    return PostgresPolicySchemaNode.is(policy) && ownedSchemaNames.has(policy.namespaceId);
+  });
 }

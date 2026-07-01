@@ -15,6 +15,7 @@ import {
   PostgresPolicySchemaNode,
   type PostgresPolicySchemaNodeInput,
 } from './postgres-policy-schema-node';
+import { PostgresSchemaNodeKind } from './schema-node-kinds';
 
 export interface PostgresTableSchemaNodeInput extends SqlTableIRInput {
   readonly policies?: readonly (PostgresPolicySchemaNode | PostgresPolicySchemaNodeInput)[];
@@ -30,9 +31,11 @@ export interface PostgresTableSchemaNodeInput extends SqlTableIRInput {
  * subclass field initialisation.
  *
  * `id` is the table name. `children()` returns the policy nodes on this table.
- * `isEqualTo` is always true — table-level attributes are not diffed yet.
+ * `isEqualTo` is identity — two table nodes are equal iff their ids (names)
+ * match. Columns are not compared here; they become child nodes later.
  */
 export class PostgresTableSchemaNode extends SqlSchemaIRNode implements DiffableNode {
+  override readonly nodeKind = PostgresSchemaNodeKind.table;
   readonly name: string;
   readonly columns: Readonly<Record<string, SqlColumnIR>>;
   readonly foreignKeys: ReadonlyArray<SqlForeignKeyIR>;
@@ -91,15 +94,15 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
     return this.name;
   }
 
-  isEqualTo(_other: DiffableNode): boolean {
-    return true;
+  isEqualTo(other: DiffableNode): boolean {
+    return this.id === other.id;
   }
 
   children(): readonly DiffableNode[] {
     return this.policies;
   }
 
-  static is(node: DiffableNode): node is PostgresTableSchemaNode {
-    return node instanceof PostgresTableSchemaNode;
+  static is(node: SqlSchemaIRNode): node is PostgresTableSchemaNode {
+    return node.nodeKind === PostgresSchemaNodeKind.table;
   }
 }

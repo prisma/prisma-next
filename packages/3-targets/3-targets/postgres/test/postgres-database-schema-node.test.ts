@@ -1,4 +1,5 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import {
   PostgresDatabaseSchemaNode,
@@ -47,7 +48,7 @@ describe('PostgresDatabaseSchemaNode', () => {
     expect(node.id).toBe('database');
   });
 
-  it('isEqualTo always returns true', () => {
+  it('isEqualTo matches by id (roots always share the "database" id)', () => {
     const a = new PostgresDatabaseSchemaNode(baseInput);
     const b = new PostgresDatabaseSchemaNode({ ...baseInput, pgVersion: '16.0' });
     expect(a.isEqualTo(b)).toBe(true);
@@ -62,7 +63,7 @@ describe('PostgresDatabaseSchemaNode', () => {
     const node = new PostgresDatabaseSchemaNode(baseInput);
     const children = node.children();
     for (const child of children) {
-      expect(PostgresRoleSchemaNode.is(child)).toBe(false);
+      expect(PostgresRoleSchemaNode.is(child as SqlSchemaIRNode)).toBe(false);
     }
   });
 
@@ -92,9 +93,9 @@ describe('PostgresDatabaseSchemaNode', () => {
     expect(Object.isFrozen(node)).toBe(true);
   });
 
-  it('nodeTarget discriminant is "postgres"', () => {
+  it('nodeKind discriminant is "postgres-database"', () => {
     const node = new PostgresDatabaseSchemaNode(baseInput);
-    expect(node.nodeTarget).toBe('postgres');
+    expect(node.nodeKind).toBe('postgres-database');
   });
 
   describe('PostgresDatabaseSchemaNode.is', () => {
@@ -103,22 +104,18 @@ describe('PostgresDatabaseSchemaNode', () => {
       expect(PostgresDatabaseSchemaNode.is(node)).toBe(true);
     });
 
-    it('returns true for a spread plain object that retains nodeTarget', () => {
+    it('returns true for a spread plain object that retains nodeKind', () => {
       const node = new PostgresDatabaseSchemaNode(baseInput);
       const spread = { ...node };
-      expect(PostgresDatabaseSchemaNode.is(spread as unknown as PostgresDatabaseSchemaNode)).toBe(
-        true,
-      );
+      expect(PostgresDatabaseSchemaNode.is(spread as unknown as SqlSchemaIRNode)).toBe(true);
     });
 
     it('returns false for a PostgresNamespaceSchemaNode', () => {
-      expect(PostgresDatabaseSchemaNode.is(nsPublic as unknown as PostgresDatabaseSchemaNode)).toBe(
-        false,
-      );
+      expect(PostgresDatabaseSchemaNode.is(nsPublic as unknown as SqlSchemaIRNode)).toBe(false);
     });
 
-    it('returns false for an object without nodeTarget', () => {
-      const bare = { id: 'database' } as unknown as PostgresDatabaseSchemaNode;
+    it('returns false for an object without nodeKind', () => {
+      const bare = { id: 'database' } as unknown as SqlSchemaIRNode;
       expect(PostgresDatabaseSchemaNode.is(bare)).toBe(false);
     });
   });
@@ -129,8 +126,8 @@ describe('PostgresDatabaseSchemaNode', () => {
       expect(() => PostgresDatabaseSchemaNode.assert(node)).not.toThrow();
     });
 
-    it('throws for an object with wrong nodeTarget', () => {
-      const bad = { nodeTarget: 'sql' } as unknown as PostgresDatabaseSchemaNode;
+    it('throws for an object with wrong nodeKind', () => {
+      const bad = { nodeKind: 'postgres-namespace' } as unknown as SqlSchemaIRNode;
       expect(() => PostgresDatabaseSchemaNode.assert(bad)).toThrow();
     });
   });

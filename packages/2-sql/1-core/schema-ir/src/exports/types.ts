@@ -7,7 +7,6 @@ export type {
   SqlIndexIRInput,
   SqlReferentialAction,
   SqlSchemaIRInput,
-  SqlSchemaTarget,
   SqlTableIRInput,
   SqlTypeMetadata,
   SqlTypeMetadataRegistry,
