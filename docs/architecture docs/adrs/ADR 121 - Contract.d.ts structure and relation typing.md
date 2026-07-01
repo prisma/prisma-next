@@ -40,7 +40,7 @@ model Post {
   id        Int      @id @default(autoincrement())
   title     String
   userId    Int
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(from: [userId], to: [id])
   createdAt DateTime @default(now())
 }
 ```
@@ -235,7 +235,7 @@ model User {
 
 model Profile {
   id     Int  @id
-  user   User @relation(fields: [userId], references: [id])
+  user   User @relation(from: [userId], to: [id])
   userId Int  @unique
 }
 ```
@@ -264,7 +264,7 @@ model User {
 
 model Post {
   id     Int  @id
-  user   User @relation(fields: [userId], references: [id])
+  user   User @relation(from: [userId], to: [id])
   userId Int
 }
 ```

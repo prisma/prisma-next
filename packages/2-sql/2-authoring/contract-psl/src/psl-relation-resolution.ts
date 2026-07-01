@@ -1,13 +1,15 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import type { FieldSymbol, PslSpan, ResolvedAttribute } from '@prisma-next/psl-parser';
+import type { FieldSymbol, ModelSymbol, PslSpan, ResolvedAttribute } from '@prisma-next/psl-parser';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 import {
+  getAttribute,
   getNamedArgument,
+  getPositionalArgument,
   getPositionalArgumentEntry,
   parseFieldList,
   parseQuotedStringLiteral,
@@ -32,10 +34,49 @@ export type ParsedRelationAttribute = {
   readonly relationName?: string;
   readonly fields?: readonly string[];
   readonly references?: readonly string[];
+  /**
+   * Set when local FK fields are declared (`from:`) but the referenced key is
+   * omitted (`to:` absent). The caller resolves the referenced columns from the
+   * target model's `@id`. `references` stays undefined in this case; the two
+   * never co-occur.
+   */
+  readonly referencesInferred?: true;
   readonly constraintName?: string;
   readonly onDelete?: string;
   readonly onUpdate?: string;
 };
+
+/**
+ * Parses a single `@relation` directional argument value (`from:`/`to:`). A
+ * single field may be bare (`from: userId`) or bracketed (`from: [userId]`);
+ * composites must be bracketed (`from: [a, b]`).
+ *
+ * A redundant model qualifier on `to:` (`to: Post.id`) is stripped to its bare
+ * column name so it lowers identically to the unqualified spelling. The PSL
+ * expression grammar does not currently carry a member-access argument value:
+ * `parseIdentifierExpr` consumes only the head identifier, so `to: Post.id`
+ * reaches the resolver as `Post`. The qualifier strip is the resolver half of
+ * the tolerance; carrying the dotted value through the parser is a separate
+ * grammar change.
+ */
+function parseRelationFieldArgument(raw: string): readonly string[] | undefined {
+  const trimmed = raw.trim();
+  const entries = trimmed.startsWith('[') ? parseFieldList(trimmed) : [trimmed];
+  if (!entries || entries.length === 0) {
+    return undefined;
+  }
+  const stripped = entries.map(stripModelQualifier);
+  if (stripped.some((entry) => entry.length === 0)) {
+    return undefined;
+  }
+  return stripped;
+}
+
+/** Drops a leading `Model.` qualifier, leaving the bare field name. */
+function stripModelQualifier(entry: string): string {
+  const dotIndex = entry.lastIndexOf('.');
+  return dotIndex === -1 ? entry : entry.slice(dotIndex + 1).trim();
+}
 
 export type FkRelationMetadata = {
   readonly declaringModelName: string;
@@ -128,10 +169,19 @@ export function parseRelationAttribute(input: {
     if (arg.kind === 'positional') {
       continue;
     }
+    if (arg.name === 'fields' || arg.name === 'references') {
+      input.diagnostics.push({
+        code: 'PSL_LEGACY_FIELDS_REFERENCES',
+        message: `Relation field "${input.modelName}.${input.fieldName}" uses @relation(fields:/references:), which is no longer supported — use from:/to: instead`,
+        sourceId: input.sourceId,
+        span: arg.span,
+      });
+      return undefined;
+    }
     if (
       arg.name !== 'name' &&
-      arg.name !== 'fields' &&
-      arg.name !== 'references' &&
+      arg.name !== 'from' &&
+      arg.name !== 'to' &&
       arg.name !== 'map' &&
       arg.name !== 'onDelete' &&
       arg.name !== 'onUpdate'
@@ -189,12 +239,13 @@ export function parseRelationAttribute(input: {
     return undefined;
   }
 
-  const fieldsRaw = getNamedArgument(input.attribute, 'fields');
-  const referencesRaw = getNamedArgument(input.attribute, 'references');
-  if ((fieldsRaw && !referencesRaw) || (!fieldsRaw && referencesRaw)) {
+  // `from:`/`to:` are the only local-fields/referenced-key arguments.
+  const fromRaw = getNamedArgument(input.attribute, 'from');
+  const toRaw = getNamedArgument(input.attribute, 'to');
+  if (!fromRaw && toRaw) {
     input.diagnostics.push({
       code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-      message: `Relation field "${input.modelName}.${input.fieldName}" requires fields and references arguments`,
+      message: `Relation field "${input.modelName}.${input.fieldName}" requires a from argument naming the local foreign-key field(s)`,
       sourceId: input.sourceId,
       span: input.attribute.span,
     });
@@ -203,25 +254,37 @@ export function parseRelationAttribute(input: {
 
   let fields: readonly string[] | undefined;
   let references: readonly string[] | undefined;
-  if (fieldsRaw && referencesRaw) {
-    const parsedFields = parseFieldList(fieldsRaw);
-    const parsedReferences = parseFieldList(referencesRaw);
-    if (
-      !parsedFields ||
-      !parsedReferences ||
-      parsedFields.length === 0 ||
-      parsedReferences.length === 0
-    ) {
+  let referencesInferred: true | undefined;
+  if (fromRaw) {
+    const parsedFields = parseRelationFieldArgument(fromRaw);
+    if (!parsedFields) {
       input.diagnostics.push({
         code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-        message: `Relation field "${input.modelName}.${input.fieldName}" requires bracketed fields and references lists`,
+        message: `Relation field "${input.modelName}.${input.fieldName}" requires a bare field or bracketed list for from`,
         sourceId: input.sourceId,
         span: input.attribute.span,
       });
       return undefined;
     }
     fields = parsedFields;
-    references = parsedReferences;
+
+    if (toRaw) {
+      const parsedReferences = parseRelationFieldArgument(toRaw);
+      if (!parsedReferences) {
+        input.diagnostics.push({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: `Relation field "${input.modelName}.${input.fieldName}" requires a bare field or bracketed list for to`,
+          sourceId: input.sourceId,
+          span: input.attribute.span,
+        });
+        return undefined;
+      }
+      references = parsedReferences;
+    } else {
+      // `to:` omitted ⇒ the referenced columns default to the target model's
+      // `@id`. The caller, which holds the target model, resolves them.
+      referencesInferred = true;
+    }
   }
 
   const onDeleteArgument = getNamedArgument(input.attribute, 'onDelete');
@@ -231,10 +294,38 @@ export function parseRelationAttribute(input: {
     ...ifDefined('relationName', relationName),
     ...ifDefined('fields', fields),
     ...ifDefined('references', references),
+    ...ifDefined('referencesInferred', referencesInferred),
     ...ifDefined('constraintName', constraintName),
     ...ifDefined('onDelete', onDeleteArgument ? unquoteStringLiteral(onDeleteArgument) : undefined),
     ...ifDefined('onUpdate', onUpdateArgument ? unquoteStringLiteral(onUpdateArgument) : undefined),
   };
+}
+
+/**
+ * Resolves a model's `@id` field names in declaration order — an inline `@id`
+ * on a single field, or a model-level `@@id([...])` list. Returns undefined
+ * when the model declares no identity, which is what makes an omitted `to:`
+ * un-inferable for a relation targeting it.
+ */
+export function resolveTargetIdFieldNames(model: ModelSymbol): readonly string[] | undefined {
+  const blockId = getAttribute(model.attributes, 'id');
+  if (blockId) {
+    const raw = getNamedArgument(blockId, 'fields') ?? getPositionalArgument(blockId);
+    const fields = raw ? parseFieldList(raw) : undefined;
+    if (fields && fields.length > 0) {
+      return fields;
+    }
+    return undefined;
+  }
+
+  const inlineIdFields = Object.values(model.fields).filter((field) =>
+    field.attributes.some((attribute) => attribute.name === 'id'),
+  );
+  if (inlineIdFields.length === 1) {
+    const idField = inlineIdFields[0];
+    return idField ? [idField.name] : undefined;
+  }
+  return undefined;
 }
 
 export function indexFkRelations(input: {
@@ -535,7 +626,7 @@ export function applyBackrelationCandidates(input: {
       }
       input.diagnostics.push({
         code: 'PSL_ORPHANED_BACKRELATION_LIST',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
+        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(from: [...], to: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
         sourceId: input.sourceId,
         span: candidate.field.span,
       });

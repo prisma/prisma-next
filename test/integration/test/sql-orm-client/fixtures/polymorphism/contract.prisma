@@ -26,8 +26,8 @@ model Task {
   projectId  Int?   @map("project_id")
   reporterId Int?   @map("reporter_id")
 
-  project  Project?     @relation(fields: [projectId], references: [id])
-  reporter Person?      @relation(fields: [reporterId], references: [id])
+  project  Project?     @relation(from: [projectId], to: [id])
+  reporter Person?      @relation(from: [reporterId], to: [id])
   comments TaskComment[]
 
   @@discriminator(type)
@@ -61,7 +61,7 @@ model User {
   kind      String
   accountId Int?   @map("account_id")
 
-  account Account? @relation(fields: [accountId], references: [id])
+  account Account? @relation(from: [accountId], to: [id])
 
   @@discriminator(kind)
   @@map("users")
@@ -102,7 +102,7 @@ model Ticket {
   subject String
   ownerId Int?   @map("owner_id")
 
-  owner User? @relation(fields: [ownerId], references: [id])
+  owner User? @relation(from: [ownerId], to: [id])
 
   @@map("tickets")
 }
@@ -121,7 +121,7 @@ model TaskComment {
   body   String
   taskId Int?   @map("task_id")
 
-  task Task? @relation(fields: [taskId], references: [id])
+  task Task? @relation(from: [taskId], to: [id])
 
   @@map("task_comments")
 }

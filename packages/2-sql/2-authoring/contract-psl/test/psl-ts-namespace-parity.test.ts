@@ -44,7 +44,7 @@ namespace public {
   model Post {
     id    Int @id
     userId Int
-    user  auth.User @relation(fields: [userId], references: [id])
+    user  auth.User @relation(from: [userId], to: [id])
   }
 }
 `,
@@ -169,7 +169,7 @@ namespace public {
       schema: `model Profile {
   id    Int @id
   userId Int
-  user  supabase:auth.User @relation(fields: [userId], references: [id])
+  user  supabase:auth.User @relation(from: [userId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -240,7 +240,7 @@ namespace public {
       schema: `model Profile {
   id    Int @id
   userId Int
-  user  supabase:auth.User @relation(fields: [userId], references: [id])
+  user  supabase:auth.User @relation(from: [userId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',

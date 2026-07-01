@@ -100,6 +100,7 @@ import {
   type ModelBackrelationCandidate,
   normalizeReferentialAction,
   parseRelationAttribute,
+  resolveTargetIdFieldNames,
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
 
@@ -529,7 +530,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (parsedRelation.fields || parsedRelation.references) {
         diagnostics.push({
           code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-          message: `Backrelation list field "${model.name}.${field.name}" cannot declare fields/references; define them on the FK-side relation field`,
+          message: `Backrelation list field "${model.name}.${field.name}" cannot declare fields/references or from/to; define them on the FK-side relation field`,
           sourceId,
           span: relationAttribute.span,
         });
@@ -858,7 +859,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (!parsedRelation.fields || !parsedRelation.references) {
         diagnostics.push({
           code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-          message: `Relation field "${model.name}.${relationAttribute.field.name}" requires fields and references arguments`,
+          message: `Cross-space relation field "${model.name}.${relationAttribute.field.name}" requires from and to arguments; to cannot be inferred across contract spaces`,
           sourceId,
           span: relationAttribute.relation.span,
         });
@@ -1026,10 +1027,10 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     if (!parsedRelation) {
       continue;
     }
-    if (!parsedRelation.fields || !parsedRelation.references) {
+    if (!parsedRelation.fields) {
       diagnostics.push({
         code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-        message: `Relation field "${model.name}.${relationAttribute.field.name}" requires fields and references arguments`,
+        message: `Relation field "${model.name}.${relationAttribute.field.name}" requires a from argument naming the local foreign-key field(s)`,
         sourceId,
         span: relationAttribute.relation.span,
       });
@@ -1052,6 +1053,21 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       continue;
     }
 
+    // An omitted `to:` references the target model's `@id`; an explicit
+    // `to:`/`references:` names the referenced fields directly.
+    const referenceFieldNames = parsedRelation.referencesInferred
+      ? resolveTargetIdFieldNames(targetMapping.model)
+      : parsedRelation.references;
+    if (!referenceFieldNames) {
+      diagnostics.push({
+        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+        message: `Relation field "${model.name}.${relationAttribute.field.name}" omits to and target model "${targetMapping.model.name}" has no @id to reference; add a to argument naming the referenced field(s)`,
+        sourceId,
+        span: relationAttribute.relation.span,
+      });
+      continue;
+    }
+
     const localColumns = mapFieldNamesToColumns({
       modelName: model.name,
       fieldNames: parsedRelation.fields,
@@ -1066,7 +1082,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     }
     const referencedColumns = mapFieldNamesToColumns({
       modelName: targetMapping.model.name,
-      fieldNames: parsedRelation.references,
+      fieldNames: referenceFieldNames,
       mapping: targetMapping,
       sourceId,
       diagnostics,

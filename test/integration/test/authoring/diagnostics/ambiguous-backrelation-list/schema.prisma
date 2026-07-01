@@ -9,6 +9,6 @@ model Post {
   id Int @id
   primaryUserId Int
   secondaryUserId Int
-  primaryUser User @relation(fields: [primaryUserId], references: [id])
-  secondaryUser User @relation(fields: [secondaryUserId], references: [id])
+  primaryUser User @relation(from: [primaryUserId], to: [id])
+  secondaryUser User @relation(from: [secondaryUserId], to: [id])
 }

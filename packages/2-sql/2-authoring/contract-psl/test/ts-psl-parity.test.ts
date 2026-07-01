@@ -261,7 +261,7 @@ model Post {
   id Int @id(map: "post_pkey")
   authorId Int
   title String
-  author User @relation(fields: [authorId], references: [id], map: "post_author_id_fkey", onDelete: Cascade)
+  author User @relation(from: [authorId], to: [id], map: "post_author_id_fkey", onDelete: Cascade)
   @@index([authorId], map: "post_author_id_idx")
 }
 `;
@@ -416,7 +416,7 @@ describe('TS and PSL authoring parity', () => {
 model Post {
   id Int @id
   authorId Int
-  author User @relation(fields: [authorId], references: [id])
+  author User @relation(from: [authorId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',

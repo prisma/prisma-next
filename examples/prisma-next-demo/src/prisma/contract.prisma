@@ -46,7 +46,7 @@ model Post {
   createdAt DateTime       @default(now())
   embedding Embedding1536?
 
-  user User  @relation(fields: [userId], references: [id])
+user User  @relation(from: [userId], to: [id])
   tags Tag[]
 
   @@map("post")
@@ -65,8 +65,8 @@ model PostTag {
   postId Uuid
   tagId  Uuid
 
-  post Post @relation(fields: [postId], references: [id])
-  tag  Tag  @relation(fields: [tagId], references: [id])
+  post Post @relation(from: [postId], to: [id])
+  tag  Tag  @relation(from: [tagId], to: [id])
 
   @@id([postId, tagId])
   @@map("post_tag")
@@ -81,7 +81,7 @@ model Task {
   userId      Uuid
   createdAt   DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(from: [userId], to: [id])
 
   @@discriminator(type)
   @@map("task")

@@ -93,7 +93,7 @@ model Post {
   id       Int    @id @default(autoincrement())
   title    String
   authorId Int
-  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author   User   @relation(from: [authorId], to: [id], onDelete: Cascade)
 
   @@unique([title, authorId])
   @@index([authorId])
@@ -290,7 +290,7 @@ namespace public {
     id       String @id @default(uuid())
     username String
     userId   Uuid   @unique
-    user     supabase:auth.AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user     supabase:auth.AuthUser @relation(from: [userId], to: [id], onDelete: Cascade)
     @@map("profile")
   }
 }

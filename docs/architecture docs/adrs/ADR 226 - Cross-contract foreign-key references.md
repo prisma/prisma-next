@@ -19,7 +19,7 @@ namespace public {
   model Profile {
     id     String @id @default(uuid())
     userId Uuid   @unique
-    user   supabase:auth.AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user   supabase:auth.AuthUser @relation(from: [userId], to: [id], onDelete: Cascade)
   }
 }
 ```

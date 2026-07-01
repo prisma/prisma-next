@@ -1,4 +1,5 @@
-import type { ResolvedAttribute, ResolvedAttributeArg } from '@prisma-next/psl-parser';
+import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
+import type { ModelSymbol, ResolvedAttribute } from '@prisma-next/psl-parser';
 import { parseQuotedStringLiteral } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 
@@ -95,38 +96,141 @@ export interface ParsedRelationAttribute {
   readonly relationName?: string;
   readonly fields?: readonly string[];
   readonly references?: readonly string[];
+  /**
+   * Set when local FK fields are declared (`from:`) but the referenced key is
+   * omitted (`to:` absent). The caller resolves the referenced columns from the
+   * target model's `@id`. `references` stays undefined in this case; the two
+   * never co-occur.
+   */
+  readonly referencesInferred?: true;
 }
 
-export function parseRelationAttribute(
-  attributes: readonly ResolvedAttribute[],
-): ParsedRelationAttribute | undefined {
-  const relationAttr = getAttribute(attributes, 'relation');
+/**
+ * Parses a single `@relation` directional argument value (`from:`/`to:`). A
+ * single field may be bare (`from: userId`) or bracketed (`from: [userId]`);
+ * composites must be bracketed (`from: [a, b]`).
+ */
+function parseRelationFieldArgument(raw: string): readonly string[] | undefined {
+  const trimmed = raw.trim();
+  const entries = trimmed.startsWith('[') ? parseFieldList(trimmed) : [trimmed];
+  if (entries.length === 0 || entries.some((entry) => entry.length === 0)) {
+    return undefined;
+  }
+  return entries;
+}
+
+export function parseRelationAttribute(input: {
+  readonly attributes: readonly ResolvedAttribute[];
+  readonly modelName: string;
+  readonly fieldName: string;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): ParsedRelationAttribute | undefined {
+  const relationAttr = getAttribute(input.attributes, 'relation');
   if (!relationAttr) return undefined;
 
   let relationName: string | undefined;
-  let fieldsArg: ResolvedAttributeArg | undefined;
-  let referencesArg: ResolvedAttributeArg | undefined;
+  let fromRaw: string | undefined;
+  let toRaw: string | undefined;
 
   for (const arg of relationAttr.args) {
     if (arg.kind === 'positional') {
       relationName = stripQuotes(arg.value);
     } else if (arg.name === 'name') {
       relationName = stripQuotes(arg.value);
-    } else if (arg.name === 'fields') {
-      fieldsArg = arg;
-    } else if (arg.name === 'references') {
-      referencesArg = arg;
+    } else if (arg.name === 'fields' || arg.name === 'references') {
+      input.diagnostics.push({
+        code: 'PSL_LEGACY_FIELDS_REFERENCES',
+        message: `Relation field "${input.modelName}.${input.fieldName}" uses @relation(fields:/references:), which is no longer supported — use from:/to: instead`,
+        sourceId: input.sourceId,
+        span: arg.span,
+      });
+      return undefined;
+    } else if (arg.name === 'from') {
+      fromRaw = arg.value;
+    } else if (arg.name === 'to') {
+      toRaw = arg.value;
     }
   }
 
-  const fields = fieldsArg ? parseFieldList(fieldsArg.value) : undefined;
-  const references = referencesArg ? parseFieldList(referencesArg.value) : undefined;
+  if (toRaw !== undefined && fromRaw === undefined) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+      message: `Relation field "${input.modelName}.${input.fieldName}" requires a from argument naming the local foreign-key field(s)`,
+      sourceId: input.sourceId,
+      span: relationAttr.span,
+    });
+    return undefined;
+  }
+
+  let fields: readonly string[] | undefined;
+  let references: readonly string[] | undefined;
+  let referencesInferred: true | undefined;
+  if (fromRaw !== undefined) {
+    const parsedFields = parseRelationFieldArgument(fromRaw);
+    if (!parsedFields) {
+      input.diagnostics.push({
+        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+        message: `Relation field "${input.modelName}.${input.fieldName}" requires a bare field or bracketed list for from`,
+        sourceId: input.sourceId,
+        span: relationAttr.span,
+      });
+      return undefined;
+    }
+    fields = parsedFields;
+
+    if (toRaw !== undefined) {
+      const parsedReferences = parseRelationFieldArgument(toRaw);
+      if (!parsedReferences) {
+        input.diagnostics.push({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: `Relation field "${input.modelName}.${input.fieldName}" requires a bare field or bracketed list for to`,
+          sourceId: input.sourceId,
+          span: relationAttr.span,
+        });
+        return undefined;
+      }
+      references = parsedReferences;
+    } else {
+      // `to:` omitted ⇒ the referenced columns default to the target model's
+      // `@id`. The caller, which holds the target model, resolves them.
+      referencesInferred = true;
+    }
+  }
 
   return {
     ...ifDefined('relationName', relationName),
     ...ifDefined('fields', fields),
     ...ifDefined('references', references),
+    ...ifDefined('referencesInferred', referencesInferred),
   };
+}
+
+/**
+ * Resolves a model's `@id` field names in declaration order — an inline `@id`
+ * on a single field, or a model-level `@@id([...])` list. Returns undefined
+ * when the model declares no identity, which is what makes an omitted `to:`
+ * un-inferable for a relation targeting it.
+ */
+export function resolveTargetIdFieldNames(model: ModelSymbol): readonly string[] | undefined {
+  const blockId = getAttribute(model.attributes, 'id');
+  if (blockId) {
+    const raw = getNamedArgument(blockId, 'fields') ?? getPositionalArgument(blockId);
+    const fields = raw ? parseFieldList(raw) : undefined;
+    if (fields && fields.length > 0) {
+      return fields;
+    }
+    return undefined;
+  }
+
+  const inlineIdFields = Object.values(model.fields).filter((field) =>
+    field.attributes.some((attribute) => attribute.name === 'id'),
+  );
+  if (inlineIdFields.length === 1) {
+    const idField = inlineIdFields[0];
+    return idField ? [idField.name] : undefined;
+  }
+  return undefined;
 }
 
 function stripQuotes(value: string): string {

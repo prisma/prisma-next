@@ -269,7 +269,11 @@ function hasFullRelation(field: PslField): boolean {
       )
       .map((a) => [a.name, a.value.trim()]),
   );
-  return named['fields'] !== undefined && named['references'] !== undefined;
+  // Canonical `from:`/`to:` declare the FK dependency edge; legacy
+  // `fields:`/`references:` are accepted as an input alias for the same edge.
+  const hasFrom = named['from'] !== undefined || named['fields'] !== undefined;
+  const hasTo = named['to'] !== undefined || named['references'] !== undefined;
+  return hasFrom && hasTo;
 }
 
 function relationReferencedModel(

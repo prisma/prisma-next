@@ -8,5 +8,5 @@ model User {
 model Post {
   id Int @id
   userId Int
-  user User @relation("UserPosts", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user User @relation("UserPosts", from: [userId], to: [id], onDelete: Cascade, onUpdate: Cascade)
 }
