@@ -31,6 +31,7 @@ import {
 import sqliteTarget, {
   SqliteContractSerializer as SqlContractSerializer,
 } from '@prisma-next/target-sqlite/runtime';
+import { assertDefined } from '@prisma-next/utils/assertions';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { buildSqliteStaticContext, type SqliteStaticContext } from '../static/sqlite-static';
@@ -48,10 +49,12 @@ type UnboundOrm<TContract extends Contract<SqlStorage>> =
 function unboundOrm<TContract extends Contract<SqlStorage>>(
   orm: OrmClient<TContract>,
 ): UnboundOrm<TContract> {
+  const value = orm[UNBOUND_NAMESPACE_ID];
+  assertDefined(value, 'the unbound namespace always exists on a sqlite builder output');
   return blindCast<
     UnboundOrm<TContract>,
-    'the unbound namespace always exists on a sqlite builder output'
-  >(orm[UNBOUND_NAMESPACE_ID]);
+    'OrmClient<TContract> indexed by a literal key widens NsId to string; Collection is invariant in NsId via row/mutation-input types, so the indexed-access type cannot be proven to match the literal-keyed OrmNamespace without this cast'
+  >(value);
 }
 
 export interface SqliteTransactionContext<TContract extends Contract<SqlStorage>>
@@ -290,10 +293,17 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
       }
       return withTransaction(runtime, (txCtx) => {
         const rawCodecInferer = stack.adapter.rawCodecInferer;
+        const txSqlNamespace = sqlBuilder<TContract>({ context, rawCodecInferer })[
+          UNBOUND_NAMESPACE_ID
+        ];
+        assertDefined(
+          txSqlNamespace,
+          'the unbound namespace always exists on a sqlite builder output',
+        );
         const txSql: UnboundSql<TContract> = blindCast<
           UnboundSql<TContract>,
-          'the unbound namespace always exists on a sqlite builder output'
-        >(sqlBuilder<TContract>({ context, rawCodecInferer })[UNBOUND_NAMESPACE_ID]);
+          'Db<TContract> indexed by a literal key widens NsId to string; TableProxy is invariant in NsId via insert()/update() parameter positions, so the indexed-access type cannot be proven to match the literal-keyed Namespace without this cast'
+        >(txSqlNamespace);
 
         const txOrm: UnboundOrm<TContract> = unboundOrm(
           ormBuilder({

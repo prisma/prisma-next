@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   AnyMongoTypeMaps,
   MongoContract,
@@ -65,7 +66,7 @@ import mongo from '../src/runtime/mongo';
 const fakeContract = {
   roots: {},
   models: {},
-  domain: { namespaces: {} },
+  domain: { namespaces: { [UNBOUND_NAMESPACE_ID]: { models: {} } } },
 } as unknown as AnyMongoContract;
 const fakeRuntime = { id: 'runtime-instance', close: vi.fn().mockResolvedValue(undefined) };
 const fakeDriverClose = vi.fn().mockResolvedValue(undefined);

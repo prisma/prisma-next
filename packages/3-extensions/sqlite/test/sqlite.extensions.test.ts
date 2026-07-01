@@ -1,8 +1,19 @@
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { coreHash } from '@prisma-next/contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
+import { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import { createContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import sqlite from '../src/runtime/sqlite';
+
+function unboundSqlStorage(): SqlStorage {
+  return new SqlStorage({
+    storageHash: coreHash('sha256:sqlite-extensions-test'),
+    namespaces: {
+      __unbound__: sqliteCreateNamespace({ id: '__unbound__', entries: { table: {} } }),
+    },
+  });
+}
 
 function createTestExtensionPack(id: string): SqlRuntimeExtensionDescriptor<'sqlite'> {
   return {
@@ -29,6 +40,7 @@ describe('sqlite extensions', () => {
     const pack = createTestExtensionPack(extensionPackId);
     const contract = createContract<SqlStorage>({
       target: 'sqlite',
+      storage: unboundSqlStorage(),
       extensionPacks: {
         [extensionPackId]: { id: extensionPackId, version: '0.0.1' },
       },
@@ -47,6 +59,7 @@ describe('sqlite extensions', () => {
     const extensionPackId = 'test-pack';
     const contract = createContract<SqlStorage>({
       target: 'sqlite',
+      storage: unboundSqlStorage(),
       extensionPacks: {
         [extensionPackId]: { id: extensionPackId, version: '0.0.1' },
       },

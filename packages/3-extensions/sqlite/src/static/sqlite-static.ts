@@ -10,6 +10,7 @@ import { createRawSql } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import sqliteTarget, { SqliteContractSerializer } from '@prisma-next/target-sqlite/runtime';
+import { assertDefined } from '@prisma-next/utils/assertions';
 import { blindCast } from '@prisma-next/utils/casts';
 
 type UnboundSql<TContract extends Contract<SqlStorage>> =
@@ -29,15 +30,17 @@ export function buildSqliteStaticContext<TContract extends Contract<SqlStorage>>
   context: ExecutionContext<TContract>,
   rawCodecInferer: RawCodecInferer,
 ): SqliteStaticContext<TContract> {
+  const sqlNamespace = sql<TContract>({ context, rawCodecInferer })[UNBOUND_NAMESPACE_ID];
+  assertDefined(sqlNamespace, 'the unbound namespace always exists on a sqlite builder output');
   const sqlDb = blindCast<
     UnboundSql<TContract>,
-    'the unbound namespace always exists on a sqlite builder output'
-  >(sql<TContract>({ context, rawCodecInferer })[UNBOUND_NAMESPACE_ID]);
+    'Db<TContract> indexed by a literal key widens NsId to string; TableProxy is invariant in NsId via insert()/update() parameter positions, so the indexed-access type cannot be proven to match the literal-keyed Namespace without this cast'
+  >(sqlNamespace);
   const raw: RawSqlTag = createRawSql(rawCodecInferer);
-  const enums = blindCast<
-    UnboundEnums<TContract>,
-    'the unbound namespace always exists on a sqlite builder output'
-  >(Object.freeze(buildNamespacedEnums(context.contract.domain))[UNBOUND_NAMESPACE_ID]);
+  const enums = Object.freeze(buildNamespacedEnums<TContract>(context.contract.domain))[
+    UNBOUND_NAMESPACE_ID
+  ];
+  assertDefined(enums, 'the unbound namespace always exists on a sqlite builder output');
   return { context, contract: context.contract, enums, sql: sqlDb, raw };
 }
 

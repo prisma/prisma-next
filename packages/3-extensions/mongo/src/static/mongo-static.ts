@@ -14,6 +14,7 @@ import {
   type MongoExecutionContext,
 } from '@prisma-next/mongo-runtime';
 import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
+import { assertDefined } from '@prisma-next/utils/assertions';
 import { blindCast } from '@prisma-next/utils/casts';
 
 type UnboundEnums<TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>> =
@@ -22,10 +23,9 @@ type UnboundEnums<TContract extends MongoContractWithTypeMaps<MongoContract, Any
 function extractUnboundEnums<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 >(contract: TContract): UnboundEnums<TContract> {
-  return blindCast<
-    UnboundEnums<TContract>,
-    'the unbound namespace always exists on a mongo builder output'
-  >(buildNamespacedEnums(contract.domain)[UNBOUND_NAMESPACE_ID]);
+  const enums = buildNamespacedEnums<TContract>(contract.domain)[UNBOUND_NAMESPACE_ID];
+  assertDefined(enums, 'the unbound namespace always exists on a mongo builder output');
+  return enums;
 }
 
 export interface MongoStaticContext<

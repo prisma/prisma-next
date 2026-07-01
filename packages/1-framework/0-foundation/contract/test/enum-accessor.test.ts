@@ -1,10 +1,13 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { Contract } from '../src/contract-types';
 import type { ContractEnumAccessor, EnumMemberNames, EnumValues } from '../src/enum-accessor';
 import {
   buildEnumsMapForNamespace,
   buildNamespacedEnums,
   createEnumAccessor,
 } from '../src/enum-accessor';
+
+type ContractWithDomain<TDomain> = Contract & { readonly domain: TDomain };
 
 const roleEnum = {
   codecId: 'pg/text@1',
@@ -187,11 +190,11 @@ describe('buildNamespacedEnums()', () => {
   it('keys the accessor map by namespace then enum name', () => {
     const domain = {
       namespaces: {
-        public: { enum: { Role: roleEnum, Status: statusEnum } },
+        public: { models: {}, enum: { Role: roleEnum, Status: statusEnum } },
       },
     };
 
-    const enums = buildNamespacedEnums(domain);
+    const enums = buildNamespacedEnums<ContractWithDomain<typeof domain>>(domain);
     expect(Object.keys(enums).sort()).toEqual(['public']);
     expect(enums['public']?.['Role']?.values).toEqual(['user', 'admin']);
     expect(enums['public']?.['Status']?.values).toEqual(['active', 'inactive', 'pending']);
@@ -200,22 +203,23 @@ describe('buildNamespacedEnums()', () => {
   it('resolves same-named enums in different namespaces independently', () => {
     const domain = {
       namespaces: {
-        public: { enum: { Role: roleEnum } },
-        audit: { enum: { Role: statusEnum } },
+        public: { models: {}, enum: { Role: roleEnum } },
+        audit: { models: {}, enum: { Role: statusEnum } },
       },
     };
 
-    const enums = buildNamespacedEnums(domain);
+    const enums = buildNamespacedEnums<ContractWithDomain<typeof domain>>(domain);
     expect(enums['public']?.['Role']?.values).toEqual(['user', 'admin']);
     expect(enums['audit']?.['Role']?.values).toEqual(['active', 'inactive', 'pending']);
   });
 
   it('exposes member accessors and helpers per namespace', () => {
     const domain = {
-      namespaces: { public: { enum: { Role: roleEnum } } },
+      namespaces: { public: { models: {}, enum: { Role: roleEnum } } },
     };
 
-    const role = buildNamespacedEnums(domain)['public']?.['Role'];
+    const role =
+      buildNamespacedEnums<ContractWithDomain<typeof domain>>(domain)['public']?.['Role'];
     expect(role?.members['User']).toBe('user');
     expect(role?.has('admin')).toBe(true);
     expect(role?.nameOf('user')).toBe('User');
@@ -224,10 +228,12 @@ describe('buildNamespacedEnums()', () => {
 
   it('yields an empty enum map for a namespace without enums', () => {
     const domain = {
-      namespaces: { public: {} },
+      namespaces: { public: { models: {} } },
     };
 
-    expect(buildNamespacedEnums(domain)).toEqual({ public: {} });
+    expect(buildNamespacedEnums<ContractWithDomain<typeof domain>>(domain)).toEqual({
+      public: {},
+    });
   });
 });
 
