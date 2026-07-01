@@ -12,7 +12,6 @@ import type {
   SqlMigrationRunnerSuccessValue,
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
-import { namespaceSchemaNodes, verifySqlSchema } from '@prisma-next/family-sql/diff';
 import type { MigrationRunnerResult } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -22,8 +21,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
 import { MARKER_TABLE_NAME } from '../control-tables';
-import { parseSqliteDefault } from '../default-normalizer';
-import { normalizeSqliteNativeType } from '../native-type-normalizer';
+import { diffSqliteDatabaseSchema } from './diff-database-schema';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 
 export function createSqliteMigrationRunner(
@@ -96,20 +94,12 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
         driver,
         contract: options.destinationContract,
       });
-      // SQLite has a single flat schema — its introspected node IS the
-      // per-schema `SqlSchemaIR` that `namespaceSchemaNodes` returns as the
-      // sole node.
-      const schemaIR = namespaceSchemaNodes(schemaNode)[0] ?? { tables: {} };
-
-      const schemaVerifyResult = verifySqlSchema({
+      const schemaVerifyResult = diffSqliteDatabaseSchema({
         contract: options.destinationContract,
-        schema: schemaIR,
+        actualSchema: schemaNode,
         strict: options.strictVerification ?? true,
-        context: options.context ?? {},
         typeMetadataRegistry: this.family.typeMetadataRegistry,
         frameworkComponents: options.frameworkComponents,
-        normalizeDefault: parseSqliteDefault,
-        normalizeNativeType: normalizeSqliteNativeType,
       });
       if (!schemaVerifyResult.ok) {
         return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {

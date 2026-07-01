@@ -11,7 +11,6 @@ import {
   plannerFailure,
 } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
-import { namespaceSchemaNodes, verifySqlSchema } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   MigrationPlanner,
@@ -19,8 +18,8 @@ import type {
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
 import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
-import { parseSqliteDefault } from '../default-normalizer';
-import { normalizeSqliteNativeType } from '../native-type-normalizer';
+import { blindCast } from '@prisma-next/utils/casts';
+import { diffSqliteDatabaseSchema } from './diff-database-schema';
 import { planIssues } from './issue-planner';
 import {
   type SqliteMigrationDestinationInfo,
@@ -182,24 +181,24 @@ export class SqliteMigrationPlanner
   private collectSchemaIssues(options: SqlMigrationPlannerPlanOptions): readonly SchemaIssue[] {
     const allowed = options.policy.allowedOperationClasses;
     const strict = allowed.includes('widening') || allowed.includes('destructive');
-    const verifyResult = verifySqlSchema({
+    const verifyResult = diffSqliteDatabaseSchema({
       contract: options.contract,
-      schema: sqliteFlatSchema(options.schema),
+      actualSchema: options.schema,
       strict,
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
-      normalizeDefault: parseSqliteDefault,
-      normalizeNativeType: normalizeSqliteNativeType,
     });
     return verifyResult.schema.issues;
   }
 }
 
 /**
- * SQLite has a single, flat schema — its introspected node IS the per-schema
- * `SqlSchemaIR`. `namespaceSchemaNodes` returns that sole node; SQLite never
- * carries the multi-namespace tree the Postgres target builds.
+ * SQLite has a single, flat schema — its introspected node IS a per-schema
+ * `SqlSchemaIR`, never the multi-namespace tree the Postgres target builds. The
+ * planner consumes that flat shape directly when building ops.
  */
 function sqliteFlatSchema(schema: SqlSchemaIRNode): SqlSchemaIR {
-  return namespaceSchemaNodes(schema)[0] ?? { tables: {} };
+  return blindCast<SqlSchemaIR, 'the SQLite introspected node is a flat per-schema SqlSchemaIR'>(
+    schema,
+  );
 }

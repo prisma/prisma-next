@@ -3,7 +3,7 @@ import type {
   ControlTargetDescriptor,
 } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlSchemaIRNode, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
 import { stubTargetDiffDatabaseSchema } from './schema-verify.helpers';
@@ -110,5 +110,37 @@ describe('SqlFamilyInstance.toSchemaView', () => {
       nullable: false,
       default: "'draft'::text",
     });
+  });
+
+  it('flattens tables from every namespace of a multi-namespace root', () => {
+    const familyInstance = createSqlFamilyInstance(createMockStack());
+
+    const namespaceTable = (columnName: string): SqlTableIR => ({
+      name: 'ignored',
+      columns: {
+        [columnName]: { name: columnName, nativeType: 'int4', nullable: false },
+      },
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+    });
+
+    const schema = {
+      namespaces: {
+        public: { schemaName: 'public', tables: { User: namespaceTable('id') } },
+        audit: { schemaName: 'audit', tables: { Log: namespaceTable('event') } },
+      },
+    } as unknown as SqlSchemaIRNode;
+
+    const view = familyInstance.toSchemaView(schema);
+    const tableIds = view.root.children?.map((n) => n.id) ?? [];
+    expect(tableIds).toContain('table-User');
+    expect(tableIds).toContain('table-Log');
+
+    const userColumn = view.root.children
+      ?.find((n) => n.id === 'table-User')
+      ?.children?.find((n) => n.id === 'columns-User')
+      ?.children?.find((n) => n.id === 'column-User-id');
+    expect(userColumn?.label).toBe('id: int4 (not nullable)');
   });
 });

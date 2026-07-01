@@ -48,7 +48,6 @@ import type { SqlSchemaIRNode, SqlTableIR } from '@prisma-next/sql-schema-ir/typ
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlControlAdapter } from './control-adapter';
-import { namespaceSchemaNodes } from './diff/sql-schema-diff';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
 import type {
   DiffDatabaseSchemaInput,
@@ -945,13 +944,28 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
 
     toSchemaView(schema: SqlSchemaIRNode): CoreSchemaView {
-      // Walk root → namespaces → tables into one flat list of table nodes. The
-      // single-schema common case (one namespace node) renders the same
-      // table-level view as today — no synthetic namespace level. A flat schema
-      // (SQLite) is its own single namespace.
-      const tableEntries: ReadonlyArray<[string, SqlTableIR]> = namespaceSchemaNodes(
-        schema,
-      ).flatMap((namespace) => Object.entries(namespace.tables));
+      // Walk the schema-IR tree's own structure (root → namespaces → tables)
+      // into one flat list of table nodes. A root that exposes a `namespaces`
+      // record (Postgres) contributes each namespace's tables; a flat root
+      // (SQLite) is its own single namespace. The single-schema common case
+      // renders the same table-level view as today — no synthetic namespace
+      // level.
+      const root = blindCast<
+        {
+          readonly namespaces?: Readonly<
+            Record<string, { readonly tables: Record<string, SqlTableIR> }>
+          >;
+          readonly tables?: Record<string, SqlTableIR>;
+        },
+        'structural read of the schema-IR tree own namespaces/tables records'
+      >(schema);
+      const tableRecords: ReadonlyArray<Record<string, SqlTableIR>> =
+        root.namespaces !== undefined
+          ? Object.values(root.namespaces).map((namespace) => namespace.tables)
+          : [root.tables ?? {}];
+      const tableEntries: ReadonlyArray<[string, SqlTableIR]> = tableRecords.flatMap((tables) =>
+        Object.entries(tables),
+      );
       const tableNodes: readonly SchemaTreeNode[] = tableEntries.map(
         ([tableName, table]: [string, SqlTableIR]) => {
           const children: SchemaTreeNode[] = [];
