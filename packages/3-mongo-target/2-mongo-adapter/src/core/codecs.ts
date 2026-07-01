@@ -6,7 +6,7 @@ import {
   mongoCodec,
   newMongoCodecRegistry,
 } from '@prisma-next/mongo-codec';
-import { ObjectId } from 'mongodb';
+import { ObjectId } from 'bson';
 import {
   MONGO_BOOLEAN_CODEC_ID,
   MONGO_DATE_CODEC_ID,
