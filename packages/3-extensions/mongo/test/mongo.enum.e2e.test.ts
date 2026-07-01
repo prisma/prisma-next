@@ -64,6 +64,12 @@ const codecLookup: CodecLookup = {
   targetTypesFor: (id: string) => mongoTargetTypes[id],
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,
+  // Enum field types are produced through the codec seam (TML-2952): the emitter
+  // renders each value-set value via `renderValueTypeFor`. `mongo/string@1` is an
+  // identity codec, so it renders the encoded string straight to a quoted literal —
+  // mirroring the real `mongo/string@1` descriptor's `renderValueType`.
+  renderValueTypeFor: (id, value) =>
+    id === 'mongo/string@1' && typeof value === 'string' ? `'${value}'` : undefined,
 };
 
 // Derive the $jsonSchema validator from the contract via the production deriver.
@@ -287,6 +293,8 @@ describe('emit-then-consume: value-union narrowing through the emitted contract.
       mongoEmission,
       mongoCodecImports,
       testHashes,
+      undefined,
+      codecLookup,
     );
 
     const outputMap = dts.slice(
@@ -311,6 +319,8 @@ describe('emit-then-consume: value-union narrowing through the emitted contract.
       mongoEmission,
       mongoCodecImports,
       testHashes,
+      undefined,
+      codecLookup,
     );
 
     const outputMap = dts.slice(
@@ -329,6 +339,8 @@ describe('emit-then-consume: value-union narrowing through the emitted contract.
       mongoEmission,
       mongoCodecImports,
       testHashes,
+      undefined,
+      codecLookup,
     );
 
     const outputMap = dts.slice(
@@ -347,6 +359,8 @@ describe('emit-then-consume: value-union narrowing through the emitted contract.
       mongoEmission,
       mongoCodecImports,
       testHashes,
+      undefined,
+      codecLookup,
     );
 
     // The emitted contract.d.ts must carry the enum entity in the domain namespace

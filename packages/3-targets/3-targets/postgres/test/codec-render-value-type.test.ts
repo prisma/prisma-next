@@ -1,0 +1,94 @@
+import type { AnyCodecDescriptor } from '@prisma-next/framework-components/codec';
+import { describe, expect, it } from 'vitest';
+import {
+  pgBoolDescriptor,
+  pgFloat4Descriptor,
+  pgFloat8Descriptor,
+  pgInt2Descriptor,
+  pgInt4Descriptor,
+  pgInt8Descriptor,
+  pgTextDescriptor,
+  pgTimestampDescriptor,
+} from '../src/core/codecs';
+
+function valueRendererFor(
+  descriptor: AnyCodecDescriptor,
+): ((encodedValue: unknown, channel: 'output' | 'input') => string | undefined) | undefined {
+  return descriptor.renderValueType as
+    | ((encodedValue: unknown, channel: 'output' | 'input') => string | undefined)
+    | undefined;
+}
+
+describe('codec renderValueType', () => {
+  describe('pg/text@1', () => {
+    const renderer = valueRendererFor(pgTextDescriptor);
+
+    it('renders a quoted string literal for output', () => {
+      expect(renderer?.('low', 'output')).toBe("'low'");
+    });
+
+    it('renders a quoted string literal for input', () => {
+      expect(renderer?.('high', 'input')).toBe("'high'");
+    });
+
+    it('escapes single quotes in string values', () => {
+      expect(renderer?.("it's", 'output')).toBe("'it\\'s'");
+    });
+  });
+
+  describe('pg/int4@1', () => {
+    const renderer = valueRendererFor(pgInt4Descriptor);
+
+    it('renders a numeric literal', () => {
+      expect(renderer?.(1, 'output')).toBe('1');
+    });
+
+    it('renders zero', () => {
+      expect(renderer?.(0, 'output')).toBe('0');
+    });
+  });
+
+  describe('pg/int2@1', () => {
+    it('renders a numeric literal', () => {
+      expect(valueRendererFor(pgInt2Descriptor)?.(42, 'output')).toBe('42');
+    });
+  });
+
+  describe('pg/int8@1', () => {
+    it('renders a numeric literal', () => {
+      expect(valueRendererFor(pgInt8Descriptor)?.(100, 'output')).toBe('100');
+    });
+  });
+
+  describe('pg/float4@1', () => {
+    it('renders a numeric literal', () => {
+      expect(valueRendererFor(pgFloat4Descriptor)?.(1.5, 'output')).toBe('1.5');
+    });
+  });
+
+  describe('pg/float8@1', () => {
+    it('renders a numeric literal', () => {
+      expect(valueRendererFor(pgFloat8Descriptor)?.(3.14, 'output')).toBe('3.14');
+    });
+  });
+
+  describe('pg/bool@1', () => {
+    const renderer = valueRendererFor(pgBoolDescriptor);
+
+    it('renders true literal', () => {
+      expect(renderer?.(true, 'output')).toBe('true');
+    });
+
+    it('renders false literal', () => {
+      expect(renderer?.(false, 'output')).toBe('false');
+    });
+  });
+
+  describe('non-narrowable codecs', () => {
+    it('pg/timestamp@1 returns undefined (Date output is not a literal)', () => {
+      expect(
+        valueRendererFor(pgTimestampDescriptor)?.('2024-01-01T00:00:00.000Z', 'output'),
+      ).toBeUndefined();
+    });
+  });
+});

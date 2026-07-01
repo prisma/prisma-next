@@ -1,3 +1,4 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecDescriptor, CodecTrait } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import {
@@ -84,12 +85,29 @@ export const mongoStandardCodecs = [
  *
  * Wraps an existing {@link MongoCodec} instance into a descriptor whose factory hands out the same shared codec. Mongo's full migration to descriptor-first authoring is tracked under TML-2324; for now the descriptor view is composed from the existing `mongoCodec()` outputs.
  */
+/**
+ * Renders a codec-encoded value as a TS literal. Valid only for identity codecs whose `encodeJson`
+ * output equals their decoded output type (string, double, int32, boolean) — it renders the
+ * encoded value directly. Used by the interim Mongo enum-field typing (removed by TML-2953).
+ */
+function renderPrimitiveLiteral(value: JsonValue): string | undefined {
+  if (typeof value === 'string') {
+    const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return `'${escaped}'`;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return undefined;
+}
+
 function descriptorFor<Id extends string>(
   codec: MongoCodec<Id, readonly CodecTrait[]>,
   metadata: {
     readonly traits: readonly CodecTrait[];
     readonly targetTypes: readonly string[];
     readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
+    readonly renderValueType?: CodecDescriptor['renderValueType'];
   },
 ): CodecDescriptor {
   // The descriptor's `P` is structurally `Record<string, unknown>` for codecs that take params (Mongo `vector`); non-parameterized codecs ignore the slot. Cast through `unknown` to fit the `CodecDescriptor` slot's `(params: P) => …` typing without leaking a per-codec `P` into the heterogeneous descriptor list.
@@ -104,6 +122,9 @@ function descriptorFor<Id extends string>(
     isParameterized: false,
     factory: (() => () => codec) as CodecDescriptor['factory'],
     ...(renderOutputType !== undefined ? { renderOutputType } : {}),
+    ...(metadata.renderValueType !== undefined
+      ? { renderValueType: metadata.renderValueType }
+      : {}),
   };
 }
 
@@ -129,16 +150,23 @@ export const mongoCodecDescriptors: ReadonlyArray<CodecDescriptor> = [
   descriptorFor(mongoStringCodec, {
     traits: ['equality', 'order', 'textual'],
     targetTypes: ['string'],
+    renderValueType: renderPrimitiveLiteral,
   }),
   descriptorFor(mongoDoubleCodec, {
     traits: ['equality', 'order', 'numeric'],
     targetTypes: ['double'],
+    renderValueType: renderPrimitiveLiteral,
   }),
   descriptorFor(mongoInt32Codec, {
     traits: ['equality', 'order', 'numeric'],
     targetTypes: ['int'],
+    renderValueType: renderPrimitiveLiteral,
   }),
-  descriptorFor(mongoBooleanCodec, { traits: ['equality', 'boolean'], targetTypes: ['bool'] }),
+  descriptorFor(mongoBooleanCodec, {
+    traits: ['equality', 'boolean'],
+    targetTypes: ['bool'],
+    renderValueType: renderPrimitiveLiteral,
+  }),
   descriptorFor(mongoDateCodec, { traits: ['equality', 'order'], targetTypes: ['date'] }),
   descriptorFor(mongoVectorCodec, {
     traits: ['equality'],

@@ -730,6 +730,32 @@ describe('extractCodecLookup', () => {
       expect.objectContaining({ code: 'CONTRACT.CODEC_DESCRIPTOR_MISSING' }),
     );
   });
+
+  it('renderValueTypeFor delegates to the descriptor renderValueType', () => {
+    const descriptorWithValueRenderer: AnyCodecDescriptor = {
+      ...stubDescriptor('text@1'),
+      renderValueType: (value: unknown) => (typeof value === 'string' ? `'${value}'` : undefined),
+    };
+    const lookup = extractCodecLookup([
+      { id: 'desc', types: { codecTypes: { codecDescriptors: [descriptorWithValueRenderer] } } },
+    ]);
+    expect(lookup.renderValueTypeFor?.('text@1', 'low', 'output')).toBe("'low'");
+    expect(lookup.renderValueTypeFor?.('text@1', 42, 'output')).toBeUndefined();
+  });
+
+  it('renderValueTypeFor returns undefined for unknown codec ids', () => {
+    const lookup = extractCodecLookup([
+      { id: 'desc', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
+    ]);
+    expect(lookup.renderValueTypeFor?.('unknown@1', 'val', 'output')).toBeUndefined();
+  });
+
+  it('renderValueTypeFor returns undefined when the codec has no renderValueType', () => {
+    const lookup = extractCodecLookup([
+      { id: 'desc', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
+    ]);
+    expect(lookup.renderValueTypeFor?.('a@1', 'val', 'output')).toBeUndefined();
+  });
 });
 
 describe('assembleScalarTypeDescriptors', () => {
