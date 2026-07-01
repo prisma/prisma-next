@@ -1,7 +1,6 @@
 # Native Postgres enums — plan
 
 **Spec:** [`spec.md`](spec.md) · **Designs:** [`specs/authoring-design.md`](specs/authoring-design.md), [`specs/querying-design.md`](specs/querying-design.md), [`specs/migration-design.md`](specs/migration-design.md)
-**Linear project:** _(to create on approval — see § Tracker)_
 
 ## At a glance
 
@@ -11,120 +10,115 @@ Postgres type the database already owns; Prisma Next represents it, types the co
 it, exposes its members at runtime, and emits **no DDL**. This is the primary deliverable and
 what unblocks Supabase.
 
-Almost everything is **reuse**. The PSL block reuses the existing variadic `enum`-block
-mechanism; typing reuses `StorageColumnTypes`; runtime access reuses `EnumAccessor`; the cast
-reuses the adapter's `nativeType` mechanism. The genuinely-new code is small: a `native_enum`
-pack entity (via the generic entity mechanism, RLS template), a `pg.enum` codec, one
-per-column `nativeType` threaded to the cast, and a `db.native_enums` facade root.
+The mechanism is a **parameterized codec, exactly like `vector(N)`.** `pg.enum(AalLevel)` binds
+a column to the `pg/enum@1` codec, parameterized by the enum's values (+ its Postgres type
+name), resolved from the `native_enum` block at authoring time. **Typing is parameterized-codec
+typing** — the codec's output type *is* the value union, for both the emitted contract and
+`typeof contract`. There is **no value-set** on the native path (that is the check-enum path)
+and no dependency on the enum-typing refactor (TML-2952/2953). Runtime member access is a new
+Postgres-only `db.native_enums` root; `db.enums` is untouched.
+
+The genuinely-new code is small: the `pg/enum@1` parameterized codec, the per-column type name
+reaching the SQL cast, the `native_enum` pack entity (via the generic pack-entity mechanism —
+the RLS template, no custom seams), and the `db.native_enums` root.
 
 **PN-managed native enums** (PN creates/drops the type, migrates `ADD VALUE`) are a **separate,
 later effort** — sketched in § Future, and may never be built. The MVP deliberately ships no
-SchemaIR node, no diff, and no ops: external enums are simply never diffed, so `db verify`
-emits nothing for them for free.
-
-Each slice is a vertical: authoring → typed read / runtime access, with an end-to-end test.
+SchemaIR node, no diff, no ops: external enums are never diffed, so `db verify` emits nothing
+for them for free.
 
 ## Slices (MVP — external Supabase enums, no DDL)
 
-### Slice 1 — `native-enum-representation-and-typed-column`
-- **Outcome:** A `native_enum` block authored in PSL (and its TS mirror) lowers to a storage
-  `native_enum` entity, and a column bound to it via the `pg.enum(Ref)` codec reads/writes as
-  the **value union** (`'aal1' | 'aal2' | 'aal3'`, not `string`) across query builder, ORM,
-  emitted contract, and the no-emit (`typeof contract`) path — with generated SQL carrying the
-  `$N::<type>` cast. Members are authored `key = value` (bare members rejected). The enum is
-  graded `external` (no DDL — and in the MVP there is no diff to emit from).
+### Slice 1 — `native-enum-representation-typing-and-access`
+- **Outcome:** A `native_enum` block (PSL + its TS mirror) lowers to a storage `native_enum`
+  entity, and a column bound to it via `pg.enum(Ref)` reads/writes as the **value union**
+  (`'aal1' | 'aal2' | 'aal3'`, not `string`) across query builder, ORM, emitted contract, and
+  the no-emit (`typeof contract`) path — with generated SQL carrying the `$N::<type>` cast; and
+  `db.native_enums.<ns>.<Name>` exposes the members at runtime. Members are authored
+  `key = "value"` (bare members rejected). Graded `external` (no DDL — and no diff in the MVP).
 - **New code (all via existing mechanisms):**
-  - **`native_enum` pack entity** — a `postgresAuthoringEntityTypes` entry + a variadic block
-    descriptor (`{ parameters: {}, variadicParameters: true }`, the shipping SQL `enum`-block
-    shape) + a lowering factory that **requires `key = value` members** (rejects bare),
-    stamps `typeName` from `@@map`, preserves member order, sets the control grade, and derives
-    the value-set.
-  - **the `pg/enum@1` codec** — a parameterized text codec whose param is a `native_enum` ref;
-    resolves the ref for its per-instance `nativeType` and its value list. (Text passthrough;
-    the type enforces membership — no runtime value check.)
-  - **the cast wiring** — stamp `columnDef.nativeType` onto the `CodecRef` in
-    `codecRefForStorageColumn` (dropped there today) and have `renderTypedParam` prefer a
-    ref-carried `nativeType` over the static `metaFor(codecId)` meta. The adapter already casts
-    by `nativeType`; this just stops discarding the per-column value.
-- **Reused as-is:** typing via `StorageColumnTypes` (value-set → union) + no-emit
-  `StorageColumnChannelTypes`; the variadic PSL block mechanism (`variadicParameters`); the
-  parameterized-codec + `AstCodecResolver` plumbing; `pg.enum`'s ref rides `typeParams`.
+  - **the `pg/enum@1` parameterized codec** — the `vector(N)` descriptor template
+    (`CodecDescriptorImpl` + `paramsSchema` + `factory` + `renderOutputType`). Params carry the
+    enum's values (+ type name); `renderOutputType(params)` returns the value union; text
+    passthrough encode/decode (the type enforces membership — no runtime value check).
+    Registered into the Postgres pack's `codecDescriptors`.
+  - **the `native_enum` pack entity** — a `postgresAuthoringEntityTypes` entry + a variadic
+    block descriptor (`{ parameters: {}, variadicParameters: true }`, the shipping SQL
+    `enum`-block shape) + a lowering factory that **requires `key = "value"` members** (rejects
+    bare), stamps `typeName` from `@@map`, preserves member order, sets the control grade, and
+    lands the entity at `storage.entries.native_enum[Name]` (IR node + arktype validator +
+    serializer, the `PostgresRole` template).
+  - **`pg.enum(Ref)` resolution** — postgres-specific field lowering resolves the `AalLevel`
+    reference against the `native_enum` block in the same document and bakes its values + type
+    name into the column (`codecId: 'pg/enum@1'`, `typeParams: { values }`, `nativeType`). Not
+    the generic scalar-only type-constructor template.
+  - **the cast wiring** — thread the per-column `nativeType` to the SQL cast: stamp
+    `columnDef.nativeType` onto the `CodecRef` in `codecRefForStorageColumn` (dropped there
+    today), and have `renderTypedParam` prefer a ref-carried `nativeType` over the static
+    `metaFor(codecId)` meta. The adapter already casts by `nativeType`; this stops discarding
+    the per-column value.
+  - **`db.native_enums`** — a `buildNamespacedNativeEnums(contract.storage)` analog of
+    `buildNamespacedEnums` over the `native_enum` entities, attached to the Postgres client
+    **only**, reusing `createEnumAccessor`/`EnumAccessor`; typed for **both** emitted and
+    no-emit. `db.enums` is untouched.
+- **Reused as-is:** the parameterized-codec descriptor + `AstCodecResolver` plumbing (the
+  `vector(N)` path — typing, encode/decode, resolution); the variadic PSL block mechanism
+  (`variadicParameters`); the pack-entity authoring + `composeSqlEntityKinds` + serializer
+  (RLS template); the `EnumAccessor` mechanics.
 - **Builds on:** nothing (foundation).
-- **Hands to:** the `native_enum` storage entity + `pg.enum` column shape that slices 2 and 3
-  consume.
+- **Hands to:** the `native_enum` entity + `pg.enum` column shape + `db.native_enums` that the
+  Supabase slice consumes.
 - **Proven by:** an authored fixture (PSL + TS, byte-identical) with a `native_enum` + a column
-  using it → type-tests asserting the union (QB, ORM, `StorageColumnTypes`, no-emit), negative
-  tests for out-of-set input and for a bare member, and an execution test asserting the
-  `$N::<type>` cast in generated SQL. `fixtures:check`.
+  using it → type-tests asserting the union (QB, ORM, and `typeof contract` no-emit), negative
+  tests for out-of-set input and for a bare member, an execution test asserting `$N::<type>` in
+  generated SQL, and a runtime test for `db.native_enums.…members`. `fixtures:check`.
 
-### Slice 2 — `db-native-enums-accessor`
-- **Outcome:** `db.native_enums.<ns>.<Name>` exposes each native enum's members at runtime
-  (`values`/`names`/`members`/`has`/`hasName`/`nameOf`/`ordinalOf`), typed in **both** the
-  emitted-`contract.d.ts` and no-emit (`typeof contract`) paths. `db.enums` is unchanged.
-- **New code:** a `db.native_enums` facade root — a `buildNamespacedNativeEnums(contract.storage)`
-  analog of `buildNamespacedEnums` over the storage `native_enum` entities, attached to the
-  Postgres client **only**, reusing `createEnumAccessor`/`EnumAccessor`; and a
-  `NativeEnums<TContract>` type derived over the storage `native_enum` block (emitted) and the
-  authored handles (no-emit).
-- **Reused as-is:** the `EnumAccessor` / `ContractEnumAccessor` shape and mechanics.
-- **Builds on:** slice 1 (the `native_enum` entity).
-- **Hands to:** runtime member access used by the Supabase example (slice 3).
-- **Proven by:** runtime tests (`db.native_enums.auth.AalLevel.members.aal1 === 'aal1'`,
-  `.has(...)`, `.values`) + type-tests for both emitted and no-emit; Postgres-only (assert the
-  field is absent on Mongo/SQLite clients).
-
-### Slice 3 — `supabase-native-enums`
+### Slice 2 — `supabase-native-enums`
 - **Outcome:** The Supabase extension declares its built-in native enums in
   `packages/3-extensions/supabase/src/contract/contract.prisma`; the supabase example uses one
-  on a column and reads it as a typed union with `db.native_enums` access; `db verify` /
-  migration emits nothing for the type (external, and un-diffed in the MVP).
+  on a column, reads it as a typed union, and reaches its members via `db.native_enums`;
+  `db verify` / migration emits nothing for the type (external, and un-diffed in the MVP).
 - **New code:** the `native_enum` declarations in the Supabase extension's contract + example
   usage; ordered members transcribed from the real Supabase types.
-- **Reused as-is:** slices 1–2; the extension authoring path.
-- **Builds on:** slices 1 and 2.
+- **Reused as-is:** slice 1; the extension authoring path.
+- **Builds on:** slice 1.
 - **Hands to:** the shipped external-enum capability (the project's purpose).
 - **Proven by:** the supabase example end-to-end — a Supabase-defined native enum represented,
   typed read + `db.native_enums`, and `db verify` reporting nothing for it.
 
 ## Sequencing
-- **Slice 1 first** — the foundation; 2 and 3 consume its entity + column shape.
-- **Slices 2 and 3 parallelize** after slice 1 (runtime accessor vs Supabase integration are
-  independent). Slice 3's example wires in slice 2's accessor when 2 lands; if that split is
-  awkward, sequence 3 after 2. Default: parallel.
-- No phase boundary inside the MVP — all three slices are external-only and independently
-  shippable increments toward the same capability.
+- **Slice 1 first** — the foundation; slice 2 consumes its entity + column + accessor.
+- **Slice 2 after.** Two slices, one stack thread; no parallelism worth modelling.
 
 ## Future (separate project — may never be built): PN-managed native enums
 Deferred, and only if a real need appears beyond Supabase. Sketch — full design in
 [`specs/migration-design.md`](specs/migration-design.md):
 - SchemaIR `PostgresNativeEnum` `DiffableNode` + Contract→SchemaIR projection (the RLS
   `PostgresRole` template).
-- Generic-differ integration: **order-aware**; accept only a pure suffix-append → `ADD VALUE`;
+- Order-aware generic-differ integration: accept only a pure suffix-append → `ADD VALUE`;
   **reject rename, remove, and reorder** with a diagnostic. external-grade suppression (needed
   once the projection exists).
 - Ops: `CREATE TYPE` / `DROP TYPE` / `ALTER TYPE … ADD VALUE` (no `RENAME VALUE`).
 - Adoption: contract-infer emits a **`managed`** `native_enum` (all inference is managed;
   ordered values from `pg_enum.enumsortorder`) instead of throwing.
 
-This is roughly three slices and its own project. Do not start it without a fresh triage and
-operator go-ahead.
+Roughly three slices and its own project. Do not start without a fresh triage and operator
+go-ahead.
 
 ## Dependencies (external)
+- **Parameterized-codec plumbing** — `CodecDescriptorImpl`, `renderOutputType`,
+  `AstCodecResolver`, the codec registry (`vector(N)` ships on it). Landed.
 - **Pack-entity + variadic-block mechanisms** — `postgresAuthoringEntityTypes`,
-  `variadicParameters` block descriptors, `composeSqlEntityKinds`. Landed (RLS and the SQL
+  `variadicParameters` block descriptors, `composeSqlEntityKinds`. Landed (RLS + the SQL
   `enum` block ship on them).
-- **`StorageColumnTypes`** (TML-2886) — landed; slice 1's typing rides it.
-- **enum-typing-via-codec refactor (TML-2952/2953)** — parallel-safe, **not** a dependency:
-  native typing already lands via `StorageColumnTypes`, and enum codecs are text/identity so
-  the codec-driven union is identical. Rebase-coordinate only.
+- **enum-typing refactor (TML-2952/2953)** — **not** a dependency and not on the native path:
+  native columns are typed by the `pg.enum` codec, not the value-set. No coupling.
 
 ## Tracker
-Not yet created. On approval of this plan: create the Linear project "Native Postgres enums"
-and one issue per MVP slice (no sub-issues — project + relations + labels per repo convention).
-Hold until the operator approves the spec + this plan.
+Linear intentionally skipped (operator call). Slices tracked here in-repo only.
 
 ## Residue (already handled)
 The dead TML-2853 validator (`postgres-enum-type-schema.ts`) is **already deleted** (commit
-`5194b18b4`). The `ISSUE_KIND_ORDER` keys (`type_missing`/`type_values_mismatch`/
-`enum_values_changed`) were checked and are **live generic infrastructure, kept** — not
-residue. No custom seams: `native_enum` rides the generic pack-entity mechanism.
+`5194b18b4`). The `ISSUE_KIND_ORDER` keys are **live generic infrastructure, kept** — not
+residue. No custom seams: `native_enum` rides the generic pack-entity mechanism; `pg.enum`
+rides the parameterized-codec mechanism.
