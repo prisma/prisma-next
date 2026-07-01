@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { clearCart } from '../../../src/data/carts';
 import { createOrder, getUserOrders } from '../../../src/data/orders';
-import { getDb } from '../../../src/db-singleton';
+import { getDb } from '../../../src/db';
+import { enums } from '../../../src/enums';
 import { getAuthUserId } from '../../../src/lib/auth';
 
 export async function GET() {
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
     userId,
     items: body.items,
     shippingAddress: body.shippingAddress,
-    type: body.type ?? 'home',
+    type: body.type ?? enums.OrderType.members.Delivery,
     statusHistory: [{ status: 'placed', timestamp: new Date() }],
   });
   await clearCart(db, userId);

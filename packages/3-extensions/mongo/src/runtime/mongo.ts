@@ -6,8 +6,8 @@ import type {
   MongoContract,
   MongoContractWithTypeMaps,
 } from '@prisma-next/mongo-contract';
-import type { MongoOrmClient, MongoQueryPlan } from '@prisma-next/mongo-orm';
-import { mongoOrm } from '@prisma-next/mongo-orm';
+import type { MongoOrmClient, MongoQueryPlan, MongoRawClient } from '@prisma-next/mongo-orm';
+import { mongoOrm, mongoRaw } from '@prisma-next/mongo-orm';
 import type { MongoMiddleware, MongoRuntime } from '@prisma-next/mongo-runtime';
 import { createMongoRuntime, type MongoExecutionContext } from '@prisma-next/mongo-runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -29,9 +29,11 @@ export interface MongoClient<
 > {
   readonly orm: MongoOrmClient<TContract>;
   readonly query: MongoStaticContext<TContract>['query'];
+  readonly raw: MongoRawClient<TContract>;
   readonly contract: TContract;
   readonly enums: UnboundEnums<TContract>;
   readonly context: MongoExecutionContext<TContract>;
+  execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row>;
   connect(bindingInput?: MongoBindingInput): Promise<MongoRuntime>;
   runtime(): Promise<MongoRuntime>;
   close(): Promise<void>;
@@ -165,25 +167,29 @@ export default function mongo<
     return runtimePromise;
   };
 
+  function execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row> {
+    async function* iterate(): AsyncGenerator<Row, void, unknown> {
+      const runtime = await getRuntime();
+      yield* runtime.execute(plan);
+    }
+    return new AsyncIterableResult(iterate());
+  }
+
   const orm = mongoOrm<TContract>({
     contract,
-    executor: {
-      execute<Row>(plan: MongoQueryPlan<Row>) {
-        async function* iterate(): AsyncGenerator<Row, void, unknown> {
-          const runtime = await getRuntime();
-          yield* runtime.execute(plan);
-        }
-        return new AsyncIterableResult(iterate());
-      },
-    },
+    executor: { execute },
   });
+
+  const raw = mongoRaw<TContract>({ contract });
 
   return {
     orm,
     query,
+    raw,
     contract,
     enums,
     context,
+    execute,
 
     async connect(bindingInput?: MongoBindingInput): Promise<MongoRuntime> {
       if (closed) {

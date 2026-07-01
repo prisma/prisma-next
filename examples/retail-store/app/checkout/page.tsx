@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../src/components/u
 import { Separator } from '../../src/components/ui/separator';
 import { getCartByUserId } from '../../src/data/carts';
 import { findLocations } from '../../src/data/locations';
-import { getDb } from '../../src/db-singleton';
+import { getDb } from '../../src/db';
 import { getAuthUser, getAuthUserId } from '../../src/lib/auth';
 import { CheckoutForm } from './checkout-form';
 

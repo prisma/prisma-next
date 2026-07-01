@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { getRandomProducts } from '../../../../src/data/products';
-import { getDb } from '../../../../src/db-singleton';
+import { getDb } from '../../../../src/db';
 
 export async function GET(req: NextRequest) {
   const raw = req.nextUrl.searchParams.get('count');

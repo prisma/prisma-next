@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { createUser } from '../../../../src/data/users';
-import { getDb } from '../../../../src/db-singleton';
+import { getDb } from '../../../../src/db';
 
 export async function POST() {
   const db = await getDb();

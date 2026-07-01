@@ -4,7 +4,7 @@ import { AddToCartButton } from '../../../src/components/add-to-cart-button';
 import { Badge } from '../../../src/components/ui/badge';
 import { Card, CardContent, CardHeader } from '../../../src/components/ui/card';
 import { findProductById } from '../../../src/data/products';
-import { getDb } from '../../../src/db-singleton';
+import { getDb } from '../../../src/db';
 
 export const dynamic = 'force-dynamic';
 

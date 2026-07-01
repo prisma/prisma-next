@@ -17,7 +17,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:24e1562cabc8241f7fd50b830ce29ea955b5cd668488fbfb5d6744b48d174d14'>;
+  StorageHashBase<'sha256:71f1cc5c3f4de1ea7c9c8426fde682cd78c7c005f6688f58c2d9d6ddd8b2284c'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510'>;
@@ -138,7 +138,7 @@ export type FieldOutputTypes = {
       readonly userId: CodecTypes['mongo/objectId@1']['output'];
       readonly items: ReadonlyArray<OrderLineItemOutput>;
       readonly shippingAddress: CodecTypes['mongo/string@1']['output'];
-      readonly type: 'delivery' | 'pickup';
+      readonly type: CodecTypes['mongo/string@1']['output'];
       readonly statusHistory: ReadonlyArray<StatusEntryOutput>;
     };
     readonly Product: {
@@ -153,7 +153,7 @@ export type FieldOutputTypes = {
       readonly price: PriceOutput;
       readonly image: ImageOutput;
       readonly embedding: ReadonlyArray<CodecTypes['mongo/double@1']['output']> | null;
-      readonly status: 'active' | 'discontinued' | 'out-of-stock';
+      readonly status: CodecTypes['mongo/string@1']['output'];
     };
     readonly SearchEvent: { readonly query: CodecTypes['mongo/string@1']['output'] };
     readonly User: {
@@ -210,7 +210,7 @@ export type FieldInputTypes = {
       readonly userId: CodecTypes['mongo/objectId@1']['input'];
       readonly items: ReadonlyArray<OrderLineItemInput>;
       readonly shippingAddress: CodecTypes['mongo/string@1']['input'];
-      readonly type: 'delivery' | 'pickup';
+      readonly type: CodecTypes['mongo/string@1']['input'];
       readonly statusHistory: ReadonlyArray<StatusEntryInput>;
     };
     readonly Product: {
@@ -225,7 +225,7 @@ export type FieldInputTypes = {
       readonly price: PriceInput;
       readonly image: ImageInput;
       readonly embedding: ReadonlyArray<CodecTypes['mongo/double@1']['input']> | null;
-      readonly status: 'active' | 'discontinued' | 'out-of-stock';
+      readonly status: CodecTypes['mongo/string@1']['input'];
     };
     readonly SearchEvent: { readonly query: CodecTypes['mongo/string@1']['input'] };
     readonly User: {
@@ -531,10 +531,7 @@ type ContractBase = Omit<
                       };
                     };
                     readonly shippingAddress: { readonly bsonType: 'string' };
-                    readonly type: {
-                      readonly bsonType: 'string';
-                      readonly enum: readonly ['delivery', 'pickup'];
-                    };
+                    readonly type: { readonly bsonType: 'string' };
                     readonly statusHistory: {
                       readonly bsonType: 'array';
                       readonly items: {
@@ -626,10 +623,7 @@ type ContractBase = Omit<
                       readonly bsonType: 'array';
                       readonly items: { readonly bsonType: 'double' };
                     };
-                    readonly status: {
-                      readonly bsonType: 'string';
-                      readonly enum: readonly ['active', 'discontinued', 'out-of-stock'];
-                    };
+                    readonly status: { readonly bsonType: 'string' };
                   };
                   readonly additionalProperties: false;
                   readonly required: readonly [
@@ -1210,23 +1204,6 @@ type ContractBase = Omit<
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/double@1' };
               };
             };
-          };
-        };
-        readonly enum: {
-          readonly ProductStatus: {
-            readonly codecId: 'mongo/string@1';
-            readonly members: readonly [
-              { readonly name: 'Active'; readonly value: 'active' },
-              { readonly name: 'Discontinued'; readonly value: 'discontinued' },
-              { readonly name: 'OutOfStock'; readonly value: 'out-of-stock' },
-            ];
-          };
-          readonly OrderType: {
-            readonly codecId: 'mongo/string@1';
-            readonly members: readonly [
-              { readonly name: 'Delivery'; readonly value: 'delivery' },
-              { readonly name: 'Pickup'; readonly value: 'pickup' },
-            ];
           };
         };
       };

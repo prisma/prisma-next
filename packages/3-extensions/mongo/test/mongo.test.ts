@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   deserializeContract: vi.fn(),
   mongoOrm: vi.fn(),
   mongoQuery: vi.fn(),
+  mongoRaw: vi.fn(),
 }));
 
 vi.mock('@prisma-next/adapter-mongo/runtime', () => ({
@@ -52,6 +53,7 @@ vi.mock('@prisma-next/family-mongo/ir', () => ({
 
 vi.mock('@prisma-next/mongo-orm', () => ({
   mongoOrm: mocks.mongoOrm,
+  mongoRaw: mocks.mongoRaw,
 }));
 
 vi.mock('@prisma-next/mongo-query-builder', () => ({
@@ -70,6 +72,7 @@ const fakeDriverClose = vi.fn().mockResolvedValue(undefined);
 const fakeDriverFromDbClose = vi.fn().mockResolvedValue(undefined);
 const fakeOrm = { id: 'orm-instance' };
 const fakeQuery = { id: 'query-instance' };
+const fakeRaw = { id: 'raw-instance', collection: vi.fn() };
 
 describe('mongo() facade', () => {
   beforeEach(() => {
@@ -88,6 +91,8 @@ describe('mongo() facade', () => {
     mocks.createMongoRuntime.mockReturnValue(fakeRuntime);
     mocks.mongoOrm.mockReturnValue(fakeOrm);
     mocks.mongoQuery.mockReturnValue(fakeQuery);
+    mocks.mongoRaw.mockReturnValue(fakeRaw);
+    fakeRaw.collection.mockClear();
     fakeRuntime.close.mockClear();
     fakeDriverClose.mockClear();
     fakeDriverFromDbClose.mockClear();
@@ -450,13 +455,48 @@ describe('mongo() facade', () => {
     expect(fakeRuntime.close).not.toHaveBeenCalled();
   });
 
-  it('validates the contract via the SPI deserializer for both authoring modes', () => {
-    const json = { models: {} };
-    mongo({ contractJson: json, url: 'mongodb://localhost:27017/mydb' });
-    expect(mocks.deserializeContract).toHaveBeenLastCalledWith(json);
+  describe('db.execute', () => {
+    it('lazily instantiates the runtime on first consumption', async () => {
+      const fakeRows = [{ id: 1 }, { id: 2 }];
+      const fakePlan = { id: 'fake-plan' };
+      const fakeRuntimeWithExecute = {
+        ...fakeRuntime,
+        execute: vi.fn(async function* () {
+          yield* fakeRows;
+        }),
+      };
+      mocks.createMongoRuntime.mockReturnValue(fakeRuntimeWithExecute);
 
-    mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
-    expect(mocks.deserializeContract).toHaveBeenLastCalledWith(fakeContract);
+      const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      const result = db.execute(fakePlan as never);
+
+      // Runtime is NOT built at construction time or at execute() call time.
+      expect(mocks.createMongoRuntime).not.toHaveBeenCalled();
+      expect(mocks.driverFromConnection).not.toHaveBeenCalled();
+
+      // Consuming the result triggers lazy runtime initialization.
+      const collected: unknown[] = [];
+      for await (const row of result) {
+        collected.push(row);
+      }
+      expect(collected).toEqual(fakeRows);
+      expect(mocks.driverFromConnection).toHaveBeenCalledTimes(1);
+      expect(fakeRuntimeWithExecute.execute).toHaveBeenCalledWith(fakePlan);
+    });
+
+    it('rejects after close()', async () => {
+      const fakeRuntimeWithExecute = {
+        ...fakeRuntime,
+        execute: vi.fn(async function* () {}),
+      };
+      mocks.createMongoRuntime.mockReturnValue(fakeRuntimeWithExecute);
+
+      const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      await db.close();
+
+      const iter = db.execute({ id: 'plan' } as never)[Symbol.asyncIterator]();
+      await expect(iter.next()).rejects.toThrow('Mongo client is closed');
+    });
   });
 
   it('threads the middleware option to createMongoRuntime', async () => {

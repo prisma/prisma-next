@@ -1,21 +1,26 @@
 import { createCacheMiddleware } from '@prisma-next/middleware-cache';
 import mongo from '@prisma-next/mongo/runtime';
-import { mongoRaw } from '@prisma-next/mongo-orm';
-import type { MongoRuntime } from '@prisma-next/mongo-runtime';
 import type { Contract } from './contract';
 import contractJson from './contract.json' with { type: 'json' };
 
-export async function createClient(connectionUri: string, dbName: string) {
-  const db = mongo<Contract>({
+export function createClient(connectionUri: string, dbName: string) {
+  return mongo<Contract>({
     contractJson,
     url: connectionUri,
     dbName,
     middleware: [createCacheMiddleware()],
   });
-  const runtime = await db.runtime();
-  const raw = mongoRaw({ contract: db.contract });
-  return { orm: db.orm, runtime, query: db.query, raw, contract: db.contract };
 }
 
-export type Db = Awaited<ReturnType<typeof createClient>>;
-export type { MongoRuntime };
+export type Db = ReturnType<typeof createClient>;
+
+let db: Db | undefined;
+
+export function getDb(): Db {
+  if (!db) {
+    const url = process.env['DB_URL'] ?? 'mongodb://localhost:27017';
+    const dbName = process.env['MONGODB_DB'] ?? 'retail-store';
+    db = createClient(url, dbName);
+  }
+  return db;
+}
