@@ -183,8 +183,8 @@ types.
 
 - **A1 — Emit typing goes through the codec.** No emit-path field/column type is produced by
   rendering a stored value directly. Every enum-restricted emit type goes through
-  `renderValueLiteral`. Grep guard: no caller renders `valueSet.values` / enum member values to
-  TS literals outside the codec seam.
+  `renderValueLiteral`; the direct-render helpers (`renderValueSetUnionBase` etc.) are deleted, so
+  no caller renders `valueSet.values` / enum member values to TS literals outside the codec seam.
 - **A2 — Domain enum is not a SQL typing input.** The hardcoded enum override in
   `domain-type-generation.ts` and `DomainEnumLookup` are deleted; the framework renders enum
   field types only through the family-supplied resolver + `renderValueLiteral`. No **SQL** code

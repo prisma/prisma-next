@@ -1,16 +1,4 @@
-import type { JsonValue } from '@prisma-next/contract/types';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
-
-function renderPrimitiveLiteral(value: JsonValue): string | undefined {
-  if (typeof value === 'string') {
-    const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    return `'${escaped}'`;
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  return undefined;
-}
+import { type CodecLookup, renderTsLiteral } from '@prisma-next/framework-components/codec';
 
 /**
  * Mirrors the real Postgres primitive codecs' `renderValueLiteral`: `pg/text@1` and `pg/int4@1` are
@@ -24,7 +12,7 @@ export const identityCodecLookup: CodecLookup = {
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,
   renderValueLiteralFor: (id, value) =>
-    id === 'pg/text@1' || id === 'pg/int4@1' ? renderPrimitiveLiteral(value) : undefined,
+    id === 'pg/text@1' || id === 'pg/int4@1' ? renderTsLiteral(value) : undefined,
 };
 
 /** Codec id of the non-identity test codec. */
