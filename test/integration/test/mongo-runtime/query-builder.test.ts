@@ -20,24 +20,29 @@ import { ObjectId } from 'mongodb';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { withMongod } from '../mongo/setup';
 
+type ScalarField<TCodecId extends string> = {
+  readonly type: { readonly kind: 'scalar'; readonly codecId: TCodecId };
+  readonly nullable: false;
+};
+
 type TestContract = MongoContract & {
   readonly models: {
     readonly Order: {
       readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly department: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly amount: { readonly codecId: 'mongo/double@1'; readonly nullable: false };
-        readonly status: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+        readonly _id: ScalarField<'mongo/objectId@1'>;
+        readonly department: ScalarField<'mongo/string@1'>;
+        readonly amount: ScalarField<'mongo/double@1'>;
+        readonly status: ScalarField<'mongo/string@1'>;
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'orders' };
     };
     readonly User: {
       readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly firstName: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly lastName: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly orderId: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
+        readonly _id: ScalarField<'mongo/objectId@1'>;
+        readonly firstName: ScalarField<'mongo/string@1'>;
+        readonly lastName: ScalarField<'mongo/string@1'>;
+        readonly orderId: ScalarField<'mongo/objectId@1'>;
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'users' };
@@ -52,6 +57,11 @@ type TestContract = MongoContract & {
 type TContract = MongoContractWithTypeMaps<TestContract, AnyMongoTypeMaps>;
 type PlanRow<TPlan> = TPlan extends MongoQueryPlan<infer Row> ? Row : never;
 
+const scalarField = <TCodecId extends string>(codecId: TCodecId) => ({
+  type: { kind: 'scalar' as const, codecId },
+  nullable: false,
+});
+
 const contractJson = {
   target: 'mongo',
   targetFamily: 'mongo',
@@ -62,20 +72,20 @@ const contractJson = {
         models: {
           Order: {
             fields: {
-              _id: { codecId: 'mongo/objectId@1', nullable: false },
-              department: { codecId: 'mongo/string@1', nullable: false },
-              amount: { codecId: 'mongo/double@1', nullable: false },
-              status: { codecId: 'mongo/string@1', nullable: false },
+              _id: scalarField('mongo/objectId@1'),
+              department: scalarField('mongo/string@1'),
+              amount: scalarField('mongo/double@1'),
+              status: scalarField('mongo/string@1'),
             },
             relations: {},
             storage: { collection: 'orders' },
           },
           User: {
             fields: {
-              _id: { codecId: 'mongo/objectId@1', nullable: false },
-              firstName: { codecId: 'mongo/string@1', nullable: false },
-              lastName: { codecId: 'mongo/string@1', nullable: false },
-              orderId: { codecId: 'mongo/objectId@1', nullable: false },
+              _id: scalarField('mongo/objectId@1'),
+              firstName: scalarField('mongo/string@1'),
+              lastName: scalarField('mongo/string@1'),
+              orderId: scalarField('mongo/objectId@1'),
             },
             relations: {},
             storage: { collection: 'users' },

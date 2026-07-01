@@ -102,3 +102,16 @@ order-type string literals with typed enum accessors via `buildNamespacedEnums` 
 changes affect the emitted contract shape; a re-emit picks them up automatically.
 No user action required. Incidental substrate diff only.
 -->
+
+<!--
+TML-2954 (reshaping-pipeline decode): the Mongo query builder now reifies a per-stage
+result shape, so reads through reshaping aggregation stages (`$project`/`$addFields`,
+with more stages to follow) decode their output fields through the contract codecs
+instead of returning raw BSON. Previously any reshaping stage collapsed the plan to an
+un-decoded pass-through — a projected `_id` came back as a raw `ObjectId`; it now comes
+back decoded, matching the row type the builder already declared. `$vectorSearch`
+(shape-preserving) is reclassified as identity, so the retail-store `findSimilarProducts`
+example drops its `db.raw` + `blindCast` for the typed builder. This is a runtime
+behaviour fix — no API or contract-shape change and no re-emit needed; code that relied
+on the previous un-decoded values would now observe decoded ones. Incidental to emit.
+-->
