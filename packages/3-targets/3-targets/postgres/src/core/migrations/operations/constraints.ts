@@ -2,8 +2,18 @@ import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adap
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import { constraintExistsAst } from '../../../contract-free/checks';
 import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
+import type { AddCheckConstraintPayload } from '../op-factory-call';
 import { qualifyTableName } from '../planner-sql-checks';
 import { type ForeignKeySpec, type Op, step, targetDetails } from './shared';
+
+/** Renders the `CHECK (...)` body for a discriminated check-constraint payload. */
+function renderCheckPredicate(payload: AddCheckConstraintPayload): string {
+  if (payload.kind === 'valueSet') {
+    const valueList = payload.values.map((v) => `'${escapeLiteral(v)}'`).join(', ');
+    return `${quoteIdentifier(payload.column)} IN (${valueList})`;
+  }
+  return payload.expression;
+}
 
 async function constraintCheckSteps(
   lowerer: ExecuteRequestLowerer,
@@ -133,12 +143,13 @@ export async function addCheckConstraint(
   schemaName: string,
   tableName: string,
   constraintName: string,
-  column: string,
-  values: readonly string[],
+  payload: AddCheckConstraintPayload,
   lowerer: ExecuteRequestLowerer,
 ): Promise<Op> {
   const qualified = qualifyTableName(schemaName, tableName);
-  const valueList = values.map((v) => `'${escapeLiteral(v)}'`).join(', ');
+  const predicate = renderCheckPredicate(payload);
+  const labelSuffix =
+    payload.kind === 'valueSet' ? `on "${tableName}"."${payload.column}"` : `on "${tableName}"`;
   const { absent, present } = await constraintCheckSteps(lowerer, {
     constraintName,
     schema: schemaName,
@@ -146,7 +157,7 @@ export async function addCheckConstraint(
   });
   return {
     id: `checkConstraint.${tableName}.${constraintName}`,
-    label: `Add check constraint "${constraintName}" on "${tableName}"."${column}"`,
+    label: `Add check constraint "${constraintName}" ${labelSuffix}`,
     operationClass: 'additive',
     target: targetDetails('checkConstraint', constraintName, schemaName, tableName),
     precheck: [
@@ -155,7 +166,7 @@ export async function addCheckConstraint(
     execute: [
       step(
         `add check constraint "${constraintName}"`,
-        `ALTER TABLE ${qualified} ADD CONSTRAINT ${quoteIdentifier(constraintName)} CHECK (${quoteIdentifier(column)} IN (${valueList}))`,
+        `ALTER TABLE ${qualified} ADD CONSTRAINT ${quoteIdentifier(constraintName)} CHECK (${predicate})`,
       ),
     ],
     postcheck: [step(`verify constraint "${constraintName}" exists`, present.sql, present.params)],

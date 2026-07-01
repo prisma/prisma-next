@@ -96,11 +96,6 @@ function renderDdlConstraintAsTsCall(constraint: DdlTableConstraint): string {
       const nameOpt = constraint.name ? `, { name: ${jsonToTsSource(constraint.name)} }` : '';
       return `unique(${jsonToTsSource(constraint.columns)}${nameOpt})`;
     }
-    case 'check-expression':
-      throw new Error(
-        `SQLite does not support expression CHECK constraints (constraint "${constraint.name}"). ` +
-          'Scalar-array columns and their element-non-null checks are Postgres-only.',
-      );
   }
 }
 

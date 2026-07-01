@@ -1,6 +1,10 @@
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { PrimaryKey, type PrimaryKeyInput } from './primary-key';
-import { SqlCheckConstraintIR, type SqlCheckConstraintIRInput } from './sql-check-constraint-ir';
+import {
+  SqlCheckConstraintIR,
+  type SqlCheckConstraintIRInput,
+  sqlCheckConstraintIR,
+} from './sql-check-constraint-ir';
 import { type SqlAnnotations, SqlColumnIR, type SqlColumnIRInput } from './sql-column-ir';
 import { SqlForeignKeyIR, type SqlForeignKeyIRInput } from './sql-foreign-key-ir';
 import { SqlIndexIR, type SqlIndexIRInput } from './sql-index-ir';
@@ -72,9 +76,7 @@ export class SqlTableIR extends SqlSchemaIRNode {
     if (input.annotations !== undefined) this.annotations = input.annotations;
     if (input.checks !== undefined && input.checks.length > 0) {
       this.checks = Object.freeze(
-        input.checks.map((c) =>
-          c instanceof SqlCheckConstraintIR ? c : new SqlCheckConstraintIR(c),
-        ),
+        input.checks.map((c) => (c instanceof SqlCheckConstraintIR ? c : sqlCheckConstraintIR(c))),
       );
     }
     freezeNode(this);

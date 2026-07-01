@@ -188,10 +188,81 @@ export function resolveValueSetValues(
 function convertCheck(check: CheckConstraint, storage: SqlStorage): SqlCheckConstraintIRInput {
   const permittedValues = resolveValueSetValues(check.valueSet, storage, `check "${check.name}"`);
   return {
+    kind: 'valueSet',
     name: check.name,
     column: check.column,
     permittedValues,
   };
+}
+
+/**
+ * Quotes a SQL identifier for embedding in a canonical check predicate. Byte-
+ * identical to the Postgres target's `quoteIdentifier` (simple double-quote
+ * doubling) so the projected predicate string matches the introspection
+ * recognizer's re-canonicalized form exactly.
+ */
+function quoteCheckIdentifier(identifier: string): string {
+  return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+/**
+ * Deterministic name for the element-non-null CHECK constraint on a scalar-array
+ * column. The distinct `_elem_not_null` suffix avoids collision with the enum
+ * value-set `_check` constraints. Re-emitting the same schema produces the same
+ * name, so `pg_get_constraintdef`-based verify sees no drift.
+ */
+export function elementNonNullCheckName(tableName: string, columnName: string): string {
+  return `${tableName}_${columnName}_elem_not_null`;
+}
+
+/**
+ * Canonical predicate enforcing that a scalar-array column carries no NULL
+ * element. The array column itself may be NULL (container nullability is the
+ * column's NOT NULL clause); `array_position` over a NULL array yields NULL,
+ * which a CHECK treats as satisfied, so a nullable array column is unaffected.
+ *
+ * This is the single source of truth for the element-non-null predicate: the
+ * projection sites below emit it, and the Postgres introspection recognizer
+ * re-canonicalizes the stored `pg_get_constraintdef` string back through this
+ * function so drift comparison is canonical-to-canonical.
+ */
+export function elementNonNullCheckExpression(columnName: string): string {
+  return `array_position(${quoteCheckIdentifier(columnName)}, NULL) IS NULL`;
+}
+
+/**
+ * Projects the full set of check constraints a contract table requires into
+ * discriminated `SqlCheckConstraintIRInput`s:
+ *
+ * - one `valueSet` check per declared `StorageTable.checks` entry (enum-style
+ *   `IN (...)` restrictions), and
+ * - one `expression` check per `many: true` column (the element-non-null
+ *   scalar-array guard), synthesized at projection time because it is a
+ *   Postgres physical detail rather than a Contract IR construct.
+ *
+ * This is the single lock-step projection shared by the verifier, the
+ * expected-IR builder, and the migration planner so all three agree on the
+ * exact checks (names + predicates) a table should carry.
+ */
+export function projectContractChecks(
+  table: StorageTable,
+  tableName: string,
+  storage: SqlStorage,
+): SqlCheckConstraintIRInput[] {
+  const checks: SqlCheckConstraintIRInput[] = [];
+  for (const check of table.checks ?? []) {
+    checks.push(convertCheck(check, storage));
+  }
+  for (const [columnName, column] of Object.entries(table.columns)) {
+    if (column.many === true) {
+      checks.push({
+        kind: 'expression',
+        name: elementNonNullCheckName(tableName, columnName),
+        expression: elementNonNullCheckExpression(columnName),
+      });
+    }
+  }
+  return checks;
 }
 
 function convertUnique(unique: UniqueConstraint): SqlUniqueIR {
@@ -258,10 +329,9 @@ function convertTable(
     satisfiedIndexColumns.add(key);
   }
 
+  const projectedChecks = projectContractChecks(table, name, storage);
   const checks: SqlCheckConstraintIRInput[] | undefined =
-    table.checks && table.checks.length > 0
-      ? table.checks.map((c) => convertCheck(c, storage))
-      : undefined;
+    projectedChecks.length > 0 ? projectedChecks : undefined;
 
   return {
     name,

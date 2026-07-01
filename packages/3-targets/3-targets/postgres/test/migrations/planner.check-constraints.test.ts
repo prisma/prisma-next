@@ -8,7 +8,7 @@ import {
   StorageValueSet,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { SqlCheckConstraintIR } from '@prisma-next/sql-schema-ir/types';
+import { sqlCheckConstraintIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
@@ -121,7 +121,8 @@ function schemaWithCheck(values: readonly string[]): SqlSchemaIR {
         uniques: [],
         indexes: [],
         checks: [
-          new SqlCheckConstraintIR({
+          sqlCheckConstraintIR({
+            kind: 'valueSet',
             name: CHECK_NAME,
             column: COLUMN_NAME,
             permittedValues: [...values],
@@ -141,6 +142,73 @@ function schemaWithoutCheck(): SqlSchemaIR {
         foreignKeys: [],
         uniques: [],
         indexes: [],
+      },
+    },
+  };
+}
+
+const ARRAY_COLUMN = 'tags';
+const ELEM_CHECK_NAME = `${TABLE_NAME}_${ARRAY_COLUMN}_elem_not_null`;
+const ELEM_CHECK_EXPR = `array_position("${ARRAY_COLUMN}", NULL) IS NULL`;
+
+function makeContractWithArrayColumn(): Contract<SqlStorage> {
+  const ns = postgresCreateNamespace({
+    id: UNBOUND_NAMESPACE_ID,
+    entries: {
+      table: {
+        [TABLE_NAME]: new StorageTable({
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            [ARRAY_COLUMN]: {
+              nativeType: 'text',
+              codecId: 'pg/text@1',
+              nullable: false,
+              many: true,
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        }),
+      },
+    },
+  });
+  return {
+    target: 'postgres',
+    targetFamily: 'sql',
+    profileHash: profileHash('sha256:test'),
+    storage: new SqlStorage({
+      storageHash: coreHash('sha256:contract'),
+      namespaces: { [UNBOUND_NAMESPACE_ID]: ns },
+    }),
+    roots: {},
+    domain: applicationDomainOf({ models: {} }),
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+  };
+}
+
+function schemaWithElementCheck(): SqlSchemaIR {
+  return {
+    tables: {
+      [TABLE_NAME]: {
+        name: TABLE_NAME,
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          [ARRAY_COLUMN]: { name: ARRAY_COLUMN, nativeType: 'text[]', nullable: false },
+        },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+        checks: [
+          sqlCheckConstraintIR({
+            kind: 'expression',
+            name: ELEM_CHECK_NAME,
+            expression: ELEM_CHECK_EXPR,
+          }),
+        ],
       },
     },
   };
@@ -183,8 +251,11 @@ describe('checkConstraintPlanCallStrategy', () => {
       factoryName: 'addCheckConstraint',
       tableName: TABLE_NAME,
       constraintName: CHECK_NAME,
-      column: COLUMN_NAME,
-      values: expect.arrayContaining(['active', 'inactive']),
+      payload: {
+        kind: 'valueSet',
+        column: COLUMN_NAME,
+        values: expect.arrayContaining(['active', 'inactive']),
+      },
     });
     expect(result.issues).toHaveLength(0);
   });
@@ -225,7 +296,10 @@ describe('checkConstraintPlanCallStrategy', () => {
       factoryName: 'addCheckConstraint',
       tableName: TABLE_NAME,
       constraintName: CHECK_NAME,
-      values: expect.arrayContaining(['active', 'inactive', 'pending']),
+      payload: {
+        kind: 'valueSet',
+        values: expect.arrayContaining(['active', 'inactive', 'pending']),
+      },
     });
     expect(result.issues).toHaveLength(0);
   });
@@ -346,6 +420,115 @@ describe('planIssues — check constraint strategy', () => {
       tableName: TABLE_NAME,
       constraintName: CHECK_NAME,
     });
+  });
+
+  it('emits an expression AddCheckConstraintCall for a new scalar-array column absent from live', () => {
+    const contract = makeContractWithArrayColumn();
+    const result = checkConstraintPlanCallStrategy([], {
+      ...defaultCtx,
+      toContract: contract,
+      fromContract: null,
+      schema: schemaWithoutCheck(),
+      policy: { allowedOperationClasses: ['additive'] },
+      frameworkComponents: [],
+    });
+
+    expect(result.kind).toBe('match');
+    if (result.kind !== 'match') return;
+    expect(result.calls).toHaveLength(1);
+    expect(result.calls[0]).toMatchObject({
+      factoryName: 'addCheckConstraint',
+      tableName: TABLE_NAME,
+      constraintName: ELEM_CHECK_NAME,
+      payload: { kind: 'expression', expression: ELEM_CHECK_EXPR },
+    });
+  });
+
+  it('emits no calls when the element-non-null check already matches live', () => {
+    const contract = makeContractWithArrayColumn();
+    const result = checkConstraintPlanCallStrategy([], {
+      ...defaultCtx,
+      toContract: contract,
+      fromContract: null,
+      schema: schemaWithElementCheck(),
+      policy: { allowedOperationClasses: ['additive'] },
+      frameworkComponents: [],
+    });
+
+    if (result.kind === 'no_match') return;
+    expect(result.calls).toHaveLength(0);
+  });
+
+  it('drops and re-adds the element check when the live predicate drifts', () => {
+    const contract = makeContractWithArrayColumn();
+    const drifted: SqlSchemaIR = {
+      tables: {
+        [TABLE_NAME]: {
+          ...schemaWithElementCheck().tables[TABLE_NAME],
+          name: TABLE_NAME,
+          columns: schemaWithElementCheck().tables[TABLE_NAME]?.columns ?? {},
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+          checks: [
+            sqlCheckConstraintIR({
+              kind: 'expression',
+              name: ELEM_CHECK_NAME,
+              expression: 'array_position("labels", NULL) IS NULL',
+            }),
+          ],
+        },
+      },
+    };
+    const result = checkConstraintPlanCallStrategy([], {
+      ...defaultCtx,
+      toContract: contract,
+      fromContract: null,
+      schema: drifted,
+      policy: { allowedOperationClasses: ['additive', 'destructive'] },
+      frameworkComponents: [],
+    });
+
+    expect(result.kind).toBe('match');
+    if (result.kind !== 'match') return;
+    expect(result.calls.map((c) => c.factoryName)).toEqual([
+      'dropCheckConstraint',
+      'addCheckConstraint',
+    ]);
+  });
+
+  it('emits the element-non-null ALTER after CREATE TABLE for a new scalar-array table', () => {
+    const contract = makeContractWithArrayColumn();
+    const result = planIssues({
+      ...defaultCtx,
+      issues: [
+        {
+          kind: 'missing_table',
+          table: TABLE_NAME,
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          message: `Table "${TABLE_NAME}" is missing`,
+        },
+      ],
+      toContract: contract,
+      fromContract: null,
+      schema: { tables: {} },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const createIdx = result.value.calls.findIndex((c) => c.factoryName === 'createTable');
+    const addCheckIdx = result.value.calls.findIndex((c) => c.factoryName === 'addCheckConstraint');
+    expect(createIdx).toBeGreaterThanOrEqual(0);
+    expect(addCheckIdx).toBeGreaterThan(createIdx);
+    expect(result.value.calls[addCheckIdx]).toMatchObject({
+      constraintName: ELEM_CHECK_NAME,
+      payload: { kind: 'expression', expression: ELEM_CHECK_EXPR },
+    });
+    // The CREATE TABLE itself no longer inlines the element CHECK constraint.
+    const createCall = result.value.calls[createIdx] as {
+      constraints?: readonly { kind: string }[];
+    };
+    expect((createCall.constraints ?? []).some((c) => c.kind === 'check-expression')).toBe(false);
   });
 
   it('check_mismatch produces DropCheckConstraintCall + AddCheckConstraintCall', () => {

@@ -8,6 +8,7 @@ import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-
 import { errorPostgresMigrationStackMissing } from '../errors';
 import {
   AddCheckConstraintCall,
+  type AddCheckConstraintPayload,
   AddColumnCall,
   AddForeignKeyCall,
   AddPrimaryKeyCall,
@@ -202,8 +203,7 @@ export abstract class PostgresMigration extends SqlMigration<
     readonly schema: string;
     readonly table: string;
     readonly constraint: string;
-    readonly column: string;
-    readonly values: readonly string[];
+    readonly payload: AddCheckConstraintPayload;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
@@ -212,8 +212,7 @@ export abstract class PostgresMigration extends SqlMigration<
       options.schema,
       options.table,
       options.constraint,
-      options.column,
-      options.values,
+      options.payload,
     ).toOp(this.controlAdapter);
   }
 

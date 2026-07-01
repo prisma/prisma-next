@@ -8,7 +8,7 @@ import {
   StorageTable,
   StorageValueSet,
 } from '@prisma-next/sql-contract/types';
-import { SqlCheckConstraintIR } from '@prisma-next/sql-schema-ir/types';
+import { type SqlCheckConstraintIR, sqlCheckConstraintIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
@@ -26,7 +26,11 @@ import {
 // ---------------------------------------------------------------------------
 
 function makeContractCheck(name: string, column: string, permittedValues: readonly string[]) {
-  return { name, column, permittedValues };
+  return { kind: 'valueSet' as const, name, column, permittedValues };
+}
+
+function makeExpressionContractCheck(name: string, expression: string) {
+  return { kind: 'expression' as const, name, expression };
 }
 
 function makeSchemaCheck(
@@ -34,7 +38,11 @@ function makeSchemaCheck(
   column: string,
   permittedValues: readonly string[],
 ): SqlCheckConstraintIR {
-  return new SqlCheckConstraintIR({ name, column, permittedValues });
+  return sqlCheckConstraintIR({ kind: 'valueSet', name, column, permittedValues });
+}
+
+function makeExpressionSchemaCheck(name: string, expression: string): SqlCheckConstraintIR {
+  return sqlCheckConstraintIR({ kind: 'expression', name, expression });
 }
 
 describe('verifyCheckConstraints', () => {
@@ -170,6 +178,100 @@ describe('verifyCheckConstraints', () => {
   });
 });
 
+describe('verifyCheckConstraints — expression checks', () => {
+  const EXPR = 'array_position("tags", NULL) IS NULL';
+
+  it('passes when an expression check matches the live predicate', () => {
+    const issues: SchemaIssue[] = [];
+    const nodes = verifyCheckConstraints(
+      [makeExpressionContractCheck('post_tags_elem_not_null', EXPR)],
+      [makeExpressionSchemaCheck('post_tags_elem_not_null', EXPR)],
+      'post',
+      UNBOUND_NAMESPACE_ID,
+      'namespaces[__unbound__].tables[post]',
+      'managed',
+      issues,
+      false,
+    );
+    expect(issues).toHaveLength(0);
+    expect(nodes[0]?.status).toBe('pass');
+  });
+
+  it('emits check_missing when an expression check is absent from the live schema', () => {
+    const issues: SchemaIssue[] = [];
+    verifyCheckConstraints(
+      [makeExpressionContractCheck('post_tags_elem_not_null', EXPR)],
+      [],
+      'post',
+      UNBOUND_NAMESPACE_ID,
+      'namespaces[__unbound__].tables[post]',
+      'managed',
+      issues,
+      false,
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      kind: 'check_missing',
+      table: 'post',
+      expected: EXPR,
+    });
+    expect(issues[0]?.message).toContain(`CHECK (${EXPR})`);
+  });
+
+  it('emits check_mismatch when the live expression predicate differs', () => {
+    const issues: SchemaIssue[] = [];
+    verifyCheckConstraints(
+      [makeExpressionContractCheck('post_tags_elem_not_null', EXPR)],
+      [
+        makeExpressionSchemaCheck(
+          'post_tags_elem_not_null',
+          'array_position("labels", NULL) IS NULL',
+        ),
+      ],
+      'post',
+      UNBOUND_NAMESPACE_ID,
+      'namespaces[__unbound__].tables[post]',
+      'managed',
+      issues,
+      false,
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ kind: 'check_mismatch', table: 'post' });
+  });
+
+  it('emits check_removed in strict mode for an extra live expression check', () => {
+    const issues: SchemaIssue[] = [];
+    verifyCheckConstraints(
+      [],
+      [makeExpressionSchemaCheck('post_tags_elem_not_null', EXPR)],
+      'post',
+      UNBOUND_NAMESPACE_ID,
+      'namespaces[__unbound__].tables[post]',
+      'managed',
+      issues,
+      true,
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ kind: 'check_removed', table: 'post', actual: EXPR });
+  });
+
+  it('emits check_mismatch when a contract expression check meets a live value-set check (cross-kind)', () => {
+    const issues: SchemaIssue[] = [];
+    verifyCheckConstraints(
+      [makeExpressionContractCheck('post_tags_elem_not_null', EXPR)],
+      [makeSchemaCheck('post_tags_elem_not_null', 'tags', ['a', 'b'])],
+      'post',
+      UNBOUND_NAMESPACE_ID,
+      'namespaces[__unbound__].tables[post]',
+      'managed',
+      issues,
+      false,
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ kind: 'check_mismatch', table: 'post' });
+  });
+});
+
 // ---------------------------------------------------------------------------
 // classifySqlVerifierIssueKind — check constraint kinds
 // ---------------------------------------------------------------------------
@@ -256,7 +358,8 @@ describe('verifySqlSchema — check constraints', () => {
       post: {
         ...createSchemaTable('post', { status: { nativeType: 'text', nullable: false } }),
         checks: [
-          new SqlCheckConstraintIR({
+          sqlCheckConstraintIR({
+            kind: 'valueSet',
             name: 'post_status_check',
             column: 'status',
             permittedValues: ['draft', 'published'],
@@ -337,7 +440,8 @@ describe('verifySqlSchema — check constraints', () => {
       post: {
         ...createSchemaTable('post', { status: { nativeType: 'text', nullable: false } }),
         checks: [
-          new SqlCheckConstraintIR({
+          sqlCheckConstraintIR({
+            kind: 'valueSet',
             name: 'post_status_check',
             column: 'status',
             permittedValues: ['draft', 'published'],

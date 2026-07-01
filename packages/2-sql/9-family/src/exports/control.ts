@@ -24,6 +24,9 @@ export type {
 export {
   contractToSchemaIR,
   detectDestructiveChanges,
+  elementNonNullCheckExpression,
+  elementNonNullCheckName,
+  projectContractChecks,
   resolveValueSetValues,
 } from '../core/migrations/contract-to-schema-ir';
 export type { ControlPolicySubject } from '../core/migrations/control-policy';

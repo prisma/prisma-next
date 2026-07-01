@@ -8,6 +8,7 @@
 
 export {
   arraysEqual,
+  checkContentEqual,
   isIndexSatisfied,
   isUniqueConstraintSatisfied,
 } from '../core/schema-verify/verify-helpers';
