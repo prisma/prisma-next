@@ -56,6 +56,7 @@ import {
   UpdateManyCommand,
   UpdateOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
+import { castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createFieldAccessor, type Expression, type FieldAccessor } from './field-accessor';
 import {
@@ -819,9 +820,9 @@ export class PipelineChain<
     const contractNarrow = this.#contract as MongoContract;
     let resultShape: MongoResultShape | undefined;
     if (modelName !== undefined) {
-      const model = domainModelsAtDefaultNamespace(contractNarrow.domain)[modelName] as
-        | MongoModelDefinition
-        | undefined;
+      const model = castAs<MongoModelDefinition | undefined>(
+        domainModelsAtDefaultNamespace(contractNarrow.domain)[modelName],
+      );
       resultShape = model
         ? computePipelineResultShape(this.#state.stages, contractModelToMongoResultShape(model))
         : { kind: 'unknown' as const };
