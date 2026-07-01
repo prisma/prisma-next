@@ -86,12 +86,13 @@ foundation). `enums`, the query builder (`query`/`sql`), and `raw` all derive fr
    derivation once; the facade calls the same builder, so the cast lives in framework code in
    one place instead of being re-asserted per facade.
 
-5. **Add a fresh client consumer for the acceptance test.** The example file the original spec
-   named (`examples/retail-store/src/enums.ts`) does not exist on `main` — retail-store does not
-   reference `.enums` today, and #880's enum work was pulled, not merged. So there is nothing to
-   migrate; instead add a minimal `'use client'` component in retail-store that imports
-   `@prisma-next/mongo/static` and uses the static surface, giving the real `next build`
-   acceptance test a concrete consumer.
+5. **Migrate the interim consumer.** #880 landed on `main` (only its `@prisma-next/mongo/enums`
+   entrypoint was pulled), so `examples/retail-store/src/enums.ts` — the `buildNamespacedEnums`
+   + `blindCast` interim — **does** exist, consumed by the `'use client'` `checkout-form.tsx`,
+   `seed.ts`, and `api/orders/route.ts`. Delete that interim and point its consumers at
+   `mongoStatic` / `@prisma-next/mongo/static` so the typing comes from the framework, not a cast
+   in example code. `checkout-form.tsx` importing the static surface is the `next build`
+   client-safety acceptance test.
 
 ## Definition of done
 
@@ -114,6 +115,15 @@ foundation). `enums`, the query builder (`query`/`sql`), and `raw` all derive fr
 
 ## Out of scope / notes
 
+- **Client-safety required a driver-free fix in the Mongo adapter.** The premise that building
+  the Mongo `ExecutionContext` is driver-free was only true for `@prisma-next/mongo-runtime`, not
+  the adapter: the codec module (`packages/3-mongo-target/2-mongo-adapter/src/core/codecs.ts`)
+  value-imported `ObjectId` from `mongodb`, dragging the whole driver into the client bundle
+  (`next build` failed with 19 errors). `ObjectId` is a `bson` class `mongodb` merely re-exports,
+  so the fix is to import it from the standalone browser-safe `bson` package. This is almost
+  certainly why #880's `mongoEnums` entrypoint was pulled. The original client-safety tests also
+  passed vacuously (an off-by-one `ROOT` so the graph walk read nothing); the strengthened walk
+  now traverses workspace packages and distinguishes value from `import type`.
 - This is distinct from `projects/facade-import-surface-completion/` (import-path consolidation).
   This slice is about the execution-plane static context abstraction, not import shapes.
 - SQLite: the Postgres changes are SQL-family-level (`createExecutionContext`, the SQL builders),
