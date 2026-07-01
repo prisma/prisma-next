@@ -38,6 +38,7 @@ const sqlSourceContext: ContractSourceContext = {
   codecLookup: sqlStack.codecLookup,
   controlMutationDefaults: sqlStack.controlMutationDefaults,
   resolvedInputs: [],
+  capabilities: sqlStack.capabilities,
 };
 
 const mongoSourceContext: ContractSourceContext = {
@@ -48,6 +49,7 @@ const mongoSourceContext: ContractSourceContext = {
   codecLookup: mongoStack.codecLookup,
   controlMutationDefaults: mongoStack.controlMutationDefaults,
   resolvedInputs: [],
+  capabilities: mongoStack.capabilities,
 };
 
 export const postgresFrameworkComponents = [postgres, postgresAdapter] as const;

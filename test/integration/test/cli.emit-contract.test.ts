@@ -35,6 +35,7 @@ function buildSourceContext(
     codecLookup: stack.codecLookup,
     controlMutationDefaults: stack.controlMutationDefaults,
     resolvedInputs,
+    capabilities: stack.capabilities,
   };
 }
 

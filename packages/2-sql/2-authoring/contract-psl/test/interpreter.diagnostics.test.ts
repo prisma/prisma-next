@@ -21,6 +21,7 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
+  capabilities: { sql: { scalarList: true } },
 } as const;
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
@@ -1087,6 +1088,7 @@ model User {
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
         createNamespace: createTestSqlNamespace,
+        capabilities: { sql: { scalarList: true } },
       });
 
       expect(result.ok).toBe(false);
@@ -1123,6 +1125,7 @@ model User {
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
         createNamespace: createTestSqlNamespace,
+        capabilities: { sql: { scalarList: true } },
       });
 
       expect(result.ok).toBe(false);
@@ -1368,6 +1371,84 @@ describe('interpretPslDocumentToSqlContract list-field constructs', () => {
     expect(storage.namespaces['public']?.entries.table?.['post']?.columns['tags']).toMatchObject({
       many: true,
       default: { kind: 'literal', value: ['a', 'b'] },
+    });
+  });
+
+  it('lowers a numeric-list default to a literal number array', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Post {
+  id Int @id
+  scores Int[] @default([1, 2])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(storage.namespaces['public']?.entries.table?.['post']?.columns['scores']).toMatchObject({
+      many: true,
+      default: { kind: 'literal', value: [1, 2] },
+    });
+  });
+
+  it('lowers a boolean-list default to a literal boolean array', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Post {
+  id Int @id
+  flags Boolean[] @default([true, false])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(storage.namespaces['public']?.entries.table?.['post']?.columns['flags']).toMatchObject({
+      many: true,
+      default: { kind: 'literal', value: [true, false] },
+    });
+  });
+
+  it('preserves commas inside a quoted list-default element', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Post {
+  id Int @id
+  tags String[] @default(["a,b", "c"])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(storage.namespaces['public']?.entries.table?.['post']?.columns['tags']).toMatchObject({
+      many: true,
+      default: { kind: 'literal', value: ['a,b', 'c'] },
     });
   });
 });

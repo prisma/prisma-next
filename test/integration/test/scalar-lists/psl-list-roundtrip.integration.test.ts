@@ -1,14 +1,13 @@
 /**
- * Slice-2 milestone checkpoint (AC1) + element fidelity through the PSL path
- * (AC2 / NFR1).
+ * End-to-end PSL scalar-list checkpoint + element fidelity through the PSL path.
  *
- * AC1: a `posts.tags String[]` schema authored in PSL emits a contract whose
+ * A `posts.tags String[]` schema authored in PSL emits a contract whose
  * `tags` storage column is a native array column (`pg/text@1`, `many:true`, NOT
  * jsonb), migrates onto a fresh Postgres database as a `text[]` column with no
  * manual edits, and round-trips through `contract infer` back to a `tags
  * String[]` PSL field.
  *
- * AC2/NFR1: a schema with `DateTime[]`, `Bytes[]`, and `Decimal[]` list fields
+ * A schema with `DateTime[]`, `Bytes[]`, and `Decimal[]` list fields
  * — authored in PSL, not a hand-built typed contract — inserts and selects
  * rows whose decoded element values deep-equal the originals, proving the
  * element codec is applied per element through the whole authored path.
@@ -101,7 +100,7 @@ async function migrateContract(
   }
 }
 
-describe.sequential('PSL scalar-list milestone (AC1 + AC2/NFR1)', () => {
+describe.sequential('PSL scalar-list end-to-end', () => {
   let database: DevDatabase | undefined;
 
   beforeAll(async () => {
@@ -113,7 +112,7 @@ describe.sequential('PSL scalar-list milestone (AC1 + AC2/NFR1)', () => {
   }, timeouts.spinUpPpgDev);
 
   it(
-    'AC1: posts.tags String[] authors → migrates as text[] → infers back to tags String[]',
+    'posts.tags String[] authors → migrates as text[] → infers back to tags String[]',
     async () => {
       if (!database) throw new Error('database not initialised');
 
@@ -182,7 +181,7 @@ describe.sequential('PSL scalar-list milestone (AC1 + AC2/NFR1)', () => {
   );
 
   it(
-    'AC2/NFR1: DateTime[]/Bytes[]/Decimal[] authored in PSL round-trip element values',
+    'DateTime[]/Bytes[]/Decimal[] authored in PSL round-trip element values',
     async () => {
       if (!database) throw new Error('database not initialised');
 

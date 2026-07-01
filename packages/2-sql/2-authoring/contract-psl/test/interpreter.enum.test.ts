@@ -98,6 +98,7 @@ function interpret(schema: string, overrides?: Partial<InterpretPslDocumentToSql
     authoringContributions: contributions,
     codecLookup: testCodecLookup,
     createNamespace: createTestSqlNamespace,
+    capabilities: { sql: { scalarList: true } },
     ...overrides,
   });
 }

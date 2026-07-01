@@ -1,5 +1,5 @@
 /**
- * Slice-2 NFR4 — Mongo parity for PSL scalar lists.
+ * Mongo parity for PSL scalar lists.
  *
  * The same PSL list schema must yield matching *observable* semantics on SQL
  * and Mongo:
@@ -14,7 +14,7 @@
  * Mongo runs against `mongodb-memory-server`, which fails to spin up on some
  * local sandboxes (UnknownLinuxDistro "nixos"); the assertion is written for
  * CI, where the memory server runs. The SQL half of assertion 3 is proven in
- * `psl-list-roundtrip.integration.test.ts` (AC2).
+ * `psl-list-roundtrip.integration.test.ts`.
  */
 import type { SerializeContract } from '@prisma-next/contract/hashing';
 import { emit } from '@prisma-next/emitter';
@@ -56,7 +56,7 @@ const sqlSerializeContract: SerializeContract = (contract) =>
 const mongoSerializeContract: SerializeContract = (contract) =>
   mongoTargetDescriptor.contractSerializer.serializeContract(contract as MongoTargetContract);
 
-describe('PSL scalar-list Mongo parity (NFR4)', () => {
+describe('PSL scalar-list Mongo parity', () => {
   it(
     'both SQL and Mongo author the same list schema with no diagnostics',
     async () => {

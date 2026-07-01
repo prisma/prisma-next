@@ -48,11 +48,11 @@ export interface ContractSourceContext {
   readonly resolvedInputs: readonly string[];
   /**
    * Merged capability matrix from the control stack's `[target, adapter, ...extensionPacks]`
-   * descriptors — the same merge `enrichContract` performs at emit time. Optional so
-   * non-adapter authoring paths (tests, bespoke providers) may omit it; an absent matrix
-   * means "do not gate". The CLI emit path always populates it.
+   * descriptors — the same merge `enrichContract` performs at emit time. Authoring-time
+   * gating (e.g. scalar lists) reads `capabilities.sql?.scalarList`; an empty matrix
+   * fails closed and rejects gated features. The control stack always populates it.
    */
-  readonly capabilities?: CapabilityMatrix;
+  readonly capabilities: CapabilityMatrix;
 }
 
 /** Lets format-aware tooling avoid file-extension sniffing and opaque loader introspection. */

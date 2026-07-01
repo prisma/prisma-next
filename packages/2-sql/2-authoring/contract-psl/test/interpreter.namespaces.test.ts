@@ -102,6 +102,7 @@ const baseInput = {
   controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
+  capabilities: { sql: { scalarList: true } },
 } as const;
 
 describe('un-namespaced PG model defaults to public namespace (TML-2916)', () => {
