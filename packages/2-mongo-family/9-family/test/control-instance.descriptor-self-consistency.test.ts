@@ -4,8 +4,9 @@ import type { ContractSpace, ControlStack } from '@prisma-next/framework-compone
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
-import type { MongoContract, MongoStorage } from '@prisma-next/mongo-contract';
+import { buildMongoNamespace, type MongoContract, MongoStorage } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { mongoFamilyDescriptor } from '../src/core/control-descriptor';
 import { createMongoFamilyInstance } from '../src/core/control-instance';
@@ -15,25 +16,24 @@ import { stubMongoTargetDescriptor as mongoTargetDescriptor } from './test-targe
 const TARGET = 'mongo' as const;
 const TARGET_FAMILY = 'mongo' as const;
 
-const fixtureStorageBody = {
-  namespaces: {
-    [UNBOUND_NAMESPACE_ID]: {
-      id: UNBOUND_NAMESPACE_ID,
-      entries: {
-        collection: {
-          fixture_box: {
-            indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
-          },
-        },
+const fixtureNamespace = buildMongoNamespace({
+  id: UNBOUND_NAMESPACE_ID,
+  entries: {
+    collection: {
+      fixture_box: {
+        indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }],
       },
     },
   },
-};
+});
 
+// Hash over the constructed namespace (not a hand-written literal): the
+// self-consistency check recomputes the hash from this same `MongoStorage`
+// instance's fields, so both sides must derive from identical data.
 const FIXTURE_HEAD_HASH = computeStorageHash({
   target: TARGET,
   targetFamily: TARGET_FAMILY,
-  storage: fixtureStorageBody,
+  storage: { namespaces: { [UNBOUND_NAMESPACE_ID]: fixtureNamespace } },
   ...mongoContractCanonicalizationHooks,
 });
 
@@ -42,15 +42,15 @@ function buildContract(): MongoContract<MongoStorage> {
     target: TARGET,
     targetFamily: TARGET_FAMILY,
     roots: {},
-    models: {},
+    domain: applicationDomainOf({}),
     capabilities: {},
     extensionPacks: {},
     meta: {},
     profileHash: profileHash('fixture-profile-v1'),
-    storage: {
-      ...fixtureStorageBody,
+    storage: new MongoStorage({
       storageHash: coreHash(FIXTURE_HEAD_HASH),
-    },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: fixtureNamespace },
+    }),
   };
 }
 

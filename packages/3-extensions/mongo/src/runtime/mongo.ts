@@ -2,7 +2,7 @@ import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contract/enum-accessor';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { type UNBOUND_NAMESPACE_ID, unboundNamespace } from '@prisma-next/framework-components/ir';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
   AnyMongoTypeMaps,
@@ -19,7 +19,6 @@ import {
   createMongoRuntime,
 } from '@prisma-next/mongo-runtime';
 import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
-import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type MongoBinding,
@@ -32,12 +31,6 @@ export type MongoTargetId = typeof mongoRuntimeTarget.targetId;
 
 type UnboundEnums<TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>> =
   NamespacedEnums<TContract>[typeof UNBOUND_NAMESPACE_ID];
-
-function unboundNamespace<T>(builderOutput: { readonly [UNBOUND_NAMESPACE_ID]?: unknown }): T {
-  return blindCast<T, 'the unbound namespace always exists on a mongo builder output'>(
-    builderOutput[UNBOUND_NAMESPACE_ID],
-  );
-}
 
 export interface MongoClient<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,

@@ -1658,10 +1658,14 @@ describe('MongoMigrationPlanner', () => {
 
       expect(source).toContain("import { Migration } from '@prisma-next/family-mongo/migration';");
       expect(source).toContain("import { MigrationCLI } from '@prisma-next/cli/migration-cli';");
-      expect(source).toContain('class M extends Migration');
+      expect(source).toContain('class M extends Migration<Start, End>');
       expect(source).toContain('MigrationCLI.run(import.meta.url, M);');
-      expect(source).toContain('sha256:00');
-      expect(source).toContain('sha256:01');
+      // New shape: from/to are derived from the imported contract JSON, not
+      // embedded as literals or a describe() block.
+      expect(source).toContain('override readonly endContractJson = endContract;');
+      expect(source).not.toContain('describe()');
+      expect(source).not.toContain('sha256:00');
+      expect(source).not.toContain('sha256:01');
     });
 
     it('produces a plan whose origin reflects the supplied fromHash', () => {

@@ -292,8 +292,12 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     expect(migrationTs).toContain(
       "import { Migration } from '@prisma-next/family-mongo/migration'",
     );
-    expect(migrationTs).toContain('class M extends Migration');
-    expect(migrationTs).toContain('describe()');
+    // New generator shape: the base derives describe() from the imported contract
+    // JSON, so the scaffold carries `Migration<…, End>` + the endContractJson
+    // field and emits no describe() / hash literals.
+    expect(migrationTs).toContain('class M extends Migration<');
+    expect(migrationTs).not.toContain('describe()');
+    expect(migrationTs).toContain('override readonly endContractJson = endContract;');
     expect(migrationTs).toContain('get operations()');
     expect(migrationTs).toContain('return [');
     // Empty stub: factory imports omitted because no calls were rendered.

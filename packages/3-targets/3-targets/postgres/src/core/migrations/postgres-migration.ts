@@ -3,9 +3,11 @@ import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control'
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { Migration as SqlMigration } from '@prisma-next/family-sql/migration';
 import type { ControlStack } from '@prisma-next/framework-components/control';
+import { MigrationContractViews } from '@prisma-next/migration-tools/migration';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import { errorPostgresMigrationStackMissing } from '../errors';
+import { PostgresContractView } from '../postgres-contract-view';
 import {
   AddCheckConstraintCall,
   AddColumnCall,
@@ -60,10 +62,10 @@ import type { PostgresPlanTargetDetails } from './planner-target-details';
  * is an antipattern in a migration. (The unbound/unspecified namespace concept
  * remains for SQLite, which has no schemas, and for Mongo's connection `db`.)
  */
-export abstract class PostgresMigration extends SqlMigration<
-  PostgresPlanTargetDetails,
-  'postgres'
-> {
+export abstract class PostgresMigration<
+  Start extends Contract<SqlStorage> = Contract<SqlStorage>,
+  End extends Contract<SqlStorage> = Contract<SqlStorage>,
+> extends SqlMigration<PostgresPlanTargetDetails, 'postgres', Start, End> {
   readonly targetId = 'postgres' as const;
 
   /**
@@ -74,6 +76,17 @@ export abstract class PostgresMigration extends SqlMigration<
    */
   protected readonly controlAdapter: SqlControlAdapter<'postgres'> | undefined;
 
+  #endView = new MigrationContractViews<PostgresContractView<End>>(
+    this,
+    'PostgresMigration',
+    (json) => PostgresContractView.fromJson<End>(json),
+  );
+  #startView = new MigrationContractViews<PostgresContractView<Start>>(
+    this,
+    'PostgresMigration',
+    (json) => PostgresContractView.fromJson<Start>(json),
+  );
+
   constructor(stack?: ControlStack<'sql', 'postgres'>) {
     super(stack);
     // The descriptor `create()` is typed as the wider `ControlAdapterInstance`;
@@ -82,6 +95,23 @@ export abstract class PostgresMigration extends SqlMigration<
     this.controlAdapter = stack?.adapter
       ? (stack.adapter.create(stack) as SqlControlAdapter<'postgres'>)
       : undefined;
+  }
+
+  /**
+   * The typed, schema-qualified Postgres view over this migration's end-state
+   * contract — `this.endContract.namespace.<schema>.table.<name>`, etc. Throws
+   * if no `endContractJson` was provided.
+   */
+  get endContract(): PostgresContractView<End> {
+    return this.#endView.endContract;
+  }
+
+  /**
+   * The typed Postgres view over this migration's start-state contract, or
+   * `null` for a baseline migration (no `startContractJson`).
+   */
+  get startContract(): PostgresContractView<Start> | null {
+    return this.#startView.startContract;
   }
 
   /**

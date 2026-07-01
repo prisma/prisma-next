@@ -4,7 +4,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqliteBinding } from '@prisma-next/driver-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { type UNBOUND_NAMESPACE_ID, unboundNamespace } from '@prisma-next/framework-components/ir';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { ExtractCodecTypes, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -33,7 +33,7 @@ import {
 import sqliteTarget, {
   SqliteContractSerializer as SqlContractSerializer,
 } from '@prisma-next/target-sqlite/runtime';
-import { blindCast, castAs } from '@prisma-next/utils/casts';
+import { castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';
 import { SqliteRuntimeImpl } from './sqlite-runtime';
@@ -47,12 +47,6 @@ type UnboundOrm<TContract extends Contract<SqlStorage>> =
   OrmClient<TContract>[typeof UNBOUND_NAMESPACE_ID];
 type UnboundEnums<TContract extends Contract<SqlStorage>> =
   NamespacedEnums<TContract>[typeof UNBOUND_NAMESPACE_ID];
-
-function unboundNamespace<T>(builderOutput: { readonly [UNBOUND_NAMESPACE_ID]?: unknown }): T {
-  return blindCast<T, 'the unbound namespace always exists on a sqlite builder output'>(
-    builderOutput[UNBOUND_NAMESPACE_ID],
-  );
-}
 
 export interface SqliteTransactionContext<TContract extends Contract<SqlStorage>>
   extends TransactionContext {

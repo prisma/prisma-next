@@ -1,3 +1,4 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   MigrationOperationClass,
   SqlMigrationPlanOperation,
@@ -5,9 +6,12 @@ import type {
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { Migration as SqlMigration } from '@prisma-next/family-sql/migration';
 import type { ControlStack } from '@prisma-next/framework-components/control';
+import { MigrationContractViews } from '@prisma-next/migration-tools/migration';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import { blindCast } from '@prisma-next/utils/casts';
 import { errorSqliteMigrationStackMissing } from '../errors';
+import { SqliteContractView } from '../sqlite-contract-view';
 import {
   AddColumnCall,
   CreateIndexCall,
@@ -34,8 +38,19 @@ type Op = SqlMigrationPlanOperation<SqlitePlanTargetDetails>;
  * forward to the corresponding `*Call` with that stored adapter, so user
  * migrations can write `this.createTable({...})` without threading the adapter
  * through every call.
+ *
+ * Binds the framework base's `Start` / `End` contract generics so a subclass
+ * that assigns its `start-contract.json` / `end-contract.json` imports gets
+ * fully-typed view accessors: `this.endContract` is a `SqliteContractView<End>`
+ * (sole namespace unwrapped to the root — `this.endContract.table.<name>`),
+ * built lazily from the JSON fields via the shared `MigrationContractViews`
+ * helper. Mirrors `MongoMigration`'s view getters; the framework base derives
+ * `describe()` from the same JSON.
  */
-export abstract class SqliteMigration extends SqlMigration<SqlitePlanTargetDetails, 'sqlite'> {
+export abstract class SqliteMigration<
+  Start extends Contract<SqlStorage> = Contract<SqlStorage>,
+  End extends Contract<SqlStorage> = Contract<SqlStorage>,
+> extends SqlMigration<SqlitePlanTargetDetails, 'sqlite', Start, End> {
   readonly targetId = 'sqlite' as const;
 
   /**
@@ -46,6 +61,15 @@ export abstract class SqliteMigration extends SqlMigration<SqlitePlanTargetDetai
    */
   protected readonly controlAdapter: SqlControlAdapter<'sqlite'> | undefined;
 
+  #endView = new MigrationContractViews<SqliteContractView<End>>(this, 'SqliteMigration', (json) =>
+    SqliteContractView.fromJson<End>(json),
+  );
+  #startView = new MigrationContractViews<SqliteContractView<Start>>(
+    this,
+    'SqliteMigration',
+    (json) => SqliteContractView.fromJson<Start>(json),
+  );
+
   constructor(stack?: ControlStack<'sql', 'sqlite'>) {
     super(stack);
     this.controlAdapter = stack?.adapter
@@ -54,6 +78,23 @@ export abstract class SqliteMigration extends SqlMigration<SqlitePlanTargetDetai
           'The SQLite descriptor create() returns SqlControlAdapter<sqlite>; typed as wider ControlAdapterInstance at the framework boundary'
         >(stack.adapter.create(stack))
       : undefined;
+  }
+
+  /**
+   * The typed SQLite view over this migration's end-state contract — sole
+   * namespace unwrapped to the root, so `this.endContract.table.<name>` etc.
+   * Throws if no `endContractJson` was provided.
+   */
+  get endContract(): SqliteContractView<End> {
+    return this.#endView.endContract;
+  }
+
+  /**
+   * The typed SQLite view over this migration's start-state contract, or
+   * `null` for a baseline migration (no `startContractJson`).
+   */
+  get startContract(): SqliteContractView<Start> | null {
+    return this.#startView.startContract;
   }
 
   protected createTable(options: {

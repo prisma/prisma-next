@@ -92,6 +92,33 @@ describe('migration file E2E', () => {
     }
   }
 
+  /**
+   * The rendered (new-shape) scaffold imports its from/to identity from
+   * committed contract JSON. Write minimal `{start,end}-contract.json` (carrying
+   * `storage.storageHash`, which the base's derived describe() reads) and the
+   * matching `{start,end}-contract.ts` type modules so the executed migration
+   * resolves its imports; the hashes match `meta` so describe() is consistent.
+   */
+  async function writeContractFixtures(meta: {
+    readonly from: string | null;
+    readonly to: string;
+  }): Promise<void> {
+    const contractType =
+      'export type Contract = { readonly storage: { readonly storageHash: string } };\n';
+    await writeFile(
+      join(tmpDir, 'end-contract.json'),
+      JSON.stringify({ storage: { storageHash: meta.to } }, null, 2),
+    );
+    await writeFile(join(tmpDir, 'end-contract.ts'), contractType);
+    if (meta.from !== null) {
+      await writeFile(
+        join(tmpDir, 'start-contract.json'),
+        JSON.stringify({ storage: { storageHash: meta.from } }, null, 2),
+      );
+      await writeFile(join(tmpDir, 'start-contract.ts'), contractType);
+    }
+  }
+
   describe('factory-based migration', () => {
     const factoryMigration = [
       `import { MigrationCLI } from '${cliMigrationCliExport}';`,
@@ -215,6 +242,7 @@ describe('migration file E2E', () => {
         .replace("'@prisma-next/target-mongo/migration'", `'${factoryExport}'`)
         .replace("'@prisma-next/cli/migration-cli'", `'${cliMigrationCliExport}'`);
       await writeFile(join(tmpDir, 'migration.ts'), resolvedSource);
+      await writeContractFixtures(defaultMeta);
 
       const result = await runFile('migration.ts');
       expect(result.exitCode).toBe(0);
@@ -258,6 +286,7 @@ describe('migration file E2E', () => {
         .replace("'@prisma-next/target-mongo/migration'", `'${factoryExport}'`)
         .replace("'@prisma-next/cli/migration-cli'", `'${cliMigrationCliExport}'`);
       await writeFile(join(tmpDir, 'migration.ts'), resolvedSource);
+      await writeContractFixtures(defaultMeta);
 
       const result = await runFile('migration.ts');
       expect(result.exitCode).toBe(0);
@@ -277,15 +306,14 @@ describe('migration file E2E', () => {
       const { DropCollectionCall } = await import('../src/core/op-factory-call');
       const calls = [new DropCollectionCall('legacy')];
 
-      const tsSource = renderCallsToTypeScript(calls, {
-        from: 'sha256:aaa',
-        to: 'sha256:bbb',
-      });
+      const meta = { from: 'sha256:aaa', to: 'sha256:bbb' } as const;
+      const tsSource = renderCallsToTypeScript(calls, meta);
       const resolvedSource = tsSource
         .replace("'@prisma-next/family-mongo/migration'", `'${migrationExport}'`)
         .replace("'@prisma-next/target-mongo/migration'", `'${factoryExport}'`)
         .replace("'@prisma-next/cli/migration-cli'", `'${cliMigrationCliExport}'`);
       await writeFile(join(tmpDir, 'migration.ts'), resolvedSource);
+      await writeContractFixtures(meta);
 
       const result = await runFile('migration.ts');
       expect(result.exitCode).toBe(0);
@@ -454,14 +482,16 @@ describe('migration file E2E', () => {
         new CreateIndexCall('users', [{ field: 'email', direction: 1 as const }], { unique: true }),
       ];
 
-      const migrationSource = renderCallsToTypeScript(calls, {
+      const directRunMeta = {
         from: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
         to: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
-      })
+      } as const;
+      const migrationSource = renderCallsToTypeScript(calls, directRunMeta)
         .replace("'@prisma-next/family-mongo/migration'", `'${familyMongoDistMigration}'`)
         .replace("'@prisma-next/target-mongo/migration'", `'${targetMongoDistMigration}'`)
         .replace("'@prisma-next/cli/migration-cli'", `'${cliMigrationCliDist}'`);
       await writeMigrationTs(tmpDir, migrationSource);
+      await writeContractFixtures(directRunMeta);
 
       const migrationPath = join(tmpDir, 'migration.ts');
       const content = await readFile(migrationPath, 'utf-8');
