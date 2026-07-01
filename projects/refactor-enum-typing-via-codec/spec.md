@@ -114,31 +114,32 @@ value-keyed counterpart of `renderOutputType` (params-keyed) to `CodecDescriptor
 `CodecLookup`:
 
 ```ts
-// Render the TS type of a single permitted value, for the given channel.
-// `encodedValue` is the value as stored in the value set (codec-encoded, i.e. encodeJson form).
+// Given one stored (codec-encoded) value, return the TS literal type to print for it.
+// `value` is the value as stored in the value set (codec-encoded, i.e. encodeJson form).
+// `side`: `output` = the read/SELECT type, `input` = the create/update type.
 // Returns a TS type string (e.g. "'low'", "1"), or `undefined` if the codec cannot
 // express the value as a narrowed literal (e.g. a Date-output codec).
-renderValueType(encodedValue: JsonValue, channel: 'output' | 'input'): string | undefined;
+renderValueLiteral(value: JsonValue, side: 'output' | 'input'): string | undefined;
 ```
 
 - **Built-in primitive codecs** (`pg/text@1`, integer, boolean, …) implement it as the
   literal of the decoded value: text → `serializeValue(decodeJson(v))` = `'low'`; int → `1`.
   (`decodeJson` is synchronous / build-time by design — [codec.ts:30](packages/1-framework/1-core/framework-components/src/shared/codec.ts).)
 - **Codecs that cannot narrow to a literal** return `undefined`; the consumer falls back to
-  the codec's full output type (`CodecTypes[id][channel]` / `renderOutputTypeFor`).
+  the codec's full output type (`CodecTypes[id][side]` / `renderOutputTypeFor`).
 
-The emitter calls `renderValueType` per value-set value and joins with `|`, applying
+The emitter calls `renderValueLiteral` per value-set value and joins with `|`, applying
 nullability. `serializeValue` stays for structural emit scaffolding; it is **not** used to
 type codec values. **No type-level counterpart** — the no-emit path already has the authored
 types.
 
 ## Changes by surface
 
-1. **Codec descriptor + lookup** — add `renderValueType`. Implement for the built-in Postgres
+1. **Codec descriptor + lookup** — add `renderValueLiteral`. Implement for the built-in Postgres
    + framework primitive codecs. Non-narrowable codecs return `undefined`.
 2. **SQL column, emit** — [emitter/index.ts](packages/2-sql/3-tooling/emitter/src/index.ts):
    in `computeColumnType`, replace the direct `renderValueSetUnionBase(valueSet.values)` with
-   per-value `codecLookup.renderValueType(value, side)`, joined with `|`, falling back to the
+   per-value `codecLookup.renderValueLiteralFor(codecId, value, side)`, joined with `|`, falling back to the
    codec output type where it returns `undefined`. Delete `renderValueSetLiteral` /
    `renderValueSetUnionBase`.
 3. **Domain field, emit** — [domain-type-generation.ts](packages/1-framework/3-tooling/emitter/src/domain-type-generation.ts):
@@ -150,7 +151,7 @@ types.
    permitted values are supplied by a **family-supplied per-field resolver** on `EmissionSpi`
    (mirroring the existing `resolveFieldTypeParams` hook): given a field, it returns
    `{ encodedValues, codecId }` for an enum-restricted field, or `undefined` otherwise. The
-   framework renders each `encodedValue` through `renderValueType`, joins with `|`, and applies
+   framework renders each `encodedValue` through `renderValueLiteral`, joins with `|`, and applies
    nullability — the **same codec path** the SQL column emit uses.
    - **SQL** resolves field → column (`storage.fields.<field>.column`) → storage value-set, so
      the SQL field type derives from its column's value set; the domain enum is no longer a SQL
@@ -158,7 +159,7 @@ types.
    - **Mongo** supplies an **interim** resolver that reads `domain.enum` members — Mongo has no
      value-set entity yet (step 6 / TML-2953), so the domain enum is its only permitted-values
      source. This keeps Mongo's emitted enum field types **byte-identical**; the resolver routes
-     through `renderValueType` like every other enum type. TML-2953 deletes it once Mongo's
+     through `renderValueLiteral` like every other enum type. TML-2953 deletes it once Mongo's
      value set lands.
 4. **No-emit** — [contract-types.ts](packages/2-sql/2-authoring/contract-ts/src/contract-types.ts):
    **no change required.** `EnumValueUnion` already propagates the authored `Values` and is
@@ -182,11 +183,11 @@ types.
 
 - **A1 — Emit typing goes through the codec.** No emit-path field/column type is produced by
   rendering a stored value directly. Every enum-restricted emit type goes through
-  `renderValueType`. Grep guard: no caller renders `valueSet.values` / enum member values to
+  `renderValueLiteral`. Grep guard: no caller renders `valueSet.values` / enum member values to
   TS literals outside the codec seam.
 - **A2 — Domain enum is not a SQL typing input.** The hardcoded enum override in
   `domain-type-generation.ts` and `DomainEnumLookup` are deleted; the framework renders enum
-  field types only through the family-supplied resolver + `renderValueType`. No **SQL** code
+  field types only through the family-supplied resolver + `renderValueLiteral`. No **SQL** code
   reads `domain…enum` to produce a TS type — the SQL resolver sources from the storage value
   set. (Repo-wide, the only remaining reader is Mongo's **interim** resolver, removed by
   TML-2953; see step 3.) `db.enums` runtime behavior unchanged.
@@ -202,7 +203,7 @@ types.
 - **A5 — Correct for a non-identity codec (emit).** A test fixture defines a value set over a
   codec whose output type differs from its encoded form, and asserts the **emitted** type is
   the codec's output type (narrowed where the codec narrows; the full output type where
-  `renderValueType` returns `undefined`) — **not** the raw encoded literal.
+  `renderValueLiteral` returns `undefined`) — **not** the raw encoded literal.
 - **A6 — Emit and no-emit agree.** For every enum field in the fixtures, the no-emit
   `typeof contract` type equals the emitted `contract.d.ts` type.
 - **A7 — No new bare casts; lint:deps clean; build + typecheck + full test suites pass.**
@@ -219,7 +220,7 @@ types.
 ## Open questions
 
 None outstanding. Resolved during shaping:
-- Codec value→type mechanism: a new **emit-only** `renderValueType` on the codec, not a
+- Codec value→type mechanism: a new **emit-only** `renderValueLiteral` on the codec, not a
   generic serializer and not `renderOutputType`-from-params, because a value does not carry
   its TS type.
 - No-emit path: already correct — it propagates the authored typed values; needs no codec
@@ -230,7 +231,7 @@ None outstanding. Resolved during shaping:
   inline, self-contained validator (rendered from the value set); the value-on-both-sides
   redundancy is intentional per ADR 172. Implemented in TML-2953.
 - Field→type connection: already solved by the existing `FieldOutputTypes` map; the refactor
-  changes the computation (a family-supplied per-field resolver feeding `renderValueType`), not
+  changes the computation (a family-supplied per-field resolver feeding `renderValueLiteral`), not
   the connection.
 - Keeping Mongo green while the shared override is deleted: `FieldOutputTypes` is generated once
   in `generate-contract-dts.ts` for both families, and the framework emitter must not read

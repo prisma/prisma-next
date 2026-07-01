@@ -254,11 +254,11 @@ export const mongoEmission = {
     return parts.length > 0 ? `{ ${parts.join('; ')} }` : 'Record<string, never>';
   },
 
-  // INTERIM (TML-2953): Mongo has no storage value-set entity yet, so an enum field's permitted
+  // INTERIM (TML-2953): Mongo has no storage value-set entity yet, so a value-set field's permitted
   // values are sourced from `domain.enum`. This is the only remaining domain-enum typing reader in
   // the repo; TML-2953 adds Mongo's value set and deletes this, routing the field type through
-  // storage like SQL. The values still flow through the codec seam (`renderValueType`), so this
-  // keeps Mongo's emitted enum field types byte-identical without re-introducing a direct render.
+  // storage. The values still flow through the codec seam (`renderValueLiteral`), so this keeps
+  // Mongo's emitted field types byte-identical without re-introducing a direct render.
   resolveFieldValueSet(
     _modelName: string,
     fieldName: string,

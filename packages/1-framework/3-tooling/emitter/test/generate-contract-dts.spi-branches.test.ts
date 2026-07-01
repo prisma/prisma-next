@@ -17,7 +17,7 @@ function literalCodecLookup(): CodecLookup {
     targetTypesFor: () => undefined,
     metaFor: () => undefined,
     renderOutputTypeFor: () => undefined,
-    renderValueTypeFor: (_id, value) =>
+    renderValueLiteralFor: (_id, value) =>
       typeof value === 'string'
         ? `'${value}'`
         : typeof value === 'number' || typeof value === 'boolean'

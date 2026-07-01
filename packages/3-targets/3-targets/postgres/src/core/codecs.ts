@@ -90,11 +90,20 @@ type NumericParams = { readonly precision: number; readonly scale?: number };
  * `encodeJson` output equals their decoded output type (text, int, float, bool) — it renders the
  * encoded value directly. A non-identity codec (e.g. one that encodes to an int but decodes to a
  * string literal) must NOT use this: it has to `decodeJson` first, then render, in its own
- * `renderValueType`.
+ * `renderValueLiteral`.
  */
 function renderPrimitiveLiteral(value: JsonValue): string | undefined {
   if (typeof value === 'string') {
-    const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    // Escape backslash and quote, plus every character that a raw single-quoted
+    // TS literal cannot contain: newline, carriage return, and the U+2028/U+2029
+    // line/paragraph separators (which JS also treats as line terminators).
+    const escaped = value
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\u2028/g, '\\u2028')
+      .replace(/\u2029/g, '\\u2029');
     return `'${escaped}'`;
   }
   if (typeof value === 'number' || typeof value === 'boolean') {
@@ -166,8 +175,8 @@ export class PgTextDescriptor extends CodecDescriptorImpl<void> {
   override readonly targetTypes = ['text'] as const;
   override readonly meta = PG_TEXT_META;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
-  override renderValueType(encodedValue: JsonValue): string | undefined {
-    return renderPrimitiveLiteral(encodedValue);
+  override renderValueLiteral(value: JsonValue): string | undefined {
+    return renderPrimitiveLiteral(value);
   }
   override factory(): (ctx: CodecInstanceContext) => PgTextCodec {
     return () => new PgTextCodec(this);
@@ -249,8 +258,8 @@ export class PgInt4Descriptor extends CodecDescriptorImpl<void> {
   override readonly targetTypes = ['int4'] as const;
   override readonly meta = PG_INT4_META;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
-  override renderValueType(encodedValue: JsonValue): string | undefined {
-    return renderPrimitiveLiteral(encodedValue);
+  override renderValueLiteral(value: JsonValue): string | undefined {
+    return renderPrimitiveLiteral(value);
   }
   override factory(): (ctx: CodecInstanceContext) => PgInt4Codec {
     return () => new PgInt4Codec(this);
@@ -291,8 +300,8 @@ export class PgInt2Descriptor extends CodecDescriptorImpl<void> {
   override readonly targetTypes = ['int2'] as const;
   override readonly meta = PG_INT2_META;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
-  override renderValueType(encodedValue: JsonValue): string | undefined {
-    return renderPrimitiveLiteral(encodedValue);
+  override renderValueLiteral(value: JsonValue): string | undefined {
+    return renderPrimitiveLiteral(value);
   }
   override factory(): (ctx: CodecInstanceContext) => PgInt2Codec {
     return () => new PgInt2Codec(this);
@@ -333,8 +342,8 @@ export class PgInt8Descriptor extends CodecDescriptorImpl<void> {
   override readonly targetTypes = ['int8'] as const;
   override readonly meta = PG_INT8_META;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
-  override renderValueType(encodedValue: JsonValue): string | undefined {
-    return renderPrimitiveLiteral(encodedValue);
+  override renderValueLiteral(value: JsonValue): string | undefined {
+    return renderPrimitiveLiteral(value);
   }
   override factory(): (ctx: CodecInstanceContext) => PgInt8Codec {
     return () => new PgInt8Codec(this);
@@ -375,8 +384,8 @@ export class PgFloat4Descriptor extends CodecDescriptorImpl<void> {
   override readonly targetTypes = ['float4'] as const;
   override readonly meta = PG_FLOAT4_META;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
-  override renderValueType(encodedValue: JsonValue): string | undefined {
-    return renderPrimitiveLiteral(encodedValue);
+  override renderValueLiteral(value: JsonValue): string | undefined {
+    return renderPrimitiveLiteral(value);
   }
   override factory(): (ctx: CodecInstanceContext) => PgFloat4Codec {
     return () => new PgFloat4Codec(this);
@@ -417,8 +426,8 @@ export class PgFloat8Descriptor extends CodecDescriptorImpl<void> {
   override readonly targetTypes = ['float8'] as const;
   override readonly meta = PG_FLOAT8_META;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
-  override renderValueType(encodedValue: JsonValue): string | undefined {
-    return renderPrimitiveLiteral(encodedValue);
+  override renderValueLiteral(value: JsonValue): string | undefined {
+    return renderPrimitiveLiteral(value);
   }
   override factory(): (ctx: CodecInstanceContext) => PgFloat8Codec {
     return () => new PgFloat8Codec(this);
@@ -459,8 +468,8 @@ export class PgBoolDescriptor extends CodecDescriptorImpl<void> {
   override readonly targetTypes = ['bool'] as const;
   override readonly meta = PG_BOOL_META;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
-  override renderValueType(encodedValue: JsonValue): string | undefined {
-    return renderPrimitiveLiteral(encodedValue);
+  override renderValueLiteral(value: JsonValue): string | undefined {
+    return renderPrimitiveLiteral(value);
   }
   override factory(): (ctx: CodecInstanceContext) => PgBoolCodec {
     return () => new PgBoolCodec(this);
@@ -1007,8 +1016,8 @@ export class PgCharDescriptor extends CodecDescriptorImpl<LengthParams> {
   override renderOutputType(params: LengthParams): string | undefined {
     return sqlCharDescriptor.renderOutputType(params);
   }
-  override renderValueType(encodedValue: JsonValue): string | undefined {
-    return renderPrimitiveLiteral(encodedValue);
+  override renderValueLiteral(value: JsonValue): string | undefined {
+    return renderPrimitiveLiteral(value);
   }
   override factory(_params: LengthParams): (ctx: CodecInstanceContext) => SqlCharCodec {
     return () => new SqlCharCodec(this);
@@ -1031,8 +1040,8 @@ export class PgVarcharDescriptor extends CodecDescriptorImpl<LengthParams> {
   override renderOutputType(params: LengthParams): string | undefined {
     return sqlVarcharDescriptor.renderOutputType(params);
   }
-  override renderValueType(encodedValue: JsonValue): string | undefined {
-    return renderPrimitiveLiteral(encodedValue);
+  override renderValueLiteral(value: JsonValue): string | undefined {
+    return renderPrimitiveLiteral(value);
   }
   override factory(_params: LengthParams): (ctx: CodecInstanceContext) => SqlVarcharCodec {
     return () => new SqlVarcharCodec(this);
@@ -1057,8 +1066,8 @@ export class PgIntDescriptor extends CodecDescriptorImpl<void> {
   override readonly meta = PG_INT_META;
   override readonly traits = sqlIntDescriptor.traits;
   override readonly paramsSchema = sqlIntDescriptor.paramsSchema;
-  override renderValueType(encodedValue: JsonValue): string | undefined {
-    return renderPrimitiveLiteral(encodedValue);
+  override renderValueLiteral(value: JsonValue): string | undefined {
+    return renderPrimitiveLiteral(value);
   }
   override factory(): (ctx: CodecInstanceContext) => SqlIntCodec {
     return () => new SqlIntCodec(this);
@@ -1078,8 +1087,8 @@ export class PgFloatDescriptor extends CodecDescriptorImpl<void> {
   override readonly meta = PG_FLOAT_META;
   override readonly traits = sqlFloatDescriptor.traits;
   override readonly paramsSchema = sqlFloatDescriptor.paramsSchema;
-  override renderValueType(encodedValue: JsonValue): string | undefined {
-    return renderPrimitiveLiteral(encodedValue);
+  override renderValueLiteral(value: JsonValue): string | undefined {
+    return renderPrimitiveLiteral(value);
   }
   override factory(): (ctx: CodecInstanceContext) => SqlFloatCodec {
     return () => new SqlFloatCodec(this);

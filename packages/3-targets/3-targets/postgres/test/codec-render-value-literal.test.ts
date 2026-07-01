@@ -13,13 +13,13 @@ import {
 
 function valueRendererFor(
   descriptor: AnyCodecDescriptor,
-): ((encodedValue: unknown, channel: 'output' | 'input') => string | undefined) | undefined {
-  return descriptor.renderValueType as
-    | ((encodedValue: unknown, channel: 'output' | 'input') => string | undefined)
+): ((value: unknown, side: 'output' | 'input') => string | undefined) | undefined {
+  return descriptor.renderValueLiteral as
+    | ((value: unknown, side: 'output' | 'input') => string | undefined)
     | undefined;
 }
 
-describe('codec renderValueType', () => {
+describe('codec renderValueLiteral', () => {
   describe('pg/text@1', () => {
     const renderer = valueRendererFor(pgTextDescriptor);
 
@@ -33,6 +33,11 @@ describe('codec renderValueType', () => {
 
     it('escapes single quotes in string values', () => {
       expect(renderer?.("it's", 'output')).toBe("'it\\'s'");
+    });
+
+    it('escapes newlines and carriage returns (invalid raw in a single-quoted literal)', () => {
+      expect(renderer?.('a\nb', 'output')).toBe("'a\\nb'");
+      expect(renderer?.('a\r\nb', 'output')).toBe("'a\\r\\nb'");
     });
   });
 

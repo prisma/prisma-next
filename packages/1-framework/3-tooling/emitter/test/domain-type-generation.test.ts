@@ -35,7 +35,7 @@ import {
 } from '../src/domain-type-generation';
 
 /**
- * Mirrors the real primitive codecs' `renderValueType`: identity codecs render the encoded value
+ * Mirrors the real primitive codecs' `renderValueLiteral`: identity codecs render the encoded value
  * directly as a literal. Tests pass this so the value-set field emit produces literal unions.
  */
 function literalCodecLookup(): CodecLookup {
@@ -49,7 +49,7 @@ function literalCodecLookup(): CodecLookup {
     targetTypesFor: () => undefined,
     metaFor: () => undefined,
     renderOutputTypeFor: () => undefined,
-    renderValueTypeFor: (_id, value) => renderPrimitiveLiteral(value),
+    renderValueLiteralFor: (_id, value) => renderPrimitiveLiteral(value),
   };
 }
 
@@ -1415,7 +1415,7 @@ describe('resolveFieldType value-set narrowing edge cases', () => {
 });
 
 describe('renderValueSetType', () => {
-  it('renders a literal union via the codec renderValueType', () => {
+  it('renders a literal union via the codec renderValueLiteral', () => {
     expect(renderValueSetType(['low', 'high'], 'pg/text@1', 'output', literalCodecLookup())).toBe(
       "'low' | 'high'",
     );
@@ -1425,7 +1425,7 @@ describe('renderValueSetType', () => {
     expect(renderValueSetType([], 'pg/text@1', 'output', literalCodecLookup())).toBeUndefined();
   });
 
-  it('returns undefined when the lookup has no renderValueTypeFor', () => {
+  it('returns undefined when the lookup has no renderValueLiteralFor', () => {
     const lookup: CodecLookup = {
       get: () => undefined,
       targetTypesFor: () => undefined,

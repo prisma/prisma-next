@@ -34,10 +34,10 @@ export interface EmissionSpi {
   ): Record<string, unknown> | undefined;
 
   /**
-   * Resolves an enum-restricted field's permitted values (codec-encoded) and the codec that types
-   * them, or `undefined` for a non-enum field. The framework renders the values through the codec
-   * seam — it never reads `domain.enum` itself. SQL sources from the storage value set; Mongo
-   * supplies an interim resolver reading `domain.enum` (removed by TML-2953).
+   * Resolves a field's permitted values (codec-encoded) plus the codec that types them, or
+   * `undefined` for a field with no restricted value set. The framework renders the values into a TS
+   * literal union through the codec seam. Each family decides where the values live — a value set in
+   * its own storage plane, or another family-owned source.
    */
   resolveFieldValueSet?(
     modelName: string,

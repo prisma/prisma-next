@@ -15,7 +15,7 @@ function literalCodecLookup(): CodecLookup {
     targetTypesFor: () => undefined,
     metaFor: () => undefined,
     renderOutputTypeFor: () => undefined,
-    renderValueTypeFor: (_id, value) =>
+    renderValueLiteralFor: (_id, value) =>
       typeof value === 'string'
         ? `'${value}'`
         : typeof value === 'number' || typeof value === 'boolean'
@@ -256,7 +256,7 @@ describe('emitter integration', () => {
       // erased by emission. This drives the full emit pipeline and asserts the
       // emitted typemap text carries the member-value union for an enum field —
       // produced via the family `resolveFieldValueSet` resolver + the codec seam
-      // (`renderValueTypeFor`), the same path the SQL/Mongo emitters wire.
+      // (`renderValueLiteralFor`), the same path the SQL/Mongo emitters wire.
       const ir = createTestContract({
         models: {
           Post: {

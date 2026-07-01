@@ -65,10 +65,10 @@ const codecLookup: CodecLookup = {
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,
   // Enum field types are produced through the codec seam (TML-2952): the emitter
-  // renders each value-set value via `renderValueTypeFor`. `mongo/string@1` is an
+  // renders each value-set value via `renderValueLiteralFor`. `mongo/string@1` is an
   // identity codec, so it renders the encoded string straight to a quoted literal —
-  // mirroring the real `mongo/string@1` descriptor's `renderValueType`.
-  renderValueTypeFor: (id, value) =>
+  // mirroring the real `mongo/string@1` descriptor's `renderValueLiteral`.
+  renderValueLiteralFor: (id, value) =>
     id === 'mongo/string@1' && typeof value === 'string' ? `'${value}'` : undefined,
 };
 

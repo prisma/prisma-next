@@ -311,9 +311,9 @@ export function extractCodecLookup(
     string,
     (params: Record<string, unknown>) => string | undefined
   >();
-  const valueRenderersById = new Map<
+  const valueLiteralRenderersById = new Map<
     string,
-    (value: JsonValue, channel: 'output' | 'input') => string | undefined
+    (value: JsonValue, side: 'output' | 'input') => string | undefined
   >();
   const owners = new Map<string, string>();
   for (const descriptor of descriptors) {
@@ -342,8 +342,8 @@ export function extractCodecLookup(
       if (typeof codecDescriptor.renderInputType === 'function') {
         inputRenderersById.set(codecDescriptor.codecId, codecDescriptor.renderInputType);
       }
-      if (typeof codecDescriptor.renderValueType === 'function') {
-        valueRenderersById.set(codecDescriptor.codecId, codecDescriptor.renderValueType);
+      if (typeof codecDescriptor.renderValueLiteral === 'function') {
+        valueLiteralRenderersById.set(codecDescriptor.codecId, codecDescriptor.renderValueLiteral);
       }
       // Materialize a representative `Codec` instance for `byId.get()` so consumers reading the lookup's instance side (e.g. SQL renderer's cast-policy lookup, or the contract emitter's literal-default `encodeJson` resolver) keep finding the codec.
       //
@@ -384,7 +384,7 @@ export function extractCodecLookup(
     metaFor: (id) => metaById.get(id),
     renderOutputTypeFor: (id, params) => renderersById.get(id)?.(params),
     renderInputTypeFor: (id, params) => inputRenderersById.get(id)?.(params),
-    renderValueTypeFor: (id, value, channel) => valueRenderersById.get(id)?.(value, channel),
+    renderValueLiteralFor: (id, value, side) => valueLiteralRenderersById.get(id)?.(value, side),
   };
 }
 

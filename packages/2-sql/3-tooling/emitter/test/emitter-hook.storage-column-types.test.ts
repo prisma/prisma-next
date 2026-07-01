@@ -816,7 +816,7 @@ describe('StorageColumnTypes', () => {
       metaFor: () => undefined,
       renderOutputTypeFor: (id) => (id === NON_IDENTITY_CODEC_ID ? 'Level' : undefined),
       // Returns undefined for every value, forcing the codec-output fallback.
-      renderValueTypeFor: () => undefined,
+      renderValueLiteralFor: () => undefined,
     };
 
     const dts = generateContractDts(

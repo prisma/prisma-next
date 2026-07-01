@@ -731,30 +731,31 @@ describe('extractCodecLookup', () => {
     );
   });
 
-  it('renderValueTypeFor delegates to the descriptor renderValueType', () => {
+  it('renderValueLiteralFor delegates to the descriptor renderValueLiteral', () => {
     const descriptorWithValueRenderer: AnyCodecDescriptor = {
       ...stubDescriptor('text@1'),
-      renderValueType: (value: unknown) => (typeof value === 'string' ? `'${value}'` : undefined),
+      renderValueLiteral: (value: unknown) =>
+        typeof value === 'string' ? `'${value}'` : undefined,
     };
     const lookup = extractCodecLookup([
       { id: 'desc', types: { codecTypes: { codecDescriptors: [descriptorWithValueRenderer] } } },
     ]);
-    expect(lookup.renderValueTypeFor?.('text@1', 'low', 'output')).toBe("'low'");
-    expect(lookup.renderValueTypeFor?.('text@1', 42, 'output')).toBeUndefined();
+    expect(lookup.renderValueLiteralFor?.('text@1', 'low', 'output')).toBe("'low'");
+    expect(lookup.renderValueLiteralFor?.('text@1', 42, 'output')).toBeUndefined();
   });
 
-  it('renderValueTypeFor returns undefined for unknown codec ids', () => {
+  it('renderValueLiteralFor returns undefined for unknown codec ids', () => {
     const lookup = extractCodecLookup([
       { id: 'desc', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
     ]);
-    expect(lookup.renderValueTypeFor?.('unknown@1', 'val', 'output')).toBeUndefined();
+    expect(lookup.renderValueLiteralFor?.('unknown@1', 'val', 'output')).toBeUndefined();
   });
 
-  it('renderValueTypeFor returns undefined when the codec has no renderValueType', () => {
+  it('renderValueLiteralFor returns undefined when the codec has no renderValueLiteral', () => {
     const lookup = extractCodecLookup([
       { id: 'desc', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
     ]);
-    expect(lookup.renderValueTypeFor?.('a@1', 'val', 'output')).toBeUndefined();
+    expect(lookup.renderValueLiteralFor?.('a@1', 'val', 'output')).toBeUndefined();
   });
 });
 

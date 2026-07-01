@@ -2,7 +2,7 @@
  * Structural guards for the enum-typing-via-codec slice (TML-2952).
  *
  * Guard 1 — every emit-path enum/value-set type goes through the codec seam
- *      (`CodecLookup.renderValueTypeFor` / `CodecDescriptor.renderValueType`).
+ *      (`CodecLookup.renderValueLiteralFor` / `CodecDescriptor.renderValueLiteral`).
  *      The pre-refactor helpers that rendered stored values straight to TS
  *      literals (`renderValueSetUnionBase`, `renderValueSetLiteral`,
  *      `renderEnumValueUnion`, `renderEnumMemberLiteral`) and the
