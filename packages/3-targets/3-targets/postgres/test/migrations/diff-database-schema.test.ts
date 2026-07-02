@@ -8,7 +8,7 @@ import { contractToPostgresDatabaseSchemaNode } from '../../src/core/migrations/
 import {
   diffPostgresSchema,
   filterIssuesByOwnership,
-} from '../../src/core/migrations/diff-postgres-schema';
+} from '../../src/core/migrations/diff-database-schema';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';

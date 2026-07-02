@@ -49,8 +49,8 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlControlAdapter } from './control-adapter';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
+import type { DiffDatabaseSchemaInput } from './migrations/schema-differ';
 import type {
-  DiffDatabaseSchemaInput,
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
 } from './migrations/types';
@@ -297,8 +297,6 @@ export interface SqlControlFamilyInstance
   }): Promise<void>;
 
   bootstrapControlTableQueries(): readonly DdlNode[];
-
-  bootstrapSignMarkerQueries(): readonly DdlNode[];
 
   toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview;
 }
@@ -937,10 +935,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
     bootstrapControlTableQueries(): readonly DdlNode[] {
       return getControlAdapter().bootstrapControlTableQueries();
-    },
-
-    bootstrapSignMarkerQueries(): readonly DdlNode[] {
-      return getControlAdapter().bootstrapSignMarkerQueries();
     },
 
     toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview {

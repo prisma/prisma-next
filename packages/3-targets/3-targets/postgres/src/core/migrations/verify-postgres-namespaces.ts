@@ -48,7 +48,11 @@ function existingSchemasFromSchema(schema: SqlSchemaIRNode): readonly string[] {
 
 /**
  * Emits a `missing_schema` issue for every contract-declared Postgres
- * namespace whose live container does not yet exist.
+ * namespace whose live container does not yet exist. The planner's
+ * `collectSchemaIssues` prepends these to the relational findings so a
+ * multi-schema plan emits `CREATE SCHEMA` before the tables that need it —
+ * a planner-only concern (verify already rejects via the `missing_table` a
+ * missing schema produces), so this is not part of the shared diff.
  *
  * A namespace's live container is the schema returned by its
  * polymorphic `ddlSchemaName(storage)` method — named schemas resolve

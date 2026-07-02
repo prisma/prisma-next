@@ -18,10 +18,8 @@ import type {
   MigrationRunnerResult,
   OperationContext,
   OpFactoryCall,
-  SchemaDiffer,
   SchemaIssue,
   SchemaVerifier,
-  VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
@@ -37,6 +35,7 @@ import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/ty
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlAdapter } from '../control-adapter';
 import type { SqlControlFamilyInstance } from '../control-instance';
+import type { SqlDiffDatabaseSchema, SqlVerifyDatabaseSchema } from './schema-differ';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
 
@@ -503,8 +502,9 @@ export interface SqlControlTargetDescriptor<
    * returns relational + policy issues; SQLite returns relational only). It is
    * schema logic on the target, not database I/O, so it lives here rather than
    * on the control adapter. How it computes the two issue sets is private.
+   * See {@link SqlDiffDatabaseSchema} / {@link SqlVerifyDatabaseSchema}.
    */
-  readonly diffDatabaseSchema: SchemaDiffer<DiffDatabaseSchemaInput>['diff'];
+  readonly diffDatabaseSchema: SqlDiffDatabaseSchema;
   /**
    * The same combined comparison as {@link diffDatabaseSchema}, wrapped in the
    * verify envelope (`ok`/`summary`/`code`/`target`/`timings`) plus the
@@ -512,22 +512,9 @@ export interface SqlControlTargetDescriptor<
    * `diffDatabaseSchema` so the relational walk that produces the tree runs
    * once per verify, not once for the diff and again for the tree.
    */
-  readonly verifyDatabaseSchema: (input: DiffDatabaseSchemaInput) => VerifyDatabaseSchemaResult;
+  readonly verifyDatabaseSchema: SqlVerifyDatabaseSchema;
   createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
-}
-
-/**
- * Inputs to a target descriptor's {@link SqlControlTargetDescriptor.diffDatabaseSchema}:
- * the contract (the expected side derives from it), the introspected actual
- * schema node, and the resolution context the relational diff needs.
- */
-export interface DiffDatabaseSchemaInput {
-  readonly contract: Contract<SqlStorage>;
-  readonly schema: SqlSchemaIRNode;
-  readonly strict: boolean;
-  readonly typeMetadataRegistry: ReadonlyMap<string, { readonly nativeType?: string }>;
-  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 export interface CreateSqlMigrationPlanOptions<TTargetDetails> {

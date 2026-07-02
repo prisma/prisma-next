@@ -31,6 +31,13 @@ function toPolicyNode(policy: PostgresRlsPolicy, namespaceId: string): PostgresP
  * per Postgres namespace, each holding its `PostgresTableSchemaNode`s with
  * their `PostgresPolicySchemaNode`s, plus the database roles on the root.
  *
+ * Not a duplicate of the family's `contractToSchemaIR`: that builds a flat,
+ * single `{ tables }` map (and throws on cross-namespace name collisions, with
+ * no RLS/role concept) for SQLite's single-schema world. This is the
+ * Postgres-specific *tree* shape — multi-schema, RLS-policy-aware, role-aware.
+ * It reuses the family's per-namespace table conversion (`contractNamespaceToSchemaIR`)
+ * for column/FK/index building and only adds the Postgres tree/policy/role shape.
+ *
  * Tables are grouped by their owning namespace (resolved DDL schema name) so
  * the tree mirrors Postgres's object hierarchy. The DDL schema name is
  * resolved once per namespace.
