@@ -23,7 +23,7 @@ Every event is a single JSON object with the fields below. Nothing else is sent.
 | `packageManager` | string \| null | `"pnpm/10.27.0"` | Parsed from the `npm_config_user_agent` env var your package manager sets when invoking the CLI |
 | `databaseTarget` | string \| null | `"postgres"` | The `target.targetId` field from your `prisma-next.config.ts`, if a config is loaded |
 | `tsVersion` | string \| null | `"5.9.3"` | The TypeScript version declared in your project's `package.json`, if readable |
-| `agent` | string \| null | `"Claude Code"` | The detected AI coding agent, or `null`. See [Agent detection](#agent-detection) |
+| `agent` | string \| null | `"claude"` | The detected AI coding agent, or `null`. See [Agent detection](#agent-detection) |
 | `extensions` | string[] | `["pgvector"]` | The `.id` values of the `extensionPacks` declared in your config |
 
 A server-side ingestion timestamp is added when the backend stores the event; no client clock is transmitted.
@@ -36,7 +36,7 @@ Telemetry deliberately excludes anything that could identify you, your machine, 
 - **No positional arguments.** Subcommand names are reported; positional inputs are dropped.
 - **No file paths.** Not absolute paths, not relative paths, not paths embedded in flag values.
 - **No usernames, hostnames, IP addresses, MAC addresses, or machine identifiers.** The installation UUID is a freshly-generated random value, never derived from anything about your system. Resetting it is as simple as deleting one file.
-- **No environment variable values.** Some env vars are *read* to populate fields (`npm_config_user_agent` for the package manager string, the agent allowlist below for `agent`), but their values never leave your machine in raw form.
+- **No environment variable values.** Some env vars are *read* to populate fields (`npm_config_user_agent` for the package manager string, the agent markers below for `agent`), but their values never leave your machine in raw form. The one exception is the opt-in `AI_AGENT` variable, whose whole purpose is to carry the agent name that gets reported — see [Agent detection](#agent-detection).
 - **No project source code, no schema contents, no migration contents.**
 - **No outcome data.** Phase 1 does not collect success/failure, exit code, or elapsed time.
 
@@ -169,20 +169,9 @@ If you ever need to force the CLI to treat a CI environment as non-CI (e.g. to v
 
 ## Agent detection
 
-The `agent` field is populated by reading a small allowlist of well-known environment-variable markers set by AI coding tools. The current allowlist is:
+The `agent` field is populated by the [`@vercel/detect-agent`](https://www.npmjs.com/package/@vercel/detect-agent) package, which recognises well-known environment-variable markers set by AI coding tools. It reports lowercase agent identifiers such as `"claude"` (Claude Code), `"cursor"` / `"cursor-cli"`, `"codex"`, `"gemini"`, `"devin"`, `"github-copilot"`, `"replit"`, and others; it also honours the emerging `AI_AGENT` convention, so a tool that exports `AI_AGENT=<name>` is reported under that name.
 
-| Env var | Reported agent |
-| --- | --- |
-| `CLAUDECODE` | `"Claude Code"` |
-| `CURSOR_AGENT` | `"Cursor"` |
-| `CODEX_SANDBOX` | `"Codex CLI"` |
-| `GEMINI_CLI` | `"Gemini CLI"` |
-| `WINDSURF` | `"Windsurf"` |
-| `AIDER` | `"Aider"` |
-| `CODY` | `"Cody"` |
-| `CONTINUE` | `"Continue"` |
-
-When no marker is set, `agent` is `null`. The detection is **best-effort**: it cannot identify an agent that doesn't set a recognised env var, and some tools (notably Codex CLI outside its sandboxed sessions) are inherently harder to detect than others. False negatives are expected and treated as "unknown" rather than "human". The allowlist is in [`packages/1-framework/3-tooling/cli-telemetry/src/detect-agent.ts`](../packages/1-framework/3-tooling/cli-telemetry/src/detect-agent.ts); new entries land there as new agents are recognised.
+When no marker is set, `agent` is `null`. The detection is **best-effort**: it cannot identify an agent that doesn't set a recognised env var. False negatives are expected and treated as "unknown" rather than "human". The full marker list lives in the [`@vercel/detect-agent` source](https://github.com/vercel/vercel/tree/main/packages/detect-agent); new agents are recognised by upgrading the dependency rather than by patching Prisma Next.
 
 ## How the data is used
 
