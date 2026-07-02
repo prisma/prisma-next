@@ -1,19 +1,36 @@
 import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
 
 /**
- * Collapse the aggregate verifier's per-space schema results into a
- * single {@link VerifyDatabaseSchemaResult} for the existing CLI
- * display surface. Concatenates issues across members; sums counts;
- * uses the app member's result as the structural envelope (storage
- * hash, target).
+ * The combined per-space contract-satisfaction result (Part 1) plus the
+ * standalone unclaimed-elements list (Part 2), reported once. The CLI renders
+ * both; `unclaimed` is never folded into the combined tree or its issues.
+ */
+export interface CombinedSchemaResult {
+  readonly result: VerifyDatabaseSchemaResult;
+  readonly unclaimed: readonly string[];
+}
+
+/**
+ * Collapse the aggregate verifier's per-space contract-satisfaction results
+ * (Part 1) into a single {@link VerifyDatabaseSchemaResult} for the existing CLI
+ * display surface, and carry the deduplicated unclaimed-elements list (Part 2)
+ * alongside it. Concatenates issues across spaces; sums counts; uses the app
+ * space's result as the structural envelope (storage hash, target). Extras are
+ * already stripped from each per-space result, so nothing here duplicates an
+ * unclaimed element per space.
+ *
+ * **Unclaimed disposition.** In strict mode a non-empty `unclaimed` list fails
+ * the combined verdict (`ok: false`); in lenient mode it is carried for
+ * informational rendering only. The list itself is returned unchanged for the
+ * renderer.
  *
  * **Summary policy.** Preserve the per-family phrasing whenever the
- * combined `ok` flag agrees with the app member's `ok` flag — this is
+ * combined `ok` flag agrees with the app space's `ok` flag — this is
  * the common case (single-family deployments, single-app deployments)
  * and the family's "satisfies / does not satisfy contract" phrasing
  * stays user-visible. When the app passes but an extension fails (or
  * vice versa) the app's summary contradicts the envelope, so fall back
- * to the first failing member's summary. This keeps family phrasing
+ * to the first failing space's summary. This keeps family phrasing
  * intact and the envelope internally consistent (`ok: false` ↔ failure
  * summary).
  */
@@ -21,7 +38,8 @@ export function combineSchemaResults(
   perSpace: ReadonlyMap<string, VerifyDatabaseSchemaResult>,
   appSpaceId: string,
   strict: boolean,
-): VerifyDatabaseSchemaResult {
+  unclaimed: readonly string[],
+): CombinedSchemaResult {
   const appResult = perSpace.get(appSpaceId) ?? perSpace.values().next().value;
   if (appResult === undefined) {
     throw new Error('Aggregate verifier returned no schema results — this is a wiring bug.');
@@ -47,41 +65,45 @@ export function combineSchemaResults(
     childRoots.push(result.schema.root);
   }
 
-  // When `okAll !== appResult.ok`, exactly one shape is reachable: app passes
-  // (`appResult.ok === true`) and at least one other member failed
-  // (`okAll === false`). In that shape the failure was assigned to
-  // `firstFailure` during iteration, so non-null assertion is safe. The mirror
-  // shape (app fails while every member passes) is impossible because
-  // `appResult` either *is* a member of `perSpace` or is the first iterator
-  // value; either way its `ok` flag participates in `okAll`.
-  const summary =
-    okAll === appResult.ok
-      ? appResult.summary
-      : (firstFailure as VerifyDatabaseSchemaResult).summary;
+  const unclaimedFails = strict && unclaimed.length > 0;
+  const ok = okAll && !unclaimedFails;
+
+  // Prefer a failing space's family phrasing; else, when only the unclaimed list
+  // fails the verdict, say so; else keep the app space's phrasing.
+  const summary = okAll
+    ? unclaimedFails
+      ? `Database schema has ${unclaimed.length} unclaimed element${unclaimed.length === 1 ? '' : 's'} (not in any contract)`
+      : appResult.summary
+    : appResult.ok
+      ? (firstFailure as VerifyDatabaseSchemaResult).summary
+      : appResult.summary;
 
   return {
-    ok: okAll,
-    ...(okAll ? {} : { code: appResult.code ?? 'PN-RUN-3010' }),
-    summary,
-    contract: appResult.contract,
-    target: appResult.target,
-    schema: {
-      issues,
-      schemaDiffIssues,
-      root: {
-        status: okAll ? 'pass' : 'fail',
-        kind: 'aggregate',
-        name: 'aggregate',
-        contractPath: '',
-        code: 'AGGREGATE',
-        message: okAll ? 'Aggregate schema matches' : 'Aggregate schema mismatch',
-        expected: undefined,
-        actual: undefined,
-        children: childRoots,
+    result: {
+      ok,
+      ...(ok ? {} : { code: appResult.code ?? 'PN-RUN-3010' }),
+      summary,
+      contract: appResult.contract,
+      target: appResult.target,
+      schema: {
+        issues,
+        schemaDiffIssues,
+        root: {
+          status: ok ? 'pass' : 'fail',
+          kind: 'aggregate',
+          name: 'aggregate',
+          contractPath: '',
+          code: 'AGGREGATE',
+          message: ok ? 'Aggregate schema matches' : 'Aggregate schema mismatch',
+          expected: undefined,
+          actual: undefined,
+          children: childRoots,
+        },
+        counts,
       },
-      counts,
+      meta: { strict },
+      timings: { total: 0 },
     },
-    meta: { strict },
-    timings: { total: 0 },
+    unclaimed,
   };
 }

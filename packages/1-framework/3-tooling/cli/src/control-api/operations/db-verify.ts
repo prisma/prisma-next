@@ -69,6 +69,12 @@ export interface ExecuteDbVerifyOptions<TFamilyId extends string, TTargetId exte
  */
 export interface ExecuteDbVerifySuccess {
   readonly schemaResults: ReadonlyMap<string, VerifyDatabaseSchemaResult>;
+  /**
+   * Live element names no contract space declares, deduplicated and reported
+   * once for the whole database (never per space). Strict mode fails on a
+   * non-empty list; lenient mode surfaces it informationally.
+   */
+  readonly unclaimed: readonly string[];
   readonly memberOrder: readonly string[];
   readonly appSpaceId: string;
 }
@@ -250,6 +256,7 @@ function finaliseVerifyResult(args: {
   emitVerifySpan(onProgress, 'spanEndOk');
   return ok({
     schemaResults: verifyResult.value.schemaCheck.perSpace,
+    unclaimed: verifyResult.value.schemaCheck.unclaimed,
     memberOrder: [aggregate.app.spaceId, ...aggregate.extensions.map((e) => e.spaceId)],
     appSpaceId: aggregate.app.spaceId,
   });

@@ -108,7 +108,14 @@ const FULL_SCHEMA_VERIFY = (
 
 function extraTables(result: VerifyDatabaseSchemaResult | undefined): string[] {
   return (result?.schema.issues ?? [])
-    .flatMap((issue) => ('table' in issue && issue.table ? [issue.table] : []))
+    .flatMap((issue) => (issue.kind === 'extra_table' && issue.table ? [issue.table] : []))
+    .sort();
+}
+
+/** The names of any grafted extra-table nodes that survive in a space view (should be none). */
+function extraNodeNames(result: VerifyDatabaseSchemaResult | undefined): string[] {
+  return (result?.schema.root.children ?? [])
+    .flatMap((node) => (node.code === 'extra_table' ? [node.name] : []))
     .sort();
 }
 
@@ -222,7 +229,7 @@ describe('verifyMigration', () => {
   });
 
   describe('schemaCheck', () => {
-    it('scopes each member to its own space, dropping the extras another member claims', () => {
+    it('Part 1: each space view shows its declared nodes only, no extras', () => {
       const aggregate = makeAggregate({
         app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
         extensions: [
@@ -250,13 +257,47 @@ describe('verifyMigration', () => {
       });
 
       const schemaCheck = result.assertOk().schemaCheck;
-      // App keeps only the undeclared `orphan_table`; `cipher_state` is dropped.
-      expect(extraTables(schemaCheck.perSpace.get('app'))).toEqual(['orphan_table']);
-      // Cipher keeps only the undeclared `orphan_table`; `user` is dropped.
-      expect(extraTables(schemaCheck.perSpace.get('cipher'))).toEqual(['orphan_table']);
+      // No space's contract-satisfaction view carries the undeclared table
+      // (nor a sibling's table) — extras are stripped from every per-space view.
+      expect(extraTables(schemaCheck.perSpace.get('app'))).toEqual([]);
+      expect(extraTables(schemaCheck.perSpace.get('cipher'))).toEqual([]);
+      expect(extraNodeNames(schemaCheck.perSpace.get('app'))).toEqual([]);
+      expect(extraNodeNames(schemaCheck.perSpace.get('cipher'))).toEqual([]);
     });
 
-    it('keeps live tables claimed by no member as each member’s undeclared extras', () => {
+    it('Part 2: reports a table no space declares once in the unclaimed list', () => {
+      const aggregate = makeAggregate({
+        app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+        extensions: [
+          makeMember({
+            spaceId: 'cipher',
+            headHash: 'sha256:cipher',
+            tables: { cipher_state: {} },
+          }),
+        ],
+      });
+      const liveSchema = {
+        tables: {
+          user: { columns: {} },
+          cipher_state: { columns: {} },
+          orphan_table: { columns: {} },
+        },
+      };
+
+      const result = verifyMigration({
+        aggregate,
+        markersBySpaceId: new Map(),
+        schemaIntrospection: liveSchema,
+        mode: 'strict',
+        verifySchemaForMember: FULL_SCHEMA_VERIFY,
+      });
+
+      // `orphan_table` is declared by no space, so it appears exactly once —
+      // not once per space, the bug the two-part split fixes.
+      expect(result.assertOk().schemaCheck.unclaimed).toEqual(['orphan_table']);
+    });
+
+    it('Part 2: deduplicates and sorts multiple undeclared tables into one list', () => {
       const aggregate = makeAggregate({
         app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
         extensions: [
@@ -284,14 +325,32 @@ describe('verifyMigration', () => {
         verifySchemaForMember: FULL_SCHEMA_VERIFY,
       });
 
-      const schemaCheck = result.assertOk().schemaCheck;
-      expect(extraTables(schemaCheck.perSpace.get('app'))).toEqual([
-        'another_orphan',
-        'mystery_table',
-      ]);
+      expect(result.assertOk().schemaCheck.unclaimed).toEqual(['another_orphan', 'mystery_table']);
     });
 
-    it('leaves no extras when every live table is claimed by some member', () => {
+    it('single-space: an undeclared table is unclaimed, not a node in the space view', () => {
+      const aggregate = makeAggregate({
+        app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+      });
+      const liveSchema = {
+        tables: { user: { columns: {} }, legacy_events: { columns: {} } },
+      };
+
+      const result = verifyMigration({
+        aggregate,
+        markersBySpaceId: new Map(),
+        schemaIntrospection: liveSchema,
+        mode: 'strict',
+        verifySchemaForMember: FULL_SCHEMA_VERIFY,
+      });
+
+      const schemaCheck = result.assertOk().schemaCheck;
+      expect(extraTables(schemaCheck.perSpace.get('app'))).toEqual([]);
+      expect(extraNodeNames(schemaCheck.perSpace.get('app'))).toEqual([]);
+      expect(schemaCheck.unclaimed).toEqual(['legacy_events']);
+    });
+
+    it('leaves the unclaimed list empty when every live table is declared by some space', () => {
       const aggregate = makeAggregate({
         app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
         extensions: [
@@ -319,6 +378,7 @@ describe('verifyMigration', () => {
       const schemaCheck = result.assertOk().schemaCheck;
       expect(extraTables(schemaCheck.perSpace.get('app'))).toEqual([]);
       expect(extraTables(schemaCheck.perSpace.get('cipher'))).toEqual([]);
+      expect(schemaCheck.unclaimed).toEqual([]);
     });
 
     it('returns notOk(introspectionFailure) when verifySchemaForMember throws', () => {

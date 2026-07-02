@@ -27,7 +27,7 @@ function issueEntityName(issue: DiffIssue): string | undefined {
  * on. Absent/empty `ownedByOtherSpaces` returns the diff unchanged.
  *
  * Generic over `TNode` so a caller passing a node-typed `SchemaDiff<TNode>`
- * (the Postgres planner passes `SchemaDiff<SqlSchemaIRNode>`) gets the same
+ * (the Postgres planner passes `SchemaDiff<SqlSchemaDiffNode>`) gets the same
  * concrete type back.
  */
 export function scopePlanDiffToSpace<TNode extends DiffableNode>(

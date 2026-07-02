@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract, StorageNamespace } from '@prisma-next/contract/types';
+import { elementCoordinates } from '@prisma-next/framework-components/ir';
 import { join } from 'pathe';
 import {
   errorBundleNotFoundForGraphNode,
@@ -283,6 +284,13 @@ export function createContractSpaceAggregate(args: {
     hasSpace: (id) => byId.has(id),
     space: (id) => byId.get(id),
     spaces: () => ordered,
+    declaresEntity: (entityName) =>
+      ordered.some((member) => {
+        for (const coord of elementCoordinates(member.contract().storage)) {
+          if (coord.entityName === entityName) return true;
+        }
+        return false;
+      }),
     checkIntegrity,
   };
 }

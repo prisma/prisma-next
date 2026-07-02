@@ -54,12 +54,13 @@ describe('combineSchemaResults', () => {
       ['cipher', makeResult({ spaceId: 'cipher', ok: true, summary: 'Schema matches contract' })],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false);
+    const combined = combineSchemaResults(perSpace, 'app', false, []);
 
-    expect(combined).toMatchObject({
+    expect(combined.result).toMatchObject({
       ok: true,
       summary: 'Database schema satisfies contract',
     });
+    expect(combined.unclaimed).toEqual([]);
   });
 
   it('preserves the per-family failure summary when every member fails', () => {
@@ -74,9 +75,9 @@ describe('combineSchemaResults', () => {
       ],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false);
+    const combined = combineSchemaResults(perSpace, 'app', false, []);
 
-    expect(combined).toMatchObject({
+    expect(combined.result).toMatchObject({
       ok: false,
       summary: 'Database schema does not satisfy contract (1 failure)',
     });
@@ -99,9 +100,9 @@ describe('combineSchemaResults', () => {
       ],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false);
+    const combined = combineSchemaResults(perSpace, 'app', false, []);
 
-    expect(combined).toMatchObject({
+    expect(combined.result).toMatchObject({
       ok: false,
       summary: 'Database schema does not satisfy contract (1 failure)',
       schema: { counts: { fail: 1 } },
@@ -123,18 +124,49 @@ describe('combineSchemaResults', () => {
       ],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', true);
+    const combined = combineSchemaResults(perSpace, 'app', true, []);
 
-    expect(combined.ok).toBe(false);
-    expect(combined.summary).not.toContain('matches contract');
-    expect(combined.schema.root.status).toBe('fail');
-    expect(combined.schema.root.message).toBe('Aggregate schema mismatch');
-    expect(combined.meta?.strict).toBe(true);
+    expect(combined.result.ok).toBe(false);
+    expect(combined.result.summary).not.toContain('matches contract');
+    expect(combined.result.schema.root.status).toBe('fail');
+    expect(combined.result.schema.root.message).toBe('Aggregate schema mismatch');
+    expect(combined.result.meta?.strict).toBe(true);
+  });
+
+  it('fails the verdict in strict mode when the unclaimed list is non-empty', () => {
+    const perSpace = new Map<string, VerifyDatabaseSchemaResult>([
+      [
+        'app',
+        makeResult({ spaceId: 'app', ok: true, summary: 'Database schema satisfies contract' }),
+      ],
+    ]);
+
+    const combined = combineSchemaResults(perSpace, 'app', true, ['legacy_events']);
+
+    expect(combined.result.ok).toBe(false);
+    expect(combined.result.summary).toContain('1 unclaimed element');
+    expect(combined.result.code).toBe('PN-RUN-3010');
+    expect(combined.unclaimed).toEqual(['legacy_events']);
+  });
+
+  it('keeps the verdict `ok` in lenient mode when the unclaimed list is non-empty', () => {
+    const perSpace = new Map<string, VerifyDatabaseSchemaResult>([
+      [
+        'app',
+        makeResult({ spaceId: 'app', ok: true, summary: 'Database schema satisfies contract' }),
+      ],
+    ]);
+
+    const combined = combineSchemaResults(perSpace, 'app', false, ['legacy_events', 'old_audit']);
+
+    expect(combined.result.ok).toBe(true);
+    expect(combined.result.summary).toBe('Database schema satisfies contract');
+    expect(combined.unclaimed).toEqual(['legacy_events', 'old_audit']);
   });
 
   it('throws a wiring-bug error when the per-space map is empty', () => {
     const empty = new Map<string, VerifyDatabaseSchemaResult>();
-    expect(() => combineSchemaResults(empty, 'app', false)).toThrow(/wiring bug/);
+    expect(() => combineSchemaResults(empty, 'app', false, [])).toThrow(/wiring bug/);
   });
 
   it('falls back to the first iterator value when the app id is absent from the per-space map', () => {
@@ -142,9 +174,9 @@ describe('combineSchemaResults', () => {
       ['cipher', makeResult({ spaceId: 'cipher', ok: true, summary: 'Schema matches contract' })],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false);
+    const combined = combineSchemaResults(perSpace, 'app', false, []);
 
-    expect(combined).toMatchObject({
+    expect(combined.result).toMatchObject({
       ok: true,
       summary: 'Schema matches contract',
       contract: { storageHash: 'sha256:cipher-storage' },
@@ -164,9 +196,9 @@ describe('combineSchemaResults', () => {
       ],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false);
+    const combined = combineSchemaResults(perSpace, 'app', false, []);
 
-    expect(combined).toMatchObject({
+    expect(combined.result).toMatchObject({
       ok: false,
       summary: 'cipher failure',
       schema: { counts: { fail: 2 } },
@@ -186,9 +218,9 @@ describe('combineSchemaResults', () => {
     delete stripped.code;
     const perSpace = new Map<string, VerifyDatabaseSchemaResult>([['app', stripped]]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false);
+    const combined = combineSchemaResults(perSpace, 'app', false, []);
 
-    expect(combined).toMatchObject({
+    expect(combined.result).toMatchObject({
       ok: false,
       code: 'PN-RUN-3010',
     });
@@ -233,9 +265,9 @@ describe('combineSchemaResults', () => {
       ],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false);
+    const combined = combineSchemaResults(perSpace, 'app', false, []);
 
-    expect(combined.schema.issues).toEqual([appStructuralIssue]);
-    expect(combined.schema.schemaDiffIssues).toEqual([appDiffIssue, extDiffIssue]);
+    expect(combined.result.schema.issues).toEqual([appStructuralIssue]);
+    expect(combined.result.schema.schemaDiffIssues).toEqual([appDiffIssue, extDiffIssue]);
   });
 });

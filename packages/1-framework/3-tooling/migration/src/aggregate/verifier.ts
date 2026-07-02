@@ -3,13 +3,13 @@ import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { requireHeadRef } from './aggregate';
 import type { ContractMarkerRecordLike } from './marker-types';
-import { otherMemberEntityNames, scopeSchemaResultToSpace } from './scope-schema-result';
 import type { ContractSpaceAggregate, ContractSpaceMember } from './types';
+import { collectExtraElementNames, stripExtraFindings } from './unclaimed-elements';
 
 /**
  * Caller policy for the verifier. Today's only knob is
- * `mode`: `strict` treats orphan elements (live tables not claimed by
- * any aggregate member) as errors; `lenient` treats them as
+ * `mode`: `strict` treats unclaimed elements (live tables declared by
+ * no contract space) as errors; `lenient` treats them as
  * informational. Maps directly to `db verify --strict`.
  */
 export interface VerifierInput {
@@ -19,10 +19,10 @@ export interface VerifierInput {
   readonly mode: 'strict' | 'lenient';
   /**
    * Caller-supplied per-space schema verifier. The CLI wires this to the
-   * family's `verifySchema`. It verifies the member against the **full**
-   * introspected schema; the verifier then scopes the result to the member's
-   * contract space (dropping the extras other members claim). It composes no
-   * pre-projection, so the framework never touches the storage shape.
+   * family's `verifySchema`, run against the **full** introspected schema. The
+   * verifier then produces two outputs from the per-space results: each space's
+   * contract-satisfaction view (extras stripped) and one deduplicated list of
+   * live elements no contract space declares. It touches no storage shape.
    */
   readonly verifySchemaForMember: (
     schema: unknown,
@@ -56,7 +56,21 @@ export interface MarkerCheckSection {
 }
 
 export interface SchemaCheckSection {
+  /**
+   * Part 1 — per contract space, its contract-satisfaction view: the space's
+   * declared nodes only, each pass/fail by whether a missing/mismatch issue
+   * concerns it. Extras are stripped; the space's verdict is missing/mismatch
+   * only.
+   */
   readonly perSpace: ReadonlyMap<string, VerifyDatabaseSchemaResult>;
+  /**
+   * Part 2 — one deduplicated, sorted list of live element names no contract
+   * space declares (built from the diffs' extra findings, filtered by the
+   * passive aggregate's ownership query). Reported once for the whole database,
+   * not per space. Strict callers fail on a non-empty list; lenient callers show
+   * it informationally.
+   */
+  readonly unclaimed: readonly string[];
 }
 
 export interface VerifierSuccess {
@@ -79,11 +93,14 @@ export type VerifierOutput = Result<VerifierSuccess, VerifierError>;
  *   member's `headRef.hash` + `headRef.invariants`. Absence is a
  *   distinct kind, not an error (callers — `db verify` strict vs
  *   `db init` precondition — choose how to interpret it).
- * - `schemaCheck` per member: verify the member against the **full**
- *   introspected schema, then scope the result to the member's contract
- *   space via {@link scopeSchemaResultToSpace} — dropping the extras every
- *   other member claims. Extras owned by no member survive as each member's
- *   undeclared-table findings. No schema is pruned before verifying.
+ * - `schemaCheck`: two distinct outputs from the per-space diffs.
+ *   **Part 1** (`perSpace`) — each space verified against the **full**
+ *   introspected schema, then its extras stripped, leaving the space's
+ *   declared nodes (its contract-satisfaction view; verdict is
+ *   missing/mismatch only). **Part 2** (`unclaimed`) — the extras gathered
+ *   across every space, deduplicated, and filtered to the names no contract
+ *   space declares (via the passive aggregate's ownership query); reported
+ *   once for the database. No schema is pruned before verifying.
  *
  * `markerCheck.orphanMarkers` lists every marker row whose `space` is
  * not a member of the aggregate. `db verify` callers reject orphans;
@@ -147,17 +164,20 @@ function runVerifyMigration(input: VerifierInput): VerifierOutput {
   }
   orphanMarkers.sort((a, b) => a.spaceId.localeCompare(b.spaceId));
 
-  // Schema check per member: verify against the full schema, then scope the
-  // result to the member's contract space.
+  // Schema check: verify each space against the full schema, then split the
+  // results in two. Part 1 — each space's contract-satisfaction view, extras
+  // stripped. Part 2 — every extra name across all spaces, deduplicated and kept
+  // only when no contract space declares it.
   const schemaPerSpace = new Map<string, VerifyDatabaseSchemaResult>();
+  const extraNames = new Set<string>();
   for (const member of allMembers) {
-    const others = allMembers.filter((m) => m.spaceId !== member.spaceId);
     const result = verifySchemaForMember(schemaIntrospection, member, mode);
-    schemaPerSpace.set(
-      member.spaceId,
-      scopeSchemaResultToSpace(result, otherMemberEntityNames(member, others)),
-    );
+    schemaPerSpace.set(member.spaceId, stripExtraFindings(result));
+    for (const name of collectExtraElementNames(result)) extraNames.add(name);
   }
+  const unclaimed = [...extraNames]
+    .filter((name) => !aggregate.declaresEntity(name))
+    .sort((a, b) => a.localeCompare(b));
 
   return ok({
     markerCheck: {
@@ -166,6 +186,7 @@ function runVerifyMigration(input: VerifierInput): VerifierOutput {
     },
     schemaCheck: {
       perSpace: schemaPerSpace,
+      unclaimed,
     },
   });
 }
