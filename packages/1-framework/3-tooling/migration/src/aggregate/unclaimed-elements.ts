@@ -47,12 +47,14 @@ function aggregateStatus(children: readonly SchemaVerificationNode[]): 'pass' | 
 type Counts = { pass: number; warn: number; fail: number; totalNodes: number };
 
 /**
- * Counts the pass/warn/fail statuses over a subtree, root included. Used only to
- * measure the contribution of a stripped extra node so it can be subtracted from
- * the family's authoritative counts — never to re-tally the whole result, whose
- * count basis varies by family (SQL counts the root, Mongo does not).
+ * Counts the pass/warn/fail statuses over a verification tree (root included).
+ * Used only when the strip actually dropped a node — the pruned tree is then
+ * self-consistent regardless of family, so the recomputed `fail` is the honest
+ * verdict signal in both count bases (SQL counts the root at its recomputed
+ * status; Mongo's root was never a failure carrier, so a fresh walk of the
+ * surviving collection nodes matches its tally).
  */
-function countSubtree(node: SchemaVerificationNode): Counts {
+function countTree(node: SchemaVerificationNode): Counts {
   let pass = 0;
   let warn = 0;
   let fail = 0;
@@ -69,26 +71,27 @@ function countSubtree(node: SchemaVerificationNode): Counts {
 }
 
 /**
- * Part 1 — a contract space's contract-satisfaction view. Strips every `extra_*`
- * finding (the family differ grafts them as fail nodes / issues so the shared
- * single-space verdict stays correct for the planner and runner) so the view is
- * the space's **declared** nodes only, each pass/fail by whether a
- * missing/mismatch issue concerns it. Extras belong to the separate unclaimed
- * list ({@link collectExtraElementNames}), never a contract-tree node.
+ * Part 1 — a contract space's contract-satisfaction view. Strips the
+ * **top-level entity extras only**: `extra_table` issues and the grafted
+ * top-level extra-entity nodes (a SQL `table` / a Mongo `collection` the family
+ * added for a live element declared by no contract). Those belong to the
+ * separate unclaimed list ({@link collectExtraElementNames}), never a
+ * contract-tree node.
  *
- * Only top-level entity nodes (a SQL `table` / a Mongo `collection`) are
- * droppable — an extra column or constraint lives inside a declared table's
- * subtree and is stripped from `issues`, not by pruning the tree. The verdict is
- * recomputed by subtracting each stripped node's own tally from the family's
- * authoritative counts (family-agnostic — SQL counts the root, Mongo does not,
- * so re-tallying the whole tree would drift the count basis). Only the root
- * status is re-derived from the surviving children.
+ * Nested `extra_*` findings (an extra column on the space's own declared
+ * table…) and extra-policy `schemaDiffIssues` are the space's **own drift** and
+ * stay in Part 1: their contribution is baked into the declared table's subtree
+ * and the family's verdict, so stripping the issue would leave a failing space
+ * with no visible evidence.
+ *
+ * Counts: when nothing was dropped, the family's authoritative counts and
+ * verdict are untouched. When a node was dropped, both are recomputed from the
+ * pruned tree with a plain self-consistent walk ({@link countTree}) —
+ * family-agnostic, correct in the SQL (root-counted) and Mongo (root-not-
+ * counted) bases alike, and free of family-specific count arithmetic.
  */
 export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDatabaseSchemaResult {
-  const issues = result.schema.issues.filter((issue) => !isExtraIssue(issue));
-  const schemaDiffIssues = result.schema.schemaDiffIssues.filter(
-    (issue) => issue.outcome !== 'extra',
-  );
+  const issues = result.schema.issues.filter((issue) => issue.kind !== 'extra_table');
   const keptChildren: SchemaVerificationNode[] = [];
   const dropped: SchemaVerificationNode[] = [];
   for (const child of result.schema.root.children) {
@@ -96,32 +99,25 @@ export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDa
     else keptChildren.push(child);
   }
 
-  const nothingStripped =
-    issues.length === result.schema.issues.length &&
-    schemaDiffIssues.length === result.schema.schemaDiffIssues.length &&
-    dropped.length === 0;
-  if (nothingStripped) return result;
-
-  const counts = { ...result.schema.counts };
-  for (const node of dropped) {
-    const sub = countSubtree(node);
-    counts.pass -= sub.pass;
-    counts.warn -= sub.warn;
-    counts.fail -= sub.fail;
-    counts.totalNodes -= sub.totalNodes;
+  const strippedIssues = issues.length !== result.schema.issues.length;
+  if (!strippedIssues && dropped.length === 0) return result;
+  if (dropped.length === 0) {
+    return { ...result, schema: { ...result.schema, issues } };
   }
+
   const root: SchemaVerificationNode = {
     ...result.schema.root,
     status: aggregateStatus(keptChildren),
     children: keptChildren,
   };
+  const counts = countTree(root);
   const ok = counts.fail === 0;
   return {
     ...result,
     ok,
     ...(ok ? {} : { code: result.code ?? 'PN-RUN-3010' }),
     summary: ok ? 'Database schema satisfies contract' : result.summary,
-    schema: { issues, schemaDiffIssues, root, counts },
+    schema: { ...result.schema, issues, root, counts },
   };
 }
 
