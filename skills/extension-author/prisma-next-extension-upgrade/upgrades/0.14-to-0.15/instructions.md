@@ -54,6 +54,24 @@ changes:
         - "renderValueTypeFor"
         - "renderOutputType"
       anyMatch: true
+  - id: mongo-derive-json-schema-value-sets-param
+    summary: |
+      `deriveJsonSchema` / `derivePolymorphicJsonSchema` (from `@prisma-next/mongo-contract-psl`) now
+      source a value-set field's `$jsonSchema` `enum` keyword from a value-set map, not the domain
+      enum. Their fourth argument changed from a domain-enum map
+      (`Record<string, ContractEnum>`, read as `members.map(m => m.value)`) to a value-set map
+      (`FieldValueSets` = `Record<string, { values: readonly JsonValue[] }>`, keyed by the field's
+      `valueSet` `entityName`). If your extension calls either function directly, pass the storage
+      value sets (`contract.storage.namespaces[<ns>].entries.valueSet`) instead of `domain.enum`; the
+      values are identical for enums, so the rendered validator is unchanged. Most extensions author
+      Mongo contracts through `mongoContract(...)` / `defineContract(...)`, which call these
+      internally — those need no change.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "deriveJsonSchema"
+        - "derivePolymorphicJsonSchema"
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in

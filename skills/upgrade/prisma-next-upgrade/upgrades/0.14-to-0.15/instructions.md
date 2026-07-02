@@ -147,3 +147,17 @@ by rendering each stored value through its codec, replacing the framework's
 clean; `contract.json`, `contract.d.ts`, and both hashes unchanged). No user action
 required. Incidental substrate diff only.
 -->
+
+<!--
+TML-2953 (this PR): Mongo enum fields now type through a storage value set, the same
+way SQL does. Authoring a Mongo enum writes a value set into
+`contract.storage.namespaces[<ns>].entries.valueSet[<Enum>]` (the codec-encoded
+member values) alongside the domain enum, and the emit typing + `$jsonSchema`
+validator source from it. The `mongo-demo` and `retail-store` example contracts
+regenerate to carry the value set (`contract.json` gains `entries.valueSet` and its
+`storageHash` updates); the emitted `contract.d.ts` field types and the `$jsonSchema`
+validator are byte-identical. `db.enums` runtime behaviour is unchanged. A re-emit
+picks up the new `contract.json` shape; existing migrations are unaffected (the value
+set is non-physical — no new migration op). No user action required. Incidental
+substrate diff only.
+-->
