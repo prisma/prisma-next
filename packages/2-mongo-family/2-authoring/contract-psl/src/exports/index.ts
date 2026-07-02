@@ -1,4 +1,8 @@
-export { deriveJsonSchema, derivePolymorphicJsonSchema } from '../derive-json-schema';
+export {
+  deriveJsonSchema,
+  derivePolymorphicJsonSchema,
+  type FieldValueSets,
+} from '../derive-json-schema';
 export {
   type InterpretPslDocumentToMongoContractInput,
   interpretPslDocumentToMongoContract,

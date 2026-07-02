@@ -2,13 +2,20 @@ import type {
   AnyEntityKindDescriptor,
   EntityKindDescriptor,
 } from '@prisma-next/framework-components/ir';
-import { StorageCollectionSchema } from './contract-schema';
+import { StorageCollectionSchema, StorageValueSetSchema } from './contract-schema';
 import { MongoCollection, type MongoCollectionInput } from './ir/mongo-collection';
+import { MongoValueSet, type MongoValueSetInput } from './ir/mongo-value-set';
 
 export const collectionEntityKind: EntityKindDescriptor<MongoCollectionInput, MongoCollection> = {
   kind: 'collection',
   schema: StorageCollectionSchema,
   construct: (input) => new MongoCollection(input),
+};
+
+export const valueSetEntityKind: EntityKindDescriptor<MongoValueSetInput, MongoValueSet> = {
+  kind: 'valueSet',
+  schema: StorageValueSetSchema,
+  construct: (input) => new MongoValueSet(input),
 };
 
 /**
@@ -21,7 +28,10 @@ export const collectionEntityKind: EntityKindDescriptor<MongoCollectionInput, Mo
 export function composeMongoEntityKinds(
   packKinds: readonly AnyEntityKindDescriptor[] = [],
 ): ReadonlyMap<string, AnyEntityKindDescriptor> {
-  const kinds = new Map<string, AnyEntityKindDescriptor>([['collection', collectionEntityKind]]);
+  const kinds = new Map<string, AnyEntityKindDescriptor>([
+    ['collection', collectionEntityKind],
+    ['valueSet', valueSetEntityKind],
+  ]);
   for (const descriptor of packKinds) {
     if (kinds.has(descriptor.kind)) {
       throw new Error(

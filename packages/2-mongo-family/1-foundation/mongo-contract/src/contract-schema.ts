@@ -342,6 +342,14 @@ export const StorageCollectionSchema = type({
   'control?': ControlPolicySchema,
 });
 
+export const StorageValueSetSchema = type({
+  '+': 'reject',
+  kind: "'valueSet'",
+  values: type('string | number | boolean | null | unknown[] | Record<string, unknown>')
+    .array()
+    .readonly(),
+});
+
 function collectionEntrySchema(fragments?: ReadonlyMap<string, Type<unknown>>): Type<unknown> {
   if (fragments === undefined || fragments.size === 0) {
     return StorageCollectionSchema;
@@ -389,6 +397,7 @@ export function createMongoNamespaceEnvelopeSchema(
     'kind?': 'string',
     entries: type({
       'collection?': type({ '[string]': collectionEntrySchema(fragments) }),
+      'valueSet?': type({ '[string]': StorageValueSetSchema }),
     }),
   }).narrow((ns, ctx) => {
     if (typeof ns !== 'object' || ns === null || Array.isArray(ns)) {

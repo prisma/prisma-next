@@ -472,6 +472,27 @@ export function errorConfigValidation(
 // ============================================================================
 
 /**
+ * An enum declares a codecId that no component in the contract's pack stack provides,
+ * so its member values cannot be encoded. Thrown by both authoring paths (TS `defineContract`
+ * and PSL interpretation) when the codec lookup built from the contract's packs has no
+ * descriptor for the codecId.
+ */
+export function errorEnumCodecNotInPackStack(options: {
+  readonly codecId: string;
+}): CliStructuredError {
+  return new CliStructuredError(
+    '4016',
+    `Enum codec "${options.codecId}" is not part of the contract's pack stack`,
+    {
+      domain: 'CON',
+      why: `An enum uses codec "${options.codecId}", but no family, target, or extension pack in the contract provides it.`,
+      fix: "Use a codec provided by the contract's target/extension packs, or add the pack that supplies this codec.",
+      meta: { codecId: options.codecId },
+    },
+  );
+}
+
+/**
  * Generic unexpected error.
  */
 export function errorUnexpected(

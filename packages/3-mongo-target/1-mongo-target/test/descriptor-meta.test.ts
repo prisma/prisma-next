@@ -3,8 +3,8 @@ import { mongoTargetDescriptorMeta } from '../src/core/descriptor-meta';
 import mongoTargetPack from '../src/exports/pack';
 
 describe('mongoTargetDescriptorMeta', () => {
-  it('has the expected shape', () => {
-    expect(mongoTargetDescriptorMeta).toEqual({
+  it('has the expected identity shape', () => {
+    expect(mongoTargetDescriptorMeta).toMatchObject({
       kind: 'target',
       familyId: 'mongo',
       targetId: 'mongo',
@@ -13,6 +13,14 @@ describe('mongoTargetDescriptorMeta', () => {
       capabilities: {},
       defaultNamespaceId: '__unbound__',
     });
+  });
+
+  it('carries its target codec descriptors for build-time authoring', () => {
+    const codecIds = mongoTargetDescriptorMeta.types.codecTypes.codecDescriptors.map(
+      (d) => d.codecId,
+    );
+    expect(codecIds).toContain('mongo/string@1');
+    expect(codecIds).toContain('mongo/objectId@1');
   });
 
   it('declares defaultNamespaceId as __unbound__', () => {

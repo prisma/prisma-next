@@ -2232,6 +2232,9 @@ importers:
       '@prisma-next/contract-authoring':
         specifier: workspace:0.14.0
         version: link:../../../1-framework/2-authoring/contract
+      '@prisma-next/errors':
+        specifier: workspace:0.14.0
+        version: link:../../../1-framework/1-core/errors
       '@prisma-next/framework-components':
         specifier: workspace:0.14.0
         version: link:../../../1-framework/1-core/framework-components
@@ -2281,6 +2284,9 @@ importers:
       '@prisma-next/contract-authoring':
         specifier: workspace:0.14.0
         version: link:../../../1-framework/2-authoring/contract
+      '@prisma-next/errors':
+        specifier: workspace:0.14.0
+        version: link:../../../1-framework/1-core/errors
       '@prisma-next/framework-components':
         specifier: workspace:0.14.0
         version: link:../../../1-framework/1-core/framework-components
@@ -2327,6 +2333,9 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:0.14.0
         version: link:../../1-foundation/mongo-contract
+      '@prisma-next/utils':
+        specifier: workspace:0.14.0
+        version: link:../../../1-framework/0-foundation/utils
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:0.14.0
