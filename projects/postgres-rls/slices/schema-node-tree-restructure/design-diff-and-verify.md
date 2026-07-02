@@ -2,14 +2,16 @@
 
 Authoritative design for the PR #894 rework. States the positive properties the code must satisfy; grounded in `file:line` where a claim rests on current code.
 
-## 1. The model
+## 1. The model — four actors, cleanly separated
 
-Schema comparison is one operation — a **differ** — and verify and plan consume it identically.
+Schema comparison is a **differ** that produces issues; verify and plan are **orchestrations** that consume them.
 
-1. **The differ is an SPI:** `SchemaDiffer.diff(contract, actual) → SchemaDiff`. Expected derives from the contract; actual is the introspected live schema. How the result is computed — a relational check plus a generic node differ, how namespaces are paired — is **private**. No consumer, and no other part of this design, describes it.
-2. **`SchemaDiff` is a result over two issue lists plus one method** (§4). It carries no verdict, no verification tree, no counts.
-3. **Verify and plan are the same shape:** `diff → filter the issues to a contract space → iterate`. Verify emits one diagnostic per surviving issue (none ⇒ success); plan emits one operation per surviving issue. Neither knows how the diff is computed.
-4. **Two issue lists stay distinct types** — `SchemaIssue` (relational) and `SchemaDiffIssue` (the node differ) — because two diffing mechanisms exist today. Merging them is a follow-on (§13).
+1. **The differ** — an SPI on the target: `SchemaDiffer.diff(contract, actual) → SchemaDiff`. It compares two derived schema-IR trees and returns issues. How it computes them is private. It is **dumb**: one contract and the actual schema in, issues out; it knows nothing about contract spaces.
+2. **`SchemaDiff`** — the result: two issue lists plus `filter` (§4). `SchemaDiffIssue` carries its **schema-IR node**, typed via a node type parameter. `SchemaDiff` carries no verdict, no verification tree, no counts.
+3. **The contract-space aggregate** — **passive data**: the contract spaces and their contracts. It *answers* ownership interrogatives ("which contract nodes belong to which space", "is this entity declared by any space"). It diffs nothing, verifies nothing, classifies nothing.
+4. **The orchestration** — the calling location that drives verify/plan (`verifyMigration`, `synthStrategy`). **It owns every verb**: it runs the differ per contract space, composes the per-space view, classifies extras (consulting the aggregate), and hands a space's issues to the planner. Verify's verdict is simply *does this space have any issue?* — `diff → its issues → empty ⇒ pass`.
+
+Two issue lists stay distinct types — `SchemaIssue` (relational) and `SchemaDiffIssue` (the generic node differ's) — because two diffing mechanisms exist today; merging them is a follow-on (§13).
 
 ## 2. The diff's inputs: two derived representations
 
@@ -21,49 +23,49 @@ The contract is uniformly namespaced for every target (`contract.storage.namespa
 
 ## 3. The differ is an SPI on the target
 
-`SchemaDiffer` names the SPI the target already implements — `diffDatabaseSchema` on the SQL target descriptor ([types.ts:499](../../../../packages/2-sql/9-family/src/core/migrations/types.ts)). No new class implements it; the family/target that owns the diff today is the implementer. Two properties:
+`SchemaDiffer` names the SPI the target already implements — `diffDatabaseSchema` on the SQL target descriptor. No new class implements it; the family/target that owns the diff is the implementer. Two properties:
 
-- **It returns `SchemaDiff`, not `VerifyDatabaseSchemaResult`.** A diff is not verify-specific. The verify envelope (`ok` / `summary` / `code` / `target` / `timings`) and the pass/warn/fail tree are the verifier's, built by the verifier (§6) — never returned by the differ.
+- **It returns `SchemaDiff`, not `VerifyDatabaseSchemaResult`.** A diff is not verify-specific. The verify envelope and the pass/fail view are the orchestration's (§6), never returned by the differ.
 - **It lives on the target descriptor, required for every SQL target** (Postgres: relational + policy; SQLite: relational only) — schema logic on the target, not database I/O on the control adapter. Its internals are private.
 
 ## 4. `SchemaDiff` — the result
 
 ```ts
-type DiffIssue = SchemaIssue | SchemaDiffIssue
+type DiffIssue<TNode extends DiffableNode = DiffableNode> = SchemaIssue | SchemaDiffIssue<TNode>
 
-class SchemaDiff {
+class SchemaDiff<TNode extends DiffableNode = DiffableNode> {
   readonly issues: readonly SchemaIssue[]
-  readonly schemaDiffIssues: readonly SchemaDiffIssue[]
-  filter(keep: (issue: DiffIssue) => boolean): SchemaDiff
+  readonly schemaDiffIssues: readonly SchemaDiffIssue<TNode>[]
+  filter(keep: (issue: DiffIssue<TNode>) => boolean): SchemaDiff<TNode>
 }
 ```
 
-- Its only job is to **abstract away that there are two issue lists.** `filter` fans one predicate across both and returns a narrowed `SchemaDiff` — still a passable unit.
-- The predicate takes the **union**, not a normalized descriptor: any caller doing real work with the result already understands both issue types. There is no `DiffEntry` / coordinate abstraction layer.
-- **Contract-space filtering and control-policy suppression are just callers passing predicates** — no policy-specific method, nothing special. `SchemaIssue` (`kind: 'extra_table'`, `table`, `namespaceId`) and `SchemaDiffIssue` (`outcome: 'extra'`, `actual` node) each express "extra" and their coordinate in their own way; the predicate discriminates.
-
-`SchemaIssue` ([control-result-types.ts:41](../../../../packages/1-framework/1-core/framework-components/src/control/control-result-types.ts)) and `SchemaDiffIssue` ([schema-diff.ts](../../../../packages/1-framework/1-core/framework-components/src/control/schema-diff.ts)) are the framework issue types Mongo also produces, so `filter` and the contract-space attribution (§11) are family-agnostic.
+- Its only job is to **abstract away that there are two issue lists.** `filter` fans one predicate across both and returns a narrowed `SchemaDiff`. The predicate takes the union; callers already understand both types.
+- **`SchemaDiffIssue<TNode>` carries its `expected` / `actual` schema-IR node**, so a caller reaches the node it concerns by a property access, not a lookup. `TNode` is **defaulted to `DiffableNode`** — a purely additive change: every existing caller keeps the default and is unbroken; only a caller that wants the concrete node opts in (the planner takes `SchemaDiff<SqlSchemaIRNode>` and drops the `asSchemaNode` cast). The coupling is to the **schema IR** — the layer the differ diffs — never back to the contract IR it was derived from (§6). `SchemaIssue` (relational) stays coordinate-based; node-typing it is the relational-port follow-on (§13).
 
 ## 5. The diffing logic lives with the diff, not in "verify"
 
-The relational diffing code must not sit in a `schema-verify/` module. Its logic is **not rewritten** — it **moves** to live with the diff, where it becomes the diff's private internal. The "verify" module then holds only the verifier's own concern (§6).
+The relational diffing code must not sit in a `schema-verify/` module. Its logic is **not rewritten** — it lives with the diff as the diff's private internal. The "verify" module holds only the orchestration's concern (§6).
 
-## 6. Verify and plan consume the diff the same way
+## 6. Verify and plan: the orchestration owns the verbs
 
-The verifier:
+The **contract-space aggregate is passive** — it holds the spaces and their contracts and answers ownership questions; it runs nothing. The **orchestration** (`verifyMigration`, `synthStrategy`) owns every verb.
 
-1. `diff(contract, actual)` — derive expected, introspect actual, call the differ.
-2. **filter the issues to the contract space** being verified (drop issues owned by other spaces).
-3. iterate the surviving issues; **none ⇒ success**, else one verify diagnostic per issue.
+**Verify.** For each contract space the orchestration:
 
-The planner is identical, emitting one migration operation per surviving issue. Verify and plan are symmetric — `diff → filter to space → iterate` — and both are blind to how the diff is computed.
+1. runs the differ — `diff(space.contract, actual)` → `SchemaDiff`;
+2. composes the space's view — walks the space's contract-derived (expected) nodes and, per node, attaches the issue that concerns it; a node is *pass* when nothing is attached, *fail* otherwise;
+3. verdict — the space passes iff it has no issue. `diff → its issues → empty ⇒ pass`. There is no verdict-derived-from-a-tree computation.
 
-- **Tables no contract declares** are not a separate detection step: after attributing issues to spaces, they are the issues owned by **no** space. This deletes the live-entity enumeration entirely.
-- **The pass/warn/fail tree (`root` / `counts`)** the CLI prints ([formatters/verify.ts](../../../../packages/1-framework/3-tooling/cli/src/utils/formatters/verify.ts), [combine-schema-results.ts](../../../../packages/1-framework/3-tooling/cli/src/utils/combine-schema-results.ts)) is the verifier's own presentation, produced by the relational walk — separate from the verdict (which is "iterate the issues") and never on `SchemaDiff`.
+Because the differ runs **per space**, a space's missing/mismatch issues are inherently its own — their expected node came from its contract; no attribution, no per-issue lookup. The only cross-space step is **extras** (an actual entity in no contract-for-this-diff): the orchestration classifies each against the aggregate — declared by some space ⇒ that space's, not this one's concern; declared by none ⇒ **undeclared**, reported once at the aggregate level. That is a positive interrogative over the contracts the aggregate holds; the `SchemaDiff` result is never consulted for ownership and never references the contract IR.
+
+**Plan.** The orchestration hands the planner **a space's issues**; the planner maps issue → op and nothing else. It takes no schema and no "other spaces" input — it works out no ownership, because the orchestration already handed it exactly its issues. The typed node on each `SchemaDiffIssue` is what the planner builds the op from (§4). Verify and plan are symmetric: run the differ per space, then verify checks emptiness while plan builds ops.
+
+**Compose, don't post-scope.** Today `verifySqlSchema` fuses the diff and the view — it walks the contract and, per element, diffs-against-actual *and* emits the tree node, then a post-step re-scopes that tree per space. The target separates them: the differ produces the issues; the per-space view is the space's own declared nodes annotated with their attached issues, and it grafts **no** extra nodes (extras are issues, not tree nodes). So the view is scoped **by construction** — no post-scoping, no recomputed counts.
 
 ## 7. The schema view is unaware of the schema IR
 
-The human-readable schema view walks its **own** tree of printable `SchemaTreeNode`s and is unaware of the schema IR. It uses no diff helper and does not flatten the schema-IR tree. How printable nodes are produced from the schema IR is the view's own concern, separate from the differ.
+The human-readable *live-schema* view (the `inspect live schema` rendering) walks its **own** tree of printable `SchemaTreeNode`s and is unaware of the schema IR. It is a separate rendering of the actual schema, distinct from the verify pass/fail view (§6).
 
 ## 8. Node type guards (`.is` / `.assert`)
 
@@ -73,69 +75,58 @@ Guards downcast **from the base node to a specific node**:
 - they discriminate on the node's own **`nodeKind`** identifier (§9), never `instanceof`;
 - applied consistently across all five node classes, and on `StorageTable` and the RLS-policy guard.
 
-There is **no** `ensure()` that constructs a new node — a guard asserts, it does not build. Call sites `assert` and use the value in place.
+There is **no** `ensure()` that constructs a new node — a guard asserts, it does not build.
 
 ## 9. Node kinds and target ids are defined identifiers
 
-- **`nodeKind`** — *which node* (database / namespace / table / policy / role). Every one of the five nodes carries a unique `nodeKind` identifier; each §8 guard is `node.nodeKind === '<that kind>'`.
+- **`nodeKind`** — *which node* (database / namespace / table / policy / role). Every one of the five nodes carries a unique `nodeKind`; each §8 guard is `node.nodeKind === '<that kind>'`.
 - **`nodeTarget`** — *which target*. The SQL family enumerates no target ids; no `'postgres'` literal lives in a SQL-family type.
-
-Both are defined identifiers, not string literals scattered across guards.
 
 ## 10. `isEqualTo` — identity only
 
 `isEqualTo` compares identity only: nodes are equal iff their `id`s match. Columns are not compared by `isEqualTo` (they become child nodes the generic differ walks). This replaces the `isEqualTo => true` stopgap.
 
-## 11. Contract-space handling: filter the issues, never prune the schema
+## 11. Contract-space ownership is a passive interrogative; nothing prunes or post-scopes
 
-The framework **does not alter the schema before diffing and does not branch on any storage shape.** It diffs the full introspected schema and filters the resulting issues by contract-space ownership. Ownership is attributed with the target-agnostic `elementCoordinates(contract.storage)` — an issue belongs to whichever member claims its entity **name** (this matches the pruning layer it replaces, so it is behaviour-neutral). An `extra_table` issue carries no `namespaceId` — a live-DB table sits in no contract namespace — so qualified `(namespaceId, name)` keying, which would let two members own same-named tables in different schemas independently, awaits the differ stamping the introspected namespace onto extra issues; that is a follow-on (§13), not a regression.
+The framework alters no schema and post-scopes no result. The **contract-space aggregate** answers, from the contracts it holds, "is this entity declared by any space, and by which one." The **orchestration** uses that answer to classify the extras from each per-space diff. That is the whole of contract-space handling — positive ownership ("my contract declares this node"), so two spaces in the same namespace are unambiguous, and a genuine double-claim surfaces as a real conflict rather than a silent mis-attribution.
 
-Deleted:
+Deleted outright:
 
-- `projectSchemaToSpace` ([project-schema-to-space.ts](../../../../packages/1-framework/3-tooling/migration/src/aggregate/project-schema-to-space.ts)) and both family `schema-shape.ts` modules ([SQL](../../../../packages/2-sql/9-family/src/core/diff/schema-shape.ts), [Mongo](../../../../packages/2-mongo-family/9-family/src/core/schema-shape.ts)) — the schema-pruning callbacks;
-- the `projectSchemaToMember` / `listSchemaEntityNames` callbacks on the family instances and their CLI wiring;
-- the `TSchemaResult` generic on the aggregate verifier ([verifier.ts](../../../../packages/1-framework/3-tooling/migration/src/aggregate/verifier.ts)) — the family returns the framework issue types, which the framework reads directly.
+- **`scope-schema-result.ts`** — the per-space tree pruning + counts/verdict recompute. It existed only because the previous pass stopped pre-pruning the schema but kept re-scoping the verification tree; the compose step (§6) makes the view scoped by construction, so there is nothing to post-scope. All three bugs it produced (a column false-pass, an enum-node false-pass, a Mongo counts-flip) disappear with the file.
+- **`entitiesOwnedByOtherSpaces`** (the planner `plan()` input) and **`otherMemberEntityNames`** (the set-subtraction) — the planner receives its space's issues; it needs no "other spaces" input.
+- The earlier pruning layer (`projectSchemaToSpace`, both family `schema-shape.ts`, the `projectSchemaToMember` / `listSchemaEntityNames` callbacks) stays removed.
 
-The aggregate verifier and planner take the family's `SchemaDiffer`, diff the full schema per member, filter each member's issues to its space, and iterate. Issues owned by no member are the undeclared tables.
+There is no bare-name keying, no name-subtraction, and no qualified-coordinate follow-on — positive ownership retires all three. The term is **contract space**, never "member"; there is no "schema result".
 
-## 12. What changes (from the state after the first rework round)
+## 12. What changes (this pass)
 
 | Now | Target |
 | --- | --- |
-| `diffDatabaseSchema` returns `VerifyDatabaseSchemaResult` ([types.ts:499]) | returns `SchemaDiff` (two lists + `filter`); the SPI is named `SchemaDiffer` |
-| verify verdict reads `counts.fail` off the verification tree | verdict iterates the filtered issues; none ⇒ success |
-| aggregate verifier prunes the schema per member (`projectSchemaToSpace` + family `schema-shape` callbacks) | diffs the full schema, filters the issues by contract space; callbacks + `schema-shape` + `project-schema-to-space` deleted |
-| undeclared tables via `listSchemaEntityNames` enumeration | issues owned by no space |
-| `TSchemaResult` generic on the verifier | gone; framework reads the framework issue types |
-| guards use `instanceof` / `unknown` / `DiffableNode`; `ensure()` constructs nodes | `(node: SqlSchemaIRNode): node is X`, `nodeKind`-discriminated; no node-constructing `ensure` |
+| `scope-schema-result.ts` prunes each space's verification tree + recomputes counts/verdict | deleted; the per-space view is composed from the space's declared nodes + attached issues, scoped by construction (§6) |
+| verify verdict = `counts.fail === 0` off the (post-scoped) tree | verdict = the space's issue list is empty |
+| planner takes the full schema + `entitiesOwnedByOtherSpaces`; filters extras itself | planner takes its space's issues and maps issue → op; `entitiesOwnedByOtherSpaces` / `otherMemberEntityNames` deleted |
+| `SchemaDiffIssue.expected/actual: DiffableNode`; planner `asSchemaNode` casts | `SchemaDiffIssue<TNode>` carries the typed node (default `DiffableNode`); planner takes `SchemaDiff<SqlSchemaIRNode>`, cast gone |
+| the contract-space aggregate driver diffs / scopes / classifies | the aggregate is passive (answers ownership); the orchestration owns those verbs |
+| "member" throughout the aggregate | "contract space" |
+
+Behaviour to preserve: `db verify` output (the per-space pass/fail view and undeclared-table reporting), planner ops, `contract infer`, single-space verify — all unchanged. The compose step must reproduce the view the post-scoped tree produced; validate byte-identity (fixtures + the multi-space guards).
 
 ## 13. Out of scope (follow-ons)
 
-- **Relational port / one issue type:** merging the relational check into the generic node differ so there is a single issue type. Until then `SchemaDiff` carries two lists. Separating `root` / `counts` from the relational walk rides with this port.
-- **Qualified-coordinate ownership keying:** attribute cross-space ownership by `(namespaceId, name)` instead of bare entity name. Needs `extra_table` issues to carry their introspected namespace; rides with the relational port.
-- **PSL-inference tree-walk (TML-2958):** inference still gathers the tree into a flat document, guarded by a fail-loud throw.
-- **`annotations.pg` full retirement (TML-2936):** this rework stops *populating* the bag (§14); typed-field replacement is TML-2936.
+- **Relational port / one issue type:** merge the relational check into the generic node differ so there is a single, node-typed issue type (which also node-types `SchemaIssue`). Until then `SchemaDiff` carries two lists.
+- **PSL-inference tree-walk (TML-2958):** inference still flattens the schema-IR tree into a flat document, fail-loud guarded.
+- **`annotations.pg` full retirement (TML-2936).**
 
-## 14. Mechanical fixes (from the PR review, no design fork)
+## 14. Mechanical fixes (landed in the earlier passes; kept here for the record)
 
-- Replace the bespoke `throw new Error("expected StorageTable…")` with an assertion helper.
-- Remove the `(storage.types ?? {}) as ResolvedStorageTypes` casts (×3) via a real type — no cast, no fallback.
-- Trim the verbose doc comments (attached, not orphaned) and sweep the whole diff for the same; add none new.
-- Consolidate the two Postgres diff files into one (`diff-postgres-schema.ts` folds into `diff-database-schema.ts`), and extract the diff-SPI types out of the catch-all `migrations/types.ts` into a named `schema-differ.ts`.
-- Delete confirmed-dead code only: the family-instance `bootstrapSignMarkerQueries` (the adapter method it duplicated stays; `sign()` uses that). `verify-postgres-namespaces` is **live** (its `missing_schema` issues drive multi-schema `CREATE SCHEMA` planning) and stays; `contract-to-postgres-database-schema-node` is **not** a duplicate of `contractToSchemaIR` (it builds the Postgres tree — RLS/roles/multi-schema — atop the shared per-namespace table conversion, whereas the flat map is SQLite-only) and stays.
-- Extract review additions **out** of the catch-all `migrations/types.ts` into named, logical files.
-- Correct the planner's transient-id string, its unreadable comment, and the "all namespace nodes are relational" note; stop *creating* contract nodes to refer to them — find them in the live contract.
-- Move the non-node file out of `schema-ir/` (so only the five node classes remain); stop populating the obsolete `annotations.pg` bag.
-- Reword the PSL-inference stopgap comment to state it converts the schema-IR **tree** into the flat structure the PSL writer expects (TML-2958), assigned to Will.
-- Re-run the full slice-DoD gate set.
+Assertion helper over the bespoke `throw`; `(storage.types ?? {}) as ResolvedStorageTypes` casts removed; verbose doc comments trimmed; the two Postgres diff files consolidated into one and the diff-SPI types extracted to `schema-differ.ts`; dead `bootstrapSignMarkerQueries` (family) removed (`verify-postgres-namespaces` and `contract-to-postgres-database-schema-node` are **live/distinct** and stay); planner transient IDs / unreadable comments fixed; non-node file moved out of `schema-ir/`; `annotations.pg` not populated; the PSL-inference stopgap comment cites TML-2958.
 
 ## 15. Rejected alternatives (timeless)
 
-- **Utility methods on the `SchemaDiffer` interface (filter / extras / verdict on the SPI).** Rejected: those are pure functions of the result; they live on `SchemaDiff`, keeping the SPI a one-method factory.
-- **Normalizing the two issue lists to a common `DiffEntry` for filtering.** Rejected: expose the union — callers already understand both types.
-- **`root` / `counts` (the verification tree) on `SchemaDiff`.** Rejected: that is verifier presentation, not diff output.
-- **Pruning the schema IR to a member's slice before diffing (family prune + enumerate callbacks).** Rejected: don't alter the schema; diff the full schema and filter the resulting issues by contract space. The framework never branches on storage shape.
-- **The diff returning `VerifyDatabaseSchemaResult`, or exposing the diff through the control adapter.** Rejected: the diff returns `SchemaDiff`; it is schema logic on the target, not verify output and not database I/O.
-- **Rewriting the relational check to be a pure contract-free diff, adding `effectiveControlPolicy` / fully-expanded native types as new fields on the expected node, and moving disposition to a post-diff filter.** Rejected: the relational logic is relocated, not rewritten.
-- **A uniform family-wide namespace-node hierarchy (wrapping SQLite/Mongo in a namespace node).** Rejected: unnecessary; multiple namespaces occur only in Postgres, internal to its diff.
-- **The verifier or the schema view knowing how the diff works.** Rejected: they consume the issue lists / walk their own printable-node tree.
+- **Coupling the diff result back to the contract IR** (a contract-node handle on the issue). Rejected: the differ works in schema IR; the result couples to the schema IR node, never back to the authoring layer it was derived from. Contract knowledge lives in the aggregate, consulted for ownership — not on the result.
+- **Post-scoping the verification tree per space (`scope-schema-result`).** Rejected: compose the per-space view from the space's own declared nodes so it is scoped by construction; there is nothing to prune.
+- **Passing "other spaces' names" to the planner; the planner working out which issues are its own.** Rejected: the orchestration hands the planner exactly its space's issues; the planner is dumb.
+- **The contract-space aggregate performing verbs (diff / verify / classify).** Rejected: the aggregate is passive data that answers ownership; the orchestration owns the verbs.
+- **Utility methods on the `SchemaDiffer` interface; normalizing the two issue lists to a common `DiffEntry`.** Rejected: utilities live on `SchemaDiff`; `filter` takes the union.
+- **`root` / `counts` on `SchemaDiff`; the diff returning `VerifyDatabaseSchemaResult`; the diff on the control adapter.** Rejected: the diff returns `SchemaDiff` — schema logic on the target, not verify output and not database I/O.
+- **Rewriting the relational check pure / adding `effectiveControlPolicy` fields / a family-wide namespace-node hierarchy.** Rejected: the relational logic is relocated not rewritten; multiple namespaces are internal to the Postgres diff.
