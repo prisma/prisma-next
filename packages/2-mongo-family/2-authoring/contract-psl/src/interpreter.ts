@@ -70,6 +70,8 @@ export interface InterpretPslDocumentToMongoContractInput {
   readonly codecLookup?: CodecLookup;
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
   readonly authoringContributions?: AuthoringContributions;
+  /** The target's default codec ids for an `enum` block that omits `@@type`. */
+  readonly enumInferenceCodecs?: { readonly text: string; readonly int: string };
 }
 
 /**
@@ -958,7 +960,7 @@ export function interpretPslDocumentToMongoContract(
     entityContext: {
       family: 'mongo',
       target: 'mongo',
-      enumInferenceCodecs: { text: 'mongo/string@1', int: 'mongo/int32@1' },
+      ...ifDefined('enumInferenceCodecs', input.enumInferenceCodecs),
       ...ifDefined('codecLookup', codecLookup),
       sourceId,
       diagnostics: {

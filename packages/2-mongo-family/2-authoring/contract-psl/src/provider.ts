@@ -10,6 +10,8 @@ import { interpretPslDocumentToMongoContract } from './interpreter';
 
 export interface MongoContractOptions {
   readonly output?: string;
+  /** The target's default codec ids for an `enum` block that omits `@@type`. */
+  readonly enumInferenceCodecs?: { readonly text: string; readonly int: string };
 }
 
 function mapParseDiagnostics(
@@ -78,6 +80,7 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
           scalarTypeDescriptors: context.scalarTypeDescriptors,
           codecLookup: context.codecLookup,
           authoringContributions: context.authoringContributions,
+          ...ifDefined('enumInferenceCodecs', options?.enumInferenceCodecs),
         });
         if (!interpreted.ok) {
           return interpreted;

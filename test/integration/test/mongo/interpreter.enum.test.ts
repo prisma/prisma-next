@@ -1,3 +1,4 @@
+import { MONGO_INT32_CODEC_ID, MONGO_STRING_CODEC_ID } from '@prisma-next/adapter-mongo/codec-ids';
 import {
   mongoFamilyEntityTypes,
   mongoFamilyPslBlockDescriptors,
@@ -73,6 +74,7 @@ function interpret(
     scalarTypeDescriptors: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
     authoringContributions: contributions,
+    enumInferenceCodecs: { text: MONGO_STRING_CODEC_ID, int: MONGO_INT32_CODEC_ID },
     ...overrides,
   });
 }
