@@ -73,9 +73,11 @@ describe('same bare table name across namespaces — execution context', () => {
 
     expect(context.codecDescriptors.codecRefForColumn('public', 'users', 'email')).toEqual({
       codecId: 'pg/text@1',
+      nativeType: 'pg/text@1',
     });
     expect(context.codecDescriptors.codecRefForColumn('auth', 'users', 'token')).toEqual({
       codecId: 'sql/varchar@1',
+      nativeType: 'sql/varchar@1',
     });
   });
 });

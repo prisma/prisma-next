@@ -94,12 +94,12 @@ describe('mutation-with-include read-back namespace coordinate', () => {
   it('stamps the public-namespace PK codec on the identity-filter param', async () => {
     const runtime = createMockRuntime();
     const codec = await readBackIdentityCodec(runtime, 'public', 1);
-    expect(codec).toEqual({ codecId: 'pg/int4@1' });
+    expect(codec).toEqual({ codecId: 'pg/int4@1', nativeType: 'pg/int4@1' });
   });
 
   it('stamps the auth-namespace PK codec on the identity-filter param', async () => {
     const runtime = createMockRuntime();
     const codec = await readBackIdentityCodec(runtime, 'auth', 'u1');
-    expect(codec).toEqual({ codecId: 'pg/text@1' });
+    expect(codec).toEqual({ codecId: 'pg/text@1', nativeType: 'pg/text@1' });
   });
 });

@@ -39,7 +39,7 @@ describe('Collection construction', () => {
       BinaryExpr.gt(
         ColumnRef.of('posts', 'views'),
         ParamRef.of(1000, {
-          codec: { codecId: 'pg/int4@1' },
+          codec: { codecId: 'pg/int4@1', nativeType: 'int4' },
         }),
       ),
     );

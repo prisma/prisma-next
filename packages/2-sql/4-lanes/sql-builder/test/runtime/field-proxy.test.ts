@@ -100,6 +100,7 @@ describe('createFieldProxy', () => {
     });
     expect(scope.namespaces['post_alias']?.['embedding']?.codec).toEqual({
       codecId: 'pgvector/vector@1',
+      nativeType: 'vector',
       typeParams: { length: 1536 },
     });
   });

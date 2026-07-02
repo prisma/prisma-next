@@ -9,6 +9,7 @@ import {
   OrExpr,
   ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import { all, and, not, or, shorthandToWhereExpr } from '../src/filters';
 import { createModelAccessor } from '../src/model-accessor';
@@ -22,10 +23,15 @@ describe('filters', () => {
   function paramRef(table: string, column: string, value: unknown): ParamRef {
     const tables = unboundTables(context.contract.storage) as Record<
       string,
-      { columns: Record<string, { codecId?: string }> } | undefined
+      { columns: Record<string, { codecId?: string; nativeType?: string }> } | undefined
     >;
-    const codecId = tables[table]?.columns[column]?.codecId;
-    return codecId ? ParamRef.of(value, { codec: { codecId } }) : ParamRef.of(value);
+    const columnDef = tables[table]?.columns[column];
+    const codecId = columnDef?.codecId;
+    return codecId
+      ? ParamRef.of(value, {
+          codec: { codecId, ...ifDefined('nativeType', columnDef?.nativeType) },
+        })
+      : ParamRef.of(value);
   }
 
   it('and(), or(), not(), and all() use rich where objects', () => {

@@ -24,6 +24,7 @@ import {
   TableSource,
   WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import { resolveIncludeRelation } from '../src/collection-contract';
 import { compileSelect, compileSelectWithIncludes } from '../src/query-plan-select';
@@ -634,8 +635,12 @@ describe('M:N include correlated subquery', () => {
       unboundTables(baseContract.storage) as Record<string, { columns: Record<string, CodecRef> }>
     )[table]!.columns[column]!;
     return meta.typeParams !== undefined
-      ? { codecId: meta.codecId, typeParams: meta.typeParams }
-      : { codecId: meta.codecId };
+      ? {
+          codecId: meta.codecId,
+          typeParams: meta.typeParams,
+          ...ifDefined('nativeType', meta.nativeType),
+        }
+      : { codecId: meta.codecId, ...ifDefined('nativeType', meta.nativeType) };
   }
 
   // `ref` is the AST table/alias the column is read from; `storageTable`
@@ -927,7 +932,10 @@ describe('compileSelect MTI JOINs', () => {
         string,
         {
           entries: {
-            table: Record<string, { columns: Record<string, { codecId: string }> }>;
+            table: Record<
+              string,
+              { columns: Record<string, { codecId: string; nativeType?: string }> }
+            >;
           };
         }
       >;
@@ -937,13 +945,14 @@ describe('compileSelect MTI JOINs', () => {
     contract: AnyContract,
     table: string,
     column: string,
-  ): { codecId: string } | undefined {
+  ): { codecId: string; nativeType?: string } | undefined {
     const tables = unboundTables(contract.storage) as Record<
       string,
-      { columns: Record<string, { codecId: string }> } | undefined
+      { columns: Record<string, { codecId: string; nativeType?: string }> } | undefined
     >;
-    const codecId = tables[table]?.columns[column]?.codecId;
-    return codecId ? { codecId } : undefined;
+    const columnDef = tables[table]?.columns[column];
+    const codecId = columnDef?.codecId;
+    return codecId ? { codecId, ...ifDefined('nativeType', columnDef?.nativeType) } : undefined;
   }
   function projectionFor(
     contract: AnyContract,
