@@ -6,9 +6,11 @@ import {
   type Storage,
 } from '@prisma-next/framework-components/ir';
 import type { MongoCollection, MongoCollectionInput } from './mongo-collection';
+import type { MongoValueSet } from './mongo-value-set';
 
 export type MongoNamespaceEntries = Readonly<Record<string, Readonly<Record<string, unknown>>>> & {
   readonly collection?: Readonly<Record<string, MongoCollection>>;
+  readonly valueSet?: Readonly<Record<string, MongoValueSet>>;
 };
 
 export interface MongoNamespaceCollectionsInput {
