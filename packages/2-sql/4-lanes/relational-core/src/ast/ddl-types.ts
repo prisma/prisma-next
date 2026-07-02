@@ -200,29 +200,4 @@ export class UniqueConstraint {
   }
 }
 
-/**
- * A table-level CHECK constraint carrying a raw SQL predicate expression. Used
- * for checks that are not enum value-set restrictions — e.g. the element-non-null
- * constraint on a scalar-array column (`array_position(col, NULL) IS NULL`).
- * The `expression` is emitted verbatim, so callers must supply safe,
- * pre-validated SQL.
- *
- * Frozen on construction — immutable after creation.
- */
-export class CheckExpressionConstraint {
-  readonly kind = 'check-expression' as const;
-  readonly name: string;
-  readonly expression: string;
-
-  constructor(options: { readonly name: string; readonly expression: string }) {
-    this.name = options.name;
-    this.expression = options.expression;
-    Object.freeze(this);
-  }
-}
-
-export type DdlTableConstraint =
-  | PrimaryKeyConstraint
-  | ForeignKeyConstraint
-  | UniqueConstraint
-  | CheckExpressionConstraint;
+export type DdlTableConstraint = PrimaryKeyConstraint | ForeignKeyConstraint | UniqueConstraint;

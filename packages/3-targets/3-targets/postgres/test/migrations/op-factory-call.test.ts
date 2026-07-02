@@ -145,12 +145,13 @@ describe('AddForeignKeyCall', () => {
 });
 
 describe('AddCheckConstraintCall', () => {
-  it('lowers typed checks and renders this.addCheckConstraint', async () => {
+  it('lowers a value-set payload and renders this.addCheckConstraint', async () => {
     const { lowerer, received } = recordingCheckLowerer();
-    const call = new AddCheckConstraintCall('public', 'post', 'post_priority_check', 'priority', [
-      'low',
-      'high',
-    ]);
+    const call = new AddCheckConstraintCall('public', 'post', 'post_priority_check', {
+      kind: 'valueSet',
+      column: 'priority',
+      values: ['low', 'high'],
+    });
     const op = await call.toOp(lowerer);
     const checks = () =>
       constraintExistsAst({
@@ -162,9 +163,24 @@ describe('AddCheckConstraintCall', () => {
     expect(op.execute[0]?.sql).toContain("CHECK (\"priority\" IN ('low', 'high'))");
     expect(op.precheck[0]).toMatchObject({ sql: 'LOWERED 1', params: ['p1'] });
     expect(call.renderTypeScript()).toBe(
-      'this.addCheckConstraint({ schema: "public", table: "post", constraint: "post_priority_check", column: "priority", values: ["low", "high"] })',
+      'this.addCheckConstraint({ schema: "public", table: "post", constraint: "post_priority_check", payload: { kind: "valueSet", column: "priority", values: ["low", "high"] } })',
     );
     expect(call.importRequirements()).toEqual([]);
+  });
+
+  it('lowers an expression payload and renders CHECK (<expression>)', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    const call = new AddCheckConstraintCall('public', 'post', 'post_tags_elem_not_null', {
+      kind: 'expression',
+      expression: 'array_position("tags", NULL) IS NULL',
+    });
+    const op = await call.toOp(lowerer);
+    expect(op.execute[0]?.sql).toContain('CHECK (array_position("tags", NULL) IS NULL)');
+    expect(op.label).toBe('Add check constraint "post_tags_elem_not_null" on "post"');
+    const rendered = call.renderTypeScript();
+    expect(rendered).toContain('this.addCheckConstraint({');
+    expect(rendered).toContain('kind: "expression"');
+    expect(rendered).toContain('expression: "array_position(\\"tags\\", NULL) IS NULL"');
   });
 });
 

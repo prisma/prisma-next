@@ -8,6 +8,7 @@ import {
   rethrowMarkerReadError,
   withMarkerReadErrorHandling,
 } from '@prisma-next/errors/execution';
+import { elementNonNullCheckExpression } from '@prisma-next/family-sql/control';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
@@ -1122,11 +1123,20 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       for (const checkRow of checksByTable.get(tableName) ?? []) {
         const parsed = parseCheckConstraintDef(checkRow.constraintdef);
         if (parsed) {
-          checksForTable.push({
-            name: checkRow.constraint_name,
-            column: parsed.column,
-            permittedValues: parsed.permittedValues,
-          });
+          checksForTable.push(
+            parsed.kind === 'valueSet'
+              ? {
+                  kind: 'valueSet',
+                  name: checkRow.constraint_name,
+                  column: parsed.column,
+                  permittedValues: parsed.permittedValues,
+                }
+              : {
+                  kind: 'expression',
+                  name: checkRow.constraint_name,
+                  expression: parsed.expression,
+                },
+          );
         }
       }
 
@@ -1445,13 +1455,25 @@ function groupBy<T, K extends keyof T>(items: readonly T[], key: K): Map<T[K], T
  * String literal values may contain Postgres-style doubled single-quotes (`''`),
  * which are un-escaped to a single `'` (e.g. `O''Brien` → `O'Brien`).
  *
- * Returns `{ column, permittedValues }` when the predicate matches one of
- * the two recognised shapes. Returns `undefined` for anything else (e.g.
- * a free-form SQL predicate that wasn't emitted by this slice).
+ * Also recognises the scalar-array element-non-null shape:
+ *
+ * 3. `array_position(col, NULL) IS NULL` — Postgres stores this as
+ *    `CHECK ((array_position(tags, NULL::text) IS NULL))`, dropping the quotes
+ *    on simple lowercase identifiers and casting the `NULL` to the array's
+ *    element type. The recognizer extracts the bare column name and
+ *    re-canonicalizes through `elementNonNullCheckExpression`, so the parsed
+ *    predicate is byte-identical to the one the projection emits (drift is
+ *    compared canonical-to-canonical, never against the raw stored string).
+ *
+ * Returns a `valueSet` result for shapes 1–2, an `expression` result for
+ * shape 3, or `undefined` for anything else (e.g. a free-form SQL predicate
+ * that wasn't emitted by this slice).
  */
-export function parseCheckConstraintDef(
-  constraintdef: string,
-): { column: string; permittedValues: readonly string[] } | undefined {
+export type ParsedCheckConstraint =
+  | { kind: 'valueSet'; column: string; permittedValues: readonly string[] }
+  | { kind: 'expression'; expression: string };
+
+export function parseCheckConstraintDef(constraintdef: string): ParsedCheckConstraint | undefined {
   // Strip outer `CHECK (...)` wrapper and any extra parentheses.
   // pg_get_constraintdef returns e.g. `CHECK ((col = ANY (ARRAY[...])))` — note
   // the double parens: one from CHECK and one that Postgres wraps the predicate
@@ -1479,7 +1501,26 @@ export function parseCheckConstraintDef(
     const arrayBody = anyArrayMatch[3];
     if (!column || !arrayBody) return undefined;
     const permittedValues = extractArrayLiterals(arrayBody);
-    return permittedValues ? { column, permittedValues } : undefined;
+    return permittedValues ? { kind: 'valueSet', column, permittedValues } : undefined;
+  }
+
+  // Shape 3: array_position(col, NULL) IS NULL — the scalar-array element-non-null
+  // guard. Postgres stores it with an element-type cast on NULL and drops quotes
+  // on simple identifiers, so accept an optional `::type` cast (including
+  // multi-word type names like `timestamp with time zone`) and both column
+  // forms, then re-canonicalize through the shared projection helper. The cast
+  // is discarded, so a non-greedy `.+?` anchored by the closing `) IS NULL`
+  // captures the whole type name without over-running the predicate.
+  const arrayPositionMatch = inner.match(
+    /^array_position\s*\(\s*(?:"((?:[^"]|"")*)"|(\w+))\s*,\s*NULL(?:::.+?)?\s*\)\s+IS\s+NULL$/i,
+  );
+  if (arrayPositionMatch) {
+    const column =
+      arrayPositionMatch[1] !== undefined
+        ? arrayPositionMatch[1].replace(/""/g, '"')
+        : arrayPositionMatch[2];
+    if (!column) return undefined;
+    return { kind: 'expression', expression: elementNonNullCheckExpression(column) };
   }
 
   // Shape 2: col IN ('a', 'b')
@@ -1492,7 +1533,7 @@ export function parseCheckConstraintDef(
     const listBody = inMatch[3];
     if (!column || !listBody) return undefined;
     const permittedValues = extractQuotedLiterals(listBody);
-    return permittedValues ? { column, permittedValues } : undefined;
+    return permittedValues ? { kind: 'valueSet', column, permittedValues } : undefined;
   }
 
   return undefined;
@@ -1656,9 +1697,6 @@ function pgRenderDdlConstraint(constraint: DdlTableConstraint): string {
       sql = `CONSTRAINT ${quoteIdentifier(constraint.name)} ${sql}`;
     }
     return sql;
-  }
-  if (constraint.kind === 'check-expression') {
-    return `CONSTRAINT ${quoteIdentifier(constraint.name)} CHECK (${constraint.expression})`;
   }
   const cols = constraint.columns.map(quoteIdentifier).join(', ');
   if (constraint.name !== undefined) {

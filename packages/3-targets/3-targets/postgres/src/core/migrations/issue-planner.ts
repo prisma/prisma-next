@@ -31,7 +31,6 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
-import { quoteIdentifier } from '../sql-utils';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -67,26 +66,6 @@ import {
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
 export type { CallMigrationStrategy, StrategyContext };
-
-/**
- * Deterministic name for the element-non-null CHECK constraint on a scalar-array
- * column. Distinct `_elem_not_null` suffix avoids collision with the enum
- * value-set `_check` constraints. Re-emitting the same schema produces the same
- * name, so `pg_get_constraintdef`-based verify sees no drift.
- */
-function elementNonNullCheckName(tableName: string, columnName: string): string {
-  return `${tableName}_${columnName}_elem_not_null`;
-}
-
-/**
- * Predicate enforcing that a scalar-array column carries no NULL element. The
- * array column itself may be NULL (container nullability is the column's NOT NULL
- * clause); `array_position` over a NULL array yields NULL, which a CHECK treats
- * as satisfied, so a nullable array column is unaffected.
- */
-function elementNonNullCheckExpression(columnName: string): string {
-  return `array_position(${quoteIdentifier(columnName)}, NULL) IS NULL`;
-}
 
 // ============================================================================
 // Issue kind ordering (dependency order)
@@ -275,7 +254,6 @@ function mapIssueToCall(
         );
       }
       const schemaForTable = tableSchema(issue);
-      const missingTableName = issue.table;
       const ddlColumns: DdlColumn[] = Object.entries(contractTable.columns).map(([name, column]) =>
         toDdlColumn(name, column, codecHooks, storageTypes),
       );
@@ -286,17 +264,14 @@ function mapIssueToCall(
             }),
           ]
         : [];
-      const elementNonNullChecks: DdlTableConstraint[] = Object.entries(contractTable.columns)
-        .filter(([, column]) => column.many === true)
-        .map(([columnName]) =>
-          contractFree.checkExpression(
-            elementNonNullCheckName(missingTableName, columnName),
-            elementNonNullCheckExpression(columnName),
-          ),
-        );
-      const allTableConstraints = [...primaryKeyConstraints, ...elementNonNullChecks];
+      // Element-non-null CHECKs for scalar-array columns are no longer inlined
+      // into CREATE TABLE: they flow through the shared check projection →
+      // `checkConstraintPlanCallStrategy` → `AddCheckConstraintCall` (expression),
+      // emitted as an ALTER after the table is created (the addCheckConstraint
+      // bucket sorts after the table bucket), so they are drift-managed like the
+      // enum value-set checks.
       const ddlConstraints: DdlTableConstraint[] | undefined =
-        allTableConstraints.length > 0 ? allTableConstraints : undefined;
+        primaryKeyConstraints.length > 0 ? primaryKeyConstraints : undefined;
       const calls: PostgresOpFactoryCall[] = [
         new CreateTableCall(schemaForTable, issue.table, ddlColumns, ddlConstraints),
       ];
