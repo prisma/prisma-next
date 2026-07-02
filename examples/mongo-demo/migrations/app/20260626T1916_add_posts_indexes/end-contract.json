@@ -450,13 +450,19 @@
                 "validationLevel": "strict"
               }
             }
+          },
+          "valueSet": {
+            "UserRole": {
+              "kind": "valueSet",
+              "values": ["admin", "author", "reader"]
+            }
           }
         },
         "id": "__unbound__",
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:ecc554e5f2f05ec120f8fef5ddf536286471edd3de11b8a906ba70e71f5e5df3"
+    "storageHash": "sha256:2b8eb72bd167d1a8c60e1527bdb14fb6c1901407a121d27d117b314dd934cd7d"
   },
   "capabilities": {},
   "extensionPacks": {},

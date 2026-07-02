@@ -15,6 +15,7 @@ import {
   type ValueSetRef,
 } from '@prisma-next/contract/types';
 import type { EnumTypeHandle } from '@prisma-next/contract-authoring';
+import { errorEnumCodecNotInPackStack } from '@prisma-next/errors/control';
 import type {
   AuthoringContributions,
   AuthoringEntityContext,
@@ -32,6 +33,7 @@ import {
   MongoIndex,
   type MongoIndexKeyDirection,
   MongoStorage,
+  type MongoValueSetInput,
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import type { CollationOptions } from '@prisma-next/mongo-value/mongodb-types';
@@ -47,6 +49,7 @@ import type {
 } from '@prisma-next/psl-parser';
 import { nodePslSpan } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
+import { assertDefined } from '@prisma-next/utils/assertions';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -61,6 +64,21 @@ import {
   parseQuotedStringLiteral,
   parseRelationAttribute,
 } from './psl-helpers';
+
+/**
+ * Encode an authored enum value to its codec-encoded JSON form via the codec resolved by id from the
+ * contract's codec lookup, so a non-identity `encodeJson` (permitted by the `mongoCodec` factory) is
+ * respected. Matches the TS builder's `encodeEnumValue`: the lookup is always threaded in production,
+ * and a codecId the lookup cannot resolve is a hard error — the enum uses a codec that is not part of
+ * the contract's pack stack.
+ */
+function encodeEnumValue(value: unknown, codecId: string, codecLookup: CodecLookup): JsonValue {
+  const codec = codecLookup.get(codecId);
+  if (!codec) {
+    throw errorEnumCodecNotInPackStack({ codecId });
+  }
+  return codec.encodeJson(value);
+}
 
 export interface InterpretPslDocumentToMongoContractInput {
   readonly symbolTable: SymbolTable;
@@ -1216,6 +1234,28 @@ export function interpretPslDocumentToMongoContract(
   const resolvedModels = polyResult.models;
   const resolvedCollections = polyResult.collections;
 
+  // The storage value set is the source of truth for both the emit typing and the validator's
+  // `enum` keyword. Built once, ahead of validator derivation, from each enum's codec-encoded member
+  // values (mirroring SQL's build-contract). Encoding needs the codec lookup; production always
+  // threads it (the CLI control stack supplies it), so its absence when enums exist is a wiring bug,
+  // not a runtime input to tolerate.
+  const storageValueSets: Record<string, MongoValueSetInput> = {};
+  const enumEntries = Object.entries(builtEnums);
+  if (enumEntries.length > 0) {
+    assertDefined(
+      codecLookup,
+      'Mongo PSL interpretation requires a codec lookup to encode enum values',
+    );
+    for (const [enumName, builtEnum] of enumEntries) {
+      storageValueSets[enumName] = {
+        kind: 'valueSet',
+        values: builtEnum.members.map((m) =>
+          encodeEnumValue(m.value, builtEnum.codecId, codecLookup),
+        ),
+      };
+    }
+  }
+
   for (const [, modelEntry] of Object.entries(resolvedModels)) {
     if (modelEntry.base) continue;
 
@@ -1236,14 +1276,14 @@ export function interpretPslDocumentToMongoContract(
         variantEntries,
         valueObjects,
         codecLookup,
-        builtEnums,
+        storageValueSets,
       );
     } else {
       coll['validator'] = deriveJsonSchema(
         modelEntry.fields,
         valueObjects,
         codecLookup,
-        builtEnums,
+        storageValueSets,
       );
     }
   }
@@ -1261,18 +1301,27 @@ export function interpretPslDocumentToMongoContract(
       'arktype-validated JSON shapes satisfy MongoCollectionInput by construction'
     >(raw);
   }
+  const hasValueSets = Object.keys(storageValueSets).length > 0;
+
   const unboundNamespace = buildMongoNamespace({
     id: UNBOUND_NAMESPACE_ID,
-    entries: { collection: collectionInputs },
+    entries: {
+      collection: collectionInputs,
+      ...(hasValueSets ? { valueSet: storageValueSets } : {}),
+    },
   });
-  // Hash the constructed (normalized) collection map, not the raw input
-  // literals — persisted storageHash values were computed over the
-  // constructed form.
+  // Hash the constructed (normalized) entries, not the raw input literals —
+  // persisted storageHash values were computed over the constructed form.
   const storageWithoutHash = {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        entries: { collection: unboundNamespace.entries.collection },
+        entries: {
+          collection: unboundNamespace.entries.collection,
+          ...(unboundNamespace.entries.valueSet !== undefined
+            ? { valueSet: unboundNamespace.entries.valueSet }
+            : {}),
+        },
       },
     },
   };

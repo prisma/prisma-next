@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { PrismaNextConfig } from '@prisma-next/config/config-types';
+import { determineAgent } from '@vercel/detect-agent';
 import { join } from 'pathe';
-import { detectAgent } from './detect-agent';
 import type { ParentToSenderPayload, TelemetryEvent } from './payload';
 
 /**
@@ -94,10 +94,21 @@ export interface EnrichEnvironment {
   readonly arch: string;
   readonly versions: VersionsSnapshot;
   /**
-   * Included because package-manager and agent detection intentionally read
+   * Included because package-manager detection intentionally reads
    * environment variables from the same process snapshot as platform/versions.
    */
   readonly env: Readonly<Record<string, string | undefined>>;
+  /**
+   * Pre-resolved AI coding-agent label, or `null` for a human session.
+   * Detection lives in `@vercel/detect-agent`, whose `determineAgent()`
+   * reads the live `process.env` and is async (it probes the filesystem
+   * for Devin), so it cannot run inside the pure event builder; the
+   * sender entry resolves it via {@link resolveAgentLabel} and passes
+   * the label here. Detection runs in the **child** sender process,
+   * never the parent. Best-effort: false negatives are expected and
+   * documented in the user-facing telemetry docs.
+   */
+  readonly agent: string | null;
   /**
    * Best-effort reader for the project's `package.json`, used only to derive
    * the optional `tsVersion` telemetry field. Returning `null` means unknown.
@@ -189,9 +200,24 @@ export function buildTelemetryEvent(
     packageManager: parsePackageManager(env.env['npm_config_user_agent']),
     databaseTarget: projectConfig.databaseTarget,
     tsVersion: readTsVersionFromPackageJson(env.readProjectPackageJson()),
-    agent: detectAgent(env.env),
+    agent: env.agent,
     extensions: projectConfig.extensions,
   };
+}
+
+/**
+ * Resolve the agent label for the telemetry event via
+ * `@vercel/detect-agent`, collapsing its discriminated result to the
+ * event's `string | null` shape. Any detection failure counts as
+ * "no agent" — telemetry is best-effort and non-blocking.
+ */
+async function resolveAgentLabel(): Promise<string | null> {
+  try {
+    const result = await determineAgent();
+    return result.isAgent ? result.agent.name : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -219,6 +245,7 @@ export async function buildTelemetryEventFromProcess(
     arch: process.arch,
     versions: process.versions,
     env: process.env,
+    agent: await resolveAgentLabel(),
     readProjectPackageJson: () => {
       try {
         return readFileSync(join(payload.projectRoot, 'package.json'), 'utf-8');

@@ -2,7 +2,7 @@ import { generateContractDts } from '@prisma-next/emitter';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { ExtractMongoFieldOutputTypes } from '@prisma-next/mongo-contract';
-import { deriveJsonSchema } from '@prisma-next/mongo-contract-psl';
+import { deriveJsonSchema, type FieldValueSets } from '@prisma-next/mongo-contract-psl';
 import { mongoEmission } from '@prisma-next/mongo-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -75,17 +75,18 @@ const codecLookup: CodecLookup = {
 // Derive the $jsonSchema validator from the contract via the production deriver.
 // This ensures a regression in deriveJsonSchema (e.g. placing enum outside items
 // for array fields) breaks this test — not just the unit tests in derive-json-schema.test.ts.
+// The validator's `enum` keyword is sourced from the storage value set (as production does), not
+// from `domain.enum`.
 const ns = contract.domain.namespaces[UNBOUND_NAMESPACE_ID];
 const accountFields = ns?.models['Account']?.fields ?? {};
-const ACCOUNT_VALIDATOR = deriveJsonSchema(
-  accountFields,
-  undefined,
-  codecLookup,
-  blindCast<
-    Record<string, import('@prisma-next/contract/types').ContractEnum>,
-    'enum member values are JsonValue-compatible at runtime; namespace enum? slot types values as a union not JsonValue'
-  >(ns?.enum),
+const storageValueSets = blindCast<
+  FieldValueSets,
+  'a mongo storage namespace exposes entries.valueSet as { <name>: { values } } after authoring'
+>(
+  (contract.storage as { namespaces: Record<string, { entries: { valueSet?: unknown } }> })
+    .namespaces[UNBOUND_NAMESPACE_ID]?.entries.valueSet ?? {},
 );
+const ACCOUNT_VALIDATOR = deriveJsonSchema(accountFields, undefined, codecLookup, storageValueSets);
 
 describe('mongo enum — end-to-end (replica set)', {
   timeout: timeouts.spinUpMongoMemoryServer,

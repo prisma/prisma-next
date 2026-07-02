@@ -19,6 +19,7 @@ const emptyContext: ContractSourceContext = {
     generatorDescriptors: [],
   },
   resolvedInputs: [],
+  capabilities: {},
 };
 
 function minimalMongoContract(overrides?: {

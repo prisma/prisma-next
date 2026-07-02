@@ -145,6 +145,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           ),
           controlMutationDefaults: context.controlMutationDefaults,
           createNamespace: options.createNamespace,
+          capabilities: context.capabilities,
           codecLookup: context.codecLookup,
           ...ifDefined('enumInferenceCodecs', options.enumInferenceCodecs),
         });

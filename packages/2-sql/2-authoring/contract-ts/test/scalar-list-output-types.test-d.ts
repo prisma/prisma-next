@@ -13,7 +13,12 @@
 
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import type { ExtractCodecTypes, ExtractFieldOutputTypes } from '@prisma-next/sql-contract/types';
+import type {
+  ExtractCodecTypes,
+  ExtractFieldOutputTypes,
+  ExtractStorageColumnInputTypes,
+  ExtractStorageColumnTypes,
+} from '@prisma-next/sql-contract/types';
 import { expectTypeOf, test } from 'vitest';
 import { field, model } from '../src/contract-builder';
 import type { SqlContractResult } from '../src/contract-types';
@@ -55,6 +60,8 @@ const definition = {
 
 type Contract = SqlContractResult<typeof definition>;
 type FieldTypes = ExtractFieldOutputTypes<Contract>['public']['Post'];
+type StorageOutputTypes = ExtractStorageColumnTypes<Contract>['public']['posts'];
+type StorageInputTypes = ExtractStorageColumnInputTypes<Contract>['public']['posts'];
 
 test('codec types include pg/text@1', () => {
   expectTypeOf<
@@ -72,4 +79,18 @@ test('nullable-container list field resolves to ReadonlyArray<string> | null', (
 
 test('scalar field is unaffected', () => {
   expectTypeOf<FieldTypes['id']>().toEqualTypeOf<string>();
+});
+
+test('non-null list storage column resolves to ReadonlyArray<string>', () => {
+  expectTypeOf<StorageOutputTypes['tags']>().toEqualTypeOf<ReadonlyArray<string>>();
+  expectTypeOf<StorageInputTypes['tags']>().toEqualTypeOf<ReadonlyArray<string>>();
+});
+
+test('nullable-container list storage column resolves to ReadonlyArray<string> | null', () => {
+  expectTypeOf<StorageOutputTypes['optTags']>().toEqualTypeOf<ReadonlyArray<string> | null>();
+  expectTypeOf<StorageInputTypes['optTags']>().toEqualTypeOf<ReadonlyArray<string> | null>();
+});
+
+test('scalar storage column is unaffected', () => {
+  expectTypeOf<StorageOutputTypes['id']>().toEqualTypeOf<string>();
 });

@@ -428,13 +428,19 @@
                 "validationLevel": "strict"
               }
             }
+          },
+          "valueSet": {
+            "UserRole": {
+              "kind": "valueSet",
+              "values": ["admin", "author", "reader"]
+            }
           }
         },
         "id": "__unbound__",
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d"
+    "storageHash": "sha256:79b46070809bf632b3742219ce1dd8924daf6350b2f478c4732962cf96288b6e"
   },
   "capabilities": {},
   "extensionPacks": {},

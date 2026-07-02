@@ -18,6 +18,7 @@
   "dependencies": {
     "@prisma-next/config": "workspace:0.14.0",
     "@prisma-next/utils": "workspace:0.14.0",
+    "@vercel/detect-agent": "^1.2.3",
     "arktype": "catalog:",
     "c12": "^3.3.4",
     "pathe": "^2.0.3"

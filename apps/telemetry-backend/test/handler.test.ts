@@ -162,10 +162,8 @@ describe('telemetry POST /events', () => {
     const row = await fetchSingleRow();
     expect(row.installationId).toBe(maxString);
     expect(row.command).toBe(maxString);
-    expect(row.flags).toHaveLength(64);
-    expect(row.flags[0]).toBe(maxArrayItem);
-    expect(row.extensions).toHaveLength(64);
-    expect(row.extensions[0]).toBe(maxArrayItem);
+    expect(row.flags).toEqual(manyArrayItems);
+    expect(row.extensions).toEqual(manyArrayItems);
   });
 
   it('rejects strings beyond the configured schema bounds with 400', async () => {

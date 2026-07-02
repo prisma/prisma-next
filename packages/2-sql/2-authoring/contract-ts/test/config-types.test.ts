@@ -35,6 +35,7 @@ const stubContext: ContractSourceContext = {
   },
   controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },
   resolvedInputs: [],
+  capabilities: {},
 };
 
 describe('source format discriminator', () => {

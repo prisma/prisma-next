@@ -2,6 +2,7 @@ import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types'
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { PslSpan, ResolvedAttribute } from '@prisma-next/psl-parser';
 import { parseQuotedStringLiteral } from '@prisma-next/psl-parser';
+import type { ExpressionAst } from '@prisma-next/psl-parser/syntax';
 
 export { parseQuotedStringLiteral };
 
@@ -32,7 +33,7 @@ export function getNamedArgument(attribute: ResolvedAttribute, name: string): st
 export function getPositionalArgumentEntry(
   attribute: ResolvedAttribute,
   index = 0,
-): { value: string; span: PslSpan } | undefined {
+): { value: string; expression?: ExpressionAst; span: PslSpan } | undefined {
   const entries = attribute.args.filter((arg) => arg.kind === 'positional');
   const entry = entries[index];
   if (!entry || entry.kind !== 'positional') {
@@ -40,6 +41,7 @@ export function getPositionalArgumentEntry(
   }
   return {
     value: entry.value,
+    ...(entry.expression !== undefined ? { expression: entry.expression } : {}),
     span: entry.span,
   };
 }

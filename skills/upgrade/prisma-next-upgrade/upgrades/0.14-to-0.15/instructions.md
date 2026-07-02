@@ -125,6 +125,19 @@ No user action required. Incidental substrate diff only.
 -->
 
 <!--
+TML-2954 (reshaping-pipeline decode): the Mongo query builder now reifies a per-stage
+result shape, so reads through reshaping aggregation stages (`$project`/`$addFields`,
+with more stages to follow) decode their output fields through the contract codecs
+instead of returning raw BSON. Previously any reshaping stage collapsed the plan to an
+un-decoded pass-through — a projected `_id` came back as a raw `ObjectId`; it now comes
+back decoded, matching the row type the builder already declared. `$vectorSearch`
+(shape-preserving) is reclassified as identity, so the retail-store `findSimilarProducts`
+example drops its `db.raw` + `blindCast` for the typed builder. This is a runtime
+behaviour fix — no API or contract-shape change and no re-emit needed; code that relied
+on the previous un-decoded values would now observe decoded ones. Incidental to emit.
+-->
+
+<!--
 TML-2955 (expose the static ExecutionContext symmetrically): additive client-safe
 static surface. New `@prisma-next/{mongo,postgres,sqlite}/static` entrypoints export
 `<target>Static({ contractJson })`, returning the driver-free `ExecutionContext`
@@ -146,4 +159,18 @@ by rendering each stored value through its codec, replacing the framework's
 (emit-vs-no-emit agreement). The emitted contract is byte-identical (`fixtures:check`
 clean; `contract.json`, `contract.d.ts`, and both hashes unchanged). No user action
 required. Incidental substrate diff only.
+-->
+
+<!--
+TML-2953 (this PR): Mongo enum fields now type through a storage value set, the same
+way SQL does. Authoring a Mongo enum writes a value set into
+`contract.storage.namespaces[<ns>].entries.valueSet[<Enum>]` (the codec-encoded
+member values) alongside the domain enum, and the emit typing + `$jsonSchema`
+validator source from it. The `mongo-demo` and `retail-store` example contracts
+regenerate to carry the value set (`contract.json` gains `entries.valueSet` and its
+`storageHash` updates); the emitted `contract.d.ts` field types and the `$jsonSchema`
+validator are byte-identical. `db.enums` runtime behaviour is unchanged. A re-emit
+picks up the new `contract.json` shape; existing migrations are unaffected (the value
+set is non-physical — no new migration op). No user action required. Incidental
+substrate diff only.
 -->

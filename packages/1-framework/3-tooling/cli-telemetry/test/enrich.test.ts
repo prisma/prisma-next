@@ -37,6 +37,7 @@ const baseEnv: EnrichEnvironment = {
   arch: 'arm64',
   versions: { node: '24.13.0' },
   env: {},
+  agent: null,
   readProjectPackageJson: () => null,
 };
 
@@ -154,12 +155,12 @@ describe('buildTelemetryEvent', () => {
     expect(event.runtimeVersion).toBe('2.5.0');
   });
 
-  it('populates the agent field when a marker env var is set', () => {
+  it('passes the pre-resolved agent label through to the event', () => {
     const event = buildTelemetryEvent(basePayload, baseProjectConfig, {
       ...baseEnv,
-      env: { CLAUDECODE: '1' },
+      agent: 'claude',
     });
-    expect(event.agent).toBe('Claude Code');
+    expect(event.agent).toBe('claude');
   });
 
   it('passes null tsVersion when the project package.json read fails', () => {

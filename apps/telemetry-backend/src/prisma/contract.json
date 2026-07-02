@@ -44,18 +44,16 @@
                 }
               },
               "extensions": {
-                "many": true,
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/jsonb@1",
                   "kind": "scalar"
                 }
               },
               "flags": {
-                "many": true,
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/jsonb@1",
                   "kind": "scalar"
                 }
               },

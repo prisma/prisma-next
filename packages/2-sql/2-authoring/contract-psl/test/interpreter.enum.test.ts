@@ -119,6 +119,7 @@ function interpret(schema: string, overrides?: Partial<InterpretPslDocumentToSql
     codecLookup: testCodecLookup,
     createNamespace: createTestSqlNamespace,
     enumInferenceCodecs: postgresEnumInferenceCodecs,
+    capabilities: { sql: { scalarList: true } },
     ...overrides,
   });
 }

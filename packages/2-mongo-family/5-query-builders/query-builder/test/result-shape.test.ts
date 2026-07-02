@@ -69,13 +69,19 @@ describe('PipelineChain build resultShape', () => {
     expect(plan.resultShape?.kind).toBe('document');
   });
 
-  it('shape-rewriting pipeline yields unknown root shape', () => {
+  it('project stage reifies a document shape retaining _id and the projected field', () => {
     const plan = mongoQuery<TContract>({ contractJson: testContractJson })
       .from('orders')
       .match(MongoFieldFilter.eq('status', 'x'))
       .project('status')
       .build();
     expect(plan.command.pipeline.some((s) => s instanceof MongoProjectStage)).toBe(true);
-    expect(plan.resultShape).toEqual({ kind: 'unknown' });
+    expect(plan.resultShape).toEqual({
+      kind: 'document',
+      fields: {
+        _id: { kind: 'leaf', codecId: 'mongo/objectId@1', nullable: false },
+        status: { kind: 'leaf', codecId: 'mongo/string@1', nullable: false },
+      },
+    });
   });
 });
