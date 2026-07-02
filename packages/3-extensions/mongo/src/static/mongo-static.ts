@@ -7,6 +7,8 @@ import type {
   MongoContract,
   MongoContractWithTypeMaps,
 } from '@prisma-next/mongo-contract';
+import type { MongoRawClient } from '@prisma-next/mongo-orm';
+import { mongoRaw } from '@prisma-next/mongo-orm';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
 import {
   createMongoExecutionContext,
@@ -35,6 +37,7 @@ export interface MongoStaticContext<
   readonly contract: TContract;
   readonly enums: UnboundEnums<TContract>;
   readonly query: ReturnType<typeof mongoQuery<TContract>>;
+  readonly raw: MongoRawClient<TContract>;
 }
 
 export function buildMongoStaticContext<
@@ -47,7 +50,8 @@ export function buildMongoStaticContext<
   const context = createMongoExecutionContext<TContract>({ contract, stack });
   const enums = extractUnboundEnums(contract);
   const query = mongoQuery<TContract>({ contractJson: contract });
-  return { context, contract, enums, query };
+  const raw = mongoRaw<TContract>({ contract });
+  return { context, contract, enums, query, raw };
 }
 
 export default function mongoStatic<

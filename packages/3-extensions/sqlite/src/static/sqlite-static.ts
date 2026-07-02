@@ -7,11 +7,12 @@ import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RawCodecInferer, RawSqlTag } from '@prisma-next/sql-relational-core/expression';
 import { createRawSql } from '@prisma-next/sql-relational-core/expression';
-import type { ExecutionContext } from '@prisma-next/sql-runtime';
+import type { ExecutionContext, SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import sqliteTarget, { SqliteContractSerializer } from '@prisma-next/target-sqlite/runtime';
 import { assertDefined } from '@prisma-next/utils/assertions';
 import { blindCast } from '@prisma-next/utils/casts';
+import type { SqliteTargetId } from '../runtime/sqlite';
 
 type UnboundSql<TContract extends Contract<SqlStorage>> =
   Db<TContract>[typeof UNBOUND_NAMESPACE_ID];
@@ -46,6 +47,7 @@ export function buildSqliteStaticContext<TContract extends Contract<SqlStorage>>
 
 export default function sqliteStatic<TContract extends Contract<SqlStorage>>(options: {
   readonly contractJson: unknown;
+  readonly extensions?: readonly SqlRuntimeExtensionDescriptor<SqliteTargetId>[];
 }): SqliteStaticContext<TContract> {
   const contract = blindCast<
     TContract,
@@ -54,6 +56,7 @@ export default function sqliteStatic<TContract extends Contract<SqlStorage>>(opt
   const stack = createSqlExecutionStack({
     target: sqliteTarget,
     adapter: sqliteAdapter,
+    extensionPacks: options.extensions ?? [],
   });
   const context = createExecutionContext({ contract, stack });
   return buildSqliteStaticContext(context, stack.adapter.rawCodecInferer);

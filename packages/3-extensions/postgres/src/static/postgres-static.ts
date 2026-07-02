@@ -6,10 +6,11 @@ import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RawCodecInferer, RawSqlTag } from '@prisma-next/sql-relational-core/expression';
 import { createRawSql } from '@prisma-next/sql-relational-core/expression';
-import type { ExecutionContext } from '@prisma-next/sql-runtime';
+import type { ExecutionContext, SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { blindCast } from '@prisma-next/utils/casts';
+import type { PostgresTargetId } from '../runtime/postgres';
 
 export interface PostgresStaticContext<TContract extends Contract<SqlStorage>> {
   readonly context: ExecutionContext<TContract>;
@@ -31,6 +32,7 @@ export function buildPostgresStaticContext<TContract extends Contract<SqlStorage
 
 export default function postgresStatic<TContract extends Contract<SqlStorage>>(options: {
   readonly contractJson: unknown;
+  readonly extensions?: readonly SqlRuntimeExtensionDescriptor<PostgresTargetId>[];
 }): PostgresStaticContext<TContract> {
   const contract = blindCast<
     TContract,
@@ -39,6 +41,7 @@ export default function postgresStatic<TContract extends Contract<SqlStorage>>(o
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
+    extensionPacks: options.extensions ?? [],
   });
   const context = createExecutionContext({ contract, stack });
   return buildPostgresStaticContext(context, stack.adapter.rawCodecInferer);

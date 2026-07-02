@@ -7,7 +7,7 @@ import type {
   MongoContractWithTypeMaps,
 } from '@prisma-next/mongo-contract';
 import type { MongoOrmClient, MongoQueryPlan, MongoRawClient } from '@prisma-next/mongo-orm';
-import { mongoOrm, mongoRaw } from '@prisma-next/mongo-orm';
+import { mongoOrm } from '@prisma-next/mongo-orm';
 import type { MongoMiddleware, MongoRuntime } from '@prisma-next/mongo-runtime';
 import { createMongoRuntime, type MongoExecutionContext } from '@prisma-next/mongo-runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -119,7 +119,7 @@ export default function mongo<
   const contract = resolveContract(options);
   let binding = resolveOptionalMongoBinding(options);
 
-  const { context, query, enums } = buildMongoStaticContext<TContract>(contract);
+  const { context, query, enums, raw } = buildMongoStaticContext<TContract>(contract);
 
   // Single source of truth for the lifecycle. `runtimePromise` is the in-flight
   // or settled build; `closed` is the terminal state set by `close()`. A failed
@@ -179,8 +179,6 @@ export default function mongo<
     contract,
     executor: { execute },
   });
-
-  const raw = mongoRaw<TContract>({ contract });
 
   return {
     orm,
