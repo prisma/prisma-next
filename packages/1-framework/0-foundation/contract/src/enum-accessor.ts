@@ -1,3 +1,4 @@
+import { blindCast } from '@prisma-next/utils/casts';
 import type { Contract } from './contract-types';
 import type { ContractEnum } from './domain-types';
 import type { JsonValue } from './types';
@@ -63,16 +64,17 @@ export function buildEnumsMapForNamespace(
   return result;
 }
 
-export function buildNamespacedEnums(domain: {
-  readonly namespaces: Readonly<
-    Record<string, { readonly enum?: Readonly<Record<string, ContractEnum>> }>
-  >;
-}): Record<string, Record<string, EnumAccessor>> {
+export function buildNamespacedEnums<TContract extends Contract>(
+  domain: TContract['domain'],
+): NamespacedEnums<TContract> {
   const result: Record<string, Record<string, EnumAccessor>> = {};
   for (const namespaceId of Object.keys(domain.namespaces)) {
     result[namespaceId] = buildEnumsMapForNamespace(domain, namespaceId);
   }
-  return result;
+  return blindCast<
+    NamespacedEnums<TContract>,
+    'built dynamically from domain.namespaces; the mapped-type shape cannot be proven statically'
+  >(result);
 }
 
 type Present<T> = Exclude<T, undefined>;

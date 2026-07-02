@@ -8,6 +8,7 @@ export default defineConfig({
     'src/exports/control.ts',
     'src/exports/family.ts',
     'src/exports/runtime.ts',
+    'src/exports/static.ts',
     'src/exports/target.ts',
   ],
 });

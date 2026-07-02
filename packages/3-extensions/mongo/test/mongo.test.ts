@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   AnyMongoTypeMaps,
   MongoContract,
@@ -65,7 +66,7 @@ import mongo from '../src/runtime/mongo';
 const fakeContract = {
   roots: {},
   models: {},
-  domain: { namespaces: {} },
+  domain: { namespaces: { [UNBOUND_NAMESPACE_ID]: { models: {} } } },
 } as unknown as AnyMongoContract;
 const fakeRuntime = { id: 'runtime-instance', close: vi.fn().mockResolvedValue(undefined) };
 const fakeDriverClose = vi.fn().mockResolvedValue(undefined);
@@ -125,7 +126,7 @@ describe('mongo() facade', () => {
       'mydb',
     );
 
-    // Per buildRuntime invocation: one stack, one context, threaded into runtime.
+    // Stack and context are built upfront at construction time; each appears exactly once.
     expect(mocks.createMongoExecutionStack).toHaveBeenCalledTimes(1);
     expect(mocks.createMongoExecutionStack).toHaveBeenCalledWith({
       target: mocks.mongoRuntimeTarget,
@@ -586,6 +587,42 @@ describe('mongo() facade', () => {
       expect(db.enums['Role']!.values).toEqual(['user', 'admin']);
       expect(mocks.driverFromConnection).not.toHaveBeenCalled();
       expect(mocks.createMongoRuntime).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('db.context (facade)', () => {
+    it('exposes a context object before any driver connection', () => {
+      const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      expect(db.context).toBeDefined();
+      expect(mocks.driverFromConnection).not.toHaveBeenCalled();
+    });
+
+    it('context matches what createMongoExecutionContext returns', () => {
+      const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      expect(db.context).toEqual({ id: 'context-instance' });
+    });
+
+    it('createMongoExecutionContext is called upfront (before runtime()) with the resolved contract', () => {
+      mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      expect(mocks.createMongoExecutionContext).toHaveBeenCalledTimes(1);
+      expect(mocks.createMongoExecutionContext).toHaveBeenCalledWith({
+        contract: fakeContract,
+        stack: { id: 'stack-instance' },
+      });
+    });
+
+    it('createMongoExecutionContext is called only once (buildRuntime reuses the upfront context)', async () => {
+      const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      await db.runtime();
+      expect(mocks.createMongoExecutionContext).toHaveBeenCalledTimes(1);
+    });
+
+    it('buildRuntime passes the upfront context to createMongoRuntime', async () => {
+      const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      await db.runtime();
+      expect(mocks.createMongoRuntime).toHaveBeenCalledWith(
+        expect.objectContaining({ context: { id: 'context-instance' } }),
+      );
     });
   });
 });

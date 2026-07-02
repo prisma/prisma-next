@@ -1,4 +1,7 @@
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import { coreHash } from '@prisma-next/contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import { createContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
@@ -6,7 +9,15 @@ import { describe, expect, it } from 'vitest';
 
 import sqlite from '../src/runtime/sqlite';
 
-const contract = createContract<SqlStorage>({ target: 'sqlite' });
+const contract: Contract<SqlStorage> = createContract<SqlStorage>({
+  target: 'sqlite',
+  storage: new SqlStorage({
+    storageHash: coreHash('sha256:sqlite-close-test'),
+    namespaces: {
+      __unbound__: sqliteCreateNamespace({ id: '__unbound__', entries: { table: {} } }),
+    },
+  }),
+});
 
 describe('sqlite close()', () => {
   it('releases the facade-owned SQLite driver when constructed from { path }', async () => {

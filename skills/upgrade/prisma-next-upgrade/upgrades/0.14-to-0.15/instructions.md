@@ -113,6 +113,18 @@ No user action required. Incidental substrate diff only.
 -->
 
 <!--
+TML-2955 (expose the static ExecutionContext symmetrically): additive client-safe
+static surface. New `@prisma-next/{mongo,postgres,sqlite}/static` entrypoints export
+`<target>Static({ contractJson })`, returning the driver-free `ExecutionContext`
+plus derived `enums` / query builder / `raw` / `contract`; the facades also expose
+`db.context` (Mongo now typed `MongoExecutionContext<TContract>`) and `db.contract`.
+All additive — existing app code is unaffected. The `retail-store` example's
+`src/enums.ts` switches from the interim `buildNamespacedEnums` + `blindCast` to
+`mongoStatic(...).enums` (example-internal). No user action required. Incidental
+substrate diff only.
+-->
+
+<!--
 TML-2952 (this PR): route SQL enum/value-set column TS typing through the codec.
 A field/column restricted to a value set now derives its narrowed TS literal union
 by rendering each stored value through its codec, replacing the framework's
