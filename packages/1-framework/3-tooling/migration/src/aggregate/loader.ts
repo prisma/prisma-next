@@ -12,7 +12,7 @@ import {
   spaceRefsDirectory,
 } from '../space-layout';
 import { listContractSpaceDirectories } from '../verify-contract-spaces';
-import { createContractSpaceAggregate, createContractSpaceMember } from './aggregate';
+import { createAggregateContractSpace, createContractSpaceAggregate } from './aggregate';
 import { computeIntegrityViolations, type IntegritySpaceState } from './check-integrity';
 import type { ContractSpaceAggregate } from './types';
 
@@ -41,7 +41,7 @@ export interface LoadAggregateInput {
  * Building **never throws on disk content**: a hash- or
  * invariants-mismatched package is retained, an unparseable package is
  * omitted, a missing extension head ref leaves `headRef: null`, and an
- * unreadable on-disk contract defers its failure to `member.contract()`.
+ * unreadable on-disk contract defers its failure to `space.contract()`.
  * Every such problem is judged by {@link ContractSpaceAggregate.checkIntegrity}
  * rather than aborting the load. The only rejections are catastrophic I/O
  * (a `migrations/` that exists but is unreadable for reasons other than
@@ -65,8 +65,8 @@ export async function loadContractSpaceAggregate(
 
   return createContractSpaceAggregate({
     targetId,
-    app: appState.member,
-    extensions: extensionStates.map((state) => state.member),
+    app: appState.space,
+    extensions: extensionStates.map((state) => state.space),
     checkIntegrity: (opts) => computeIntegrityViolations({ targetId, spaces }, opts),
   });
 }
@@ -80,7 +80,7 @@ async function loadAppSpace(
   const { packages, problems } = await readMigrationsDir(spaceDir);
   const { refs, problems: refProblems } = await readRefsTolerant(spaceRefsDirectory(spaceDir));
 
-  const member = createContractSpaceMember({
+  const space = createAggregateContractSpace({
     spaceId: APP_SPACE_ID,
     packages,
     refs,
@@ -93,7 +93,7 @@ async function loadAppSpace(
   // The app head ref is synthesised from the live contract, so there is
   // no on-disk head.json to be missing or corrupt for it.
   return {
-    member,
+    space,
     problems,
     refProblems,
     headRefProblem: null,
@@ -131,7 +131,7 @@ async function loadExtensionSpace(
 
   const rawContract = await readRawContractDeferred(migrationsDir, spaceId);
 
-  const member = createContractSpaceMember({
+  const space = createAggregateContractSpace({
     spaceId,
     packages,
     refs,
@@ -141,7 +141,7 @@ async function loadExtensionSpace(
     deserializeContract,
   });
 
-  return { member, problems, refProblems, headRefProblem, isApp: false };
+  return { space, problems, refProblems, headRefProblem, isApp: false };
 }
 
 /**

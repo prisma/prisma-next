@@ -283,7 +283,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
       markersBySpaceId: new Map(),
       schemaIntrospection: { tables: { user: { columns: {} }, test_box: { columns: {} } } },
       mode: 'lenient',
-      verifySchemaForMember: () => ({
+      verifySchemaForSpace: () => ({
         ok: true,
         summary: 'Database schema satisfies contract',
         contract: { storageHash: 'sha256:test' },

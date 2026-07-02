@@ -3,7 +3,7 @@ import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { requireHeadRef } from './aggregate';
 import type { ContractMarkerRecordLike } from './marker-types';
-import type { ContractSpaceAggregate, ContractSpaceMember } from './types';
+import type { AggregateContractSpace, ContractSpaceAggregate } from './types';
 import { collectExtraElementNames, stripExtraFindings } from './unclaimed-elements';
 
 /**
@@ -24,15 +24,15 @@ export interface VerifierInput {
    * contract-satisfaction view (extras stripped) and one deduplicated list of
    * live elements no contract space declares. It touches no storage shape.
    */
-  readonly verifySchemaForMember: (
+  readonly verifySchemaForSpace: (
     schema: unknown,
-    member: ContractSpaceMember,
+    space: AggregateContractSpace,
     mode: 'strict' | 'lenient',
   ) => VerifyDatabaseSchemaResult;
 }
 
 /**
- * Marker-check result per member. Mirrors the four cases the
+ * Marker-check result per contract space. Mirrors the four cases the
  * `verifyContractSpaces` primitive surfaces today, plus an `'absent'`
  * case for greenfield spaces (no marker row written yet — `db init`
  * not run).
@@ -89,8 +89,8 @@ export type VerifierOutput = Result<VerifierSuccess, VerifierError>;
  * Verify a {@link ContractSpaceAggregate} against the live database
  * state. Bundles two checks:
  *
- * - `markerCheck` per member: compare the live marker row against the
- *   member's `headRef.hash` + `headRef.invariants`. Absence is a
+ * - `markerCheck` per contract space: compare the live marker row against the
+ *   space's `headRef.hash` + `headRef.invariants`. Absence is a
  *   distinct kind, not an error (callers — `db verify` strict vs
  *   `db init` precondition — choose how to interpret it).
  * - `schemaCheck`: two distinct outputs from the per-space diffs.
@@ -103,7 +103,7 @@ export type VerifierOutput = Result<VerifierSuccess, VerifierError>;
  *   once for the database. No schema is pruned before verifying.
  *
  * `markerCheck.orphanMarkers` lists every marker row whose `space` is
- * not a member of the aggregate. `db verify` callers reject orphans;
+ * not a contract space of the aggregate. `db verify` callers reject orphans;
  * future tooling may not.
  *
  * Pure synchronous function; no I/O. The caller (CLI) gathers
@@ -121,21 +121,21 @@ export function verifyMigration(input: VerifierInput): VerifierOutput {
 }
 
 function runVerifyMigration(input: VerifierInput): VerifierOutput {
-  const { aggregate, markersBySpaceId, schemaIntrospection, mode, verifySchemaForMember } = input;
-  const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
-  const memberSpaceIds = new Set(allMembers.map((m) => m.spaceId));
+  const { aggregate, markersBySpaceId, schemaIntrospection, mode, verifySchemaForSpace } = input;
+  const allSpaces: ReadonlyArray<AggregateContractSpace> = [aggregate.app, ...aggregate.extensions];
+  const aggregateSpaceIds = new Set(allSpaces.map((m) => m.spaceId));
 
-  // Marker check per member.
+  // Marker check per contract space.
   const markerPerSpace = new Map<string, MarkerCheckResult>();
-  for (const member of allMembers) {
-    const marker = markersBySpaceId.get(member.spaceId) ?? null;
+  for (const space of allSpaces) {
+    const marker = markersBySpaceId.get(space.spaceId) ?? null;
     if (marker === null) {
-      markerPerSpace.set(member.spaceId, { kind: 'absent' });
+      markerPerSpace.set(space.spaceId, { kind: 'absent' });
       continue;
     }
-    const headRef = requireHeadRef(member);
+    const headRef = requireHeadRef(space);
     if (marker.storageHash !== headRef.hash) {
-      markerPerSpace.set(member.spaceId, {
+      markerPerSpace.set(space.spaceId, {
         kind: 'hashMismatch',
         markerHash: marker.storageHash,
         expected: headRef.hash,
@@ -145,20 +145,20 @@ function runVerifyMigration(input: VerifierInput): VerifierOutput {
     const markerInvariants = new Set(marker.invariants);
     const missing = headRef.invariants.filter((id) => !markerInvariants.has(id));
     if (missing.length > 0) {
-      markerPerSpace.set(member.spaceId, {
+      markerPerSpace.set(space.spaceId, {
         kind: 'missingInvariants',
         missing: [...missing].sort(),
       });
       continue;
     }
-    markerPerSpace.set(member.spaceId, { kind: 'ok' });
+    markerPerSpace.set(space.spaceId, { kind: 'ok' });
   }
 
   // Orphan markers: entries in markersBySpaceId whose spaceId is not a
-  // member of the aggregate.
+  // contract space of the aggregate.
   const orphanMarkers: { spaceId: string; row: ContractMarkerRecordLike }[] = [];
   for (const [spaceId, row] of markersBySpaceId) {
-    if (row !== null && !memberSpaceIds.has(spaceId)) {
+    if (row !== null && !aggregateSpaceIds.has(spaceId)) {
       orphanMarkers.push({ spaceId, row });
     }
   }
@@ -170,9 +170,9 @@ function runVerifyMigration(input: VerifierInput): VerifierOutput {
   // only when no contract space declares it.
   const schemaPerSpace = new Map<string, VerifyDatabaseSchemaResult>();
   const extraNames = new Set<string>();
-  for (const member of allMembers) {
-    const result = verifySchemaForMember(schemaIntrospection, member, mode);
-    schemaPerSpace.set(member.spaceId, stripExtraFindings(result));
+  for (const space of allSpaces) {
+    const result = verifySchemaForSpace(schemaIntrospection, space, mode);
+    schemaPerSpace.set(space.spaceId, stripExtraFindings(result));
     for (const name of collectExtraElementNames(result)) extraNames.add(name);
   }
   const unclaimed = [...extraNames]

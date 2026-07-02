@@ -3,7 +3,7 @@ import { requireHeadRef } from './aggregate';
 import type { PerSpacePlan, PlannerError, PlannerInput, PlannerOutput } from './planner-types';
 import { graphWalkStrategy } from './strategies/graph-walk';
 import { synthStrategy } from './strategies/synth';
-import type { ContractSpaceMember } from './types';
+import type { AggregateContractSpace } from './types';
 
 export type {
   AggregateCurrentDBState,
@@ -17,16 +17,16 @@ export type {
 } from './planner-types';
 
 /**
- * Plan a migration across every member of a {@link ContractSpaceAggregate}.
+ * Plan a migration across every contract space of a {@link ContractSpaceAggregate}.
  *
- * Strategy selection per member, in order; first match wins:
+ * Strategy selection per contract space, in order; first match wins:
  *
- * 1. If `callerPolicy.ignoreGraphFor.has(member.spaceId)`:
- *    - If `member.headRef.invariants` is empty → synth.
+ * 1. If `callerPolicy.ignoreGraphFor.has(space.spaceId)`:
+ *    - If `space.headRef.invariants` is empty → synth.
  *    - Else → `policyConflict` (synth cannot satisfy authored invariants).
- * 2. Else if `member.graph()` is non-empty AND graph-walk
+ * 2. Else if `space.graph()` is non-empty AND graph-walk
  *    succeeds → graph-walk.
- * 3. Else if `member.headRef.invariants` is empty → synth.
+ * 3. Else if `space.headRef.invariants` is empty → synth.
  * 4. Else → graph-walk failure → `extensionPathUnreachable` /
  *    `extensionPathUnsatisfiable`.
  *
@@ -45,27 +45,27 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
 
   const perSpace = new Map<string, PerSpacePlan>();
 
-  // Iterate in apply order so a per-member error short-circuits the
+  // Iterate in apply order so a per-space error short-circuits the
   // walk in the same order the runner would walk inputs.
-  const orderedMembers: ReadonlyArray<ContractSpaceMember> = [
+  const orderedSpaces: ReadonlyArray<AggregateContractSpace> = [
     ...aggregate.extensions,
     aggregate.app,
   ];
 
-  for (const member of orderedMembers) {
+  for (const space of orderedSpaces) {
     const declaredByAnotherSpace = (entityName: string): boolean =>
-      aggregate.declaringSpaces(entityName).some((spaceId) => spaceId !== member.spaceId);
-    const currentMarker = currentDBState.markersBySpaceId.get(member.spaceId) ?? null;
-    const headRef = requireHeadRef(member);
+      aggregate.declaringSpaces(entityName).some((spaceId) => spaceId !== space.spaceId);
+    const currentMarker = currentDBState.markersBySpaceId.get(space.spaceId) ?? null;
+    const headRef = requireHeadRef(space);
 
-    const ignoreGraph = callerPolicy.ignoreGraphFor.has(member.spaceId);
+    const ignoreGraph = callerPolicy.ignoreGraphFor.has(space.spaceId);
     const invariantsRequired = headRef.invariants.length > 0;
 
     if (ignoreGraph && invariantsRequired) {
       const conflict: PlannerError = {
         kind: 'policyConflict',
-        spaceId: member.spaceId,
-        detail: `\`callerPolicy.ignoreGraphFor\` requested for space "${member.spaceId}", but the member declares non-empty head-ref invariants (${headRef.invariants.join(', ')}). Synthesising a plan from the contract IR cannot satisfy authored invariants — the graph must be walked. Either remove "${member.spaceId}" from \`ignoreGraphFor\` or amend the on-disk head ref to declare zero invariants.`,
+        spaceId: space.spaceId,
+        detail: `\`callerPolicy.ignoreGraphFor\` requested for space "${space.spaceId}", but the contract space declares non-empty head-ref invariants (${headRef.invariants.join(', ')}). Synthesising a plan from the contract IR cannot satisfy authored invariants — the graph must be walked. Either remove "${space.spaceId}" from \`ignoreGraphFor\` or amend the on-disk head ref to declare zero invariants.`,
       };
       return notOk(conflict);
     }
@@ -74,7 +74,7 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
       const synthOutcome = await synthStrategy({
         aggregateTargetId: aggregate.targetId,
         currentMarker,
-        member,
+        space,
         declaredByAnotherSpace,
         schemaIntrospection: currentDBState.schemaIntrospection,
         adapter: input.adapter,
@@ -85,47 +85,47 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
       if (synthOutcome.kind === 'failure') {
         return notOk({
           kind: 'appSynthFailure',
-          spaceId: member.spaceId,
+          spaceId: space.spaceId,
           conflicts: synthOutcome.conflicts,
         });
       }
-      perSpace.set(member.spaceId, synthOutcome.result);
+      perSpace.set(space.spaceId, synthOutcome.result);
       continue;
     }
 
     // Try graph-walk first when the graph has nodes; fall back to synth
     // when the graph is empty AND no invariants are required.
-    if (member.graph().nodes.size > 0) {
+    if (space.graph().nodes.size > 0) {
       const walked = graphWalkStrategy({
         aggregateTargetId: aggregate.targetId,
-        member,
+        space,
         currentMarker,
       });
       if (walked.kind === 'ok') {
-        perSpace.set(member.spaceId, walked.result);
+        perSpace.set(space.spaceId, walked.result);
         continue;
       }
       if (walked.kind === 'unreachable') {
         return notOk({
           kind: 'extensionPathUnreachable',
-          spaceId: member.spaceId,
+          spaceId: space.spaceId,
           target: headRef.hash,
         });
       }
       // unsatisfiable — surface
       return notOk({
         kind: 'extensionPathUnsatisfiable',
-        spaceId: member.spaceId,
+        spaceId: space.spaceId,
         missingInvariants: walked.missing,
       });
     }
 
     // Empty graph: synth is the only option, and it can only satisfy
-    // empty-invariant members.
+    // empty-invariant contract spaces.
     if (invariantsRequired) {
       return notOk({
         kind: 'extensionPathUnsatisfiable',
-        spaceId: member.spaceId,
+        spaceId: space.spaceId,
         missingInvariants: [...headRef.invariants].sort(),
       });
     }
@@ -133,7 +133,7 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
     const synthOutcome = await synthStrategy({
       aggregateTargetId: aggregate.targetId,
       currentMarker,
-      member,
+      space,
       declaredByAnotherSpace,
       schemaIntrospection: currentDBState.schemaIntrospection,
       adapter: input.adapter,
@@ -144,11 +144,11 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
     if (synthOutcome.kind === 'failure') {
       return notOk({
         kind: 'appSynthFailure',
-        spaceId: member.spaceId,
+        spaceId: space.spaceId,
         conflicts: synthOutcome.conflicts,
       });
     }
-    perSpace.set(member.spaceId, synthOutcome.result);
+    perSpace.set(space.spaceId, synthOutcome.result);
   }
 
   return ok({

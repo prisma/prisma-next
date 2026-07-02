@@ -5,7 +5,7 @@ import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-componen
  * standalone unclaimed-elements list (Part 2), reported once. The CLI renders
  * both; `unclaimed` is never folded into the combined tree or its issues.
  */
-export interface CombinedSchemaResult {
+export interface CombinedVerifyResult {
   readonly result: VerifyDatabaseSchemaResult;
   readonly unclaimed: readonly string[];
 }
@@ -34,15 +34,17 @@ export interface CombinedSchemaResult {
  * intact and the envelope internally consistent (`ok: false` ↔ failure
  * summary).
  */
-export function combineSchemaResults(
+export function combineVerifyResults(
   perSpace: ReadonlyMap<string, VerifyDatabaseSchemaResult>,
   appSpaceId: string,
   strict: boolean,
   unclaimed: readonly string[],
-): CombinedSchemaResult {
+): CombinedVerifyResult {
   const appResult = perSpace.get(appSpaceId) ?? perSpace.values().next().value;
   if (appResult === undefined) {
-    throw new Error('Aggregate verifier returned no schema results — this is a wiring bug.');
+    throw new Error(
+      'Aggregate verifier returned no per-space verify results — this is a wiring bug.',
+    );
   }
 
   let okAll = true;

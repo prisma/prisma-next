@@ -111,7 +111,7 @@ export function toExtensionInputs(
  * {@link import('./contract-space-aggregate-loader').buildContractSpaceAggregate}.
  *
  * Codec-only extensions (no `contractSpace` declaration) are filtered
- * out: they are not contract-space members, so the aggregate loader
+ * out: they contribute no contract space, so the aggregate loader
  * has nothing to do with them. Filtering happens at this descriptor-
  * import boundary so the loader stays oblivious to that distinction —
  * every entry it sees expects an on-disk `migrations/<id>/` directory.

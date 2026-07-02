@@ -25,9 +25,9 @@ export abstract class SqlSchemaIRNode extends IRNodeBase {
   /**
    * Enumerable discriminant identifying which node this is (database /
    * namespace / table / policy / role). Target concretions set a unique value;
-   * the `.is`/`.assert`/`.ensure` guards compare against it. Unlike `kind`, it
-   * is enumerable, so it survives the `projectSchemaToSpace` spread that
-   * flattens the tree into plain objects.
+   * the `.is`/`.assert` guards compare against it. Unlike `kind`, it is
+   * enumerable, so it survives a spread that flattens a node into a plain
+   * object.
    */
   readonly nodeKind?: string;
 

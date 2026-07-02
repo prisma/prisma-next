@@ -1,7 +1,7 @@
 export {
   collectAggregateNamespaces,
+  createAggregateContractSpace,
   createContractSpaceAggregate,
-  createContractSpaceMember,
   requireHeadRef,
 } from '../aggregate/aggregate';
 export {
@@ -30,10 +30,10 @@ export {
 } from '../aggregate/strategies/graph-walk';
 export { buildSynthMigrationEdge } from '../aggregate/synth-migration-edge';
 export type {
+  AggregateContractSpace,
   ContractAtOptions,
   ContractAtResult,
   ContractSpaceAggregate,
-  ContractSpaceMember,
 } from '../aggregate/types';
 export {
   type MarkerCheckResult,

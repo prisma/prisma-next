@@ -4,7 +4,7 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
-import { combineSchemaResults } from '../../src/utils/combine-schema-results';
+import { combineVerifyResults } from '../../src/utils/combine-verify-results';
 
 function makeResult(overrides: {
   spaceId: string;
@@ -44,8 +44,8 @@ function makeResult(overrides: {
   return result;
 }
 
-describe('combineSchemaResults', () => {
-  it('preserves the per-family summary when every member passes', () => {
+describe('combineVerifyResults', () => {
+  it('preserves the per-family summary when every space passes', () => {
     const perSpace = new Map<string, VerifyDatabaseSchemaResult>([
       [
         'app',
@@ -54,7 +54,7 @@ describe('combineSchemaResults', () => {
       ['cipher', makeResult({ spaceId: 'cipher', ok: true, summary: 'Schema matches contract' })],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false, []);
+    const combined = combineVerifyResults(perSpace, 'app', false, []);
 
     expect(combined.result).toMatchObject({
       ok: true,
@@ -63,7 +63,7 @@ describe('combineSchemaResults', () => {
     expect(combined.unclaimed).toEqual([]);
   });
 
-  it('preserves the per-family failure summary when every member fails', () => {
+  it('preserves the per-family failure summary when every space fails', () => {
     const perSpace = new Map<string, VerifyDatabaseSchemaResult>([
       [
         'app',
@@ -75,7 +75,7 @@ describe('combineSchemaResults', () => {
       ],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false, []);
+    const combined = combineVerifyResults(perSpace, 'app', false, []);
 
     expect(combined.result).toMatchObject({
       ok: false,
@@ -83,7 +83,7 @@ describe('combineSchemaResults', () => {
     });
   });
 
-  it('falls back to the failing member summary when the app passes but an extension fails', () => {
+  it('falls back to the failing space summary when the app passes but an extension fails', () => {
     const perSpace = new Map<string, VerifyDatabaseSchemaResult>([
       [
         'app',
@@ -100,7 +100,7 @@ describe('combineSchemaResults', () => {
       ],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false, []);
+    const combined = combineVerifyResults(perSpace, 'app', false, []);
 
     expect(combined.result).toMatchObject({
       ok: false,
@@ -110,7 +110,7 @@ describe('combineSchemaResults', () => {
     });
   });
 
-  it('returns a non-`ok` envelope when any member fails, even when the app passes', () => {
+  it('returns a non-`ok` envelope when any space fails, even when the app passes', () => {
     const perSpace = new Map<string, VerifyDatabaseSchemaResult>([
       ['app', makeResult({ spaceId: 'app', ok: true, summary: 'Schema matches contract' })],
       [
@@ -124,7 +124,7 @@ describe('combineSchemaResults', () => {
       ],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', true, []);
+    const combined = combineVerifyResults(perSpace, 'app', true, []);
 
     expect(combined.result.ok).toBe(false);
     expect(combined.result.summary).not.toContain('matches contract');
@@ -141,7 +141,7 @@ describe('combineSchemaResults', () => {
       ],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', true, ['legacy_events']);
+    const combined = combineVerifyResults(perSpace, 'app', true, ['legacy_events']);
 
     expect(combined.result.ok).toBe(false);
     expect(combined.result.summary).toContain('1 unclaimed element');
@@ -157,7 +157,7 @@ describe('combineSchemaResults', () => {
       ],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false, ['legacy_events', 'old_audit']);
+    const combined = combineVerifyResults(perSpace, 'app', false, ['legacy_events', 'old_audit']);
 
     expect(combined.result.ok).toBe(true);
     expect(combined.result.summary).toBe('Database schema satisfies contract');
@@ -166,7 +166,7 @@ describe('combineSchemaResults', () => {
 
   it('throws a wiring-bug error when the per-space map is empty', () => {
     const empty = new Map<string, VerifyDatabaseSchemaResult>();
-    expect(() => combineSchemaResults(empty, 'app', false, [])).toThrow(/wiring bug/);
+    expect(() => combineVerifyResults(empty, 'app', false, [])).toThrow(/wiring bug/);
   });
 
   it('falls back to the first iterator value when the app id is absent from the per-space map', () => {
@@ -174,7 +174,7 @@ describe('combineSchemaResults', () => {
       ['cipher', makeResult({ spaceId: 'cipher', ok: true, summary: 'Schema matches contract' })],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false, []);
+    const combined = combineVerifyResults(perSpace, 'app', false, []);
 
     expect(combined.result).toMatchObject({
       ok: true,
@@ -183,7 +183,7 @@ describe('combineSchemaResults', () => {
     });
   });
 
-  it('keeps the first failure summary when multiple members fail', () => {
+  it('keeps the first failure summary when multiple spaces fail', () => {
     const perSpace = new Map<string, VerifyDatabaseSchemaResult>([
       [
         'app',
@@ -196,7 +196,7 @@ describe('combineSchemaResults', () => {
       ],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false, []);
+    const combined = combineVerifyResults(perSpace, 'app', false, []);
 
     expect(combined.result).toMatchObject({
       ok: false,
@@ -218,7 +218,7 @@ describe('combineSchemaResults', () => {
     delete stripped.code;
     const perSpace = new Map<string, VerifyDatabaseSchemaResult>([['app', stripped]]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false, []);
+    const combined = combineVerifyResults(perSpace, 'app', false, []);
 
     expect(combined.result).toMatchObject({
       ok: false,
@@ -226,7 +226,7 @@ describe('combineSchemaResults', () => {
     });
   });
 
-  it('concatenates issues and schemaDiffIssues from all members into the combined result', () => {
+  it('concatenates issues and schemaDiffIssues from all spaces into the combined result', () => {
     const appStructuralIssue: SchemaIssue = {
       kind: 'missing_table',
       table: 'profiles',
@@ -265,7 +265,7 @@ describe('combineSchemaResults', () => {
       ],
     ]);
 
-    const combined = combineSchemaResults(perSpace, 'app', false, []);
+    const combined = combineVerifyResults(perSpace, 'app', false, []);
 
     expect(combined.result.schema.issues).toEqual([appStructuralIssue]);
     expect(combined.result.schema.schemaDiffIssues).toEqual([appDiffIssue, extDiffIssue]);

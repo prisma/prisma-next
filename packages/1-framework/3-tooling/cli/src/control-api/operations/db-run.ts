@@ -98,9 +98,9 @@ export interface ExecuteRunOptions<TFamilyId extends string, TTargetId extends s
  * 2. **Read DB state**: marker rows (`familyInstance.readAllMarkers`)
  *    + introspected schema (`familyInstance.introspect`).
  * 3. **Plan**: {@link planMigration} chooses graph-walk vs synth per
- *    member according to `callerPolicy.ignoreGraphFor`. The app member
+ *    space according to `callerPolicy.ignoreGraphFor`. The app space
  *    is forced through synth (today's daily-driver behaviour); every
- *    extension member walks its on-disk graph.
+ *    extension space walks its on-disk graph.
  * 4. **Apply** (when `mode === 'apply'`): every per-space `MigrationPlan`
  *    feeds into the runner's `execute` — one outer
  *    transaction across every space; failure on any space rolls back
@@ -200,7 +200,7 @@ export async function executeRun<TFamilyId extends string, TTargetId extends str
   const appResolution = orderedResolutions.find((r) => r.spaceId === aggregate.app.spaceId);
   if (!appResolution) {
     throw new Error(
-      'Aggregate planner returned no plan for the app member — the planner is supposed to always emit one.',
+      'Aggregate planner returned no plan for the app space — the planner is supposed to always emit one.',
     );
   }
   const appPlan = appResolution.entry.plan;
@@ -280,14 +280,14 @@ function aggregatePlannerWarnings(
 
 /**
  * Compare the live `_prisma_marker` rows against the aggregate's
- * declared members. Any marker row whose `space` is not a member of
+ * declared contract spaces. Any marker row whose `space` is not a space of
  * the aggregate is an "orphan" — typically a marker left behind by
  * an extension that was removed from `extensionPacks` without first
  * cleaning up its on-disk migrations / database tables.
  *
  * Returns a {@link CliStructuredError} envelope (code `5002`,
  * `kind: 'orphanMarker'`) for the first orphan it finds, or `null`
- * when every marker row maps to a declared member. Mirrors the M2
+ * when every marker row maps to a declared contract space. Mirrors the M2
  * `runContractSpaceVerifierMarkerCheck` envelope so downstream
  * tooling (integration tests, JSON consumers) keeps asserting on the
  * same shape.
@@ -296,13 +296,13 @@ function detectOrphanMarkers(
   aggregate: ContractSpaceAggregate,
   markerRows: ReadonlyMap<string, unknown>,
 ): CliStructuredError | null {
-  const memberSpaceIds = new Set<string>([
+  const aggregateSpaceIds = new Set<string>([
     aggregate.app.spaceId,
     ...aggregate.extensions.map((m) => m.spaceId),
   ]);
   const orphans: string[] = [];
   for (const [spaceId, row] of markerRows) {
-    if (row !== null && row !== undefined && !memberSpaceIds.has(spaceId)) {
+    if (row !== null && row !== undefined && !aggregateSpaceIds.has(spaceId)) {
       orphans.push(spaceId);
     }
   }

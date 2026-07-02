@@ -26,7 +26,7 @@ import {
   errorTargetMismatch,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { type CombinedSchemaResult, combineSchemaResults } from '../utils/combine-schema-results';
+import { type CombinedVerifyResult, combineVerifyResults } from '../utils/combine-verify-results';
 import {
   addGlobalOptions,
   maskConnectionUrl,
@@ -100,7 +100,7 @@ function mapVerifyFailure(verifyResult: VerifyDatabaseResult): CliStructuredErro
   return errorRuntime(verifyResult.summary);
 }
 
-type DbVerifyFailure = CliStructuredError | CombinedSchemaResult;
+type DbVerifyFailure = CliStructuredError | CombinedVerifyResult;
 
 function errorInvalidVerifyMode(options: {
   readonly why: string;
@@ -416,7 +416,7 @@ async function executeDbVerifyCommand(
       });
     }
 
-    const combined = combineSchemaResults(
+    const combined = combineVerifyResults(
       aggregateResult.value.schemaResults,
       aggregateResult.value.appSpaceId,
       options.strict ?? false,
@@ -458,7 +458,7 @@ async function executeDbSchemaOnlyVerifyCommand(
   options: DbVerifyOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
-): Promise<Result<CombinedSchemaResult, CliStructuredError>> {
+): Promise<Result<CombinedVerifyResult, CliStructuredError>> {
   const paths = await resolveVerifyPaths(options);
   renderVerifyHeader(paths, options, 'schema-only', flags, ui);
 
@@ -483,7 +483,7 @@ async function executeDbSchemaOnlyVerifyCommand(
     if (!aggregateResult.ok) return notOk(aggregateResult.failure);
 
     return ok(
-      combineSchemaResults(
+      combineVerifyResults(
         aggregateResult.value.schemaResults,
         aggregateResult.value.appSpaceId,
         options.strict ?? false,

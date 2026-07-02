@@ -1,17 +1,17 @@
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { graphWalkStrategy } from '../../../src/aggregate/strategies/graph-walk';
-import type { ContractSpaceMember } from '../../../src/aggregate/types';
+import type { AggregateContractSpace } from '../../../src/aggregate/types';
 import { EMPTY_CONTRACT_HASH } from '../../../src/constants';
 import type { OnDiskMigrationPackage } from '../../../src/package';
-import { createAttestedPackage, makeContractSpaceMember } from '../../fixtures';
+import { createAttestedPackage, makeAggregateContractSpace } from '../../fixtures';
 
-function makeMember(
+function makeSpace(
   packages: readonly OnDiskMigrationPackage[],
   headHash: string,
   invariants: readonly string[] = [],
-): ContractSpaceMember {
-  return makeContractSpaceMember({
+): AggregateContractSpace {
+  return makeAggregateContractSpace({
     spaceId: 'cipherstash',
     contract: createSqlContract({ target: 'postgres' }),
     headRef: { hash: headHash, invariants },
@@ -26,7 +26,7 @@ describe('graphWalkStrategy', () => {
 
     const outcome = graphWalkStrategy({
       aggregateTargetId: 'postgres',
-      member: makeMember([pkg], headHash),
+      space: makeSpace([pkg], headHash),
       currentMarker: null,
     });
 
@@ -49,7 +49,7 @@ describe('graphWalkStrategy', () => {
 
     const outcome = graphWalkStrategy({
       aggregateTargetId: 'postgres',
-      member: makeMember([pkg], headHash),
+      space: makeSpace([pkg], headHash),
       currentMarker: null,
     });
 
@@ -60,11 +60,11 @@ describe('graphWalkStrategy', () => {
     // A package walking baseline → headHash but providing zero invariants.
     const headHash = 'sha256:cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
-    const member = makeMember([pkg], headHash, ['cipher:create-v1']);
+    const space = makeSpace([pkg], headHash, ['cipher:create-v1']);
 
     const outcome = graphWalkStrategy({
       aggregateTargetId: 'postgres',
-      member,
+      space,
       currentMarker: null,
     });
 
@@ -79,7 +79,7 @@ describe('graphWalkStrategy', () => {
 
     const outcome = graphWalkStrategy({
       aggregateTargetId: 'postgres',
-      member: makeMember([pkg], headHash),
+      space: makeSpace([pkg], headHash),
       currentMarker: null,
       refName: 'prod',
     });
@@ -95,7 +95,7 @@ describe('graphWalkStrategy', () => {
 
     const outcome = graphWalkStrategy({
       aggregateTargetId: 'postgres',
-      member: makeMember([pkg], headHash),
+      space: makeSpace([pkg], headHash),
       currentMarker: null,
     });
 
@@ -110,7 +110,7 @@ describe('graphWalkStrategy', () => {
 
     const outcome = graphWalkStrategy({
       aggregateTargetId: 'postgres',
-      member: makeMember([pkg], headHash),
+      space: makeSpace([pkg], headHash),
       currentMarker: { storageHash: headHash, invariants: [] },
     });
 
@@ -126,7 +126,7 @@ describe('graphWalkStrategy', () => {
     // with an empty path because fromHash === toHash.
     const outcome = graphWalkStrategy({
       aggregateTargetId: 'postgres',
-      member: makeMember([], EMPTY_CONTRACT_HASH),
+      space: makeSpace([], EMPTY_CONTRACT_HASH),
       currentMarker: null,
     });
 

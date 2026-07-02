@@ -13,12 +13,12 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { ContractMarkerRecordLike } from '../marker-types';
 import type { PerSpacePlan } from '../planner-types';
 import { buildSynthMigrationEdge } from '../synth-migration-edge';
-import type { ContractSpaceMember } from '../types';
+import type { AggregateContractSpace } from '../types';
 
 export interface SynthStrategyInputs<TFamilyId extends string, TTargetId extends string> {
   readonly aggregateTargetId: string;
   readonly currentMarker: ContractMarkerRecordLike | null;
-  readonly member: ContractSpaceMember;
+  readonly space: AggregateContractSpace;
   /**
    * Ownership query over the passive contract-space aggregate: does a contract
    * space OTHER than this one declare a storage entity with this bare name?
@@ -112,12 +112,12 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
 ): Promise<SynthStrategyOutcome> {
   const planner = input.migrations.createPlanner(input.adapter);
   const plannerResult: MigrationPlannerResult = await (planner.plan({
-    contract: input.member.contract(),
+    contract: input.space.contract(),
     schema: input.schemaIntrospection,
     policy: input.operationPolicy,
     fromContract: null,
     frameworkComponents: input.frameworkComponents,
-    spaceId: input.member.spaceId,
+    spaceId: input.space.spaceId,
     keepDiffIssue: keepIssuesOfThisSpace(input.declaredByAnotherSpace),
   }) as MaybeAsyncPlannerResult);
 
@@ -156,7 +156,7 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
     result: {
       plan,
       displayOps: synthedOps,
-      destinationContract: input.member.contract(),
+      destinationContract: input.space.contract(),
       strategy: 'synth',
       ...(plannerResult.warnings && plannerResult.warnings.length > 0
         ? { warnings: plannerResult.warnings }

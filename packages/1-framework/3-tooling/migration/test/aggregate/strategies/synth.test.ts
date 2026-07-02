@@ -11,8 +11,8 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { synthStrategy } from '../../../src/aggregate/strategies/synth';
-import type { ContractSpaceMember } from '../../../src/aggregate/types';
-import { makeContractSpaceMember } from '../../fixtures';
+import type { AggregateContractSpace } from '../../../src/aggregate/types';
+import { makeAggregateContractSpace } from '../../fixtures';
 
 const POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening'],
@@ -21,8 +21,8 @@ const POLICY: MigrationOperationPolicy = {
 const STUB_ADAPTER: ControlAdapterInstance<'sql', 'postgres'> =
   {} as unknown as ControlAdapterInstance<'sql', 'postgres'>;
 
-function makeMember(spaceId: string, tables: Record<string, unknown>): ContractSpaceMember {
-  return makeContractSpaceMember({
+function makeSpace(spaceId: string, tables: Record<string, unknown>): AggregateContractSpace {
+  return makeAggregateContractSpace({
     spaceId,
     contract: createSqlContract({
       target: 'postgres',
@@ -71,7 +71,7 @@ describe('synthStrategy', () => {
       contractToSchema: () => ({ tables: {} }),
     };
 
-    const appMember = makeMember('app', { app_user: {} });
+    const appSpace = makeSpace('app', { app_user: {} });
 
     const liveSchema = {
       tables: {
@@ -84,7 +84,7 @@ describe('synthStrategy', () => {
     const outcome = await synthStrategy({
       aggregateTargetId: 'postgres',
       currentMarker: null,
-      member: appMember,
+      space: appSpace,
       declaredByAnotherSpace: (name) => name === 'cipher_state',
       schemaIntrospection: liveSchema,
       adapter: STUB_ADAPTER,
@@ -181,7 +181,7 @@ describe('synthStrategy', () => {
     const outcome = await synthStrategy({
       aggregateTargetId: 'postgres',
       currentMarker: null,
-      member: makeMember('app', {}),
+      space: makeSpace('app', {}),
       declaredByAnotherSpace: () => false,
       schemaIntrospection: { tables: {} },
       adapter: STUB_ADAPTER,

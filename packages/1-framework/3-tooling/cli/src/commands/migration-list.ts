@@ -1,7 +1,7 @@
 import { loadConfig } from '@prisma-next/config-loader';
 import type {
+  AggregateContractSpace,
   ContractSpaceAggregate,
-  ContractSpaceMember,
 } from '@prisma-next/migration-tools/aggregate';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { HEAD_REF_NAME, refsByContractHash } from '@prisma-next/migration-tools/refs';
@@ -59,18 +59,18 @@ function compareDirNamesDescending(a: MigrationListEntry, b: MigrationListEntry)
 
 /**
  * Ref names decorating a space's destination contract hashes. The
- * tolerant `member.refs` deliberately omits the structural `head.json`;
+ * tolerant `space.refs` deliberately omits the structural `head.json`;
  * for extension spaces the old enumerator surfaced it as a `head`
- * decoration on the tip migration, so fold `member.headRef` back in to
+ * decoration on the tip migration, so fold `space.headRef` back in to
  * keep that output. The app space synthesises its head, so it carries
  * no on-disk `head` ref to restore.
  */
 export function listRefsByContractHash(
-  member: ContractSpaceMember,
+  space: AggregateContractSpace,
 ): ReadonlyMap<string, readonly string[]> {
-  const byHash = new Map(refsByContractHash(member.refs));
-  if (member.spaceId !== APP_SPACE_ID && member.headRef !== null) {
-    const hash = member.headRef.hash;
+  const byHash = new Map(refsByContractHash(space.refs));
+  if (space.spaceId !== APP_SPACE_ID && space.headRef !== null) {
+    const hash = space.headRef.hash;
     const bucket = byHash.get(hash) ?? [];
     if (!bucket.includes(HEAD_REF_NAME)) {
       byHash.set(hash, [...bucket, HEAD_REF_NAME].sort());
@@ -92,7 +92,7 @@ async function orderedOnDiskSpaceIds(projectMigrationsDir: string): Promise<read
  * {@link MigrationSpaceListEntry} rows `migration list` displays.
  *
  * Space membership matches the on-disk contract-space directories (not the
- * aggregate's always-present synthesized app member when `migrations/app/`
+ * aggregate's always-present synthesized app space when `migrations/app/`
  * is absent); package and ref data come from `aggregate.space(id)`.
  */
 export async function migrationSpaceListEntriesFromAggregate(
@@ -103,12 +103,12 @@ export async function migrationSpaceListEntriesFromAggregate(
   const spaces: MigrationSpaceListEntry[] = [];
 
   for (const spaceId of spaceIds) {
-    const member = aggregate.space(spaceId);
-    if (member === undefined) {
+    const space = aggregate.space(spaceId);
+    if (space === undefined) {
       continue;
     }
-    const refsByHash = listRefsByContractHash(member);
-    const migrations: MigrationListEntry[] = member.packages
+    const refsByHash = listRefsByContractHash(space);
+    const migrations: MigrationListEntry[] = space.packages
       .map((pkg) => ({
         name: pkg.dirName,
         hash: pkg.metadata.migrationHash,
