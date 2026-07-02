@@ -282,4 +282,83 @@ model Reading {
     },
     timeouts.spinUpPpgDev,
   );
+
+  it(
+    'String[]/Int[] authored in PSL round-trip element values',
+    async () => {
+      if (!database) throw new Error('database not initialised');
+
+      const authored = await authorSqlContractFromPsl(`model Item {
+  id     Int      @id
+  tags   String[]
+  scores Int[]
+}`);
+      expect(authored.ok).toBe(true);
+      const contract = authored.contract;
+      if (!contract) throw new Error('authoring produced no contract');
+
+      // Sanity: each list field lowered to a native array column (not jsonb).
+      expect(findStorageColumn(contract, 'tags')).toMatchObject({
+        codecId: 'pg/text@1',
+        many: true,
+      });
+      expect(findStorageColumn(contract, 'scores')).toMatchObject({
+        codecId: 'pg/int4@1',
+        many: true,
+      });
+
+      await withClient(database.connectionString, async (client) => {
+        await client.query('DROP SCHEMA IF EXISTS public CASCADE');
+        await client.query('CREATE SCHEMA public');
+        await client.query('DROP SCHEMA IF EXISTS prisma_contract CASCADE');
+      });
+      await migrateContract(database.connectionString, contract);
+
+      const tableName = tableNameForColumn(contract, 'tags');
+      const table = TableSource.named(tableName);
+      const tagsRef = listCodecRefFor(contract, 'tags');
+      const scoresRef = listCodecRefFor(contract, 'scores');
+
+      const tags = ['a', 'b', 'c'];
+      const scores = [1, 2, 3];
+
+      await withClient(database.connectionString, async (client) => {
+        const runtime = await createTestRuntimeFromClient(contract, client, {
+          verifyMarker: false,
+        });
+
+        const insert = InsertAst.into(table).withRows([
+          {
+            id: ParamRef.of(1, { codec: { codecId: 'pg/int4@1' } }),
+            tags: ParamRef.of(tags, { codec: tagsRef }),
+            scores: ParamRef.of(scores, { codec: scoresRef }),
+          },
+        ]);
+        await runtime.execute(planFromAst(insert, contract)).toArray();
+
+        const select = SelectAst.from(table)
+          .withProjection([
+            ProjectionItem.of('tags', ColumnRef.of(tableName, 'tags'), tagsRef),
+            ProjectionItem.of('scores', ColumnRef.of(tableName, 'scores'), scoresRef),
+          ])
+          .withWhere(
+            BinaryExpr.eq(
+              ColumnRef.of(tableName, 'id'),
+              ParamRef.of(1, { codec: { codecId: 'pg/int4@1' } }),
+            ),
+          );
+
+        const rows = await runtime.execute(planFromAst(select, contract)).toArray();
+        expect(rows).toHaveLength(1);
+        const row = rows[0] as unknown as {
+          tags: string[];
+          scores: number[];
+        };
+
+        expect(row.tags).toEqual(tags);
+        expect(row.scores).toEqual(scores);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
 });
