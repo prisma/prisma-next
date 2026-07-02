@@ -1,3 +1,5 @@
+import type { AnyCodecDescriptor, Codec } from '@prisma-next/framework-components/codec';
+import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MongoContractSchema } from '@prisma-next/mongo-contract';
@@ -13,6 +15,22 @@ const mongoFamilyPack = {
   version: '0.0.1',
 } as const satisfies FamilyPackRef<'mongo'>;
 
+const identityDescriptor = (id: string): AnyCodecDescriptor => ({
+  codecId: id,
+  traits: ['equality'],
+  targetTypes: ['string'],
+  paramsSchema: voidParamsSchema,
+  isParameterized: false,
+  factory: () => () =>
+    ({
+      id,
+      encode: async (v: unknown) => v,
+      decode: async (v: unknown) => v,
+      encodeJson: (v: unknown) => v,
+      decodeJson: (j: unknown) => j,
+    }) as unknown as Codec,
+});
+
 const mongoTargetPack = {
   kind: 'target',
   id: 'mongo',
@@ -20,6 +38,7 @@ const mongoTargetPack = {
   targetId: 'mongo',
   version: '0.0.1',
   defaultNamespaceId: '__unbound__',
+  types: { codecTypes: { codecDescriptors: [identityDescriptor('mongo/string@1')] } },
 } as const satisfies TargetPackRef<'mongo', 'mongo'>;
 
 const mongoString = { codecId: 'mongo/string@1' as const, nativeType: 'string' } as const;
@@ -211,5 +230,82 @@ describe('defineContract() — undeclared enum reference', () => {
         models: { Account },
       }),
     ).toThrow('references enum "Role" which is not declared');
+  });
+});
+
+describe('defineContract() — codec-encoded value set', () => {
+  const upperCodec = { codecId: 'test/upper@1' as const, nativeType: 'string' } as const;
+  const upperDescriptor: AnyCodecDescriptor = {
+    codecId: 'test/upper@1',
+    traits: ['equality'],
+    targetTypes: ['string'],
+    paramsSchema: voidParamsSchema,
+    isParameterized: false,
+    factory: () => () =>
+      ({
+        id: 'test/upper@1',
+        encode: async (v: unknown) => v,
+        decode: async (v: unknown) => v,
+        encodeJson: (v: unknown) => (v as string).toUpperCase(),
+        decodeJson: (j: unknown) => j,
+      }) as unknown as Codec,
+  };
+  const packWithEncoders = {
+    ...mongoTargetPack,
+    types: { codecTypes: { codecDescriptors: [upperDescriptor] } },
+  } satisfies TargetPackRef<'mongo', 'mongo'>;
+
+  const Role = enumType('Role', upperCodec, member('Admin', 'admin'), member('Author', 'author'));
+  const Account = model('Account', {
+    collection: 'accounts',
+    fields: { _id: field.objectId(), role: field.namedType(Role) },
+  });
+
+  const contract = defineContract({
+    family: mongoFamilyPack,
+    target: packWithEncoders,
+    enums: { Role },
+    models: { Account },
+  });
+
+  it('encodes storage value-set values through the codec', () => {
+    const envelope = JSON.parse(JSON.stringify(contract)) as {
+      storage: {
+        namespaces: Record<
+          string,
+          { entries: { valueSet?: Record<string, { values: unknown[] }> } }
+        >;
+      };
+    };
+    const ns = envelope.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(ns?.entries.valueSet?.['Role']?.values).toEqual(['ADMIN', 'AUTHOR']);
+  });
+
+  it('encodes domain enum member values through the codec', () => {
+    const ns = contract.domain.namespaces[UNBOUND_NAMESPACE_ID];
+    const enumSlot = (ns as Record<string, unknown>)['enum'] as Record<string, unknown>;
+    expect(enumSlot['Role']).toEqual({
+      codecId: 'test/upper@1',
+      members: [
+        { name: 'Admin', value: 'ADMIN' },
+        { name: 'Author', value: 'AUTHOR' },
+      ],
+    });
+  });
+
+  it('throws a clear error when the enum codec is not in the pack surface', () => {
+    const Missing = enumType('Missing', upperCodec, member('One', 'one'));
+    const WithMissing = model('WithMissing', {
+      collection: 'withMissing',
+      fields: { _id: field.objectId(), value: field.namedType(Missing) },
+    });
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        enums: { Missing },
+        models: { WithMissing },
+      }),
+    ).toThrow('test/upper@1');
   });
 });

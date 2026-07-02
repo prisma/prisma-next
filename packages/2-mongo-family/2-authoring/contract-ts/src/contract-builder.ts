@@ -21,17 +21,20 @@ import {
   type ExtractAuthoringNamespaceFromPack,
   type MergeExtensionAuthoringNamespaces,
 } from '@prisma-next/contract-authoring';
+import { errorEnumCodecNotInPackStack } from '@prisma-next/errors/control';
 import type { AuthoringEntityTypeNamespace } from '@prisma-next/framework-components/authoring';
 import {
   assertNoCrossRegistryCollisions,
   isAuthoringEntityTypeDescriptor,
   mergeAuthoringNamespaces,
 } from '@prisma-next/framework-components/authoring';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   ExtensionPackRef,
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
+import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyPolymorphicScopeToMongoIndex,
@@ -58,6 +61,22 @@ import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { EnumTypeHandle } from './enum-type';
+
+/**
+ * Encode an authored enum value to its codec-encoded JSON form, mirroring SQL's `build-contract`.
+ *
+ * The codec is resolved by id from the lookup built from the contract's target pack, so a
+ * non-identity `encodeJson` (permitted by the `mongoCodec` factory) is respected. A codecId the
+ * lookup cannot resolve is a hard error: the enum uses a codec that is not part of the contract's
+ * pack stack.
+ */
+function encodeEnumValue(value: unknown, codecId: string, codecLookup: CodecLookup): JsonValue {
+  const codec = codecLookup.get(codecId);
+  if (!codec) {
+    throw errorEnumCodecNotInPackStack({ codecId });
+  }
+  return codec.encodeJson(value);
+}
 
 // `canonicalStringify` rejects non-plain objects so a `Map` or class
 // instance cannot silently collapse to `{}`. The storage-shape values
@@ -1766,21 +1785,16 @@ function buildContractFromDefinition<
   const capabilities: Record<string, Record<string, boolean>> = {};
   const collections = buildCollections(definition.models);
 
-  // The value set stores each enum's codec-encoded member values. An enum member value is always a
-  // `JsonValue` (string/number/boolean), and the `mongoCodec` factory requires an explicit
-  // `encodeJson` for any codec whose value is not already `JsonValue` — so an enum codec's
-  // `encodeJson` is identity by construction and the encoded value equals the member value. The
-  // values are therefore the member values verbatim (not "string-only").
+  // Resolve the target's codecs by id from the pack the contract binds, then encode each enum's
+  // member values through `codec.encodeJson` — the same real codecs the runtime/control stacks use.
+  const codecLookup = extractCodecLookup([definition.target]);
+
+  // The value set stores each enum's codec-encoded member values (mirroring SQL's build-contract).
   const storageValueSets: Record<string, MongoValueSetInput> = {};
   for (const [enumName, handle] of Object.entries(definition.enums ?? {})) {
     storageValueSets[enumName] = {
       kind: 'valueSet',
-      values: handle.values.map((v) =>
-        blindCast<
-          JsonValue,
-          'enum member values are JsonValue by construction (see comment above)'
-        >(v),
-      ),
+      values: handle.values.map((v) => encodeEnumValue(v, handle.codecId, codecLookup)),
     };
   }
   const hasValueSets = Object.keys(storageValueSets).length > 0;
@@ -1829,10 +1843,7 @@ function buildContractFromDefinition<
       codecId: handle.codecId,
       members: handle.enumMembers.map((m) => ({
         name: m.name,
-        value: blindCast<
-          JsonValue,
-          'enum member values are codec inputs (string/number/bool) and are always JsonValue-compatible'
-        >(m.value),
+        value: encodeEnumValue(m.value, handle.codecId, codecLookup),
       })),
     };
   }

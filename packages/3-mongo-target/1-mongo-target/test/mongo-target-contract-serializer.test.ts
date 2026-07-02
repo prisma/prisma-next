@@ -7,6 +7,7 @@ import {
   MongoIndex,
   MongoStorage,
   MongoValidator,
+  MongoValueSet,
 } from '@prisma-next/mongo-contract';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -274,6 +275,49 @@ describe('MongoTargetContractSerializer', () => {
       const roundtrippedNs = roundtripped.storage.namespaces[UNBOUND_NAMESPACE_ID];
       expect(roundtrippedNs).toBeDefined();
       expect(roundtrippedNs!.entries.collection?.['items']).toBeInstanceOf(MongoCollection);
+    });
+  });
+
+  describe('entries.valueSet round-trip', () => {
+    function makeValueSetContractJson() {
+      const base = makeValidContractJson();
+      const ns = base.storage.namespaces[UNBOUND_NAMESPACE_ID] as {
+        entries: Record<string, unknown>;
+      };
+      ns.entries['valueSet'] = {
+        Role: { kind: 'valueSet', values: ['admin', 'author', 'reader'] },
+      };
+      return base;
+    }
+
+    it('hydrates entries.valueSet into MongoValueSet IR instances (deserialize)', () => {
+      const serializer = new MongoTargetContractSerializer();
+      const contract = serializer.deserializeContract(makeValueSetContractJson());
+      const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+      const roleVs = ns!.entries.valueSet?.['Role'];
+      expect(roleVs).toBeInstanceOf(MongoValueSet);
+      expect(roleVs?.values).toEqual(['admin', 'author', 'reader']);
+    });
+
+    it('serializes entries.valueSet back to JSON with values intact (serialize)', () => {
+      const serializer = new MongoTargetContractSerializer();
+      const contract = serializer.deserializeContract(makeValueSetContractJson());
+      const out = JSON.parse(JSON.stringify(serializer.serializeContract(contract)));
+      const entries = out.storage.namespaces[UNBOUND_NAMESPACE_ID].entries;
+      expect(entries.valueSet).toEqual({
+        Role: { kind: 'valueSet', values: ['admin', 'author', 'reader'] },
+      });
+    });
+
+    it('survives a full serialize → deserialize cycle with the value set intact (both directions)', () => {
+      const serializer = new MongoTargetContractSerializer();
+      const contract = serializer.deserializeContract(makeValueSetContractJson());
+      const reparsed = JSON.parse(JSON.stringify(serializer.serializeContract(contract)));
+      const roundtripped = serializer.deserializeContract(reparsed);
+      const ns = roundtripped.storage.namespaces[UNBOUND_NAMESPACE_ID];
+      const roleVs = ns!.entries.valueSet?.['Role'];
+      expect(roleVs).toBeInstanceOf(MongoValueSet);
+      expect(roleVs?.values).toEqual(['admin', 'author', 'reader']);
     });
   });
 });

@@ -5,6 +5,7 @@ export default defineConfig({
     index: 'src/exports/index.ts',
     control: 'src/exports/control.ts',
     runtime: 'src/exports/runtime.ts',
+    codecs: 'src/exports/codecs.ts',
     'codec-types': 'src/exports/codec-types.ts',
   },
 });
