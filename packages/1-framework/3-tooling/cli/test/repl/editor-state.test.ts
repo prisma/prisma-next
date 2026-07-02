@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { complete } from '../../src/repl/completion';
 import type { EditorContext, EditorState } from '../../src/repl/editor-state';
-import { applyKey, initialEditorState, isSubmittable } from '../../src/repl/editor-state';
+import { applyKey, initialEditorState } from '../../src/repl/editor-state';
+import { isSubmittable } from '../../src/repl/scan';
 import { extractReplSchemaInfo } from '../../src/repl/schema-info';
 import { replContractFixture } from './fixture';
 
@@ -203,6 +204,44 @@ describe('applyKey: ghost text', () => {
     state = applyKey(state, { name: 'escape' }, ghostCtx).state;
     state = applyKey(state, { name: 'right' }, ghostCtx).state;
     expect(state.buffer).toBe("db.sql.public.user.select('id')");
+  });
+});
+
+describe('applyKey: regressions', () => {
+  it('treats the enter key name (bare \\n) like return', () => {
+    const state = type(initialEditorState(), '1 + 1');
+    const { effect } = applyKey(state, { name: 'enter' }, ctx);
+    expect(effect).toEqual({ type: 'submit', input: '1 + 1' });
+  });
+
+  it('submits input whose comment contains an unbalanced paren', () => {
+    const state = type(initialEditorState(), '1 + 1 // :-(');
+    const { effect } = applyKey(state, { name: 'return' }, ctx);
+    expect(effect).toEqual({ type: 'submit', input: '1 + 1 // :-(' });
+  });
+
+  it('closes the menu when the cursor moves right', () => {
+    let state = type(initialEditorState(), 'db.');
+    expect(state.menu).not.toBeNull();
+    state = applyKey(state, { name: 'right' }, ctx).state;
+    expect(state.menu).toBeNull();
+  });
+
+  it('deletes a whole surrogate pair with backspace', () => {
+    let state = type(initialEditorState(), 'a');
+    state = applyKey(state, { sequence: '😀' }, ctx).state;
+    expect(state.buffer).toBe('a😀');
+    state = applyKey(state, { name: 'backspace' }, ctx).state;
+    expect(state.buffer).toBe('a');
+  });
+
+  it('steps over surrogate pairs with left and right', () => {
+    let state = type(initialEditorState(), 'a');
+    state = applyKey(state, { sequence: '😀' }, ctx).state;
+    state = applyKey(state, { name: 'left' }, ctx).state;
+    expect(state.cursor).toBe(1);
+    state = applyKey(state, { name: 'right' }, ctx).state;
+    expect(state.cursor).toBe(3);
   });
 });
 

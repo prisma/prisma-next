@@ -4,16 +4,12 @@
  * completion dropdown. All editing logic lives in `editor-state.ts`.
  */
 import { emitKeypressEvents } from 'node:readline';
-import { createColors } from 'colorette';
 import stringWidth from 'string-width';
 import type { CompletionItem } from './completion';
 import type { EditorContext, EditorKey, EditorState } from './editor-state';
 import { applyKey, initialEditorState } from './editor-state';
 import { highlightCode } from './highlight';
-
-const { bgCyan, black, bold, cyan, dim, green, magenta, yellow } = createColors({
-  useColor: true,
-});
+import { type ReplPalette, replPalette } from './palette';
 
 export interface LineEditorOptions {
   readonly input: NodeJS.ReadStream;
@@ -30,29 +26,28 @@ export interface LineEditor {
   close(): void;
 }
 
-const KIND_BADGES: Record<CompletionItem['kind'], { label: string; paint: (s: string) => string }> =
-  {
-    namespace: { label: 'ns', paint: dim },
-    table: { label: 'table', paint: cyan },
-    column: { label: 'col', paint: yellow },
-    model: { label: 'model', paint: green },
-    field: { label: 'field', paint: yellow },
-    relation: { label: 'rel', paint: magenta },
-    method: { label: 'fn', paint: magenta },
-    property: { label: 'prop', paint: cyan },
-    enum: { label: 'enum', paint: green },
-    global: { label: 'var', paint: dim },
-    meta: { label: 'cmd', paint: dim },
+function kindBadges(
+  p: ReplPalette,
+): Record<CompletionItem['kind'], { label: string; paint: (s: string) => string }> {
+  return {
+    namespace: { label: 'ns', paint: p.dim },
+    table: { label: 'table', paint: p.cyan },
+    column: { label: 'col', paint: p.yellow },
+    model: { label: 'model', paint: p.green },
+    field: { label: 'field', paint: p.yellow },
+    relation: { label: 'rel', paint: p.magenta },
+    method: { label: 'fn', paint: p.magenta },
+    property: { label: 'prop', paint: p.cyan },
+    enum: { label: 'enum', paint: p.green },
+    global: { label: 'var', paint: p.dim },
+    meta: { label: 'cmd', paint: p.dim },
   };
-
-const ANSI_PATTERN = /\x1b\[[0-9;]*m/g;
-
-function visibleWidth(text: string): number {
-  return stringWidth(text.replaceAll(ANSI_PATTERN, ''));
 }
 
 export function createLineEditor(options: LineEditorOptions): LineEditor {
   const { input, output, prompt, continuationPrompt, color, ctx } = options;
+  const palette = replPalette(color);
+  const badges = kindBadges(palette);
   let cursorRow = 0;
   let closed = false;
 
@@ -62,12 +57,18 @@ export function createLineEditor(options: LineEditorOptions): LineEditor {
     return output.columns || 80;
   }
 
+  /** Rows a rendered line occupies once terminal wrapping is applied. */
+  function wrappedRows(line: string): number {
+    // string-width strips ANSI escapes internally.
+    return 1 + Math.floor(Math.max(0, stringWidth(line) - 1) / columns());
+  }
+
   function menuLines(state: EditorState): string[] {
-    if (!state.menu) return [];
+    if (!state.menu || state.menu.items.length === 0) return [];
     const width = columns();
     const labelWidth = Math.max(...state.menu.items.map((item) => item.label.length));
     return state.menu.items.map((item, index) => {
-      const badge = KIND_BADGES[item.kind];
+      const badge = badges[item.kind];
       const selected = index === state.menu?.selected;
       const label = item.label.padEnd(labelWidth + 2);
       const badgeText = badge.label.padEnd(7);
@@ -76,10 +77,10 @@ export function createLineEditor(options: LineEditorOptions): LineEditor {
         return selected ? `> ${plain.slice(2)}` : plain;
       }
       if (selected) {
-        return bgCyan(black(plain));
+        return palette.bgCyan(palette.black(plain));
       }
       const detail = plain.slice(2 + label.length + badgeText.length);
-      return `  ${bold(label)}${badge.paint(badgeText)}${dim(detail)}`;
+      return `  ${palette.bold(label)}${badge.paint(badgeText)}${palette.dim(detail)}`;
     });
   }
 
@@ -100,23 +101,30 @@ export function createLineEditor(options: LineEditorOptions): LineEditor {
 
     bufferLines.forEach((line, i) => {
       const linePrompt = i === 0 ? prompt : continuationPrompt;
-      const promptWidth = visibleWidth(linePrompt);
       let rendered = highlightCode(line, color);
-      if (i === bufferLines.length - 1 && state.ghost !== null && color) {
-        rendered += dim(state.ghost);
-      } else if (i === bufferLines.length - 1 && state.ghost !== null) {
-        rendered += state.ghost;
+      if (i === bufferLines.length - 1 && state.ghost !== null) {
+        rendered += color ? palette.dim(state.ghost) : state.ghost;
       }
       lines.push(linePrompt + rendered);
 
       const lineStart = consumed;
       const lineEnd = consumed + line.length;
       if (state.cursor >= lineStart && state.cursor <= lineEnd) {
-        const col = promptWidth + (state.cursor - lineStart);
-        cursorRowOut = rowsBefore + Math.floor(col / width);
-        cursorColOut = col % width;
+        // Measure the visible width of everything left of the cursor so
+        // double-width characters position correctly.
+        const col = stringWidth(linePrompt) + stringWidth(line.slice(0, state.cursor - lineStart));
+        if (col > 0 && col % width === 0) {
+          // DECAWM pending-wrap: the terminal keeps the cursor on the last
+          // column of the previous row until the next glyph is written, so
+          // park on that cell instead of the (not yet real) next row.
+          cursorRowOut = rowsBefore + col / width - 1;
+          cursorColOut = width - 1;
+        } else {
+          cursorRowOut = rowsBefore + Math.floor(col / width);
+          cursorColOut = col % width;
+        }
       }
-      rowsBefore += 1 + Math.floor(Math.max(0, promptWidth + line.length - 1) / width);
+      rowsBefore += wrappedRows(lines[lines.length - 1]!);
       consumed = lineEnd + 1;
     });
 
@@ -125,11 +133,7 @@ export function createLineEditor(options: LineEditorOptions): LineEditor {
   }
 
   function totalRows(lines: readonly string[]): number {
-    const width = columns();
-    return lines.reduce(
-      (rows, line) => rows + 1 + Math.floor(Math.max(0, visibleWidth(line) - 1) / width),
-      0,
-    );
+    return lines.reduce((rows, line) => rows + wrappedRows(line), 0);
   }
 
   function render(state: EditorState): void {
@@ -148,7 +152,7 @@ export function createLineEditor(options: LineEditorOptions): LineEditor {
 
   /** Re-render without menu/ghost and park the cursor below the input. */
   function finishLine(state: EditorState): void {
-    render({ ...state, menu: null, ghost: null });
+    render({ ...state, menu: null, ghost: null, cursor: state.buffer.length });
     output.write('\n');
     cursorRow = 0;
   }
@@ -169,6 +173,21 @@ export function createLineEditor(options: LineEditorOptions): LineEditor {
       };
 
       const onKeypress = (_chunk: string | undefined, key: EditorKey | undefined): void => {
+        // Exception barrier: a throw here would become an uncaughtException
+        // on the ReadStream, killing the process with the terminal stuck in
+        // raw mode and the session's finally blocks never running.
+        try {
+          handleKey(key);
+        } catch (error) {
+          output.write('\n');
+          process.stderr.write(
+            `repl editor error: ${error instanceof Error ? error.message : String(error)}\n`,
+          );
+          finish(null);
+        }
+      };
+
+      const handleKey = (key: EditorKey | undefined): void => {
         if (closed) {
           finish(null);
           return;
@@ -179,11 +198,7 @@ export function createLineEditor(options: LineEditorOptions): LineEditor {
 
         switch (step.effect?.type) {
           case 'submit': {
-            finishLine({
-              ...previous,
-              buffer: step.effect.input,
-              cursor: step.effect.input.length,
-            });
+            finishLine({ ...previous, buffer: step.effect.input });
             finish(step.effect.input);
             return;
           }

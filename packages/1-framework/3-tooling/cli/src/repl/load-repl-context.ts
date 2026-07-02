@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url';
 import { loadConfig } from '@prisma-next/config-loader';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { dirname, join, resolve } from 'pathe';
+import { targetPackageName } from '../commands/init/templates/code-templates';
 import {
   CliStructuredError,
   errorDatabaseConnectionRequired,
@@ -47,13 +48,13 @@ export interface LoadReplContextOptions {
   readonly config?: string;
 }
 
-/**
- * Target id → facade package. Mirrors the mapping `prisma-next init`
- * scaffolds with (`targetPackageName` in the init templates).
- */
-const RUNTIME_FACADES: Record<string, string> = {
-  postgres: '@prisma-next/postgres',
-};
+/** Targets whose facade runtime the REPL knows how to drive today. */
+const REPL_SUPPORTED_TARGETS = ['postgres'] as const;
+type ReplSupportedTarget = (typeof REPL_SUPPORTED_TARGETS)[number];
+
+function isReplSupportedTarget(targetId: string): targetId is ReplSupportedTarget {
+  return (REPL_SUPPORTED_TARGETS as readonly string[]).includes(targetId);
+}
 
 function extensionPackIds(contractJson: unknown): string[] {
   if (typeof contractJson !== 'object' || contractJson === null) return [];
@@ -101,6 +102,8 @@ function isRuntimeClient(value: unknown): value is ReplRuntimeClient {
     value !== null &&
     'sql' in value &&
     'orm' in value &&
+    'enums' in value &&
+    'raw' in value &&
     typeof (value as { runtime?: unknown }).runtime === 'function' &&
     typeof (value as { close?: unknown }).close === 'function'
   );
@@ -135,14 +138,16 @@ export async function loadReplContext(
   }
 
   const targetId = config.target.targetId;
-  const facadePackage = RUNTIME_FACADES[targetId];
-  if (!facadePackage) {
+  if (!isReplSupportedTarget(targetId)) {
     return notOk(
       errorUnexpected(`The repl does not support the '${targetId}' target yet`, {
-        why: `Supported targets: ${Object.keys(RUNTIME_FACADES).join(', ')}`,
+        why: `Supported targets: ${REPL_SUPPORTED_TARGETS.join(', ')}`,
       }),
     );
   }
+  // Single source of truth for the facade package name — shared with the
+  // init scaffolding templates.
+  const facadePackage = targetPackageName(targetId);
 
   const contractPath = config.contract?.output;
   if (contractPath === undefined) {
@@ -177,7 +182,7 @@ export async function loadReplContext(
     if (!isRuntimeClient(created)) {
       return notOk(
         errorUnexpected(`${facadePackage}/runtime did not return a client`, {
-          why: 'The runtime facade default export must produce a client with sql/orm/runtime/close.',
+          why: 'The runtime facade default export must produce a client with sql/orm/enums/raw/runtime/close.',
         }),
       );
     }

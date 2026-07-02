@@ -58,7 +58,40 @@ describe('renderRowsTable', () => {
   });
 });
 
+describe('renderRowsTable: hardening', () => {
+  it('caps large result sets and notes the cap in the footer', () => {
+    const rows = Array.from({ length: 120 }, (_, i) => ({ id: i }));
+    const out = renderRowsTable(rows, noColor);
+    expect(out).toContain('120 rows');
+    expect(out).toContain('showing first 50');
+    expect(out).not.toContain('│ 51');
+  });
+
+  it('measures widths in display columns for wide characters', () => {
+    const out = renderRowsTable([{ name: '田中' }, { name: 'bo' }], noColor);
+    const lines = out.split('\n');
+    const borderWidths = new Set(
+      lines
+        .filter((l) => l.startsWith('┌') || l.startsWith('└') || l.startsWith('├'))
+        .map((l) => l.length),
+    );
+    expect(borderWidths.size).toBe(1);
+  });
+
+  it('truncates without splitting surrogate pairs', () => {
+    const out = renderRowsTable([{ x: '💥'.repeat(30) }], noColor);
+    expect(out).toContain('…');
+    expect(out).not.toContain('�');
+  });
+});
+
 describe('renderResultValue', () => {
+  it('falls back to inspect for rows without enumerable keys', () => {
+    const out = renderResultValue([new Map([['a', 1]])], noColor);
+    expect(out).not.toContain('┌');
+    expect(out).toContain('Map');
+  });
+
   it('renders arrays of plain objects as tables', () => {
     const out = renderResultValue([{ id: 1 }], noColor);
     expect(out).toContain('┌');

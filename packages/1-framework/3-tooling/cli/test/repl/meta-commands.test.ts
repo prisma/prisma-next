@@ -12,6 +12,11 @@ describe('runMetaCommand', () => {
     expect(runMetaCommand('1 + 1', schema, opts).handled).toBe(false);
   });
 
+  it('passes leading-dot JavaScript through to the evaluator', () => {
+    expect(runMetaCommand('.5 + 1', schema, opts).handled).toBe(false);
+    expect(runMetaCommand(".select('id').limit(5)", schema, opts).handled).toBe(false);
+  });
+
   it('handles .help and \\?', () => {
     const result = runMetaCommand('.help', schema, opts);
     expect(result.handled).toBe(true);

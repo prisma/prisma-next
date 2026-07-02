@@ -16,6 +16,7 @@
  *   resolved to the relation's target model.
  */
 import { META_COMMAND_COMPLETIONS } from './meta-commands';
+import { type OpenFrame, type SourceScan, scanSource } from './scan';
 import type { ReplModelInfo, ReplSchemaInfo, ReplTableInfo } from './schema-info';
 
 export type CompletionKind =
@@ -68,6 +69,7 @@ const SELECT_CHAIN_METHODS = methods([
   'where',
   'orderBy',
   'groupBy',
+  'distinct',
   'distinctOn',
   'limit',
   'offset',
@@ -76,32 +78,22 @@ const SELECT_CHAIN_METHODS = methods([
   'annotate',
   'build',
 ]);
+const GROUPED_CHAIN_METHODS = methods([
+  'having',
+  'groupBy',
+  'orderBy',
+  'distinct',
+  'distinctOn',
+  'limit',
+  'offset',
+  'as',
+  'annotate',
+  'build',
+]);
 const INSERT_CHAIN_METHODS = methods(['returning', 'annotate', 'build']);
 const UPDATE_DELETE_CHAIN_METHODS = methods(['where', 'returning', 'annotate', 'build']);
 const RETURNING_CHAIN_METHODS = methods(['annotate', 'build']);
 
-const COLLECTION_ROOT_METHODS = methods([
-  'where',
-  'select',
-  'include',
-  'orderBy',
-  'take',
-  'skip',
-  'cursor',
-  'all',
-  'first',
-  'count',
-  'aggregate',
-  'groupBy',
-  'variant',
-  'create',
-  'createAll',
-  'update',
-  'updateAll',
-  'upsert',
-  'delete',
-  'deleteAll',
-]);
 const COLLECTION_CHAIN_METHODS = methods([
   'where',
   'select',
@@ -117,6 +109,16 @@ const COLLECTION_CHAIN_METHODS = methods([
   'groupBy',
   'variant',
 ]);
+const COLLECTION_WRITE_METHODS = methods([
+  'create',
+  'createAll',
+  'update',
+  'updateAll',
+  'upsert',
+  'delete',
+  'deleteAll',
+]);
+const COLLECTION_ROOT_METHODS = [...COLLECTION_CHAIN_METHODS, ...COLLECTION_WRITE_METHODS];
 /** Methods available on an include-callback collection param. */
 const INCLUDE_BUILDER_METHODS = methods([
   'select',
@@ -188,57 +190,6 @@ const ORM_LAMBDA_METHODS = new Set(['where', 'orderBy']);
 interface ChainSegment {
   readonly name: string;
   readonly called: boolean;
-}
-
-interface OpenFrame {
-  /** Index of the unmatched '(' in the scanned text. */
-  readonly openIndex: number;
-}
-
-interface ScanState {
-  readonly inString: { readonly quote: string; readonly contentStart: number } | null;
-  /** Unmatched '(' positions, outermost first. */
-  readonly openFrames: readonly OpenFrame[];
-  /** For every index, whether it sits inside a string literal (quotes included). */
-  readonly stringMask: readonly boolean[];
-}
-
-function scanSource(text: string): ScanState {
-  const stringMask = new Array<boolean>(text.length).fill(false);
-  const frames: OpenFrame[] = [];
-  let quote: string | null = null;
-  let contentStart = 0;
-
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i]!;
-    if (quote !== null) {
-      stringMask[i] = true;
-      if (ch === '\\') {
-        if (i + 1 < text.length) stringMask[i + 1] = true;
-        i++;
-        continue;
-      }
-      if (ch === quote) quote = null;
-      continue;
-    }
-    if (ch === "'" || ch === '"' || ch === '`') {
-      quote = ch;
-      contentStart = i + 1;
-      stringMask[i] = true;
-      continue;
-    }
-    if (ch === '(') {
-      frames.push({ openIndex: i });
-    } else if (ch === ')') {
-      frames.pop();
-    }
-  }
-
-  return {
-    inString: quote !== null ? { quote, contentStart } : null,
-    openFrames: frames,
-    stringMask,
-  };
 }
 
 function isIdentChar(ch: string): boolean {
@@ -364,7 +315,12 @@ function resolveChainContext(
     const model = modelInfo(schema, binding.namespace, binding.model);
     const target = model?.relationTargets[relation];
     if (target !== undefined && RELATION_PREDICATE_NAMES.has(predicate)) {
-      return { kind: 'ormModel', namespace: binding.namespace, model: target, method: predicate };
+      return {
+        kind: 'ormModel',
+        namespace: target.namespace,
+        model: target.model,
+        method: predicate,
+      };
     }
   }
 
@@ -442,7 +398,11 @@ function lambdaParams(
           ? modelInfo(schema, context.namespace, context.model)?.relationTargets[relation]
           : undefined;
       if (target !== undefined) {
-        params.set(param, { kind: 'ormCollection', namespace: context.namespace, model: target });
+        params.set(param, {
+          kind: 'ormCollection',
+          namespace: target.namespace,
+          model: target.model,
+        });
       }
     }
   });
@@ -480,6 +440,7 @@ function sqlChainMethods(subjectMethod: string | null): readonly CompletionItem[
   if (subjectMethod === 'insert') return INSERT_CHAIN_METHODS;
   if (subjectMethod === 'update' || subjectMethod === 'delete') return UPDATE_DELETE_CHAIN_METHODS;
   if (subjectMethod === 'returning') return RETURNING_CHAIN_METHODS;
+  if (subjectMethod === 'groupBy' || subjectMethod === 'having') return GROUPED_CHAIN_METHODS;
   return SELECT_CHAIN_METHODS;
 }
 
@@ -505,15 +466,15 @@ function completeMeta(text: string, cursor: number): CompletionResult | null {
 function completeInString(
   text: string,
   cursor: number,
-  scan: ScanState,
+  scan: SourceScan,
   schema: ReplSchemaInfo,
 ): CompletionResult {
   const inString = scan.inString;
   if (!inString) return EMPTY;
   const frame = scan.openFrames[scan.openFrames.length - 1];
   if (!frame) return EMPTY;
-  const params = lambdaParams(text, scan.openFrames, scan.stringMask, schema);
-  const chain = chainBeforeIndex(text, frame.openIndex, scan.stringMask);
+  const params = lambdaParams(text, scan.openFrames, scan.mask, schema);
+  const chain = chainBeforeIndex(text, frame.openIndex, scan.mask);
   const context = resolveChainContext(chain, schema, params);
   if (!context || context.method === null) return EMPTY;
   const ns = schema.namespaces[context.namespace];
@@ -644,9 +605,9 @@ export function complete(
   const hasDot = dotIndex > 0 && text[dotIndex - 1] === '.';
 
   if (hasDot) {
-    const segments = chainBeforeIndex(text, dotIndex - 1, scan.stringMask);
+    const segments = chainBeforeIndex(text, dotIndex - 1, scan.mask);
     if (segments.length === 0) return EMPTY;
-    const params = lambdaParams(text, scan.openFrames, scan.stringMask, schema);
+    const params = lambdaParams(text, scan.openFrames, scan.mask, schema);
     const items = completeChain(segments, schema, params);
     return { items: filterItems(items, partial), from };
   }

@@ -3,12 +3,9 @@
  * regex colorization — no parser, ANSI-safe (plain text round-trips when
  * codes are stripped).
  */
-import { createColors } from 'colorette';
+import { replPalette } from './palette';
 
-// The `color` parameter is authoritative: the session decides once (TTY,
-// --color/--no-color) and the palette must not silently defer to NO_COLOR,
-// which vitest sets globally.
-const { cyan, dim, green, magenta, yellow } = createColors({ useColor: true });
+const { cyan, dim, green, magenta, yellow } = replPalette(true);
 
 const TOKEN =
   /(?<string>'(?:\\.|[^'\\])*'?|"(?:\\.|[^"\\])*"?|`(?:\\.|[^`\\])*`?)|(?<comment>\/\/[^\n]*)|(?<number>\b\d[\w.]*\b)|(?<keyword>\b(?:const|let|var|await|async|function|return|new|typeof|true|false|null|undefined)\b)|(?<member>(?<=\.)[A-Za-z_$][\w$]*)/g;

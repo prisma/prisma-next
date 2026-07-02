@@ -14,6 +14,12 @@ interface ReplCommandOptions extends CommonCommandOptions {
   readonly config?: string;
 }
 
+/** Resolves once queued stdout writes have reached the OS, then exits. */
+function flushAndExit(code: number): void {
+  process.exitCode = code;
+  process.stdout.write('', () => process.exit(code));
+}
+
 export function createReplCommand(): Command {
   const command = new Command('repl');
   setCommandDescriptions(
@@ -23,7 +29,8 @@ export function createReplCommand(): Command {
       'query — SQL lane or ORM lane — and it executes on Enter; builders and plans run\n' +
       'without .build() or execute(). Tab completes tables, columns, and methods from\n' +
       'your contract. Plain TypeScript works too. When stdin is piped, each line is\n' +
-      'evaluated in order and results stream to stdout.',
+      'evaluated in order, results stream to stdout, and the exit code is 1 when any\n' +
+      'line fails.',
   );
   setCommandExamples(command, [
     'prisma-next repl',
@@ -40,10 +47,12 @@ export function createReplCommand(): Command {
       // Loaded lazily so the repl's heavier dependencies (esbuild for TS
       // stripping, the line editor) never tax the startup time of other
       // commands bundled into the same CLI entry.
-      const [{ loadReplContext }, { runBatchSession, runInteractiveSession }] = await Promise.all([
-        import('../repl/load-repl-context'),
-        import('../repl/session'),
-      ]);
+      const [{ loadReplContext }, { runInteractiveSession }, { runBatchSession }] =
+        await Promise.all([
+          import('../repl/load-repl-context'),
+          import('../repl/session'),
+          import('../repl/batch'),
+        ]);
 
       const result = await loadReplContext({
         ...(options.db !== undefined ? { db: options.db } : {}),
@@ -56,9 +65,13 @@ export function createReplCommand(): Command {
       }
 
       const context = result.value;
-      const interactive = process.stdin.isTTY === true && process.stdout.isTTY === true;
+      const interactive =
+        flags.interactive !== false &&
+        process.stdin.isTTY === true &&
+        process.stdout.isTTY === true;
       const color = flags.color === true;
 
+      let exitCode = 0;
       try {
         if (interactive) {
           await runInteractiveSession({
@@ -68,22 +81,22 @@ export function createReplCommand(): Command {
             color,
           });
         } else {
-          await runBatchSession({
+          const { failures } = await runBatchSession({
             context,
             input: process.stdin,
             output: process.stdout,
             color,
             echo: true,
           });
+          if (failures > 0) exitCode = 1;
         }
-        process.exitCode = 0;
       } catch (error) {
         ui.error(error instanceof Error ? error.message : String(error));
-        process.exitCode = 1;
+        exitCode = 1;
       } finally {
         await context.close();
       }
-      process.exit(process.exitCode ?? 0);
+      flushAndExit(exitCode);
     });
 
   return command;

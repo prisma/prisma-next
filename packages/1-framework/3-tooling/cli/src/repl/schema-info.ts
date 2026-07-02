@@ -16,11 +16,16 @@ export interface ReplTableInfo {
   readonly columns: readonly ReplColumnInfo[];
 }
 
+export interface ReplRelationTarget {
+  readonly model: string;
+  readonly namespace: string;
+}
+
 export interface ReplModelInfo {
   readonly fields: readonly string[];
   readonly relations: readonly string[];
-  /** Relation name → target model name, for resolving callback params. */
-  readonly relationTargets: Readonly<Record<string, string>>;
+  /** Relation name → target model coordinate, for resolving callback params. */
+  readonly relationTargets: Readonly<Record<string, ReplRelationTarget>>;
   readonly table: string;
 }
 
@@ -68,13 +73,19 @@ function extractTable(tableJson: unknown): ReplTableInfo {
   return { columns };
 }
 
-function extractModel(modelJson: unknown): ReplModelInfo {
+function extractModel(modelJson: unknown, sourceNamespace: string): ReplModelInfo {
   const storage = recordAt(modelJson, 'storage');
   const relationsJson = recordAt(modelJson, 'relations');
-  const relationTargets: Record<string, string> = {};
+  const relationTargets: Record<string, ReplRelationTarget> = {};
   for (const [name, relation] of Object.entries(relationsJson)) {
-    const target = recordAt(relation, 'to')['model'];
-    if (typeof target === 'string') relationTargets[name] = target;
+    const to = recordAt(relation, 'to');
+    const model = to['model'];
+    if (typeof model === 'string') {
+      relationTargets[name] = {
+        model,
+        namespace: typeof to['namespace'] === 'string' ? to['namespace'] : sourceNamespace,
+      };
+    }
   }
   return {
     fields: Object.keys(recordAt(modelJson, 'fields')),
@@ -121,7 +132,7 @@ export function extractReplSchemaInfo(contractJson: unknown): ReplSchemaInfo {
     const modelsJson = recordAt(domainNamespaces[nsId], 'models');
     const models: Record<string, ReplModelInfo> = {};
     for (const [modelName, modelJson] of Object.entries(modelsJson)) {
-      models[modelName] = extractModel(modelJson);
+      models[modelName] = extractModel(modelJson, nsId);
     }
 
     namespaces[nsId] = {

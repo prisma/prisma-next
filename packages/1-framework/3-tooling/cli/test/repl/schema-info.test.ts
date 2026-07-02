@@ -39,12 +39,12 @@ describe('extractReplSchemaInfo', () => {
     expect(user?.table).toBe('user');
   });
 
-  it('extracts relation target models', () => {
+  it('extracts relation target models with their namespace', () => {
     expect(schema.namespaces['public']?.models['User']?.relationTargets).toEqual({
-      posts: 'Post',
+      posts: { model: 'Post', namespace: 'public' },
     });
     expect(schema.namespaces['public']?.models['Post']?.relationTargets).toEqual({
-      user: 'User',
+      user: { model: 'User', namespace: 'public' },
     });
   });
 

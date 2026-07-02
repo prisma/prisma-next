@@ -6,6 +6,7 @@
  * model unit-testable without a TTY.
  */
 import type { CompletionItem, CompletionResult } from './completion';
+import { endsInsideString, isSubmittable } from './scan';
 
 export interface EditorKey {
   readonly name?: string;
@@ -52,38 +53,24 @@ export function initialEditorState(): EditorState {
   return { buffer: '', cursor: 0, historyIndex: null, stash: '', menu: null, ghost: null };
 }
 
-/** Balanced brackets outside string literals — the multiline gate. */
-export function isSubmittable(buffer: string): boolean {
-  let quote: string | null = null;
-  let depth = 0;
-  for (let i = 0; i < buffer.length; i++) {
-    const ch = buffer[i]!;
-    if (quote !== null) {
-      if (ch === '\\') i++;
-      else if (ch === quote) quote = null;
-      continue;
-    }
-    if (ch === "'" || ch === '"' || ch === '`') quote = ch;
-    else if (ch === '(' || ch === '[' || ch === '{') depth++;
-    else if (ch === ')' || ch === ']' || ch === '}') depth--;
-  }
-  return depth <= 0 && quote === null;
-}
-
 const MAX_MENU_ITEMS = 8;
 
-function endsInsideString(text: string): boolean {
-  let quote: string | null = null;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i]!;
-    if (quote !== null) {
-      if (ch === '\\') i++;
-      else if (ch === quote) quote = null;
-      continue;
-    }
-    if (ch === "'" || ch === '"' || ch === '`') quote = ch;
-  }
-  return quote !== null;
+function isLowSurrogate(code: number | undefined): boolean {
+  return code !== undefined && code >= 0xdc00 && code <= 0xdfff;
+}
+
+/** Steps one cursor position left, keeping surrogate pairs intact. */
+function stepLeft(buffer: string, cursor: number): number {
+  if (cursor <= 0) return 0;
+  const next = cursor - 1;
+  return next > 0 && isLowSurrogate(buffer.charCodeAt(next)) ? next - 1 : next;
+}
+
+/** Steps one cursor position right, keeping surrogate pairs intact. */
+function stepRight(buffer: string, cursor: number): number {
+  if (cursor >= buffer.length) return buffer.length;
+  const next = cursor + 1;
+  return next < buffer.length && isLowSurrogate(buffer.charCodeAt(next)) ? next + 1 : next;
 }
 
 function withDerived(state: EditorState, ctx: EditorContext, openMenu: boolean): EditorState {
@@ -124,10 +111,9 @@ function acceptMenuItem(state: EditorState, ctx: EditorContext): EditorState {
   if (!menu) return state;
   const item = menu.items[menu.selected];
   if (!item) return state;
-  const buffer = item.insert + state.buffer.slice(state.cursor);
-  const withPrefix = state.buffer.slice(0, menu.from) + buffer;
+  const buffer = state.buffer.slice(0, menu.from) + item.insert + state.buffer.slice(state.cursor);
   const cursor = menu.from + item.insert.length;
-  return withDerived({ ...state, buffer: withPrefix, cursor, menu: null }, ctx, false);
+  return withDerived({ ...state, buffer, cursor, menu: null }, ctx, false);
 }
 
 function moveMenuSelection(state: EditorState, delta: number): EditorState {
@@ -174,7 +160,11 @@ function deleteWordBack(state: EditorState, ctx: EditorContext): EditorState {
   while (start > 0 && /[\w$]/.test(state.buffer[start - 1]!)) start--;
   if (start === state.cursor) return state;
   const buffer = state.buffer.slice(0, start) + state.buffer.slice(state.cursor);
-  return withDerived({ ...state, buffer, cursor: start }, ctx, state.menu !== null);
+  return withDerived(
+    { ...state, buffer, cursor: start, historyIndex: null },
+    ctx,
+    state.menu !== null,
+  );
 }
 
 export function applyKey(state: EditorState, key: EditorKey, ctx: EditorContext): EditorStep {
@@ -199,11 +189,11 @@ export function applyKey(state: EditorState, key: EditorKey, ctx: EditorContext)
         return none({ ...state, cursor: state.buffer.length, menu: null });
       case 'u': {
         const buffer = state.buffer.slice(state.cursor);
-        return none(withDerived({ ...state, buffer, cursor: 0 }, ctx, false));
+        return none(withDerived({ ...state, buffer, cursor: 0, historyIndex: null }, ctx, false));
       }
       case 'k': {
         const buffer = state.buffer.slice(0, state.cursor);
-        return none(withDerived({ ...state, buffer }, ctx, false));
+        return none(withDerived({ ...state, buffer, historyIndex: null }, ctx, false));
       }
       case 'w':
         return none(deleteWordBack(state, ctx));
@@ -213,7 +203,9 @@ export function applyKey(state: EditorState, key: EditorKey, ctx: EditorContext)
   }
 
   switch (key.name) {
-    case 'return': {
+    // readline names '\r' 'return' and a bare '\n' 'enter'; both submit.
+    case 'return':
+    case 'enter': {
       if (state.menu) {
         return none(acceptMenuItem(state, ctx));
       }
@@ -226,7 +218,6 @@ export function applyKey(state: EditorState, key: EditorKey, ctx: EditorContext)
     }
     case 'tab': {
       if (state.menu) {
-        if (state.menu.items.length === 1) return none(acceptMenuItem(state, ctx));
         return none(acceptMenuItem(state, ctx));
       }
       const result = ctx.complete(state.buffer, state.cursor);
@@ -253,7 +244,7 @@ export function applyKey(state: EditorState, key: EditorKey, ctx: EditorContext)
       if (state.menu) return none(moveMenuSelection(state, 1));
       return none(navigateHistory(state, ctx, 1));
     case 'left':
-      return none({ ...state, cursor: Math.max(0, state.cursor - 1), menu: null });
+      return none({ ...state, cursor: stepLeft(state.buffer, state.cursor), menu: null });
     case 'right': {
       if (state.cursor === state.buffer.length && state.ghost !== null) {
         const buffer = state.buffer + state.ghost;
@@ -261,7 +252,7 @@ export function applyKey(state: EditorState, key: EditorKey, ctx: EditorContext)
           withDerived({ ...state, buffer, cursor: buffer.length, ghost: null }, ctx, false),
         );
       }
-      return none({ ...state, cursor: Math.min(state.buffer.length, state.cursor + 1) });
+      return none({ ...state, cursor: stepRight(state.buffer, state.cursor), menu: null });
     }
     case 'home':
       return none({ ...state, cursor: 0, menu: null });
@@ -269,14 +260,16 @@ export function applyKey(state: EditorState, key: EditorKey, ctx: EditorContext)
       return none({ ...state, cursor: state.buffer.length, menu: null });
     case 'backspace': {
       if (state.cursor === 0) return none(state);
-      const buffer = state.buffer.slice(0, state.cursor - 1) + state.buffer.slice(state.cursor);
-      const next = { ...state, buffer, cursor: state.cursor - 1, historyIndex: null };
+      const start = stepLeft(state.buffer, state.cursor);
+      const buffer = state.buffer.slice(0, start) + state.buffer.slice(state.cursor);
+      const next = { ...state, buffer, cursor: start, historyIndex: null };
       return none(withDerived(next, ctx, state.menu !== null && buffer.length > 0));
     }
     case 'delete': {
       if (state.cursor >= state.buffer.length) return none(state);
-      const buffer = state.buffer.slice(0, state.cursor) + state.buffer.slice(state.cursor + 1);
-      return none(withDerived({ ...state, buffer }, ctx, state.menu !== null));
+      const end = stepRight(state.buffer, state.cursor);
+      const buffer = state.buffer.slice(0, state.cursor) + state.buffer.slice(end);
+      return none(withDerived({ ...state, buffer, historyIndex: null }, ctx, state.menu !== null));
     }
     default: {
       const sequence = key.sequence ?? '';
