@@ -100,17 +100,21 @@ export interface AuthoringEntityRefResolution {
  * constructor is the escape hatch for a field type that names another
  * document-local entity (e.g. Postgres's `pg.enum(<native_enum ref>)`
  * resolving the ref against an already-lowered `native_enum` block): its
- * `resolve` function is handed the call's sole positional-argument string and
- * the namespace-scoped map of already-lowered extension entities (the exact
- * shape {@link AuthoringEntityTypeFactoryOutput.factory} output is collected
- * into, keyed by entries-slot discriminator then block name), and returns the
- * resolved storage-type triple plus an optional value-set-derivation pointer,
- * or `undefined` when the ref does not resolve (the caller reports the
- * diagnostic — this hook reports no diagnostics of its own).
+ * `resolve` function is handed the call's sole positional-argument string, the
+ * namespace-scoped map of already-lowered extension entities (the exact shape
+ * {@link AuthoringEntityTypeFactoryOutput.factory} output is collected into,
+ * keyed by entries-slot discriminator then block name), and the field's own
+ * namespace id (so a target can qualify its resolved `nativeType` by schema,
+ * e.g. Postgres's `pg.enum` prefixing a non-default-schema enum's type name
+ * with its schema). It returns the resolved storage-type triple plus an
+ * optional value-set-derivation pointer, or `undefined` when the ref does not
+ * resolve (the caller reports the diagnostic — this hook reports no
+ * diagnostics of its own).
  *
  * Deliberately narrower than a general "run arbitrary code during field
- * resolution" hook: `resolve` is a pure function over `(ref, entities)` with
- * no side effects, mirroring the purity of the declarative template path.
+ * resolution" hook: `resolve` is a pure function over `(ref, entities,
+ * namespaceId)` with no side effects, mirroring the purity of the
+ * declarative template path.
  */
 export interface AuthoringEntityRefTypeConstructorDescriptor {
   readonly kind: 'entityRefTypeConstructor';
@@ -119,6 +123,7 @@ export interface AuthoringEntityRefTypeConstructorDescriptor {
     namespaceExtensionEntities:
       | Readonly<Record<string, Readonly<Record<string, unknown>>>>
       | undefined,
+    namespaceId?: string,
   ) => AuthoringEntityRefResolution | undefined;
 }
 

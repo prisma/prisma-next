@@ -173,6 +173,30 @@ describe('renderLoweredSql cast policy', () => {
     );
   });
 
+  it('emits $N::<schema>.<nativeType> for a native-enum column in a non-public schema, using the schema-qualified nativeType verbatim', () => {
+    const pgEnumCodec: Codec = defineTestCodec({
+      typeId: 'pg/enum@1',
+      encode: (value: string): string => value,
+      decode: (wire: string): string => wire,
+    });
+    const lookup = lookupOf({
+      'pg/enum@1': {
+        codec: pgEnumCodec,
+        metadata: {
+          targetTypes: ['text'],
+          meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
+        },
+      },
+    });
+
+    const ast = selectWithNativeTypeParam('status', 'pg/enum@1', 'auth.aal_level', 'aal2');
+    const lowered = renderLoweredSql(ast, baseContract, lookup);
+
+    expect(lowered.sql).toBe(
+      'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."status" = $1::auth.aal_level',
+    );
+  });
+
   it('emits plain $N when the codec carries no nativeType metadata', () => {
     const enumCodec: Codec = defineTestCodec({
       typeId: 'app/test-opaque@1',

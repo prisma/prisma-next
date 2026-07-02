@@ -9,7 +9,9 @@ import type {
   AuthoringTypeNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
+import { DEFAULT_NAMESPACE_ID } from './namespace-ids';
 import {
   PostgresNativeEnumSchema,
   PostgresRlsPolicySchema,
@@ -35,17 +37,31 @@ export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespa
  * pointing at it without this resolver needing to know the ref shape.
  * `valueSetEnforcement: 'native-type'` — the native Postgres enum TYPE
  * enforces membership; no `CHECK` is written (authoring-design.md §5).
+ *
+ * `nativeType` is schema-qualified (`<namespaceId>.<typeName>`) when the
+ * enum's namespace is a real, named, non-default schema — matching what
+ * Postgres's `format_type()` reports for a non-`public` type, so the
+ * `$N::<nativeType>` cast and `db verify`'s column-type comparison both stay
+ * correct. The default namespace (`public`) and the unbound/late-bound
+ * namespace (resolved by `search_path` at runtime) both stay bare, mirroring
+ * `PostgresSchema.qualifyTable` / `PostgresUnboundSchema.qualifyTable`'s own
+ * qualify-vs-don't-qualify split for tables.
  */
 function resolvePgEnumRef(
   ref: string,
   entities: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
+  namespaceId?: string,
 ): AuthoringEntityRefResolution | undefined {
   const nativeEnums = entities?.['native_enum'];
   const entity = nativeEnums?.[ref];
   if (!(entity instanceof PostgresNativeEnum)) return undefined;
+  const qualifyNativeType =
+    namespaceId !== undefined &&
+    namespaceId !== DEFAULT_NAMESPACE_ID &&
+    namespaceId !== UNBOUND_NAMESPACE_ID;
   return {
     codecId: PG_ENUM_CODEC_ID,
-    nativeType: entity.typeName,
+    nativeType: qualifyNativeType ? `${namespaceId}.${entity.typeName}` : entity.typeName,
     valueSetEntityName: ref,
     valueSetEnforcement: 'native-type',
   };

@@ -455,7 +455,11 @@ function resolveEntityRefTypeConstructorCall(input: {
     return { ok: false, alreadyReported: true };
   }
 
-  const resolution = input.descriptor.resolve(ref, input.namespaceExtensionEntities);
+  const resolution = input.descriptor.resolve(
+    ref,
+    input.namespaceExtensionEntities,
+    input.namespaceId,
+  );
   if (resolution === undefined) {
     input.diagnostics.push({
       code: 'PSL_UNKNOWN_ENTITY_REF',
