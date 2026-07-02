@@ -176,3 +176,13 @@ it from there instead of defining a local copy. Behaviour-preserving — the run
 facade surface (`db.enums`, `sql`, `orm`) is byte-identical. No extension-author
 API or surface change; nothing to migrate. Incidental substrate diff only.
 -->
+
+<!--
+TML-2915 (infer an enum's `@@type` from its members): a PSL `enum` block may now
+omit `@@type` and have the codec inferred (text for bare/string members, int for
+integers). Additive: the framework gains an optional `AuthoringEntityContext.enumInferenceCodecs`
+and a `resolveEnumCodecId` export; each built-in target's config supplies its default
+codec ids, and `@prisma-next/adapter-mongo` gains a `./codec-ids` entrypoint. Explicit
+`@@type` is unchanged. No extension-author action required — the new context field is
+optional and framework-populated. Incidental substrate diff only.
+-->

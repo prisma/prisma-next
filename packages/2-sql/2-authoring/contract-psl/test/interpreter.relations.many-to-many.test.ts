@@ -8,7 +8,6 @@ import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
   modelsOf,
-  postgresEnumInferenceCodecs,
   postgresScalarTypeDescriptors,
   postgresTarget,
   symbolTableInputFromParseArgs,
@@ -20,7 +19,6 @@ const baseInput = {
   controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
-  enumInferenceCodecs: postgresEnumInferenceCodecs,
 } as const;
 
 function interpretSchema(schema: string) {

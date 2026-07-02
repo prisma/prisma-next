@@ -12,8 +12,8 @@ import {
   type AuthoringEntityContext,
   type AuthoringEntityTypeNamespace,
   type AuthoringPslBlockDescriptorNamespace,
-  classifyEnumMemberType,
   type PslExtensionBlock,
+  resolveEnumCodecId,
 } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
@@ -38,36 +38,11 @@ function testEnumFactory(
   const sourceId = ctx.sourceId ?? 'unknown';
   const diagnostics = ctx.diagnostics;
 
-  const typeAttr = block.blockAttributes.find((a) => a.name === 'type');
-
-  let codecId: string;
-  if (!typeAttr) {
-    const inferredKind = classifyEnumMemberType(block);
-    if (inferredKind === null || !ctx.enumInferenceCodecs) {
-      diagnostics?.push({
-        code: 'PSL_ENUM_CANNOT_INFER_TYPE',
-        message: `cannot infer @@type for enum "${block.name}"; add an explicit @@type(...)`,
-        sourceId,
-        span: block.span,
-      });
-      return undefined;
-    }
-    codecId = ctx.enumInferenceCodecs[inferredKind];
-  } else {
-    const rawArg = typeAttr.args[0]?.value;
-    const explicitCodecId =
-      rawArg?.startsWith('"') && rawArg.endsWith('"') ? rawArg.slice(1, -1) : undefined;
-    if (!explicitCodecId) {
-      diagnostics?.push({
-        code: 'PSL_ENUM_MISSING_TYPE',
-        message: `enum "${block.name}" @@type attribute must have a quoted codec id argument`,
-        sourceId,
-        span: typeAttr.span,
-      });
-      return undefined;
-    }
-    codecId = explicitCodecId;
+  const resolved = resolveEnumCodecId(block, ctx);
+  if (resolved === undefined) {
+    return undefined;
   }
+  const { codecId, codecSpan } = resolved;
 
   const nativeType = ctx.codecLookup?.targetTypesFor(codecId)?.[0];
   if (nativeType === undefined) {
@@ -75,7 +50,7 @@ function testEnumFactory(
       code: 'PSL_EXTENSION_INVALID_VALUE',
       message: `enum "${block.name}" @@type references unknown codec "${codecId}"`,
       sourceId,
-      span: typeAttr?.args[0]?.span ?? typeAttr?.span ?? block.span,
+      span: codecSpan,
     });
     return undefined;
   }
@@ -86,7 +61,7 @@ function testEnumFactory(
       code: 'PSL_EXTENSION_INVALID_VALUE',
       message: `enum "${block.name}" @@type codec "${codecId}" resolves in targetTypesFor but is absent from codecLookup.get`,
       sourceId,
-      span: typeAttr?.args[0]?.span ?? typeAttr?.span ?? block.span,
+      span: codecSpan,
     });
     return undefined;
   }

@@ -11,7 +11,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import type { CodecLookup } from './codec-types';
-import type { PslBlockParam, PslExtensionBlock } from './psl-extension-block';
+import type { PslBlockParam, PslExtensionBlock, PslSpan } from './psl-extension-block';
 
 export type EnumInferredMemberType = 'text' | 'int';
 
@@ -186,6 +186,52 @@ export function classifyEnumMemberType(block: PslExtensionBlock): 'text' | 'int'
   if (sawText) return 'text';
   if (sawInt) return 'int';
   return null;
+}
+
+/**
+ * Resolves the codec id for an `enum` block. When `@@type` is absent, the codec
+ * is inferred from the members via {@link classifyEnumMemberType}; otherwise the
+ * explicit `@@type("codec")` argument is parsed. Pushes the appropriate
+ * diagnostic and returns `undefined` when neither yields a codec. `codecSpan` is
+ * the span downstream codec-validation diagnostics should anchor to. Shared by
+ * every family's enum factory so inference and the explicit path stay identical.
+ */
+export function resolveEnumCodecId(
+  block: PslExtensionBlock,
+  ctx: AuthoringEntityContext,
+): { readonly codecId: string; readonly codecSpan: PslSpan } | undefined {
+  const sourceId = ctx.sourceId ?? 'unknown';
+  const typeAttr = block.blockAttributes.find((a) => a.name === 'type');
+
+  if (typeAttr === undefined) {
+    const inferredKind = classifyEnumMemberType(block);
+    if (inferredKind === null || ctx.enumInferenceCodecs === undefined) {
+      ctx.diagnostics?.push({
+        code: 'PSL_ENUM_CANNOT_INFER_TYPE',
+        message: `cannot infer @@type for enum "${block.name}"; add an explicit @@type(...)`,
+        sourceId,
+        span: block.span,
+      });
+      return undefined;
+    }
+    return { codecId: ctx.enumInferenceCodecs[inferredKind], codecSpan: block.span };
+  }
+
+  const rawCodecArg = typeAttr.args[0]?.value;
+  const codecId =
+    rawCodecArg?.startsWith('"') && rawCodecArg.endsWith('"') && rawCodecArg.length >= 2
+      ? rawCodecArg.slice(1, -1)
+      : undefined;
+  if (codecId === undefined) {
+    ctx.diagnostics?.push({
+      code: 'PSL_ENUM_MISSING_TYPE',
+      message: `enum "${block.name}" @@type attribute must have a quoted codec id argument`,
+      sourceId,
+      span: typeAttr.span,
+    });
+    return undefined;
+  }
+  return { codecId, codecSpan: typeAttr.args[0]?.span ?? typeAttr.span };
 }
 
 export interface AuthoringEntityTypeTemplateOutput {

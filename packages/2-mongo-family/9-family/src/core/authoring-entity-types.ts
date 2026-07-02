@@ -4,18 +4,11 @@ import {
   type AuthoringEntityTypeDescriptor,
   type AuthoringEntityTypeNamespace,
   type AuthoringPslBlockDescriptorNamespace,
-  classifyEnumMemberType,
   type PslExtensionBlock,
+  resolveEnumCodecId,
 } from '@prisma-next/framework-components/authoring';
 import { type EnumTypeHandle, enumType } from '@prisma-next/mongo-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
-
-function parseQuotedString(raw: string): string | undefined {
-  if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
-    return raw.slice(1, -1);
-  }
-  return undefined;
-}
 
 export const mongoFamilyEnumEntityDescriptor = {
   kind: 'entity' as const,
@@ -28,38 +21,11 @@ export const mongoFamilyEnumEntityDescriptor = {
       const sourceId = ctx.sourceId ?? 'unknown';
       const diagnostics = ctx.diagnostics;
 
-      const typeAttr = block.blockAttributes.find((a) => a.name === 'type');
-
-      let codecId: string;
-      if (!typeAttr) {
-        const inferredKind = classifyEnumMemberType(block);
-        if (inferredKind === null || !ctx.enumInferenceCodecs) {
-          diagnostics?.push({
-            code: 'PSL_ENUM_CANNOT_INFER_TYPE',
-            message: `cannot infer @@type for enum "${block.name}"; add an explicit @@type(...)`,
-            sourceId,
-            span: block.span,
-          });
-          return undefined;
-        }
-        codecId = ctx.enumInferenceCodecs[inferredKind];
-      } else {
-        const rawCodecArg = typeAttr.args[0]?.value;
-        const explicitCodecId =
-          rawCodecArg !== undefined ? parseQuotedString(rawCodecArg) : undefined;
-        if (!explicitCodecId) {
-          diagnostics?.push({
-            code: 'PSL_ENUM_MISSING_TYPE',
-            message: `enum "${block.name}" @@type attribute must have a quoted codec id argument`,
-            sourceId,
-            span: typeAttr.span,
-          });
-          return undefined;
-        }
-        codecId = explicitCodecId;
+      const resolved = resolveEnumCodecId(block, ctx);
+      if (resolved === undefined) {
+        return undefined;
       }
-
-      const typeArgSpan = typeAttr?.args[0]?.span ?? typeAttr?.span ?? block.span;
+      const { codecId, codecSpan } = resolved;
 
       const nativeType = ctx.codecLookup?.targetTypesFor(codecId)?.[0];
       if (nativeType === undefined) {
@@ -67,7 +33,7 @@ export const mongoFamilyEnumEntityDescriptor = {
           code: 'PSL_EXTENSION_INVALID_VALUE',
           message: `enum "${block.name}" @@type references unknown codec "${codecId}"`,
           sourceId,
-          span: typeArgSpan,
+          span: codecSpan,
         });
         return undefined;
       }
@@ -78,7 +44,7 @@ export const mongoFamilyEnumEntityDescriptor = {
           code: 'PSL_EXTENSION_INVALID_VALUE',
           message: `enum "${block.name}" @@type codec "${codecId}" resolves in targetTypesFor but is absent from codecLookup.get`,
           sourceId,
-          span: typeArgSpan,
+          span: codecSpan,
         });
         return undefined;
       }

@@ -11,7 +11,6 @@ import {
   createBuiltinLikeControlMutationDefaults,
   documentScopedTypes,
   modelsOf,
-  postgresEnumInferenceCodecs,
   postgresScalarTypeDescriptors,
   postgresTarget,
   symbolTableInputFromParseArgs,
@@ -22,11 +21,7 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
   const interpretPslDocumentToSqlContract = (
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
-      | 'target'
-      | 'scalarTypeDescriptors'
-      | 'composedExtensionContracts'
-      | 'createNamespace'
-      | 'enumInferenceCodecs'
+      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts' | 'createNamespace'
     > &
       Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
@@ -35,7 +30,6 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
-      enumInferenceCodecs: postgresEnumInferenceCodecs,
       ...input,
     });
 

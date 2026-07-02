@@ -9,7 +9,6 @@ import {
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
 } from '../src/interpreter';
 import {
-  postgresEnumInferenceCodecs,
   postgresScalarTypeDescriptors,
   postgresTarget,
   symbolTableInputFromParseArgs,
@@ -19,11 +18,7 @@ describe('composed mutation default registries', () => {
   const interpretPslDocumentToSqlContract = (
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
-      | 'target'
-      | 'scalarTypeDescriptors'
-      | 'composedExtensionContracts'
-      | 'createNamespace'
-      | 'enumInferenceCodecs'
+      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts' | 'createNamespace'
     > &
       Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
@@ -32,7 +27,6 @@ describe('composed mutation default registries', () => {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
-      enumInferenceCodecs: postgresEnumInferenceCodecs,
       ...input,
     });
 

@@ -6,7 +6,6 @@ import { createTestSqlNamespace } from '../../../1-core/contract/test/test-suppo
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
-  postgresEnumInferenceCodecs,
   postgresScalarTypeDescriptors,
   postgresTarget,
   symbolTableInputFromParseArgs,
@@ -25,7 +24,6 @@ function interpretSchema(schema: string) {
     composedExtensionContracts: new Map(),
     controlMutationDefaults: builtinControlMutationDefaults,
     createNamespace: createTestSqlNamespace,
-    enumInferenceCodecs: postgresEnumInferenceCodecs,
   });
 }
 

@@ -7,7 +7,6 @@ import {
 import {
   createBuiltinLikeControlMutationDefaults,
   modelsOf,
-  postgresEnumInferenceCodecs,
   postgresScalarTypeDescriptors,
   postgresTarget,
   symbolTableInputFromParseArgs,
@@ -19,11 +18,7 @@ describe('interpretPslDocumentToSqlContract value objects and list fields', () =
   const interpretPslDocumentToSqlContract = (
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
-      | 'target'
-      | 'scalarTypeDescriptors'
-      | 'composedExtensionContracts'
-      | 'createNamespace'
-      | 'enumInferenceCodecs'
+      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts' | 'createNamespace'
     > &
       Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
@@ -32,7 +27,6 @@ describe('interpretPslDocumentToSqlContract value objects and list fields', () =
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
-      enumInferenceCodecs: postgresEnumInferenceCodecs,
       ...input,
     });
 

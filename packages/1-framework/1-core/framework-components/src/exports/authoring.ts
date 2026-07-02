@@ -33,6 +33,7 @@ export {
   isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
   resolveAuthoringTemplateValue,
+  resolveEnumCodecId,
   validateAuthoringHelperArguments,
 } from '../shared/framework-authoring';
 export type {

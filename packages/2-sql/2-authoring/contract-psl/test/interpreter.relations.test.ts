@@ -5,7 +5,6 @@ import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
   modelsOf,
-  postgresEnumInferenceCodecs,
   postgresScalarTypeDescriptors,
   postgresTarget,
   symbolTableInputFromParseArgs,
@@ -18,7 +17,6 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
-  enumInferenceCodecs: postgresEnumInferenceCodecs,
 } as const;
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
