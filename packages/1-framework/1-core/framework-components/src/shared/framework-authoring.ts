@@ -11,7 +11,9 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import type { CodecLookup } from './codec-types';
-import type { PslBlockParam } from './psl-extension-block';
+import type { PslBlockParam, PslExtensionBlock } from './psl-extension-block';
+
+export type EnumInferredMemberType = 'text' | 'int';
 
 export type AuthoringArgRef = {
   readonly kind: 'arg';
@@ -134,6 +136,56 @@ export interface AuthoringEntityContext {
   readonly sourceId?: string;
   /** Push channel for authoring-time diagnostics emitted by the factory. */
   readonly diagnostics?: AuthoringDiagnosticSink;
+  /**
+   * The target's default codec ids for an `enum` block that omits `@@type`.
+   * `text` is used when every member is a bare name or a string value;
+   * `int` is used when every member is an integer value. Every target pack
+   * populates this so `@@type` omission can be inferred consistently.
+   */
+  readonly enumInferenceCodecs?: { readonly text: string; readonly int: string };
+}
+
+/**
+ * Classifies an `enum` block's members (before codec decoding, which needs
+ * the codec chosen first) into which default codec an omitted `@@type`
+ * should resolve to:
+ *
+ * - every member is `bare`, or a `value` whose raw JSON is a string → `'text'`
+ * - every member is a `value` whose raw JSON is an integer → `'int'`
+ * - anything else (float, bigint, boolean, mixed, or a `ref`/`option`/`list`
+ *   parameter) → `null`, meaning the caller must require an explicit `@@type`.
+ */
+export function classifyEnumMemberType(block: PslExtensionBlock): 'text' | 'int' | null {
+  let sawText = false;
+  let sawInt = false;
+
+  for (const paramValue of Object.values(block.parameters)) {
+    if (paramValue.kind === 'bare') {
+      sawText = true;
+      continue;
+    }
+    if (paramValue.kind !== 'value') {
+      return null;
+    }
+    let jsonValue: unknown;
+    try {
+      jsonValue = JSON.parse(paramValue.raw);
+    } catch {
+      return null;
+    }
+    if (typeof jsonValue === 'string') {
+      sawText = true;
+    } else if (typeof jsonValue === 'number' && Number.isInteger(jsonValue)) {
+      sawInt = true;
+    } else {
+      return null;
+    }
+  }
+
+  if (sawText && sawInt) return null;
+  if (sawText) return 'text';
+  if (sawInt) return 'int';
+  return null;
 }
 
 export interface AuthoringEntityTypeTemplateOutput {

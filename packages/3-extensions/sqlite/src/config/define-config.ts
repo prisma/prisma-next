@@ -6,6 +6,10 @@ import sql from '@prisma-next/family-sql/control';
 import type { ControlExtensionDescriptor } from '@prisma-next/framework-components/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import { typescriptContractFromPath } from '@prisma-next/sql-contract-ts/config-types';
+import {
+  SQLITE_INTEGER_CODEC_ID,
+  SQLITE_TEXT_CODEC_ID,
+} from '@prisma-next/target-sqlite/codec-ids';
 import sqlite, { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import sqlitePackRef from '@prisma-next/target-sqlite/pack';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -46,6 +50,7 @@ export function defineConfig(options: SqliteConfigOptions): PrismaNextConfig<'sq
           output,
           target: sqlitePackRef,
           createNamespace: sqliteCreateNamespace,
+          enumInferenceCodecs: { text: SQLITE_TEXT_CODEC_ID, int: SQLITE_INTEGER_CODEC_ID },
         });
 
   return coreDefineConfig({

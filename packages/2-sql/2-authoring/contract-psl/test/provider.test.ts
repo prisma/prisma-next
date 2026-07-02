@@ -11,6 +11,7 @@ import {
   modelsOf,
   pgvectorAuthoringContributions,
   pgvectorExtensionPack,
+  postgresEnumInferenceCodecs,
   postgresTarget,
 } from './fixtures';
 import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
@@ -22,6 +23,7 @@ describe('prismaContract provider helper', () => {
   const baseOptions = {
     target: postgresTarget,
     createNamespace: createTestSqlNamespace,
+    enumInferenceCodecs: postgresEnumInferenceCodecs,
   } as const;
 
   afterEach(async () => {

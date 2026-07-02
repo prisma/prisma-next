@@ -958,6 +958,9 @@ export function interpretPslDocumentToMongoContract(
     entityContext: {
       family: 'mongo',
       target: 'mongo',
+      // Mongo @@type inference lands in TML-2915 D2; this satisfies the
+      // required field until Mongo's own factory reads it.
+      enumInferenceCodecs: { text: 'mongo/string@1', int: 'mongo/int32@1' },
       ...ifDefined('codecLookup', codecLookup),
       sourceId,
       diagnostics: {

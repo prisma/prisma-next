@@ -14,6 +14,7 @@ import { createTestSqlNamespace } from '../../../1-core/contract/test/test-suppo
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  postgresEnumInferenceCodecs,
   postgresScalarTypeDescriptors,
   postgresTarget,
   symbolTableInputFromParseArgs,
@@ -58,6 +59,7 @@ namespace public {
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       createNamespace: createTestSqlNamespace,
+      enumInferenceCodecs: postgresEnumInferenceCodecs,
     });
 
     expect(pslResult.ok).toBe(true);
@@ -183,6 +185,7 @@ namespace public {
       composedExtensionPacks: ['supabase'],
       composedExtensionContracts: new Map([['supabase', syntheticExtensionContract]]),
       createNamespace: createTestSqlNamespace,
+      enumInferenceCodecs: postgresEnumInferenceCodecs,
     });
 
     expect(pslResult.ok).toBe(true);
@@ -253,6 +256,7 @@ namespace public {
       composedExtensionPacks: ['supabase'],
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
+      enumInferenceCodecs: postgresEnumInferenceCodecs,
     });
 
     expect(result.ok).toBe(false);

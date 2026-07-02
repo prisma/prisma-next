@@ -129,6 +129,8 @@ export interface InterpretPslDocumentToSqlContractInput {
   readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespaceBase;
   readonly codecLookup?: CodecLookup;
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
+  /** The target's default codec ids for an `enum` block that omits `@@type`. */
+  readonly enumInferenceCodecs?: { readonly text: string; readonly int: string };
 }
 
 function buildComposedExtensionPackRefs(
@@ -1839,6 +1841,7 @@ export function interpretPslDocumentToSqlContract(
           );
         },
       },
+      ...ifDefined('enumInferenceCodecs', input.enumInferenceCodecs),
     },
     diagnostics,
   });
@@ -2016,6 +2019,7 @@ export function interpretPslDocumentToSqlContract(
   const extensionEntityContext: AuthoringEntityContext = {
     family: input.target.familyId,
     target: input.target.targetId,
+    ...ifDefined('enumInferenceCodecs', input.enumInferenceCodecs),
   };
   const namespaceExtensionEntities = new Map<
     string,

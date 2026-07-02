@@ -6,6 +6,7 @@ import {
   documentScopedTypes,
   pgvectorAuthoringContributions,
   pgvectorExtensionPack,
+  postgresEnumInferenceCodecs,
   postgresScalarTypeDescriptors,
   postgresTarget,
   symbolTableInputFromParseArgs,
@@ -16,6 +17,7 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
+  enumInferenceCodecs: postgresEnumInferenceCodecs,
 } as const;
 
 describe('interpretPslDocumentToSqlContract extensions', () => {

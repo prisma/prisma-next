@@ -21,6 +21,8 @@ export interface PrismaContractOptions {
   readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
   readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespaceBase;
   readonly defaultControlPolicy?: ControlPolicy;
+  /** The target's default codec ids for an `enum` block that omits `@@type`. */
+  readonly enumInferenceCodecs?: { readonly text: string; readonly int: string };
 }
 
 /**
@@ -144,6 +146,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           controlMutationDefaults: context.controlMutationDefaults,
           createNamespace: options.createNamespace,
           codecLookup: context.codecLookup,
+          ...ifDefined('enumInferenceCodecs', options.enumInferenceCodecs),
         });
         if (!interpreted.ok) {
           return interpreted;

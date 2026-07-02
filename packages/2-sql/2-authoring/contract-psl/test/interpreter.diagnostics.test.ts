@@ -7,8 +7,10 @@ import {
 import {
   createBuiltinLikeControlMutationDefaults,
   documentScopedTypes,
+  postgresEnumInferenceCodecs,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  sqliteEnumInferenceCodecs,
   sqliteScalarTypeDescriptors,
   sqliteTarget,
   symbolTableInputFromParseArgs,
@@ -19,6 +21,7 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
+  enumInferenceCodecs: postgresEnumInferenceCodecs,
 } as const;
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
@@ -1085,6 +1088,7 @@ model User {
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
         createNamespace: createTestSqlNamespace,
+        enumInferenceCodecs: sqliteEnumInferenceCodecs,
       });
 
       expect(result.ok).toBe(false);
@@ -1121,6 +1125,7 @@ model User {
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
         createNamespace: createTestSqlNamespace,
+        enumInferenceCodecs: sqliteEnumInferenceCodecs,
       });
 
       expect(result.ok).toBe(false);

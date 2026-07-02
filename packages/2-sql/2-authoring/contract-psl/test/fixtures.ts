@@ -7,12 +7,13 @@ import {
   domainModelsAtDefaultNamespace,
   domainValueObjectsAtDefaultNamespace,
 } from '@prisma-next/contract/types';
-import type {
-  AuthoringContributions,
-  AuthoringEntityContext,
-  AuthoringEntityTypeNamespace,
-  AuthoringPslBlockDescriptorNamespace,
-  PslExtensionBlock,
+import {
+  type AuthoringContributions,
+  type AuthoringEntityContext,
+  type AuthoringEntityTypeNamespace,
+  type AuthoringPslBlockDescriptorNamespace,
+  classifyEnumMemberType,
+  type PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
@@ -38,26 +39,34 @@ function testEnumFactory(
   const diagnostics = ctx.diagnostics;
 
   const typeAttr = block.blockAttributes.find((a) => a.name === 'type');
-  if (!typeAttr) {
-    diagnostics?.push({
-      code: 'PSL_ENUM_MISSING_TYPE',
-      message: `enum "${block.name}" is missing a @@type("codecId") attribute`,
-      sourceId,
-      span: block.span,
-    });
-    return undefined;
-  }
 
-  const rawArg = typeAttr.args[0]?.value;
-  const codecId = rawArg?.startsWith('"') && rawArg.endsWith('"') ? rawArg.slice(1, -1) : undefined;
-  if (!codecId) {
-    diagnostics?.push({
-      code: 'PSL_ENUM_MISSING_TYPE',
-      message: `enum "${block.name}" @@type attribute must have a quoted codec id argument`,
-      sourceId,
-      span: typeAttr.span,
-    });
-    return undefined;
+  let codecId: string;
+  if (!typeAttr) {
+    const inferredKind = classifyEnumMemberType(block);
+    if (inferredKind === null || !ctx.enumInferenceCodecs) {
+      diagnostics?.push({
+        code: 'PSL_ENUM_CANNOT_INFER_TYPE',
+        message: `cannot infer @@type for enum "${block.name}"; add an explicit @@type(...)`,
+        sourceId,
+        span: block.span,
+      });
+      return undefined;
+    }
+    codecId = ctx.enumInferenceCodecs[inferredKind];
+  } else {
+    const rawArg = typeAttr.args[0]?.value;
+    const explicitCodecId =
+      rawArg?.startsWith('"') && rawArg.endsWith('"') ? rawArg.slice(1, -1) : undefined;
+    if (!explicitCodecId) {
+      diagnostics?.push({
+        code: 'PSL_ENUM_MISSING_TYPE',
+        message: `enum "${block.name}" @@type attribute must have a quoted codec id argument`,
+        sourceId,
+        span: typeAttr.span,
+      });
+      return undefined;
+    }
+    codecId = explicitCodecId;
   }
 
   const nativeType = ctx.codecLookup?.targetTypesFor(codecId)?.[0];
@@ -66,7 +75,7 @@ function testEnumFactory(
       code: 'PSL_EXTENSION_INVALID_VALUE',
       message: `enum "${block.name}" @@type references unknown codec "${codecId}"`,
       sourceId,
-      span: typeAttr.args[0]?.span ?? typeAttr.span,
+      span: typeAttr?.args[0]?.span ?? typeAttr?.span ?? block.span,
     });
     return undefined;
   }
@@ -77,7 +86,7 @@ function testEnumFactory(
       code: 'PSL_EXTENSION_INVALID_VALUE',
       message: `enum "${block.name}" @@type codec "${codecId}" resolves in targetTypesFor but is absent from codecLookup.get`,
       sourceId,
-      span: typeAttr.args[0]?.span ?? typeAttr.span,
+      span: typeAttr?.args[0]?.span ?? typeAttr?.span ?? block.span,
     });
     return undefined;
   }
@@ -236,6 +245,16 @@ function parseStringLiteral(raw: string): string | undefined {
   return match?.[2];
 }
 
+export const postgresEnumInferenceCodecs = {
+  text: 'pg/text@1',
+  int: 'pg/int@1',
+} as const;
+
+export const sqliteEnumInferenceCodecs = {
+  text: 'sqlite/text@1',
+  int: 'sqlite/integer@1',
+} as const;
+
 export const postgresTarget: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
   familyId: 'sql',
@@ -312,6 +331,7 @@ export function buildSymbolTableInput(
   sourceFile: SourceFile;
   sourceId: string;
   seedDiagnostics: ContractSourceDiagnostic[];
+  enumInferenceCodecs: { readonly text: string; readonly int: string };
 } {
   const sourceId = options?.sourceId ?? 'schema.prisma';
   const scalarTypes = options?.scalarTypes ?? [...postgresScalarTypeDescriptors.keys()];
@@ -329,7 +349,13 @@ export function buildSymbolTableInput(
     sourceId,
     span: rangeToPslSpan(diagnostic.range, sourceFile),
   }));
-  return { symbolTable: table, sourceFile, sourceId, seedDiagnostics };
+  return {
+    symbolTable: table,
+    sourceFile,
+    sourceId,
+    seedDiagnostics,
+    enumInferenceCodecs: postgresEnumInferenceCodecs,
+  };
 }
 
 export function symbolTableInputFromParseArgs(args: {
@@ -341,6 +367,7 @@ export function symbolTableInputFromParseArgs(args: {
   sourceFile: SourceFile;
   sourceId: string;
   seedDiagnostics: ContractSourceDiagnostic[];
+  enumInferenceCodecs: { readonly text: string; readonly int: string };
 } {
   return buildSymbolTableInput(args.schema, {
     ...(args.sourceId !== undefined ? { sourceId: args.sourceId } : {}),
@@ -376,6 +403,7 @@ export const postgresCodecIdOnlyDescriptors = new Map<string, string>([
 
 const targetTypesByCodecId: Record<string, readonly string[]> = {
   'pg/text@1': ['text'],
+  'pg/int@1': ['int4'],
   'pg/bool@1': ['bool'],
   'pg/int4@1': ['int4'],
   'pg/int8@1': ['int8'],

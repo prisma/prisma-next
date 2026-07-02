@@ -7,6 +7,7 @@ import { createTestSqlNamespace } from '../../../1-core/contract/test/test-suppo
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  postgresEnumInferenceCodecs,
   postgresScalarTypeDescriptors,
   postgresTarget,
   symbolTableInputFromParseArgs,
@@ -102,6 +103,7 @@ const baseInput = {
   controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
+  enumInferenceCodecs: postgresEnumInferenceCodecs,
 } as const;
 
 describe('un-namespaced PG model defaults to public namespace (TML-2916)', () => {

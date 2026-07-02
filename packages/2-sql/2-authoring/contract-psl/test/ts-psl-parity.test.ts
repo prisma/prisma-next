@@ -13,6 +13,8 @@ import { createTestSqlNamespace } from '../../../1-core/contract/test/test-suppo
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  postgresEnumInferenceCodecs,
+  sqliteEnumInferenceCodecs,
   symbolTableInputFromParseArgs,
   testEnumEntityContributions,
 } from './fixtures';
@@ -364,6 +366,7 @@ describe('TS and PSL authoring parity', () => {
     readonly targetPack: TargetPackRef<'sql', string>;
     readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnTypeDescriptor>;
     readonly authoringContributions: AuthoringContributions;
+    readonly enumInferenceCodecs: { readonly text: string; readonly int: string };
   }): void {
     const tsContract = target.buildTsContract();
     const pslDocument = symbolTableInputFromParseArgs({
@@ -379,6 +382,7 @@ describe('TS and PSL authoring parity', () => {
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions: target.authoringContributions,
       createNamespace: createTestSqlNamespace,
+      enumInferenceCodecs: target.enumInferenceCodecs,
     });
 
     expect(interpreted.ok).toBe(true);
@@ -392,6 +396,7 @@ describe('TS and PSL authoring parity', () => {
       targetPack: sqliteTimestampTargetPack,
       scalarTypeDescriptors: sqliteTimestampScalarTypeDescriptors,
       authoringContributions: sqliteTimestampAuthoringContributions,
+      enumInferenceCodecs: sqliteEnumInferenceCodecs,
     });
   });
 
@@ -401,6 +406,7 @@ describe('TS and PSL authoring parity', () => {
       targetPack: postgresTimestampTargetPack,
       scalarTypeDescriptors: postgresTimestampScalarTypeDescriptors,
       authoringContributions: postgresTimestampAuthoringContributions,
+      enumInferenceCodecs: postgresEnumInferenceCodecs,
     });
   });
 
@@ -430,6 +436,7 @@ model Post {
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions,
       createNamespace: createTestSqlNamespace,
+      enumInferenceCodecs: postgresEnumInferenceCodecs,
     });
 
     expect(pslContract.ok).toBe(true);

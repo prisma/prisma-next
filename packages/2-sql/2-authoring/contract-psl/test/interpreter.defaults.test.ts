@@ -6,8 +6,10 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  postgresEnumInferenceCodecs,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  sqliteEnumInferenceCodecs,
   sqliteScalarTypeDescriptors,
   sqliteTarget,
   symbolTableInputFromParseArgs,
@@ -20,7 +22,11 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
   const interpretPslDocumentToSqlContract = (
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
-      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts' | 'createNamespace'
+      | 'target'
+      | 'scalarTypeDescriptors'
+      | 'composedExtensionContracts'
+      | 'createNamespace'
+      | 'enumInferenceCodecs'
     > &
       Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
@@ -29,6 +35,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
+      enumInferenceCodecs: postgresEnumInferenceCodecs,
       ...input,
     });
   it('lowers supported default functions into execution and storage contract shapes', () => {
@@ -498,6 +505,7 @@ model UuidNativeBad {
       controlMutationDefaults: builtinControlMutationDefaults,
       authoringContributions: sqliteTemporalContributions,
       createNamespace: createTestSqlNamespace,
+      enumInferenceCodecs: sqliteEnumInferenceCodecs,
     });
 
     expect(result.ok).toBe(true);
