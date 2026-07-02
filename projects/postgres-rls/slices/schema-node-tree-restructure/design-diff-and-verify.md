@@ -41,7 +41,7 @@ class SchemaDiff<TNode extends DiffableNode = DiffableNode> {
 ```
 
 - Its only job is to **abstract away that there are two issue lists.** `filter` fans one predicate across both and returns a narrowed `SchemaDiff`. The predicate takes the union; callers already understand both types.
-- **`SchemaDiffIssue<TNode>` carries its `expected` / `actual` schema-IR node**, so a caller reaches the node it concerns by a property access, not a lookup. `TNode` is **defaulted to `DiffableNode`** — a purely additive change: every existing caller keeps the default and is unbroken; only a caller that wants the concrete node opts in (the planner takes `SchemaDiff<SqlSchemaIRNode>` and drops the `asSchemaNode` cast). The coupling is to the **schema IR** — the layer the differ diffs — never back to the contract IR it was derived from (§6). `SchemaIssue` (relational) stays coordinate-based; node-typing it is the relational-port follow-on (§13).
+- **`SchemaDiffIssue<TNode>` carries its `expected` / `actual` schema-IR node**, so a caller reaches the node it concerns by a property access, not a lookup. `TNode` is **defaulted to `DiffableNode`** — a purely additive change: every existing caller keeps the default and is unbroken; only a caller that wants the concrete node opts in. The Postgres side uses `SqlSchemaDiffNode = SqlSchemaIRNode & DiffableNode` (the honest constraint — `SqlSchemaIRNode` alone is *not* a `DiffableNode`, since its relational subclasses lack `id`/`isEqualTo`/`children`; only the five `Postgres*SchemaNode` classes implement it): the differ returns `SchemaDiff<SqlSchemaDiffNode>` and the planner consumes it, dropping the per-issue `asSchemaNode` cast. The coupling is to the **schema IR** — the layer the differ diffs — never back to the contract IR it was derived from (§6). `SchemaIssue` (relational) stays coordinate-based; node-typing it is the relational-port follow-on (§13).
 
 ## 5. The diffing logic lives with the diff, not in "verify"
 
@@ -51,13 +51,12 @@ The relational diffing code must not sit in a `schema-verify/` module. Its logic
 
 The **contract-space aggregate is passive** — it holds the spaces and their contracts and answers ownership questions; it runs nothing. The **orchestration** (`verifyMigration`, `synthStrategy`) owns every verb.
 
-**Verify.** For each contract space the orchestration:
+**Verify produces two distinct outputs.** A diff of expected-vs-actual reports *against the contract*, but an **unclaimed** live element has no place in a contract's structure — so it is not forced into one. The verifier presents:
 
-1. runs the differ — `diff(space.contract, actual)` → `SchemaDiff`;
-2. composes the space's view — walks the space's contract-derived (expected) nodes and, per node, attaches the issue that concerns it; a node is *pass* when nothing is attached, *fail* otherwise;
-3. verdict — the space passes iff it has no issue. `diff → its issues → empty ⇒ pass`. There is no verdict-derived-from-a-tree computation.
+1. **Per contract space — is the contract satisfied?** The orchestration runs the differ (`diff(space.contract, actual)`) and composes the space's view: its declared nodes, each *pass* or *fail* by whether a **missing/mismatch** issue concerns it. Verdict = the space has no missing/mismatch issue. Extras are **not** represented here.
+2. **Across the database — which live elements are unclaimed?** A separate, standalone list: introspected elements no contract space declares. The orchestration takes the diff's **extra** findings, deduplicates them, and asks the passive aggregate "does any contract declare this?" — the ones no contract claims are the unclaimed list, reported **once**. Its disposition is a rendering policy over the one list (strict fails on it; lenient shows it informationally).
 
-Because the differ runs **per space**, a space's missing/mismatch issues are inherently its own — their expected node came from its contract; no attribution, no per-issue lookup. The only cross-space step is **extras** (an actual entity in no contract-for-this-diff): the orchestration classifies each against the aggregate — declared by some space ⇒ that space's, not this one's concern; declared by none ⇒ **undeclared**, reported once at the aggregate level. That is a positive interrogative over the contracts the aggregate holds; the `SchemaDiff` result is never consulted for ownership and never references the contract IR.
+The CLI renders both. This dissolves the "represent an unclaimed element against a contract" problem — it is a second list, never a contract-tree node — and fixes today's bug (an unclaimed element duplicated once per space, N times, across `issues` / `counts` / tree). Because the differ runs **per space**, a space's missing/mismatch issues are inherently its own; the `SchemaDiff` result is never consulted for ownership and never references the contract IR — the aggregate answers ownership for the unclaimed list.
 
 **Plan.** The orchestration hands the planner **a space's issues**; the planner maps issue → op and nothing else. It takes no schema and no "other spaces" input — it works out no ownership, because the orchestration already handed it exactly its issues. The typed node on each `SchemaDiffIssue` is what the planner builds the op from (§4). Verify and plan are symmetric: run the differ per space, then verify checks emptiness while plan builds ops.
 
@@ -105,7 +104,7 @@ There is no bare-name keying, no name-subtraction, and no qualified-coordinate f
 | `scope-schema-result.ts` prunes each space's verification tree + recomputes counts/verdict | deleted; the per-space view is composed from the space's declared nodes + attached issues, scoped by construction (§6) |
 | verify verdict = `counts.fail === 0` off the (post-scoped) tree | verdict = the space's issue list is empty |
 | planner takes the full schema + `entitiesOwnedByOtherSpaces`; filters extras itself | planner takes its space's issues and maps issue → op; `entitiesOwnedByOtherSpaces` / `otherMemberEntityNames` deleted |
-| `SchemaDiffIssue.expected/actual: DiffableNode`; planner `asSchemaNode` casts | `SchemaDiffIssue<TNode>` carries the typed node (default `DiffableNode`); planner takes `SchemaDiff<SqlSchemaIRNode>`, cast gone |
+| `SchemaDiffIssue.expected/actual: DiffableNode`; planner `asSchemaNode` casts | `SchemaDiffIssue<TNode>` carries the typed node (default `DiffableNode`); planner takes `SchemaDiff<SqlSchemaDiffNode>` (= `SqlSchemaIRNode & DiffableNode`), per-issue casts gone (one boundary narrowing at the differ) |
 | the contract-space aggregate driver diffs / scopes / classifies | the aggregate is passive (answers ownership); the orchestration owns those verbs |
 | "member" throughout the aggregate | "contract space" |
 
