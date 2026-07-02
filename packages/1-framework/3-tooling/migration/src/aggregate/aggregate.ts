@@ -276,6 +276,12 @@ export function createContractSpaceAggregate(args: {
   const { targetId, app, extensions, checkIntegrity } = args;
   const ordered: readonly ContractSpaceMember[] = [app, ...extensions];
   const byId = new Map(ordered.map((m) => [m.spaceId, m]));
+  const spaceDeclares = (member: ContractSpaceMember, entityName: string): boolean => {
+    for (const coord of elementCoordinates(member.contract().storage)) {
+      if (coord.entityName === entityName) return true;
+    }
+    return false;
+  };
   return {
     targetId,
     app,
@@ -284,13 +290,9 @@ export function createContractSpaceAggregate(args: {
     hasSpace: (id) => byId.has(id),
     space: (id) => byId.get(id),
     spaces: () => ordered,
-    declaresEntity: (entityName) =>
-      ordered.some((member) => {
-        for (const coord of elementCoordinates(member.contract().storage)) {
-          if (coord.entityName === entityName) return true;
-        }
-        return false;
-      }),
+    declaresEntity: (entityName) => ordered.some((member) => spaceDeclares(member, entityName)),
+    declaringSpaces: (entityName) =>
+      ordered.filter((member) => spaceDeclares(member, entityName)).map((m) => m.spaceId),
     checkIntegrity,
   };
 }

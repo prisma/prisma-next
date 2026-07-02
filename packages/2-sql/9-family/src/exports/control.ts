@@ -43,7 +43,6 @@ export {
   runnerSuccess,
 } from '../core/migrations/plan-helpers';
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
-export { scopePlanDiffToSpace } from '../core/migrations/scope-plan-diff';
 export type {
   CodecControlHooks,
   CreateSqlMigrationPlanOptions,

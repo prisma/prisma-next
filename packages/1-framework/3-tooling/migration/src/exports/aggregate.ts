@@ -24,10 +24,6 @@ export {
   planMigration,
 } from '../aggregate/planner';
 export {
-  otherMemberEntityNames,
-  scopeSchemaResultToSpace,
-} from '../aggregate/scope-schema-result';
-export {
   type GraphWalkOutcome,
   type GraphWalkStrategyInputs,
   graphWalkStrategy,

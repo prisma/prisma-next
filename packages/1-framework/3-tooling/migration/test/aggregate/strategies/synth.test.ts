@@ -1,6 +1,7 @@
 import type {
   ControlAdapterInstance,
   ControlFamilyInstance,
+  DiffIssue,
   MigrationOperationPolicy,
   MigrationPlanner,
   MigrationPlanWithAuthoringSurface,
@@ -45,13 +46,13 @@ function makeStubPlan(targetId: string): MigrationPlanWithAuthoringSurface {
 }
 
 describe('synthStrategy', () => {
-  it('passes the full schema and the other spaces’ entity names to the family planner', async () => {
+  it('passes the full schema and a diff filter that drops only other spaces’ extras', async () => {
     let observedSchema: unknown;
-    let observedOwned: ReadonlySet<string> | undefined;
+    let observedKeep: ((issue: DiffIssue) => boolean) | undefined;
     const stubPlanner: MigrationPlanner<'sql', 'postgres'> = {
-      plan: ({ schema, entitiesOwnedByOtherSpaces }) => {
+      plan: ({ schema, keepDiffIssue }) => {
         observedSchema = schema;
-        observedOwned = entitiesOwnedByOtherSpaces;
+        observedKeep = keepDiffIssue;
         return { kind: 'success', plan: makeStubPlan('placeholder') };
       },
       emptyMigration: () => {
@@ -71,7 +72,6 @@ describe('synthStrategy', () => {
     };
 
     const appMember = makeMember('app', { app_user: {} });
-    const extMember = makeMember('cipher', { cipher_state: {} });
 
     const liveSchema = {
       tables: {
@@ -85,7 +85,7 @@ describe('synthStrategy', () => {
       aggregateTargetId: 'postgres',
       currentMarker: null,
       member: appMember,
-      otherMembers: [extMember],
+      declaredByAnotherSpace: (name) => name === 'cipher_state',
       schemaIntrospection: liveSchema,
       adapter: STUB_ADAPTER,
       migrations: stubMigrations,
@@ -108,15 +108,52 @@ describe('synthStrategy', () => {
       },
     ]);
 
-    // Critical: the planner saw the FULL schema (no pre-pruning) and the set of
-    // entity names the sibling space owns, so it can drop those extras itself.
+    // Critical: the planner saw the FULL schema (no pre-pruning) …
     const observed = observedSchema as { tables: Record<string, unknown> };
     expect(Object.keys(observed.tables).sort()).toEqual([
       'app_user',
       'cipher_state',
       'orphan_table',
     ]);
-    expect([...(observedOwned ?? [])].sort()).toEqual(['cipher_state']);
+
+    // … and a keep-predicate it applies to its diff. The planner holds no
+    // ownership logic: the predicate drops exactly the extras a sibling
+    // contract space declares, keeps every non-extra finding, and keeps
+    // extras no space declares (the planner may DROP those under policy).
+    const keep = observedKeep;
+    expect(keep).toBeDefined();
+    if (keep === undefined) return;
+    const missingIssue: DiffIssue = {
+      kind: 'missing_table',
+      table: 'cipher_state',
+      message: 'missing',
+    };
+    const siblingExtraIssue: DiffIssue = {
+      kind: 'extra_table',
+      table: 'cipher_state',
+      message: 'extra',
+    };
+    const undeclaredExtraIssue: DiffIssue = {
+      kind: 'extra_table',
+      table: 'orphan_table',
+      message: 'extra',
+    };
+    const siblingExtraDiffIssue: DiffIssue = {
+      path: ['public', 'cipher_state'],
+      outcome: 'extra',
+      message: 'extra',
+      actual: { tableName: 'cipher_state' } as never,
+    };
+    const missingDiffIssue: DiffIssue = {
+      path: ['public', 'app_user', 'policy_x'],
+      outcome: 'missing',
+      message: 'missing',
+    };
+    expect(keep(missingIssue)).toBe(true);
+    expect(keep(siblingExtraIssue)).toBe(false);
+    expect(keep(undeclaredExtraIssue)).toBe(true);
+    expect(keep(siblingExtraDiffIssue)).toBe(false);
+    expect(keep(missingDiffIssue)).toBe(true);
   });
 
   it('forwards planner failures verbatim', async () => {
@@ -145,7 +182,7 @@ describe('synthStrategy', () => {
       aggregateTargetId: 'postgres',
       currentMarker: null,
       member: makeMember('app', {}),
-      otherMembers: [],
+      declaredByAnotherSpace: () => false,
       schemaIntrospection: { tables: {} },
       adapter: STUB_ADAPTER,
       migrations: stubMigrations,

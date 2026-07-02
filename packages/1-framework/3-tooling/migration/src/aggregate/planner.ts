@@ -42,7 +42,6 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
   input: PlannerInput<TFamilyId, TTargetId>,
 ): Promise<PlannerOutput> {
   const { aggregate, currentDBState, callerPolicy } = input;
-  const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
 
   const perSpace = new Map<string, PerSpacePlan>();
 
@@ -54,7 +53,8 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
   ];
 
   for (const member of orderedMembers) {
-    const otherMembers = allMembers.filter((m) => m.spaceId !== member.spaceId);
+    const declaredByAnotherSpace = (entityName: string): boolean =>
+      aggregate.declaringSpaces(entityName).some((spaceId) => spaceId !== member.spaceId);
     const currentMarker = currentDBState.markersBySpaceId.get(member.spaceId) ?? null;
     const headRef = requireHeadRef(member);
 
@@ -75,7 +75,7 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
         aggregateTargetId: aggregate.targetId,
         currentMarker,
         member,
-        otherMembers,
+        declaredByAnotherSpace,
         schemaIntrospection: currentDBState.schemaIntrospection,
         adapter: input.adapter,
         migrations: input.migrations,
@@ -134,7 +134,7 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
       aggregateTargetId: aggregate.targetId,
       currentMarker,
       member,
-      otherMembers,
+      declaredByAnotherSpace,
       schemaIntrospection: currentDBState.schemaIntrospection,
       adapter: input.adapter,
       migrations: input.migrations,

@@ -11,7 +11,6 @@ import {
   partitionIssuesByControlPolicy,
   planFieldEventOperations,
   plannerFailure,
-  scopePlanDiffToSpace,
 } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
@@ -163,20 +162,20 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // findings (+ namespace presence) become structural DDL via `planIssues`,
     // the policy findings become RLS ops via `planPostgresSchemaDiff`. Verify
     // runs the same underlying comparison (via `verifyDatabaseSchema`) and
-    // rejects on non-empty.
+    // rejects on non-empty. The caller-supplied `keepDiffIssue` predicate is
+    // applied blindly — any scoping (e.g. multi-space ownership) is the
+    // orchestration's, never worked out here.
     PostgresDatabaseSchemaNode.assert(options.schema);
-    const databaseDiff = scopePlanDiffToSpace(
-      diffPostgresDatabaseSchema({
-        contract: options.contract,
-        actualSchema: options.schema,
-        strict:
-          options.policy.allowedOperationClasses.includes('widening') ||
-          options.policy.allowedOperationClasses.includes('destructive'),
-        typeMetadataRegistry: new Map(),
-        frameworkComponents: options.frameworkComponents,
-      }),
-      options.entitiesOwnedByOtherSpaces,
-    );
+    const rawDiff = diffPostgresDatabaseSchema({
+      contract: options.contract,
+      actualSchema: options.schema,
+      strict:
+        options.policy.allowedOperationClasses.includes('widening') ||
+        options.policy.allowedOperationClasses.includes('destructive'),
+      typeMetadataRegistry: new Map(),
+      frameworkComponents: options.frameworkComponents,
+    });
+    const databaseDiff = options.keepDiffIssue ? rawDiff.filter(options.keepDiffIssue) : rawDiff;
     const schemaIssues = this.collectSchemaIssues(options, databaseDiff.issues);
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
     const storageTypes = options.contract.storage.types ?? {};

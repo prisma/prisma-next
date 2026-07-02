@@ -13,16 +13,10 @@ import { contractToMongoSchemaIR } from '@prisma-next/family-mongo/control';
 import type { MongoControlAdapter } from '@prisma-next/family-mongo/control-adapter';
 import type {
   MigrationRunner,
-  MigrationRunnerPerSpaceOptions,
   MigrationRunnerPerSpaceSuccessValue,
   MigrationRunnerResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import {
-  createContractSpaceMember,
-  otherMemberEntityNames,
-  scopeSchemaResultToSpace,
-} from '@prisma-next/migration-tools/aggregate';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { blindCast } from '@prisma-next/utils/casts';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -32,6 +26,7 @@ import { MongoMigrationRunner, type MongoMigrationRunnerExecuteOptions } from '.
 import type { MongoTargetContract } from './mongo-target-contract';
 import { MongoTargetContractSerializer } from './mongo-target-contract-serializer';
 import { MongoTargetSchemaVerifier } from './mongo-target-schema-verifier';
+import { entityNamesDeclaredBy, scopeVerifyResultToSpace } from './scope-verify-result';
 
 export type { MongoControlTargetDescriptor };
 
@@ -96,17 +91,21 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
         // markers are not rolled back when a later space fails. Re-running reads
         // each marker, finds spaces 1..N−1 at-head (no-op skip), retries N onward.
         //
-        // Per-space verify is scoped by `scopeSchemaResultToSpace`: the live DB
-        // holds collections owned by sibling spaces, so each space verifies the
-        // full schema and then drops the `extra` findings for the collections a
-        // sibling space claims. Without the scoping an aggregate of two spaces
-        // could not pass strict verify (every other-space collection would look
-        // like an extra).
+        // Per-space verify is scoped by `scopeVerifyResultToSpace`: the live DB
+        // holds collections owned by sibling contract spaces, so each space
+        // verifies the full schema and then drops the `extra` findings for the
+        // collections a sibling space claims. Without the scoping an aggregate
+        // of two spaces could not pass strict verify (every other-space
+        // collection would look like an extra).
         //
         // See `docs/architecture docs/subsystems/10. MongoDB Family.md` §
         // Contract spaces and ADR 212 — Contract spaces.
         async execute({ driver, perSpaceOptions }): Promise<MigrationRunnerResult> {
-          const members = perSpaceOptions.map(toSpaceMember);
+          const contracts = perSpaceOptions.map((opts) =>
+            blindCast<Contract, 'destinationContract validated at aggregate boundary'>(
+              opts.destinationContract,
+            ),
+          );
           const perSpaceResults: Array<{
             space: string;
             value: MigrationRunnerPerSpaceSuccessValue;
@@ -114,16 +113,13 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
           for (let i = 0; i < perSpaceOptions.length; i++) {
             const spaceOptions = perSpaceOptions[i];
             if (!spaceOptions) continue;
-            const member = members[i];
-            if (!member) continue;
-            const others = members.filter((_, j) => j !== i);
             // The runner verifies the destination contract against the full
             // introspected schema; scope the result to this space, dropping the
-            // `extra` findings for collections a sibling space owns.
-            const ownedByOthers = otherMemberEntityNames(member, others);
+            // `extra` findings for collections a sibling space claims.
+            const ownedByOtherSpaces = entityNamesDeclaredBy(contracts.filter((_, j) => j !== i));
             const scopeVerifyResult = (
               result: VerifyDatabaseSchemaResult,
-            ): VerifyDatabaseSchemaResult => scopeSchemaResultToSpace(result, ownedByOthers);
+            ): VerifyDatabaseSchemaResult => scopeVerifyResultToSpace(result, ownedByOtherSpaces);
             const { space, ...runnerOptions } = spaceOptions;
             const result = await runMongo(driver, { ...runnerOptions, scopeVerifyResult });
             if (!result.ok) {
@@ -152,25 +148,3 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
     return { familyId: 'mongo' as const, targetId: 'mongo' as const };
   },
 };
-
-/**
- * Synthesise a {@link ContractSpaceMember}-shaped value from a per-space option
- * entry, for `otherMemberEntityNames`. Only `spaceId` and `contract()` are
- * read; migration graph state is empty because the runner consumes the
- * destination contract directly.
- */
-function toSpaceMember(opts: MigrationRunnerPerSpaceOptions<'mongo', 'mongo'>) {
-  const contract = blindCast<Contract, 'destinationContract validated at aggregate boundary'>(
-    opts.destinationContract,
-  );
-  return createContractSpaceMember({
-    spaceId: opts.space,
-    packages: [],
-    refs: {},
-    headRef: null,
-    refsDir: '',
-    resolveContract: () => contract,
-    deserializeContract: (raw) =>
-      blindCast<Contract, 'destinationContract validated at aggregate boundary'>(raw),
-  });
-}

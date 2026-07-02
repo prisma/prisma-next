@@ -9,7 +9,6 @@ import {
   extractCodecControlHooks,
   planFieldEventOperations,
   plannerFailure,
-  scopePlanDiffToSpace,
 } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
@@ -182,16 +181,16 @@ export class SqliteMigrationPlanner
   private collectSchemaIssues(options: SqlMigrationPlannerPlanOptions): readonly SchemaIssue[] {
     const allowed = options.policy.allowedOperationClasses;
     const strict = allowed.includes('widening') || allowed.includes('destructive');
-    const diff = scopePlanDiffToSpace(
-      diffSqliteDatabaseSchema({
-        contract: options.contract,
-        actualSchema: options.schema,
-        strict,
-        typeMetadataRegistry: new Map(),
-        frameworkComponents: options.frameworkComponents,
-      }),
-      options.entitiesOwnedByOtherSpaces,
-    );
+    const rawDiff = diffSqliteDatabaseSchema({
+      contract: options.contract,
+      actualSchema: options.schema,
+      strict,
+      typeMetadataRegistry: new Map(),
+      frameworkComponents: options.frameworkComponents,
+    });
+    // The caller-supplied predicate is applied blindly — any scoping (e.g.
+    // multi-space ownership) is the orchestration's, never worked out here.
+    const diff = options.keepDiffIssue ? rawDiff.filter(options.keepDiffIssue) : rawDiff;
     return diff.issues;
   }
 }

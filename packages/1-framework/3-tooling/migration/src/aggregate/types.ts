@@ -91,10 +91,11 @@ export interface ContractSpaceMember {
  * - `listSpaces()` / `hasSpace()` / `space()` / `spaces()`: the query
  *   surface the read commands consume — `app` first, then extension ids
  *   lex-ascending.
- * - `declaresEntity(name)`: ownership query — does any contract space
- *   declare a storage entity with this bare name? The verifier's
- *   unclaimed-elements pass asks this of each live element the diff
- *   reports as extra; the passive aggregate answers, it runs no diff.
+ * - `declaresEntity(name)` / `declaringSpaces(name)`: ownership queries —
+ *   does any contract space declare a storage entity with this bare name,
+ *   and which spaces do? The verifier's unclaimed-elements pass and the
+ *   plan orchestration's diff scoping ask these of the diff's extra
+ *   findings; the passive aggregate answers, it runs no diff.
  * - `checkIntegrity()`: judges the loaded model and returns every
  *   violation (never bailing at the first). Config/contract-dependent
  *   checks run only when the matching {@link IntegrityQueryOptions} opt
@@ -109,5 +110,6 @@ export interface ContractSpaceAggregate {
   space(id: string): ContractSpaceMember | undefined;
   spaces(): readonly ContractSpaceMember[];
   declaresEntity(entityName: string): boolean;
+  declaringSpaces(entityName: string): readonly string[];
   checkIntegrity(opts?: IntegrityQueryOptions): readonly IntegrityViolation[];
 }

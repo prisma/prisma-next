@@ -5,6 +5,7 @@ import type {
   ContractSpace,
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
+  DiffIssue,
   MigratableTargetDescriptor,
   MigrationOperationPolicy,
   MigrationPlan,
@@ -351,12 +352,15 @@ export interface SqlMigrationPlannerPlanOptions {
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   /**
-   * Entity names every OTHER contract-space member claims. The planner
-   * diffs the full live schema, then drops the `extra` findings for these
-   * names so it never emits DROP ops against a sibling space's tables.
-   * Absent (or empty) for single-space plans.
+   * Caller-supplied keep-predicate the planner applies to its schema diff
+   * (via `SchemaDiff.filter`) before building operations. The orchestration
+   * constructs it so the diff findings reaching op-building are exactly the
+   * contract space's own — e.g. dropping the `extra` findings for elements a
+   * sibling contract space declares, so the planner never emits DROP ops
+   * against another space's tables. The planner applies it blindly and holds
+   * no ownership logic. Absent for single-space plans.
    */
-  readonly entitiesOwnedByOtherSpaces?: ReadonlySet<string>;
+  readonly keepDiffIssue?: (issue: DiffIssue) => boolean;
 }
 
 export interface SqlMigrationPlanner<TTargetDetails> {
