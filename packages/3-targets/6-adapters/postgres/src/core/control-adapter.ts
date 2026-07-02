@@ -1506,10 +1506,13 @@ export function parseCheckConstraintDef(constraintdef: string): ParsedCheckConst
 
   // Shape 3: array_position(col, NULL) IS NULL — the scalar-array element-non-null
   // guard. Postgres stores it with an element-type cast on NULL and drops quotes
-  // on simple identifiers, so accept an optional `::type` cast and both column
-  // forms, then re-canonicalize through the shared projection helper.
+  // on simple identifiers, so accept an optional `::type` cast (including
+  // multi-word type names like `timestamp with time zone`) and both column
+  // forms, then re-canonicalize through the shared projection helper. The cast
+  // is discarded, so a non-greedy `.+?` anchored by the closing `) IS NULL`
+  // captures the whole type name without over-running the predicate.
   const arrayPositionMatch = inner.match(
-    /^array_position\s*\(\s*(?:"((?:[^"]|"")*)"|(\w+))\s*,\s*NULL(?:::[^\s)]+)?\s*\)\s+IS\s+NULL$/i,
+    /^array_position\s*\(\s*(?:"((?:[^"]|"")*)"|(\w+))\s*,\s*NULL(?:::.+?)?\s*\)\s+IS\s+NULL$/i,
   );
   if (arrayPositionMatch) {
     const column =

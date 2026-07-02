@@ -120,6 +120,26 @@ describe('parseCheckConstraintDef', () => {
     });
   });
 
+  it('re-canonicalizes with a multi-word element-type cast (timestamptz[])', () => {
+    const result = parseCheckConstraintDef(
+      'CHECK ((array_position(dates, NULL::timestamp with time zone) IS NULL))',
+    );
+    expect(result).toEqual({
+      kind: 'expression',
+      expression: 'array_position("dates", NULL) IS NULL',
+    });
+  });
+
+  it('re-canonicalizes with a multi-word element-type cast (double precision[])', () => {
+    const result = parseCheckConstraintDef(
+      'CHECK ((array_position(measurements, NULL::double precision) IS NULL))',
+    );
+    expect(result).toEqual({
+      kind: 'expression',
+      expression: 'array_position("measurements", NULL) IS NULL',
+    });
+  });
+
   it('preserves quoting for a mixed-case element-non-null column', () => {
     const result = parseCheckConstraintDef(
       'CHECK ((array_position("myTags", NULL::text) IS NULL))',

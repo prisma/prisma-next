@@ -39,6 +39,12 @@ function buildArrayContract(): Contract<SqlStorage> {
                   tags: { nativeType: 'text', codecId: 'pg/text@1', nullable: false, many: true },
                   labels: { nativeType: 'text', codecId: 'pg/text@1', nullable: true, many: true },
                   scores: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false, many: true },
+                  dates: {
+                    nativeType: 'timestamptz',
+                    codecId: 'pg/timestamptz@1',
+                    nullable: true,
+                    many: true,
+                  },
                   tagsWithDefault: {
                     nativeType: 'text',
                     codecId: 'pg/text@1',
@@ -320,6 +326,7 @@ describe.sequential('native array columns DDL', () => {
     const checkNames = checkRows.rows.map((r) => r.constraint_name).sort();
     expect(checkNames).toEqual(
       [
+        'ArrayTest_dates_elem_not_null',
         'ArrayTest_labels_elem_not_null',
         'ArrayTest_scores_elem_not_null',
         'ArrayTest_tags_elem_not_null',
