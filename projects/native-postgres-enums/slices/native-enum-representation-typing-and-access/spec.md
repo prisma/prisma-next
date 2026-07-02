@@ -7,7 +7,7 @@
 ## At a glance
 
 A native Postgres enum becomes representable, typed, and readable at runtime. A `native_enum`
-block (PSL + its TS mirror) lowers to a storage `native_enum` entity **and a derived
+**PSL block** lowers to a storage `native_enum` entity **and a derived
 `StorageValueSet`**; a column bound to it via `pg.enum(Ref)` carries `{ codecId, valueSet ref,
 nativeType }` and reads/writes as the **value union** (`'aal1' | 'aal2' | 'aal3'`, not
 `string`) in the query builder, ORM, and emitted `contract.d.ts` — via the **existing
@@ -60,17 +60,21 @@ rollback unit; the complete read surface. Supabase is the only separate slice.
 ## Scope
 
 **In:** the `native_enum` block descriptor + entityType + lowering factory + IR node + validator
-+ serializer; the derived `StorageValueSet`; the `pg.enum(Ref)` codec + resolution (PSL + TS);
++ serializer; the derived `StorageValueSet`; the `pg.enum(Ref)` codec + resolution (**PSL**);
 the cast wiring; `db.native_enums`; tests (emit typing, cast, runtime accessor, negatives).
 
 **Deliberately out:**
 - Supabase declarations + example → **slice 2**.
+- **TS authoring** (`helpers.nativeEnum` + `field.column(pg.enum(handle))`) → **TML-2965** — it
+  needs generic `ContractDefinition` pack-entity attachment (shared with RLS role/policy), unused
+  by the MVP's PSL/Supabase path.
 - **all** migration machinery (SchemaIR node, projection, diff, CREATE/DROP/ADD-VALUE ops,
   adoption) → the deferred managed project.
 - **No-emit (`typeof contract`) column typing** — deferred to **TML-2960** (the no-emit path is
   codec-id-keyed and doesn't read the value-set; a native column types as the codec base type
-  in `typeof contract` until 2960 lands). *The `db.native_enums` accessor no-emit typing is
-  separate and IS in scope* (it mirrors `enumAccessors`, not `CodecChannelType`).
+  in `typeof contract` until 2960 lands). *The `db.native_enums` accessor is typed per namespace
+  as an open `Record<string, EnumAccessor>` — runtime-correct in emit + no-emit; per-name literal
+  accessor typing is deferred (composes with TML-2960).*
 - rename/remove/reorder; any change to `db.enums`, the domain-enum path, or the check-enum path.
 
 ## Pre-investigated edge cases
@@ -87,7 +91,7 @@ the cast wiring; `db.native_enums`; tests (emit typing, cast, runtime accessor, 
 
 ## Slice-specific done conditions
 
-- An authored fixture (PSL **and** TS, byte-identical contract) with a `native_enum` + a
+- An authored **PSL** fixture with a `native_enum` + a
   `pg.enum` column: emits `storage.entries.native_enum` + the derived `entries.valueSet` + the
   column `{ codecId, valueSet ref, nativeType, no CHECK }`; types as the value union in QB/ORM
   (emit); rejects out-of-set input and a bare member; generates `$N::<type>` in compiled SQL;
@@ -103,6 +107,9 @@ explicitly out, per TML-2960.)
 
 ## Dispatch plan
 
+**Status:** D1–D4 delivered and committed (`cbb1f6e50`, `2ffb797d7`, `fbb9609aa`, `a105437f6`).
+D5 remaining (PSL-only e2e + slice review). TS authoring moved out → [TML-2965].
+
 Sequential, test-first. Each dispatch: write the failing test, then implement.
 
 ### D1 — `native-enum-entity-and-valueset`
@@ -117,15 +124,15 @@ Sequential, test-first. Each dispatch: write the failing test, then implement.
   derivation. Test: authored-fixture round-trip + bare-member negative + `fixtures:check`.
 
 ### D2 — `pg-enum-column-and-emit-typing`
-- **Outcome:** a field `pg.enum(Ref)` (PSL + TS) lowers to a column `{ codecId, valueSet ref →
+- **Outcome:** a field `pg.enum(Ref)` (**PSL**) lowers to a column `{ codecId, valueSet ref →
   D1's value-set, nativeType }` (no CHECK), and the column types as the value union in QB/ORM
   (emitted contract) via the existing value-set machinery — zero new typing code.
 - **Builds on:** D1.
 - **Hands to:** value-set-typed native columns for D3 (cast) and slice 2.
 - **Focus:** decide + implement the codec (distinct `pg/enum@1` text codec — encode/decode
   passthrough + `renderValueLiteral` — vs. reuse `pg/text@1`; lean distinct) + registration;
-  the `pg.enum(Ref)` postgres field resolver (resolve ref → valueSet ref + nativeType); TS
-  `field.column(pg.enum(Ref))`. Test: emit type-tests (QB/ORM union) + out-of-set negative +
+  the `pg.enum(Ref)` postgres field resolver (resolve ref → valueSet ref + nativeType). Test:
+  emit type-tests (QB/ORM union) + out-of-set negative +
   column-shape assertion. (No-emit column typing NOT asserted — TML-2960.)
 
 ### D3 — `native-enum-param-cast`
@@ -139,15 +146,17 @@ Sequential, test-first. Each dispatch: write the failing test, then implement.
 
 ### D4 — `db-native-enums-accessor`  *(may run parallel to D3 after D1)*
 - **Outcome:** `db.native_enums.<ns>.<Name>` exposes members at runtime
-  (values/names/members/has/hasName/nameOf/ordinalOf), typed (emit + no-emit, mirroring
-  `enumAccessors`); Postgres-only.
+  (values/names/members/has/hasName/nameOf/ordinalOf), typed per namespace as an open
+  `Record<string, EnumAccessor>` (emit + no-emit; per-name literal typing deferred → TML-2960);
+  Postgres-only.
 - **Builds on:** D1.
 - **Hands to:** runtime member access for slice 2's example.
 - **Focus:** `buildNamespacedNativeEnums(contract.storage)` + Postgres-client wiring +
-  `NativeEnums<TContract>` type. Test: runtime + type tests; assert absent on Mongo/SQLite.
+  `NamespacedNativeEnums<TContract>` type. Test: runtime + type tests; assert absent on
+  Mongo/SQLite.
 
 ### D5 — `end-to-end-fixture-and-review`
-- **Outcome:** one authored fixture (PSL + TS, byte-identical) exercising entity + value-set +
+- **Outcome:** one authored **PSL** fixture exercising entity + value-set +
   typed column + cast + `db.native_enums` end-to-end; `fixtures:check` green; slice review.
 - **Builds on:** D1–D4.
 - **Hands to:** the shipped slice-1 capability.

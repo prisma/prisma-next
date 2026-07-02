@@ -27,14 +27,17 @@ no diff, no ops: external enums are never diffed, so `db verify` emits nothing f
 
 ## Slices (MVP — external Supabase enums, no DDL)
 
-### Slice 1 — `native-enum-representation-typing-and-access`
-- **Outcome:** A `native_enum` block (PSL + its TS mirror) lowers to a storage `native_enum`
+### Slice 1 — `native-enum-representation-typing-and-access` (PSL vertical)
+- **Outcome:** A `native_enum` **PSL block** lowers to a storage `native_enum`
   entity **and a derived `StorageValueSet`**, and a column bound via `pg.enum(Ref)` — carrying
   `{ codecId, valueSet ref, nativeType }` — reads/writes as the **value union**
   (`'aal1' | 'aal2' | 'aal3'`, not `string`) in the query builder, ORM, and emitted contract,
   via the existing value-set → codec machinery; generated SQL carries the `$N::<type>` cast; and
   `db.native_enums.<ns>.<Name>` exposes the members at runtime. Members are `key = "value"`
   (bare rejected). Graded `external` (no DDL — and no diff in the MVP).
+- **TS authoring is deferred** to [TML-2965] (see Slice 3): the TS mirror needs generic
+  `ContractDefinition` pack-entity attachment — shared with RLS role/policy, and unused by the
+  MVP's PSL/Supabase path. Slice 1 ships the complete **PSL** vertical.
 - **New code (all via existing mechanisms):**
   - **the `native_enum` pack entity** — a `postgresAuthoringEntityTypes` entry + a variadic
     block descriptor (`{ parameters: {}, variadicParameters: true }`, the shipping SQL
@@ -52,8 +55,10 @@ no diff, no ops: external enums are never diffed, so `db verify` emits nothing f
     `codecRefForStorageColumn` (dropped there today); `renderTypedParam` prefers a ref-carried
     `nativeType` over the static `metaFor(codecId)` meta.
   - **`db.native_enums`** — `buildNamespacedNativeEnums(contract.storage)` over the `native_enum`
-    entities, attached to the Postgres client **only**, reusing `EnumAccessor`; typed for both
-    emitted and no-emit (mirroring the existing `enumAccessors`). `db.enums` untouched.
+    entities, attached to the Postgres client **only**, reusing `EnumAccessor`. Typed per
+    namespace as an open `Record<string, EnumAccessor>` — runtime-correct in both emitted and
+    no-emit. Per-name literal accessor typing is deferred: the storage plane isn't type-emitted
+    per-entity, so it composes with the value-set typing boundary (TML-2960). `db.enums` untouched.
 - **Reused as-is:** the **value-set → codec typing** (post-TML-2952, *unchanged* — a native
   column carries a `valueSet` ref exactly like a check-enum column); the `StorageValueSet`
   structure; the variadic PSL block mechanism; the pack-entity authoring + `composeSqlEntityKinds`
@@ -62,11 +67,11 @@ no diff, no ops: external enums are never diffed, so `db verify` emits nothing f
 - **Builds on:** nothing (foundation).
 - **Hands to:** the `native_enum` entity + derived value-set + `pg.enum` column shape +
   `db.native_enums` that the Supabase slice consumes.
-- **Proven by:** an authored fixture (PSL + TS, byte-identical) with a `native_enum` + a column
-  using it → type-tests asserting the value union (QB, ORM, emitted contract), negative tests for
+- **Proven by:** an authored **PSL** fixture with a `native_enum` + a column using it →
+  type-tests asserting the value union (QB, ORM, emitted contract), negative tests for
   out-of-set input and a bare member, an execution test asserting `$N::<type>` in generated SQL,
   and a runtime test for `db.native_enums.…members`. `fixtures:check`. (No-emit column typing is
-  out of scope — TML-2960.)
+  out of scope — TML-2960; TS authoring is out of scope — TML-2965.)
 
 ### Slice 2 — `supabase-native-enums`
 - **Outcome:** The Supabase extension declares its built-in native enums in
@@ -81,9 +86,25 @@ no diff, no ops: external enums are never diffed, so `db verify` emits nothing f
 - **Proven by:** the supabase example end-to-end — a Supabase-defined native enum represented,
   typed read + `db.native_enums`, and `db verify` reporting nothing for it.
 
+### Slice 3 — `native-enum-ts-authoring-mirror` (deferred → [TML-2965])
+- **Outcome:** A `native_enum` is authorable in the TS DSL (`helpers.nativeEnum(...)` +
+  `field.column(pg.enum(handle))`), producing a contract byte-identical to the PSL version.
+- **New code:** generic `ContractDefinition` pack-entity attachment — route author-declared,
+  namespace-scoped pack entities into `entries.<kind>` at `createNamespace` time (**shared with
+  RLS role/policy**, which face the identical gap); a `pg.enum(handle)` TS descriptor function;
+  `helpers.nativeEnum` ergonomics. The column/codec plumbing (`ColumnTypeDescriptor.valueSet` /
+  `valueSetEnforcement`) already exists — no new machinery there.
+- **Deferred:** not MVP-blocking (Supabase enums are PSL-authored). Best sequenced with the RLS
+  TS-authoring-surface work, which needs the identical attachment mechanism. Do not start before
+  Supabase ships. Tracked as [TML-2965].
+- **Proven by:** a PSL + TS byte-identical parity test (mirror
+  `contract-psl/test/ts-psl-parity.test.ts`).
+
 ## Sequencing
 - **Slice 1 first** — the foundation; slice 2 consumes its entity + column + accessor.
-- **Slice 2 after.** Two slices, one stack thread; no parallelism worth modelling.
+- **Slice 2 after** — one stack thread; no parallelism worth modelling.
+- **Slice 3 deferred** ([TML-2965]) — the TS authoring mirror; picked up with the RLS
+  TS-authoring surface, not before Supabase ships.
 
 ## Future (separate project — may never be built): PN-managed native enums
 Deferred, and only if a real need appears beyond Supabase. Sketch — full design in
@@ -112,8 +133,9 @@ go-ahead.
   lands (assigned to the operator).
 
 ## Tracker
-Linear intentionally skipped for the slices (operator call); tracked here in-repo. Cross-cutting
-follow-up filed: **TML-2960** (no-emit typing).
+Linear intentionally skipped for the MVP slices 1–2 (operator call); tracked here in-repo.
+Cross-cutting follow-ups filed: **TML-2960** (no-emit per-instance column typing) and **TML-2965**
+(TS authoring mirror + generic `ContractDefinition` pack-entity attachment, shared with RLS).
 
 ## Residue (already handled)
 The dead TML-2853 validator (`postgres-enum-type-schema.ts`) is **already deleted**. The
