@@ -7,5 +7,6 @@ export default defineConfig({
     runtime: 'src/exports/runtime.ts',
     codecs: 'src/exports/codecs.ts',
     'codec-types': 'src/exports/codec-types.ts',
+    'codec-ids': 'src/exports/codec-ids.ts',
   },
 });

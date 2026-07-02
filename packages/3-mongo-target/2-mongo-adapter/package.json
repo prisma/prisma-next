@@ -65,6 +65,7 @@
   "types": "./dist/index.d.mts",
   "exports": {
     ".": "./dist/index.mjs",
+    "./codec-ids": "./dist/codec-ids.mjs",
     "./codec-types": "./dist/codec-types.mjs",
     "./codecs": "./dist/codecs.mjs",
     "./control": "./dist/control.mjs",

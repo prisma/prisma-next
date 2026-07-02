@@ -11,7 +11,9 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import type { CodecLookup } from './codec-types';
-import type { PslBlockParam } from './psl-extension-block';
+import type { PslBlockParam, PslExtensionBlock, PslSpan } from './psl-extension-block';
+
+export type EnumInferredMemberType = 'text' | 'int';
 
 export type AuthoringArgRef = {
   readonly kind: 'arg';
@@ -134,6 +136,102 @@ export interface AuthoringEntityContext {
   readonly sourceId?: string;
   /** Push channel for authoring-time diagnostics emitted by the factory. */
   readonly diagnostics?: AuthoringDiagnosticSink;
+  /**
+   * The target's default codec ids for an `enum` block that omits `@@type`.
+   * `text` is used when every member is a bare name or a string value;
+   * `int` is used when every member is an integer value. Every target pack
+   * populates this so `@@type` omission can be inferred consistently.
+   */
+  readonly enumInferenceCodecs?: { readonly text: string; readonly int: string };
+}
+
+/**
+ * Classifies an `enum` block's members (before codec decoding, which needs
+ * the codec chosen first) into which default codec an omitted `@@type`
+ * should resolve to:
+ *
+ * - every member is `bare`, or a `value` whose raw JSON is a string → `'text'`
+ * - every member is a `value` whose raw JSON is an integer → `'int'`
+ * - anything else (float, bigint, boolean, mixed, or a `ref`/`option`/`list`
+ *   parameter) → `null`, meaning the caller must require an explicit `@@type`.
+ */
+export function classifyEnumMemberType(block: PslExtensionBlock): 'text' | 'int' | null {
+  let sawText = false;
+  let sawInt = false;
+
+  for (const paramValue of Object.values(block.parameters)) {
+    if (paramValue.kind === 'bare') {
+      sawText = true;
+      continue;
+    }
+    if (paramValue.kind !== 'value') {
+      return null;
+    }
+    let jsonValue: unknown;
+    try {
+      jsonValue = JSON.parse(paramValue.raw);
+    } catch {
+      return null;
+    }
+    if (typeof jsonValue === 'string') {
+      sawText = true;
+    } else if (typeof jsonValue === 'number' && Number.isInteger(jsonValue)) {
+      sawInt = true;
+    } else {
+      return null;
+    }
+  }
+
+  if (sawText && sawInt) return null;
+  if (sawText) return 'text';
+  if (sawInt) return 'int';
+  return null;
+}
+
+/**
+ * Resolves the codec id for an `enum` block. When `@@type` is absent, the codec
+ * is inferred from the members via {@link classifyEnumMemberType}; otherwise the
+ * explicit `@@type("codec")` argument is parsed. Pushes the appropriate
+ * diagnostic and returns `undefined` when neither yields a codec. `codecSpan` is
+ * the span downstream codec-validation diagnostics should anchor to. Shared by
+ * every family's enum factory so inference and the explicit path stay identical.
+ */
+export function resolveEnumCodecId(
+  block: PslExtensionBlock,
+  ctx: AuthoringEntityContext,
+): { readonly codecId: string; readonly codecSpan: PslSpan } | undefined {
+  const sourceId = ctx.sourceId ?? 'unknown';
+  const typeAttr = block.blockAttributes.find((a) => a.name === 'type');
+
+  if (typeAttr === undefined) {
+    const inferredKind = classifyEnumMemberType(block);
+    if (inferredKind === null || ctx.enumInferenceCodecs === undefined) {
+      ctx.diagnostics?.push({
+        code: 'PSL_ENUM_CANNOT_INFER_TYPE',
+        message: `cannot infer @@type for enum "${block.name}"; add an explicit @@type(...)`,
+        sourceId,
+        span: block.span,
+      });
+      return undefined;
+    }
+    return { codecId: ctx.enumInferenceCodecs[inferredKind], codecSpan: block.span };
+  }
+
+  const rawCodecArg = typeAttr.args[0]?.value;
+  const codecId =
+    rawCodecArg?.startsWith('"') && rawCodecArg.endsWith('"') && rawCodecArg.length >= 2
+      ? rawCodecArg.slice(1, -1)
+      : undefined;
+  if (codecId === undefined) {
+    ctx.diagnostics?.push({
+      code: 'PSL_ENUM_MISSING_TYPE',
+      message: `enum "${block.name}" @@type attribute must have a quoted codec id argument`,
+      sourceId,
+      span: typeAttr.span,
+    });
+    return undefined;
+  }
+  return { codecId, codecSpan: typeAttr.args[0]?.span ?? typeAttr.span };
 }
 
 export interface AuthoringEntityTypeTemplateOutput {

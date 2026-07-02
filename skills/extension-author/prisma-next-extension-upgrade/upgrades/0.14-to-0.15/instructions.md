@@ -196,6 +196,16 @@ API or surface change; nothing to migrate. Incidental substrate diff only.
 -->
 
 <!--
+TML-2915 (infer an enum's `@@type` from its members): a PSL `enum` block may now
+omit `@@type` and have the codec inferred (text for bare/string members, int for
+integers). Additive: the framework gains an optional `AuthoringEntityContext.enumInferenceCodecs`
+and a `resolveEnumCodecId` export; each built-in target's config supplies its default
+codec ids, and `@prisma-next/adapter-mongo` gains a `./codec-ids` entrypoint. Explicit
+`@@type` is unchanged. No extension-author action required — the new context field is
+optional and framework-populated. Incidental substrate diff only.
+-->
+
+<!--
 TML-2912 (PSL native scalar lists, end-to-end): PSL now lowers scalar-list fields
 (`String[]`, `Int[]`, …) to native array storage columns instead of the JSONB
 fallback, gated on the adapter-reported `scalarList` capability. The review-round
