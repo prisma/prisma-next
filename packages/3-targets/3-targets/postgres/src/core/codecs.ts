@@ -60,6 +60,7 @@ import {
   PG_BOOL_CODEC_ID,
   PG_BYTEA_CODEC_ID,
   PG_CHAR_CODEC_ID,
+  PG_ENUM_CODEC_ID,
   PG_FLOAT_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
   PG_FLOAT8_CODEC_ID,
@@ -164,6 +165,61 @@ export const pgTextColumn = () =>
 
 pgTextColumn satisfies ColumnHelperFor<PgTextDescriptor>;
 pgTextColumn satisfies ColumnHelperForStrict<PgTextDescriptor>;
+
+/**
+ * Codec for a `pg.enum(Ref)` column bound to a native Postgres enum type.
+ * Text passthrough, identical to `pg/text@1` — encode/decode do not carry the
+ * enum's member values; membership is enforced by the native type itself, not
+ * by this codec. `renderValueLiteral` renders a member value as its TS
+ * literal, which is what drives the column's typed value-union (via
+ * `renderValueSetType` reading the column's `valueSet` ref) — the codec
+ * itself carries no params of its own; typing comes entirely from the
+ * column's value-set, not from `pg/enum@1`.
+ *
+ * A distinct codec id (rather than reusing `pg/text@1` on a plain text
+ * column) keeps native-enum columns independently identifiable — from a
+ * column's `codecId` alone, without also inspecting `nativeType` — which
+ * the managed (DDL) phase needs to target `CREATE TYPE`/`ALTER TYPE`
+ * operations at exactly the columns that use one.
+ */
+export class PgEnumCodec extends CodecImpl<
+  typeof PG_ENUM_CODEC_ID,
+  readonly ['equality', 'order', 'textual'],
+  string,
+  string
+> {
+  async encode(value: string, _ctx: CodecCallContext): Promise<string> {
+    return value;
+  }
+  async decode(wire: string, _ctx: CodecCallContext): Promise<string> {
+    return wire;
+  }
+  encodeJson(value: string): JsonValue {
+    return value;
+  }
+  decodeJson(json: JsonValue): string {
+    return blindCast<
+      string,
+      'text codec: a native-enum member value is stored as its wire string form'
+    >(json);
+  }
+}
+
+export class PgEnumDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_ENUM_CODEC_ID;
+  override readonly traits = ['equality', 'order', 'textual'] as const;
+  override readonly targetTypes = ['text'] as const;
+  override readonly meta = PG_TEXT_META;
+  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override renderValueLiteral(value: JsonValue): string | undefined {
+    return renderTsLiteral(value);
+  }
+  override factory(): (ctx: CodecInstanceContext) => PgEnumCodec {
+    return () => new PgEnumCodec(this);
+  }
+}
+
+export const pgEnumDescriptor = new PgEnumDescriptor();
 
 /**
  * Postgres `text[]` codec. Encode is an identity pass-through: the pg wire
@@ -1086,6 +1142,7 @@ export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   sqlTextDescriptor,
   sqlTimestampDescriptor,
   pgTextDescriptor,
+  pgEnumDescriptor,
   pgCharDescriptor,
   pgVarcharDescriptor,
   pgIntDescriptor,

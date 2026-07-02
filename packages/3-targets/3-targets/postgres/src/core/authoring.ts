@@ -1,12 +1,15 @@
 import { temporalAuthoringPresets } from '@prisma-next/family-sql/control';
 import type {
   AuthoringEntityContext,
+  AuthoringEntityRefResolution,
+  AuthoringEntityRefTypeConstructorNamespace,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
   AuthoringPslBlockDescriptorNamespace,
   AuthoringTypeNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
+import { PG_ENUM_CODEC_ID } from './codec-ids';
 import {
   PostgresNativeEnumSchema,
   PostgresRlsPolicySchema,
@@ -18,6 +21,44 @@ import { PostgresRlsPolicy } from './schema-ir/postgres-rls-policy';
 import { PostgresRole, type PostgresRoleInput } from './schema-ir/postgres-role';
 
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
+
+/**
+ * Resolves `pg.enum(<ref>)` — a field type naming a `native_enum` block in
+ * the same document — against the namespace's already-lowered extension
+ * entities (see `namespaceExtensionEntities` threaded through PSL field
+ * resolution). `entities['native_enum']` is the `native_enum` entries slot
+ * (keyed by block name); a hit yields the `pg/enum@1` codec, the enum's
+ * `typeName` as the column's `nativeType`, and the block name as the
+ * `valueSetEntityName` — the `native_enum` entity derives a value-set of the
+ * same name (`deriveValueSet` on the `native_enum` entityType descriptor,
+ * §2.5 of authoring-design.md), so the caller builds a `valueSet` ref
+ * pointing at it without this resolver needing to know the ref shape.
+ * `valueSetEnforcement: 'native-type'` — the native Postgres enum TYPE
+ * enforces membership; no `CHECK` is written (authoring-design.md §5).
+ */
+function resolvePgEnumRef(
+  ref: string,
+  entities: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
+): AuthoringEntityRefResolution | undefined {
+  const nativeEnums = entities?.['native_enum'];
+  const entity = nativeEnums?.[ref];
+  if (!(entity instanceof PostgresNativeEnum)) return undefined;
+  return {
+    codecId: PG_ENUM_CODEC_ID,
+    nativeType: entity.typeName,
+    valueSetEntityName: ref,
+    valueSetEnforcement: 'native-type',
+  };
+}
+
+export const postgresAuthoringEntityRefTypeConstructors = {
+  pg: {
+    enum: {
+      kind: 'entityRefTypeConstructor',
+      resolve: resolvePgEnumRef,
+    },
+  },
+} as const satisfies AuthoringEntityRefTypeConstructorNamespace;
 
 export interface RlsPolicyExtensionBlock extends PslExtensionBlock {
   readonly namespaceId: string;

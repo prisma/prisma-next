@@ -457,6 +457,17 @@ interface BuildModelNodeInput {
   /** Resolved namespace id keyed by model name — used to stamp the target namespace on FKs. */
   readonly modelNamespaceIds: ReadonlyMap<string, string>;
   readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
+  /**
+   * Extension entities already lowered per namespace (the exact shape
+   * `lowerExtensionBlocksForNamespace` produces), keyed by namespace id then
+   * entries-slot discriminator then block name. Forwarded to
+   * `collectResolvedFields` for entity-ref type-constructor resolution (e.g.
+   * `pg.enum(Ref)`).
+   */
+  readonly namespaceExtensionEntities?: ReadonlyMap<
+    string,
+    Readonly<Record<string, Readonly<Record<string, unknown>>>>
+  >;
 }
 
 interface BuildModelNodeResult {
@@ -471,6 +482,11 @@ interface BuildModelNodeResult {
 function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult {
   const { model, mapping, sourceId, diagnostics } = input;
   const tableName = mapping.tableName;
+  const modelNamespaceId = input.modelNamespaceIds.get(model.name);
+  const namespaceExtensionEntitiesForModel =
+    modelNamespaceId !== undefined
+      ? input.namespaceExtensionEntities?.get(modelNamespaceId)
+      : undefined;
 
   const resolvedFields = collectResolvedFields({
     model,
@@ -489,6 +505,8 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     sourceId,
     scalarTypeDescriptors: input.scalarTypeDescriptors,
     ...ifDefined('enumHandles', input.enumHandles),
+    ...ifDefined('namespaceId', modelNamespaceId),
+    ...ifDefined('namespaceExtensionEntities', namespaceExtensionEntitiesForModel),
   });
 
   const inlineIdFields = resolvedFields.filter((field) => field.isId);
@@ -1863,6 +1881,83 @@ export function interpretPslDocumentToSqlContract(
 
   const enumHandlesByName = new Map(Object.entries(validEnumHandles));
 
+  // Generic extension-block lowering pass: per named namespace, lower all
+  // parsed extension blocks into IR entities via the registered factory for
+  // each block's discriminator, then collect by entrySlotName. The pass
+  // names no specific discriminator value — all target-specific logic lives
+  // in the factory contributed by the target pack, and value-set derivation
+  // rides the generic `deriveValueSet` descriptor hook (see
+  // `lowerExtensionBlocksForNamespace`).
+  //
+  // This runs before model/field resolution (not just before contract
+  // assembly) so that a field-type resolver contributed by a target pack
+  // (e.g. Postgres's `pg.enum(Ref)`) can resolve `Ref` against an
+  // already-lowered extension entity — see `namespaceExtensionEntities`
+  // threaded into `collectResolvedFields` below.
+  const entityTypesByDiscriminator = buildEntityTypesByDiscriminator(input.authoringContributions);
+  const extensionEntityContext: AuthoringEntityContext = {
+    family: input.target.familyId,
+    target: input.target.targetId,
+    ...ifDefined('codecLookup', input.codecLookup),
+    sourceId,
+    diagnostics: {
+      push: (d) => {
+        diagnostics.push(
+          blindCast<ContractSourceDiagnostic, 'sink diagnostics are span-compatible'>(d),
+        );
+      },
+    },
+  };
+  const namespaceExtensionEntities = new Map<
+    string,
+    Readonly<Record<string, Readonly<Record<string, unknown>>>>
+  >();
+  for (const ns of namespaceSymbols) {
+    if (ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME) continue;
+    const nsId = resolveNamespaceIdForSqlTarget({
+      bucketName: ns.name,
+      targetId: input.target.targetId,
+    });
+    if (nsId === undefined) continue;
+    const entities = lowerExtensionBlocksForNamespace(
+      ns,
+      nsId,
+      entityTypesByDiscriminator,
+      extensionEntityContext,
+    );
+    if (Object.keys(entities).length > 0) {
+      namespaceExtensionEntities.set(nsId, entities);
+    }
+  }
+
+  // A domain `enum` and an extension-derived value-set (e.g. from a
+  // `native_enum`) that share a name in one namespace would both target the
+  // same `entries.valueSet[name]` slot — the merge below would otherwise let
+  // the extension one silently overwrite the domain one. Domain enums always
+  // register under `defaultNamespaceId` (see `build-contract.ts`), so a
+  // collision can only occur there. Flag it rather than resolve it silently.
+  const defaultNsExtensionValueSets =
+    namespaceExtensionEntities.get(defaultNamespaceId)?.['valueSet'];
+  if (defaultNsExtensionValueSets !== undefined) {
+    for (const name of Object.keys(defaultNsExtensionValueSets)) {
+      if (Object.hasOwn(validEnumHandles, name)) {
+        diagnostics.push({
+          code: 'PSL_VALUE_SET_NAME_COLLISION',
+          message: `namespace "${defaultNamespaceId}": name "${name}" is declared both as a domain enum and as an extension entity that derives a value-set; rename one`,
+          sourceId,
+        });
+      }
+    }
+  }
+
+  // No early diagnostics checkpoint here (unlike after the field-resolution
+  // loop below): this pass runs early specifically so its output
+  // (`namespaceExtensionEntities`) is available to field resolution, and an
+  // immediate return would also discard any diagnostics already present from
+  // symbol-table seeding (`input.seedDiagnostics`) without ever reaching
+  // field resolution to accumulate its own. The first real checkpoint after
+  // model/field resolution below catches failures from this pass too.
+
   const namedTypeSymbols: readonly NamedTypeSymbol[] = [
     ...Object.values(topLevel.scalars),
     ...Object.values(topLevel.typeAliases),
@@ -1931,6 +2026,7 @@ export function interpretPslDocumentToSqlContract(
       diagnostics,
       modelNamespaceIds,
       ...(enumHandlesByName.size > 0 ? { enumHandles: enumHandlesByName } : {}),
+      ...(namespaceExtensionEntities.size > 0 ? { namespaceExtensionEntities } : {}),
     });
     modelNodes.push(
       namespaceId !== undefined ? { ...result.modelNode, namespaceId } : result.modelNode,
@@ -2013,76 +2109,6 @@ export function interpretPslDocumentToSqlContract(
     diagnostics,
     sourceId,
   });
-
-  if (diagnostics.length > 0) {
-    return notOk({
-      summary: 'PSL to SQL contract interpretation failed',
-      diagnostics,
-    });
-  }
-
-  // Generic extension-block lowering pass: per named namespace, lower all
-  // parsed extension blocks into IR entities via the registered factory for
-  // each block's discriminator, then collect by entrySlotName. The pass
-  // names no specific discriminator value — all target-specific logic lives
-  // in the factory contributed by the target pack, and value-set derivation
-  // rides the generic `deriveValueSet` descriptor hook (see
-  // `lowerExtensionBlocksForNamespace`).
-  const entityTypesByDiscriminator = buildEntityTypesByDiscriminator(input.authoringContributions);
-  const extensionEntityContext: AuthoringEntityContext = {
-    family: input.target.familyId,
-    target: input.target.targetId,
-    ...ifDefined('codecLookup', input.codecLookup),
-    sourceId,
-    diagnostics: {
-      push: (d) => {
-        diagnostics.push(
-          blindCast<ContractSourceDiagnostic, 'sink diagnostics are span-compatible'>(d),
-        );
-      },
-    },
-  };
-  const namespaceExtensionEntities = new Map<
-    string,
-    Readonly<Record<string, Readonly<Record<string, unknown>>>>
-  >();
-  for (const ns of namespaceSymbols) {
-    if (ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME) continue;
-    const nsId = resolveNamespaceIdForSqlTarget({
-      bucketName: ns.name,
-      targetId: input.target.targetId,
-    });
-    if (nsId === undefined) continue;
-    const entities = lowerExtensionBlocksForNamespace(
-      ns,
-      nsId,
-      entityTypesByDiscriminator,
-      extensionEntityContext,
-    );
-    if (Object.keys(entities).length > 0) {
-      namespaceExtensionEntities.set(nsId, entities);
-    }
-  }
-
-  // A domain `enum` and an extension-derived value-set (e.g. from a
-  // `native_enum`) that share a name in one namespace would both target the
-  // same `entries.valueSet[name]` slot — the merge below would otherwise let
-  // the extension one silently overwrite the domain one. Domain enums always
-  // register under `defaultNamespaceId` (see `build-contract.ts`), so a
-  // collision can only occur there. Flag it rather than resolve it silently.
-  const defaultNsExtensionValueSets =
-    namespaceExtensionEntities.get(defaultNamespaceId)?.['valueSet'];
-  if (defaultNsExtensionValueSets !== undefined) {
-    for (const name of Object.keys(defaultNsExtensionValueSets)) {
-      if (Object.hasOwn(validEnumHandles, name)) {
-        diagnostics.push({
-          code: 'PSL_VALUE_SET_NAME_COLLISION',
-          message: `namespace "${defaultNamespaceId}": name "${name}" is declared both as a domain enum and as an extension entity that derives a value-set; rename one`,
-          sourceId,
-        });
-      }
-    }
-  }
 
   if (diagnostics.length > 0) {
     return notOk({

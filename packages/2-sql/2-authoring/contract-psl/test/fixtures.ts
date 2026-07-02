@@ -269,6 +269,7 @@ export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
  */
 export const pgvectorAuthoringContributions = {
   entityTypes: {},
+  entityRefTypeConstructors: {},
   field: {},
   pslBlockDescriptors: {},
   type: {
@@ -412,7 +413,13 @@ export function createPostgresTestContext(
     composedExtensionPacks: [],
     composedExtensionContracts: new Map(),
     scalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
-    authoringContributions: { field: {}, type: {}, entityTypes: {}, pslBlockDescriptors: {} },
+    authoringContributions: {
+      field: {},
+      type: {},
+      entityTypes: {},
+      entityRefTypeConstructors: {},
+      pslBlockDescriptors: {},
+    },
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
     resolvedInputs: [],

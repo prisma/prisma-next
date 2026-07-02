@@ -63,6 +63,65 @@ export interface AuthoringTypeConstructorDescriptor {
   readonly output: AuthoringStorageTypeTemplate;
 }
 
+/**
+ * The result of resolving an {@link AuthoringEntityRefTypeConstructorDescriptor}
+ * call against a document-local entity ref (e.g. `pg.enum(AalLevel)` resolving
+ * `AalLevel`).
+ *
+ * `valueSetEntityName`, when present, names a value-set entry already derived
+ * for the same namespace (`entries.valueSet[valueSetEntityName]` — see
+ * {@link AuthoringEntityTypeFactoryOutput.deriveValueSet}); the caller builds
+ * the storage-plane `ValueSetRef` from this name plus the field's own
+ * namespace id. This type does not import the ref shape itself so the
+ * framework-shared authoring surface stays family-agnostic (mirroring
+ * {@link AuthoringDerivedValueSet}'s own convention).
+ *
+ * `valueSetEnforcement` names how membership in the value-set is enforced at
+ * the database level, so the family-shared column-building code (which
+ * auto-generates a `CHECK` constraint for every value-set column) can skip
+ * that generation for a column whose enforcement is intrinsic to its native
+ * type. Defaults to `'check'` (today's only enforcement strategy) when
+ * absent, so every existing resolver keeps generating a `CHECK` unchanged.
+ * `'native-type'` means the column's `nativeType` itself enforces membership
+ * (e.g. a Postgres native enum's `CREATE TYPE … AS ENUM (…)`) — no `CHECK`
+ * is written.
+ */
+export interface AuthoringEntityRefResolution {
+  readonly codecId: string;
+  readonly nativeType: string;
+  readonly valueSetEntityName?: string;
+  readonly valueSetEnforcement?: 'check' | 'native-type';
+}
+
+/**
+ * Declarative-template type constructors ({@link AuthoringTypeConstructorDescriptor})
+ * only map scalar call arguments through a static template — they have no
+ * access to other entities parsed from the same document. An entity-ref type
+ * constructor is the escape hatch for a field type that names another
+ * document-local entity (e.g. Postgres's `pg.enum(<native_enum ref>)`
+ * resolving the ref against an already-lowered `native_enum` block): its
+ * `resolve` function is handed the call's sole positional-argument string and
+ * the namespace-scoped map of already-lowered extension entities (the exact
+ * shape {@link AuthoringEntityTypeFactoryOutput.factory} output is collected
+ * into, keyed by entries-slot discriminator then block name), and returns the
+ * resolved storage-type triple plus an optional value-set-derivation pointer,
+ * or `undefined` when the ref does not resolve (the caller reports the
+ * diagnostic — this hook reports no diagnostics of its own).
+ *
+ * Deliberately narrower than a general "run arbitrary code during field
+ * resolution" hook: `resolve` is a pure function over `(ref, entities)` with
+ * no side effects, mirroring the purity of the declarative template path.
+ */
+export interface AuthoringEntityRefTypeConstructorDescriptor {
+  readonly kind: 'entityRefTypeConstructor';
+  readonly resolve: (
+    ref: string,
+    namespaceExtensionEntities:
+      | Readonly<Record<string, Readonly<Record<string, unknown>>>>
+      | undefined,
+  ) => AuthoringEntityRefResolution | undefined;
+}
+
 export interface AuthoringColumnDefaultTemplateLiteral {
   readonly kind: 'literal';
   readonly value: AuthoringTemplateValue;
@@ -98,6 +157,23 @@ export interface AuthoringFieldPresetDescriptor {
 
 export type AuthoringTypeNamespace = {
   readonly [name: string]: AuthoringTypeConstructorDescriptor | AuthoringTypeNamespace;
+};
+
+/**
+ * Namespace tree of {@link AuthoringEntityRefTypeConstructorDescriptor}
+ * leaves — structurally identical in shape to {@link AuthoringTypeNamespace}
+ * but kept as a distinct field on {@link AuthoringContributions} (not folded
+ * into `type`) so the many existing generic walkers over `type`
+ * (`createTypeHelpersFromNamespace`'s TS-helper generation,
+ * `mergeAuthoringNamespaces`, cross-registry collision detection) do not need
+ * to learn a second leaf shape. A path (e.g. `pg.enum`) is unique across
+ * `type` and `entityRefTypeConstructors` combined — see
+ * `assertNoCrossRegistryCollisions`'s sibling check for this registry.
+ */
+export type AuthoringEntityRefTypeConstructorNamespace = {
+  readonly [name: string]:
+    | AuthoringEntityRefTypeConstructorDescriptor
+    | AuthoringEntityRefTypeConstructorNamespace;
 };
 
 export type AuthoringFieldNamespace = {
@@ -265,6 +341,17 @@ export interface AuthoringContributions {
   readonly field?: AuthoringFieldNamespace;
   readonly entityTypes?: AuthoringEntityTypeNamespace;
   /**
+   * Registry of {@link AuthoringEntityRefTypeConstructorDescriptor} leaves —
+   * field types that resolve a call argument against another entity parsed
+   * from the same document (e.g. Postgres's `pg.enum(<native_enum ref>)`).
+   * Kept separate from `type` (not a nested shape within it) because a
+   * declarative `type` leaf and an entity-ref leaf resolve through
+   * fundamentally different call paths in PSL field resolution — merging
+   * them would force every generic `type`-namespace walker (TS-helper
+   * generation, collision detection) to learn a second leaf shape.
+   */
+  readonly entityRefTypeConstructors?: AuthoringEntityRefTypeConstructorNamespace;
+  /**
    * Registry of declarative block descriptors this contribution registers,
    * keyed by arbitrary path segments. Each leaf is an
    * {@link AuthoringPslBlockDescriptor} that claims a PSL top-level keyword.
@@ -306,6 +393,17 @@ export function isAuthoringTypeConstructorDescriptor(
     typeof (value as { output?: unknown }).output === 'object' &&
     (value as { output?: unknown }).output !== null
   );
+}
+
+export function isAuthoringEntityRefTypeConstructorDescriptor(
+  value: unknown,
+): value is AuthoringEntityRefTypeConstructorDescriptor {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = blindCast<
+    { kind?: unknown; resolve?: unknown },
+    'runtime shape check on an otherwise-unknown value; narrowed by the typeof/null guard above'
+  >(value);
+  return candidate.kind === 'entityRefTypeConstructor' && typeof candidate.resolve === 'function';
 }
 
 export function isAuthoringFieldPresetDescriptor(
@@ -659,6 +757,7 @@ export function assertNoCrossRegistryCollisions(
   fieldNamespace: AuthoringFieldNamespace,
   entityTypeNamespace: AuthoringEntityTypeNamespace = {},
   pslBlockNamespace: AuthoringPslBlockDescriptorNamespace = {},
+  entityRefTypeConstructorNamespace: AuthoringEntityRefTypeConstructorNamespace = {},
 ): void {
   const typePaths = new Set(
     collectDescriptorPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
@@ -669,6 +768,12 @@ export function assertNoCrossRegistryCollisions(
   const entityPaths = new Set(
     collectDescriptorPaths(entityTypeNamespace, isAuthoringEntityTypeDescriptor),
   );
+  const entityRefTypeConstructorPaths = new Set(
+    collectDescriptorPaths(
+      entityRefTypeConstructorNamespace,
+      isAuthoringEntityRefTypeConstructorDescriptor,
+    ),
+  );
   // Within-registry duplicate detection is handled upstream by the merge
   // walker (`mergeAuthoringNamespaces` in control-stack.ts and
   // `mergeHelperNamespaces` in composed-authoring-helpers.ts), which throws
@@ -676,15 +781,15 @@ export function assertNoCrossRegistryCollisions(
   // runs. This function only handles the cross-registry case.
   //
   // Cross-registry collisions are checked among `type` / `field` /
-  // `entityTypes` only — these three are user-facing helper paths that PSL
-  // must resolve unambiguously. `pslBlockDescriptors` is an internal
-  // framework index consumed by parser and printer dispatch, not a
-  // user-facing helper path; the natural authoring pattern is the same
+  // `entityTypes` / `entityRefTypeConstructors` only — these are user-facing
+  // helper paths that PSL must resolve unambiguously. `pslBlockDescriptors`
+  // is an internal framework index consumed by parser and printer dispatch,
+  // not a user-facing helper path; the natural authoring pattern is the same
   // path key in `entityTypes` and `pslBlockDescriptors` for a single
   // contribution. The block→factory link is enforced by
   // `assertPslBlocksHaveFactories` via the discriminator string, not by path.
   const ambiguityHint =
-    'Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes.';
+    'Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes / authoringContributions.entityRefTypeConstructors.';
   for (const fieldPath of fieldPaths) {
     if (typePaths.has(fieldPath)) {
       throw new Error(
@@ -696,6 +801,17 @@ export function assertNoCrossRegistryCollisions(
     if (typePaths.has(entityPath) || fieldPaths.has(entityPath)) {
       throw new Error(
         `Ambiguous authoring registry path "${entityPath}". The same path is registered as an entity contribution AND as a type constructor or field preset; PSL resolution would be ambiguous. ${ambiguityHint}`,
+      );
+    }
+  }
+  for (const entityRefPath of entityRefTypeConstructorPaths) {
+    if (
+      typePaths.has(entityRefPath) ||
+      fieldPaths.has(entityRefPath) ||
+      entityPaths.has(entityRefPath)
+    ) {
+      throw new Error(
+        `Ambiguous authoring registry path "${entityRefPath}". The same path is registered as an entity-ref type constructor AND as a type constructor, field preset, or entity contribution; PSL resolution would be ambiguous. ${ambiguityHint}`,
       );
     }
   }

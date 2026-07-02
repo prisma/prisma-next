@@ -147,6 +147,10 @@ export interface CollectResolvedFieldsInput {
   readonly sourceId: string;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
+  /** The model's resolved namespace id — forwarded to `resolveFieldTypeDescriptor` for entity-ref value-set scoping. */
+  readonly namespaceId?: string;
+  /** Extension entities already lowered for this namespace — forwarded to `resolveFieldTypeDescriptor` for entity-ref type-constructor resolution (e.g. `pg.enum(Ref)`). */
+  readonly namespaceExtensionEntities?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
 const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
@@ -297,6 +301,8 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     sourceId,
     scalarTypeDescriptors,
     enumHandles,
+    namespaceId,
+    namespaceExtensionEntities,
   } = input;
   const resolvedFields: ResolvedField[] = [];
 
@@ -347,6 +353,8 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       diagnostics,
       sourceId,
       entityLabel: `Field "${model.name}.${field.name}"`,
+      ...ifDefined('namespaceId', namespaceId),
+      ...ifDefined('namespaceExtensionEntities', namespaceExtensionEntities),
     };
 
     if (isValueObjectField) {

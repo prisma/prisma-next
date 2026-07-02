@@ -5,6 +5,7 @@ import type { AnyCodecDescriptor } from '../shared/codec-descriptor';
 import type { CodecLookup, CodecMeta, CodecRef, CodecRegistry } from '../shared/codec-types';
 import type {
   AuthoringContributions,
+  AuthoringEntityRefTypeConstructorNamespace,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
   AuthoringPslBlockDescriptorNamespace,
@@ -12,6 +13,7 @@ import type {
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
+  isAuthoringEntityRefTypeConstructorDescriptor,
   isAuthoringEntityTypeDescriptor,
   isAuthoringFieldPresetDescriptor,
   isAuthoringPslBlockDescriptor,
@@ -42,6 +44,7 @@ export interface AssembledAuthoringContributions {
   readonly field: AuthoringFieldNamespace;
   readonly type: AuthoringTypeNamespace;
   readonly entityTypes: AuthoringEntityTypeNamespace;
+  readonly entityRefTypeConstructors: AuthoringEntityRefTypeConstructorNamespace;
   readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
 }
 
@@ -162,6 +165,7 @@ export function assembleAuthoringContributions(
   const field = {} as Record<string, unknown>;
   const type = {} as Record<string, unknown>;
   const entityTypes = {} as Record<string, unknown>;
+  const entityRefTypeConstructors: Record<string, unknown> = {};
   const pslBlockDescriptors: Record<string, unknown> = {};
 
   for (const descriptor of descriptors) {
@@ -181,6 +185,15 @@ export function assembleAuthoringContributions(
         [],
         isAuthoringTypeConstructorDescriptor,
         'type',
+      );
+    }
+    if (descriptor.authoring?.entityRefTypeConstructors) {
+      mergeAuthoringNamespaces(
+        entityRefTypeConstructors,
+        descriptor.authoring.entityRefTypeConstructors,
+        [],
+        isAuthoringEntityRefTypeConstructorDescriptor,
+        'entityRefTypeConstructors',
       );
     }
     if (descriptor.authoring?.entityTypes) {
@@ -206,6 +219,10 @@ export function assembleAuthoringContributions(
   const fieldNamespace = field as AuthoringFieldNamespace;
   const typeNamespace = type as AuthoringTypeNamespace;
   const entityTypeNamespace = entityTypes as AuthoringEntityTypeNamespace;
+  const entityRefTypeConstructorNamespace = blindCast<
+    AuthoringEntityRefTypeConstructorNamespace,
+    'merge target accumulator narrows to typed namespace post-merge'
+  >(entityRefTypeConstructors);
   const pslBlockDescriptorNamespace = blindCast<
     AuthoringPslBlockDescriptorNamespace,
     'merge target accumulator narrows to typed namespace post-merge'
@@ -215,12 +232,14 @@ export function assembleAuthoringContributions(
     fieldNamespace,
     entityTypeNamespace,
     pslBlockDescriptorNamespace,
+    entityRefTypeConstructorNamespace,
   );
 
   return {
     field: fieldNamespace,
     type: typeNamespace,
     entityTypes: entityTypeNamespace,
+    entityRefTypeConstructors: entityRefTypeConstructorNamespace,
     pslBlockDescriptors: pslBlockDescriptorNamespace,
   };
 }

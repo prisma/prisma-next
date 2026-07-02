@@ -1,7 +1,12 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  ExecutionMutationDefaultPhases,
+  ValueSetRef,
+} from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
+  AuthoringEntityRefTypeConstructorDescriptor,
   AuthoringEntityTypeDescriptor,
   AuthoringFieldPresetDescriptor,
   AuthoringTypeConstructorDescriptor,
@@ -10,6 +15,7 @@ import {
   hasRegisteredFieldNamespace,
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
+  isAuthoringEntityRefTypeConstructorDescriptor,
   isAuthoringEntityTypeDescriptor,
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
@@ -46,6 +52,22 @@ export type ColumnDescriptor = {
   readonly nativeType: string;
   readonly typeRef?: string;
   readonly typeParams?: Record<string, unknown> | undefined;
+  /**
+   * Storage-plane value-set ref, set only by an entity-ref type constructor
+   * (e.g. `pg.enum(Ref)`) resolving `Ref` against a document-local
+   * value-set-deriving entity. Threaded straight onto the `StorageColumn` —
+   * this is what drives value-set → codec typing (`computeColumnType`
+   * gating on `column.valueSet`); every other resolution path leaves it
+   * unset.
+   */
+  readonly valueSet?: ValueSetRef;
+  /**
+   * How `valueSet` membership is enforced at the database level — `'check'`
+   * (default; auto-generate a `CHECK`) or `'native-type'` (the column's
+   * `nativeType` itself enforces membership; no `CHECK` is generated).
+   * Meaningless without `valueSet`.
+   */
+  readonly valueSetEnforcement?: 'check' | 'native-type';
 };
 
 export function toNamedTypeFieldDescriptor(
@@ -75,6 +97,31 @@ export function getAuthoringTypeConstructor(
   }
 
   return isAuthoringTypeConstructorDescriptor(current) ? current : undefined;
+}
+
+/**
+ * Walks `authoringContributions.entityRefTypeConstructors` segment-by-segment
+ * and returns the descriptor at the resolved path, or `undefined` if none is
+ * registered. Symmetric with `getAuthoringTypeConstructor`, over the
+ * sibling registry a target contributes for field types that resolve a call
+ * argument against another document-local entity (e.g. `pg.enum(Ref)`).
+ */
+export function getAuthoringEntityRefTypeConstructor(
+  contributions: AuthoringContributions | undefined,
+  path: readonly string[],
+): AuthoringEntityRefTypeConstructorDescriptor | undefined {
+  let current: unknown = contributions?.entityRefTypeConstructors;
+
+  for (const segment of path) {
+    if (typeof current !== 'object' || current === null || Array.isArray(current)) {
+      return undefined;
+    }
+    current = blindCast<Record<string, unknown>, 'narrowed by preceding typeof/null/array guards'>(
+      current,
+    )[segment];
+  }
+
+  return isAuthoringEntityRefTypeConstructorDescriptor(current) ? current : undefined;
 }
 
 /**
@@ -377,6 +424,82 @@ export function instantiateFieldPreset(input: {
 }
 
 /**
+ * Resolves an entity-ref type-constructor call (e.g. `pg.enum(AalLevel)`) by
+ * extracting its sole positional-argument ref string and delegating to the
+ * descriptor's `resolve` function against the field's namespace's
+ * already-lowered extension entities. Builds the `ColumnDescriptor` from the
+ * resolution result — including a `valueSet` ref when the descriptor names
+ * one, scoped to the field's own namespace.
+ */
+function resolveEntityRefTypeConstructorCall(input: {
+  readonly call: ResolvedTypeConstructorCall;
+  readonly descriptor: AuthoringEntityRefTypeConstructorDescriptor;
+  readonly namespaceId: string | undefined;
+  readonly namespaceExtensionEntities:
+    | Readonly<Record<string, Readonly<Record<string, unknown>>>>
+    | undefined;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly entityLabel: string;
+}): ResolveFieldTypeResult {
+  const helperPath = input.call.path.join('.');
+  const positionalArgs = input.call.args.filter((arg) => arg.kind === 'positional');
+  const ref = positionalArgs[0]?.value;
+  if (input.call.args.length !== 1 || positionalArgs.length !== 1 || ref === undefined) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `${input.entityLabel} type constructor "${helperPath}" expects exactly one positional argument naming the referenced entity`,
+      sourceId: input.sourceId,
+      span: input.call.span,
+    });
+    return { ok: false, alreadyReported: true };
+  }
+
+  const resolution = input.descriptor.resolve(ref, input.namespaceExtensionEntities);
+  if (resolution === undefined) {
+    input.diagnostics.push({
+      code: 'PSL_UNKNOWN_ENTITY_REF',
+      message: `${input.entityLabel} type constructor "${helperPath}(${ref})" does not resolve — no entity named "${ref}" was found in namespace "${input.namespaceId ?? '(unspecified)'}"`,
+      sourceId: input.sourceId,
+      span: input.call.span,
+    });
+    return { ok: false, alreadyReported: true };
+  }
+
+  if (resolution.valueSetEntityName !== undefined && input.namespaceId === undefined) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `${input.entityLabel} type constructor "${helperPath}(${ref})" resolves to a value-set-typed entity, but the field has no resolvable namespace to scope the value-set ref to`,
+      sourceId: input.sourceId,
+      span: input.call.span,
+    });
+    return { ok: false, alreadyReported: true };
+  }
+
+  const valueSet: ValueSetRef | undefined =
+    resolution.valueSetEntityName !== undefined && input.namespaceId !== undefined
+      ? {
+          plane: 'storage',
+          entityKind: 'valueSet',
+          namespaceId: input.namespaceId,
+          entityName: resolution.valueSetEntityName,
+        }
+      : undefined;
+
+  return {
+    ok: true,
+    descriptor: {
+      codecId: resolution.codecId,
+      nativeType: resolution.nativeType,
+      ...(valueSet !== undefined ? { valueSet } : {}),
+      ...(resolution.valueSetEnforcement !== undefined
+        ? { valueSetEnforcement: resolution.valueSetEnforcement }
+        : {}),
+    },
+  };
+}
+
+/**
  * Contract contributions a field preset adds beyond the bare storage-type triple. Set when a field is resolved through the field-preset dispatch path; absent when resolved through the type-constructor path or as a scalar/enum/named-type lookup.
  */
 export type FieldPresetContributions = {
@@ -407,6 +530,22 @@ export function resolveFieldTypeDescriptor(input: {
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly entityLabel: string;
+  /**
+   * The field's namespace id — required to build a `valueSet` ref (`{
+   * namespaceId, entityName, … }`) when an entity-ref type constructor
+   * resolves the field's type. Storage value-sets are namespace-scoped, so
+   * the ref must point at the value-set derived in the SAME namespace the
+   * field's own column lives in.
+   */
+  readonly namespaceId?: string;
+  /**
+   * Extension entities already lowered for this namespace (the exact shape
+   * `lowerExtensionBlocksForNamespace` in the interpreter produces), keyed
+   * by entries-slot discriminator then block name. Consulted only by an
+   * `entityRefTypeConstructor` match (e.g. `pg.enum(Ref)`); every other
+   * resolution path ignores it.
+   */
+  readonly namespaceExtensionEntities?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }): ResolveFieldTypeResult {
   // Avoid cascading unsupported-type diagnostics after invalid qualification.
   if (input.field.malformedType) {
@@ -439,6 +578,22 @@ export function resolveFieldTypeDescriptor(input: {
           : {}),
       };
       return { ok: true, descriptor: instantiated.descriptor, presetContributions };
+    }
+
+    const entityRefDescriptor = getAuthoringEntityRefTypeConstructor(
+      input.authoringContributions,
+      input.field.typeConstructor.path,
+    );
+    if (entityRefDescriptor) {
+      return resolveEntityRefTypeConstructorCall({
+        call: input.field.typeConstructor,
+        descriptor: entityRefDescriptor,
+        namespaceId: input.namespaceId,
+        namespaceExtensionEntities: input.namespaceExtensionEntities,
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        entityLabel: input.entityLabel,
+      });
     }
 
     const helperPath = input.field.typeConstructor.path.join('.');

@@ -6,6 +6,7 @@
  * `column()` is a trivial, non-polymorphic packager. Generic over `R` (the codec instance type returned by the descriptor's curried factory) and `P` (the typeParams record). The framework does NOT try to infer `R` and `P` from a descriptor — that path is the variance trap. Per-codec helpers absorb the descriptor relationship instead and tie themselves to their descriptor via `satisfies ColumnHelperFor<D>` or `satisfies ColumnHelperForStrict<D>`.
  */
 
+import type { ValueSetRef } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from './codec-descriptor';
 import type { CodecInstanceContext } from './codec-types';
 
@@ -21,6 +22,25 @@ export type ColumnTypeDescriptor<TCodecId extends string = string> = {
   readonly nativeType: string;
   readonly typeParams?: Record<string, unknown> | undefined;
   readonly typeRef?: string;
+  /**
+   * Storage-plane value-set ref, set by an authoring path that resolves a
+   * field's type against a value-set-deriving entity (e.g. a PSL entity-ref
+   * type constructor like `pg.enum(Ref)`, or a TS `enumType` handle).
+   * Threaded straight onto the `StorageColumn` this descriptor builds — this
+   * is what drives value-set → codec typing (`computeColumnType` gating on
+   * `column.valueSet`). Every codec's own descriptor leaves this unset.
+   */
+  readonly valueSet?: ValueSetRef;
+  /**
+   * How membership in `valueSet` is enforced at the database level. Defaults
+   * to `'check'` (auto-generate a `CHECK` constraint, today's only strategy)
+   * when `valueSet` is set and this is absent. `'native-type'` means the
+   * column's `nativeType` itself enforces membership (e.g. a Postgres native
+   * enum) — the contract-building code that auto-generates a `CHECK` per
+   * value-set column skips a column with this enforcement. Meaningless
+   * without `valueSet`.
+   */
+  readonly valueSetEnforcement?: 'check' | 'native-type';
 };
 
 /**

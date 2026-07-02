@@ -248,6 +248,13 @@ function buildStorageColumn(
       ? encodeColumnDefault(field.default, codecId, codecLookup)
       : undefined;
 
+  // `storageValueSetRef` (derived from an `enumTypeHandle`) takes precedence
+  // when present — the established domain-enum path. `field.descriptor.valueSet`
+  // is the fallback: set by an entity-ref type constructor (e.g. `pg.enum(Ref)`)
+  // that resolved the field's type against a value-set-deriving entity with no
+  // domain enum involved. A field carries at most one of the two in practice.
+  const valueSet = storageValueSetRef ?? field.descriptor.valueSet;
+
   return {
     nativeType: field.descriptor.nativeType,
     codecId,
@@ -255,7 +262,7 @@ function buildStorageColumn(
     ...ifDefined('typeParams', field.descriptor.typeParams),
     ...ifDefined('default', encodedDefault),
     ...ifDefined('typeRef', field.descriptor.typeRef),
-    ...ifDefined('valueSet', storageValueSetRef),
+    ...ifDefined('valueSet', valueSet),
   };
 }
 
@@ -371,6 +378,10 @@ export function buildSqlContractFromDefinition(
     const fieldToColumn: Record<string, string> = {};
     const domainFields: Record<string, ContractField> = {};
     const domainFieldRefs: Record<string, DomainFieldRef> = {};
+    // Columns whose value-set membership is enforced by the native type
+    // itself (`field.descriptor.valueSetEnforcement === 'native-type'`, e.g.
+    // a Postgres native enum) — excluded from the auto-generated CHECK below.
+    const nativeTypeEnforcedColumns = new Set<string>();
 
     for (const field of semanticModel.fields) {
       const executionDefaultPhases =
@@ -416,6 +427,13 @@ export function buildSqlContractFromDefinition(
       const column = buildStorageColumn(field, storageValueSetRef, codecLookup);
       columns[field.columnName] = column;
       fieldToColumn[field.fieldName] = field.columnName;
+      if (
+        !isValueObjectField(field) &&
+        !field.many &&
+        field.descriptor.valueSetEnforcement === 'native-type'
+      ) {
+        nativeTypeEnforcedColumns.add(field.columnName);
+      }
 
       domainFields[field.fieldName] = buildDomainField(field, column, domainValueSetRef);
 
@@ -510,9 +528,10 @@ export function buildSqlContractFromDefinition(
       const checksForTable: CheckConstraintInput[] = Object.entries(columns).flatMap(
         ([columnName, col]) => {
           const valueSet = col.valueSet;
-          return valueSet === undefined
-            ? []
-            : [{ name: `${tableName}_${columnName}_check`, column: columnName, valueSet }];
+          if (valueSet === undefined || nativeTypeEnforcedColumns.has(columnName)) {
+            return [];
+          }
+          return [{ name: `${tableName}_${columnName}_check`, column: columnName, valueSet }];
         },
       );
 

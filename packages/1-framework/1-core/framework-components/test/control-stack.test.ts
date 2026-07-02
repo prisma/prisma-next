@@ -128,7 +128,13 @@ describe('extractComponentIds', () => {
 describe('assembleAuthoringContributions', () => {
   it('returns empty namespaces for descriptors without authoring', () => {
     const result = assembleAuthoringContributions([createDescriptor()]);
-    expect(result).toEqual({ field: {}, type: {}, entityTypes: {}, pslBlockDescriptors: {} });
+    expect(result).toEqual({
+      field: {},
+      type: {},
+      entityTypes: {},
+      entityRefTypeConstructors: {},
+      pslBlockDescriptors: {},
+    });
   });
 
   it('merges field namespaces from multiple descriptors', () => {
@@ -976,6 +982,7 @@ describe('createControlStack', () => {
       field: {},
       type: {},
       entityTypes: {},
+      entityRefTypeConstructors: {},
       pslBlockDescriptors: {},
     });
   });
