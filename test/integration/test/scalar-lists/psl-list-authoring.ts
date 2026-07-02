@@ -68,11 +68,7 @@ export interface SqlAuthoringResult {
   readonly contract?: Contract<SqlStorage>;
 }
 
-/**
- * Authors a PSL document to a deserialized SQL contract through the production
- * provider + enrichment path the CLI uses. Returns diagnostics on failure so
- * callers can assert authoring acceptance/rejection.
- */
+/** Authors PSL through the production provider + enrichment path the CLI uses. */
 export async function authorSqlContractFromPsl(schema: string): Promise<SqlAuthoringResult> {
   const schemaPath = writeSchemaToTempFile(schema);
   const provider = prismaContract(schemaPath, {
@@ -97,11 +93,7 @@ export async function authorSqlContractFromPsl(schema: string): Promise<SqlAutho
   return { ok: true, diagnostics: [], contract };
 }
 
-/**
- * Walks every table in the contract's storage namespaces and returns the first
- * column matching `columnName`. List schemas in these tests use a single model,
- * so the table name (model-derived) is incidental to the assertion.
- */
+/** Returns the first column matching `columnName` across all storage tables. */
 export function findStorageColumn(
   contract: Contract<SqlStorage>,
   columnName: string,

@@ -1,19 +1,10 @@
 /**
  * Strongly-typed ORM write->read round-trip over native scalar-list columns.
  *
- * The model (`Item { id Int @id; tags String[]; scores Int[] }`) is authored in
- * PSL and emitted to a committed contract fixture
- * (`../sql-orm-client/fixtures/scalar-lists/generated`). Its storage columns are
- * native arrays (`pg/text@1` / `pg/int4@1`, `many: true`, not the jsonb
- * fallback) and the generated `contract.d.ts` types each field as
- * `ReadonlyArray<...>`.
- *
- * Because the contract is the precise emitted type (not a widened
- * `Contract<SqlStorage>`), the ORM's namespace/model accessors are fully typed:
- * `db.public.Item` is a real `Item` collection, not an index signature. The test
- * migrates the contract onto a real Postgres database, seeds a row through the
- * typed ORM (`create`), reads it back through dotted, strongly-typed accessors,
- * and asserts both the value round-trip and the `many` -> array type inference.
+ * The test consumes the precise emitted contract fixture (not a widened
+ * `Contract<SqlStorage>`), which is what makes the ORM's namespace/model
+ * accessors fully typed: `db.public.Item` is a real `Item` collection rather
+ * than an index signature.
  */
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresRuntimeAdapter from '@prisma-next/adapter-postgres/runtime';
@@ -47,10 +38,6 @@ const controlStack = createControlStack({
 });
 const familyInstance = sql.create(controlStack);
 
-// Deserialization runs the full sql contract validation pipeline (structure +
-// domain + storage semantics), so a contract that failed to round-trip
-// validation would throw here. The result carries the precise emitted `Contract`
-// type, which is what makes the ORM accessors below strongly typed.
 const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
 
 async function migrateContract(connectionString: string): Promise<void> {
@@ -139,15 +126,12 @@ describe.sequential('ORM scalar-list round-trip', () => {
         });
         const db = orm({ runtime, context });
 
-        // Seed through the typed ORM: `tags`/`scores` are typed as
-        // `ReadonlyArray<string>` / `ReadonlyArray<number>` on the create input.
         await db.public.Item.create({ id: 1, tags: ['a', 'b', 'c'], scores: [1, 2, 3] });
 
         const rows = await db.public.Item.select('id', 'tags', 'scores').all();
 
         expect(rows).toEqual([{ id: 1, tags: ['a', 'b', 'c'], scores: [1, 2, 3] }]);
 
-        // The whole point: `many` list columns infer as arrays at the type level.
         type Row = (typeof rows)[number];
         expectTypeOf<Row['tags']>().toEqualTypeOf<ReadonlyArray<string>>();
         expectTypeOf<Row['scores']>().toEqualTypeOf<ReadonlyArray<number>>();

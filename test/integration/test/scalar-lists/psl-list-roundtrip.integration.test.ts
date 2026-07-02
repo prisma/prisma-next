@@ -1,16 +1,7 @@
 /**
- * End-to-end PSL scalar-list checkpoint + element fidelity through the PSL path.
- *
- * A `posts.tags String[]` schema authored in PSL emits a contract whose
- * `tags` storage column is a native array column (`pg/text@1`, `many:true`, NOT
- * jsonb), migrates onto a fresh Postgres database as a `text[]` column with no
- * manual edits, and round-trips through `contract infer` back to a `tags
- * String[]` PSL field.
- *
- * A schema with `DateTime[]`, `Bytes[]`, and `Decimal[]` list fields
- * — authored in PSL, not a hand-built typed contract — inserts and selects
- * rows whose decoded element values deep-equal the originals, proving the
- * element codec is applied per element through the whole authored path.
+ * PSL-authored scalar lists lower to native array columns, and element values
+ * round-trip with fidelity through the authored path — proven end-to-end against
+ * a real Postgres database over the production authoring/migration/infer flow.
  */
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
@@ -116,7 +107,6 @@ describe.sequential('PSL scalar-list end-to-end', () => {
     async () => {
       if (!database) throw new Error('database not initialised');
 
-      // --- author ---
       const authored = await authorSqlContractFromPsl(`model Post {
   id   Int      @id
   tags String[]
@@ -125,7 +115,6 @@ describe.sequential('PSL scalar-list end-to-end', () => {
       const contract = authored.contract;
       if (!contract) throw new Error('authoring produced no contract');
 
-      // The flip: tags is a native array column, not the jsonb fallback.
       const tagsColumn = findStorageColumn(contract, 'tags');
       expect(tagsColumn).toMatchObject({
         codecId: 'pg/text@1',
@@ -134,7 +123,6 @@ describe.sequential('PSL scalar-list end-to-end', () => {
       });
       expect(tagsColumn?.['nativeType']).not.toBe('jsonb');
 
-      // --- migrate onto a fresh database, no manual edits ---
       await withClient(database.connectionString, async (client) => {
         await client.query('DROP SCHEMA IF EXISTS public CASCADE');
         await client.query('CREATE SCHEMA public');
@@ -142,7 +130,6 @@ describe.sequential('PSL scalar-list end-to-end', () => {
       });
       await migrateContract(database.connectionString, contract);
 
-      // The migrated column is a real Postgres array (`text[]`).
       await withClient(database.connectionString, async (client) => {
         const formatted = await client.query<{ attname: string; formatted_type: string }>(
           `SELECT a.attname, format_type(a.atttypid, a.atttypmod) AS formatted_type
@@ -155,7 +142,6 @@ describe.sequential('PSL scalar-list end-to-end', () => {
         expect(formatted.rows[0]?.formatted_type).toBe('text[]');
       });
 
-      // --- infer: live DB → schema IR → PSL AST round-trips to tags String[] ---
       const driver = await postgresControlDriver.create(database.connectionString);
       try {
         const schemaIR = await familyInstance.introspect({ driver });
@@ -166,7 +152,6 @@ describe.sequential('PSL scalar-list end-to-end', () => {
         );
         expect(postModel).toBeDefined();
         const tagsField = postModel?.fields.find((field) => field.name === 'tags');
-        // `tags String[]` — a non-null list of a String element.
         expect(tagsField).toMatchObject({
           name: 'tags',
           typeName: 'String',
@@ -203,8 +188,6 @@ model Reading {
       const contract = authored.contract;
       if (!contract) throw new Error('authoring produced no contract');
 
-      // Sanity: each list field lowered to a native array column (element codec
-      // retained), not the jsonb fallback.
       expect(findStorageColumn(contract, 'dates')).toMatchObject({
         codecId: 'pg/timestamptz@1',
         many: true,
@@ -297,7 +280,6 @@ model Reading {
       const contract = authored.contract;
       if (!contract) throw new Error('authoring produced no contract');
 
-      // Sanity: each list field lowered to a native array column (not jsonb).
       expect(findStorageColumn(contract, 'tags')).toMatchObject({
         codecId: 'pg/text@1',
         many: true,

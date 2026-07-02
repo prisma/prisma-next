@@ -1,20 +1,11 @@
 /**
- * Mongo parity for PSL scalar lists.
+ * Mongo parity for PSL scalar lists: the same PSL list schema yields matching
+ * observable semantics on SQL and Mongo.
  *
- * The same PSL list schema must yield matching *observable* semantics on SQL
- * and Mongo:
- *   1. Authoring acceptance — both families author the schema with no
- *      diagnostics.
- *   2. Generated domain type — the emitted `contract.d.ts` types the list field
- *      as `ReadonlyArray<...>` on both families.
- *   3. Decoded element values — element values round-trip through insert/select
- *      equal to the originals on both families.
- *
- * Assertions 1 and 2 require no database and run everywhere. Assertion 3 for
- * Mongo runs against `mongodb-memory-server`, which fails to spin up on some
- * local sandboxes (UnknownLinuxDistro "nixos"); the assertion is written for
- * CI, where the memory server runs. The SQL half of assertion 3 is proven in
- * `psl-list-roundtrip.integration.test.ts`.
+ * The decoded-element-values assertion for Mongo runs against
+ * `mongodb-memory-server`, which fails to spin up on some local sandboxes
+ * (UnknownLinuxDistro "nixos"); it is written for CI, where the memory server
+ * runs.
  */
 import type { SerializeContract } from '@prisma-next/contract/hashing';
 import { emit } from '@prisma-next/emitter';
