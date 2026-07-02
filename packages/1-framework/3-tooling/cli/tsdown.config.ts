@@ -14,6 +14,7 @@ export default defineConfig({
     'src/commands/db-verify.ts',
     'src/commands/contract-emit.ts',
     'src/commands/migrate.ts',
+    'src/commands/repl.ts',
     'src/commands/migration-new.ts',
     'src/commands/migration-plan.ts',
     'src/commands/ref.ts',
