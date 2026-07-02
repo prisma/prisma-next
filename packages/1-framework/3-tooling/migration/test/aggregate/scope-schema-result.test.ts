@@ -10,10 +10,30 @@ function policyNode(id: string, tableName: string): DiffableNode {
   return { id, tableName, isEqualTo: () => false, children: () => [] } as DiffableNode;
 }
 
+function columnNode(
+  tableName: string,
+  columnName: string,
+  status: 'pass' | 'warn' | 'fail',
+  code = '',
+): SchemaVerificationNode {
+  return {
+    status,
+    kind: 'column',
+    name: columnName,
+    contractPath: `storage.namespaces.*.entries.table.${tableName}.columns.${columnName}`,
+    code,
+    message: '',
+    expected: undefined,
+    actual: undefined,
+    children: [],
+  };
+}
+
 function tableNode(
   name: string,
   status: 'pass' | 'warn' | 'fail',
   code = '',
+  children: readonly SchemaVerificationNode[] = [],
 ): SchemaVerificationNode {
   return {
     status,
@@ -24,7 +44,7 @@ function tableNode(
     message: '',
     expected: undefined,
     actual: undefined,
-    children: [],
+    children,
   };
 }
 
@@ -32,10 +52,15 @@ function resultWith(
   children: readonly SchemaVerificationNode[],
   issues: VerifyDatabaseSchemaResult['schema']['issues'],
 ): VerifyDatabaseSchemaResult {
-  const fail = children.filter((c) => c.status === 'fail').length;
-  const warn = children.filter((c) => c.status === 'warn').length;
-  const pass = children.filter((c) => c.status === 'pass').length;
+  let fail = children.filter((c) => c.status === 'fail').length;
+  let warn = children.filter((c) => c.status === 'warn').length;
+  let pass = children.filter((c) => c.status === 'pass').length;
   const rootStatus = fail > 0 ? 'fail' : warn > 0 ? 'warn' : 'pass';
+  // Count the root node itself at its own status — matching the family verify's
+  // `computeCounts`, which walks every node including the root.
+  if (rootStatus === 'fail') fail += 1;
+  else if (rootStatus === 'warn') warn += 1;
+  else pass += 1;
   return {
     ok: fail === 0,
     summary: 'original summary',
@@ -55,7 +80,7 @@ function resultWith(
         actual: undefined,
         children,
       },
-      counts: { pass: pass + 1, warn, fail, totalNodes: children.length + 1 },
+      counts: { pass, warn, fail, totalNodes: children.length + 1 },
     },
     timings: { total: 0 },
   };
@@ -65,6 +90,25 @@ describe('scopeSchemaResultToSpace', () => {
   it('returns the input unchanged when no names are owned by others', () => {
     const result = resultWith([tableNode('user', 'pass')], []);
     expect(scopeSchemaResultToSpace(result, new Set())).toBe(result);
+  });
+
+  it('preserves the authoritative counts when a non-empty owned set drops nothing', () => {
+    // A multi-schema result keeps only the first namespace's root but sums the
+    // counts across every namespace, so `counts` is not derivable from `root`.
+    // Scoping must not recompute counts from the (partial) root when it drops
+    // nothing — it must leave the authoritative counts untouched.
+    const result = resultWith([tableNode('user', 'pass')], []);
+    const authoritative = { pass: 9, warn: 2, fail: 1, totalNodes: 12 };
+    const multiSchema: VerifyDatabaseSchemaResult = {
+      ...result,
+      ok: false,
+      schema: { ...result.schema, counts: authoritative },
+    };
+
+    const scoped = scopeSchemaResultToSpace(multiSchema, new Set(['nothing_here']));
+
+    expect(scoped.schema.counts).toEqual(authoritative);
+    expect(scoped.ok).toBe(false);
   });
 
   it('drops an extra-table issue owned by another member, keeps the undeclared one', () => {
@@ -127,6 +171,59 @@ describe('scopeSchemaResultToSpace', () => {
     expect(scoped.schema.issues).toEqual([
       { kind: 'missing_column', table: 'user', column: 'age', message: 'missing age' },
     ]);
+  });
+
+  it('prunes only top-level table nodes, never a member’s own column named like a sibling table', () => {
+    // A sibling space owns a table named `orders`. The member's own `user` table
+    // has two columns, `orders` (passing) and `orders` again as a failing type
+    // mismatch — both share the sibling table's name. Scoping must touch NEITHER
+    // column (they are not top-level tables), so the real failure survives and
+    // the verdict does not flip to a false pass.
+    const passCol = columnNode('user', 'orders', 'pass');
+    const failCol = columnNode('user', 'orders', 'fail', 'type_mismatch');
+    const userTable = tableNode('user', 'fail', 'type_mismatch', [passCol, failCol]);
+    const result: VerifyDatabaseSchemaResult = {
+      ok: false,
+      code: 'PN-RUN-3010',
+      summary: 'Database schema does not satisfy contract (1 failure)',
+      contract: { storageHash: 'sha256:test' },
+      target: { expected: 'postgres' },
+      schema: {
+        issues: [
+          {
+            kind: 'type_mismatch',
+            table: 'user',
+            column: 'orders',
+            message: 'type mismatch on user.orders',
+          },
+        ],
+        schemaDiffIssues: [],
+        root: {
+          status: 'fail',
+          kind: 'contract',
+          name: 'contract',
+          contractPath: '',
+          code: 'type_mismatch',
+          message: '',
+          expected: undefined,
+          actual: undefined,
+          children: [userTable],
+        },
+        counts: { pass: 2, warn: 0, fail: 2, totalNodes: 4 },
+      },
+      timings: { total: 0 },
+    };
+    // The sibling space owns a table literally named `orders`.
+    const scoped = scopeSchemaResultToSpace(result, new Set(['orders']));
+
+    // The member's own `user` table and both its columns are untouched, so the
+    // failing column survives and the verdict does not flip to a false pass.
+    const scopedUser = scoped.schema.root.children[0];
+    expect(scopedUser?.name).toBe('table user');
+    expect(scopedUser?.children).toHaveLength(2);
+    expect(scoped.ok).toBe(false);
+    expect(scoped.schema.counts.fail).toBe(result.schema.counts.fail);
+    expect(scoped.schema.issues).toEqual(result.schema.issues);
   });
 
   it('drops an extra policy schemaDiffIssue owned by another member', () => {

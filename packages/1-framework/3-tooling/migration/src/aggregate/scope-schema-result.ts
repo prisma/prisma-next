@@ -64,26 +64,35 @@ function aggregateStatus(children: readonly SchemaVerificationNode[]): 'pass' | 
   return status;
 }
 
-function pruneTree(
-  node: SchemaVerificationNode,
+type Counts = { pass: number; warn: number; fail: number; totalNodes: number };
+
+/**
+ * Partitions `root.children` into the top-level table nodes another member
+ * claims (dropped) and the rest (kept), then rebuilds the root over the kept
+ * children with a freshly aggregated status. Only `root.children` is filtered —
+ * each surviving table keeps its full subtree. Descending further would wrongly
+ * drop a member's own column (or `storage.types` enum) whose name collides with
+ * a sibling space's table; the pruning layer this replaces dropped top-level
+ * entities only.
+ */
+function pruneTopLevelTables(
+  root: SchemaVerificationNode,
   ownedByOthers: ReadonlySet<string>,
-): SchemaVerificationNode {
-  if (node.children.length === 0) return node;
-  const keptChildren = node.children
-    .filter((child) => {
-      const name = nodeEntityName(child);
-      return name === undefined || !ownedByOthers.has(name);
-    })
-    .map((child) => pruneTree(child, ownedByOthers));
-  return { ...node, status: aggregateStatus(keptChildren), children: keptChildren };
+): { readonly root: SchemaVerificationNode; readonly dropped: readonly SchemaVerificationNode[] } {
+  const kept: SchemaVerificationNode[] = [];
+  const dropped: SchemaVerificationNode[] = [];
+  for (const child of root.children) {
+    const name = nodeEntityName(child);
+    if (name !== undefined && ownedByOthers.has(name)) dropped.push(child);
+    else kept.push(child);
+  }
+  return {
+    root: { ...root, status: aggregateStatus(kept), children: kept },
+    dropped,
+  };
 }
 
-function countTree(node: SchemaVerificationNode): {
-  pass: number;
-  warn: number;
-  fail: number;
-  totalNodes: number;
-} {
+function subtreeCounts(node: SchemaVerificationNode): Counts {
   let pass = 0;
   let warn = 0;
   let fail = 0;
@@ -97,6 +106,35 @@ function countTree(node: SchemaVerificationNode): {
   };
   visit(node);
   return { pass, warn, fail, totalNodes };
+}
+
+/**
+ * The verify tree keeps only the first namespace's `root` on a multi-schema
+ * database (the counts are summed across namespaces), so recomputing counts
+ * from the root would undercount. Instead subtract the dropped top-level
+ * subtrees from the authoritative incoming counts, and reconcile the root's own
+ * status flip: if dropping the last failing/worst top-level node changes the
+ * root's status, that node is no longer counted at its old status.
+ */
+function countsAfterDrop(
+  original: Counts,
+  dropped: readonly SchemaVerificationNode[],
+  oldRootStatus: SchemaVerificationNode['status'],
+  newRootStatus: SchemaVerificationNode['status'],
+): Counts {
+  const next = { ...original };
+  for (const node of dropped) {
+    const c = subtreeCounts(node);
+    next.pass -= c.pass;
+    next.warn -= c.warn;
+    next.fail -= c.fail;
+    next.totalNodes -= c.totalNodes;
+  }
+  if (newRootStatus !== oldRootStatus) {
+    next[oldRootStatus] -= 1;
+    next[newRootStatus] += 1;
+  }
+  return next;
 }
 
 /**
@@ -126,8 +164,13 @@ export function scopeSchemaResultToSpace(
     const name = schemaDiffIssueEntityName(issue);
     return name === undefined || !ownedByOthers.has(name);
   });
-  const root = pruneTree(result.schema.root, ownedByOthers);
-  const counts = countTree(root);
+  const { root, dropped } = pruneTopLevelTables(result.schema.root, ownedByOthers);
+  const counts = countsAfterDrop(
+    result.schema.counts,
+    dropped,
+    result.schema.root.status,
+    root.status,
+  );
   const ok = counts.fail === 0;
 
   return {
