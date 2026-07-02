@@ -60,7 +60,7 @@ The CLI renders both. This dissolves the "represent an unclaimed element against
 
 **Plan.** The orchestration hands the planner **a space's issues**; the planner maps issue → op and nothing else. It takes no schema and no "other spaces" input — it works out no ownership, because the orchestration already handed it exactly its issues. The typed node on each `SchemaDiffIssue` is what the planner builds the op from (§4). Verify and plan are symmetric: run the differ per space, then verify checks emptiness while plan builds ops.
 
-**Compose, don't post-scope.** Today `verifySqlSchema` fuses the diff and the view — it walks the contract and, per element, diffs-against-actual *and* emits the tree node, then a post-step re-scopes that tree per space. The target separates them: the differ produces the issues; the per-space view is the space's own declared nodes annotated with their attached issues, and it grafts **no** extra nodes (extras are issues, not tree nodes). So the view is scoped **by construction** — no post-scoping, no recomputed counts.
+**The two-part split lives in the aggregate layer, not the family differ.** `verifySqlSchema` (the single-space family check) is **shared** with the migration planner (reads its `issues`) and the runner's post-apply verify (reads its `ok` = `counts.fail`, a tree walk) — so it stays **unchanged**; it keeps grafting `extra_*` as fail nodes, and the single-space verdict planner/runner depend on is preserved byte-identical. The two-part output is inherently an aggregate concern — "unclaimed by *any* space" only has meaning across spaces — so the aggregate driver (`verifyMigration`, **replacing** `scope-schema-result`) does the split: from each per-space result it strips the `extra_*` nodes/issues to leave **Part 1** (the space's declared nodes), and gathers the stripped extras, deduplicated and filtered by the passive aggregate's ownership query, into **Part 2** (the unclaimed list). No per-space tree post-scoping, no per-family counts recompute.
 
 ## 7. The schema view is unaware of the schema IR
 
@@ -91,7 +91,7 @@ The framework alters no schema and post-scopes no result. The **contract-space a
 
 Deleted outright:
 
-- **`scope-schema-result.ts`** — the per-space tree pruning + counts/verdict recompute. It existed only because the previous pass stopped pre-pruning the schema but kept re-scoping the verification tree; the compose step (§6) makes the view scoped by construction, so there is nothing to post-scope. All three bugs it produced (a column false-pass, an enum-node false-pass, a Mongo counts-flip) disappear with the file.
+- **`scope-schema-result.ts`** — the per-space tree pruning + counts/verdict recompute. The aggregate two-part split (§6) replaces it: strip each per-space result's extras to Part 1, gather them into the Part 2 unclaimed list — no post-scoping. All three bugs it produced (a column false-pass, an enum-node false-pass, a Mongo counts-flip) disappear with the file.
 - **`entitiesOwnedByOtherSpaces`** (the planner `plan()` input) and **`otherMemberEntityNames`** (the set-subtraction) — the planner receives its space's issues; it needs no "other spaces" input.
 - The earlier pruning layer (`projectSchemaToSpace`, both family `schema-shape.ts`, the `projectSchemaToMember` / `listSchemaEntityNames` callbacks) stays removed.
 
