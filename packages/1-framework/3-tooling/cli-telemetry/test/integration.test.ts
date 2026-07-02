@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { AGENT_MARKERS } from '../src/detect-agent';
 import type { ParentToSenderPayload } from '../src/payload';
 import { type BackendHarness, HARNESS_PATHS, startBackendHarness } from './backend-harness';
 
@@ -185,10 +184,37 @@ function envWithoutDebug(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return { ...env, ...extra };
 }
 
+/**
+ * Every env var `@vercel/detect-agent`'s `determineAgent()` reads. The
+ * suite itself may run inside one of these agents (CLAUDECODE is set when
+ * a coding agent drives the tests), so the child env is scrubbed before
+ * layering test-specific markers on top.
+ */
+const AGENT_MARKER_ENV_VARS = [
+  'AI_AGENT',
+  'CURSOR_TRACE_ID',
+  'CURSOR_AGENT',
+  'CURSOR_EXTENSION_HOST_ROLE',
+  'GEMINI_CLI',
+  'CODEX_SANDBOX',
+  'CODEX_CI',
+  'CODEX_THREAD_ID',
+  'ANTIGRAVITY_AGENT',
+  'AUGMENT_AGENT',
+  'OPENCODE_CLIENT',
+  'CLAUDECODE',
+  'CLAUDE_CODE',
+  'CLAUDE_CODE_IS_COWORK',
+  'REPL_ID',
+  'COPILOT_MODEL',
+  'COPILOT_ALLOW_ALL',
+  'COPILOT_GITHUB_TOKEN',
+] as const;
+
 function envWithoutAgentMarkers(): NodeJS.ProcessEnv {
   const baseEnv = { ...process.env };
-  for (const marker of AGENT_MARKERS) {
-    delete baseEnv[marker.envVar];
+  for (const envVar of AGENT_MARKER_ENV_VARS) {
+    delete baseEnv[envVar];
   }
   return baseEnv;
 }
@@ -249,15 +275,15 @@ describe('cli-telemetry end-to-end via telemetry backend', () => {
   });
 
   it('populates the agent field from the child env', async () => {
-    await spawnSenderDirect(buildPayload(), { ...process.env, CLAUDECODE: '1' });
+    await spawnSenderDirect(buildPayload(), { ...envWithoutAgentMarkers(), CLAUDECODE: '1' });
     const [row] = await harness.awaitRows(1);
-    expect(row?.agent).toBe('Claude Code');
+    expect(row?.agent).toBe('claude');
   });
 
   it('populates the agent field for Gemini CLI sessions', async () => {
     await spawnSenderDirect(buildPayload(), { ...envWithoutAgentMarkers(), GEMINI_CLI: '1' });
     const [row] = await harness.awaitRows(1);
-    expect(row?.agent).toBe('Gemini CLI');
+    expect(row?.agent).toBe('gemini');
   });
 
   it('passes null agent when no marker env var is set', async () => {
