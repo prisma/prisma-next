@@ -1,9 +1,8 @@
 /**
  * The `nodeKind` discriminant for each Postgres schema-diff node. Each node
- * carries a unique value; the `.is`/`.assert`/`.ensure` guards compare against
- * these identifiers rather than spelling the string inline. The field is an
- * enumerable own property, so it survives the `projectSchemaToSpace` spread that
- * flattens the tree into plain objects.
+ * carries a unique value; the static `is`/`assert` guards compare against these
+ * identifiers rather than spelling the string inline or using `instanceof`. The
+ * field is an enumerable own property carried on every node instance.
  */
 export const PostgresSchemaNodeKind = {
   database: 'postgres-database',

@@ -78,7 +78,10 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
         // typed surface.
         return new MongoMigrationRunner(cachedDeps).execute({
           ...runnerOptions,
-          destinationContract: runnerOptions.destinationContract as MongoContract,
+          destinationContract: blindCast<
+            MongoContract,
+            'framework MigrationRunner types destinationContract as unknown; deserializeContract validated it upstream'
+          >(runnerOptions.destinationContract),
         });
       };
 
@@ -137,7 +140,12 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
       return runner;
     },
     contractToSchema(contract: Contract | null) {
-      return contractToMongoSchemaIR(contract as MongoContract | null);
+      return contractToMongoSchemaIR(
+        blindCast<
+          MongoContract | null,
+          'framework contractToSchema types contract as the generic Contract; any contract reaching the mongo target is MongoContract by construction'
+        >(contract),
+      );
     },
   },
   create() {

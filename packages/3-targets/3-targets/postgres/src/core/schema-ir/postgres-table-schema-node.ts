@@ -11,14 +11,11 @@ import {
   type SqlTableIRInput,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
-import {
-  PostgresPolicySchemaNode,
-  type PostgresPolicySchemaNodeInput,
-} from './postgres-policy-schema-node';
+import type { PostgresPolicySchemaNode } from './postgres-policy-schema-node';
 import { PostgresSchemaNodeKind } from './schema-node-kinds';
 
 export interface PostgresTableSchemaNodeInput extends SqlTableIRInput {
-  readonly policies?: readonly (PostgresPolicySchemaNode | PostgresPolicySchemaNodeInput)[];
+  readonly policies?: readonly PostgresPolicySchemaNode[];
 }
 
 /**
@@ -80,13 +77,7 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
         ),
       );
     }
-    // Reconstruct policy nodes from plain objects: `projectSchemaToSpace`
-    // spreads the tree into plain objects before a consumer `ensure`s the root.
-    this.policies = Object.freeze(
-      (input.policies ?? []).map((p) =>
-        p instanceof PostgresPolicySchemaNode ? p : new PostgresPolicySchemaNode(p),
-      ),
-    );
+    this.policies = Object.freeze([...(input.policies ?? [])]);
     freezeNode(this);
   }
 
@@ -104,5 +95,13 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
 
   static is(node: SqlSchemaIRNode): node is PostgresTableSchemaNode {
     return node.nodeKind === PostgresSchemaNodeKind.table;
+  }
+
+  static assert(node: SqlSchemaIRNode): asserts node is PostgresTableSchemaNode {
+    if (!PostgresTableSchemaNode.is(node)) {
+      throw new Error(
+        `Expected a PostgresTableSchemaNode but got nodeKind=${node.nodeKind ?? 'undefined'}`,
+      );
+    }
   }
 }

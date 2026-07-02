@@ -53,7 +53,6 @@ export type {
 } from '../types';
 export {
   applyFkDefaults,
-  assertStorageTable,
   CheckConstraint,
   CODEC_INSTANCE_KIND,
   DEFAULT_FK_CONSTRAINT,
@@ -63,7 +62,6 @@ export {
   Index,
   isMaterializedSqlNamespace,
   isSqlAuthoringContributions,
-  isStorageTable,
   isStorageTypeInstance,
   isStorageValueSet,
   PrimaryKey,

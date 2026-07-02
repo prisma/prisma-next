@@ -78,9 +78,8 @@ function computePostgresSchemaComparison(input: PostgresDiffDatabaseSchemaInput)
   const expected = contractToPostgresDatabaseSchemaNode(postgresContract, {
     annotationNamespace: 'pg',
   });
-  const actual = PostgresDatabaseSchemaNode.ensure(input.actualSchema);
   const schemaDiffIssues = filterIssuesByOwnership(
-    diffPostgresSchema(expected, actual),
+    diffPostgresSchema(expected, input.actualSchema),
     ownedSchemaNames(expected),
   );
 

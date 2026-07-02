@@ -1,15 +1,13 @@
 import type { ColumnDefault, Contract, JsonValue } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
 import {
-  assertStorageTable,
   type CheckConstraint,
   type ForeignKey,
   type Index,
-  isStorageTable,
   isStorageTypeInstance,
   type SqlStorage,
   type StorageColumn,
-  type StorageTable,
+  StorageTable,
   type StorageTypeInstance,
   type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
@@ -306,7 +304,7 @@ export function detectDestructiveChanges(
 
     for (const tableName of Object.keys(fromTables)) {
       const toTableRaw = toNs?.entries.table?.[tableName];
-      if (!isStorageTable(toTableRaw)) {
+      if (!StorageTable.is(toTableRaw)) {
         conflicts.push({
           kind: 'tableRemoved',
           summary: `Table "${tableName}" was removed`,
@@ -316,7 +314,7 @@ export function detectDestructiveChanges(
       const toTable = toTableRaw;
 
       const fromTableRaw = fromTables[tableName];
-      if (!isStorageTable(fromTableRaw)) continue;
+      if (!StorageTable.is(fromTableRaw)) continue;
       const fromTable = fromTableRaw;
 
       for (const columnName of Object.keys(fromTable.columns)) {
@@ -390,7 +388,7 @@ export function contractNamespaceToSchemaIR(
   const storageTypes: ResolvedStorageTypes = { ...(storage.types ?? {}) };
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDefRaw] of Object.entries(namespace.entries.table ?? {})) {
-    assertStorageTable(tableDefRaw, `namespaces.${namespaceId}.entries.table.${tableName}`);
+    StorageTable.assert(tableDefRaw, `namespaces.${namespaceId}.entries.table.${tableName}`);
     tables[tableName] = convertTable(
       tableName,
       tableDefRaw,
@@ -420,7 +418,7 @@ export function contractToSchemaIR(
   const tables: Record<string, SqlTableIR> = {};
   for (const ns of Object.values(storage.namespaces)) {
     for (const [tableName, tableDefRaw] of Object.entries(ns.entries.table ?? {})) {
-      assertStorageTable(tableDefRaw, `namespaces.${ns.id}.entries.table.${tableName}`);
+      StorageTable.assert(tableDefRaw, `namespaces.${ns.id}.entries.table.${tableName}`);
       const tableDef = tableDefRaw;
       if (tables[tableName] !== undefined) {
         throw new Error(

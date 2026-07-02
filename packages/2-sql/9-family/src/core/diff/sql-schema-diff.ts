@@ -18,11 +18,10 @@ import type {
 } from '@prisma-next/framework-components/control';
 
 import {
-  isStorageTable,
   isStorageTypeInstance,
   type SqlStorage,
   type StorageColumn,
-  type StorageTable,
+  StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
@@ -340,7 +339,7 @@ function verifySchemaTables(options: {
     const ns = contract.storage.namespaces[namespaceId];
     if (!ns) continue;
     for (const [tableName, contractTableRaw] of Object.entries(ns.entries.table ?? {})) {
-      if (!isStorageTable(contractTableRaw)) {
+      if (!StorageTable.is(contractTableRaw)) {
         throw new Error(
           `verifySqlSchema: expected StorageTable at storage.namespaces.${namespaceId}.entries.table.${tableName}`,
         );

@@ -41,7 +41,7 @@ function resolveDdlSchemaName(storage: SqlStorage, namespaceId: string): string 
  */
 function existingSchemasFromSchema(schema: SqlSchemaIRNode): readonly string[] {
   if (PostgresDatabaseSchemaNode.is(schema)) {
-    return PostgresDatabaseSchemaNode.ensure(schema).existingSchemas;
+    return schema.existingSchemas;
   }
   return ['public'];
 }

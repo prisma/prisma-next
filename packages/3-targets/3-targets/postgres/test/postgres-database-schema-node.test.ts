@@ -131,21 +131,4 @@ describe('PostgresDatabaseSchemaNode', () => {
       expect(() => PostgresDatabaseSchemaNode.assert(bad)).toThrow();
     });
   });
-
-  describe('PostgresDatabaseSchemaNode.ensure', () => {
-    it('returns the same instance when already a real instance', () => {
-      const node = new PostgresDatabaseSchemaNode(baseInput);
-      expect(PostgresDatabaseSchemaNode.ensure(node)).toBe(node);
-    });
-
-    it('reconstructs from a spread-flattened plain object', () => {
-      const node = new PostgresDatabaseSchemaNode(baseInput);
-      const spread = { ...node } as unknown as PostgresDatabaseSchemaNode;
-      const reconstructed = PostgresDatabaseSchemaNode.ensure(spread);
-      expect(reconstructed).toBeInstanceOf(PostgresDatabaseSchemaNode);
-      expect(reconstructed.id).toBe('database');
-      expect(reconstructed.pgVersion).toBe('15.2');
-      expect(Object.keys(reconstructed.namespaces)).toEqual(['public', 'app']);
-    });
-  });
 });

@@ -404,7 +404,7 @@ function relationalNamespaceNode(
   schema: PostgresDatabaseSchemaNode,
   schemaName: string,
 ): SqlSchemaIR | undefined {
-  const namespaceNodes = Object.values(PostgresDatabaseSchemaNode.ensure(schema).namespaces);
+  const namespaceNodes = Object.values(schema.namespaces);
   const byName = namespaceNodes.find((node) => node.schemaName === schemaName);
   return byName ?? namespaceNodes[0];
 }

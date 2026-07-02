@@ -48,15 +48,19 @@ export class PostgresRoleSchemaNode extends SqlSchemaIRNode implements DiffableN
       SqlSchemaIRNode,
       'every diff-tree node the differ pairs is a SqlSchemaIRNode; the guard rejects non-role kinds'
     >(other);
-    if (!PostgresRoleSchemaNode.is(node)) {
-      throw new Error(
-        `PostgresRoleSchemaNode.isEqualTo: expected a PostgresRoleSchemaNode, got nodeKind=${node.nodeKind ?? 'undefined'}`,
-      );
-    }
+    PostgresRoleSchemaNode.assert(node);
     return this.id === node.id;
   }
 
   static is(node: SqlSchemaIRNode): node is PostgresRoleSchemaNode {
     return node.nodeKind === PostgresSchemaNodeKind.role;
+  }
+
+  static assert(node: SqlSchemaIRNode): asserts node is PostgresRoleSchemaNode {
+    if (!PostgresRoleSchemaNode.is(node)) {
+      throw new Error(
+        `Expected a PostgresRoleSchemaNode but got nodeKind=${node.nodeKind ?? 'undefined'}`,
+      );
+    }
   }
 }

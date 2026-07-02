@@ -2,7 +2,7 @@ import type { DiffableNode, SchemaDiffIssue } from '@prisma-next/framework-compo
 import { diffSchemas } from '@prisma-next/framework-components/control';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
-import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
+import type { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
 
 // Every node in a diff issue produced from Postgres schema trees is a
@@ -38,8 +38,7 @@ export function diffPostgresSchema(
   expected: PostgresDatabaseSchemaNode,
   actual: PostgresDatabaseSchemaNode,
 ): readonly SchemaDiffIssue[] {
-  const safeActual = PostgresDatabaseSchemaNode.ensure(actual);
-  const issues = diffSchemas(expected, safeActual);
+  const issues = diffSchemas(expected, actual);
 
   return issues
     .filter((i) => {

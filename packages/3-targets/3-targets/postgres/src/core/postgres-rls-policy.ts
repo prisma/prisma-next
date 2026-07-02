@@ -62,25 +62,3 @@ export class PostgresRlsPolicy extends SqlNode {
     freezeNode(this);
   }
 }
-
-export function isPostgresRlsPolicy(node: unknown): node is PostgresRlsPolicy {
-  return (
-    node !== undefined &&
-    node !== null &&
-    typeof node === 'object' &&
-    'kind' in node &&
-    node.kind === 'policy'
-  );
-}
-
-export function assertPostgresRlsPolicy(node: unknown): asserts node is PostgresRlsPolicy {
-  if (!isPostgresRlsPolicy(node)) {
-    const kind =
-      node !== undefined && node !== null && typeof node === 'object' && 'kind' in node
-        ? String(node.kind)
-        : typeof node;
-    throw new Error(
-      `planPostgresSchemaDiff: expected a PostgresRlsPolicy on the policy-diff path but got ${kind}`,
-    );
-  }
-}

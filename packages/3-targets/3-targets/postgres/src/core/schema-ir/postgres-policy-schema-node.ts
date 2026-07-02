@@ -75,11 +75,7 @@ export class PostgresPolicySchemaNode extends SqlSchemaIRNode implements Diffabl
       SqlSchemaIRNode,
       'every diff-tree node the differ pairs is a SqlSchemaIRNode; the guard rejects non-policy kinds'
     >(other);
-    if (!PostgresPolicySchemaNode.is(node)) {
-      throw new Error(
-        `PostgresPolicySchemaNode.isEqualTo: expected a PostgresPolicySchemaNode, got nodeKind=${node.nodeKind ?? 'undefined'}`,
-      );
-    }
+    PostgresPolicySchemaNode.assert(node);
     return this.id === node.id;
   }
 
@@ -90,7 +86,7 @@ export class PostgresPolicySchemaNode extends SqlSchemaIRNode implements Diffabl
   static assert(node: SqlSchemaIRNode | undefined): asserts node is PostgresPolicySchemaNode {
     if (node === undefined || !PostgresPolicySchemaNode.is(node)) {
       throw new Error(
-        `Expected a PostgresPolicySchemaNode, got nodeKind=${node?.nodeKind ?? 'undefined'}`,
+        `Expected a PostgresPolicySchemaNode but got nodeKind=${node?.nodeKind ?? 'undefined'}`,
       );
     }
   }

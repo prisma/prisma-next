@@ -4,11 +4,7 @@
  * The DiffableNode role belongs to PostgresPolicySchemaNode / PostgresRoleSchemaNode.
  */
 import { describe, expect, it } from 'vitest';
-import {
-  assertPostgresRlsPolicy,
-  isPostgresRlsPolicy,
-  PostgresRlsPolicy,
-} from '../src/core/postgres-rls-policy';
+import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
 import { PostgresRole } from '../src/core/postgres-role';
 
 describe('PostgresRlsPolicy — Contract-IR entity, not a DiffableNode', () => {
@@ -84,49 +80,5 @@ describe('PostgresRole — Contract-IR entity, not a DiffableNode', () => {
   it('kind survives JSON round-trip', () => {
     const json = JSON.parse(JSON.stringify(role)) as Record<string, unknown>;
     expect(json['kind']).toBe('role');
-  });
-});
-
-describe('isPostgresRlsPolicy guard', () => {
-  it('returns true for a PostgresRlsPolicy', () => {
-    const policy = new PostgresRlsPolicy({
-      name: 'p_a1b2c3d4',
-      prefix: 'p',
-      tableName: 'users',
-      namespaceId: 'public',
-      operation: 'select',
-      roles: [],
-      permissive: true,
-    });
-    expect(isPostgresRlsPolicy(policy)).toBe(true);
-  });
-
-  it('returns false for a PostgresRole', () => {
-    const role = new PostgresRole({ name: 'anon', namespaceId: 'public' });
-    expect(isPostgresRlsPolicy(role)).toBe(false);
-  });
-
-  it('returns false for undefined', () => {
-    expect(isPostgresRlsPolicy(undefined)).toBe(false);
-  });
-});
-
-describe('assertPostgresRlsPolicy guard', () => {
-  it('does not throw for a PostgresRlsPolicy', () => {
-    const policy = new PostgresRlsPolicy({
-      name: 'p_a1b2c3d4',
-      prefix: 'p',
-      tableName: 'users',
-      namespaceId: 'public',
-      operation: 'select',
-      roles: [],
-      permissive: true,
-    });
-    expect(() => assertPostgresRlsPolicy(policy)).not.toThrow();
-  });
-
-  it('throws with a descriptive message for a non-policy value', () => {
-    const role = new PostgresRole({ name: 'anon', namespaceId: 'public' });
-    expect(() => assertPostgresRlsPolicy(role)).toThrow(/planPostgresSchemaDiff/);
   });
 });

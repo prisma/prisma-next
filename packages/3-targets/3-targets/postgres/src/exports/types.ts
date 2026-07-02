@@ -1,6 +1,4 @@
 export {
-  assertPostgresRlsPolicy,
-  isPostgresRlsPolicy,
   PostgresRlsPolicy,
   type PostgresRlsPolicyInput,
   type RlsPolicyOperation,

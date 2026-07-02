@@ -1,15 +1,12 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
-import {
-  PostgresTableSchemaNode,
-  type PostgresTableSchemaNodeInput,
-} from './postgres-table-schema-node';
+import type { PostgresTableSchemaNode } from './postgres-table-schema-node';
 import { PostgresSchemaNodeKind } from './schema-node-kinds';
 
 export interface PostgresNamespaceSchemaNodeInput {
   readonly schemaName: string;
-  readonly tables: Readonly<Record<string, PostgresTableSchemaNode | PostgresTableSchemaNodeInput>>;
+  readonly tables: Readonly<Record<string, PostgresTableSchemaNode>>;
   readonly nativeEnumTypeNames: readonly string[];
 }
 
@@ -33,16 +30,7 @@ export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements Diff
   constructor(input: PostgresNamespaceSchemaNodeInput) {
     super();
     this.schemaName = input.schemaName;
-    // Reconstruct table nodes from plain objects: `projectSchemaToSpace`
-    // spreads the tree into plain objects before a consumer `ensure`s the root.
-    this.tables = Object.freeze(
-      Object.fromEntries(
-        Object.entries(input.tables).map(([key, t]) => [
-          key,
-          t instanceof PostgresTableSchemaNode ? t : new PostgresTableSchemaNode(t),
-        ]),
-      ),
-    );
+    this.tables = Object.freeze({ ...input.tables });
     this.nativeEnumTypeNames = Object.freeze([...input.nativeEnumTypeNames]);
     freezeNode(this);
   }
@@ -61,5 +49,13 @@ export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements Diff
 
   static is(node: SqlSchemaIRNode): node is PostgresNamespaceSchemaNode {
     return node.nodeKind === PostgresSchemaNodeKind.namespace;
+  }
+
+  static assert(node: SqlSchemaIRNode): asserts node is PostgresNamespaceSchemaNode {
+    if (!PostgresNamespaceSchemaNode.is(node)) {
+      throw new Error(
+        `Expected a PostgresNamespaceSchemaNode but got nodeKind=${node.nodeKind ?? 'undefined'}`,
+      );
+    }
   }
 }

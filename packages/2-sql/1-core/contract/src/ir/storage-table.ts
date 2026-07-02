@@ -68,18 +68,25 @@ export class StorageTable extends SqlNode {
     }
     freezeNode(this);
   }
-}
 
-export function isStorageTable(value: unknown): value is StorageTable {
-  if (typeof value !== 'object' || value === null) return false;
-  return 'columns' in value && 'uniques' in value && 'indexes' in value && 'foreignKeys' in value;
-}
+  /**
+   * Runtime guard that a namespace `table` entry is really a `StorageTable`.
+   * The compiler already types the entry as `StorageTable`, but a
+   * freshly-deserialized contract may carry plain JSON at that slot until
+   * hydration; this duck-types the structural shape. Accepts `undefined` so
+   * optional-chained entry lookups pass straight through.
+   */
+  static is(value: StorageTable | undefined): value is StorageTable {
+    if (typeof value !== 'object' || value === null) return false;
+    return 'columns' in value && 'uniques' in value && 'indexes' in value && 'foreignKeys' in value;
+  }
 
-export function assertStorageTable(
-  value: unknown,
-  coordinate: string,
-): asserts value is StorageTable {
-  if (!isStorageTable(value)) {
-    throw new Error(`Expected a StorageTable at ${coordinate}`);
+  static assert(
+    value: StorageTable | undefined,
+    coordinate: string,
+  ): asserts value is StorageTable {
+    if (!StorageTable.is(value)) {
+      throw new Error(`Expected a StorageTable at ${coordinate}`);
+    }
   }
 }
