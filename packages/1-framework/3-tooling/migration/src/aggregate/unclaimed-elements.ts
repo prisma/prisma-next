@@ -111,6 +111,10 @@ export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDa
     children: keptChildren,
   };
   const counts = countTree(root);
+  // schemaDiffIssues (extra RLS policies…) carry no tree node; the family folds
+  // their count into `counts.fail` after its own tree walk. Re-fold them here,
+  // or a policy-only failure would vanish from the recomputed verdict.
+  counts.fail += result.schema.schemaDiffIssues.length;
   const ok = counts.fail === 0;
   return {
     ...result,

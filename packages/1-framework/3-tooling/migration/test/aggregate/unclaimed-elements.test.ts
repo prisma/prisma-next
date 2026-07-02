@@ -188,6 +188,37 @@ describe('stripExtraFindings', () => {
     expect(stripped.ok).toBe(false);
   });
 
+  it('keeps failing on an extra RLS policy when a sibling extra node is dropped', () => {
+    // Composed case: the space is relationally clean but has one extra RLS
+    // policy on its own table — a schemaDiffIssue with NO tree node; the family
+    // folds schemaDiffIssues.length into counts.fail. A sibling space's table
+    // shows up as a dropped top-level extra, so the dropped branch recomputes
+    // counts from the pruned tree — which must re-fold the policy contribution,
+    // or the space false-passes with live policy drift.
+    const policyIssue = {
+      path: ['public', 'user', 'policy_rogue'],
+      outcome: 'extra' as const,
+      message: "RLS policy 'policy_rogue' is present in the database but not in the contract",
+    };
+    const result = makeResult({
+      ok: false,
+      children: [tableNode('user', 'pass'), extraTableNode('cipher_state', 'fail')],
+      // Faithful SQL counts: computeCounts (root fail + user pass + extra fail)
+      // then the family fold adds the policy: fail = 2 + 1 = 3.
+      counts: { pass: 1, warn: 0, fail: 3, totalNodes: 3 },
+      issues: [{ kind: 'extra_table', table: 'cipher_state', message: 'x' }],
+      schemaDiffIssues: [policyIssue],
+    });
+
+    const stripped = stripExtraFindings(result);
+
+    expect(stripped.schema.schemaDiffIssues).toEqual([policyIssue]);
+    // Pruned tree is all-pass, but the policy drift remains the space's own
+    // failure: countTree (fail 0) + refolded schemaDiffIssues (1).
+    expect(stripped.schema.counts.fail).toBe(1);
+    expect(stripped.ok).toBe(false);
+  });
+
   it('keeps an extra-policy schemaDiffIssue in Part 1 as the space’s own drift', () => {
     const result = makeResult({
       ok: false,
