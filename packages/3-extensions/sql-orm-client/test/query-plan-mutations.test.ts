@@ -8,7 +8,6 @@ import {
   ParamRef as ParamRefClass,
   type UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
-import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import {
   compileDeleteCount,
@@ -35,15 +34,12 @@ function usersColParam(
   value: unknown,
 ): ParamRef {
   const columns = unboundTables(contract.storage)['users']?.columns as
-    | Record<string, { codecId?: string; nativeType?: string }>
+    | Record<string, { codecId?: string }>
     | undefined;
   const columnMeta = columns?.[column];
   return ParamRef.of(value, {
     name: column,
-    codec: {
-      codecId: columnMeta?.codecId ?? 'unknown',
-      ...ifDefined('nativeType', columnMeta?.nativeType),
-    },
+    codec: { codecId: columnMeta?.codecId ?? 'unknown' },
   });
 }
 

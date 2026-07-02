@@ -495,6 +495,7 @@ function resolveEntityRefTypeConstructorCall(input: {
     descriptor: {
       codecId: resolution.codecId,
       nativeType: resolution.nativeType,
+      ...(resolution.typeParams !== undefined ? { typeParams: resolution.typeParams } : {}),
       ...(valueSet !== undefined ? { valueSet } : {}),
       ...(resolution.valueSetEnforcement !== undefined
         ? { valueSetEnforcement: resolution.valueSetEnforcement }

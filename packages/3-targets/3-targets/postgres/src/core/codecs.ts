@@ -205,16 +205,33 @@ export class PgEnumCodec extends CodecImpl<
   }
 }
 
-export class PgEnumDescriptor extends CodecDescriptorImpl<void> {
+type PgEnumParams = { readonly typeName: string };
+
+const pgEnumParamsSchema = arktype({
+  typeName: 'string',
+}) satisfies StandardSchemaV1<PgEnumParams>;
+
+function isJsonObject(
+  value: JsonValue | undefined,
+): value is { readonly [key: string]: JsonValue } {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export class PgEnumDescriptor extends CodecDescriptorImpl<PgEnumParams> {
   override readonly codecId = PG_ENUM_CODEC_ID;
   override readonly traits = ['equality', 'order', 'textual'] as const;
   override readonly targetTypes = ['text'] as const;
   override readonly meta = PG_TEXT_META;
-  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override readonly paramsSchema = pgEnumParamsSchema satisfies StandardSchemaV1<PgEnumParams>;
   override renderValueLiteral(value: JsonValue): string | undefined {
     return renderTsLiteral(value);
   }
-  override factory(): (ctx: CodecInstanceContext) => PgEnumCodec {
+  override nativeTypeFor(typeParams: JsonValue | undefined): string | undefined {
+    if (!isJsonObject(typeParams)) return undefined;
+    const typeName = typeParams['typeName'];
+    return typeof typeName === 'string' ? typeName : undefined;
+  }
+  override factory(_params: PgEnumParams): (ctx: CodecInstanceContext) => PgEnumCodec {
     return () => new PgEnumCodec(this);
   }
 }

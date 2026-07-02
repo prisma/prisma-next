@@ -96,7 +96,10 @@
                 "nullable": true,
                 "type": {
                   "codecId": "pg/enum@1",
-                  "kind": "scalar"
+                  "kind": "scalar",
+                  "typeParams": {
+                    "typeName": "auth.aal_level"
+                  }
                 }
               },
               "created_at": {
@@ -384,6 +387,9 @@
                   "codecId": "pg/enum@1",
                   "nativeType": "auth.aal_level",
                   "nullable": true,
+                  "typeParams": {
+                    "typeName": "auth.aal_level"
+                  },
                   "valueSet": {
                     "entityKind": "valueSet",
                     "entityName": "AalLevel",
@@ -559,7 +565,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:e0bc9b2307571fa31aa6f7cbe30e93c914decafb102c580811594dd1e76d648f",
+    "storageHash": "sha256:a370d4a08b89ede10154241bee283741c4b33239ca9b7a4aeb3fac64b8cc9f8b",
     "types": {
       "Timestamptz": {
         "codecId": "pg/timestamptz@1",

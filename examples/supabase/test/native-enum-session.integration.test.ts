@@ -14,7 +14,7 @@
  *      the emitted `SupabaseExtensionContract` (the extension's own emitted
  *      `contract.d.ts`, reached through `.supabase`, the only surface that
  *      carries `auth.*`), not a hand-built type.
- *   2. `db.asServiceRole().supabase.native_enums.auth.AalLevel` exposes the
+ *   2. `db.asServiceRole().supabase.nativeEnums.auth.AalLevel` exposes the
  *      same member set at runtime, wired via `@prisma-next/postgres`'s
  *      `buildNamespacedNativeEnums`, built from the extension contract's own
  *      storage.
@@ -91,7 +91,7 @@ describe('native Postgres enum (auth.aal_level) on auth.sessions', () => {
   );
 
   it(
-    'db.native_enums.auth.AalLevel exposes the same member set at runtime',
+    'db.nativeEnums.auth.AalLevel exposes the same member set at runtime',
     async () => {
       database = await createDevDatabase();
       const { connectionString } = database;
@@ -104,10 +104,16 @@ describe('native Postgres enum (auth.aal_level) on auth.sessions', () => {
         const db = await createDb(connectionString);
         try {
           const internal: SupabaseInternalDb = db.asServiceRole().supabase;
-          const AalLevel = internal.native_enums.auth['AalLevel'];
+          const AalLevel = internal.nativeEnums.auth['AalLevel'];
 
           expect(AalLevel?.values).toEqual(['aal1', 'aal2', 'aal3']);
           expect(AalLevel?.members['aal2']).toBe('aal2');
+
+          // Literal-typing proof: the accessor's values are typed from the
+          // emitted contract's native_enum entries, not a generic string[].
+          expectTypeOf(internal.nativeEnums.auth.AalLevel.values).toEqualTypeOf<
+            readonly ['aal1', 'aal2', 'aal3']
+          >();
         } finally {
           await db.close();
         }

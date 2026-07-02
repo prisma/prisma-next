@@ -137,6 +137,19 @@ type ContractBase = Omit<
               ];
             };
           };
+          readonly policy: {
+            readonly profile_owner_read: {
+              readonly kind: 'policy';
+              readonly name: 'profile_owner_read_9f8e536e';
+              readonly prefix: 'profile_owner_read';
+              readonly tableName: 'profile';
+              readonly namespaceId: 'public';
+              readonly operation: 'select';
+              readonly roles: readonly ['authenticated'];
+              readonly permissive: true;
+              readonly using: '"userId"::uuid = auth.uid()';
+            };
+          };
         };
       };
     };

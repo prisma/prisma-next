@@ -25,27 +25,12 @@ import { PostgresRole, type PostgresRoleInput } from './schema-ir/postgres-role'
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
 
 /**
- * Resolves `pg.enum(<ref>)` — a field type naming a `native_enum` block in
- * the same document — against the namespace's already-lowered extension
- * entities (see `namespaceExtensionEntities` threaded through PSL field
- * resolution). `entities['native_enum']` is the `native_enum` entries slot
- * (keyed by block name); a hit yields the `pg/enum@1` codec, the enum's
- * `typeName` as the column's `nativeType`, and the block name as the
- * `valueSetEntityName` — the `native_enum` entity derives a value-set of the
- * same name (`deriveValueSet` on the `native_enum` entityType descriptor,
- * §2.5 of authoring-design.md), so the caller builds a `valueSet` ref
- * pointing at it without this resolver needing to know the ref shape.
- * `valueSetEnforcement: 'native-type'` — the native Postgres enum TYPE
- * enforces membership; no `CHECK` is written (authoring-design.md §5).
- *
- * `nativeType` is schema-qualified (`<namespaceId>.<typeName>`) when the
- * enum's namespace is a real, named, non-default schema — matching what
- * Postgres's `format_type()` reports for a non-`public` type, so the
- * `$N::<nativeType>` cast and `db verify`'s column-type comparison both stay
- * correct. The default namespace (`public`) and the unbound/late-bound
- * namespace (resolved by `search_path` at runtime) both stay bare, mirroring
- * `PostgresSchema.qualifyTable` / `PostgresUnboundSchema.qualifyTable`'s own
- * qualify-vs-don't-qualify split for tables.
+ * Resolves `pg.enum(<ref>)` against the namespace's already-lowered `native_enum`
+ * entities: the `pg/enum@1` codec, the enum's type name as both the column
+ * `nativeType` and the codec-instance `typeParams.typeName`, and the block name
+ * as the `valueSetEntityName` (the entity derives a same-named value-set). The
+ * type name is schema-qualified for a named non-default schema (matching
+ * `format_type()`); `public` and the unbound namespace stay bare (`search_path`).
  */
 function resolvePgEnumRef(
   ref: string,
@@ -54,14 +39,16 @@ function resolvePgEnumRef(
 ): AuthoringEntityRefResolution | undefined {
   const nativeEnums = entities?.['native_enum'];
   const entity = nativeEnums?.[ref];
-  if (!(entity instanceof PostgresNativeEnum)) return undefined;
+  if (!PostgresNativeEnum.is(entity)) return undefined;
   const qualifyNativeType =
     namespaceId !== undefined &&
     namespaceId !== DEFAULT_NAMESPACE_ID &&
     namespaceId !== UNBOUND_NAMESPACE_ID;
+  const typeName = qualifyNativeType ? `${namespaceId}.${entity.typeName}` : entity.typeName;
   return {
     codecId: PG_ENUM_CODEC_ID,
-    nativeType: qualifyNativeType ? `${namespaceId}.${entity.typeName}` : entity.typeName,
+    nativeType: typeName,
+    typeParams: { typeName },
     valueSetEntityName: ref,
     valueSetEnforcement: 'native-type',
   };
@@ -133,23 +120,12 @@ function lowerRlsPolicyFromBlock(
   });
 }
 
-// TODO(TS-mirror parity): this diverges from `applyNaming(..., 'snake_case')`
-// on acronym runs. The TS mirror (`field.column(pg.enum(handle))`) must reuse ONE
-// canonical snake_case so PSL and TS lower to a byte-identical contract — pick
-// the single source of truth then, don't leave two implementations.
-function snakeCase(name: string): string {
-  return name
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
-    .toLowerCase();
-}
-
 /**
  * Lowers a `native_enum { memberName = "value" … @@map("type_name") }` block
  * into a {@link PostgresNativeEnum}. Members must be authored as explicit
  * `key = "value"` pairs — a bare (value-less) member is a diagnostic, not
  * accepted (authoring-design.md §2.1). `typeName` comes from `@@map` or
- * defaults to `snake_case(block.name)`.
+ * defaults to the block name verbatim.
  */
 function lowerNativeEnumFromBlock(
   block: PslExtensionBlock,
@@ -159,7 +135,7 @@ function lowerNativeEnumFromBlock(
   const diagnostics = ctx.diagnostics;
 
   const mapAttr = block.blockAttributes.find((a) => a.name === 'map');
-  let typeName = snakeCase(block.name);
+  let typeName = block.name;
   if (mapAttr) {
     const rawArg = mapAttr.args[0]?.value;
     const mapped = rawArg !== undefined ? unwrapQuotedString(rawArg) : undefined;
@@ -240,11 +216,7 @@ function lowerNativeEnumFromBlock(
     return undefined;
   }
 
-  // `control` is left unset here — the effective grade (`external` for the
-  // Supabase pack, `managed` by default) is resolved at read time via
-  // `effectiveControlPolicy(node.control, contract.defaultControlPolicy)`,
-  // exactly as `StorageTable`/`StorageColumn` leave `control` unset and rely
-  // on the contract-level default (see `applySpecifierDefaultControlPolicy`).
+  // `control` stays unset — the effective grade is resolved at read time via `effectiveControlPolicy`, like `StorageTable`/`StorageColumn`.
   return new PostgresNativeEnum({ typeName, members });
 }
 

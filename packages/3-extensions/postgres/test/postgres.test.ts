@@ -462,7 +462,7 @@ describe('postgres', () => {
     });
   });
 
-  describe('db.native_enums (facade)', () => {
+  describe('db.nativeEnums (facade)', () => {
     // Built from real `PostgresSchema`/`PostgresNativeEnum` IR instances (not
     // plain literals): `PostgresContractSerializer.serializeContract` only
     // walks `entries.native_enum` for namespaces it recognizes via
@@ -507,7 +507,7 @@ describe('postgres', () => {
       },
     };
 
-    // A literal-keyed contract so `db.native_enums.public` and `.audit` resolve
+    // A literal-keyed contract so `db.nativeEnums.public` and `.audit` resolve
     // to distinct namespace maps, proving per-namespace resolution rather than
     // falling back to a single shared `Record<string, ...>`. Each namespace's
     // enum accessors are still looked up by bracket access (`['AalLevel']`):
@@ -523,8 +523,8 @@ describe('postgres', () => {
         url: 'postgres://localhost:5432/db',
       });
 
-      const publicAalLevel = db.native_enums.public['AalLevel'];
-      const auditAalLevel = db.native_enums.audit['AalLevel'];
+      const publicAalLevel = db.nativeEnums.public['AalLevel'];
+      const auditAalLevel = db.nativeEnums.audit['AalLevel'];
 
       expect(publicAalLevel?.values).toEqual(['aal1', 'aal2']);
       expect(auditAalLevel?.values).toEqual(['low', 'high']);
@@ -534,13 +534,13 @@ describe('postgres', () => {
       expect(auditAalLevel?.nameOf('high')).toBe('high');
     });
 
-    it('builds the native_enums surface eagerly, without a runtime', () => {
+    it('builds the nativeEnums surface eagerly, without a runtime', () => {
       const db = postgres<TwoNsStorageContract>({
         contract: twoNamespaceStorage,
         url: 'postgres://localhost:5432/db',
       });
 
-      expect(db.native_enums.public['AalLevel']?.values).toEqual(['aal1', 'aal2']);
+      expect(db.nativeEnums.public['AalLevel']?.values).toEqual(['aal1', 'aal2']);
       expect(poolConnectSpy()).not.toHaveBeenCalled();
     });
   });

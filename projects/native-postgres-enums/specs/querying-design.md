@@ -15,7 +15,7 @@ A native-enum column is **just a column with a value-set** — the same read pat
 column uses; it needs **no** native-specific typing code. Only **two** pieces are new, and both
 are isolated:
 
-1. a **`db.native_enums`** facade root (runtime member access), a Postgres-only sibling of
+1. a **`db.nativeEnums`** facade root (runtime member access), a Postgres-only sibling of
    `db.enums`;
 2. the **`::type` cast** on bound parameters, whose type name is now per-column rather than
    per-codec — a small wiring change to the adapter's existing `nativeType` cast (§5).
@@ -28,7 +28,7 @@ machinery that already ships.
 `auth.aal_level` (from `authoring-design.md` §1), queried:
 
 ```ts
-const s = await db.auth.sessions.findOne({ where: { id, aal: db.native_enums.auth.AalLevel.members.aal2 } })
+const s = await db.auth.sessions.findOne({ where: { id, aal: db.nativeEnums.auth.AalLevel.members.aal2 } })
 s.aal   // typed 'aal1' | 'aal2' | 'aal3'  — not string
 ```
 
@@ -39,7 +39,7 @@ SELECT "aal" FROM "auth"."sessions" WHERE "id" = $1::uuid AND "aal" = $2::auth.a
 ```
 
 - `s.aal` is `'aal1' | 'aal2' | 'aal3'` because the column's value-set drives its type (§2).
-- `db.native_enums.auth.AalLevel` is the new facade root (§3).
+- `db.nativeEnums.auth.AalLevel` is the new facade root (§3).
 - `$2::auth.aal_level` is the per-column cast (§5).
 - The decoded value is the plain string `'aal2'` (§4.3 — the codec is text/identity).
 
@@ -97,7 +97,7 @@ resolves a column's `typeof contract` type by **`codecId` alone** — it does no
 left the no-emit path untouched. Closing it (making no-emit read the value-set) is **TML-2960**,
 out of scope for this slice. **Emit typing (§2.1) is what the MVP ships.**
 
-## 3. Runtime member access — the `db.native_enums` facade root (new)
+## 3. Runtime member access — the `db.nativeEnums` facade root (new)
 
 This is the only new read-side code, and it is confined to the Postgres facade.
 
@@ -122,7 +122,7 @@ Postgres attaches it as `db.enums` ([3-extensions/postgres/src/runtime/postgres.
 It reads the **domain** plane only — a storage-plane native enum never appears here, and we
 do not change that.
 
-### 3.2 The new `db.native_enums`
+### 3.2 The new `db.nativeEnums`
 
 A **new facade root**, sibling of `db.enums`, **composed into the Postgres client only**
 (mirroring where `enums` is attached, `postgres.ts:264`). It:
@@ -136,9 +136,9 @@ A **new facade root**, sibling of `db.enums`, **composed into the Postgres clien
 - is **Postgres-only** — Mongo/SQLite clients have no native enums and gain no such field.
 
 ```ts
-db.native_enums.auth.AalLevel.values        // readonly ['aal1','aal2','aal3']
-db.native_enums.auth.AalLevel.members.aal1  // 'aal1'
-db.native_enums.auth.AalLevel.has('aal2')   // true
+db.nativeEnums.auth.AalLevel.values        // readonly ['aal1','aal2','aal3']
+db.nativeEnums.auth.AalLevel.members.aal1  // 'aal1'
+db.nativeEnums.auth.AalLevel.has('aal2')   // true
 ```
 
 ### 3.3 Typing the accessor
@@ -147,7 +147,7 @@ The accessor's TS type reuses the existing `ContractEnumAccessor<Entry>` /
 `NamespacedEnums<TContract>` machinery ([enum-accessor.ts:99](../../../packages/1-framework/0-foundation/contract/src/enum-accessor.ts:99)),
 pointed at the storage `native_enum` block instead of the domain `enum` block. The emitted
 `contract.d.ts` already literalizes storage entries; the Postgres client interface adds a
-`native_enums` field typed as a `NativeEnums<TContract>` derived the same way `NamespacedEnums`
+`nativeEnums` field typed as a `NativeEnums<TContract>` derived the same way `NamespacedEnums`
 is, but over `TContract['storage']['namespaces'][Ns]['entries']['native_enum']`. No framework
 type changes — the derivation lives in the Postgres runtime package. **Both paths are
 covered:** the emitted `contract.d.ts` storage block *and* the no-emit (`typeof contract`)
@@ -165,32 +165,28 @@ Every AST node carries a `codec: CodecRef` (`{ codecId, typeParams, many }`). At
 ([2-sql/5-runtime/src/sql-context.ts](../../../packages/2-sql/5-runtime/src/sql-context.ts):~494)
 uses `createAstCodecResolver`
 ([ast-codec-resolver.ts](../../../packages/2-sql/5-runtime/src/codecs/ast-codec-resolver.ts):31),
-content-keyed on `` `${codecId}:${canonicalizeJson(typeParams)}` ``. `pg.enum` is a **param-free
-text codec** — encode/decode is identical for every native enum (text passthrough), so it
-resolves to a single instance; per-enum distinction lives in the value-set (typing) and
-`nativeType` (cast), not the codec.
+content-keyed on `` `${codecId}:${canonicalizeJson(typeParams)}` ``. `pg.enum` is a
+**parameterized text codec** — each enum column carries `typeParams: { typeName }`, so
+`forCodecRef` resolves a distinct instance per enum type; encode/decode is identical for all of
+them (text passthrough). Per-enum distinction lives in the value-set (typing) and the codec
+instance's `typeName` param (the cast).
 
-### 4.2 The parameter cast (`renderTypedParam`) — static today
+### 4.2 The parameter cast (`renderTypedParam`) — instance param first, static meta fallback
 
-`renderTypedParam(index, codecId, codecLookup, many)`
+`renderTypedParam(index, codecId, codecLookup, many, typeParams)`
 ([3-targets/6-adapters/postgres/src/core/sql-renderer.ts:72](../../../packages/3-targets/6-adapters/postgres/src/core/sql-renderer.ts:72))
-decides whether to append `::<type>` to a bound parameter. Today it reads a **static**
-per-codec-id native type: `codecLookup.metaFor(codecId).db.sql.postgres.nativeType`, and
-appends the cast when that type is **not** in the inferrable allow-list
-`POSTGRES_INFERRABLE_NATIVE_TYPES` (`sql-renderer.ts:46`). Its callers (`renderParamRef`,
-`sql-renderer.ts:746/757`) forward only `codecId` and `many` — **`typeParams` is not passed
-in.**
+decides whether to append `::<type>` to a bound parameter. It first asks the codec for a
+per-instance native type — `codecLookup.nativeTypeFor?.(codecId, typeParams)` — and falls back
+to the **static** per-codec-id meta (`codecLookup.metaFor(codecId).db.sql.postgres.nativeType`)
+when the hook yields nothing. The cast is appended when the resulting type is **not** in the
+inferrable allow-list `POSTGRES_INFERRABLE_NATIVE_TYPES` (`sql-renderer.ts:46`). Its callers
+(`renderParamRef`) forward `ref.codec.typeParams`.
 
-`CodecDescriptor.meta` is a plain, static field ([codec-descriptor.ts:39](../../../packages/1-framework/1-core/framework-components/src/shared/codec-descriptor.ts:39)),
-one value per codec id (proven: every `vector(N)` shares one `PG_VECTOR_META`,
-[pgvector/src/core/codecs.ts:44](../../../packages/3-extensions/pgvector/src/core/codecs.ts:44)).
-`CodecLookup.metaFor` takes a `codecId` only ([codec-types.ts:47](../../../packages/1-framework/1-core/framework-components/src/shared/codec-types.ts:47)).
-
-**Why the per-column value must reach the cast:** all native enums share **one** codec id
-(`pg/enum@1`), but each has its **own** Postgres type name (`auth.aal_level`,
-`public.user_role`, …). A single static `meta.nativeType` cannot serve them. The per-column
-`nativeType` is dropped when the `CodecRef` is built (`codecRefForStorageColumn`, §5), so the
-fix just threads it through — small and local. §5.
+`CodecDescriptor.meta` remains a plain, static field, one value per codec id (every `vector(N)`
+shares one `PG_VECTOR_META`); `metaFor` takes a `codecId` only. The instance hook exists
+because all native enums share **one** codec id (`pg/enum@1`) but each has its **own** Postgres
+type name (`auth.aal_level`, `public.user_role`, …) — a single static `meta.nativeType` cannot
+serve them, so the per-instance value rides the codec's own `typeParams`. §5.
 
 ### 4.3 Decode
 
@@ -203,37 +199,37 @@ codec is **text/identity**: `decode('aal2') → 'aal2'`. No new decode path; no 
 value-validation (the type and the compile-time union already constrain the value — the parent
 project ruled out a third runtime check).
 
-## 5. The `::type` cast — a small wiring change to the adapter's existing mechanism
+## 5. The `::type` cast — the codec instance carries its type name
 
-The adapter already casts by `nativeType`; the per-column type name just has to reach
-`renderTypedParam`. Two ways; recommendation first, in plain terms.
+`pg/enum@1` is a **parameterized codec**: each enum column carries
+`typeParams: { typeName: '<qualified>' }`, baked at authoring time by `resolvePgEnumRef` —
+alongside the column's unchanged `StorageColumn.nativeType`
+([storage-column.ts:15](../../../packages/2-sql/1-core/contract/src/ir/storage-column.ts:15)),
+which `db verify` and (managed phase) DDL read. `typeParams` already flows onto the `CodecRef`
+(`codecRefForStorageColumn` forwards it; `frozenCodecRef` preserves it), so the per-instance
+value reaches the renderer with no new transport.
 
-**Recommended — carry the resolved type name on the lowered parameter.** The column already
-stores its own Postgres type name in `StorageColumn.nativeType`
-([storage-column.ts:15](../../../packages/2-sql/1-core/contract/src/ir/storage-column.ts:15))
-— for a native-enum column that field is `aal_level` (schema-qualified `auth.aal_level`).
-That type name is currently dropped when the `CodecRef` is built (`codecRefForStorageColumn`
-[relational-core/src/codec-ref-for-column.ts:22](../../../packages/2-sql/4-lanes/relational-core/src/codec-ref-for-column.ts:22)
-reads `typeRef`/`typeParams`/`codecId`/`many`, never `nativeType`); stamp it there onto the
-`CodecRef`. `renderTypedParam` then
-**prefers a type name carried on the parameter** over the static `metaFor(codecId)` lookup,
-and emits `$N::auth.aal_level`. The SQL text builder gains **no** knowledge of enums or the
-contract — it just uses an attached type name when present, and falls back to the static codec
-meta for every other codec (`vector`, `jsonb`, text, …). `aal_level` is not in
-`POSTGRES_INFERRABLE_NATIVE_TYPES`, so the cast is always emitted.
-
-Concretely, the change is: (a) the lowerer stamps the parameter with the column's `nativeType`
-for `pg.enum` columns; (b) `renderTypedParam` reads a ref-carried `nativeType` first. Additive
-and local to the Postgres adapter + lowerer.
-
-**Alternative — compute the type name at render time** from the codec's `typeParams` (pass them
-through to `renderTypedParam` and derive the cast type there). Rejected: the column already
-carries its `nativeType`, so carrying it on the ref is simpler and keeps the SQL text builder
-free of codec-param logic — no benefit to re-deriving at render.
+At render time, `renderTypedParam` asks the codec for its per-instance native type through a
+codec-owned hook — `CodecLookup.nativeTypeFor(codecId, typeParams)`, the same delegate shape as
+the existing `renderValueLiteralFor` — and falls back to the static `metaFor(codecId)` meta
+when the hook returns `undefined`. `PgEnumDescriptor` implements the hook
+(`nativeTypeFor(params) = params.typeName`); no other codec does, so **every non-enum column
+renders byte-identically** — the renderer consults the codec, never a column-carried type name.
+`auth.aal_level` is not in `POSTGRES_INFERRABLE_NATIVE_TYPES`, so the cast is always emitted:
+`$N::auth.aal_level`.
 
 Schema-qualification: non-`public` enum types cast as `$N::auth.aal_level`. The `native_enum`'s
-`namespaceId` qualifies the type name baked onto the column at authoring time, so the qualified
-name is already present when the cast is rendered.
+`namespaceId` qualifies the type name baked into the column's `typeParams` (and `nativeType`)
+at authoring time; `public`/default and the unbound namespace stay bare, matching what
+`format_type()` reports to `db verify`.
+
+**Alternative — stamp the column's `nativeType` onto the `CodecRef`** and have
+`renderTypedParam` prefer a ref-carried type name. Rejected after being tried: every column has
+a `nativeType`, so the stamp rides **every** ref and shadows the codec's static meta for
+non-enum binds too — a column whose udt-name spelling differs from its codec's static meta
+(`int4` vs `integer`) flips plain `$N` into a spurious `$N::int4`. It also puts a SQL-only
+field on the family-agnostic `CodecRef` that Mongo AST nodes share. The codec-instance hook is
+opt-in per codec, so neither failure mode exists.
 
 ## 6. Ordering (`ORDER BY`)
 
@@ -246,12 +242,14 @@ in query machinery for native enums, not an addition.
 ## 7. What is new vs reused (query path)
 
 **New (small):**
-1. **`db.native_enums`** facade root (§3) — Postgres-only, reuses `EnumAccessor`; new code in
+1. **`db.nativeEnums`** facade root (§3) — Postgres-only, reuses `EnumAccessor`; new code in
    the Postgres runtime package only.
-2. **Per-column `::type` cast** (§5) — the per-instance native type on the parameter +
-   `renderTypedParam` preferring it. Local to the Postgres adapter + `CodecRef` builder.
-3. The **`pg/enum@1` codec** itself (text decode + `renderValueLiteral` + a per-column
-   `nativeType`) — new code, but the value-set → codec typing *mechanism* it plugs into is reused.
+2. **Per-instance `::type` cast** (§5) — the codec-owned `nativeTypeFor` hook +
+   `renderTypedParam` consulting it before static meta. Local to the codec surface + the
+   Postgres adapter.
+3. The **`pg/enum@1` codec** itself (a parameterized text codec: `typeParams: { typeName }`,
+   decode passthrough, `renderValueLiteral`, `nativeTypeFor`) — new code, but the value-set →
+   codec typing *mechanism* it plugs into is reused.
 
 **Reused (everything else):**
 - value-set → codec typing — `computeColumnType` / `renderValueSetType` / `renderValueLiteral`
@@ -264,6 +262,6 @@ in query machinery for native enums, not an addition.
 ## 8. Open questions
 
 None open in the design. Notes: the cast is always emitted via the adapter's `nativeType`
-mechanism (§4–§5); the `db.native_enums` accessor types from **both** the emitted block and the
+mechanism (§4–§5); the `db.nativeEnums` accessor types from **both** the emitted block and the
 no-emit handle (§3.3). The one deferred item is **no-emit column typing** (§2.3) — tracked as
 TML-2960, out of this slice's scope.

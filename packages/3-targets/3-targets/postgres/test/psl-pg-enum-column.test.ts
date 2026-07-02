@@ -100,6 +100,7 @@ describe('PSL pg.enum(Ref) field resolution', () => {
     expect(aalColumn).toMatchObject({
       codecId: 'pg/enum@1',
       nativeType: 'auth.aal_level',
+      typeParams: { typeName: 'auth.aal_level' },
       nullable: false,
       valueSet: {
         plane: 'storage',
@@ -201,6 +202,7 @@ namespace public {
     expect(aalColumn).toMatchObject({
       codecId: 'pg/enum@1',
       nativeType: 'aal_level',
+      typeParams: { typeName: 'aal_level' },
       valueSet: {
         plane: 'storage',
         entityKind: 'valueSet',

@@ -1,3 +1,4 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { RuntimeExtensionDescriptor } from '@prisma-next/framework-components/execution';
@@ -10,6 +11,7 @@ import {
   type Codec as SqlCodec,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { TestSqlContractSerializer as SqlContractSerializer } from '../../../../2-sql/9-family/test/test-sql-contract-serializer';
@@ -32,6 +34,7 @@ interface CodecMetadata {
     readonly db?: { readonly sql?: { readonly postgres?: { readonly nativeType?: string } } };
   };
   readonly renderOutputType?: (params: Record<string, unknown>) => string | undefined;
+  readonly nativeTypeFor?: (typeParams: unknown) => string | undefined;
 }
 
 function lookupOf(
@@ -42,6 +45,7 @@ function lookupOf(
     targetTypesFor: (id) => byId[id]?.metadata?.targetTypes,
     metaFor: (id) => byId[id]?.metadata?.meta,
     renderOutputTypeFor: (id, params) => byId[id]?.metadata?.renderOutputType?.(params),
+    nativeTypeFor: (id, typeParams) => byId[id]?.metadata?.nativeTypeFor?.(typeParams),
   };
 }
 
@@ -68,7 +72,12 @@ const baseContract = new SqlContractSerializer().deserializeContract({
                 note: { codecId: 'app/test-opaque@1', nativeType: 'tag', nullable: false },
                 geo: { codecId: 'app/geography@1', nativeType: 'geography', nullable: false },
                 profile: { codecId: 'arktype/json@1', nativeType: 'jsonb', nullable: false },
-                status: { codecId: 'pg/enum@1', nativeType: 'aal_level', nullable: false },
+                status: {
+                  codecId: 'pg/enum@1',
+                  nativeType: 'aal_level',
+                  nullable: false,
+                  typeParams: { typeName: 'aal_level' },
+                },
               },
               uniques: [],
               indexes: [],
@@ -92,13 +101,13 @@ function selectWithParam(column: string, codecId: string | undefined, value: unk
     .withWhere(BinaryExpr.eq(ColumnRef.of('user', column), ref));
 }
 
-function selectWithNativeTypeParam(
+function selectWithTypeParams(
   column: string,
   codecId: string,
-  nativeType: string,
+  typeParams: JsonValue,
   value: unknown,
 ) {
-  const ref = ParamRef.of(value, { name: column, codec: { codecId, nativeType } });
+  const ref = ParamRef.of(value, { name: column, codec: { codecId, typeParams } });
   return SelectAst.from(TableSource.named('user'))
     .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
     .withWhere(BinaryExpr.eq(ColumnRef.of('user', column), ref));
@@ -149,7 +158,7 @@ describe('renderLoweredSql cast policy', () => {
     expect(lowered.sql).toBe('SELECT "user"."id" AS "id" FROM "user" WHERE "user"."score" = $1');
   });
 
-  it('emits $N::<nativeType> for a native-enum column using the per-column nativeType, not the codec static meta', () => {
+  it('emits $N::<nativeType> for a native-enum column using the codec instance nativeTypeFor hook, not the codec static meta', () => {
     const pgEnumCodec: Codec = defineTestCodec({
       typeId: 'pg/enum@1',
       encode: (value: string): string => value,
@@ -161,11 +170,15 @@ describe('renderLoweredSql cast policy', () => {
         metadata: {
           targetTypes: ['text'],
           meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
+          nativeTypeFor: (typeParams) =>
+            typeParams !== null && typeof typeParams === 'object' && 'typeName' in typeParams
+              ? String((typeParams as { typeName: unknown }).typeName)
+              : undefined,
         },
       },
     });
 
-    const ast = selectWithNativeTypeParam('status', 'pg/enum@1', 'aal_level', 'aal2');
+    const ast = selectWithTypeParams('status', 'pg/enum@1', { typeName: 'aal_level' }, 'aal2');
     const lowered = renderLoweredSql(ast, baseContract, lookup);
 
     expect(lowered.sql).toBe(
@@ -173,7 +186,7 @@ describe('renderLoweredSql cast policy', () => {
     );
   });
 
-  it('emits $N::<schema>.<nativeType> for a native-enum column in a non-public schema, using the schema-qualified nativeType verbatim', () => {
+  it('emits $N::<schema>.<nativeType> for a native-enum column in a non-public schema, using the schema-qualified typeName verbatim', () => {
     const pgEnumCodec: Codec = defineTestCodec({
       typeId: 'pg/enum@1',
       encode: (value: string): string => value,
@@ -185,16 +198,55 @@ describe('renderLoweredSql cast policy', () => {
         metadata: {
           targetTypes: ['text'],
           meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
+          nativeTypeFor: (typeParams) =>
+            typeParams !== null && typeof typeParams === 'object' && 'typeName' in typeParams
+              ? String((typeParams as { typeName: unknown }).typeName)
+              : undefined,
         },
       },
     });
 
-    const ast = selectWithNativeTypeParam('status', 'pg/enum@1', 'auth.aal_level', 'aal2');
+    const ast = selectWithTypeParams('status', 'pg/enum@1', { typeName: 'auth.aal_level' }, 'aal2');
     const lowered = renderLoweredSql(ast, baseContract, lookup);
 
     expect(lowered.sql).toBe(
       'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."status" = $1::auth.aal_level',
     );
+  });
+
+  it('a column whose codec has no nativeTypeFor hook renders plain $N even when its udt-name spelling (int4) differs from static meta (integer)', () => {
+    // Built through the real codecRefForStorageColumn path (not a hand-built
+    // ref), against the "score" column declared above with nativeType:
+    // 'int4' in the contract. A CodecRef must not carry the column's own
+    // nativeType: forwarding it once shadowed the codec's static, inferrable
+    // meta ('integer') and produced a spurious $1::int4 cast on every
+    // non-enum bind.
+    const integerCodec: Codec = defineTestCodec({
+      typeId: 'pg/int4@1',
+      encode: (value: number): number => value,
+      decode: (wire: number): number => wire,
+    });
+    const lookup = lookupOf({
+      'pg/int4@1': {
+        codec: integerCodec,
+        metadata: {
+          targetTypes: ['int4'],
+          meta: { db: { sql: { postgres: { nativeType: 'integer' } } } },
+        },
+      },
+    });
+
+    const ref = codecRefForStorageColumn(baseContract.storage, '__unbound__', 'user', 'score');
+    expect(ref).toEqual({ codecId: 'pg/int4@1' });
+    if (ref === undefined) return;
+    const ast = SelectAst.from(TableSource.named('user'))
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withWhere(
+        BinaryExpr.eq(ColumnRef.of('user', 'score'), ParamRef.of(1, { name: 'score', codec: ref })),
+      );
+    const lowered = renderLoweredSql(ast, baseContract, lookup);
+
+    expect(lowered.sql).toBe('SELECT "user"."id" AS "id" FROM "user" WHERE "user"."score" = $1');
   });
 
   it('emits plain $N when the codec carries no nativeType metadata', () => {
@@ -314,6 +366,19 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
 
     expect(lowered.sql).toBe(
       'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."geo" = $1::geography',
+    );
+  });
+
+  it('emits the per-instance enum cast through the assembled stack: the builtin pg/enum@1 descriptor exposes nativeTypeFor and the stack lookup wires it', () => {
+    // No hand-built lookup — this goes through the production extractCodecLookup
+    // path, proving the codec-instance cast works end-to-end from descriptor
+    // registration to rendered SQL.
+    const adapter = createComposedPostgresAdapter({ extensionPacks: [] });
+    const ast = selectWithTypeParams('status', 'pg/enum@1', { typeName: 'auth.aal_level' }, 'aal2');
+    const lowered = adapter.lower(ast, { contract: baseContract });
+
+    expect(lowered.sql).toBe(
+      'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."status" = $1::auth.aal_level',
     );
   });
 });

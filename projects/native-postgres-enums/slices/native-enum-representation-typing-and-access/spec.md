@@ -12,7 +12,7 @@ A native Postgres enum becomes representable, typed, and readable at runtime. A 
 nativeType }` and reads/writes as the **value union** (`'aal1' | 'aal2' | 'aal3'`, not
 `string`) in the query builder, ORM, and emitted `contract.d.ts` — via the **existing
 post-TML-2952 value-set → codec typing machinery, unchanged**; generated SQL carries the
-`$N::<type>` cast; and `db.native_enums.<ns>.<Name>` exposes the members at runtime. The enum
+`$N::<type>` cast; and `db.nativeEnums.<ns>.<Name>` exposes the members at runtime. The enum
 is graded `external`; **no migration machinery** ships (external enums are never diffed). This
 is the whole read surface — slice 2 (Supabase) consumes it.
 
@@ -25,7 +25,7 @@ merged). Full detail in the design docs; the shape this slice builds:
   `role`/`policy` template, no custom seams): a variadic block descriptor
   (`{ parameters: {}, variadicParameters: true }`, the shipping SQL `enum`-block shape); a
   lowering factory requiring `key = "value"` members (rejects bare), stamping `typeName` from
-  `@@map` (default `snake_case(name)`), preserving member order, setting the `control` grade;
+  `@@map` (default: the block name verbatim), preserving member order, setting the `control` grade;
   an IR node (`PostgresNativeEnum`) + arktype validator + serializer at
   `storage.namespaces[ns].entries.native_enum[Name]`.
 - **Derived value-set** (authoring-design §2.5) — the entity's members derive a
@@ -41,10 +41,12 @@ merged). Full detail in the design docs; the shape this slice builds:
   `if (column.valueSet)` → `renderValueSetType(valueSet.values, column.codecId, side,
   codecLookup)` → `codecLookup.renderValueLiteralFor(...)` → the literal union. **Zero new
   typing code**; the same path check enums use. No `renderOutputType`, no domain-enum path.
-- **The `::type` cast** (querying-design §4–§5) — stamp `columnDef.nativeType` onto the
-  `CodecRef` in `codecRefForStorageColumn` (dropped there today); `renderTypedParam` prefers a
-  ref-carried `nativeType` over the static `metaFor(codecId)` meta. Additive.
-- **`db.native_enums`** (querying-design §3) — `buildNamespacedNativeEnums(contract.storage)`
+- **The `::type` cast** (querying-design §4–§5) — the codec instance carries its type name:
+  the column bakes `typeParams: { typeName }`, and `renderTypedParam` asks the codec via the
+  `nativeTypeFor` hook (static `metaFor(codecId)` meta as fallback). Only `pg/enum@1`
+  implements the hook, so other columns render unchanged. (A ref-carried `nativeType` was
+  tried first and reverted — it shadowed static meta on every non-enum bind.)
+- **`db.nativeEnums`** (querying-design §3) — `buildNamespacedNativeEnums(contract.storage)`
   over the `native_enum` entities, attached to the Postgres client only, reusing
   `EnumAccessor`; typed for emit + no-emit (mirroring the existing `enumAccessors`). `db.enums`
   untouched.
@@ -54,14 +56,14 @@ merged). Full detail in the design docs; the shape this slice builds:
 One reviewer holds: **"a `native_enum` exists, columns using it read/write as a typed value
 union with the correct cast, and its members are reachable at runtime."** The pieces are
 interdependent (column needs the entity + value-set; cast needs the per-column type name;
-`db.native_enums` reads the entity) — splitting yields incomplete verticals. One coherent
+`db.nativeEnums` reads the entity) — splitting yields incomplete verticals. One coherent
 rollback unit; the complete read surface. Supabase is the only separate slice.
 
 ## Scope
 
 **In:** the `native_enum` block descriptor + entityType + lowering factory + IR node + validator
 + serializer; the derived `StorageValueSet`; the `pg.enum(Ref)` codec + resolution (**PSL**);
-the cast wiring; `db.native_enums`; tests (emit typing, cast, runtime accessor, negatives).
+the cast wiring; `db.nativeEnums`; tests (emit typing, cast, runtime accessor, negatives).
 
 **Deliberately out:**
 - Supabase declarations + example → **slice 2**.
@@ -72,7 +74,7 @@ the cast wiring; `db.native_enums`; tests (emit typing, cast, runtime accessor, 
   adoption) → the deferred managed project.
 - **No-emit (`typeof contract`) column typing** — deferred to **TML-2960** (the no-emit path is
   codec-id-keyed and doesn't read the value-set; a native column types as the codec base type
-  in `typeof contract` until 2960 lands). *The `db.native_enums` accessor is typed per namespace
+  in `typeof contract` until 2960 lands). *The `db.nativeEnums` accessor is typed per namespace
   as an open `Record<string, EnumAccessor>` — runtime-correct in emit + no-emit; per-name literal
   accessor typing is deferred (composes with TML-2960).*
 - rename/remove/reorder; any change to `db.enums`, the domain-enum path, or the check-enum path.
@@ -80,9 +82,9 @@ the cast wiring; `db.native_enums`; tests (emit typing, cast, runtime accessor, 
 ## Pre-investigated edge cases
 
 - **Schema-qualified cast** — non-`public` enum types cast as `$N::auth.aal_level`; the baked
-  `nativeType` must be schema-qualified.
+  type name (`typeParams.typeName` + the column's `nativeType`) must be schema-qualified.
 - **`renderTypedParam` callers** (`renderParamRef`, prepared + plain, all in `sql-renderer.ts`)
-  — the ref-carried `nativeType` must be additive; fall back to static meta for other codecs.
+  — the per-instance hook must be additive; fall back to static meta for codecs without it.
 - **`pg/enum@1` id** reuses the deleted-in-TML-2853 codec id — confirm no stale references.
 - **Bare members rejected** — the variadic parser accepts a value-less key as `{kind:'bare'}`;
   the lowering factory must diagnose it.
@@ -95,7 +97,7 @@ the cast wiring; `db.native_enums`; tests (emit typing, cast, runtime accessor, 
   `pg.enum` column: emits `storage.entries.native_enum` + the derived `entries.valueSet` + the
   column `{ codecId, valueSet ref, nativeType, no CHECK }`; types as the value union in QB/ORM
   (emit); rejects out-of-set input and a bare member; generates `$N::<type>` in compiled SQL;
-  and `db.native_enums.<ns>.<Name>.members` resolves at runtime (Postgres client only).
+  and `db.nativeEnums.<ns>.<Name>.members` resolves at runtime (Postgres client only).
 - `pnpm fixtures:check` clean.
 
 (CI-green, reviewer-accept, project-DoD floor inherited — not restated. No-emit column typing is
@@ -109,6 +111,9 @@ explicitly out, per TML-2960.)
 
 **Status:** D1–D4 delivered and committed (`cbb1f6e50`, `2ffb797d7`, `fbb9609aa`, `a105437f6`).
 D5 remaining (PSL-only e2e + slice review). TS authoring moved out → [TML-2965].
+**Post-review rework:** the PR #906 review round replaced D3's ref-carried `nativeType` cast
+transport with the codec-instance parameter (`typeParams.typeName` + the `nativeTypeFor` hook)
+— the D3 entry below records what D3 originally did; the Chosen design above is current.
 
 Sequential, test-first. Each dispatch: write the failing test, then implement.
 
@@ -145,7 +150,7 @@ Sequential, test-first. Each dispatch: write the failing test, then implement.
   (`$N::auth.aal_level`), other codecs unaffected.
 
 ### D4 — `db-native-enums-accessor`  *(may run parallel to D3 after D1)*
-- **Outcome:** `db.native_enums.<ns>.<Name>` exposes members at runtime
+- **Outcome:** `db.nativeEnums.<ns>.<Name>` exposes members at runtime
   (values/names/members/has/hasName/nameOf/ordinalOf), typed per namespace as an open
   `Record<string, EnumAccessor>` (emit + no-emit; per-name literal typing deferred → TML-2960);
   Postgres-only.
@@ -157,7 +162,7 @@ Sequential, test-first. Each dispatch: write the failing test, then implement.
 
 ### D5 — `end-to-end-fixture-and-review`
 - **Outcome:** one authored **PSL** fixture exercising entity + value-set +
-  typed column + cast + `db.native_enums` end-to-end; `fixtures:check` green; slice review.
+  typed column + cast + `db.nativeEnums` end-to-end; `fixtures:check` green; slice review.
 - **Builds on:** D1–D4.
 - **Hands to:** the shipped slice-1 capability.
 - **Focus:** the e2e fixture + full gate set (build, typecheck, lint:deps, package + integration

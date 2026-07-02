@@ -49,14 +49,14 @@ export interface PostgresTransactionContext<TContract extends Contract<SqlStorag
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
   readonly enums: NamespacedEnums<TContract>;
-  readonly native_enums: NamespacedNativeEnums<TContract>;
+  readonly nativeEnums: NamespacedNativeEnums<TContract>;
 }
 
 export interface PostgresClient<TContract extends Contract<SqlStorage>> {
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
   readonly enums: NamespacedEnums<TContract>;
-  readonly native_enums: NamespacedNativeEnums<TContract>;
+  readonly nativeEnums: NamespacedNativeEnums<TContract>;
   readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
@@ -269,7 +269,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     'buildNamespacedEnums returns the namespace-keyed accessor map this contract types'
   >(Object.freeze(buildNamespacedEnums(contract.domain)));
 
-  const native_enums = blindCast<
+  const nativeEnums = blindCast<
     NamespacedNativeEnums<TContract>,
     'buildNamespacedNativeEnums returns the namespace-keyed accessor map this contract types'
   >(Object.freeze(buildNamespacedNativeEnums(contract.storage)));
@@ -278,7 +278,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     sql,
     orm,
     enums,
-    native_enums,
+    nativeEnums,
     raw: rawSqlTag,
     context,
     stack,
@@ -348,7 +348,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
         // Spreading would evaluate the getter once and freeze its value.
         const tx: PostgresTransactionContext<TContract> = Object.assign(
           Object.create(txCtx) as TransactionContext,
-          { sql: txSql, orm: txOrm, enums, native_enums },
+          { sql: txSql, orm: txOrm, enums, nativeEnums },
         );
 
         return fn(tx);

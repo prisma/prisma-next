@@ -196,7 +196,7 @@ namespace auth {
     expect(valueSet?.values).toEqual(['aal1', 'aal2', 'aal3']);
   });
 
-  it('defaults typeName to snake_case(HandleName) when @@map is omitted', () => {
+  it('defaults typeName to the block name verbatim when @@map is omitted', () => {
     const source = `
 namespace auth {
   native_enum FactorType {
@@ -216,7 +216,7 @@ namespace auth {
 
     const ns = result.value.storage.namespaces['auth'] as PostgresSchema;
     const nativeEnum = ns.nativeEnum['FactorType'];
-    expect(nativeEnum?.typeName).toBe('factor_type');
+    expect(nativeEnum?.typeName).toBe('FactorType');
   });
 
   it('does not create a domain enum entry (native enums never appear alongside db.enums)', () => {

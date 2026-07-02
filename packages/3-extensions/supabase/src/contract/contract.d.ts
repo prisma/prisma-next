@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:e0bc9b2307571fa31aa6f7cbe30e93c914decafb102c580811594dd1e76d648f'>;
+  StorageHashBase<'sha256:a370d4a08b89ede10154241bee283741c4b33239ca9b7a4aeb3fac64b8cc9f8b'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -268,6 +268,7 @@ type ContractBase = Omit<
                   readonly nativeType: 'auth.aal_level';
                   readonly codecId: 'pg/enum@1';
                   readonly nullable: true;
+                  readonly typeParams: { readonly typeName: 'auth.aal_level' };
                 };
                 readonly created_at: {
                   readonly nativeType: 'timestamptz';
@@ -311,6 +312,17 @@ type ContractBase = Omit<
               uniques: readonly [];
               indexes: readonly [];
               foreignKeys: readonly [];
+            };
+          };
+          readonly native_enum: {
+            readonly AalLevel: {
+              readonly kind: 'postgres-enum';
+              readonly typeName: 'aal_level';
+              readonly members: readonly [
+                { readonly name: 'aal1'; readonly value: 'aal1' },
+                { readonly name: 'aal2'; readonly value: 'aal2' },
+                { readonly name: 'aal3'; readonly value: 'aal3' },
+              ];
             };
           };
           readonly valueSet: {
@@ -489,7 +501,11 @@ type ContractBase = Omit<
               };
               readonly aal: {
                 readonly nullable: true;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/enum@1' };
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/enum@1';
+                  readonly typeParams: { readonly typeName: 'auth.aal_level' };
+                };
               };
               readonly created_at: {
                 readonly nullable: false;

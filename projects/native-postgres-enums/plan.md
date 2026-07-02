@@ -10,7 +10,7 @@ Phase 1 (external enums) is **shipped** — [PR #906](https://github.com/prisma/
 
 The complete external-enum vertical — represent → type → cast → runtime access → Supabase demonstration. Satisfies **R1–R5**. Design of record: [`spec.md`](spec.md); implementation is the commits below.
 
-- **Representation, typing, cast, `db.native_enums`** (`cbb1f6e50` → `a105437f6`) — the `native_enum` pack entity + derived value-set; the `pg.enum(Ref)` column + `pg/enum@1` codec typed via the value-set → codec path; the per-column `$N::<type>` cast; the Postgres-only `db.native_enums` accessor. Satisfies R1–R4.
+- **Representation, typing, cast, `db.nativeEnums`** (`cbb1f6e50` → `a105437f6`) — the `native_enum` pack entity + derived value-set; the `pg.enum(Ref)` column + `pg/enum@1` codec typed via the value-set → codec path; the per-column `$N::<type>` cast; the Postgres-only `db.nativeEnums` accessor. Satisfies R1–R4.
 - **Supabase demonstration + schema-qualification fix** (`b8c4a69a7`, `1a3306cf4`) — the Supabase extension declares `auth.aal_level`; the example proves the whole path end-to-end against real Postgres. Running it for real exposed that a non-`public` schema needs a **schema-qualified** type reference (`auth.aal_level`) for both the cast and `db verify` — fixed by qualifying the column's `nativeType` by its namespace. Satisfies R5 and proves R1–R4 end-to-end.
 
 ## Forward work

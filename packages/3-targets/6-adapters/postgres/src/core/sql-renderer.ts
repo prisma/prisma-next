@@ -74,7 +74,7 @@ function renderTypedParam(
   codecId: string | undefined,
   codecLookup: CodecLookup,
   many?: boolean,
-  columnNativeType?: string,
+  typeParams?: JsonValue,
 ): string {
   if (codecId === undefined) {
     return `$${index}`;
@@ -99,7 +99,9 @@ function renderTypedParam(
   const sqlBlock = isRecord(dbRecord) ? dbRecord['sql'] : undefined;
   const dialectBlock = isRecord(sqlBlock) ? sqlBlock['postgres'] : undefined;
   const staticNativeType = isRecord(dialectBlock) ? dialectBlock['nativeType'] : undefined;
-  const nativeType = columnNativeType ?? staticNativeType;
+  // A parameterized codec can carry a per-instance native type (e.g. a native enum's type name from its `typeParams`); it wins over the codec's static meta.
+  const instanceNativeType = codecLookup.nativeTypeFor?.(codecId, typeParams);
+  const nativeType = instanceNativeType ?? staticNativeType;
   if (typeof nativeType === 'string') {
     const arraySuffix = many ? '[]' : '';
     if (!POSTGRES_INFERRABLE_NATIVE_TYPES.has(nativeType)) {
@@ -750,7 +752,7 @@ function renderParamRef(ref: AnyParamRef, pim: ParamIndexMap): string {
       ref.codec.codecId,
       pim.codecLookup,
       ref.codec.many,
-      ref.codec.nativeType,
+      ref.codec.typeParams,
     );
   }
   if (ref.codec === undefined) {
@@ -767,7 +769,7 @@ function renderParamRef(ref: AnyParamRef, pim: ParamIndexMap): string {
     ref.codec.codecId,
     pim.codecLookup,
     ref.codec.many,
-    ref.codec.nativeType,
+    ref.codec.typeParams,
   );
 }
 

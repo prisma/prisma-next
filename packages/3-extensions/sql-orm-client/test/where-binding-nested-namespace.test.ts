@@ -75,7 +75,7 @@ describe('bindWhereExpr nested-subquery namespace coordinate', () => {
     const param = innerWhere.right as ParamRef;
     expect(param.kind).toBe('param-ref');
     expect(param.value).toBe('secret');
-    expect(param.codec).toEqual({ codecId: 'pg/varchar@1', nativeType: 'pg/varchar@1' });
+    expect(param.codec).toEqual({ codecId: 'pg/varchar@1' });
   });
 
   it('stamps the per-namespace codec on a param bound inside a JOIN ON targeting the second namespace', () => {
@@ -98,6 +98,6 @@ describe('bindWhereExpr nested-subquery namespace coordinate', () => {
     const param = onExpr.right as ParamRef;
     expect(param.kind).toBe('param-ref');
     expect(param.value).toBe('secret');
-    expect(param.codec).toEqual({ codecId: 'pg/varchar@1', nativeType: 'pg/varchar@1' });
+    expect(param.codec).toEqual({ codecId: 'pg/varchar@1' });
   });
 });

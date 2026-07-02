@@ -110,7 +110,6 @@ function frozenCodecRef(codec: CodecRef): CodecRef {
   const base = {
     codecId: codec.codecId,
     ...ifDefined('typeParams', typeParams),
-    ...ifDefined('nativeType', codec.nativeType),
   };
   return Object.freeze(codec.many ? { ...base, many: true } : base);
 }

@@ -535,20 +535,14 @@ function generateDocumentScopedStorageTypesType(types: SqlStorage['types']): str
   return `{ ${typeEntries.join('; ')} }`;
 }
 
-function generateNamespaceValueSetType(
-  valueSet: Readonly<Record<string, StorageValueSet>>,
-): string {
-  if (Object.keys(valueSet).length === 0) {
-    return 'Record<string, never>';
-  }
-  const entries: string[] = [];
-  for (const [name, vs] of Object.entries(valueSet)) {
-    const valuesLiteral = vs.values.map((v) => serializeValue(v)).join(', ');
-    entries.push(
-      `readonly ${serializeObjectKey(name)}: { readonly kind: 'valueSet'; readonly values: readonly [${valuesLiteral}] }`,
-    );
-  }
-  return `{ ${entries.join('; ')} }`;
+/**
+ * Literalizes a pack-contributed entries slot from its canonical serialized JSON — the same value
+ * `contract.json` carries for the slot. The emitter has no family→target knowledge of what the
+ * slot is (`valueSet`, `native_enum`, `role`, …); it reflects whatever the pack serialized.
+ */
+function literalizeSerializedEntriesSlot(slotEntries: unknown): string {
+  const json: unknown = JSON.parse(JSON.stringify(slotEntries));
+  return serializeValue(json);
 }
 
 function namespaceSerializedKind(ns: Namespace): string {
@@ -664,10 +658,22 @@ function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): st
     const tablesType = generateTablesMapType(
       (ns.entries.table ?? {}) as Readonly<Record<string, StorageTable>>,
     );
-    const valueSetSlot = ns.entries.valueSet;
     const entriesParts = [`readonly table: ${tablesType}`];
-    if (valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0) {
-      entriesParts.push(`readonly valueSet: ${generateNamespaceValueSetType(valueSetSlot)}`);
+    // Every non-table entries slot is emitted generically from its canonical serialized JSON.
+    const otherSlots = Object.entries(ns.entries)
+      .filter(([slotKey]) => slotKey !== 'table')
+      .sort(([a], [b]) => a.localeCompare(b));
+    for (const [slotKey, slotEntries] of otherSlots) {
+      if (
+        slotEntries === undefined ||
+        slotEntries === null ||
+        Object.keys(slotEntries).length === 0
+      ) {
+        continue;
+      }
+      entriesParts.push(
+        `readonly ${serializeObjectKey(slotKey)}: ${literalizeSerializedEntriesSlot(slotEntries)}`,
+      );
     }
     const entriesType = `{ ${entriesParts.join('; ')} }`;
     parts.push(

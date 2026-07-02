@@ -16,7 +16,6 @@ import {
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
-import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import { buildPairedColumnExprs, createModelAccessor } from '../src/model-accessor';
 import {
@@ -33,15 +32,10 @@ describe('createModelAccessor', () => {
   function paramRef(table: string, column: string, value: unknown): ParamRef {
     const tables = unboundTables(context.contract.storage) as Record<
       string,
-      { columns: Record<string, { codecId?: string; nativeType?: string }> } | undefined
+      { columns: Record<string, { codecId?: string }> } | undefined
     >;
-    const columnDef = tables[table]?.columns[column];
-    const codecId = columnDef?.codecId;
-    return codecId
-      ? ParamRef.of(value, {
-          codec: { codecId, ...ifDefined('nativeType', columnDef?.nativeType) },
-        })
-      : ParamRef.of(value);
+    const codecId = tables[table]?.columns[column]?.codecId;
+    return codecId ? ParamRef.of(value, { codec: { codecId } }) : ParamRef.of(value);
   }
 
   function expectBinaryParam(
@@ -506,15 +500,10 @@ describe('createModelAccessor', () => {
     function polyParam(table: string, column: string, value: unknown): ParamRef {
       const tables = unboundTables(polyContext.contract.storage) as Record<
         string,
-        { columns: Record<string, { codecId?: string; nativeType?: string }> } | undefined
+        { columns: Record<string, { codecId?: string }> } | undefined
       >;
-      const columnDef = tables[table]?.columns[column];
-      const codecId = columnDef?.codecId;
-      return codecId
-        ? ParamRef.of(value, {
-            codec: { codecId, ...ifDefined('nativeType', columnDef?.nativeType) },
-          })
-        : ParamRef.of(value);
+      const codecId = tables[table]?.columns[column]?.codecId;
+      return codecId ? ParamRef.of(value, { codec: { codecId } }) : ParamRef.of(value);
     }
 
     // The base `Task` accessor type carries only base fields; the patched poly

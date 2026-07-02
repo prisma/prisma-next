@@ -10,8 +10,8 @@ A native Postgres enum is a database **type** (`CREATE TYPE … AS ENUM`) — a 
 
 - a **`native_enum` entity** in storage (`entries.native_enum[Name]`, kind `postgres-enum`): `typeName`, ordered `members[{name,value}]`, optional `control` grade;
 - a **derived value-set** (`entries.valueSet[Name]`): the entity's member values — exactly as a check enum derives one. **This drives typing.**
-- a **column** bound via `pg.enum(Ref)`: `codecId: pg/enum@1` (a text codec), a **`valueSet` ref** → the derived value-set (typing), and **`nativeType`** = the schema-qualified type name (the cast). **No `CHECK`** — the type enforces membership.
-- **`db.native_enums`** — a Postgres-only accessor root (a sibling of `db.enums`), built from the entity's members. `db.enums` is untouched and never contains native enums.
+- a **column** bound via `pg.enum(Ref)`: `codecId: pg/enum@1` (a **parameterized** text codec), a **`valueSet` ref** → the derived value-set (typing), **`typeParams: { typeName }`** = the schema-qualified type name as the codec instance's parameter (the cast), and the same name as the column's **`nativeType`** (`db verify` / DDL). **No `CHECK`** — the type enforces membership.
+- **`db.nativeEnums`** — a Postgres-only accessor root (a sibling of `db.enums`), built from the entity's members. `db.enums` is untouched and never contains native enums.
 
 Typing is the **existing value-set → codec path** (post-TML-2952, unchanged): a native column carries a `valueSet` ref exactly like a check-enum column, so it reads/writes as the member-value union in the query builder, the ORM, and the emitted contract — **with no native-specific typing code**. Native realization is **Postgres-only**; SQLite and MongoDB have no native enum and keep the check realization.
 
@@ -20,7 +20,7 @@ So there are **two enum realizations sharing one typing path**, differing only i
 | | construct | enforcement | accessor | targets |
 | --- | --- | --- | --- | --- |
 | **check-realized** (the domain enum) | `enumType` | table `CHECK` | `db.enums` | all (family-agnostic) |
-| **native** | `native_enum` block + `pg.enum` codec | the Postgres type | `db.native_enums` | Postgres only |
+| **native** | `native_enum` block + `pg.enum` codec | the Postgres type | `db.nativeEnums` | Postgres only |
 
 ### At a glance
 
@@ -52,13 +52,14 @@ Emitted `storage.namespaces.public.entries`:
 },
 "table": { "profiles": { "columns": {
   "role": { "codecId": "pg/enum@1", "nativeType": "user_role", "nullable": false,
+    "typeParams": { "typeName": "user_role" },   // the codec instance's parameter → the $N::user_role cast
     "valueSet": { "plane":"storage", "entityKind":"valueSet", "namespaceId":"public", "entityName":"UserRole" } }
 } } }
 ```
 
 ```ts
 p.role                                  // 'admin' | 'member' | 'guest'   (not string)
-db.native_enums.public.UserRole.values  // readonly ['admin','member','guest']
+db.nativeEnums.public.UserRole.values  // readonly ['admin','member','guest']
 ```
 
 ## The design, part by part (Phase 1 — shipped)
@@ -71,9 +72,9 @@ Each element below states what is built and the requirement it satisfies (see th
 
 **Typing — satisfies R3.** The column reads/writes as the value union via `computeColumnType`'s `column.valueSet` branch → `renderValueSetType` → the codec's `renderValueLiteral` → the literal union. This is the **same path a check enum uses** (post-TML-2952, which made column typing value-set-driven and enum-agnostic — *"the domain enum is no longer a typing input"*); there is no native-specific typing code. The `pg.enum` codec is a text codec that also renders value literals. Typed input rejects out-of-set literals; generated SQL casts a bound parameter to the enum's type. (No-emit `typeof contract` column typing is the one gap — [TML-2960]: that path is codec-id-keyed and doesn't read the value-set yet. Emit typing works today.)
 
-**The cast — satisfies R3.** The column's own `nativeType` drives the `$N::<type>` cast: the SQL renderer prefers the per-column `nativeType` on the `CodecRef` over the codec's static metadata. A type in a **non-`public` schema is referenced schema-qualified** (`$N::auth.aal_level`), which is also what makes `db verify`'s column-type comparison agree with Postgres `format_type()`; `public`/default and the unbound namespace stay bare — the same qualify-vs-don't split `PostgresSchema.qualifyTable` uses for tables.
+**The cast — satisfies R3.** The codec instance drives the `$N::<type>` cast: each enum column carries `typeParams: { typeName }`, and the SQL renderer asks the codec for its per-instance native type through a codec-owned `nativeTypeFor` hook (the `renderValueLiteralFor` delegate shape), falling back to the codec's static metadata — only `pg/enum@1` implements the hook, so every other column renders as before. A type in a **non-`public` schema is referenced schema-qualified** (`$N::auth.aal_level`), which is also what makes `db verify`'s column-type comparison (reading the column's `nativeType`) agree with Postgres `format_type()`; `public`/default and the unbound namespace stay bare — the same qualify-vs-don't split `PostgresSchema.qualifyTable` uses for tables.
 
-**Runtime access — satisfies R4.** `db.native_enums.<ns>.<Name>` exposes each native enum's members (name→value, same accessor shape as `db.enums`), built by walking the `native_enum` storage entities and reusing the framework `createEnumAccessor`. It is attached to the Postgres client, and — because a namespace like Supabase `auth` lives in an extension's own contract — to the Supabase client's `.supabase` root. `db.enums` is unchanged.
+**Runtime access — satisfies R4.** `db.nativeEnums.<ns>.<Name>` exposes each native enum's members (name→value, same accessor shape as `db.enums`), built by walking the `native_enum` storage entities and reusing the framework `createEnumAccessor`. It is attached to the Postgres client, and — because a namespace like Supabase `auth` lives in an extension's own contract — to the Supabase client's `.supabase` root. `db.enums` is unchanged.
 
 **External grade — satisfies R5.** `external`/`observed` native enums produce no DDL and no drift reports; the Supabase extension's `external` default applies to its contributed enums. External enums are never diffed, so `db verify` reports nothing for them for free.
 
@@ -114,7 +115,7 @@ Phase 1 requirements are met by the shipped design above; Phase 2 requirements a
 | **R1** | A `native_enum` entity (type name, ordered members, control) round-trips and derives a value-set | 1 ✓ | Representation | `psl-native-enum-authoring.test.ts`, serializer round-trip |
 | **R2** | A field references it via `pg.enum(ref)` → column `{codecId, valueSet, nativeType}`, no `CHECK`, no domain enum | 1 ✓ | Authoring | `psl-pg-enum-column.test.ts` |
 | **R3** | The column reads as the value union (not `string`); input rejects out-of-set literals; SQL carries the `::type` cast | 1 ✓ | Typing + the cast | `native-enum.field-output.test-d.ts`, `sql-renderer.cast-policy.test.ts` |
-| **R4** | `db.native_enums.<ns>.<Name>` exposes members; `db.enums` unchanged | 1 ✓ | Runtime access | `postgres.test.ts`, `supabase-facade.test.ts` |
+| **R4** | `db.nativeEnums.<ns>.<Name>` exposes members; `db.enums` unchanged | 1 ✓ | Runtime access | `postgres.test.ts`, `supabase-facade.test.ts` |
 | **R5** | `external` enums produce no DDL and no drift | 1 ✓ | External grade (+ Phase-2 suppression) | Supabase `db verify` integration tests |
 | **R6** | Contract-infer emits a `managed` `native_enum` for an introspected type instead of throwing | 2 | Adoption | (phase 2) |
 | **R7** | An author-selected native enum is created and dropped, ordered before its columns | 2 | SchemaIR node + ops | (phase 2, live DB) |
@@ -132,7 +133,7 @@ Phase 1 requirements are met by the shipped design above; Phase 2 requirements a
 
 ## Alternatives considered
 
-- **Type native columns via a parameterized codec** (`renderOutputType`, values baked into `typeParams`, no value-set). Rejected: post-TML-2952 the value-set → codec path is the general, enum-agnostic column-typing mechanism, so a native column just carries a `valueSet` ref (like a check enum) and reuses it with zero new typing code. A bespoke parameterized-codec path would duplicate that; it only seemed right pre-2952, when value-set typing was still enum-tangled.
+- **Type native columns via a parameterized codec** (`renderOutputType`, the *values* baked into `typeParams`, no value-set). Rejected for **typing**: post-TML-2952 the value-set → codec path is the general, enum-agnostic column-typing mechanism, so a native column just carries a `valueSet` ref (like a check enum) and reuses it with zero new typing code. A bespoke parameterized-codec typing path would duplicate that; it only seemed right pre-2952, when value-set typing was still enum-tangled. (The codec *is* parameterized — but by the type **name** for the cast, not by the values for typing.)
 - **Reuse `StorageColumn.typeRef` + `storage.types` for the column→type join.** Rejected: that slot is the codec-alias mechanism (`vector`/`geometry`/`uuid`) — values rendered inline into a column type, never a managed `CREATE TYPE` object. A native enum is a managed schema object (the RLS template) — a different concept.
 - **A `codec | nativeEnum` union on the column type.** Rejected: every column always has a codec; native realization is an additive structural fact, not a replacement of the codec.
 - **Native as the default Postgres realization.** Rejected: native can't cheaply remove/reorder and forces table rewrites; check is the safe default.

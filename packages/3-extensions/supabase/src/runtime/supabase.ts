@@ -90,7 +90,7 @@ export interface RoleBoundDb<TContract extends Contract<SqlStorage>> {
 export interface SupabaseInternalDb {
   readonly sql: Db<SupabaseExtensionContract>;
   readonly orm: OrmClient<SupabaseExtensionContract>;
-  readonly native_enums: NamespacedNativeEnums<SupabaseExtensionContract>;
+  readonly nativeEnums: NamespacedNativeEnums<SupabaseExtensionContract>;
   execute<Row>(
     plan: (SqlExecutionPlan<Row> | SqlQueryPlan<Row>) & { readonly _row?: Row },
     options?: RuntimeExecuteOptions,
@@ -377,7 +377,7 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
       },
       context: extContext,
     }),
-    native_enums: extNativeEnums,
+    nativeEnums: extNativeEnums,
     execute<Row>(
       plan: (SqlExecutionPlan<Row> | SqlQueryPlan<Row>) & { readonly _row?: Row },
       execOptions?: RuntimeExecuteOptions,

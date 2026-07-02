@@ -89,6 +89,8 @@ export interface AuthoringTypeConstructorDescriptor {
 export interface AuthoringEntityRefResolution {
   readonly codecId: string;
   readonly nativeType: string;
+  /** Codec-instance params threaded onto the column (e.g. a native enum's `{ typeName }`), for codecs whose per-instance behavior is parameterized. */
+  readonly typeParams?: Record<string, unknown>;
   readonly valueSetEntityName?: string;
   readonly valueSetEnforcement?: 'check' | 'native-type';
 }

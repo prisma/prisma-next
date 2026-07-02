@@ -32,6 +32,12 @@ export interface PostgresNativeEnumInput {
  * differ in the MVP — external enums are never diffed.
  */
 export class PostgresNativeEnum extends SqlNode implements DiffableNode {
+  static is(node: unknown): node is PostgresNativeEnum {
+    return (
+      typeof node === 'object' && node !== null && 'kind' in node && node.kind === 'postgres-enum'
+    );
+  }
+
   override readonly kind = 'postgres-enum' as const;
   readonly typeName: string;
   readonly members: readonly PostgresNativeEnumMember[];
@@ -55,7 +61,7 @@ export class PostgresNativeEnum extends SqlNode implements DiffableNode {
   }
 
   isEqualTo(other: DiffableNode): boolean {
-    if (!isPostgresNativeEnum(other)) {
+    if (!PostgresNativeEnum.is(other)) {
       throw new Error(
         `PostgresNativeEnum.isEqualTo: expected a PostgresNativeEnum, got ${other.constructor?.name ?? typeof other}`,
       );
@@ -66,8 +72,4 @@ export class PostgresNativeEnum extends SqlNode implements DiffableNode {
       (m, i) => m.name === other.members[i]?.name && m.value === other.members[i]?.value,
     );
   }
-}
-
-export function isPostgresNativeEnum(node: DiffableNode | undefined): node is PostgresNativeEnum {
-  return node !== undefined && 'kind' in node && node.kind === 'postgres-enum';
 }

@@ -80,17 +80,20 @@ type Present<T> = Exclude<T, undefined>;
 type EnumMemberEntry = { readonly name: string; readonly value: JsonValue };
 type EnumEntry = { readonly members: readonly EnumMemberEntry[] };
 
-type EnumEntryValues<Entry extends EnumEntry> = {
-  readonly [I in keyof Entry['members']]: Entry['members'][I] extends EnumMemberEntry
-    ? Entry['members'][I]['value']
-    : never;
+// Mapped over a bare type parameter so the mapped type is homomorphic — a
+// readonly tuple of members yields a readonly tuple of values/names (array
+// methods preserved), not a plain `{ 0: …; 1: … }` mapped object.
+type MemberValues<Members> = {
+  readonly [I in keyof Members]: Members[I] extends EnumMemberEntry ? Members[I]['value'] : never;
 };
 
-type EnumEntryNames<Entry extends EnumEntry> = {
-  readonly [I in keyof Entry['members']]: Entry['members'][I] extends EnumMemberEntry
-    ? Entry['members'][I]['name']
-    : never;
+type MemberNames<Members> = {
+  readonly [I in keyof Members]: Members[I] extends EnumMemberEntry ? Members[I]['name'] : never;
 };
+
+type EnumEntryValues<Entry extends EnumEntry> = MemberValues<Entry['members']>;
+
+type EnumEntryNames<Entry extends EnumEntry> = MemberNames<Entry['members']>;
 
 type EnumEntryMembers<Entry extends EnumEntry> = {
   readonly [M in Entry['members'][number] as M['name']]: M['value'];
@@ -120,7 +123,7 @@ export type EnumValues<A> = A extends { readonly values: ReadonlyArray<infer V> 
  */
 export type EnumMemberNames<A> = A extends { readonly names: ReadonlyArray<infer N> } ? N : never;
 
-type EnumEntriesToAccessors<Enums> = {
+export type EnumEntriesToAccessors<Enums> = {
   readonly [K in keyof Enums]: Enums[K] extends EnumEntry ? ContractEnumAccessor<Enums[K]> : never;
 };
 

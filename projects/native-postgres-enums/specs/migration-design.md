@@ -197,7 +197,7 @@ migration identity (ADR 199). This is why the permitted values live in storage, 
 type from storage alone, with no `domain` reference.
 
 External enums are recorded in `storage.entries` too (so columns can reference them, casts can
-name them, `db.native_enums` can read them) and therefore feed `storageHash` — but they are
+name them, `db.nativeEnums` can read them) and therefore feed `storageHash` — but they are
 stable (their definition is whatever Supabase ships), so they do not churn the hash, and their
 `external` grade means the hash change never yields DDL.
 

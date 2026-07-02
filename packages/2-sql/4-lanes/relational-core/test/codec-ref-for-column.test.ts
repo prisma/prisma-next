@@ -28,7 +28,12 @@ function usersTable(columnName: string, codecId: string): StorageTable {
 function enumTable(): StorageTable {
   return new StorageTable({
     columns: {
-      status: { codecId: 'pg/enum@1', nativeType: 'aal_level', nullable: false },
+      status: {
+        codecId: 'pg/enum@1',
+        nativeType: 'aal_level',
+        nullable: false,
+        typeParams: { typeName: 'aal_level' },
+      },
     },
     primaryKey: { columns: ['status'] },
     uniques: [],
@@ -59,11 +64,9 @@ describe('codecRefForStorageColumn', () => {
 
     expect(codecRefForStorageColumn(storage, 'public', 'users', 'email_addr')).toEqual({
       codecId: 'pg/text@1',
-      nativeType: 'text',
     });
     expect(codecRefForStorageColumn(storage, 'auth', 'users', 'token_col')).toEqual({
       codecId: 'pg/int4@1',
-      nativeType: 'text',
     });
   });
 
@@ -87,12 +90,11 @@ describe('codecRefForStorageColumn', () => {
 
     expect(codecRefForStorageColumn(storage, 'public', 'users', 'email_addr')).toEqual({
       codecId: 'pg/text@1',
-      nativeType: 'text',
     });
     expect(codecRefForStorageColumn(storage, 'public', 'users', 'missing')).toBeUndefined();
   });
 
-  it('carries the column nativeType on the returned CodecRef', () => {
+  it("derives {codecId, typeParams} for an enum column, from the column's own typeParams", () => {
     const storage = new SqlStorage({
       storageHash: STORAGE_HASH,
       namespaces: {
@@ -105,7 +107,7 @@ describe('codecRefForStorageColumn', () => {
 
     expect(codecRefForStorageColumn(storage, 'public', 'session', 'status')).toEqual({
       codecId: 'pg/enum@1',
-      nativeType: 'aal_level',
+      typeParams: { typeName: 'aal_level' },
     });
   });
 });

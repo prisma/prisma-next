@@ -147,29 +147,11 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
   }
 
   private serializePostgresNamespace(ns: PostgresSchema, isUnboundSlot: boolean): JsonObject {
-    const tablesOut: Record<string, JsonObject> = {};
-    for (const [tableName, table] of Object.entries(ns.table)) {
-      tablesOut[tableName] = this.serializeJsonObject(table);
-    }
-    const valueSetEntries = ns.valueSet;
-    const valueSetOut: Record<string, JsonObject> = {};
-    if (valueSetEntries !== undefined) {
-      for (const [valueSetName, valueSet] of Object.entries(valueSetEntries)) {
-        valueSetOut[valueSetName] = this.serializeJsonObject(valueSet);
-      }
-    }
-    const roleOut: Record<string, JsonObject> = {};
-    for (const [roleName, role] of Object.entries(ns.role)) {
-      roleOut[roleName] = this.serializeJsonObject(role);
-    }
-    const policyOut: Record<string, JsonObject> = {};
-    for (const [policyName, policy] of Object.entries(ns.policy)) {
-      policyOut[policyName] = this.serializeJsonObject(policy);
-    }
-    const nativeEnumOut: Record<string, JsonObject> = {};
-    for (const [nativeEnumName, nativeEnum] of Object.entries(ns.nativeEnum)) {
-      nativeEnumOut[nativeEnumName] = this.serializeJsonObject(nativeEnum);
-    }
+    const tablesOut = this.serializeEntries(ns.table);
+    const valueSetOut = this.serializeEntries(ns.valueSet ?? {});
+    const roleOut = this.serializeEntries(ns.role);
+    const policyOut = this.serializeEntries(ns.policy);
+    const nativeEnumOut = this.serializeEntries(ns.nativeEnum);
     return {
       id: ns.id,
       kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
@@ -181,6 +163,14 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
         ...(Object.keys(nativeEnumOut).length > 0 ? { native_enum: nativeEnumOut } : {}),
       },
     };
+  }
+
+  private serializeEntries(entries: Readonly<Record<string, unknown>>): Record<string, JsonObject> {
+    const out: Record<string, JsonObject> = {};
+    for (const [name, entry] of Object.entries(entries)) {
+      out[name] = this.serializeJsonObject(entry);
+    }
+    return out;
   }
 
   private serializeJsonObject(value: unknown): JsonObject {

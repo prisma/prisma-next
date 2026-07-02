@@ -126,7 +126,6 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     expect(registry.codecRefForColumn(UNBOUND_NAMESPACE_ID, 'Doc', 'embedding')).toEqual({
       codecId: 'pg/vector@1',
       typeParams: { length: 1536 },
-      nativeType: 'vector',
     });
   });
 
@@ -154,7 +153,6 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     expect(registry.codecRefForColumn(UNBOUND_NAMESPACE_ID, 'Doc', 'embedding')).toEqual({
       codecId: 'pg/vector@1',
       typeParams: { length: 768 },
-      nativeType: 'vector',
     });
   });
 
@@ -179,7 +177,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
 
     const registry = buildCodecDescriptorRegistry(descriptors, storage);
     const ref = registry.codecRefForColumn(UNBOUND_NAMESPACE_ID, 'User', 'email');
-    expect(ref).toEqual({ codecId: 'pg/text@1', nativeType: 'text' });
+    expect(ref).toEqual({ codecId: 'pg/text@1' });
     expect(ref?.typeParams).toBeUndefined();
   });
 
@@ -276,11 +274,9 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn namespace coordinat
 
     expect(registry.codecRefForColumn('public', 'users', 'email')).toEqual({
       codecId: 'pg/text@1',
-      nativeType: 'pg/text@1',
     });
     expect(registry.codecRefForColumn('auth', 'users', 'token')).toEqual({
       codecId: 'pg/varchar@1',
-      nativeType: 'pg/varchar@1',
     });
 
     // A column present only in the other namespace must not resolve here — proves

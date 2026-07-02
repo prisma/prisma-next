@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PostgresSchema } from '../src/core/postgres-schema';
-import {
-  isPostgresNativeEnum,
-  PostgresNativeEnum,
-} from '../src/core/schema-ir/postgres-native-enum';
+import { PostgresNativeEnum } from '../src/core/schema-ir/postgres-native-enum';
 import { PostgresRole } from '../src/core/schema-ir/postgres-role';
 
 const aalLevelInput = {
@@ -105,18 +102,18 @@ describe('PostgresNativeEnum', () => {
     });
   });
 
-  describe('isPostgresNativeEnum guard', () => {
+  describe('PostgresNativeEnum.is guard', () => {
     it('returns true for a real PostgresNativeEnum', () => {
-      expect(isPostgresNativeEnum(new PostgresNativeEnum(aalLevelInput))).toBe(true);
+      expect(PostgresNativeEnum.is(new PostgresNativeEnum(aalLevelInput))).toBe(true);
     });
 
     it('returns false for a node with a different kind', () => {
       const role = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
-      expect(isPostgresNativeEnum(role)).toBe(false);
+      expect(PostgresNativeEnum.is(role)).toBe(false);
     });
 
     it('returns false for undefined', () => {
-      expect(isPostgresNativeEnum(undefined)).toBe(false);
+      expect(PostgresNativeEnum.is(undefined)).toBe(false);
     });
   });
 });

@@ -289,9 +289,9 @@ describe('supabase() factory — SupabaseDb surface', () => {
   });
 });
 
-describe('service_role .supabase.native_enums (facade)', () => {
+describe('service_role .supabase.nativeEnums (facade)', () => {
   // Built from the real extension contract (`../contract/contract.json`),
-  // not a fixture — `native_enums` is derived from `extContract.storage`,
+  // not a fixture — `nativeEnums` is derived from `extContract.storage`,
   // which the Supabase runtime always builds from the extension's own
   // emitted contract (see `buildExtensionContract` in ../src/runtime/supabase.ts).
   // The `auth` namespace's `AalLevel` native_enum entry is production data:
@@ -303,7 +303,7 @@ describe('service_role .supabase.native_enums (facade)', () => {
       jwtSecret: fixtureJwt,
     });
 
-    const AalLevel = db.asServiceRole().supabase.native_enums.auth['AalLevel'];
+    const AalLevel = db.asServiceRole().supabase.nativeEnums.auth['AalLevel'];
 
     expect(AalLevel?.values).toEqual(['aal1', 'aal2', 'aal3']);
     expect(AalLevel?.members['aal2']).toBe('aal2');
@@ -311,14 +311,14 @@ describe('service_role .supabase.native_enums (facade)', () => {
     await db.close();
   });
 
-  it('builds the native_enums surface eagerly, without a runtime', async () => {
+  it('builds the nativeEnums surface eagerly, without a runtime', async () => {
     const db = await supabase({
       contract,
       url: 'postgres://localhost/db',
       jwtSecret: fixtureJwt,
     });
 
-    expect(db.asServiceRole().supabase.native_enums.auth['AalLevel']?.values).toEqual([
+    expect(db.asServiceRole().supabase.nativeEnums.auth['AalLevel']?.values).toEqual([
       'aal1',
       'aal2',
       'aal3',
