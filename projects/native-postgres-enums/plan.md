@@ -73,18 +73,27 @@ no diff, no ops: external enums are never diffed, so `db verify` emits nothing f
   and a runtime test for `db.native_enums.…members`. `fixtures:check`. (No-emit column typing is
   out of scope — TML-2960; TS authoring is out of scope — TML-2965.)
 
-### Slice 2 — `supabase-native-enums`
+### Slice 2 — `supabase-native-enums` (also the slice-1 e2e proof)
 - **Outcome:** The Supabase extension declares its built-in native enums in
   `packages/3-extensions/supabase/src/contract/contract.prisma`; the supabase example uses one
   on a column, reads it as a typed union, and reaches its members via `db.native_enums`;
-  `db verify` / migration emits nothing for the type (external, and un-diffed in the MVP).
-- **New code:** the `native_enum` declarations in the Supabase extension's contract + example
-  usage; ordered members transcribed from the real Supabase types.
-- **Reused as-is:** slice 1; the extension authoring path.
+  `db verify` / migration emits nothing for the type (external, and un-diffed in the MVP). This
+  real example-app demonstration **subsumes the synthetic D5 fixture** — an executed example is a
+  stronger emit-then-consume proof than a test-only fixture.
+- **First enum:** `auth.aal_level` (`aal1`/`aal2`/`aal3`, the one member set already grounded in
+  the repo) on a new `AuthSession` model (`@@map("sessions")`), `aal pg.enum(AalLevel)?`.
+- **New code:** the `native_enum` + `AuthSession` declarations in the Supabase extension's
+  contract; example usage; and — since the enum is **external** — a `CREATE TYPE auth.aal_level`
+  + `sessions` table in the example's `bootstrapSupabaseShim` seed (PN emits no DDL, so the dev
+  DB must already own the type).
+- **Reused as-is:** slice 1; the extension authoring path; the example's executed integration
+  harness (`@prisma/dev` disposable Postgres, `.supabase` service-role root).
 - **Builds on:** slice 1.
 - **Hands to:** the shipped external-enum capability (the project's purpose).
 - **Proven by:** the supabase example end-to-end — a Supabase-defined native enum represented,
-  typed read + `db.native_enums`, and `db verify` reporting nothing for it.
+  typed read + `db.native_enums` at runtime, and `db verify` reporting nothing for it. The
+  bound-param `$N::auth.aal_level` cast is exercised and its schema-qualification behaviour
+  verified (a non-`public` enum type needs a schema-qualified cast).
 
 ### Slice 3 — `native-enum-ts-authoring-mirror` (deferred → [TML-2965])
 - **Outcome:** A `native_enum` is authorable in the TS DSL (`helpers.nativeEnum(...)` +
