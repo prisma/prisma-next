@@ -71,6 +71,10 @@ type TopLevelNameResult = {
   readonly map?: string | undefined;
 };
 
+export type SqlSchemaIrToPslAstOptions = {
+  readonly claimedTableNames?: ReadonlySet<string>;
+};
+
 /**
  * Converts a SQL schema IR into a PSL AST suitable for `printPsl`.
  *
@@ -78,7 +82,10 @@ type TopLevelNameResult = {
  * relation inference from foreign keys, enum extraction, and raw default parsing.
  * The output is a fully-formed `PslDocumentAst` with synthetic spans.
  */
-export function sqlSchemaIrToPslAst(schemaIR: SqlSchemaIR): PslDocumentAst {
+export function sqlSchemaIrToPslAst(
+  schemaIR: SqlSchemaIR,
+  inferOptions?: SqlSchemaIrToPslAstOptions,
+): PslDocumentAst {
   const enumInfo = extractEnumInfo(schemaIR.annotations);
   if (enumInfo.typeNames.size > 0) {
     const names = [...enumInfo.typeNames].join(', ');
@@ -96,7 +103,34 @@ export function sqlSchemaIrToPslAst(schemaIR: SqlSchemaIR): PslDocumentAst {
     parseRawDefault,
   };
 
-  return buildPslDocumentAst(schemaIR, options);
+  const filteredSchemaIR = filterClaimedTables(schemaIR, inferOptions?.claimedTableNames);
+
+  return buildPslDocumentAst(filteredSchemaIR, options);
+}
+
+function filterClaimedTables(
+  schemaIR: SqlSchemaIR,
+  claimedTableNames: ReadonlySet<string> | undefined,
+): SqlSchemaIR {
+  if (!claimedTableNames || claimedTableNames.size === 0) {
+    return schemaIR;
+  }
+
+  const tables = Object.fromEntries(
+    Object.entries(schemaIR.tables)
+      .filter(([tableName]) => !claimedTableNames.has(tableName))
+      .map(([tableName, table]) => {
+        const survivingForeignKeys = table.foreignKeys.filter(
+          (fk) => !claimedTableNames.has(fk.referencedTable),
+        );
+        if (survivingForeignKeys.length === table.foreignKeys.length) {
+          return [tableName, table];
+        }
+        return [tableName, { ...table, foreignKeys: survivingForeignKeys }];
+      }),
+  );
+
+  return { ...schemaIR, tables };
 }
 
 function buildPslDocumentAst(schemaIR: SqlSchemaIR, options: PslPrinterOptions): PslDocumentAst {

@@ -202,6 +202,62 @@ describe('sqlSchemaIrToPslAst', () => {
     expect(user?.comment).toBeUndefined();
   });
 
+  it('omits tables whose name is in claimedTableNames', () => {
+    const schemaIR = ir({
+      tables: {
+        app_table: {
+          name: 'app_table',
+          columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+        t_owned: {
+          name: 't_owned',
+          columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+    });
+
+    const ast = sqlSchemaIrToPslAst(schemaIR, { claimedTableNames: new Set(['t_owned']) });
+    const modelNames = flatPslModels(ast).map((m) => m.name);
+    expect(modelNames).toContain('AppTable');
+    expect(modelNames).not.toContain('TOwned');
+  });
+
+  it('keeps all tables when no options are passed', () => {
+    const schemaIR = ir({
+      tables: {
+        app_table: {
+          name: 'app_table',
+          columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+        t_owned: {
+          name: 't_owned',
+          columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+    });
+
+    const ast = sqlSchemaIrToPslAst(schemaIR);
+    const modelNames = flatPslModels(ast).map((m) => m.name);
+    expect(modelNames).toEqual(expect.arrayContaining(['AppTable', 'TOwned']));
+    expect(modelNames).toHaveLength(2);
+  });
+
   it('renders a representative two-table schema with FK relation deterministically', () => {
     const schemaIR = ir({
       tables: {

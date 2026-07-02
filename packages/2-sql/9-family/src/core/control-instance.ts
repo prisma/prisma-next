@@ -10,6 +10,7 @@ import type {
   TargetDescriptor,
 } from '@prisma-next/framework-components/components';
 import type {
+  ContractSpace,
   ControlFamilyInstance,
   ControlStack,
   CoreSchemaView,
@@ -463,6 +464,33 @@ export function assertNoCrossSpaceFkReverseReferences(
   }
 }
 
+const PUBLIC_NAMESPACE_ID = 'public';
+
+/**
+ * Collects the DB table names each extension pack claims in its `public`
+ * namespace. `contract infer` introspects the `public` schema only and
+ * introspected tables carry no schema qualifier, so only `public`-namespace
+ * claims are eligible to suppress an introspected table — a pack claiming
+ * `auth.users` must never suppress an app's `public.users`.
+ */
+function collectClaimedPublicTableNames(
+  extensions: readonly { readonly contractSpace?: ContractSpace<Contract<SqlStorage>> }[],
+): ReadonlySet<string> {
+  const claimed = new Set<string>();
+  for (const extension of extensions) {
+    const namespaces = extension.contractSpace?.contractJson.storage.namespaces;
+    for (const namespace of Object.values(namespaces ?? {})) {
+      if (namespace.id !== PUBLIC_NAMESPACE_ID) {
+        continue;
+      }
+      for (const tableName of Object.keys(namespace.entries.table ?? {})) {
+        claimed.add(tableName);
+      }
+    }
+  }
+  return claimed;
+}
+
 export function createSqlFamilyInstance<TTargetId extends string>(
   stack: ControlStack<'sql', TTargetId>,
 ): SqlFamilyInstance {
@@ -890,7 +918,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
 
     inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst {
-      return sqlSchemaIrToPslAst(schemaIR);
+      return sqlSchemaIrToPslAst(schemaIR, {
+        claimedTableNames: collectClaimedPublicTableNames(extensions),
+      });
     },
 
     lowerAst(
