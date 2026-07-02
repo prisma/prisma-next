@@ -24,6 +24,7 @@ function interpretSchema(schema: string) {
     composedExtensionContracts: new Map(),
     controlMutationDefaults: builtinControlMutationDefaults,
     createNamespace: createTestSqlNamespace,
+    capabilities: { sql: { scalarList: true } },
   });
 }
 

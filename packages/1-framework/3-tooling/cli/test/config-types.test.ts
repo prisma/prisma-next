@@ -217,6 +217,7 @@ describe('defineConfig', () => {
       },
       controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },
       resolvedInputs: [],
+      capabilities: {},
     });
 
     expect(config.output).toBe('output/contract.json');

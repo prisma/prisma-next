@@ -21,7 +21,11 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
   const interpretPslDocumentToSqlContract = (
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
-      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts' | 'createNamespace'
+      | 'target'
+      | 'scalarTypeDescriptors'
+      | 'composedExtensionContracts'
+      | 'createNamespace'
+      | 'capabilities'
     > &
       Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
@@ -30,6 +34,7 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
       ...input,
     });
 

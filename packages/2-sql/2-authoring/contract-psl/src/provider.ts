@@ -143,6 +143,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           ),
           controlMutationDefaults: context.controlMutationDefaults,
           createNamespace: options.createNamespace,
+          capabilities: context.capabilities,
           codecLookup: context.codecLookup,
         });
         if (!interpreted.ok) {

@@ -58,6 +58,63 @@ function canonicalizeTimestampDefault(expr: string): string | undefined {
   return undefined;
 }
 
+type ArrayElementToken = { readonly value: string; readonly quoted: boolean };
+
+/**
+ * Splits a Postgres array literal body (without the enclosing braces) into its
+ * element tokens, honouring quoting. A comma only separates elements when it is
+ * outside double quotes; inside a quoted element a doubled quote (`""`) or a
+ * backslash-escaped quote (`\"`) is a literal quote, and a backslash escapes the
+ * next character. Returns undefined if the body is malformed (e.g. an unbalanced
+ * quote).
+ */
+function splitArrayElements(inner: string): readonly ArrayElementToken[] | undefined {
+  const tokens: ArrayElementToken[] = [];
+  let current = '';
+  let inQuotes = false;
+  let quoted = false;
+
+  for (let i = 0; i < inner.length; i++) {
+    const char = inner[i];
+    if (inQuotes) {
+      if (char === '\\') {
+        const next = inner[i + 1];
+        if (next === undefined) return undefined;
+        current += next;
+        i++;
+        continue;
+      }
+      if (char === '"') {
+        if (inner[i + 1] === '"') {
+          current += '"';
+          i++;
+          continue;
+        }
+        inQuotes = false;
+        continue;
+      }
+      current += char;
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = true;
+      quoted = true;
+      continue;
+    }
+    if (char === ',') {
+      tokens.push({ value: current, quoted });
+      current = '';
+      quoted = false;
+      continue;
+    }
+    current += char;
+  }
+
+  if (inQuotes) return undefined;
+  tokens.push({ value: current, quoted });
+  return tokens;
+}
+
 /**
  * Parses a Postgres array literal body (`{...}`) into a JS array of primitives.
  * Returns undefined if the body cannot be reliably parsed.
@@ -65,14 +122,23 @@ function canonicalizeTimestampDefault(expr: string): string | undefined {
  * Handles:
  * - `{}` → `[]`
  * - `{elem1,elem2,...}` → `[elem1, elem2, ...]` with numeric and string element coercion
+ * - quoted elements that contain commas, doubled/escaped quotes, and the literal
+ *   strings `NULL`/`true`/`false` (a quoted token is always a string)
  */
 function parseArrayLiteralBody(body: string): readonly JsonValue[] | undefined {
   const inner = body.slice(1, -1).trim();
   if (inner === '') return [];
-  const elements = inner.split(',');
+  const tokens = splitArrayElements(inner);
+  if (tokens === undefined) return undefined;
   const result: JsonValue[] = [];
-  for (const rawEl of elements) {
-    const el = rawEl.trim();
+  for (const token of tokens) {
+    if (token.quoted) {
+      // A quoted token is always a string — `"NULL"`, `"true"`, `"1"` are the
+      // literal text, never the keyword/number.
+      result.push(token.value);
+      continue;
+    }
+    const el = token.value.trim();
     if (el.toUpperCase() === 'NULL') {
       result.push(null);
       continue;
@@ -87,10 +153,6 @@ function parseArrayLiteralBody(body: string): readonly JsonValue[] | undefined {
     }
     if (NUMERIC_PATTERN.test(el)) {
       result.push(Number(el));
-      continue;
-    }
-    if (el.startsWith('"') && el.endsWith('"')) {
-      result.push(el.slice(1, -1).replace(/""/g, '"'));
       continue;
     }
     return undefined;

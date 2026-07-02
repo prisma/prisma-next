@@ -194,3 +194,19 @@ it from there instead of defining a local copy. Behaviour-preserving — the run
 facade surface (`db.enums`, `sql`, `orm`) is byte-identical. No extension-author
 API or surface change; nothing to migrate. Incidental substrate diff only.
 -->
+
+<!--
+TML-2912 (PSL native scalar lists, end-to-end): PSL now lowers scalar-list fields
+(`String[]`, `Int[]`, …) to native array storage columns instead of the JSONB
+fallback, gated on the adapter-reported `scalarList` capability. The review-round
+follow-up also makes the adapter capability matrix required end-to-end on the
+contract-source seam — `ContractSourceContext.capabilities`,
+`InterpretPslDocumentToSqlContractInput`, and the SQL PSL resolution inputs are no
+longer optional. These are framework-internal contract-emission types that the
+control stack always populates; extension authors do not construct them. The only
+`packages/3-extensions/` touch is a one-line test-context update in
+`postgres/test/psl-namespace-qualifier-routing.test.ts` (threading the now-required
+`capabilities` field). No extension-author API changed — re-emit absorbs the
+scalar-list contract shape. No extension-author action required. Incidental
+substrate diff only.
+-->

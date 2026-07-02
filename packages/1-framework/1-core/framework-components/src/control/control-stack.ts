@@ -1,5 +1,7 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import type { CapabilityMatrix } from '../shared/capabilities';
+import { mergeCapabilityMatrices } from '../shared/capabilities';
 import type { Codec } from '../shared/codec';
 import type { AnyCodecDescriptor } from '../shared/codec-descriptor';
 import type { CodecLookup, CodecMeta, CodecRef, CodecRegistry } from '../shared/codec-types';
@@ -62,6 +64,7 @@ export interface ControlStack<
   readonly authoringContributions: AssembledAuthoringContributions;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly controlMutationDefaults: ControlMutationDefaults;
+  readonly capabilities: CapabilityMatrix;
 }
 
 export interface CreateControlStackInput<
@@ -522,5 +525,10 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     authoringContributions: assembleAuthoringContributions(allDescriptors),
     scalarTypeDescriptors,
     controlMutationDefaults: assembleControlMutationDefaults(allDescriptors),
+    capabilities: mergeCapabilityMatrices({}, [
+      target,
+      ...(adapter ? [adapter] : []),
+      ...orderedExtensionPacks,
+    ]),
   };
 }
