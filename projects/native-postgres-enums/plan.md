@@ -73,7 +73,14 @@ no diff, no ops: external enums are never diffed, so `db verify` emits nothing f
   and a runtime test for `db.native_enums.…members`. `fixtures:check`. (No-emit column typing is
   out of scope — TML-2960; TS authoring is out of scope — TML-2965.)
 
-### Slice 2 — `supabase-native-enums` (also the slice-1 e2e proof)
+### Slice 2 — `supabase-native-enums` (also the slice-1 e2e proof) — DELIVERED
+- **Delivered:** the schema-qualification fix (`b8c4a69a7`) + the Supabase demonstration
+  (`1a3306cf4`). Running the feature for real exposed that slice 1 was incomplete for non-`public`
+  schemas — the `$N::type` cast and `db verify` both used the bare `@@map` type name, so an `auth`
+  enum needs `auth.aal_level`. Fixed by qualifying the column's `nativeType` by its namespace; the
+  same fix corrects both the cast and verify. Also wired `db.native_enums` onto the Supabase
+  client's `.supabase` root (D4 had it on the plain postgres client only). The executed example
+  test proves typed read + `db.native_enums` + the `$N::auth.aal_level` cast against real Postgres.
 - **Outcome:** The Supabase extension declares its built-in native enums in
   `packages/3-extensions/supabase/src/contract/contract.prisma`; the supabase example uses one
   on a column, reads it as a typed union, and reaches its members via `db.native_enums`;
