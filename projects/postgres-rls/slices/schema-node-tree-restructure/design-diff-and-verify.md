@@ -121,7 +121,8 @@ The aggregate verifier and planner take the family's `SchemaDiffer`, diff the fu
 - Replace the bespoke `throw new Error("expected StorageTable…")` with an assertion helper.
 - Remove the `(storage.types ?? {}) as ResolvedStorageTypes` casts (×3) via a real type — no cast, no fallback.
 - Trim the verbose doc comments (attached, not orphaned) and sweep the whole diff for the same; add none new.
-- Delete the dead operations the review flags (`verify-postgres-namespaces` and the two unused `control-instance` methods).
+- Consolidate the two Postgres diff files into one (`diff-postgres-schema.ts` folds into `diff-database-schema.ts`), and extract the diff-SPI types out of the catch-all `migrations/types.ts` into a named `schema-differ.ts`.
+- Delete confirmed-dead code only: the family-instance `bootstrapSignMarkerQueries` (the adapter method it duplicated stays; `sign()` uses that). `verify-postgres-namespaces` is **live** (its `missing_schema` issues drive multi-schema `CREATE SCHEMA` planning) and stays; `contract-to-postgres-database-schema-node` is **not** a duplicate of `contractToSchemaIR` (it builds the Postgres tree — RLS/roles/multi-schema — atop the shared per-namespace table conversion, whereas the flat map is SQLite-only) and stays.
 - Extract review additions **out** of the catch-all `migrations/types.ts` into named, logical files.
 - Correct the planner's transient-id string, its unreadable comment, and the "all namespace nodes are relational" note; stop *creating* contract nodes to refer to them — find them in the live contract.
 - Move the non-node file out of `schema-ir/` (so only the five node classes remain); stop populating the obsolete `annotations.pg` bag.
