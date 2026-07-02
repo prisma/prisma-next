@@ -21,7 +21,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
 import { MARKER_TABLE_NAME } from '../control-tables';
-import { diffSqliteDatabaseSchema } from './diff-database-schema';
+import { verifySqliteDatabaseSchema } from './diff-database-schema';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 
 export function createSqliteMigrationRunner(
@@ -94,7 +94,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
         driver,
         contract: options.destinationContract,
       });
-      const schemaVerifyResult = diffSqliteDatabaseSchema({
+      const schemaVerifyResult = verifySqliteDatabaseSchema({
         contract: options.destinationContract,
         actualSchema: schemaNode,
         strict: options.strictVerification ?? true,

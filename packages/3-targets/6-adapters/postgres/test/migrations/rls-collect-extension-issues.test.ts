@@ -157,7 +157,7 @@ function policyDiffIssues(contract: Contract<SqlStorage>, schema: PostgresDataba
     strict: false,
     typeMetadataRegistry: new Map(),
     frameworkComponents: [],
-  }).schema.schemaDiffIssues;
+  }).schemaDiffIssues;
 }
 
 describe('diffDatabaseSchema — RLS drift detection', () => {

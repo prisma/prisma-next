@@ -555,18 +555,22 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     { readonly inferPslContract?: (schema: SqlSchemaIRNode) => PslDocumentAst },
     'reading the optional target-descriptor inferPslContract hook'
   >(target).inferPslContract;
-  // The combined database-schema diff is a required target-descriptor operation:
-  // every SQL target provides it. Read it off the descriptor like the other
+  // The combined database-schema verify is a required target-descriptor
+  // operation: every SQL target provides it, wrapping the same comparison
+  // `diffDatabaseSchema` runs in the verify envelope plus the pass/warn/fail
+  // tree the CLI renders. Read it off the descriptor like the other
   // target-owned hooks.
-  const diffDatabaseSchema = blindCast<
+  const verifyDatabaseSchema = blindCast<
     {
-      readonly diffDatabaseSchema?: (input: DiffDatabaseSchemaInput) => VerifyDatabaseSchemaResult;
+      readonly verifyDatabaseSchema?: (
+        input: DiffDatabaseSchemaInput,
+      ) => VerifyDatabaseSchemaResult;
     },
-    'reading the required target-descriptor diffDatabaseSchema hook'
-  >(target).diffDatabaseSchema;
-  if (!diffDatabaseSchema) {
+    'reading the required target-descriptor verifyDatabaseSchema hook'
+  >(target).verifyDatabaseSchema;
+  if (!verifyDatabaseSchema) {
     throw new Error(
-      `SQL target "${target.targetId}" is missing the required diffDatabaseSchema descriptor operation`,
+      `SQL target "${target.targetId}" is missing the required verifyDatabaseSchema descriptor operation`,
     );
   }
   const deserializeWithTargetSerializer = (contractOrJson: unknown): Contract<SqlStorage> => {
@@ -726,11 +730,12 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
     }): VerifyDatabaseSchemaResult {
       const contract = deserializeWithTargetSerializer(options.contract) as Contract<SqlStorage>;
-      // Verify is a thin consumer of the target's black-box diff: it introspects
-      // the actual schema (already in `options.schema`), calls the target's
-      // required `diffDatabaseSchema`, and rejects when a surviving issue is a
-      // failure. It composes no diffing itself and is blind to how the diff works.
-      const sqlResult = diffDatabaseSchema({
+      // Verify is a thin consumer of the target's black-box comparison: it
+      // introspects the actual schema (already in `options.schema`), calls the
+      // target's required `verifyDatabaseSchema`, and rejects when a surviving
+      // issue is a failure. It composes no diffing itself and is blind to how
+      // the comparison works.
+      const sqlResult = verifyDatabaseSchema({
         contract,
         schema: options.schema,
         strict: options.strict,

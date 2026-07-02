@@ -18,6 +18,7 @@ import type {
   MigrationRunnerResult,
   OperationContext,
   OpFactoryCall,
+  SchemaDiffer,
   SchemaIssue,
   SchemaVerifier,
   VerifyDatabaseSchemaResult,
@@ -496,7 +497,15 @@ export interface SqlControlTargetDescriptor<
    * schema logic on the target, not database I/O, so it lives here rather than
    * on the control adapter. How it computes the two issue sets is private.
    */
-  readonly diffDatabaseSchema: (input: DiffDatabaseSchemaInput) => VerifyDatabaseSchemaResult;
+  readonly diffDatabaseSchema: SchemaDiffer<DiffDatabaseSchemaInput>['diff'];
+  /**
+   * The same combined comparison as {@link diffDatabaseSchema}, wrapped in the
+   * verify envelope (`ok`/`summary`/`code`/`target`/`timings`) plus the
+   * pass/warn/fail tree the CLI renders. Verify calls this instead of
+   * `diffDatabaseSchema` so the relational walk that produces the tree runs
+   * once per verify, not once for the diff and again for the tree.
+   */
+  readonly verifyDatabaseSchema: (input: DiffDatabaseSchemaInput) => VerifyDatabaseSchemaResult;
   createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }

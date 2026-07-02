@@ -6,7 +6,10 @@ import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlSchemaIR, SqlSchemaIRNode, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
-import { stubTargetDiffDatabaseSchema } from './schema-verify.helpers';
+import {
+  stubTargetDiffDatabaseSchema,
+  stubTargetVerifyDatabaseSchema,
+} from './schema-verify.helpers';
 
 function createMockStack() {
   return createControlStack({
@@ -41,6 +44,7 @@ function createMockStack() {
         serializeContract: (contract) => contract as never,
       },
       diffDatabaseSchema: stubTargetDiffDatabaseSchema,
+      verifyDatabaseSchema: stubTargetVerifyDatabaseSchema,
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     } as ControlTargetDescriptor<'sql', 'postgres'>,
     adapter: {

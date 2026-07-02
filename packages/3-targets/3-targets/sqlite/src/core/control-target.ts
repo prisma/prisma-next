@@ -11,6 +11,7 @@ import { sqliteTargetDescriptorMeta } from './descriptor-meta';
 import {
   diffSqliteDatabaseSchema,
   sqliteContractToSchema,
+  verifySqliteDatabaseSchema,
 } from './migrations/diff-database-schema';
 import { createSqliteMigrationPlanner } from './migrations/planner';
 import type { SqlitePlanTargetDetails } from './migrations/planner-target-details';
@@ -29,6 +30,15 @@ const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', Sqlite
     schemaVerifier: new SqliteSchemaVerifier(),
     diffDatabaseSchema(input) {
       return diffSqliteDatabaseSchema({
+        contract: input.contract,
+        actualSchema: input.schema,
+        strict: input.strict,
+        typeMetadataRegistry: input.typeMetadataRegistry,
+        frameworkComponents: input.frameworkComponents,
+      });
+    },
+    verifyDatabaseSchema(input) {
+      return verifySqliteDatabaseSchema({
         contract: input.contract,
         actualSchema: input.schema,
         strict: input.strict,

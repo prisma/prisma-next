@@ -181,14 +181,14 @@ export class SqliteMigrationPlanner
   private collectSchemaIssues(options: SqlMigrationPlannerPlanOptions): readonly SchemaIssue[] {
     const allowed = options.policy.allowedOperationClasses;
     const strict = allowed.includes('widening') || allowed.includes('destructive');
-    const verifyResult = diffSqliteDatabaseSchema({
+    const diff = diffSqliteDatabaseSchema({
       contract: options.contract,
       actualSchema: options.schema,
       strict,
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
     });
-    return verifyResult.schema.issues;
+    return diff.issues;
   }
 }
 

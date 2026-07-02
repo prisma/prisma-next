@@ -15,7 +15,10 @@ import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
 import type { SqlControlExtensionDescriptor } from '../src/core/migrations/types';
-import { stubTargetDiffDatabaseSchema } from './schema-verify.helpers';
+import {
+  stubTargetDiffDatabaseSchema,
+  stubTargetVerifyDatabaseSchema,
+} from './schema-verify.helpers';
 
 const TARGET = 'postgres' as const;
 const TARGET_FAMILY = 'sql' as const;
@@ -173,6 +176,7 @@ function makeStack(
         serializeContract: (contract) => contract as never,
       },
       diffDatabaseSchema: stubTargetDiffDatabaseSchema,
+      verifyDatabaseSchema: stubTargetVerifyDatabaseSchema,
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     } as ControlTargetDescriptor<'sql', 'postgres'>,
     adapter: {

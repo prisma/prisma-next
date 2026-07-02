@@ -161,7 +161,8 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // One combined database-schema diff drives the whole plan: the relational
     // findings (+ namespace presence) become structural DDL via `planIssues`,
     // the policy findings become RLS ops via `planPostgresSchemaDiff`. Verify
-    // runs the same `diffPostgresDatabaseSchema` and rejects on non-empty.
+    // runs the same underlying comparison (via `verifyDatabaseSchema`) and
+    // rejects on non-empty.
     PostgresDatabaseSchemaNode.assert(options.schema);
     const databaseDiff = diffPostgresDatabaseSchema({
       contract: options.contract,
@@ -172,7 +173,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
     });
-    const schemaIssues = this.collectSchemaIssues(options, databaseDiff.schema.issues);
+    const schemaIssues = this.collectSchemaIssues(options, databaseDiff.issues);
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
     const storageTypes = options.contract.storage.types ?? {};
     // The strategy layer reads the live schema by bare table name for
@@ -222,10 +223,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       return plannerFailure(result.failure);
     }
 
-    const schemaDiffCalls = this.planPostgresSchemaDiff(
-      options,
-      databaseDiff.schema.schemaDiffIssues,
-    );
+    const schemaDiffCalls = this.planPostgresSchemaDiff(options, databaseDiff.schemaDiffIssues);
     const schemaDiffPartition = partitionCallsByControlPolicy({
       calls: schemaDiffCalls,
       contract: options.contract,

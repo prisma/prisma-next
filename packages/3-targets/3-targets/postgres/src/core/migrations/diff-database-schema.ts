@@ -1,7 +1,11 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { verifySqlSchemaTree } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
+import type {
+  SchemaDiffIssue,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/framework-components/control';
+import { SchemaDiff } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -12,10 +16,18 @@ import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schem
 import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
 import { diffPostgresSchema, filterIssuesByOwnership } from './diff-postgres-schema';
 
+interface PostgresDiffDatabaseSchemaInput {
+  readonly contract: Contract<SqlStorage>;
+  readonly actualSchema: SqlSchemaIRNode;
+  readonly strict: boolean;
+  readonly typeMetadataRegistry: ReadonlyMap<string, { readonly nativeType?: string }>;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+}
+
 /**
- * The single combined database-schema diff of two schema-IR trees — the one
- * operation the migration planner and the family schema verify both run. It
- * composes, once each:
+ * The single combined database-schema comparison — the one computation the
+ * migration planner and the family schema verify both consume. Composes,
+ * once each:
  *
  * - the per-namespace-paired relational diff (`verifySqlSchemaTree`) → table /
  *   column / constraint findings as framework `SchemaIssue`s (with the
@@ -24,28 +36,14 @@ import { diffPostgresSchema, filterIssuesByOwnership } from './diff-postgres-sch
  *   presence as `SchemaDiffIssue`s, ownership-filtered to the contract's owned
  *   schemas.
  *
- * The return is a `VerifyDatabaseSchemaResult` whose `schema` carries both shapes
- * (`issues` + `schemaDiffIssues`) plus the relational `root`/`counts` the CLI
- * renders — i.e. exactly the existing verify-result schema shape, so nothing
- * downstream changes. The two issue shapes stay separate (the relational
- * findings are stringly `SchemaIssue`s; the policy findings carry the live
- * policy nodes the planner needs to build ops); merging them onto one type is
- * the follow-on relational port, not here.
- *
- * Namespace presence (`missing_schema` → `CREATE SCHEMA`) is intentionally NOT
- * composed here: it is a planner-only op-generation concern (verify rejects on
- * the relational `missing_table` a missing schema already produces), so the
- * planner stitches it in around this diff. Control-policy suppression of the
- * policy issues is likewise a per-consumer post-step (verify filters the issues;
- * the planner filters the calls).
+ * `diffPostgresDatabaseSchema` and `verifyPostgresDatabaseSchema` both read
+ * this single result, so the relational walk runs once per caller — never
+ * once for the diff and again for the verify tree.
  */
-export function diffPostgresDatabaseSchema(input: {
-  readonly contract: Contract<SqlStorage>;
-  readonly actualSchema: SqlSchemaIRNode;
-  readonly strict: boolean;
-  readonly typeMetadataRegistry: ReadonlyMap<string, { readonly nativeType?: string }>;
-  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
-}): VerifyDatabaseSchemaResult {
+function computePostgresSchemaComparison(input: PostgresDiffDatabaseSchemaInput): {
+  readonly relational: VerifyDatabaseSchemaResult;
+  readonly schemaDiffIssues: readonly SchemaDiffIssue[];
+} {
   const postgresContract = blindCast<
     PostgresContract,
     'diffPostgresDatabaseSchema is only called with a postgres contract'
@@ -86,6 +84,34 @@ export function diffPostgresDatabaseSchema(input: {
     ownedSchemaNames(expected),
   );
 
+  return { relational, schemaDiffIssues };
+}
+
+/**
+ * The `SchemaDiffer` for Postgres: the target's black-box comparison,
+ * projected to the two issue lists. Namespace presence (`missing_schema` →
+ * `CREATE SCHEMA`) is intentionally NOT composed here: it is a planner-only
+ * op-generation concern (verify rejects on the relational `missing_table` a
+ * missing schema already produces), so the planner stitches it in around this
+ * diff. Control-policy suppression of the policy issues is likewise a
+ * per-consumer post-step (verify filters the issues; the planner filters the
+ * calls).
+ */
+export function diffPostgresDatabaseSchema(input: PostgresDiffDatabaseSchemaInput): SchemaDiff {
+  const { relational, schemaDiffIssues } = computePostgresSchemaComparison(input);
+  return new SchemaDiff(relational.schema.issues, schemaDiffIssues);
+}
+
+/**
+ * The same combined comparison as {@link diffPostgresDatabaseSchema}, wrapped
+ * in the verify envelope (`ok`/`summary`/`code`/`target`/`timings`) plus the
+ * pass/warn/fail tree the CLI renders — i.e. exactly the existing verify-result
+ * schema shape, so nothing downstream changes.
+ */
+export function verifyPostgresDatabaseSchema(
+  input: PostgresDiffDatabaseSchemaInput,
+): VerifyDatabaseSchemaResult {
+  const { relational, schemaDiffIssues } = computePostgresSchemaComparison(input);
   return {
     ...relational,
     schema: { ...relational.schema, schemaDiffIssues },

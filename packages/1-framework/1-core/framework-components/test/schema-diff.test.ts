@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { DiffableNode, SchemaDiffIssue } from '../src/control/schema-diff';
-import { diffSchemas } from '../src/control/schema-diff';
+import type { SchemaIssue } from '../src/control/control-result-types';
+import type { DiffableNode, DiffIssue, SchemaDiffIssue } from '../src/control/schema-diff';
+import { diffSchemas, SchemaDiff } from '../src/control/schema-diff';
 
 /** A synthetic root node whose `isEqualTo` is always true — used to wrap flat node lists. */
 function rootOf(nodes: readonly DiffableNode[]): DiffableNode {
@@ -235,5 +236,57 @@ describe('diffSchemas', () => {
     const issues = diffSchemas(rootOf([leaf]), rootOf([]));
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ outcome: 'missing', path: ['root', 'lone_leaf'] });
+  });
+});
+
+function makeSchemaIssue(table: string): SchemaIssue {
+  return { kind: 'extra_table', table, message: `Extra table "${table}"` };
+}
+
+function makeSchemaDiffIssue(path: readonly string[]): SchemaDiffIssue {
+  return { path, outcome: 'extra', message: outcomeMessageFor(path) };
+}
+
+function outcomeMessageFor(path: readonly string[]): string {
+  return `extra: ${path.join('/')}`;
+}
+
+describe('SchemaDiff', () => {
+  it('exposes the issues and schemaDiffIssues it was constructed with', () => {
+    const issues = [makeSchemaIssue('a')];
+    const schemaDiffIssues = [makeSchemaDiffIssue(['root', 'p'])];
+    const diff = new SchemaDiff(issues, schemaDiffIssues);
+    expect(diff.issues).toBe(issues);
+    expect(diff.schemaDiffIssues).toBe(schemaDiffIssues);
+  });
+
+  it('filter narrows both issue lists using one predicate over the union', () => {
+    const keep = makeSchemaIssue('keep');
+    const drop = makeSchemaIssue('drop');
+    const keepDiff = makeSchemaDiffIssue(['root', 'keep']);
+    const dropDiff = makeSchemaDiffIssue(['root', 'drop']);
+    const diff = new SchemaDiff([keep, drop], [keepDiff, dropDiff]);
+
+    const keepPredicate = (issue: DiffIssue): boolean =>
+      'outcome' in issue ? issue.path.includes('keep') : 'table' in issue && issue.table === 'keep';
+    const filtered = diff.filter(keepPredicate);
+
+    expect(filtered.issues).toEqual([keep]);
+    expect(filtered.schemaDiffIssues).toEqual([keepDiff]);
+  });
+
+  it('filter returns a new SchemaDiff, not a mutation of the original', () => {
+    const diff = new SchemaDiff([makeSchemaIssue('a')], []);
+    const filtered = diff.filter(() => false);
+    expect(filtered).not.toBe(diff);
+    expect(diff.issues).toHaveLength(1);
+    expect(filtered.issues).toHaveLength(0);
+  });
+
+  it('filter on an empty diff returns an empty diff', () => {
+    const diff = new SchemaDiff([], []);
+    const filtered = diff.filter(() => true);
+    expect(filtered.issues).toEqual([]);
+    expect(filtered.schemaDiffIssues).toEqual([]);
   });
 });

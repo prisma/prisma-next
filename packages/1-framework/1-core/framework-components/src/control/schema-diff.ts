@@ -1,3 +1,5 @@
+import type { SchemaIssue } from './control-result-types';
+
 export type SchemaDiffOutcome = 'missing' | 'extra' | 'mismatch';
 
 export interface SchemaDiffIssue {
@@ -129,4 +131,39 @@ function diffChildren(
   }
 
   return issues;
+}
+
+/** The union a `SchemaDiff` consumer filters over: either issue shape it carries. */
+export type DiffIssue = SchemaIssue | SchemaDiffIssue;
+
+/**
+ * The result of diffing a contract's expected schema against the introspected
+ * actual schema: two issue lists, kept distinct because two diffing mechanisms
+ * produce them (the relational check and the generic node differ). Carries no
+ * verdict, verification tree, or counts — those are the verifier's own
+ * presentation, built from the same underlying comparison.
+ */
+export class SchemaDiff {
+  readonly issues: readonly SchemaIssue[];
+  readonly schemaDiffIssues: readonly SchemaDiffIssue[];
+
+  constructor(issues: readonly SchemaIssue[], schemaDiffIssues: readonly SchemaDiffIssue[]) {
+    this.issues = issues;
+    this.schemaDiffIssues = schemaDiffIssues;
+  }
+
+  /** Fans `keep` across both issue lists, returning a new `SchemaDiff` narrowed to the survivors. */
+  filter(keep: (issue: DiffIssue) => boolean): SchemaDiff {
+    return new SchemaDiff(this.issues.filter(keep), this.schemaDiffIssues.filter(keep));
+  }
+}
+
+/**
+ * The SPI a SQL target implements to compare a contract's expected schema
+ * against the introspected actual schema. How the comparison is computed —
+ * relational check, generic node differ, namespace pairing — is private to
+ * the implementer; verify and plan consume only the returned `SchemaDiff`.
+ */
+export interface SchemaDiffer<TInput> {
+  diff(input: TInput): SchemaDiff;
 }
