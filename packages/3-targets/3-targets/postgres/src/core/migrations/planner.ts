@@ -16,7 +16,6 @@ import {
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
-  DiffableNode,
   MigrationPlanner,
   MigrationPlanWithAuthoringSurface,
   MigrationScaffoldContext,
@@ -24,12 +23,13 @@ import type {
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
+import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import {
   formatPostgresControlPolicySubjectLabel,
   resolvePostgresCallControlPolicySubject,
@@ -292,7 +292,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
    */
   private planPostgresSchemaDiff(
     options: PlannerOptionsWithComponents,
-    filteredDiffIssues: readonly SchemaDiffIssue[],
+    filteredDiffIssues: readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
   ): readonly PostgresOpFactoryCall[] {
     const allowsDestructive = options.policy.allowedOperationClasses.includes('destructive');
     const calls: PostgresOpFactoryCall[] = [];
@@ -303,7 +303,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       // encodes the body hash, so two policies sharing a local key (same name)
       // are always equal and isEqualTo never returns false.
       if (issue.outcome === 'missing') {
-        const expected = asSchemaNode(issue.expected);
+        const expected = issue.expected;
         PostgresPolicySchemaNode.assert(expected);
         // expected.namespaceId is the DDL schema name (resolved during projection);
         // this re-resolution is a no-op as long as PostgresSchema.ddlSchemaName() returns this.id.
@@ -324,7 +324,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
           ),
         );
       } else if (issue.outcome === 'extra' && allowsDestructive) {
-        const actual = asSchemaNode(issue.actual);
+        const actual = issue.actual;
         PostgresPolicySchemaNode.assert(actual);
         const schemaForTable = resolveDdlSchemaForNamespaceStorage(
           options.contract.storage,
@@ -375,19 +375,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     }
     return [...namespaceIssues, ...relationalIssues];
   }
-}
-
-// The framework types `SchemaDiffIssue`'s nodes as `DiffableNode`, but every
-// node in a Postgres diff issue is really a `SqlSchemaIRNode` (the concrete
-// schema-node classes). Bridge to that base so the `.is`/`.assert` guards can
-// discriminate on `nodeKind`. The principled fix — a node-typed `SchemaDiffIssue`
-// so this bridge is unnecessary — is a framework change tracked separately.
-function asSchemaNode(node: DiffableNode | undefined): SqlSchemaIRNode | undefined {
-  if (node === undefined) return undefined;
-  return blindCast<
-    SqlSchemaIRNode,
-    'diff issues over Postgres schema trees carry SqlSchemaIRNode nodes'
-  >(node);
 }
 
 /**

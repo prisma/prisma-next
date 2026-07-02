@@ -2,15 +2,15 @@ import type { SchemaIssue } from './control-result-types';
 
 export type SchemaDiffOutcome = 'missing' | 'extra' | 'mismatch';
 
-export interface SchemaDiffIssue {
+export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
   /** Path from the root node down to the diffed node, as a sequence of local keys. */
   readonly path: readonly string[];
   readonly outcome: SchemaDiffOutcome;
   readonly message: string;
   /** The expected (contract-side) node, when available. Absent for `extra` outcomes. */
-  readonly expected?: DiffableNode;
+  readonly expected?: TNode;
   /** The actual (live-DB-side) node, when available. Absent for `missing` outcomes. */
-  readonly actual?: DiffableNode;
+  readonly actual?: TNode;
 }
 
 /**
@@ -133,8 +133,14 @@ function diffChildren(
   return issues;
 }
 
-/** The union a `SchemaDiff` consumer filters over: either issue shape it carries. */
-export type DiffIssue = SchemaIssue | SchemaDiffIssue;
+/**
+ * The two issue representations a `SchemaDiff` carries: `SchemaIssue` from the
+ * legacy relational differ (coordinate-based) and `SchemaDiffIssue` from the
+ * generic node differ (carrying the schema-IR node it concerns).
+ */
+export type DiffIssue<TNode extends DiffableNode = DiffableNode> =
+  | SchemaIssue
+  | SchemaDiffIssue<TNode>;
 
 /**
  * The result of diffing a contract's expected schema against the introspected
@@ -142,18 +148,23 @@ export type DiffIssue = SchemaIssue | SchemaDiffIssue;
  * produce them (the relational check and the generic node differ). Carries no
  * verdict, verification tree, or counts — those are the verifier's own
  * presentation, built from the same underlying comparison.
+ *
+ * `TNode` is the concrete schema-IR node the `schemaDiffIssues` carry; it
+ * defaults to `DiffableNode`, so this is purely additive — a caller that wants
+ * the concrete node opts in (the Postgres planner uses the concrete node type),
+ * everyone else keeps the default unchanged.
  */
-export class SchemaDiff {
+export class SchemaDiff<TNode extends DiffableNode = DiffableNode> {
   readonly issues: readonly SchemaIssue[];
-  readonly schemaDiffIssues: readonly SchemaDiffIssue[];
+  readonly schemaDiffIssues: readonly SchemaDiffIssue<TNode>[];
 
-  constructor(issues: readonly SchemaIssue[], schemaDiffIssues: readonly SchemaDiffIssue[]) {
+  constructor(issues: readonly SchemaIssue[], schemaDiffIssues: readonly SchemaDiffIssue<TNode>[]) {
     this.issues = issues;
     this.schemaDiffIssues = schemaDiffIssues;
   }
 
   /** Fans `keep` across both issue lists, returning a new `SchemaDiff` narrowed to the survivors. */
-  filter(keep: (issue: DiffIssue) => boolean): SchemaDiff {
+  filter(keep: (issue: DiffIssue<TNode>) => boolean): SchemaDiff<TNode> {
     return new SchemaDiff(this.issues.filter(keep), this.schemaDiffIssues.filter(keep));
   }
 }

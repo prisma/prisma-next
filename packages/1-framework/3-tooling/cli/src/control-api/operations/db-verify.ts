@@ -13,7 +13,7 @@ import {
   type VerifierOutput,
   verifyMigration,
 } from '@prisma-next/migration-tools/aggregate';
-import { blindCast, castAs } from '@prisma-next/utils/casts';
+import { castAs } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { CliStructuredError } from '../../utils/cli-errors';
 import {
@@ -183,13 +183,10 @@ export function createPerMemberVerifier<TFamilyId extends string, TTargetId exte
     if (skipSchema) return buildSkippedSchemaResult(member);
     return familyInstance.verifySchema({
       contract: member.contract(),
-      // The family's `TSchemaIR` is opaque to migration-tools; the aggregate
-      // verifier passes the full introspected schema through and scopes the
-      // result afterwards. The family expects its own IR shape on the way back.
-      schema: blindCast<
-        never,
-        'family TSchemaIR is opaque to migration-tools; the full schema is passed straight through'
-      >(schema),
+      // `familyInstance` is `ControlFamilyInstance<_, unknown>`, so `verifySchema`
+      // takes its `TSchemaIR` as `unknown` — the introspected schema passes
+      // straight through; the family narrows to its own IR node internally.
+      schema,
       strict: verifyMode === 'strict',
       frameworkComponents,
     });

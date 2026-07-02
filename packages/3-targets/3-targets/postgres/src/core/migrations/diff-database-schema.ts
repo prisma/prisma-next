@@ -2,7 +2,6 @@ import type { Contract } from '@prisma-next/contract/types';
 import { verifySqlSchemaTree } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
-  DiffableNode,
   SchemaDiffIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
@@ -15,6 +14,7 @@ import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import type { PostgresContract } from '../postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
+import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
 
 interface PostgresDiffDatabaseSchemaInput {
@@ -43,7 +43,7 @@ interface PostgresDiffDatabaseSchemaInput {
  */
 function computePostgresSchemaComparison(input: PostgresDiffDatabaseSchemaInput): {
   readonly relational: VerifyDatabaseSchemaResult;
-  readonly schemaDiffIssues: readonly SchemaDiffIssue[];
+  readonly schemaDiffIssues: readonly SchemaDiffIssue<SqlSchemaDiffNode>[];
 } {
   const postgresContract = blindCast<
     PostgresContract,
@@ -97,7 +97,9 @@ function computePostgresSchemaComparison(input: PostgresDiffDatabaseSchemaInput)
  * per-consumer post-step (verify filters the issues; the planner filters the
  * calls).
  */
-export function diffPostgresDatabaseSchema(input: PostgresDiffDatabaseSchemaInput): SchemaDiff {
+export function diffPostgresDatabaseSchema(
+  input: PostgresDiffDatabaseSchemaInput,
+): SchemaDiff<SqlSchemaDiffNode> {
   const { relational, schemaDiffIssues } = computePostgresSchemaComparison(input);
   return new SchemaDiff(relational.schema.issues, schemaDiffIssues);
 }
@@ -125,15 +127,6 @@ function ownedSchemaNames(expected: PostgresDatabaseSchemaNode): ReadonlySet<str
   return new Set([...policyNamespaces, ...expected.existingSchemas]);
 }
 
-// Every node in a diff issue produced from Postgres schema trees is a
-// `SqlSchemaIRNode`; the framework types it as the narrower `DiffableNode`.
-function asSchemaNode(node: DiffableNode): SqlSchemaIRNode {
-  return blindCast<
-    SqlSchemaIRNode,
-    'diff issues over Postgres schema trees carry SqlSchemaIRNode nodes'
-  >(node);
-}
-
 // Renders a display-only reference string for the diff message. If policy
 // rendering grows, route it through the adapter's SQL renderer so the message
 // can't diverge from the emitted policy SQL.
@@ -152,26 +145,32 @@ function renderPostgresPolicyReference(policy: PostgresPolicySchemaNode): string
  *    table/column drift, so non-policy issues are dropped here.
  * 3. Remaps the message to a human-readable policy reference.
  *
+ * Both trees are `PostgresDatabaseSchemaNode`s, so every issue node is a
+ * `SqlSchemaDiffNode` — narrow the framework's `SchemaDiffIssue<DiffableNode>`
+ * output once here (the single boundary cast), so every downstream consumer
+ * (the ownership filter, the planner) reads the concrete node with no cast.
+ *
  * Ownership filtering (dropping `extra` issues in namespaces a contract doesn't
  * own) is the caller's responsibility — use `filterIssuesByOwnership`.
  */
 export function diffPostgresSchema(
   expected: PostgresDatabaseSchemaNode,
   actual: PostgresDatabaseSchemaNode,
-): readonly SchemaDiffIssue[] {
-  const issues = diffSchemas(expected, actual);
+): readonly SchemaDiffIssue<SqlSchemaDiffNode>[] {
+  const issues = blindCast<
+    readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
+    'both trees are PostgresDatabaseSchemaNodes, so every diff-issue node is a SqlSchemaDiffNode'
+  >(diffSchemas(expected, actual));
 
   return issues
     .filter((i) => {
       const node = i.expected ?? i.actual;
-      return node !== undefined && PostgresPolicySchemaNode.is(asSchemaNode(node));
+      return node !== undefined && PostgresPolicySchemaNode.is(node);
     })
     .map((i) => {
       const node = i.expected ?? i.actual;
-      if (node === undefined) return i;
-      const policy = asSchemaNode(node);
-      if (!PostgresPolicySchemaNode.is(policy)) return i;
-      return { ...i, message: `${i.outcome}: ${renderPostgresPolicyReference(policy)}` };
+      if (node === undefined || !PostgresPolicySchemaNode.is(node)) return i;
+      return { ...i, message: `${i.outcome}: ${renderPostgresPolicyReference(node)}` };
     });
 }
 
@@ -181,13 +180,12 @@ export function diffPostgresSchema(
  * policies and its `existingSchemas`.
  */
 export function filterIssuesByOwnership(
-  issues: readonly SchemaDiffIssue[],
+  issues: readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
   ownedSchemaNameSet: ReadonlySet<string>,
-): readonly SchemaDiffIssue[] {
+): readonly SchemaDiffIssue<SqlSchemaDiffNode>[] {
   return issues.filter((i) => {
     if (i.outcome !== 'extra') return true;
     if (i.actual === undefined) return false;
-    const policy = asSchemaNode(i.actual);
-    return PostgresPolicySchemaNode.is(policy) && ownedSchemaNameSet.has(policy.namespaceId);
+    return PostgresPolicySchemaNode.is(i.actual) && ownedSchemaNameSet.has(i.actual.namespaceId);
   });
 }
