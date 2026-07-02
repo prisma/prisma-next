@@ -133,12 +133,6 @@ export interface InterpretPslDocumentToSqlContractInput {
   readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespaceBase;
   readonly codecLookup?: CodecLookup;
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
-  /**
-   * Merged capability matrix from the control stack's
-   * `[target, adapter, ...extensionPacks]` descriptors. Authoring-time gating
-   * (e.g. scalar lists) reads `capabilities.sql?.scalarList`; an empty matrix
-   * fails closed and rejects gated features. The control stack always populates it.
-   */
   readonly capabilities: CapabilityMatrix;
 }
 

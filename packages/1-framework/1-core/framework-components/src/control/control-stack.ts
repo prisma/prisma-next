@@ -64,13 +64,6 @@ export interface ControlStack<
   readonly authoringContributions: AssembledAuthoringContributions;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly controlMutationDefaults: ControlMutationDefaults;
-  /**
-   * Merged capability matrix folded from the `[target, adapter, ...extensionPacks]`
-   * descriptors — the same merge `enrichContract` performs at emit time. Authoring
-   * paths read this to gate features (e.g. scalar lists) before the contract is
-   * produced, so an unsupported construct is rejected with a diagnostic rather than
-   * silently emitted.
-   */
   readonly capabilities: CapabilityMatrix;
 }
 
