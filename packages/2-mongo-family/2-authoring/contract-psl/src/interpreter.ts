@@ -1214,6 +1214,19 @@ export function interpretPslDocumentToMongoContract(
   const resolvedModels = polyResult.models;
   const resolvedCollections = polyResult.collections;
 
+  // The storage value set is the source of truth for both the emit typing and the validator's
+  // `enum` keyword. Built once, ahead of validator derivation, from each enum's member values. An
+  // enum member value is always a `JsonValue` (string/number/boolean), and the `mongoCodec` factory
+  // requires an explicit `encodeJson` for any non-`JsonValue` codec — so an enum codec's
+  // `encodeJson` is identity by construction and the encoded value equals the member value.
+  const storageValueSets: Record<string, MongoValueSetInput> = {};
+  for (const [enumName, builtEnum] of Object.entries(builtEnums)) {
+    storageValueSets[enumName] = {
+      kind: 'valueSet',
+      values: builtEnum.members.map((m) => m.value),
+    };
+  }
+
   for (const [, modelEntry] of Object.entries(resolvedModels)) {
     if (modelEntry.base) continue;
 
@@ -1234,14 +1247,14 @@ export function interpretPslDocumentToMongoContract(
         variantEntries,
         valueObjects,
         codecLookup,
-        builtEnums,
+        storageValueSets,
       );
     } else {
       coll['validator'] = deriveJsonSchema(
         modelEntry.fields,
         valueObjects,
         codecLookup,
-        builtEnums,
+        storageValueSets,
       );
     }
   }
@@ -1258,13 +1271,6 @@ export function interpretPslDocumentToMongoContract(
       MongoCollectionInput,
       'arktype-validated JSON shapes satisfy MongoCollectionInput by construction'
     >(raw);
-  }
-  const storageValueSets: Record<string, MongoValueSetInput> = {};
-  for (const [enumName, builtEnum] of Object.entries(builtEnums)) {
-    storageValueSets[enumName] = {
-      kind: 'valueSet',
-      values: builtEnum.members.map((m) => m.value),
-    };
   }
   const hasValueSets = Object.keys(storageValueSets).length > 0;
 

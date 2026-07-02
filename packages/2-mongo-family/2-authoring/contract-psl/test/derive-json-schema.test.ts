@@ -1,7 +1,11 @@
-import type { ContractEnum, ContractField, ContractValueObject } from '@prisma-next/contract/types';
+import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
-import { deriveJsonSchema, derivePolymorphicJsonSchema } from '../src/derive-json-schema';
+import {
+  deriveJsonSchema,
+  derivePolymorphicJsonSchema,
+  type FieldValueSets,
+} from '../src/derive-json-schema';
 
 const mongoTargetTypes: Record<string, readonly string[]> = {
   'mongo/string@1': ['string'],
@@ -483,15 +487,7 @@ describe('derivePolymorphicJsonSchema', () => {
 });
 
 describe('deriveJsonSchema — enum fields', () => {
-  const roleEnum: ContractEnum = {
-    codecId: 'mongo/string@1',
-    members: [
-      { name: 'User', value: 'user' },
-      { name: 'Admin', value: 'admin' },
-    ],
-  };
-
-  const enums: Record<string, ContractEnum> = { Role: roleEnum };
+  const valueSets: FieldValueSets = { Role: { values: ['user', 'admin'] } };
 
   it('emits enum: [...values] in declaration order for an enum-valueSet field', () => {
     const result = deriveJsonSchema(
@@ -501,7 +497,7 @@ describe('deriveJsonSchema — enum fields', () => {
       },
       undefined,
       mongoCodecLookup,
-      enums,
+      valueSets,
     );
 
     const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
@@ -517,7 +513,7 @@ describe('deriveJsonSchema — enum fields', () => {
       },
       undefined,
       mongoCodecLookup,
-      enums,
+      valueSets,
     );
 
     const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
@@ -533,7 +529,7 @@ describe('deriveJsonSchema — enum fields', () => {
       },
       undefined,
       mongoCodecLookup,
-      enums,
+      valueSets,
     );
 
     const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
@@ -548,7 +544,7 @@ describe('deriveJsonSchema — enum fields', () => {
       },
       undefined,
       mongoCodecLookup,
-      enums,
+      valueSets,
     );
 
     const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
@@ -567,7 +563,7 @@ describe('deriveJsonSchema — enum fields', () => {
       },
       undefined,
       mongoCodecLookup,
-      enums,
+      valueSets,
     );
 
     const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
@@ -585,15 +581,6 @@ describe('deriveJsonSchema — enum fields', () => {
   });
 
   it('preserves member value declaration order', () => {
-    const orderedEnum: ContractEnum = {
-      codecId: 'mongo/string@1',
-      members: [
-        { name: 'C', value: 'c' },
-        { name: 'A', value: 'a' },
-        { name: 'B', value: 'b' },
-      ],
-    };
-
     const result = deriveJsonSchema(
       {
         _id: scalarField('mongo/objectId@1'),
@@ -601,14 +588,14 @@ describe('deriveJsonSchema — enum fields', () => {
       },
       undefined,
       mongoCodecLookup,
-      { Status: orderedEnum },
+      { Status: { values: ['c', 'a', 'b'] } },
     );
 
     const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
     expect(props['status']?.['enum']).toEqual(['c', 'a', 'b']);
   });
 
-  it('skips enum injection when enumResolver does not contain the referenced enum', () => {
+  it('skips enum injection when the value set does not contain the referenced entry', () => {
     const result = deriveJsonSchema(
       {
         _id: scalarField('mongo/objectId@1'),
@@ -616,11 +603,32 @@ describe('deriveJsonSchema — enum fields', () => {
       },
       undefined,
       mongoCodecLookup,
-      enums,
+      valueSets,
     );
 
     const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
     expect(props['role']).toEqual({ bsonType: 'string' });
     expect(props['role']).not.toHaveProperty('enum');
+  });
+
+  it('sources the enum keyword from the value set only (a differing domain enum is never consulted)', () => {
+    // The deriver takes a value-set map and nothing else — it cannot read `domain.enum`. Passing a
+    // value set whose values differ from any domain enum proves the `enum` keyword follows the value
+    // set, not the domain enum.
+    const result = deriveJsonSchema(
+      {
+        _id: scalarField('mongo/objectId@1'),
+        role: enumField('mongo/string@1', 'Role'),
+      },
+      undefined,
+      mongoCodecLookup,
+      { Role: { values: ['from-value-set-a', 'from-value-set-b'] } },
+    );
+
+    const props = result.jsonSchema['properties'] as Record<string, Record<string, unknown>>;
+    expect(props['role']).toEqual({
+      bsonType: 'string',
+      enum: ['from-value-set-a', 'from-value-set-b'],
+    });
   });
 });

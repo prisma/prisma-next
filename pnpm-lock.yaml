@@ -2324,6 +2324,9 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:0.14.0
         version: link:../../1-foundation/mongo-contract
+      '@prisma-next/utils':
+        specifier: workspace:0.14.0
+        version: link:../../../1-framework/0-foundation/utils
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:0.14.0

@@ -1766,6 +1766,11 @@ function buildContractFromDefinition<
   const capabilities: Record<string, Record<string, boolean>> = {};
   const collections = buildCollections(definition.models);
 
+  // The value set stores each enum's codec-encoded member values. An enum member value is always a
+  // `JsonValue` (string/number/boolean), and the `mongoCodec` factory requires an explicit
+  // `encodeJson` for any codec whose value is not already `JsonValue` — so an enum codec's
+  // `encodeJson` is identity by construction and the encoded value equals the member value. The
+  // values are therefore the member values verbatim (not "string-only").
   const storageValueSets: Record<string, MongoValueSetInput> = {};
   for (const [enumName, handle] of Object.entries(definition.enums ?? {})) {
     storageValueSets[enumName] = {
@@ -1773,7 +1778,7 @@ function buildContractFromDefinition<
       values: handle.values.map((v) =>
         blindCast<
           JsonValue,
-          'enum member values are codec inputs (string/number/bool); mongo/string@1 is identity so the value set values equal the encoded member values, always JsonValue-compatible'
+          'enum member values are JsonValue by construction (see comment above)'
         >(v),
       ),
     };
