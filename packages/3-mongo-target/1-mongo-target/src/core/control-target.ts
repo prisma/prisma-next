@@ -9,24 +9,21 @@ import type {
   MongoControlFamilyInstance,
   MongoControlTargetDescriptor,
 } from '@prisma-next/family-mongo/control';
-import {
-  contractToMongoSchemaIR,
-  mongoProjectSchemaToMember,
-} from '@prisma-next/family-mongo/control';
+import { contractToMongoSchemaIR } from '@prisma-next/family-mongo/control';
 import type { MongoControlAdapter } from '@prisma-next/family-mongo/control-adapter';
 import type {
   MigrationRunner,
   MigrationRunnerPerSpaceOptions,
   MigrationRunnerPerSpaceSuccessValue,
   MigrationRunnerResult,
+  VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
   createContractSpaceMember,
-  projectSchemaToSpace,
+  otherMemberEntityNames,
+  scopeSchemaResultToSpace,
 } from '@prisma-next/migration-tools/aggregate';
 import type { MongoContract } from '@prisma-next/mongo-contract';
-import type { MongoSchemaCollection } from '@prisma-next/mongo-schema-ir';
-import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { mongoTargetDescriptorMeta } from './descriptor-meta';
@@ -96,11 +93,12 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
         // markers are not rolled back when a later space fails. Re-running reads
         // each marker, finds spaces 1..N−1 at-head (no-op skip), retries N onward.
         //
-        // Per-space verify is sliced via `projectSchemaToSpace`: the live DB
-        // holds collections owned by sibling spaces, but each space's verify
-        // only sees the slice that space's contract actually claims. Without
-        // the projection an aggregate of two spaces could not pass strict
-        // verify (every other-space collection would look like an extra).
+        // Per-space verify is scoped by `scopeSchemaResultToSpace`: the live DB
+        // holds collections owned by sibling spaces, so each space verifies the
+        // full schema and then drops the `extra` findings for the collections a
+        // sibling space claims. Without the scoping an aggregate of two spaces
+        // could not pass strict verify (every other-space collection would look
+        // like an extra).
         //
         // See `docs/architecture docs/subsystems/10. MongoDB Family.md` §
         // Contract spaces and ADR 212 — Contract spaces.
@@ -116,26 +114,15 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
             const member = members[i];
             if (!member) continue;
             const others = members.filter((_, j) => j !== i);
-            const projectSchema = (schema: MongoSchemaIR): MongoSchemaIR => {
-              // `projectSchemaToSpace` returns a plain object
-              // `{...schemaIR, collections: prunedArray}` (not a
-              // `MongoSchemaIR` instance), so the descriptor rewraps
-              // the pruned collections into a fresh `MongoSchemaIR`
-              // before handing it to `verifyMongoSchema` (which
-              // depends on the class's `collectionNames` /
-              // `collection(name)` accessors).
-              const projected = projectSchemaToSpace(
-                schema,
-                member,
-                others,
-                mongoProjectSchemaToMember,
-              ) as {
-                readonly collections: ReadonlyArray<MongoSchemaCollection>;
-              };
-              return new MongoSchemaIR(projected.collections);
-            };
+            // The runner verifies the destination contract against the full
+            // introspected schema; scope the result to this space, dropping the
+            // `extra` findings for collections a sibling space owns.
+            const ownedByOthers = otherMemberEntityNames(member, others);
+            const scopeVerifyResult = (
+              result: VerifyDatabaseSchemaResult,
+            ): VerifyDatabaseSchemaResult => scopeSchemaResultToSpace(result, ownedByOthers);
             const { space, ...runnerOptions } = spaceOptions;
-            const result = await runMongo(driver, { ...runnerOptions, projectSchema });
+            const result = await runMongo(driver, { ...runnerOptions, scopeVerifyResult });
             if (!result.ok) {
               return notOk({
                 ...result.failure,
@@ -159,10 +146,10 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
 };
 
 /**
- * Synthesise a {@link projectSchemaToSpace}-compatible member from a
- * per-space option entry. The projector only reads `spaceId` and
- * `contract()`; migration graph state is empty because the runner
- * consumes the destination contract directly.
+ * Synthesise a {@link ContractSpaceMember}-shaped value from a per-space option
+ * entry, for `otherMemberEntityNames`. Only `spaceId` and `contract()` are
+ * read; migration graph state is empty because the runner consumes the
+ * destination contract directly.
  */
 function toSpaceMember(opts: MigrationRunnerPerSpaceOptions<'mongo', 'mongo'>) {
   const contract = blindCast<Contract, 'destinationContract validated at aggregate boundary'>(

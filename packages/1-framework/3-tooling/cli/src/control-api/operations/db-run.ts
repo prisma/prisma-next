@@ -185,14 +185,6 @@ export async function executeRun<TFamilyId extends string, TTargetId extends str
     frameworkComponents,
     callerPolicy: { ignoreGraphFor: new Set([aggregate.app.spaceId]) },
     operationPolicy: policy,
-    projectSchemaToMember: (schema, ownedByOtherNames) =>
-      familyInstance.projectSchemaToMember(
-        blindCast<
-          never,
-          'family TSchemaIR is opaque to the CLI; schema is passed straight through'
-        >(schema),
-        ownedByOtherNames,
-      ),
   });
   if (!planResult.ok) {
     onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.plan, outcome: 'error' });

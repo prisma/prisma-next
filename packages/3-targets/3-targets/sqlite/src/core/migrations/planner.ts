@@ -9,6 +9,7 @@ import {
   extractCodecControlHooks,
   planFieldEventOperations,
   plannerFailure,
+  scopePlanDiffToSpace,
 } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
@@ -181,13 +182,16 @@ export class SqliteMigrationPlanner
   private collectSchemaIssues(options: SqlMigrationPlannerPlanOptions): readonly SchemaIssue[] {
     const allowed = options.policy.allowedOperationClasses;
     const strict = allowed.includes('widening') || allowed.includes('destructive');
-    const diff = diffSqliteDatabaseSchema({
-      contract: options.contract,
-      actualSchema: options.schema,
-      strict,
-      typeMetadataRegistry: new Map(),
-      frameworkComponents: options.frameworkComponents,
-    });
+    const diff = scopePlanDiffToSpace(
+      diffSqliteDatabaseSchema({
+        contract: options.contract,
+        actualSchema: options.schema,
+        strict,
+        typeMetadataRegistry: new Map(),
+        frameworkComponents: options.frameworkComponents,
+      }),
+      options.entitiesOwnedByOtherSpaces,
+    );
     return diff.issues;
   }
 }

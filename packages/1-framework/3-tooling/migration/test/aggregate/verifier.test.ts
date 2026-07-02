@@ -1,4 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type {
+  SchemaVerificationNode,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -7,10 +11,6 @@ import type { ContractMarkerRecordLike } from '../../src/aggregate/marker-types'
 import type { ContractSpaceAggregate, ContractSpaceMember } from '../../src/aggregate/types';
 import { verifyMigration } from '../../src/aggregate/verifier';
 import { makeContractSpaceMember } from '../fixtures';
-
-interface StubSchemaResult {
-  readonly tablesSeen: readonly string[];
-}
 
 function makeMember(args: {
   spaceId: string;
@@ -46,35 +46,71 @@ function makeAggregate(args: {
   });
 }
 
-const STUB_VERIFY = (
-  projectedSchema: unknown,
-  _member: ContractSpaceMember,
+function extraTableNode(name: string): SchemaVerificationNode {
+  return {
+    status: 'warn',
+    kind: 'table',
+    name: `table ${name}`,
+    contractPath: `storage.namespaces.*.entries.table.${name}`,
+    code: 'extra_table',
+    message: '',
+    expected: undefined,
+    actual: undefined,
+    children: [],
+  };
+}
+
+/**
+ * A per-member verifier standing in for a family's: it verifies the member's
+ * contract against the **full** live schema and flags every live table the
+ * member does not declare as an `extra_table` warning — exactly the shape the
+ * real family verify produces before the aggregate verifier scopes it.
+ */
+const FULL_SCHEMA_VERIFY = (
+  schema: unknown,
+  member: ContractSpaceMember,
   _mode: 'strict' | 'lenient',
-): StubSchemaResult => {
-  const schema = projectedSchema as { tables?: Record<string, unknown> } | null;
-  if (!schema || typeof schema !== 'object' || !schema.tables) {
-    return { tablesSeen: [] };
-  }
-  return { tablesSeen: Object.keys(schema.tables).sort() };
+): VerifyDatabaseSchemaResult => {
+  const liveTables = Object.keys((schema as { tables?: Record<string, unknown> })?.tables ?? {});
+  const declared = new Set(
+    Object.keys(member.contract().storage.namespaces[UNBOUND_NAMESPACE_ID]?.entries['table'] ?? {}),
+  );
+  const extras = liveTables.filter((name) => !declared.has(name));
+  const children = extras.map(extraTableNode);
+  return {
+    ok: true,
+    summary: 'Database schema satisfies contract',
+    contract: { storageHash: 'sha256:test' },
+    target: { expected: 'postgres' },
+    schema: {
+      issues: extras.map((name) => ({
+        kind: 'extra_table' as const,
+        table: name,
+        message: `Extra table "${name}"`,
+      })),
+      schemaDiffIssues: [],
+      root: {
+        status: children.some((c) => c.status === 'warn') ? 'warn' : 'pass',
+        kind: 'contract',
+        name: 'contract',
+        contractPath: '',
+        code: '',
+        message: '',
+        expected: undefined,
+        actual: undefined,
+        children,
+      },
+      counts: { pass: 1, warn: children.length, fail: 0, totalNodes: children.length + 1 },
+    },
+    timings: { total: 0 },
+  };
 };
 
-// Flat-`tables` schema-shape callbacks standing in for a family's. The verifier
-// is family-agnostic: it only calls these, never inspects the shape itself.
-const STUB_PROJECT = (schema: unknown, ownedByOtherNames: ReadonlySet<string>): unknown => {
-  const s = schema as { tables?: Record<string, unknown> };
-  if (typeof s !== 'object' || s === null || typeof s.tables !== 'object') return schema;
-  const pruned: Record<string, unknown> = {};
-  for (const [name, value] of Object.entries(s.tables)) {
-    if (!ownedByOtherNames.has(name)) pruned[name] = value;
-  }
-  return { ...s, tables: pruned };
-};
-
-const STUB_LIST = (schema: unknown): readonly string[] => {
-  const s = schema as { tables?: Record<string, unknown> };
-  if (typeof s !== 'object' || s === null || typeof s.tables !== 'object') return [];
-  return Object.keys(s.tables);
-};
+function extraTables(result: VerifyDatabaseSchemaResult | undefined): string[] {
+  return (result?.schema.issues ?? [])
+    .flatMap((issue) => ('table' in issue && issue.table ? [issue.table] : []))
+    .sort();
+}
 
 describe('verifyMigration', () => {
   describe('markerCheck', () => {
@@ -87,9 +123,7 @@ describe('verifyMigration', () => {
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: {} },
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
-        projectSchemaToMember: STUB_PROJECT,
-        listEntityNames: STUB_LIST,
+        verifySchemaForMember: FULL_SCHEMA_VERIFY,
       });
       expect(result.ok).toBe(true);
       expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({ kind: 'absent' });
@@ -111,9 +145,7 @@ describe('verifyMigration', () => {
         markersBySpaceId: markers,
         schemaIntrospection: { tables: {} },
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
-        projectSchemaToMember: STUB_PROJECT,
-        listEntityNames: STUB_LIST,
+        verifySchemaForMember: FULL_SCHEMA_VERIFY,
       });
       expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({ kind: 'ok' });
     });
@@ -130,9 +162,7 @@ describe('verifyMigration', () => {
         markersBySpaceId: markers,
         schemaIntrospection: { tables: {} },
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
-        projectSchemaToMember: STUB_PROJECT,
-        listEntityNames: STUB_LIST,
+        verifySchemaForMember: FULL_SCHEMA_VERIFY,
       });
       expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({
         kind: 'hashMismatch',
@@ -160,9 +190,7 @@ describe('verifyMigration', () => {
         markersBySpaceId: markers,
         schemaIntrospection: { tables: {} },
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
-        projectSchemaToMember: STUB_PROJECT,
-        listEntityNames: STUB_LIST,
+        verifySchemaForMember: FULL_SCHEMA_VERIFY,
       });
       expect(result.assertOk().markerCheck.perSpace.get('cipher')).toEqual({
         kind: 'missingInvariants',
@@ -184,9 +212,7 @@ describe('verifyMigration', () => {
         markersBySpaceId: markers,
         schemaIntrospection: { tables: {} },
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
-        projectSchemaToMember: STUB_PROJECT,
-        listEntityNames: STUB_LIST,
+        verifySchemaForMember: FULL_SCHEMA_VERIFY,
       });
       expect(result.assertOk().markerCheck.orphanMarkers.map((o) => o.spaceId)).toEqual([
         'cipher',
@@ -196,14 +222,9 @@ describe('verifyMigration', () => {
   });
 
   describe('schemaCheck', () => {
-    it('projects the schema per member before invoking the verifier (F23 lock)', () => {
-      // Multi-member deployment: each member sees only its own tables.
+    it('scopes each member to its own space, dropping the extras another member claims', () => {
       const aggregate = makeAggregate({
-        app: makeMember({
-          spaceId: 'app',
-          headHash: 'sha256:h',
-          tables: { user: {} },
-        }),
+        app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
         extensions: [
           makeMember({
             spaceId: 'cipher',
@@ -225,22 +246,17 @@ describe('verifyMigration', () => {
         markersBySpaceId: new Map(),
         schemaIntrospection: liveSchema,
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
-        projectSchemaToMember: STUB_PROJECT,
-        listEntityNames: STUB_LIST,
+        verifySchemaForMember: FULL_SCHEMA_VERIFY,
       });
 
       const schemaCheck = result.assertOk().schemaCheck;
-      // App member's pass saw `user` and `orphan_table` (cipher_state pruned).
-      expect(schemaCheck.perSpace.get('app')?.tablesSeen).toEqual(['orphan_table', 'user']);
-      // Cipher member's pass saw `cipher_state` and `orphan_table` (user pruned).
-      expect(schemaCheck.perSpace.get('cipher')?.tablesSeen).toEqual([
-        'cipher_state',
-        'orphan_table',
-      ]);
+      // App keeps only the undeclared `orphan_table`; `cipher_state` is dropped.
+      expect(extraTables(schemaCheck.perSpace.get('app'))).toEqual(['orphan_table']);
+      // Cipher keeps only the undeclared `orphan_table`; `user` is dropped.
+      expect(extraTables(schemaCheck.perSpace.get('cipher'))).toEqual(['orphan_table']);
     });
 
-    it('reports live tables not claimed by any member as `orphanElements`', () => {
+    it('keeps live tables claimed by no member as each member’s undeclared extras', () => {
       const aggregate = makeAggregate({
         app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
         extensions: [
@@ -264,21 +280,18 @@ describe('verifyMigration', () => {
         aggregate,
         markersBySpaceId: new Map(),
         schemaIntrospection: liveSchema,
-        // Lenient mode: the verifier still reports orphan elements; the
-        // caller (db verify) decides whether to treat them as errors.
         mode: 'lenient',
-        verifySchemaForMember: STUB_VERIFY,
-        projectSchemaToMember: STUB_PROJECT,
-        listEntityNames: STUB_LIST,
+        verifySchemaForMember: FULL_SCHEMA_VERIFY,
       });
 
-      expect(result.assertOk().schemaCheck.orphanElements).toEqual([
-        { kind: 'table', name: 'another_orphan' },
-        { kind: 'table', name: 'mystery_table' },
+      const schemaCheck = result.assertOk().schemaCheck;
+      expect(extraTables(schemaCheck.perSpace.get('app'))).toEqual([
+        'another_orphan',
+        'mystery_table',
       ]);
     });
 
-    it('returns an empty `orphanElements` list when every live table is claimed', () => {
+    it('leaves no extras when every live table is claimed by some member', () => {
       const aggregate = makeAggregate({
         app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
         extensions: [
@@ -300,12 +313,12 @@ describe('verifyMigration', () => {
           },
         },
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
-        projectSchemaToMember: STUB_PROJECT,
-        listEntityNames: STUB_LIST,
+        verifySchemaForMember: FULL_SCHEMA_VERIFY,
       });
 
-      expect(result.assertOk().schemaCheck.orphanElements).toEqual([]);
+      const schemaCheck = result.assertOk().schemaCheck;
+      expect(extraTables(schemaCheck.perSpace.get('app'))).toEqual([]);
+      expect(extraTables(schemaCheck.perSpace.get('cipher'))).toEqual([]);
     });
 
     it('returns notOk(introspectionFailure) when verifySchemaForMember throws', () => {
@@ -321,8 +334,6 @@ describe('verifyMigration', () => {
         verifySchemaForMember: () => {
           throw new Error('introspection broke');
         },
-        projectSchemaToMember: STUB_PROJECT,
-        listEntityNames: STUB_LIST,
       });
 
       expect(result.ok).toBe(false);
@@ -330,31 +341,6 @@ describe('verifyMigration', () => {
         kind: 'introspectionFailure',
         detail: 'introspection broke',
       });
-    });
-
-    it('returns notOk(introspectionFailure) when a shape callback throws via a malformed schema', () => {
-      const aggregate = makeAggregate({
-        app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
-      });
-
-      const exploding = {
-        get tables() {
-          throw new Error('schema access blew up');
-        },
-      };
-
-      const result = verifyMigration({
-        aggregate,
-        markersBySpaceId: new Map(),
-        schemaIntrospection: exploding,
-        mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
-        projectSchemaToMember: STUB_PROJECT,
-        listEntityNames: STUB_LIST,
-      });
-
-      expect(result.ok).toBe(false);
-      expect(result.assertNotOk().kind).toBe('introspectionFailure');
     });
 
     it('threads the verifier mode (strict / lenient) to the per-member callback verbatim', () => {
@@ -368,12 +354,10 @@ describe('verifyMigration', () => {
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: {} },
         mode: 'lenient',
-        verifySchemaForMember: (_schema, _member, mode) => {
+        verifySchemaForMember: (schema, member, mode) => {
           observedMode = mode;
-          return { tablesSeen: [] };
+          return FULL_SCHEMA_VERIFY(schema, member, mode);
         },
-        projectSchemaToMember: STUB_PROJECT,
-        listEntityNames: STUB_LIST,
       });
 
       expect(observedMode).toBe('lenient');

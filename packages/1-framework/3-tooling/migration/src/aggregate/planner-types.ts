@@ -12,7 +12,6 @@ import type {
 import type { Result } from '@prisma-next/utils/result';
 import type { PathDecision } from '../migration-graph';
 import type { ContractMarkerRecordLike } from './marker-types';
-import type { ProjectSchemaToMember } from './project-schema-to-space';
 import type { ContractSpaceAggregate } from './types';
 
 /**
@@ -43,9 +42,9 @@ export interface CallerPolicy {
  *   marker yet (greenfield space). The planner treats the marker's
  *   `storageHash` as the graph-walk's `from` node, falling back to
  *   {@link import('../constants').EMPTY_CONTRACT_HASH} when absent.
- * - `schemaIntrospection`: the family's full live schema IR. Fed into
- *   the synth strategy after per-space pre-projection via
- *   {@link import('./project-schema-to-space').projectSchemaToSpace}.
+ * - `schemaIntrospection`: the family's full live schema IR. Fed into the
+ *   synth strategy in full; the planner scopes the resulting diff to each
+ *   member's own space rather than pruning the schema up front.
  *
  * Callers (CLI commands) gather this via the family's
  * `readAllMarkers` + `introspect` calls before invoking the planner.
@@ -82,11 +81,6 @@ export interface PlannerInput<TFamilyId extends string, TTargetId extends string
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly callerPolicy: CallerPolicy;
   readonly operationPolicy: MigrationOperationPolicy;
-  /**
-   * Family-provided callback that prunes the live schema to a member's slice.
-   * Threaded into the synth strategy; the planner never touches the shape.
-   */
-  readonly projectSchemaToMember: ProjectSchemaToMember;
 }
 
 /**

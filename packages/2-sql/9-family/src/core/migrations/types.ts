@@ -351,6 +351,13 @@ export interface SqlMigrationPlannerPlanOptions {
    * All components must have matching familyId ('sql') and targetId.
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  /**
+   * Entity names every OTHER contract-space member claims. The planner
+   * diffs the full live schema, then drops the `extra` findings for these
+   * names so it never emits DROP ops against a sibling space's tables.
+   * Absent (or empty) for single-space plans.
+   */
+  readonly entitiesOwnedByOtherSpaces?: ReadonlySet<string>;
 }
 
 export interface SqlMigrationPlanner<TTargetDetails> {

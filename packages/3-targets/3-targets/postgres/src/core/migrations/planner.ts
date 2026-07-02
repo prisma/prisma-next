@@ -11,6 +11,7 @@ import {
   partitionIssuesByControlPolicy,
   planFieldEventOperations,
   plannerFailure,
+  scopePlanDiffToSpace,
 } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
@@ -164,15 +165,18 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // runs the same underlying comparison (via `verifyDatabaseSchema`) and
     // rejects on non-empty.
     PostgresDatabaseSchemaNode.assert(options.schema);
-    const databaseDiff = diffPostgresDatabaseSchema({
-      contract: options.contract,
-      actualSchema: options.schema,
-      strict:
-        options.policy.allowedOperationClasses.includes('widening') ||
-        options.policy.allowedOperationClasses.includes('destructive'),
-      typeMetadataRegistry: new Map(),
-      frameworkComponents: options.frameworkComponents,
-    });
+    const databaseDiff = scopePlanDiffToSpace(
+      diffPostgresDatabaseSchema({
+        contract: options.contract,
+        actualSchema: options.schema,
+        strict:
+          options.policy.allowedOperationClasses.includes('widening') ||
+          options.policy.allowedOperationClasses.includes('destructive'),
+        typeMetadataRegistry: new Map(),
+        frameworkComponents: options.frameworkComponents,
+      }),
+      options.entitiesOwnedByOtherSpaces,
+    );
     const schemaIssues = this.collectSchemaIssues(options, databaseDiff.issues);
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
     const storageTypes = options.contract.storage.types ?? {};

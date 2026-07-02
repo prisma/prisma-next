@@ -48,7 +48,6 @@ import type { SqlSchemaIRNode, SqlTableIR } from '@prisma-next/sql-schema-ir/typ
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlControlAdapter } from './control-adapter';
-import { sqlListSchemaEntityNames, sqlProjectSchemaToMember } from './diff/schema-shape';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
 import type {
   DiffDatabaseSchemaInput,
@@ -216,14 +215,13 @@ export interface SqlControlFamilyInstance
   }): Promise<VerifyDatabaseResult>;
 
   /**
-   * Verify a contract against an already-introspected schema slice.
+   * Verify a contract against an already-introspected schema.
    *
    * Callers that need to verify against the live database compose
    * `introspect({ driver })` + `verifySchema({ contract, schema, ... })`.
-   * The aggregate verifier projects each member's claimed slice via
-   * `projectSchemaToSpace` and hands the projected slice in — this
-   * keeps per-member verification from surfacing sibling-space tables
-   * as `extras`.
+   * The aggregate verifier hands in the full introspected schema and scopes
+   * the returned result to each member's contract space afterwards — so
+   * sibling-space tables never survive as `extras`.
    */
   verifySchema(options: {
     readonly contract: unknown;
@@ -231,19 +229,6 @@ export interface SqlControlFamilyInstance
     readonly strict: boolean;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): VerifyDatabaseSchemaResult;
-
-  /**
-   * Prunes the introspected SQL schema to a member's slice. Walks the family's
-   * flat/namespaced shape so the framework aggregate verifier/planner never has
-   * to. See the framework `ControlFamilyInstance.projectSchemaToMember`.
-   */
-  projectSchemaToMember(
-    schema: SqlSchemaIRNode,
-    ownedByOtherNames: ReadonlySet<string>,
-  ): SqlSchemaIRNode;
-
-  /** Lists the live table names in the introspected SQL schema. */
-  listSchemaEntityNames(schema: SqlSchemaIRNode): readonly string[];
 
   sign(options: {
     readonly driver: SqlControlDriverInstance<string>;
@@ -766,18 +751,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           counts: { ...sqlResult.schema.counts, fail: totalFails },
         },
       };
-    },
-    projectSchemaToMember(
-      schema: SqlSchemaIRNode,
-      ownedByOtherNames: ReadonlySet<string>,
-    ): SqlSchemaIRNode {
-      return blindCast<
-        SqlSchemaIRNode,
-        'the SQL shape pruner returns the same SqlSchemaIRNode shape, spread into a plain object'
-      >(sqlProjectSchemaToMember(schema, ownedByOtherNames));
-    },
-    listSchemaEntityNames(schema: SqlSchemaIRNode): readonly string[] {
-      return sqlListSchemaEntityNames(schema);
     },
     async sign(options: {
       readonly driver: SqlControlDriverInstance<string>;

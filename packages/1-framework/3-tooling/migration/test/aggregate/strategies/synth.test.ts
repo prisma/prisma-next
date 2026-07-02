@@ -17,17 +17,6 @@ const POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening'],
 };
 
-// Flat-`tables` schema-shape pruning standing in for a family's callback.
-const STUB_PROJECT = (schema: unknown, ownedByOtherNames: ReadonlySet<string>): unknown => {
-  const s = schema as { tables?: Record<string, unknown> };
-  if (typeof s !== 'object' || s === null || typeof s.tables !== 'object') return schema;
-  const pruned: Record<string, unknown> = {};
-  for (const [name, value] of Object.entries(s.tables)) {
-    if (!ownedByOtherNames.has(name)) pruned[name] = value;
-  }
-  return { ...s, tables: pruned };
-};
-
 const STUB_ADAPTER: ControlAdapterInstance<'sql', 'postgres'> =
   {} as unknown as ControlAdapterInstance<'sql', 'postgres'>;
 
@@ -56,11 +45,13 @@ function makeStubPlan(targetId: string): MigrationPlanWithAuthoringSurface {
 }
 
 describe('synthStrategy', () => {
-  it('projects the live schema before passing it to the family planner', async () => {
+  it('passes the full schema and the other spaces’ entity names to the family planner', async () => {
     let observedSchema: unknown;
+    let observedOwned: ReadonlySet<string> | undefined;
     const stubPlanner: MigrationPlanner<'sql', 'postgres'> = {
-      plan: ({ schema }) => {
+      plan: ({ schema, entitiesOwnedByOtherSpaces }) => {
         observedSchema = schema;
+        observedOwned = entitiesOwnedByOtherSpaces;
         return { kind: 'success', plan: makeStubPlan('placeholder') };
       },
       emptyMigration: () => {
@@ -100,7 +91,6 @@ describe('synthStrategy', () => {
       migrations: stubMigrations,
       frameworkComponents: [],
       operationPolicy: POLICY,
-      projectSchemaToMember: STUB_PROJECT,
     });
 
     expect(outcome.kind).toBe('ok');
@@ -118,9 +108,15 @@ describe('synthStrategy', () => {
       },
     ]);
 
-    // Critical: the planner saw a schema with cipher_state pruned out.
+    // Critical: the planner saw the FULL schema (no pre-pruning) and the set of
+    // entity names the sibling space owns, so it can drop those extras itself.
     const observed = observedSchema as { tables: Record<string, unknown> };
-    expect(Object.keys(observed.tables).sort()).toEqual(['app_user', 'orphan_table']);
+    expect(Object.keys(observed.tables).sort()).toEqual([
+      'app_user',
+      'cipher_state',
+      'orphan_table',
+    ]);
+    expect([...(observedOwned ?? [])].sort()).toEqual(['cipher_state']);
   });
 
   it('forwards planner failures verbatim', async () => {
@@ -155,7 +151,6 @@ describe('synthStrategy', () => {
       migrations: stubMigrations,
       frameworkComponents: [],
       operationPolicy: POLICY,
-      projectSchemaToMember: STUB_PROJECT,
     });
 
     expect(outcome.kind).toBe('failure');

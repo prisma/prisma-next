@@ -24,11 +24,9 @@ export {
   planMigration,
 } from '../aggregate/planner';
 export {
-  collectOwnedNames,
-  type ListSchemaEntityNames,
-  type ProjectSchemaToMember,
-  projectSchemaToSpace,
-} from '../aggregate/project-schema-to-space';
+  otherMemberEntityNames,
+  scopeSchemaResultToSpace,
+} from '../aggregate/scope-schema-result';
 export {
   type GraphWalkOutcome,
   type GraphWalkStrategyInputs,
@@ -44,7 +42,6 @@ export type {
 export {
   type MarkerCheckResult,
   type MarkerCheckSection,
-  type OrphanElement,
   type SchemaCheckSection,
   type VerifierError,
   type VerifierInput,

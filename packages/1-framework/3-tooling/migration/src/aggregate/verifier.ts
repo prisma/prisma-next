@@ -1,13 +1,9 @@
-import { elementCoordinates } from '@prisma-next/framework-components/ir';
+import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { requireHeadRef } from './aggregate';
 import type { ContractMarkerRecordLike } from './marker-types';
-import {
-  type ListSchemaEntityNames,
-  type ProjectSchemaToMember,
-  projectSchemaToSpace,
-} from './project-schema-to-space';
+import { otherMemberEntityNames, scopeSchemaResultToSpace } from './scope-schema-result';
 import type { ContractSpaceAggregate, ContractSpaceMember } from './types';
 
 /**
@@ -16,37 +12,23 @@ import type { ContractSpaceAggregate, ContractSpaceMember } from './types';
  * any aggregate member) as errors; `lenient` treats them as
  * informational. Maps directly to `db verify --strict`.
  */
-export interface VerifierInput<TSchemaResult> {
+export interface VerifierInput {
   readonly aggregate: ContractSpaceAggregate;
   readonly markersBySpaceId: ReadonlyMap<string, ContractMarkerRecordLike | null>;
   readonly schemaIntrospection: unknown;
   readonly mode: 'strict' | 'lenient';
   /**
-   * Caller-supplied per-space schema verifier. The CLI wires this to
-   * the family's `verifySqlSchema` (SQL) / equivalent (other
-   * families). The verifier projects the schema to the
-   * member's slice via {@link projectSchemaToSpace} before invoking
-   * the callback, so single-contract semantics are preserved.
-   *
-   * Typed structurally with a generic `TSchemaResult` so the
-   * migration-tools layer doesn't depend on the SQL family's
-   * `VerifySqlSchemaResult`. CLI callers pass the family's type
-   * through unchanged.
+   * Caller-supplied per-space schema verifier. The CLI wires this to the
+   * family's `verifySchema`. It verifies the member against the **full**
+   * introspected schema; the verifier then scopes the result to the member's
+   * contract space (dropping the extras other members claim). It composes no
+   * pre-projection, so the framework never touches the storage shape.
    */
   readonly verifySchemaForMember: (
-    projectedSchema: unknown,
+    schema: unknown,
     member: ContractSpaceMember,
     mode: 'strict' | 'lenient',
-  ) => TSchemaResult;
-  /**
-   * Caller-supplied schema-shape callbacks. The framework touches no storage
-   * shape: `projectSchemaToMember` prunes the live schema to a member's slice,
-   * and `listEntityNames` enumerates the live entity names for orphan
-   * detection. The families provide both (each knows how its own introspected
-   * schema is shaped); the CLI wires them.
-   */
-  readonly projectSchemaToMember: ProjectSchemaToMember;
-  readonly listEntityNames: ListSchemaEntityNames;
+  ) => VerifyDatabaseSchemaResult;
 }
 
 /**
@@ -73,30 +55,13 @@ export interface MarkerCheckSection {
   }[];
 }
 
-/**
- * A live storage element (today: a top-level table) not claimed by any
- * member of the aggregate. The verifier always reports these;
- * the caller decides what to do — `db verify --strict` treats them as
- * errors, the lenient default treats them as informational.
- *
- * Today only `kind: 'table'` exists. The discriminated shape leaves
- * room for orphan columns / indexes / sequences in the future without
- * breaking the type contract.
- */
-export type OrphanElement = { readonly kind: 'table'; readonly name: string };
-
-export interface SchemaCheckSection<TSchemaResult> {
-  readonly perSpace: ReadonlyMap<string, TSchemaResult>;
-  /**
-   * Live elements present in the introspected schema that are not
-   * claimed by **any** aggregate member. Sorted alphabetically by name.
-   */
-  readonly orphanElements: readonly OrphanElement[];
+export interface SchemaCheckSection {
+  readonly perSpace: ReadonlyMap<string, VerifyDatabaseSchemaResult>;
 }
 
-export interface VerifierSuccess<TSchemaResult> {
+export interface VerifierSuccess {
   readonly markerCheck: MarkerCheckSection;
-  readonly schemaCheck: SchemaCheckSection<TSchemaResult>;
+  readonly schemaCheck: SchemaCheckSection;
 }
 
 export type VerifierError = {
@@ -104,7 +69,7 @@ export type VerifierError = {
   readonly detail: string;
 };
 
-export type VerifierOutput<TSchemaResult> = Result<VerifierSuccess<TSchemaResult>, VerifierError>;
+export type VerifierOutput = Result<VerifierSuccess, VerifierError>;
 
 /**
  * Verify a {@link ContractSpaceAggregate} against the live database
@@ -114,12 +79,11 @@ export type VerifierOutput<TSchemaResult> = Result<VerifierSuccess<TSchemaResult
  *   member's `headRef.hash` + `headRef.invariants`. Absence is a
  *   distinct kind, not an error (callers — `db verify` strict vs
  *   `db init` precondition — choose how to interpret it).
- * - `schemaCheck` per member: project the live schema to the slice
- *   the member claims via {@link projectSchemaToSpace}, then delegate
- *   to the caller-supplied `verifySchemaForMember`. The pre-projection
- *   means the family's single-contract verifier no longer sees other
- *   members' tables as `extras`, so a multi-member deployment never
- *   surfaces cross-member tables as orphaned schema elements.
+ * - `schemaCheck` per member: verify the member against the **full**
+ *   introspected schema, then scope the result to the member's contract
+ *   space via {@link scopeSchemaResultToSpace} — dropping the extras every
+ *   other member claims. Extras owned by no member survive as each member's
+ *   undeclared-table findings. No schema is pruned before verifying.
  *
  * `markerCheck.orphanMarkers` lists every marker row whose `space` is
  * not a member of the aggregate. `db verify` callers reject orphans;
@@ -128,9 +92,7 @@ export type VerifierOutput<TSchemaResult> = Result<VerifierSuccess<TSchemaResult
  * Pure synchronous function; no I/O. The caller (CLI) gathers
  * `markersBySpaceId` and `schemaIntrospection` ahead of the call.
  */
-export function verifyMigration<TSchemaResult>(
-  input: VerifierInput<TSchemaResult>,
-): VerifierOutput<TSchemaResult> {
+export function verifyMigration(input: VerifierInput): VerifierOutput {
   try {
     return runVerifyMigration(input);
   } catch (error) {
@@ -141,18 +103,8 @@ export function verifyMigration<TSchemaResult>(
   }
 }
 
-function runVerifyMigration<TSchemaResult>(
-  input: VerifierInput<TSchemaResult>,
-): VerifierOutput<TSchemaResult> {
-  const {
-    aggregate,
-    markersBySpaceId,
-    schemaIntrospection,
-    mode,
-    verifySchemaForMember,
-    projectSchemaToMember,
-    listEntityNames,
-  } = input;
+function runVerifyMigration(input: VerifierInput): VerifierOutput {
+  const { aggregate, markersBySpaceId, schemaIntrospection, mode, verifySchemaForMember } = input;
   const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
   const memberSpaceIds = new Set(allMembers.map((m) => m.spaceId));
 
@@ -195,17 +147,16 @@ function runVerifyMigration<TSchemaResult>(
   }
   orphanMarkers.sort((a, b) => a.spaceId.localeCompare(b.spaceId));
 
-  // Schema check per member (with per-space pre-projection).
-  const schemaPerSpace = new Map<string, TSchemaResult>();
+  // Schema check per member: verify against the full schema, then scope the
+  // result to the member's contract space.
+  const schemaPerSpace = new Map<string, VerifyDatabaseSchemaResult>();
   for (const member of allMembers) {
     const others = allMembers.filter((m) => m.spaceId !== member.spaceId);
-    const projected = projectSchemaToSpace(
-      schemaIntrospection,
-      member,
-      others,
-      projectSchemaToMember,
+    const result = verifySchemaForMember(schemaIntrospection, member, mode);
+    schemaPerSpace.set(
+      member.spaceId,
+      scopeSchemaResultToSpace(result, otherMemberEntityNames(member, others)),
     );
-    schemaPerSpace.set(member.spaceId, verifySchemaForMember(projected, member, mode));
   }
 
   return ok({
@@ -215,39 +166,6 @@ function runVerifyMigration<TSchemaResult>(
     },
     schemaCheck: {
       perSpace: schemaPerSpace,
-      orphanElements: detectOrphanElements(schemaIntrospection, allMembers, listEntityNames),
     },
   });
-}
-
-/**
- * Live entities not claimed by any aggregate member. The live entity names come
- * from the family-provided {@link ListSchemaEntityNames} callback; the claimed
- * names come from each member's contract storage via {@link elementCoordinates}
- * (target-agnostic). The framework never inspects the schema shape.
- */
-function detectOrphanElements(
-  schemaIntrospection: unknown,
-  members: ReadonlyArray<ContractSpaceMember>,
-  listEntityNames: ListSchemaEntityNames,
-): readonly OrphanElement[] {
-  const liveTableNames = listEntityNames(schemaIntrospection);
-  if (liveTableNames.length === 0) return [];
-
-  const claimedTables = new Set<string>();
-  for (const member of members) {
-    const contract = member.contract();
-    for (const { entityName } of elementCoordinates(contract.storage)) {
-      claimedTables.add(entityName);
-    }
-  }
-
-  const orphans: OrphanElement[] = [];
-  for (const tableName of liveTableNames) {
-    if (!claimedTables.has(tableName)) {
-      orphans.push({ kind: 'table', name: tableName });
-    }
-  }
-  orphans.sort((a, b) => a.name.localeCompare(b.name));
-  return orphans;
 }

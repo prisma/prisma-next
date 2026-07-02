@@ -6,10 +6,6 @@
  * top; SQLite is relational only). Pure — no database connection required.
  */
 
-export {
-  sqlListSchemaEntityNames,
-  sqlProjectSchemaToMember,
-} from '../core/diff/schema-shape';
 export type {
   NativeTypeNormalizer,
   VerifySqlSchemaOptions,

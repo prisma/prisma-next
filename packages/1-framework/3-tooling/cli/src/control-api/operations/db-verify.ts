@@ -37,9 +37,9 @@ const SPAN_IDS = {
  *
  * Loader → verifier pipeline. The loader (sole descriptor-import
  * boundary) builds a {@link import('@prisma-next/migration-tools/aggregate').ContractSpaceAggregate};
- * the aggregate verifier bundles `markerCheck` + per-space pre-projected
- * `schemaCheck`. `mode: 'strict' | 'lenient'` maps directly to the user
- * facing `--strict` flag.
+ * the aggregate verifier bundles `markerCheck` + per-space `schemaCheck`
+ * (each member verified against the full schema, then scoped to its space).
+ * `mode: 'strict' | 'lenient'` maps directly to the user facing `--strict` flag.
  */
 export interface ExecuteDbVerifyOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
@@ -85,11 +85,11 @@ export type ExecuteDbVerifyResult = Result<ExecuteDbVerifySuccess, CliStructured
  *    structured CLI error.
  * 2. **Read DB state**: marker rows + (when `skipSchema` is `false`)
  *    schema introspection.
- * 3. **Verify**: {@link verifyMigration} returns per-space
- *    `markerCheck` + per-space pre-projected `schemaCheck` (closes F23).
- *    Marker mismatches map to `CliStructuredError` (code `5002`) so
- *    callers (CLI command) can render and exit. Schema results are
- *    returned to the caller verbatim.
+ * 3. **Verify**: {@link verifyMigration} returns per-space `markerCheck` +
+ *    per-space `schemaCheck` (each member verified against the full schema,
+ *    then scoped to its own contract space). Marker mismatches map to
+ *    `CliStructuredError` (code `5002`) so callers (CLI command) can render
+ *    and exit. Schema results are returned to the caller verbatim.
  */
 export async function executeDbVerify<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbVerifyOptions<TFamilyId, TTargetId>,
@@ -116,21 +116,6 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
     schemaIntrospection,
     mode: options.mode,
     verifySchemaForMember: createPerMemberVerifier(options),
-    projectSchemaToMember: (schema, ownedByOtherNames) =>
-      familyInstance.projectSchemaToMember(
-        blindCast<
-          never,
-          'family TSchemaIR is opaque to the CLI; schema is passed straight through'
-        >(schema),
-        ownedByOtherNames,
-      ),
-    listEntityNames: (schema) =>
-      familyInstance.listSchemaEntityNames(
-        blindCast<
-          never,
-          'family TSchemaIR is opaque to the CLI; schema is passed straight through'
-        >(schema),
-      ),
   });
   return finaliseVerifyResult({ verifyResult, aggregate, skipMarker, onProgress });
 }
@@ -189,22 +174,22 @@ async function runIntrospection<TFamilyId extends string, TTargetId extends stri
 export function createPerMemberVerifier<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbVerifyOptions<TFamilyId, TTargetId>,
 ): (
-  projectedSchema: unknown,
+  schema: unknown,
   member: ContractSpaceMember,
   verifyMode: 'strict' | 'lenient',
 ) => VerifyDatabaseSchemaResult {
   const { skipSchema, familyInstance, frameworkComponents } = options;
-  return (projectedSchema, member, verifyMode) => {
+  return (schema, member, verifyMode) => {
     if (skipSchema) return buildSkippedSchemaResult(member);
     return familyInstance.verifySchema({
       contract: member.contract(),
-      // The family's `TSchemaIR` is opaque to migration-tools; the
-      // aggregate verifier passes through whatever we hand it. The
-      // family expects its own IR shape on the way back.
+      // The family's `TSchemaIR` is opaque to migration-tools; the aggregate
+      // verifier passes the full introspected schema through and scopes the
+      // result afterwards. The family expects its own IR shape on the way back.
       schema: blindCast<
         never,
-        'family TSchemaIR is opaque to migration-tools; projectedSchema is passed straight through'
-      >(projectedSchema),
+        'family TSchemaIR is opaque to migration-tools; the full schema is passed straight through'
+      >(schema),
       strict: verifyMode === 'strict',
       frameworkComponents,
     });
@@ -238,7 +223,7 @@ function emitVerifySpan(
  * by the CLI's `--schema-only` mode.
  */
 function finaliseVerifyResult(args: {
-  verifyResult: VerifierOutput<VerifyDatabaseSchemaResult>;
+  verifyResult: VerifierOutput;
   aggregate: {
     readonly app: { readonly spaceId: string };
     readonly extensions: ReadonlyArray<{ readonly spaceId: string }>;

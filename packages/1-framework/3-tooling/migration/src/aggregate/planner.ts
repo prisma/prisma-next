@@ -81,7 +81,6 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
         migrations: input.migrations,
         frameworkComponents: input.frameworkComponents,
         operationPolicy: input.operationPolicy,
-        projectSchemaToMember: input.projectSchemaToMember,
       });
       if (synthOutcome.kind === 'failure') {
         return notOk({
@@ -141,7 +140,6 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
       migrations: input.migrations,
       frameworkComponents: input.frameworkComponents,
       operationPolicy: input.operationPolicy,
-      projectSchemaToMember: input.projectSchemaToMember,
     });
     if (synthOutcome.kind === 'failure') {
       return notOk({

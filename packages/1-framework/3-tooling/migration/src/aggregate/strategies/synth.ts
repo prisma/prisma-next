@@ -10,7 +10,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { ContractMarkerRecordLike } from '../marker-types';
 import type { PerSpacePlan } from '../planner-types';
-import { type ProjectSchemaToMember, projectSchemaToSpace } from '../project-schema-to-space';
+import { otherMemberEntityNames } from '../scope-schema-result';
 import { buildSynthMigrationEdge } from '../synth-migration-edge';
 import type { ContractSpaceMember } from '../types';
 
@@ -28,7 +28,6 @@ export interface SynthStrategyInputs<TFamilyId extends string, TTargetId extends
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly operationPolicy: MigrationOperationPolicy;
-  readonly projectSchemaToMember: ProjectSchemaToMember;
 }
 
 export type SynthStrategyOutcome =
@@ -45,14 +44,14 @@ export type SynthStrategyOutcome =
 type MaybeAsyncPlannerResult = MigrationPlannerResult | Promise<MigrationPlannerResult>;
 
 /**
- * Synthesise a migration plan for a single member by projecting the
- * live schema down to that member's claimed slice and delegating to
- * the family's `createPlanner(...).plan(...)`.
+ * Synthesise a migration plan for a single member from the full live schema,
+ * delegating to the family's `createPlanner(...).plan(...)`.
  *
- * Pre-projection (via {@link projectSchemaToSpace}) closes the F23
- * concern: without it, the family's planner sees other members'
- * tables as "extras" and emits destructive ops to drop them. With it,
- * the planner only sees the slice this member claims.
+ * The planner diffs the whole introspected schema, so it sees other members'
+ * tables as "extras"; `entitiesOwnedByOtherSpaces` (every other member's
+ * claimed entity names) tells it to drop those extras before building ops, so
+ * it never emits a destructive drop for a sibling space's table. The schema is
+ * never pruned before planning.
  *
  * The synthesised plan's `targetId` is set from `aggregateTargetId`
  * (the aggregate's ambient target). The family's planner does not
@@ -70,21 +69,15 @@ type MaybeAsyncPlannerResult = MigrationPlannerResult | Promise<MigrationPlanner
 export async function synthStrategy<TFamilyId extends string, TTargetId extends string>(
   input: SynthStrategyInputs<TFamilyId, TTargetId>,
 ): Promise<SynthStrategyOutcome> {
-  const projectedSchema = projectSchemaToSpace(
-    input.schemaIntrospection,
-    input.member,
-    input.otherMembers,
-    input.projectSchemaToMember,
-  );
-
   const planner = input.migrations.createPlanner(input.adapter);
   const plannerResult: MigrationPlannerResult = await (planner.plan({
     contract: input.member.contract(),
-    schema: projectedSchema,
+    schema: input.schemaIntrospection,
     policy: input.operationPolicy,
     fromContract: null,
     frameworkComponents: input.frameworkComponents,
     spaceId: input.member.spaceId,
+    entitiesOwnedByOtherSpaces: otherMemberEntityNames(input.member, input.otherMembers),
   }) as MaybeAsyncPlannerResult);
 
   if (plannerResult.kind === 'failure') {

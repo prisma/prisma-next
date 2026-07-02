@@ -11,8 +11,4 @@ export {
   mongoOperationsToPreview,
 } from '../core/operation-preview';
 export { diffMongoSchemas } from '../core/schema-diff';
-export {
-  mongoListSchemaEntityNames,
-  mongoProjectSchemaToMember,
-} from '../core/schema-shape';
 export { canonicalizeSchemasForVerification } from '../core/schema-verify/canonicalize-introspection';
