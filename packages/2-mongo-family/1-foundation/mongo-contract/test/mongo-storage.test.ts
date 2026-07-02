@@ -126,7 +126,7 @@ describe('MongoStorage', () => {
       entries: {
         collection: {},
         valueSet: { Role: { kind: 'valueSet', values: ['admin', 'author', 'reader'] } },
-      } as never,
+      },
     });
     const roleVs = ns.entries['valueSet']?.['Role'];
     expect(roleVs).toBeInstanceOf(MongoValueSet);
@@ -139,7 +139,7 @@ describe('MongoStorage', () => {
       entries: {
         collection: {},
         valueSet: { Role: { kind: 'valueSet', values: ['admin', 'reader'] } },
-      } as never,
+      },
     });
     const json = JSON.parse(JSON.stringify(ns)) as { entries: Record<string, unknown> };
     expect(json.entries['valueSet']).toEqual({
@@ -159,7 +159,7 @@ describe('MongoStorage', () => {
   it('buildMongoNamespace with unbound id and only a valueSet slot does not return the unbound singleton', () => {
     const ns = buildMongoNamespace({
       id: UNBOUND_NAMESPACE_ID,
-      entries: { valueSet: { Role: { kind: 'valueSet', values: ['admin'] } } } as never,
+      entries: { valueSet: { Role: { kind: 'valueSet', values: ['admin'] } } },
     });
     expect(ns.entries['valueSet']?.['Role']).toBeInstanceOf(MongoValueSet);
     expect(ns).not.toBe(MongoUnboundNamespace.instance);

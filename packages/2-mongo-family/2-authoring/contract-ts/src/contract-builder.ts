@@ -51,6 +51,7 @@ import {
   MongoStorage,
   type MongoStorageShape,
   type MongoTypeMaps,
+  type MongoValueSetInput,
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
@@ -1764,18 +1765,36 @@ function buildContractFromDefinition<
   // at `hash({})`.
   const capabilities: Record<string, Record<string, boolean>> = {};
   const collections = buildCollections(definition.models);
+
+  const storageValueSets: Record<string, MongoValueSetInput> = {};
+  for (const [enumName, handle] of Object.entries(definition.enums ?? {})) {
+    storageValueSets[enumName] = {
+      kind: 'valueSet',
+      values: handle.values.map((v) =>
+        blindCast<
+          JsonValue,
+          'enum member values are codec inputs (string/number/bool); mongo/string@1 is identity so the value set values equal the encoded member values, always JsonValue-compatible'
+        >(v),
+      ),
+    };
+  }
+  const hasValueSets = Object.keys(storageValueSets).length > 0;
+
   const unboundNamespace = buildMongoNamespace({
     id: UNBOUND_NAMESPACE_ID,
-    entries: { collection: collections },
+    entries: {
+      collection: collections,
+      ...ifDefined('valueSet', hasValueSets ? storageValueSets : undefined),
+    },
   });
-  // Hash the constructed (normalized) collection map, not the raw input
-  // literals — persisted storageHash values were computed over the
-  // constructed form.
+  // Hash the constructed (normalized) entries, not the raw input literals —
+  // persisted storageHash values were computed over the constructed form.
   const storageBody = {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
         collections: unboundNamespace.entries.collection,
+        ...ifDefined('valueSet', unboundNamespace.entries.valueSet),
       },
     },
   };

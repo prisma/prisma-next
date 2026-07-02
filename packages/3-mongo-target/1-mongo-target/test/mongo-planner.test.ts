@@ -1688,4 +1688,29 @@ describe('MongoMigrationPlanner', () => {
       expect(empty.origin).toBeNull();
     });
   });
+
+  describe('value set is non-physical', () => {
+    function makeContractWithValueSet(
+      collections: Record<string, MongoCollectionData>,
+      valueSets: Record<string, { kind: 'valueSet'; values: readonly unknown[] }>,
+    ): MongoContract {
+      const base = makeContract(collections);
+      const ns = base.storage.namespaces['__unbound__'] as { entries: Record<string, unknown> };
+      ns.entries['valueSet'] = valueSets;
+      return base;
+    }
+
+    it('emits no migration op when the only storage delta is a value-set addition', () => {
+      // Origin schema matches the collection exactly; the contract adds a value
+      // set. The planner reads only entries.collection, so the value set produces
+      // no op — the validator (physical artifact) is unchanged.
+      const contract = makeContractWithValueSet(
+        { users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] } },
+        { Role: { kind: 'valueSet', values: ['admin', 'author', 'reader'] } },
+      );
+      const origin = irWithCollection('users', [ascIndex('email')]);
+      const plan = planSuccess(planner, contract, origin);
+      expect(plan.operations).toHaveLength(0);
+    });
+  });
 });

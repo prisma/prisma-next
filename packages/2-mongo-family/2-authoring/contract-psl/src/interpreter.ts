@@ -32,6 +32,7 @@ import {
   MongoIndex,
   type MongoIndexKeyDirection,
   MongoStorage,
+  type MongoValueSetInput,
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import type { CollationOptions } from '@prisma-next/mongo-value/mongodb-types';
@@ -1258,18 +1259,34 @@ export function interpretPslDocumentToMongoContract(
       'arktype-validated JSON shapes satisfy MongoCollectionInput by construction'
     >(raw);
   }
+  const storageValueSets: Record<string, MongoValueSetInput> = {};
+  for (const [enumName, builtEnum] of Object.entries(builtEnums)) {
+    storageValueSets[enumName] = {
+      kind: 'valueSet',
+      values: builtEnum.members.map((m) => m.value),
+    };
+  }
+  const hasValueSets = Object.keys(storageValueSets).length > 0;
+
   const unboundNamespace = buildMongoNamespace({
     id: UNBOUND_NAMESPACE_ID,
-    entries: { collection: collectionInputs },
+    entries: {
+      collection: collectionInputs,
+      ...(hasValueSets ? { valueSet: storageValueSets } : {}),
+    },
   });
-  // Hash the constructed (normalized) collection map, not the raw input
-  // literals — persisted storageHash values were computed over the
-  // constructed form.
+  // Hash the constructed (normalized) entries, not the raw input literals —
+  // persisted storageHash values were computed over the constructed form.
   const storageWithoutHash = {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        entries: { collection: unboundNamespace.entries.collection },
+        entries: {
+          collection: unboundNamespace.entries.collection,
+          ...(unboundNamespace.entries.valueSet !== undefined
+            ? { valueSet: unboundNamespace.entries.valueSet }
+            : {}),
+        },
       },
     },
   };

@@ -116,6 +116,22 @@ describe('builder accumulation + contract-schema acceptance', () => {
     });
   });
 
+  it('emits the storage value set alongside the domain enum', () => {
+    const envelope = JSON.parse(JSON.stringify(contract)) as {
+      storage: {
+        namespaces: Record<
+          string,
+          { entries: { valueSet?: Record<string, { kind: string; values: unknown[] }> } }
+        >;
+      };
+    };
+    const ns = envelope.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(ns?.entries.valueSet?.['Role']).toEqual({
+      kind: 'valueSet',
+      values: ['user', 'admin'],
+    });
+  });
+
   it('passes Mongo arktype contract-schema validation', () => {
     const envelope = JSON.parse(JSON.stringify(contract)) as unknown;
     const result = MongoContractSchema(envelope);
