@@ -11,7 +11,7 @@ import {
   MongoProjectStage,
 } from '@prisma-next/mongo-query-ast/execution';
 
-const identityStageKinds = new Set(['match', 'sort', 'limit', 'skip', 'sample']);
+const identityStageKinds = new Set(['match', 'sort', 'limit', 'skip', 'sample', 'vectorSearch']);
 
 const unknownShape: MongoFieldShape = { kind: 'unknown' as const };
 
@@ -76,7 +76,7 @@ export function computePipelineResultShape(
     if (shape.kind === 'unknown') {
       return { kind: 'unknown' as const };
     }
-    if (identityStageKinds.has(stage.kind) || stage.kind === 'vectorSearch') {
+    if (identityStageKinds.has(stage.kind)) {
       continue;
     }
     if (stage instanceof MongoProjectStage) {
