@@ -1,5 +1,4 @@
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
-import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contract/enum-accessor';
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqliteBinding } from '@prisma-next/driver-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
@@ -10,7 +9,6 @@ import type { Db } from '@prisma-next/sql-builder/types';
 import type { ExtractCodecTypes, SqlStorage } from '@prisma-next/sql-contract/types';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
 import type { CodecTypesBase, RawSqlTag } from '@prisma-next/sql-relational-core/expression';
-import { createRawSql } from '@prisma-next/sql-relational-core/expression';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   BindSiteParams,
@@ -33,8 +31,10 @@ import {
 import sqliteTarget, {
   SqliteContractSerializer as SqlContractSerializer,
 } from '@prisma-next/target-sqlite/runtime';
+import { assertDefined } from '@prisma-next/utils/assertions';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { buildSqliteStaticContext, type SqliteStaticContext } from '../static/sqlite-static';
 import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';
 import { SqliteRuntimeImpl } from './sqlite-runtime';
 
@@ -45,28 +45,32 @@ type UnboundSql<TContract extends Contract<SqlStorage>> =
   Db<TContract>[typeof UNBOUND_NAMESPACE_ID];
 type UnboundOrm<TContract extends Contract<SqlStorage>> =
   OrmClient<TContract>[typeof UNBOUND_NAMESPACE_ID];
-type UnboundEnums<TContract extends Contract<SqlStorage>> =
-  NamespacedEnums<TContract>[typeof UNBOUND_NAMESPACE_ID];
 
-function unboundNamespace<T>(builderOutput: { readonly [UNBOUND_NAMESPACE_ID]?: unknown }): T {
-  return blindCast<T, 'the unbound namespace always exists on a sqlite builder output'>(
-    builderOutput[UNBOUND_NAMESPACE_ID],
-  );
+function unboundOrm<TContract extends Contract<SqlStorage>>(
+  orm: OrmClient<TContract>,
+): UnboundOrm<TContract> {
+  const value = orm[UNBOUND_NAMESPACE_ID];
+  assertDefined(value, 'the unbound namespace always exists on a sqlite builder output');
+  return blindCast<
+    UnboundOrm<TContract>,
+    'OrmClient<TContract> indexed by a literal key widens NsId to string; Collection is invariant in NsId via row/mutation-input types, so the indexed-access type cannot be proven to match the literal-keyed OrmNamespace without this cast'
+  >(value);
 }
 
 export interface SqliteTransactionContext<TContract extends Contract<SqlStorage>>
   extends TransactionContext {
   readonly sql: UnboundSql<TContract>;
   readonly orm: UnboundOrm<TContract>;
-  readonly enums: UnboundEnums<TContract>;
+  readonly enums: SqliteStaticContext<TContract>['enums'];
 }
 
 export interface SqliteClient<TContract extends Contract<SqlStorage>> {
   readonly sql: UnboundSql<TContract>;
   readonly orm: UnboundOrm<TContract>;
-  readonly enums: UnboundEnums<TContract>;
+  readonly enums: SqliteStaticContext<TContract>['enums'];
   readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
+  readonly contract: TContract;
   readonly stack: SqlExecutionStackWithDriver<SqliteTargetId>;
   connect(bindingInput?: { readonly path: string }): Promise<Runtime>;
   runtime(): Runtime;
@@ -130,6 +134,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
 ): SqliteClient<TContract> {
   const contract = resolveContract(options);
   let binding = resolveOptionalSqliteBinding(options);
+
   const stack = createSqlExecutionStack({
     target: sqliteTarget,
     adapter: sqliteAdapter,
@@ -137,20 +142,20 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     extensionPacks: options.extensions ?? [],
   });
 
-  const context = createExecutionContext({
+  const context = createExecutionContext<TContract, SqliteTargetId>({
     contract,
     stack,
+    driver: sqliteDriver,
   });
-
-  const rawCodecInferer = stack.adapter.rawCodecInferer;
-  const rawSqlTag: RawSqlTag = createRawSql(rawCodecInferer);
-
-  const sql: UnboundSql<TContract> = unboundNamespace(
-    sqlBuilder<TContract>({ context, rawCodecInferer }),
+  const {
+    sql,
+    raw: rawSqlTag,
+    enums,
+  }: SqliteStaticContext<TContract> = buildSqliteStaticContext<TContract>(
+    context,
+    stack.adapter.rawCodecInferer,
   );
-  const enums: UnboundEnums<TContract> = unboundNamespace(
-    Object.freeze(buildNamespacedEnums(contract.domain)),
-  );
+
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
@@ -214,7 +219,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     return runtimeInstance;
   };
 
-  const orm: UnboundOrm<TContract> = unboundNamespace(
+  const orm: UnboundOrm<TContract> = unboundOrm(
     ormBuilder({
       context,
       runtime: {
@@ -234,6 +239,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     enums,
     raw: rawSqlTag,
     context,
+    contract,
     stack,
     async connect(bindingInput) {
       if (closed) {
@@ -286,14 +292,20 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
         return Promise.reject(err);
       }
       return withTransaction(runtime, (txCtx) => {
-        const txSql: UnboundSql<TContract> = unboundNamespace(
-          sqlBuilder<TContract>({
-            context,
-            rawCodecInferer,
-          }),
+        const rawCodecInferer = stack.adapter.rawCodecInferer;
+        const txSqlNamespace = sqlBuilder<TContract>({ context, rawCodecInferer })[
+          UNBOUND_NAMESPACE_ID
+        ];
+        assertDefined(
+          txSqlNamespace,
+          'the unbound namespace always exists on a sqlite builder output',
         );
+        const txSql: UnboundSql<TContract> = blindCast<
+          UnboundSql<TContract>,
+          'Db<TContract> indexed by a literal key widens NsId to string; TableProxy is invariant in NsId via insert()/update() parameter positions, so the indexed-access type cannot be proven to match the literal-keyed Namespace without this cast'
+        >(txSqlNamespace);
 
-        const txOrm: UnboundOrm<TContract> = unboundNamespace(
+        const txOrm: UnboundOrm<TContract> = unboundOrm(
           ormBuilder({
             runtime: {
               execute(plan) {

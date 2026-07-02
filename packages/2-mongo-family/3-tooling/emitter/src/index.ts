@@ -1,4 +1,9 @@
-import type { Contract, ContractModel, ContractModelBase } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractModel,
+  ContractModelBase,
+  JsonValue,
+} from '@prisma-next/contract/types';
 import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-type-generation';
 import type { ValidationContext } from '@prisma-next/framework-components/emission';
 import type { Namespace } from '@prisma-next/framework-components/ir';
@@ -247,6 +252,29 @@ export const mongoEmission = {
     }
 
     return parts.length > 0 ? `{ ${parts.join('; ')} }` : 'Record<string, never>';
+  },
+
+  // INTERIM (TML-2953): Mongo has no storage value-set entity yet, so a value-set field's permitted
+  // values are sourced from `domain.enum`. This is the only remaining domain-enum typing reader in
+  // the repo; TML-2953 adds Mongo's value set and deletes this, routing the field type through
+  // storage. The values still flow through the codec seam (`renderValueLiteral`), so this keeps
+  // Mongo's emitted field types byte-identical without re-introducing a direct render.
+  resolveFieldValueSet(
+    _modelName: string,
+    fieldName: string,
+    model: ContractModelBase,
+    contract: Contract,
+  ): { readonly encodedValues: readonly JsonValue[]; readonly codecId: string } | undefined {
+    const field = model.fields[fieldName];
+    const ref = field?.valueSet;
+    if (ref?.entityKind !== 'enum') return undefined;
+    const domainNs = contract.domain.namespaces[ref.namespaceId];
+    const domainEnum = domainNs?.enum?.[ref.entityName];
+    if (!domainEnum) return undefined;
+    return {
+      encodedValues: domainEnum.members.map((m) => m.value),
+      codecId: domainEnum.codecId,
+    };
   },
 
   getFamilyImports(): string[] {

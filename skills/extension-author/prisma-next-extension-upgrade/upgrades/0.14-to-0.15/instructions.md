@@ -35,6 +35,25 @@ changes:
         - "SqlUnboundNamespace"
         - "'sql-namespace'"
       anyMatch: true
+  - id: codec-render-value-literal-for-restricted-columns
+    summary: |
+      A field/column restricted to a value set (e.g. an enum) now derives its narrowed TS literal
+      union **through the codec**, not the framework's (now-deleted) domain-enum override. If your
+      extension authors a custom codec descriptor (`extends CodecDescriptorImpl`) used by a
+      restricted/enum column, implement `renderValueLiteral(value, side)` on it so the column narrows
+      to its value union; without it the column widens to the codec's output type
+      (`CodecTypes[id][side]`). If your extension builds a `CodecLookup` by hand and drives the
+      framework emitter (`generateContractDts`), expose `renderValueLiteralFor` so the emit path can
+      reach your descriptor's renderer. Framework-built lookups (via the CLI/build / control-stack)
+      already supply it — no action there. (`side`: `output` = the read/SELECT type, `input` = the
+      create/update type.)
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "CodecDescriptorImpl"
+        - "renderValueTypeFor"
+        - "renderOutputType"
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in
@@ -125,4 +144,25 @@ Exercise Mongo enums in retail-store (this PR): the `MongoClient` facade gains t
 additive members — `raw` (MongoRawClient) and `execute<Row>(plan)` (direct query
 execution without going through `runtime()`). Both additive; existing extension code
 is unaffected. No extension-author action required. Incidental substrate diff only.
+-->
+
+<!--
+TML-2955 (expose the static ExecutionContext symmetrically): the built-in target
+facades gain a client-safe `@prisma-next/{mongo,postgres,sqlite}/static` entrypoint
+(`<target>Static`) and expose `db.context` / `db.contract`. Internally, the mongo
+adapter codec now imports `ObjectId` from `bson` instead of `mongodb` so the static
+`ExecutionContext` is genuinely driver-free (client-bundle-safe). All additive /
+internal — no extension-author API or surface change; existing extensions are
+unaffected. No extension-author action required. Incidental substrate diff only.
+-->
+
+<!--
+TML-2503 (extension-supabase slice D): `@prisma-next/extension-supabase` gains a
+secondary `.supabase` admin root on `asServiceRole()` — new `ServiceRoleDb` /
+`SupabaseInternalDb` exports from `/runtime`, backed by the extension contract's own
+execution context plus a second runtime sharing the app pool + `service_role` session.
+Purely additive for extension authors — no other extension's API is affected, and no
+released surface changed (the `WithExtensionNamespaces` export existed only on this
+branch's earlier, unmerged merge-design revision and was removed before merge). No
+extension-author API change. Incidental substrate diff only.
 -->

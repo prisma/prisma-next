@@ -73,6 +73,15 @@ kind rename. Re-emit picks up the new contract shape automatically; no consumer
 action required. Incidental substrate diff only.
 -->
 
+<!--
+TML-2503 (extension-supabase slice D): the `examples/supabase` diff adds two new
+integration/type tests exercising the additive `db.asServiceRole().supabase.{sql,orm}`
+admin surface — a secondary root for reading Supabase-internal `auth.*`/`storage.*`
+tables as `service_role`. App authors are unaffected: the admin root is additive, and
+the primary `db.asServiceRole().sql`/`.orm` surface (plus `asUser`/`asAnon`) is
+unchanged. No user action. Incidental substrate diff only.
+-->
+
 # Upgrade 0.14 → 0.15
 
 No consumer-facing action is required for this transition.
@@ -114,4 +123,28 @@ back decoded, matching the row type the builder already declared. `$vectorSearch
 example drops its `db.raw` + `blindCast` for the typed builder. This is a runtime
 behaviour fix — no API or contract-shape change and no re-emit needed; code that relied
 on the previous un-decoded values would now observe decoded ones. Incidental to emit.
+-->
+
+<!--
+TML-2955 (expose the static ExecutionContext symmetrically): additive client-safe
+static surface. New `@prisma-next/{mongo,postgres,sqlite}/static` entrypoints export
+`<target>Static({ contractJson })`, returning the driver-free `ExecutionContext`
+plus derived `enums` / query builder / `raw` / `contract`; the facades also expose
+`db.context` (Mongo now typed `MongoExecutionContext<TContract>`) and `db.contract`.
+All additive — existing app code is unaffected. The `retail-store` example's
+`src/enums.ts` switches from the interim `buildNamespacedEnums` + `blindCast` to
+`mongoStatic(...).enums` (example-internal). No user action required. Incidental
+substrate diff only.
+-->
+
+<!--
+TML-2952 (this PR): route SQL enum/value-set column TS typing through the codec.
+A field/column restricted to a value set now derives its narrowed TS literal union
+by rendering each stored value through its codec, replacing the framework's
+(now-deleted) domain-enum override. The only `examples/` touch is a type test —
+`examples/prisma-next-demo/test/demo-dx.types.test.ts` — asserting the emitted
+`FieldOutputTypes` enum field equals the no-emit `typeof contract` value union
+(emit-vs-no-emit agreement). The emitted contract is byte-identical (`fixtures:check`
+clean; `contract.json`, `contract.d.ts`, and both hashes unchanged). No user action
+required. Incidental substrate diff only.
 -->

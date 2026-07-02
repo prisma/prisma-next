@@ -32,7 +32,8 @@
     "@prisma-next/mongo-wire": "workspace:0.14.0",
     "@prisma-next/operations": "workspace:0.14.0",
     "@prisma-next/utils": "workspace:0.14.0",
-    "arktype": "catalog:"
+    "arktype": "catalog:",
+    "bson": "^7.2.0"
   },
   "devDependencies": {
     "mongodb": "catalog:",

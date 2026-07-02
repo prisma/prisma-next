@@ -236,6 +236,25 @@ describe('postgres', () => {
     expect(db.context).toBeDefined();
   });
 
+  it('exposes contract on the facade', () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    expect(db.contract).toBeDefined();
+    expect(db.contract.target).toBe(contract.target);
+  });
+
+  it('db.contract is typed as TContract', () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    expectTypeOf(db.contract).toEqualTypeOf<Contract<SqlStorage>>();
+  });
+
   it('creates pool from url with explicit timeout defaults (pool options passed)', () => {
     const db = postgres({
       contract,
