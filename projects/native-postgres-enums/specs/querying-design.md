@@ -11,10 +11,9 @@ relevant `file:line` is cited inline.
 
 ## 0. The one-line summary of the query path
 
-A native-enum column is **just a column with a parameterized codec** (the `vector(N)`
-mechanism). The read path is the
-*existing* SQL read path — it needs **no** native-specific typing code. Only **two** pieces
-are new, and both are isolated:
+A native-enum column is **just a column with a value-set** — the same read path a check-enum
+column uses; it needs **no** native-specific typing code. Only **two** pieces are new, and both
+are isolated:
 
 1. a **`db.native_enums`** facade root (runtime member access), a Postgres-only sibling of
    `db.enums`;
@@ -39,59 +38,59 @@ Generated SQL — the bound `aal` parameter carries the enum type as an explicit
 SELECT "aal" FROM "auth"."sessions" WHERE "id" = $1::uuid AND "aal" = $2::auth.aal_level
 ```
 
-- `s.aal` is `'aal1' | 'aal2' | 'aal3'` because the `pg.enum` codec's output type is the value union (§2).
+- `s.aal` is `'aal1' | 'aal2' | 'aal3'` because the column's value-set drives its type (§2).
 - `db.native_enums.auth.AalLevel` is the new facade root (§3).
 - `$2::auth.aal_level` is the per-column cast (§5).
 - The decoded value is the plain string `'aal2'` (§4.3 — the codec is text/identity).
 
 ## 2. The typed read surface (compile-time)
 
-A native-enum column is typed by the **`pg.enum` parameterized codec** — the same mechanism
-`vector(N)` uses. The codec's `typeParams` carry the enum's values (baked from the `native_enum`
-block at authoring, see `authoring-design.md` §3.3), and the codec's output type *is* the value
-union. This holds in both compile-time paths, with **no value-set**, **no `EnumTypeHandle`**,
-and **no dependency on the enum-typing refactor (TML-2952/2953)**.
+A native-enum column is typed by its **value-set**, through the existing post-TML-2952 value-set
+→ codec machinery — the **same path a check-enum column uses**. The column carries a `valueSet`
+ref (to the value-set derived from the `native_enum` entity, see `authoring-design.md` §2.5); no
+domain enum, no parameterized-codec `renderOutputType`.
 
-### 2.1 Emitted contract (`StorageColumnTypes`) — the codec-refined branch
+### 2.1 Emitted contract (`StorageColumnTypes`) — the value-set branch
 
 `computeColumnType`
-([2-sql/3-tooling/emitter/src/index.ts](../../../packages/2-sql/3-tooling/emitter/src/index.ts), ~L425)
-computes a column's TS type. A native-enum column has **no** `valueSet`, so it takes the
-**codec-refined** branch — `renderRefinedCodecType` → `codecLookup.renderOutputTypeFor(codecId,
-typeParams)` → the `pg.enum` codec's `renderOutputType({ values })`, returning
-`'aal1' | 'aal2' | 'aal3'`:
+([2-sql/3-tooling/emitter/src/index.ts](../../../packages/2-sql/3-tooling/emitter/src/index.ts), ~L456)
+gates on `if (column.valueSet)` and renders the literal union from the value-set **through the
+codec** — `renderValueSetType(valueSet.values, column.codecId, side, codecLookup)` →
+`codecLookup.renderValueLiteralFor(codecId, value, side)` per value → `'aal1' | 'aal2' | 'aal3'`:
 
 ```ts
 function computeColumnType(storage, column, side, codecLookup): string {
   let base: string | undefined;
-  if (column.valueSet) { … }                    // check-enum path — a native column has no valueSet
+  if (column.valueSet) {
+    const valueSet = entityAt<StorageValueSet>(storage, { …column.valueSet });
+    base = valueSet ? renderValueSetType(valueSet.values, column.codecId, side, codecLookup) : undefined;
+  }
   if (base === undefined) base = renderRefinedCodecType(column, side, columnTypeParams(storage, column), codecLookup);
   return column.nullable ? `${base} | null` : base;
 }
 ```
 
-This is exactly the path `vector(1536)` takes to render `Vector<1536>` via its
-`renderOutputType`. `StorageColumnTypes` is consumed by the SQL builder and ORM via
-`ExtractStorageColumnTypes` ([2-sql/1-core/contract/src/types.ts](../../../packages/2-sql/1-core/contract/src/types.ts):103,110,198,218),
+A native-enum column carries a `valueSet` ref, so this branch fires — the **same branch a check
+enum uses** (TML-2952 made it enum-agnostic: *"the domain enum is no longer a typing input"*).
+`StorageColumnTypes` is consumed by the SQL builder and ORM via `ExtractStorageColumnTypes`
+([2-sql/1-core/contract/src/types.ts](../../../packages/2-sql/1-core/contract/src/types.ts):103,110,198,218),
 `table-proxy.ts`, `selection.ts`.
 
 ### 2.2 The domain `FieldOutputTypes` path is *not* involved
 
-`resolveFieldType`'s enum branch ([1-framework/3-tooling/emitter/src/domain-type-generation.ts:313](../../../packages/1-framework/3-tooling/emitter/src/domain-type-generation.ts:313))
-builds a union only for a **domain** enum (`field.valueSet.entityKind === 'enum'` →
-`domainEnumLookup`). A native enum has no domain enum, so this path is untouched — native typing
-is the codec's job (§2.1). We touch neither `resolveFieldType` nor `FieldOutputTypes`.
+Post-2952, `resolveFieldType` gates on the field's resolved value-set, not a domain-enum
+override; a native enum has no domain enum, and the SQL query surface reads `StorageColumnTypes`
+(§2.1) regardless. We touch neither `resolveFieldType` nor `FieldOutputTypes`.
 
-### 2.3 No-emit (`typeof contract`) — parameterized-codec typing
+### 2.3 No-emit (`typeof contract`) — the one gap (TML-2960)
 
-The no-emit path types the column from the codec too. `FieldChannelType` /
-`StorageColumnChannelTypes`
+The no-emit path does **not** yet reach the value union for a native column. `CodecChannelType`
 ([2-sql/2-authoring/contract-ts/src/contract-types.ts](../../../packages/2-sql/2-authoring/contract-ts/src/contract-types.ts))
-first check for a domain `EnumTypeHandle` (`EnumValueUnion`) — a native column has none — and
-so fall to `CodecChannelType`, which applies the codec's parameterized output type. `pg.enum`'s
-output type is the value union from its `typeParams` values — the same way `vector`'s is
-`Vector<N>`. No `EnumTypeHandle`, no value-set; the no-emit union comes from the one codec, so
-it matches the emitted one.
+resolves a column's `typeof contract` type by **`codecId` alone** — it does not read the
+`valueSet` — so a native column types as the codec's base type (`string`), not the union, in
+`typeof contract`. This is the same gap **every** value-set column has today; TML-2952 explicitly
+left the no-emit path untouched. Closing it (making no-emit read the value-set) is **TML-2960**,
+out of scope for this slice. **Emit typing (§2.1) is what the MVP ships.**
 
 ## 3. Runtime member access — the `db.native_enums` facade root (new)
 
@@ -161,9 +160,10 @@ Every AST node carries a `codec: CodecRef` (`{ codecId, typeParams, many }`). At
 ([2-sql/5-runtime/src/sql-context.ts](../../../packages/2-sql/5-runtime/src/sql-context.ts):~494)
 uses `createAstCodecResolver`
 ([ast-codec-resolver.ts](../../../packages/2-sql/5-runtime/src/codecs/ast-codec-resolver.ts):31),
-content-keyed on `` `${codecId}:${canonicalizeJson(typeParams)}` ``. So `pg.enum`'s
-`typeParams` (its baked values) distinguish one native enum from another **for encode/decode
-with no new machinery** — the same mechanism `vector(1536)` rides.
+content-keyed on `` `${codecId}:${canonicalizeJson(typeParams)}` ``. `pg.enum` is a **param-free
+text codec** — encode/decode is identical for every native enum (text passthrough), so it
+resolves to a single instance; per-enum distinction lives in the value-set (typing) and
+`nativeType` (cast), not the codec.
 
 ### 4.2 The parameter cast (`renderTypedParam`) — static today
 
@@ -245,12 +245,12 @@ in query machinery for native enums, not an addition.
    the Postgres runtime package only.
 2. **Per-column `::type` cast** (§5) — the per-instance native type on the parameter +
    `renderTypedParam` preferring it. Local to the Postgres adapter + `CodecRef` builder.
-3. The **`pg.enum` codec's `renderOutputType`** (the value union) — new, but the
-   parameterized-codec typing *mechanism* it rides is reused.
+3. The **`pg/enum@1` codec** itself (text decode + `renderValueLiteral` + a per-column
+   `nativeType`) — new code, but the value-set → codec typing *mechanism* it plugs into is reused.
 
 **Reused (everything else):**
-- parameterized-codec typing — `renderOutputType` (emit) + `CodecChannelType` (no-emit), the
-  `vector(N)` path (§2).
+- value-set → codec typing — `computeColumnType` / `renderValueSetType` / `renderValueLiteral`
+  (post-TML-2952), the same path check enums use (§2).
 - per-instance codec resolution `forCodecRef` / `AstCodecResolver` (§4.1).
 - decode via `codec.decode` (§4.3); `pg.enum` is text/identity.
 - the whole DSL → lowering → runtime pipeline.
@@ -258,6 +258,7 @@ in query machinery for native enums, not an addition.
 
 ## 8. Open questions
 
-None. The cast is always emitted via the adapter's `nativeType` mechanism (§4–§5); the
-`db.native_enums` accessor types from **both** the emitted `contract.d.ts` block and the
-no-emit handle (§3.3).
+None open in the design. Notes: the cast is always emitted via the adapter's `nativeType`
+mechanism (§4–§5); the `db.native_enums` accessor types from **both** the emitted block and the
+no-emit handle (§3.3). The one deferred item is **no-emit column typing** (§2.3) — tracked as
+TML-2960, out of this slice's scope.
