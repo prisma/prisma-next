@@ -13,17 +13,13 @@ export interface PostgresDatabaseSchemaNodeInput {
 }
 
 /**
- * The real root of the Postgres schema-diff tree: one node per database.
+ * The root of the Postgres schema-diff tree: one node per database.
  *
  * `id` is the fixed sentinel `'database'` — the root has no siblings and
  * the value is never emitted into migration paths. `isEqualTo` is identity
  * (roots always share the `'database'` id). `children()` returns namespace
- * nodes only; roles are held on the root but NOT yielded (role diffing is a
- * later slice, R4).
- *
- * `nodeKind` is an enumerable own discriminant that identifies this node and
- * distinguishes it from the other schema-diff nodes; the `is`/`assert` guards
- * discriminate on it.
+ * nodes only; roles are held on the root but not yielded (role diffing is a
+ * later slice).
  */
 export class PostgresDatabaseSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.database;

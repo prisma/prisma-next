@@ -339,11 +339,10 @@ function verifySchemaTables(options: {
     const ns = contract.storage.namespaces[namespaceId];
     if (!ns) continue;
     for (const [tableName, contractTableRaw] of Object.entries(ns.entries.table ?? {})) {
-      if (!StorageTable.is(contractTableRaw)) {
-        throw new Error(
-          `verifySqlSchema: expected StorageTable at storage.namespaces.${namespaceId}.entries.table.${tableName}`,
-        );
-      }
+      StorageTable.assert(
+        contractTableRaw,
+        `storage.namespaces.${namespaceId}.entries.table.${tableName}`,
+      );
       const contractTable = contractTableRaw;
       const tableControlPolicy = effectiveControlPolicy(
         contractTable.control,

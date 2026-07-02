@@ -180,12 +180,11 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const schemaIssues = this.collectSchemaIssues(options, databaseDiff.issues);
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
     const storageTypes = options.contract.storage.types ?? {};
-    // The strategy layer reads the live schema by bare table name for
-    // existence checks (shared-temp-default safety, FK/unique probes). It
-    // takes the per-schema namespace node, never the whole tree root — and
-    // never a flat merge of every namespace (that would collide same-named
-    // tables across schemas). Single-schema is the one node matching the
-    // planner's resolved schema name; multi-schema scoping is CF-2.
+    // The strategy layer reads the live schema by bare table name for existence
+    // checks (shared-temp-default safety, FK/unique probes), so it takes one
+    // per-schema namespace node — never the whole tree root, and never a flat
+    // merge of every namespace (which would collide same-named tables across
+    // schemas). Probing more than one namespace at once is future work.
     const relationalSchema = relationalNamespaceNode(options.schema, schemaName);
 
     // Input-side control-policy partition. `external` / `observed` subjects
@@ -359,7 +358,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
    * op-generation concern, so it is stitched in here rather than inside the
    * shared diff — verify never needs it (a missing schema already surfaces as
    * `missing_table` in the relational findings). It reads `existingSchemas` off
-   * the database root (CF-1) so it takes the whole tree. Policy drift is handled
+   * the database root, so it takes the whole tree. Policy drift is handled
    * separately via `planPostgresSchemaDiff` from the same shared diff's
    * `schemaDiffIssues`.
    */
@@ -378,10 +377,11 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
   }
 }
 
-// Every node in a diff issue produced from Postgres schema trees is a
-// `SqlSchemaIRNode`; the framework types issue nodes as the narrower
-// `DiffableNode`. The `PostgresPolicySchemaNode` guards downcast from
-// `SqlSchemaIRNode`, so bridge the framework type here.
+// The framework types `SchemaDiffIssue`'s nodes as `DiffableNode`, but every
+// node in a Postgres diff issue is really a `SqlSchemaIRNode` (the concrete
+// schema-node classes). Bridge to that base so the `.is`/`.assert` guards can
+// discriminate on `nodeKind`. The principled fix — a node-typed `SchemaDiffIssue`
+// so this bridge is unnecessary — is a framework change tracked separately.
 function asSchemaNode(node: DiffableNode | undefined): SqlSchemaIRNode | undefined {
   if (node === undefined) return undefined;
   return blindCast<
@@ -391,14 +391,13 @@ function asSchemaNode(node: DiffableNode | undefined): SqlSchemaIRNode | undefin
 }
 
 /**
- * Selects the per-schema namespace node the relational strategy layer probes
- * for live-table existence. Prefers the node matching the planner's resolved
- * schema name; otherwise the sole namespace node (the single-schema common
- * case). Returns `undefined` when the tree carries no namespaces, so the
- * strategy context falls back to its empty-schema default.
+ * Returns the one namespace node whose tables the relational strategy layer
+ * probes for live-table existence — the node matching the planner's resolved
+ * schema name, or the first namespace when none matches. `undefined` when the
+ * tree has no namespaces, so the strategy context uses its empty-schema default.
  *
- * Multi-schema selection by name is CF-2: the relational strategies key tables
- * by bare name, so only one namespace's tables can be probed at a time.
+ * The relational strategies key tables by bare name, so they can only probe one
+ * namespace at a time; probing across every namespace at once is future work.
  */
 function relationalNamespaceNode(
   schema: PostgresDatabaseSchemaNode,
@@ -410,11 +409,13 @@ function relationalNamespaceNode(
 }
 
 /**
- * Rebuilds the serialized `PostgresRlsPolicy` contract entity from a policy
- * schema node. The migration op (`CreatePostgresRlsPolicyCall`) carries the
- * authored contract entity — its `renderTypeScript`/`createRlsPolicy` paths
- * serialize it — so the planner converts the diff node back to the entity the
- * call type expects, preserving byte-identical migration output.
+ * Rebuilds the `PostgresRlsPolicy` contract entity `CreatePostgresRlsPolicyCall`
+ * carries (its `renderTypeScript`/`createRlsPolicy` paths serialize the whole
+ * entity, `namespaceId` included). This reconstructs rather than looking the
+ * original up in the contract on purpose: the diff node's `namespaceId` is the
+ * *resolved DDL schema* (set when the expected tree was built), which is the
+ * value the emitted op must carry; the contract-stored entity holds the raw,
+ * pre-resolution coordinate, so a lookup would change the migration output.
  */
 function policyNodeToContractPolicy(node: PostgresPolicySchemaNode): PostgresRlsPolicy {
   return new PostgresRlsPolicy({

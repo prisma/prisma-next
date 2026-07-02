@@ -108,16 +108,13 @@ export function inferPostgresPslContract(tree: PostgresDatabaseSchemaNode): PslD
     );
   }
 
-  // Gather the tree's tables into the flat `{ tables }` the relational document
-  // builder walks. This replaces the old flat `.tables` iteration; it does not
-  // reintroduce a stored flat schema — it is a read-only projection for PSL
-  // emission over a single introspected namespace.
-  //
-  // Multi-namespace PSL inference (per-namespace `namespace { … }` output) is not
-  // supported yet — `contract infer` introspects a single namespace and emits one
-  // flat `__unspecified__` bucket. Until the per-namespace tree-walk lands, a
-  // same-named table in two schemas has no unambiguous single-bucket model, so
-  // throw rather than silently dropping one.
+  // Stopgap (TML-2958): flatten the schema-IR *tree* into the single `{ tables }`
+  // map the PSL writer expects. The writer still walks a flat table map, so this
+  // is a read-only projection — it does not reintroduce a stored flat schema.
+  // The real fix is to extend the PSL writer to walk the namespace tree and emit
+  // per-namespace `namespace { … }` blocks; until then `contract infer` handles a
+  // single introspected namespace, and a same-named table in two schemas has no
+  // unambiguous single-bucket model, so we throw rather than silently drop one.
   const tables: Record<string, SqlTableIR> = {};
   for (const namespace of namespaces) {
     for (const [tableName, table] of Object.entries(namespace.tables)) {
@@ -301,9 +298,8 @@ function buildModel(
 
   // Surface introspection advisory: tables without a primary key cannot serve
   // as the right-hand side of a `findUnique`-style query downstream, so the
-  // user should add an `@id` policy. This warning has shipped since
-  // `contract infer` was introduced and is part of the spec § A9 byte-identity
-  // contract for SQL output.
+  // user should add an `@id`. This warning is part of the emitted SQL output
+  // and is asserted byte-for-byte, so keep the exact wording.
   const comment = table.primaryKey
     ? undefined
     : '// WARNING: This table has no primary key in the database';

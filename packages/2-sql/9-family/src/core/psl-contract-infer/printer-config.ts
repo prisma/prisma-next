@@ -1,12 +1,6 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { DefaultMappingOptions } from './default-mapping';
 
-/**
- * Printer-shaped configuration for database→PSL inference: dialect-neutral types
- * the SQL family exports and the target's inference (which owns the dialect maps)
- * consumes.
- */
-
 export type PslNativeTypeAttribute = {
   readonly name: string;
   readonly args?: readonly string[];

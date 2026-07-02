@@ -121,17 +121,10 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       applyValue = applyResult.value;
     }
 
-    // Schema verification on app-space only — extension spaces don't own
-    // user-facing tables in the live schema, and the verify matches the
-    // destination contract against the database, which would flag every
-    // app-space table as "extra" when called against an extension contract.
-    //
-    // The runner is the third consumer of the one shared database-schema diff:
-    // it delegates to the family `verifySchema`, which runs the same
-    // per-namespace-paired diff (`diffDatabaseSchema` / `verifySqlSchemaTree`)
-    // the CLI verify and the planner use. No private per-namespace loop here —
-    // verifying the whole contract against one namespace node would falsely
-    // report tables in other schemas as missing.
+    // Verify the schema on app-space only: extension spaces don't own
+    // user-facing tables, so verifying the destination contract against the
+    // database would flag every app-space table as "extra". Delegates to the
+    // family `verifySchema` — the same comparison the CLI verify runs.
     if (space === APP_SPACE_ID) {
       const schemaNode = await this.family.introspect({
         driver,
