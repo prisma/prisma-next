@@ -16,14 +16,11 @@ import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control'
 import { Migration, MigrationCLI, rawSql } from '@prisma-next/target-postgres/migration';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { AUDIT_BASELINE_INVARIANT_ID, AUDIT_EVENT_TABLE } from '../../src/constants';
+import type { Contract as End } from './end-contract';
+import endContract from './end-contract.json' with { type: 'json' };
 
-export default class M extends Migration {
-  override describe() {
-    return {
-      from: null,
-      to: 'sha256:b0d547223488b4a8cea642a0bb2cc8e8f6cd9b2a6e490f23832865146ac51468',
-    };
-  }
+export default class M extends Migration<never, End> {
+  override readonly endContractJson = endContract;
 
   override get operations(): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     return [

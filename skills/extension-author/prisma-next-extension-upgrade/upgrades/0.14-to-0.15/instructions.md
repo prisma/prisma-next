@@ -166,3 +166,13 @@ released surface changed (the `WithExtensionNamespaces` export existed only on t
 branch's earlier, unmerged merge-design revision and was removed before merge). No
 extension-author API change. Incidental substrate diff only.
 -->
+
+<!--
+TML-2892 (migration-author ContractView): the `unboundNamespace` helper that the
+SQLite and Mongo runtimes use to unwrap their single default namespace was lifted
+into the shared foundation (`@prisma-next/framework-components/ir`); the two
+extension runtimes (`packages/3-extensions/{mongo,sqlite}/src/runtime`) now import
+it from there instead of defining a local copy. Behaviour-preserving — the runtime
+facade surface (`db.enums`, `sql`, `orm`) is byte-identical. No extension-author
+API or surface change; nothing to migrate. Incidental substrate diff only.
+-->

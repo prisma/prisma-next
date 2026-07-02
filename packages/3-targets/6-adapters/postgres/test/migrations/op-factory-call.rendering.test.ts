@@ -406,11 +406,16 @@ describe('renderCallsToTypeScript', () => {
     );
   });
 
-  it('embeds describe() with the supplied from/to hashes', () => {
+  it('derives describe() from contract JSON instead of embedding from/to hashes', () => {
     const source = renderCallsToTypeScript([], { from: 'sha256:a', to: 'sha256:b' });
-    expect(source).toContain('from: "sha256:a",');
-    expect(source).toContain('to: "sha256:b",');
-    expect(source).toContain('export default class M extends Migration {');
+    // New shape: from/to are derived by the base from the imported contract JSON
+    // (no describe() block, no hash literals).
+    expect(source).not.toContain('describe()');
+    expect(source).not.toContain('sha256:a');
+    expect(source).not.toContain('sha256:b');
+    expect(source).toContain('export default class M extends Migration<Start, End> {');
+    expect(source).toContain('override readonly startContractJson = startContract;');
+    expect(source).toContain('override readonly endContractJson = endContract;');
     expect(source).toContain(
       "import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';",
     );

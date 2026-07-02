@@ -1,6 +1,5 @@
 #!/usr/bin/env -S node
 import { MigrationCLI } from '@prisma-next/cli/migration-cli';
-import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import {
   AggregateCommand,
@@ -11,45 +10,23 @@ import {
   RawUpdateManyCommand,
 } from '@prisma-next/mongo-query-ast/execution';
 import { dataTransform, setValidation } from '@prisma-next/target-mongo/migration';
-import type { Contract } from './end-contract';
-import endContractJson from './end-contract.json' with { type: 'json' };
+import type { Contract as End } from './end-contract';
+import endContract from './end-contract.json' with { type: 'json' };
+import type { Contract as Start } from './start-contract';
+import startContract from './start-contract.json' with { type: 'json' };
 
-const endContract = new MongoContractSerializer().deserializeContract<Contract>(endContractJson);
-
-const STORAGE_HASH = endContract.storage.storageHash;
-
-// `migration new` records the contract delta as `from` → `to` but produces an
-// empty `operations` array; the author is responsible for declaring the work
-// that bridges the two contract states. This migration's contract delta adds
-// `embedding` and `status` fields to `products` (with `status` becoming
-// required via its `@default("active")`), so two ops are needed:
-//
-// 1. `setValidation` — refresh the live `$jsonSchema` so it includes the new
-//    fields. Without this, `db verify` would fail with `VALIDATOR_MISMATCH`
-//    after this migration applies because the live validator (still the
-//    state-1 shape from migration 1's `createCollection`) wouldn't match the
-//    contract-derived expected validator for state 3.
-//
-// 2. `dataTransform` — backfill `status: "active"` on pre-existing products
-//    so they satisfy the new `required: [..., "status", ...]` rule.
-//
-// The validator is sourced from `end-contract.json` so the op stays in sync
-// with the contract if the chain is ever re-emitted.
-const PRODUCTS_VALIDATOR =
-  endContract.storage.namespaces.__unbound__.entries.collection.products.validator;
-
-function existingProductsWithoutStatus(): MongoQueryPlan {
+function existingProductsWithoutStatus(storageHash: string): MongoQueryPlan {
   return {
     collection: 'products',
     command: new AggregateCommand('products', [
       new MongoMatchStage(new MongoExistsExpr('status', false)),
       new MongoLimitStage(1),
     ]),
-    meta: { target: 'mongo', storageHash: STORAGE_HASH, lane: 'mongo-pipeline' },
+    meta: { target: 'mongo', storageHash, lane: 'mongo-pipeline' },
   };
 }
 
-function backfillRun(): MongoQueryPlan {
+function backfillRun(storageHash: string): MongoQueryPlan {
   return {
     collection: 'products',
     // Raw command form: the typed query-builder (`mongoQuery(...).updateMany(...)`)
@@ -62,28 +39,42 @@ function backfillRun(): MongoQueryPlan {
       { status: { $exists: false } },
       { $set: { status: 'active' } },
     ),
-    meta: { target: 'mongo', storageHash: STORAGE_HASH, lane: 'mongo-raw' },
+    meta: { target: 'mongo', storageHash, lane: 'mongo-raw' },
   };
 }
 
-class BackfillProductStatus extends Migration {
-  override describe() {
-    return {
-      from: 'sha256:059f3f35403c5a7a90851c23f1028e16d5250630f8a82fba33053e9a50534589',
-      to: 'sha256:71f1cc5c3f4de1ea7c9c8426fde682cd78c7c005f6688f58c2d9d6ddd8b2284c',
-      labels: ['backfill-product-status'],
-    };
-  }
+class BackfillProductStatus extends Migration<Start, End> {
+  override readonly startContractJson = startContract;
+  override readonly endContractJson = endContract;
 
+  // `migration new` records the contract delta as `from` → `to` but produces an
+  // empty `operations` array; the author is responsible for declaring the work
+  // that bridges the two contract states. This migration's contract delta adds
+  // `embedding` and `status` fields to `products` (with `status` becoming
+  // required via its `@default("active")`), so two ops are needed:
+  //
+  // 1. `setValidation` — refresh the live `$jsonSchema` so it includes the new
+  //    fields. Without this, `db verify` would fail with `VALIDATOR_MISMATCH`
+  //    after this migration applies because the live validator (still the
+  //    state-1 shape from migration 1's `createCollection`) wouldn't match the
+  //    contract-derived expected validator for state 3.
+  //
+  // 2. `dataTransform` — backfill `status: "active"` on pre-existing products
+  //    so they satisfy the new `required: [..., "status", ...]` rule.
+  //
+  // The validator is sourced from the end-state contract view so the op stays
+  // in sync with the contract if the chain is ever re-emitted.
   override get operations() {
+    const storageHash = this.endContract.storage.storageHash;
+    const productsValidator = this.endContract.collection.products.validator;
     return [
-      setValidation('products', PRODUCTS_VALIDATOR.jsonSchema, {
-        validationLevel: PRODUCTS_VALIDATOR.validationLevel,
-        validationAction: PRODUCTS_VALIDATOR.validationAction,
+      setValidation('products', productsValidator.jsonSchema, {
+        validationLevel: productsValidator.validationLevel,
+        validationAction: productsValidator.validationAction,
       }),
       dataTransform('backfill-product-status', {
-        check: { source: existingProductsWithoutStatus },
-        run: backfillRun,
+        check: { source: () => existingProductsWithoutStatus(storageHash) },
+        run: () => backfillRun(storageHash),
       }),
     ];
   }

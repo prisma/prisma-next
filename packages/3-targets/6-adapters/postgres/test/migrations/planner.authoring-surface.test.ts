@@ -103,9 +103,13 @@ describe('PostgresMigrationPlanner authoring surface', () => {
 
       expect(source).toContain("from '@prisma-next/postgres/migration'");
       expect(source).toMatch(/\bMigration\b/);
-      expect(source).toContain('export default class M extends Migration');
-      expect(source).toContain(`from: "${coreHash('sha256:from')}"`);
-      expect(source).toContain(`to: "${contract.storage.storageHash}"`);
+      // New shape: base derives describe() from the imported contract JSON, so
+      // the scaffold carries `Migration<Start, End>` + the JSON/field imports
+      // and emits no describe()/hash literals.
+      expect(source).toContain('export default class M extends Migration<Start, End>');
+      expect(source).toContain('override readonly endContractJson = endContract;');
+      expect(source).not.toContain('describe()');
+      expect(source).not.toContain(coreHash('sha256:from'));
     });
   });
 
@@ -126,7 +130,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       expect(empty.destination).toEqual({ storageHash: 'sha256:to' });
     });
 
-    it('renders a stub whose describe() carries from/to and whose operations list is empty', () => {
+    it('renders a stub that derives from/to from contract JSON and has an empty operations list', () => {
       const planner = makeFrameworkPlanner();
       const empty = planner.emptyMigration(
         {
@@ -140,9 +144,11 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       const source = empty.renderTypeScript();
 
       expect(source).toContain("from '@prisma-next/postgres/migration'");
-      expect(source).toContain('export default class M extends Migration');
-      expect(source).toContain('from: "sha256:from"');
-      expect(source).toContain('to: "sha256:to"');
+      expect(source).toContain('export default class M extends Migration<Start, End>');
+      expect(source).toContain('override readonly endContractJson = endContract;');
+      expect(source).not.toContain('describe()');
+      expect(source).not.toContain('"sha256:from"');
+      expect(source).not.toContain('"sha256:to"');
       expect(source).toContain('override get operations()');
     });
   });
