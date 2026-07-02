@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Runtime } from '@prisma-next/sql-runtime';
+import { PostgresSchema } from '@prisma-next/target-postgres/types';
 import { createContract } from '@prisma-next/test-utils';
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
@@ -457,6 +458,89 @@ describe('postgres', () => {
       });
 
       expect(db.enums.public.Role.values).toEqual(['user', 'admin']);
+      expect(poolConnectSpy()).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('db.native_enums (facade)', () => {
+    // Built from real `PostgresSchema`/`PostgresNativeEnum` IR instances (not
+    // plain literals): `PostgresContractSerializer.serializeContract` only
+    // walks `entries.native_enum` for namespaces it recognizes via
+    // `isPostgresSchema`, matching how a real Postgres contract always
+    // rehydrates through the serializer at the `postgres()` call site.
+    const publicNs = new PostgresSchema({
+      id: 'public',
+      entries: {
+        table: {},
+        native_enum: {
+          AalLevel: {
+            typeName: 'aal_level',
+            members: [
+              { name: 'aal1', value: 'aal1' },
+              { name: 'aal2', value: 'aal2' },
+            ],
+          },
+        },
+      },
+    });
+    const auditNs = new PostgresSchema({
+      id: 'audit',
+      entries: {
+        table: {},
+        native_enum: {
+          AalLevel: {
+            typeName: 'audit_aal_level',
+            members: [
+              { name: 'low', value: 'low' },
+              { name: 'high', value: 'high' },
+            ],
+          },
+        },
+      },
+    });
+
+    const twoNamespaceStorage = {
+      ...contract,
+      storage: {
+        ...contract.storage,
+        namespaces: { public: publicNs, audit: auditNs },
+      },
+    };
+
+    // A literal-keyed contract so `db.native_enums.public` and `.audit` resolve
+    // to distinct namespace maps, proving per-namespace resolution rather than
+    // falling back to a single shared `Record<string, ...>`. Each namespace's
+    // enum accessors are still looked up by bracket access (`['AalLevel']`):
+    // `NamespacedNativeEnums` intentionally keeps entity names as an open
+    // index signature (see native-enums.ts), not a per-name literal facade.
+    type TwoNsStorageContract = Contract<SqlStorage> & {
+      readonly storage: (typeof twoNamespaceStorage)['storage'];
+    };
+
+    it('exposes native enum members per namespace and resolves same-named native enums independently', () => {
+      const db = postgres<TwoNsStorageContract>({
+        contract: twoNamespaceStorage,
+        url: 'postgres://localhost:5432/db',
+      });
+
+      const publicAalLevel = db.native_enums.public['AalLevel'];
+      const auditAalLevel = db.native_enums.audit['AalLevel'];
+
+      expect(publicAalLevel?.values).toEqual(['aal1', 'aal2']);
+      expect(auditAalLevel?.values).toEqual(['low', 'high']);
+      expect(publicAalLevel?.names).toEqual(['aal1', 'aal2']);
+      expect(publicAalLevel?.has('aal1')).toBe(true);
+      expect(publicAalLevel?.nameOf('aal2')).toBe('aal2');
+      expect(auditAalLevel?.nameOf('high')).toBe('high');
+    });
+
+    it('builds the native_enums surface eagerly, without a runtime', () => {
+      const db = postgres<TwoNsStorageContract>({
+        contract: twoNamespaceStorage,
+        url: 'postgres://localhost:5432/db',
+      });
+
+      expect(db.native_enums.public['AalLevel']?.values).toEqual(['aal1', 'aal2']);
       expect(poolConnectSpy()).not.toHaveBeenCalled();
     });
   });
