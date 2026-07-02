@@ -154,6 +154,37 @@ export interface AuthoringEntityTypeTemplateOutput {
  */
 export interface AuthoringEntityTypeFactoryOutput<Input = never, Output = unknown> {
   readonly factory: (input: Input, ctx: AuthoringEntityContext) => Output;
+  /**
+   * Optional, opt-in hook: derive a value-set from an entity this factory
+   * produced. When present, the generic extension-block lowering pass folds
+   * the returned value-set into the same namespace's `valueSet` slot, keyed
+   * by the entity's block name. Return `undefined` to derive nothing.
+   *
+   * This is the generic mechanism by which a value-set-carrying pack entity
+   * (e.g. Postgres `native_enum`) contributes the value-set that drives
+   * value-set → codec typing — without the family-layer pass naming any
+   * target discriminator or inspecting a target-specific shape.
+   *
+   * The parameter is `never` here (not `Output`) for the same contravariant
+   * reason the base `factory` input is `never` (see this type's docstring): a
+   * pack literal declaring `deriveValueSet: (e: PostgresNativeEnum) => …` is
+   * only assignable to the base shape when the base's parameter is the bottom
+   * type. The pack still authors the hook against its real IR class with no
+   * cast; the runtime bridge lives in {@link deriveValueSetFromEntity}.
+   */
+  readonly deriveValueSet?: (entity: never) => AuthoringDerivedValueSet | undefined;
+}
+
+/**
+ * The canonical value-set shape a {@link AuthoringEntityTypeFactoryOutput.deriveValueSet}
+ * hook returns — the on-disk `StorageValueSet` envelope (`kind: 'valueSet'`,
+ * ordered codec-encoded values). Declared here (not imported from the SQL
+ * family) so the framework-shared authoring surface stays family-agnostic;
+ * it is structurally identical to `StorageValueSetInput`.
+ */
+export interface AuthoringDerivedValueSet {
+  readonly kind: 'valueSet';
+  readonly values: readonly unknown[];
 }
 
 export interface AuthoringEntityTypeDescriptor<Input = never, Output = unknown> {
@@ -945,6 +976,32 @@ export function instantiateAuthoringEntityType<TOutput = unknown>(
   validateAuthoringHelperArguments(helperPath, descriptor.args, args);
   return blindCast<TOutput, 'template-output resolves to the declared TOutput by convention'>(
     resolveAuthoringTemplateValue(descriptor.output.template, args),
+  );
+}
+
+/**
+ * If the descriptor's factory output supplies a
+ * {@link AuthoringEntityTypeFactoryOutput.deriveValueSet} hook, invoke it on
+ * `entity` and return the derived value-set; otherwise return `undefined`.
+ *
+ * The generic extension-block lowering pass calls this after building each
+ * entity so a value-set-carrying pack entity can contribute its value-set
+ * without the pass naming any target discriminator. The hook is invoked with
+ * the already-built entity (typed as the pack's `Output` at the descriptor's
+ * declaration site).
+ */
+export function deriveValueSetFromEntity(
+  descriptor: AuthoringEntityTypeDescriptor,
+  entity: unknown,
+): AuthoringDerivedValueSet | undefined {
+  if (!('factory' in descriptor.output)) return undefined;
+  const { deriveValueSet } = descriptor.output;
+  if (deriveValueSet === undefined) return undefined;
+  return deriveValueSet(
+    blindCast<
+      never,
+      "entity is this descriptor's factory Output; deriveValueSet's parameter is that same Output at the declaration site"
+    >(entity),
   );
 }
 

@@ -3,6 +3,7 @@ export type {
   AuthoringArgumentDescriptor,
   AuthoringColumnDefaultTemplate,
   AuthoringContributions,
+  AuthoringDerivedValueSet,
   AuthoringDiagnosticSink,
   AuthoringEntityContext,
   AuthoringEntityTypeDescriptor,
@@ -21,6 +22,7 @@ export type {
 } from '../shared/framework-authoring';
 export {
   assertNoCrossRegistryCollisions,
+  deriveValueSetFromEntity,
   hasRegisteredFieldNamespace,
   instantiateAuthoringEntityType,
   instantiateAuthoringFieldPreset,

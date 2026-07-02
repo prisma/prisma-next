@@ -18,7 +18,7 @@ import type { SqlNamespaceInput, SqlStorage } from '@prisma-next/sql-contract/ty
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject, JsonValue } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
-import { policyEntityKind, roleEntityKind } from './entity-kinds';
+import { nativeEnumEntityKind, policyEntityKind, roleEntityKind } from './entity-kinds';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
@@ -68,7 +68,12 @@ function collectStorageTypesHydrators(
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor(extraPackEntityKinds: readonly AnyEntityKindDescriptor[] = []) {
     const storageTypesHydrators = collectStorageTypesHydrators(postgresAuthoringEntityTypes);
-    super(storageTypesHydrators, [policyEntityKind, roleEntityKind, ...extraPackEntityKinds]);
+    super(storageTypesHydrators, [
+      policyEntityKind,
+      roleEntityKind,
+      nativeEnumEntityKind,
+      ...extraPackEntityKinds,
+    ]);
   }
 
   protected override hydrateSqlNamespaceEntry(
@@ -161,6 +166,10 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     for (const [policyName, policy] of Object.entries(ns.policy)) {
       policyOut[policyName] = this.serializeJsonObject(policy);
     }
+    const nativeEnumOut: Record<string, JsonObject> = {};
+    for (const [nativeEnumName, nativeEnum] of Object.entries(ns.nativeEnum)) {
+      nativeEnumOut[nativeEnumName] = this.serializeJsonObject(nativeEnum);
+    }
     return {
       id: ns.id,
       kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
@@ -169,6 +178,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
         ...(Object.keys(valueSetOut).length > 0 ? { valueSet: valueSetOut } : {}),
         ...(Object.keys(roleOut).length > 0 ? { role: roleOut } : {}),
         ...(Object.keys(policyOut).length > 0 ? { policy: policyOut } : {}),
+        ...(Object.keys(nativeEnumOut).length > 0 ? { native_enum: nativeEnumOut } : {}),
       },
     };
   }

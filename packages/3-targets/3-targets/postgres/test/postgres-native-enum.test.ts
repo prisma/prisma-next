@@ -1,0 +1,144 @@
+import { describe, expect, it } from 'vitest';
+import { PostgresSchema } from '../src/core/postgres-schema';
+import {
+  isPostgresNativeEnum,
+  PostgresNativeEnum,
+} from '../src/core/schema-ir/postgres-native-enum';
+import { PostgresRole } from '../src/core/schema-ir/postgres-role';
+
+const aalLevelInput = {
+  typeName: 'aal_level',
+  members: [
+    { name: 'aal1', value: 'aal1' },
+    { name: 'aal2', value: 'aal2' },
+    { name: 'aal3', value: 'aal3' },
+  ],
+  control: 'external' as const,
+};
+
+describe('PostgresNativeEnum', () => {
+  it('constructs with typeName, ordered members, and control', () => {
+    const node = new PostgresNativeEnum(aalLevelInput);
+    expect(node.kind).toBe('postgres-enum');
+    expect(node.typeName).toBe('aal_level');
+    expect(node.members).toEqual([
+      { name: 'aal1', value: 'aal1' },
+      { name: 'aal2', value: 'aal2' },
+      { name: 'aal3', value: 'aal3' },
+    ]);
+    expect(node.control).toBe('external');
+  });
+
+  it('omits control when not provided', () => {
+    const node = new PostgresNativeEnum({
+      typeName: 'aal_level',
+      members: [{ name: 'aal1', value: 'aal1' }],
+    });
+    expect(Object.hasOwn(node, 'control')).toBe(false);
+    expect('control' in JSON.parse(JSON.stringify(node))).toBe(false);
+  });
+
+  it('freezes the members array', () => {
+    const node = new PostgresNativeEnum(aalLevelInput);
+    expect(Object.isFrozen(node.members)).toBe(true);
+  });
+
+  it('is frozen — mutation throws in strict mode', () => {
+    const node = new PostgresNativeEnum(aalLevelInput);
+    expect(Object.isFrozen(node)).toBe(true);
+    expect(() => {
+      (node as { typeName: string }).typeName = 'mutated';
+    }).toThrow();
+  });
+
+  it('kind is enumerable and survives JSON round-trip', () => {
+    const node = new PostgresNativeEnum(aalLevelInput);
+    const json = JSON.parse(JSON.stringify(node)) as Record<string, unknown>;
+    expect(json['kind']).toBe('postgres-enum');
+    expect(json['typeName']).toBe('aal_level');
+    expect(json['members']).toEqual(aalLevelInput.members);
+    expect(json['control']).toBe('external');
+  });
+
+  it('does not share the members array reference with input', () => {
+    const members = [{ name: 'aal1', value: 'aal1' }];
+    const node = new PostgresNativeEnum({ typeName: 'aal_level', members });
+    expect(node.members).not.toBe(members);
+  });
+
+  describe('DiffableNode surface', () => {
+    it('id returns the type name', () => {
+      const node = new PostgresNativeEnum(aalLevelInput);
+      expect(node.id).toBe('aal_level');
+    });
+
+    it('children() returns an empty list (leaf node)', () => {
+      const node = new PostgresNativeEnum(aalLevelInput);
+      expect(node.children()).toEqual([]);
+    });
+
+    it('isEqualTo() returns true for two native enums with the same type name and members', () => {
+      const a = new PostgresNativeEnum(aalLevelInput);
+      const b = new PostgresNativeEnum({ ...aalLevelInput });
+      expect(a.isEqualTo(b)).toBe(true);
+    });
+
+    it('isEqualTo() returns false when members differ in order', () => {
+      const a = new PostgresNativeEnum(aalLevelInput);
+      const b = new PostgresNativeEnum({
+        ...aalLevelInput,
+        members: [...aalLevelInput.members].reverse(),
+      });
+      expect(a.isEqualTo(b)).toBe(false);
+    });
+
+    it('isEqualTo() returns false for different type names', () => {
+      const a = new PostgresNativeEnum(aalLevelInput);
+      const b = new PostgresNativeEnum({ ...aalLevelInput, typeName: 'other_type' });
+      expect(a.isEqualTo(b)).toBe(false);
+    });
+
+    it('isEqualTo() throws when other is not a PostgresNativeEnum', () => {
+      const node = new PostgresNativeEnum(aalLevelInput);
+      const notANativeEnum = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
+      expect(() => node.isEqualTo(notANativeEnum)).toThrow();
+    });
+  });
+
+  describe('isPostgresNativeEnum guard', () => {
+    it('returns true for a real PostgresNativeEnum', () => {
+      expect(isPostgresNativeEnum(new PostgresNativeEnum(aalLevelInput))).toBe(true);
+    });
+
+    it('returns false for a node with a different kind', () => {
+      const role = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
+      expect(isPostgresNativeEnum(role)).toBe(false);
+    });
+
+    it('returns false for undefined', () => {
+      expect(isPostgresNativeEnum(undefined)).toBe(false);
+    });
+  });
+});
+
+describe('PostgresSchema native_enum slot', () => {
+  it('exposes an empty native_enum map when not provided', () => {
+    const schema = new PostgresSchema({ id: 'public', entries: { table: {} } });
+    expect(schema.nativeEnum).toEqual({});
+    expect(Object.isFrozen(schema.nativeEnum)).toBe(true);
+  });
+
+  it('normalises plain native_enum input into PostgresNativeEnum instances', () => {
+    const schema = new PostgresSchema({
+      id: 'auth',
+      entries: {
+        table: {},
+        native_enum: { AalLevel: aalLevelInput },
+      },
+    });
+    const node = schema.nativeEnum['AalLevel'];
+    expect(node).toBeInstanceOf(PostgresNativeEnum);
+    expect(node?.typeName).toBe('aal_level');
+    expect(node?.members).toHaveLength(3);
+  });
+});

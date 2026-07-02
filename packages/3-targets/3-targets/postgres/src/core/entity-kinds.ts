@@ -1,5 +1,10 @@
 import type { EntityKindDescriptor } from '@prisma-next/framework-components/ir';
-import { PostgresRlsPolicySchema, PostgresRoleSchema } from './postgres-validators';
+import {
+  PostgresNativeEnumSchema,
+  PostgresRlsPolicySchema,
+  PostgresRoleSchema,
+} from './postgres-validators';
+import { PostgresNativeEnum, type PostgresNativeEnumInput } from './schema-ir/postgres-native-enum';
 import { PostgresRlsPolicy, type PostgresRlsPolicyInput } from './schema-ir/postgres-rls-policy';
 import { PostgresRole, type PostgresRoleInput } from './schema-ir/postgres-role';
 
@@ -13,4 +18,13 @@ export const roleEntityKind: EntityKindDescriptor<PostgresRoleInput, PostgresRol
   kind: 'role',
   schema: PostgresRoleSchema,
   construct: (input) => new PostgresRole(input),
+};
+
+export const nativeEnumEntityKind: EntityKindDescriptor<
+  PostgresNativeEnumInput,
+  PostgresNativeEnum
+> = {
+  kind: 'native_enum',
+  schema: PostgresNativeEnumSchema,
+  construct: (input) => new PostgresNativeEnum(input),
 };

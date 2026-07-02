@@ -7,8 +7,13 @@ import type {
   AuthoringTypeNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
-import { PostgresRlsPolicySchema, PostgresRoleSchema } from './postgres-validators';
+import {
+  PostgresNativeEnumSchema,
+  PostgresRlsPolicySchema,
+  PostgresRoleSchema,
+} from './postgres-validators';
 import { computeContentHash, normalizePredicate } from './rls/canonicalize';
+import { PostgresNativeEnum } from './schema-ir/postgres-native-enum';
 import { PostgresRlsPolicy } from './schema-ir/postgres-rls-policy';
 import { PostgresRole, type PostgresRoleInput } from './schema-ir/postgres-role';
 
@@ -71,6 +76,121 @@ function lowerRlsPolicyFromBlock(
   });
 }
 
+// TODO(TS-mirror parity): this diverges from `applyNaming(..., 'snake_case')`
+// on acronym runs. The TS mirror (`field.column(pg.enum(handle))`) must reuse ONE
+// canonical snake_case so PSL and TS lower to a byte-identical contract — pick
+// the single source of truth then, don't leave two implementations.
+function snakeCase(name: string): string {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    .toLowerCase();
+}
+
+/**
+ * Lowers a `native_enum { memberName = "value" … @@map("type_name") }` block
+ * into a {@link PostgresNativeEnum}. Members must be authored as explicit
+ * `key = "value"` pairs — a bare (value-less) member is a diagnostic, not
+ * accepted (authoring-design.md §2.1). `typeName` comes from `@@map` or
+ * defaults to `snake_case(block.name)`.
+ */
+function lowerNativeEnumFromBlock(
+  block: PslExtensionBlock,
+  ctx: AuthoringEntityContext,
+): PostgresNativeEnum | undefined {
+  const sourceId = ctx.sourceId ?? 'unknown';
+  const diagnostics = ctx.diagnostics;
+
+  const mapAttr = block.blockAttributes.find((a) => a.name === 'map');
+  let typeName = snakeCase(block.name);
+  if (mapAttr) {
+    const rawArg = mapAttr.args[0]?.value;
+    const mapped = rawArg !== undefined ? unwrapQuotedString(rawArg) : undefined;
+    if (mapped === undefined) {
+      diagnostics?.push({
+        code: 'PSL_NATIVE_ENUM_INVALID_MAP',
+        message: `native_enum "${block.name}" @@map attribute must have a quoted type-name argument`,
+        sourceId,
+        span: mapAttr.span,
+      });
+      return undefined;
+    }
+    typeName = mapped;
+  }
+
+  let memberError = false;
+  const seenValues = new Set<string>();
+  const members: { name: string; value: string }[] = [];
+  for (const [memberName, paramValue] of Object.entries(block.parameters)) {
+    if (paramValue.kind === 'bare') {
+      diagnostics?.push({
+        code: 'PSL_NATIVE_ENUM_BARE_MEMBER',
+        message: `native_enum "${block.name}" member "${memberName}" has no value; members must be authored as "${memberName} = \\"value\\""`,
+        sourceId,
+        span: paramValue.span,
+      });
+      memberError = true;
+      continue;
+    }
+    if (paramValue.kind !== 'value') continue;
+
+    let jsonValue: unknown;
+    try {
+      jsonValue = JSON.parse(paramValue.raw);
+    } catch {
+      diagnostics?.push({
+        code: 'PSL_EXTENSION_INVALID_VALUE',
+        message: `native_enum "${block.name}" member "${memberName}" value "${paramValue.raw}" is not valid JSON`,
+        sourceId,
+        span: paramValue.span,
+      });
+      memberError = true;
+      continue;
+    }
+    if (typeof jsonValue !== 'string') {
+      diagnostics?.push({
+        code: 'PSL_EXTENSION_INVALID_VALUE',
+        message: `native_enum "${block.name}" member "${memberName}" value must be a string`,
+        sourceId,
+        span: paramValue.span,
+      });
+      memberError = true;
+      continue;
+    }
+    if (seenValues.has(jsonValue)) {
+      diagnostics?.push({
+        code: 'PSL_NATIVE_ENUM_DUPLICATE_MEMBER_VALUE',
+        message: `native_enum "${block.name}": duplicate member value "${jsonValue}"`,
+        sourceId,
+        span: paramValue.span,
+      });
+      memberError = true;
+      continue;
+    }
+    seenValues.add(jsonValue);
+    members.push({ name: memberName, value: jsonValue });
+  }
+
+  if (memberError) return undefined;
+
+  if (members.length === 0) {
+    diagnostics?.push({
+      code: 'PSL_NATIVE_ENUM_MISSING_MEMBERS',
+      message: `native_enum "${block.name}" must have at least one member`,
+      sourceId,
+      span: block.span,
+    });
+    return undefined;
+  }
+
+  // `control` is left unset here — the effective grade (`external` for the
+  // Supabase pack, `managed` by default) is resolved at read time via
+  // `effectiveControlPolicy(node.control, contract.defaultControlPolicy)`,
+  // exactly as `StorageTable`/`StorageColumn` leave `control` unset and rely
+  // on the contract-level default (see `applySpecifierDefaultControlPolicy`).
+  return new PostgresNativeEnum({ typeName, members });
+}
+
 export const postgresAuthoringEntityTypes = {
   role: {
     kind: 'entity',
@@ -86,6 +206,18 @@ export const postgresAuthoringEntityTypes = {
     validatorSchema: PostgresRlsPolicySchema,
     output: {
       factory: lowerRlsPolicyFromBlock,
+    },
+  },
+  native_enum: {
+    kind: 'entity',
+    discriminator: 'native_enum',
+    validatorSchema: PostgresNativeEnumSchema,
+    output: {
+      factory: lowerNativeEnumFromBlock,
+      deriveValueSet: (entity: PostgresNativeEnum) => ({
+        kind: 'valueSet',
+        values: entity.members.map((m) => m.value),
+      }),
     },
   },
 } as const satisfies AuthoringEntityTypeNamespace;
@@ -133,6 +265,24 @@ export const postgresAuthoringPslBlockDescriptors = {
       },
       using: { kind: 'value', codecId: 'pg/text@1', required: true },
     },
+  },
+  /**
+   * PSL block descriptor for `native_enum`.
+   *
+   * Reuses the existing variadic-block mechanism (the same shape the SQL
+   * family's `enum` block ships): the body is an open `memberName = "value"`
+   * list. `variadicParameters: true` opens the block to arbitrary keys
+   * beyond the declared (empty) `parameters` set — the lowering factory
+   * (`lowerNativeEnumFromBlock`) turns the variadic entries into ordered
+   * members and rejects a bare (value-less) member.
+   */
+  native_enum: {
+    kind: 'pslBlock',
+    keyword: 'native_enum',
+    discriminator: 'native_enum',
+    name: { required: true },
+    parameters: {},
+    variadicParameters: true,
   },
 } as const satisfies AuthoringPslBlockDescriptorNamespace;
 

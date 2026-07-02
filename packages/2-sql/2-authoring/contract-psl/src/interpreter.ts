@@ -19,6 +19,7 @@ import type {
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
 import {
+  deriveValueSetFromEntity,
   instantiateAuthoringEntityType,
   isAuthoringEntityTypeDescriptor,
   isAuthoringPslBlockDescriptor,
@@ -309,6 +310,12 @@ function buildEntityTypesByDiscriminator(
  *
  * This pass is intentionally generic: no discriminator value is named here.
  * The factory (registered by the target pack) owns all block-specific logic.
+ * A descriptor may also opt into value-set derivation via its
+ * {@link AuthoringEntityTypeFactoryOutput.deriveValueSet} hook — when present,
+ * the derived value-set is folded into the namespace's `valueSet` slot
+ * (keyed by block name), so a value-set-carrying pack entity (e.g. Postgres
+ * `native_enum`) contributes the value-set that drives value-set → codec
+ * typing without this pass inspecting a target-specific shape.
  *
  * The `namespaceId` is attached to the block before the factory call so the
  * factory can record the namespace coordinate without the interpreter
@@ -343,6 +350,13 @@ function lowerExtensionBlocksForNamespace(
     const slot = result[entriesKey] ?? {};
     result[entriesKey] = slot;
     slot[block.name] = entity;
+
+    const derivedValueSet = deriveValueSetFromEntity(descriptor, entity);
+    if (derivedValueSet !== undefined) {
+      const valueSetSlot = result['valueSet'] ?? {};
+      result['valueSet'] = valueSetSlot;
+      valueSetSlot[block.name] = derivedValueSet;
+    }
   }
 
   return result;
@@ -2009,13 +2023,24 @@ export function interpretPslDocumentToSqlContract(
 
   // Generic extension-block lowering pass: per named namespace, lower all
   // parsed extension blocks into IR entities via the registered factory for
-  // each block's discriminator, then collect by entrySlotName. This pass
+  // each block's discriminator, then collect by entrySlotName. The pass
   // names no specific discriminator value — all target-specific logic lives
-  // in the factory contributed by the target pack.
+  // in the factory contributed by the target pack, and value-set derivation
+  // rides the generic `deriveValueSet` descriptor hook (see
+  // `lowerExtensionBlocksForNamespace`).
   const entityTypesByDiscriminator = buildEntityTypesByDiscriminator(input.authoringContributions);
   const extensionEntityContext: AuthoringEntityContext = {
     family: input.target.familyId,
     target: input.target.targetId,
+    ...ifDefined('codecLookup', input.codecLookup),
+    sourceId,
+    diagnostics: {
+      push: (d) => {
+        diagnostics.push(
+          blindCast<ContractSourceDiagnostic, 'sink diagnostics are span-compatible'>(d),
+        );
+      },
+    },
   };
   const namespaceExtensionEntities = new Map<
     string,
@@ -2039,19 +2064,60 @@ export function interpretPslDocumentToSqlContract(
     }
   }
 
+  // A domain `enum` and an extension-derived value-set (e.g. from a
+  // `native_enum`) that share a name in one namespace would both target the
+  // same `entries.valueSet[name]` slot — the merge below would otherwise let
+  // the extension one silently overwrite the domain one. Domain enums always
+  // register under `defaultNamespaceId` (see `build-contract.ts`), so a
+  // collision can only occur there. Flag it rather than resolve it silently.
+  const defaultNsExtensionValueSets =
+    namespaceExtensionEntities.get(defaultNamespaceId)?.['valueSet'];
+  if (defaultNsExtensionValueSets !== undefined) {
+    for (const name of Object.keys(defaultNsExtensionValueSets)) {
+      if (Object.hasOwn(validEnumHandles, name)) {
+        diagnostics.push({
+          code: 'PSL_VALUE_SET_NAME_COLLISION',
+          message: `namespace "${defaultNamespaceId}": name "${name}" is declared both as a domain enum and as an extension entity that derives a value-set; rename one`,
+          sourceId,
+        });
+      }
+    }
+  }
+
+  if (diagnostics.length > 0) {
+    return notOk({
+      summary: 'PSL to SQL contract interpretation failed',
+      diagnostics,
+    });
+  }
+
   // Wrap createNamespace to merge lowered extension-block entities into each
   // namespace's entries before handing off to the factory. The entities map
   // keys are discriminator strings — equal to the entries key by the one-string
   // rule — so they merge directly into entries without translation.
+  //
+  // `valueSet` is merged specifically (rather than let `entities` overwrite
+  // it wholesale): `nsInput.entries.valueSet` may already carry PSL `enum`
+  // block-derived value-sets (built in `buildSqlContractFromDefinition` from
+  // `definition.enums`, independently of this pass), and `entities.valueSet`
+  // may carry `deriveValueSet`-hook-derived ones — a namespace authoring both
+  // an `enum` and a value-set-deriving extension entity needs both to survive.
+  // Name collisions between the two are already rejected above, so this merge
+  // only ever unions distinct names.
   const { createNamespace } = input;
   const createNamespaceWithExtensions = (nsInput: SqlNamespaceInput) => {
     const entities = namespaceExtensionEntities.get(nsInput.id);
     if (entities === undefined) {
       return createNamespace(nsInput);
     }
+    const mergedValueSet = { ...nsInput.entries['valueSet'], ...entities['valueSet'] };
     const extended: SqlNamespaceInput = {
       ...nsInput,
-      entries: { ...nsInput.entries, ...entities },
+      entries: {
+        ...nsInput.entries,
+        ...entities,
+        ...(Object.keys(mergedValueSet).length > 0 ? { valueSet: mergedValueSet } : {}),
+      },
     };
     return createNamespace(extended);
   };
