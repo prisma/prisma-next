@@ -74,6 +74,7 @@ function renderTypedParam(
   codecId: string | undefined,
   codecLookup: CodecLookup,
   many?: boolean,
+  columnNativeType?: string,
 ): string {
   if (codecId === undefined) {
     return `$${index}`;
@@ -97,7 +98,8 @@ function renderTypedParam(
   const dbRecord = meta?.db;
   const sqlBlock = isRecord(dbRecord) ? dbRecord['sql'] : undefined;
   const dialectBlock = isRecord(sqlBlock) ? sqlBlock['postgres'] : undefined;
-  const nativeType = isRecord(dialectBlock) ? dialectBlock['nativeType'] : undefined;
+  const staticNativeType = isRecord(dialectBlock) ? dialectBlock['nativeType'] : undefined;
+  const nativeType = columnNativeType ?? staticNativeType;
   if (typeof nativeType === 'string') {
     const arraySuffix = many ? '[]' : '';
     if (!POSTGRES_INFERRABLE_NATIVE_TYPES.has(nativeType)) {
@@ -743,7 +745,13 @@ function renderParamRef(ref: AnyParamRef, pim: ParamIndexMap): string {
     throw new Error('ParamRef not found in index map');
   }
   if (ref.kind === 'prepared-param-ref') {
-    return renderTypedParam(index, ref.codec.codecId, pim.codecLookup, ref.codec.many);
+    return renderTypedParam(
+      index,
+      ref.codec.codecId,
+      pim.codecLookup,
+      ref.codec.many,
+      ref.codec.nativeType,
+    );
   }
   if (ref.codec === undefined) {
     throw runtimeError(
@@ -754,7 +762,13 @@ function renderParamRef(ref: AnyParamRef, pim: ParamIndexMap): string {
       { paramIndex: index, ...ifDefined('name', ref.name) },
     );
   }
-  return renderTypedParam(index, ref.codec.codecId, pim.codecLookup, ref.codec.many);
+  return renderTypedParam(
+    index,
+    ref.codec.codecId,
+    pim.codecLookup,
+    ref.codec.many,
+    ref.codec.nativeType,
+  );
 }
 
 function renderLiteral(expr: LiteralExpr): string {

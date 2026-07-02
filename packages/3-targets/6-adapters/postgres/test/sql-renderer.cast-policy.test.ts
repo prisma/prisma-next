@@ -68,6 +68,7 @@ const baseContract = new SqlContractSerializer().deserializeContract({
                 note: { codecId: 'app/test-opaque@1', nativeType: 'tag', nullable: false },
                 geo: { codecId: 'app/geography@1', nativeType: 'geography', nullable: false },
                 profile: { codecId: 'arktype/json@1', nativeType: 'jsonb', nullable: false },
+                status: { codecId: 'pg/enum@1', nativeType: 'aal_level', nullable: false },
               },
               uniques: [],
               indexes: [],
@@ -86,6 +87,18 @@ function selectWithParam(column: string, codecId: string | undefined, value: unk
     codecId === undefined
       ? ParamRef.of(value, { name: column })
       : ParamRef.of(value, { name: column, codec: { codecId } });
+  return SelectAst.from(TableSource.named('user'))
+    .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+    .withWhere(BinaryExpr.eq(ColumnRef.of('user', column), ref));
+}
+
+function selectWithNativeTypeParam(
+  column: string,
+  codecId: string,
+  nativeType: string,
+  value: unknown,
+) {
+  const ref = ParamRef.of(value, { name: column, codec: { codecId, nativeType } });
   return SelectAst.from(TableSource.named('user'))
     .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
     .withWhere(BinaryExpr.eq(ColumnRef.of('user', column), ref));
@@ -134,6 +147,30 @@ describe('renderLoweredSql cast policy', () => {
     const lowered = renderLoweredSql(ast, baseContract, lookup);
 
     expect(lowered.sql).toBe('SELECT "user"."id" AS "id" FROM "user" WHERE "user"."score" = $1');
+  });
+
+  it('emits $N::<nativeType> for a native-enum column using the per-column nativeType, not the codec static meta', () => {
+    const pgEnumCodec: Codec = defineTestCodec({
+      typeId: 'pg/enum@1',
+      encode: (value: string): string => value,
+      decode: (wire: string): string => wire,
+    });
+    const lookup = lookupOf({
+      'pg/enum@1': {
+        codec: pgEnumCodec,
+        metadata: {
+          targetTypes: ['text'],
+          meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
+        },
+      },
+    });
+
+    const ast = selectWithNativeTypeParam('status', 'pg/enum@1', 'aal_level', 'aal2');
+    const lowered = renderLoweredSql(ast, baseContract, lookup);
+
+    expect(lowered.sql).toBe(
+      'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."status" = $1::aal_level',
+    );
   });
 
   it('emits plain $N when the codec carries no nativeType metadata', () => {

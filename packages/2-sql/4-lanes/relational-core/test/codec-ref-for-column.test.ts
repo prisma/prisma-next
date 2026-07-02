@@ -25,6 +25,18 @@ function usersTable(columnName: string, codecId: string): StorageTable {
   });
 }
 
+function enumTable(): StorageTable {
+  return new StorageTable({
+    columns: {
+      status: { codecId: 'pg/enum@1', nativeType: 'aal_level', nullable: false },
+    },
+    primaryKey: { columns: ['status'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  });
+}
+
 function twoNamespaceSameTableName(): SqlStorage {
   return new SqlStorage({
     storageHash: STORAGE_HASH,
@@ -47,9 +59,11 @@ describe('codecRefForStorageColumn', () => {
 
     expect(codecRefForStorageColumn(storage, 'public', 'users', 'email_addr')).toEqual({
       codecId: 'pg/text@1',
+      nativeType: 'text',
     });
     expect(codecRefForStorageColumn(storage, 'auth', 'users', 'token_col')).toEqual({
       codecId: 'pg/int4@1',
+      nativeType: 'text',
     });
   });
 
@@ -73,7 +87,25 @@ describe('codecRefForStorageColumn', () => {
 
     expect(codecRefForStorageColumn(storage, 'public', 'users', 'email_addr')).toEqual({
       codecId: 'pg/text@1',
+      nativeType: 'text',
     });
     expect(codecRefForStorageColumn(storage, 'public', 'users', 'missing')).toBeUndefined();
+  });
+
+  it('carries the column nativeType on the returned CodecRef', () => {
+    const storage = new SqlStorage({
+      storageHash: STORAGE_HASH,
+      namespaces: {
+        public: createTestSqlNamespace({
+          id: 'public',
+          entries: { table: { session: enumTable() } },
+        }),
+      },
+    });
+
+    expect(codecRefForStorageColumn(storage, 'public', 'session', 'status')).toEqual({
+      codecId: 'pg/enum@1',
+      nativeType: 'aal_level',
+    });
   });
 });

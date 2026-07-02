@@ -107,8 +107,11 @@ function frozenCodecRef(codec: CodecRef): CodecRef {
     codec.typeParams === undefined
       ? undefined
       : (structuredClone(codec.typeParams) as CodecRef['typeParams']);
-  const base =
-    typeParams === undefined ? { codecId: codec.codecId } : { codecId: codec.codecId, typeParams };
+  const base = {
+    codecId: codec.codecId,
+    ...ifDefined('typeParams', typeParams),
+    ...ifDefined('nativeType', codec.nativeType),
+  };
   return Object.freeze(codec.many ? { ...base, many: true } : base);
 }
 

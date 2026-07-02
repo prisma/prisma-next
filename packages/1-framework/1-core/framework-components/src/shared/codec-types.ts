@@ -13,12 +13,15 @@ export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual
  *
  * `many` marks a scalar-array (list-typed) column. When `true`, the encode/decode paths map the element codec over the JS array rather than applying the codec to the whole value. The element codec id is `codecId`; the driver owns the array wire framing (`{…}`) in both directions. Absent for scalar columns.
  *
+ * `nativeType` is the storage column's own native type (e.g. a native Postgres enum's type name), used in preference to the codec's static `meta` when a SQL renderer decides whether to cast a bound parameter. Absent when the column carries no independent native type, in which case renderers fall back to the codec's static metadata.
+ *
  * Family-agnostic by design — both SQL and Mongo AST nodes carry `codec: CodecRef | undefined`, and the resolver is the only dispatch path that survives serialization.
  */
 export interface CodecRef {
   readonly codecId: string;
   readonly typeParams?: JsonValue;
   readonly many?: boolean;
+  readonly nativeType?: string;
 }
 
 /**

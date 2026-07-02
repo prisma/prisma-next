@@ -13,6 +13,8 @@ import { blindCast } from '@prisma-next/utils/casts';
  * - inline `typeParams` column → `{codecId, typeParams}` from the column itself.
  * - non-parameterized column → `{codecId}` with `typeParams` undefined.
  *
+ * Every returned ref also carries `nativeType` from the column itself (not from `storage.types[typeRef]` — the column's own native type, e.g. a native Postgres enum's type name, always wins). SQL renderers prefer this over the codec's static metadata when deciding whether to cast a bound parameter.
+ *
  * Returns `undefined` when the table or column is unknown, or when a `typeRef` column references a `storage.types` entry that does not exist.
  *
  * `namespaceId` leads the coordinate args and is always supplied: every
@@ -37,8 +39,12 @@ export function codecRefForStorageColumn(
       const instanceParams = instance.typeParams;
       const hasParamKeys = instanceParams !== undefined && Object.keys(instanceParams).length > 0;
       return hasParamKeys
-        ? { codecId: instance.codecId, typeParams: instanceParams as JsonValue }
-        : { codecId: instance.codecId };
+        ? {
+            codecId: instance.codecId,
+            typeParams: instanceParams as JsonValue,
+            nativeType: columnDef.nativeType,
+          }
+        : { codecId: instance.codecId, nativeType: columnDef.nativeType };
     }
     return undefined;
   }
@@ -48,10 +54,10 @@ export function codecRefForStorageColumn(
       'column typeParams is a validated contract record; its values are JSON-serialisable'
     >(columnDef.typeParams);
     return columnDef.many
-      ? { codecId: columnDef.codecId, typeParams, many: true }
-      : { codecId: columnDef.codecId, typeParams };
+      ? { codecId: columnDef.codecId, typeParams, many: true, nativeType: columnDef.nativeType }
+      : { codecId: columnDef.codecId, typeParams, nativeType: columnDef.nativeType };
   }
   return columnDef.many
-    ? { codecId: columnDef.codecId, many: true }
-    : { codecId: columnDef.codecId };
+    ? { codecId: columnDef.codecId, many: true, nativeType: columnDef.nativeType }
+    : { codecId: columnDef.codecId, nativeType: columnDef.nativeType };
 }
