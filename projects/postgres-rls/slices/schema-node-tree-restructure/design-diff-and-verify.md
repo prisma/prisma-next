@@ -88,7 +88,7 @@ Both are defined identifiers, not string literals scattered across guards.
 
 ## 11. Contract-space handling: filter the issues, never prune the schema
 
-The framework **does not alter the schema before diffing and does not branch on any storage shape.** It diffs the full introspected schema and filters the resulting issues by contract-space ownership. Ownership is attributed with the target-agnostic `elementCoordinates(contract.storage)` — an issue belongs to whichever member claims its `(namespaceId, name)` coordinate.
+The framework **does not alter the schema before diffing and does not branch on any storage shape.** It diffs the full introspected schema and filters the resulting issues by contract-space ownership. Ownership is attributed with the target-agnostic `elementCoordinates(contract.storage)` — an issue belongs to whichever member claims its entity **name** (this matches the pruning layer it replaces, so it is behaviour-neutral). An `extra_table` issue carries no `namespaceId` — a live-DB table sits in no contract namespace — so qualified `(namespaceId, name)` keying, which would let two members own same-named tables in different schemas independently, awaits the differ stamping the introspected namespace onto extra issues; that is a follow-on (§13), not a regression.
 
 Deleted:
 
@@ -112,6 +112,7 @@ The aggregate verifier and planner take the family's `SchemaDiffer`, diff the fu
 ## 13. Out of scope (follow-ons)
 
 - **Relational port / one issue type:** merging the relational check into the generic node differ so there is a single issue type. Until then `SchemaDiff` carries two lists. Separating `root` / `counts` from the relational walk rides with this port.
+- **Qualified-coordinate ownership keying:** attribute cross-space ownership by `(namespaceId, name)` instead of bare entity name. Needs `extra_table` issues to carry their introspected namespace; rides with the relational port.
 - **PSL-inference tree-walk (TML-2958):** inference still gathers the tree into a flat document, guarded by a fail-loud throw.
 - **`annotations.pg` full retirement (TML-2936):** this rework stops *populating* the bag (§14); typed-field replacement is TML-2936.
 
