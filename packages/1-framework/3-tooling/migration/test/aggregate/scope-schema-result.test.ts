@@ -48,6 +48,36 @@ function tableNode(
   };
 }
 
+/** A Mongo top-level entity node (`kind: 'collection'`). */
+function collectionNode(name: string, status: 'pass' | 'warn' | 'fail'): SchemaVerificationNode {
+  return {
+    status,
+    kind: 'collection',
+    name,
+    contractPath: `storage.namespaces.unbound.entries.collection.${name}`,
+    code: status === 'pass' ? '' : 'extra_table',
+    message: '',
+    expected: null,
+    actual: name,
+    children: [],
+  };
+}
+
+/** The synthesized `storage.types` root child — named `types`, but not a table node. */
+function storageTypesNode(status: 'pass' | 'warn' | 'fail'): SchemaVerificationNode {
+  return {
+    status,
+    kind: 'storageTypes',
+    name: 'types',
+    contractPath: 'storage.types',
+    code: status === 'fail' ? 'type_mismatch' : '',
+    message: '',
+    expected: undefined,
+    actual: undefined,
+    children: [],
+  };
+}
+
 function resultWith(
   children: readonly SchemaVerificationNode[],
   issues: VerifyDatabaseSchemaResult['schema']['issues'],
@@ -224,6 +254,82 @@ describe('scopeSchemaResultToSpace', () => {
     expect(scoped.ok).toBe(false);
     expect(scoped.schema.counts.fail).toBe(result.schema.counts.fail);
     expect(scoped.schema.issues).toEqual(result.schema.issues);
+  });
+
+  it('never drops the storageTypes node even when a sibling owns a table named `types`', () => {
+    // The synthesized `storage.types` root child is named `types` but is not a
+    // table node. A sibling space owning a table literally named `types` must
+    // not drop it — if it is a failing enum-drift node, dropping it would flip
+    // the member to a false pass.
+    const typesNode = storageTypesNode('fail');
+    const result: VerifyDatabaseSchemaResult = {
+      ok: false,
+      code: 'PN-RUN-3010',
+      summary: 'Database schema does not satisfy contract (1 failure)',
+      contract: { storageHash: 'sha256:test' },
+      target: { expected: 'postgres' },
+      schema: {
+        issues: [
+          {
+            kind: 'enum_values_changed',
+            namespaceId: 'public',
+            typeName: 'status',
+            addedValues: ['archived'],
+            removedValues: [],
+            message: 'enum status changed',
+          },
+        ],
+        schemaDiffIssues: [],
+        root: {
+          status: 'fail',
+          kind: 'contract',
+          name: 'contract',
+          contractPath: '',
+          code: 'type_mismatch',
+          message: '',
+          expected: undefined,
+          actual: undefined,
+          children: [tableNode('user', 'pass'), typesNode],
+        },
+        counts: { pass: 2, warn: 0, fail: 2, totalNodes: 3 },
+      },
+      timings: { total: 0 },
+    };
+
+    const scoped = scopeSchemaResultToSpace(result, new Set(['types']));
+
+    expect(scoped.schema.root.children.map((c) => c.name)).toContain('types');
+    expect(scoped.ok).toBe(false);
+    expect(scoped.schema.counts.fail).toBe(result.schema.counts.fail);
+  });
+
+  it('still drops a Mongo collection node another member claims', () => {
+    // The entity-node allowlist covers Mongo's `collection` kind too, so
+    // sibling-owned collections are dropped just like SQL tables.
+    const result: VerifyDatabaseSchemaResult = {
+      ...resultWith([], []),
+      schema: {
+        issues: [{ kind: 'extra_table', table: 'sibling_coll', message: 'extra collection' }],
+        schemaDiffIssues: [],
+        root: {
+          status: 'warn',
+          kind: 'root',
+          name: 'mongo-schema',
+          contractPath: 'storage',
+          code: 'DRIFT',
+          message: '',
+          expected: null,
+          actual: null,
+          children: [collectionNode('own_coll', 'pass'), collectionNode('sibling_coll', 'warn')],
+        },
+        counts: { pass: 2, warn: 1, fail: 0, totalNodes: 3 },
+      },
+    };
+
+    const scoped = scopeSchemaResultToSpace(result, new Set(['sibling_coll']));
+
+    expect(scoped.schema.root.children.map((c) => c.name)).toEqual(['own_coll']);
+    expect(scoped.schema.issues).toEqual([]);
   });
 
   it('drops an extra policy schemaDiffIssue owned by another member', () => {

@@ -33,6 +33,11 @@ function nodeEntityName(node: SchemaVerificationNode): string | undefined {
   return segments.length > 0 ? segments[segments.length - 1] : undefined;
 }
 
+/** True for a top-level entity verify-node: a SQL `table` or a Mongo `collection`. */
+function isEntityNode(node: SchemaVerificationNode): boolean {
+  return node.kind === 'table' || node.kind === 'collection';
+}
+
 /** True when an issue reports an entity present in the database but claimed by no member (an extra). */
 function isExtraIssue(issue: SchemaIssue): issue is BaseSchemaIssue {
   return (
@@ -83,8 +88,16 @@ function pruneTopLevelTables(
   const dropped: SchemaVerificationNode[] = [];
   for (const child of root.children) {
     const name = nodeEntityName(child);
-    if (name !== undefined && ownedByOthers.has(name)) dropped.push(child);
-    else kept.push(child);
+    // Only top-level entity nodes are droppable — a SQL `table` or a Mongo
+    // `collection`. The root also carries the synthesized `storageTypes` node
+    // (`name: 'types'`); a sibling owning a table named `types` must never drop
+    // it, or an enum-drift failure would vanish. Any other root child (now or
+    // later) is likewise never droppable, regardless of name.
+    if (isEntityNode(child) && name !== undefined && ownedByOthers.has(name)) {
+      dropped.push(child);
+    } else {
+      kept.push(child);
+    }
   }
   return {
     root: { ...root, status: aggregateStatus(kept), children: kept },
