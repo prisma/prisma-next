@@ -288,8 +288,10 @@ static codec meta.)
   The column's `valueSet` ref drives typing: `computeColumnType` gates on `if (column.valueSet)`
   → `renderValueSetType(valueSet.values, column.codecId, side, codecLookup)` → the codec's
   `renderValueLiteral` per value → the union. The **same path a check enum uses**; no
-  native-specific typing code, and the domain `FieldOutputTypes` path is not involved.
-  **No-emit** (`typeof contract`) column typing is the one gap — TML-2960 (the no-emit path is
+  native-specific typing code. Both emitted maps get the union from the value-set — the SQL
+  builder's `StorageColumnTypes` and the ORM's `FieldOutputTypes` (post-2952 the latter is
+  value-set-driven via `resolveFieldValueSet`, not a domain-enum override). **No-emit**
+  (`typeof contract`) column typing is the one gap — TML-2960 (the no-emit path is
   codec-id-keyed, doesn't read the value-set yet). Full detail:
   [`querying-design.md`](querying-design.md) §2.
 - **`db.native_enums` — a new Postgres-only facade root.** Native-enum members are surfaced

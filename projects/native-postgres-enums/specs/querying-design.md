@@ -76,11 +76,16 @@ enum uses** (TML-2952 made it enum-agnostic: *"the domain enum is no longer a ty
 ([2-sql/1-core/contract/src/types.ts](../../../packages/2-sql/1-core/contract/src/types.ts):103,110,198,218),
 `table-proxy.ts`, `selection.ts`.
 
-### 2.2 The domain `FieldOutputTypes` path is *not* involved
+### 2.2 `FieldOutputTypes` (the ORM surface) — also value-set-driven
 
-Post-2952, `resolveFieldType` gates on the field's resolved value-set, not a domain-enum
-override; a native enum has no domain enum, and the SQL query surface reads `StorageColumnTypes`
-(§2.1) regardless. We touch neither `resolveFieldType` nor `FieldOutputTypes`.
+Two emitted maps carry the union, both from the **same** value-set: the raw SQL builder
+(`sql().from()`) reads `StorageColumnTypes` (§2.1); the ORM (`db.model.findOne()`) reads
+`FieldOutputTypes`. Post-2952 `FieldOutputTypes` is value-set-driven too —
+`sqlEmission.resolveFieldValueSet` walks domain field → storage column → `column.valueSet` and
+feeds the same `renderValueSetType`, so a native column resolves to `'aal1' | 'aal2' | 'aal3'`
+on the ORM surface as well. There is **no domain enum** and no domain-enum override
+(`domainEnumLookup` was deleted by TML-2952). We add no field-typing code — the storage
+column's value-set drives both maps.
 
 ### 2.3 No-emit (`typeof contract`) — the one gap (TML-2960)
 
