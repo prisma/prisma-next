@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:4b58da96bcee8697563d149dd99bc639c62e0760b47a6b860bdfa83e44705f1d'>;
+  StorageHashBase<'sha256:be92c3521871ea0d863f15c8889093bd38747d60e97bd1dca404da27d0b13bc7'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -50,7 +50,7 @@ export type FieldOutputTypes = {
       readonly installationId: CodecTypes['pg/text@1']['output'];
       readonly version: CodecTypes['pg/text@1']['output'];
       readonly command: CodecTypes['pg/text@1']['output'];
-      readonly flags: ReadonlyArray<CodecTypes['pg/text@1']['output']>;
+      readonly flags: CodecTypes['pg/jsonb@1']['output'];
       readonly runtimeName: CodecTypes['pg/text@1']['output'];
       readonly runtimeVersion: CodecTypes['pg/text@1']['output'];
       readonly os: CodecTypes['pg/text@1']['output'];
@@ -59,7 +59,7 @@ export type FieldOutputTypes = {
       readonly databaseTarget: CodecTypes['pg/text@1']['output'] | null;
       readonly tsVersion: CodecTypes['pg/text@1']['output'] | null;
       readonly agent: CodecTypes['pg/text@1']['output'] | null;
-      readonly extensions: ReadonlyArray<CodecTypes['pg/text@1']['output']>;
+      readonly extensions: CodecTypes['pg/jsonb@1']['output'];
     };
   };
 };
@@ -71,7 +71,7 @@ export type FieldInputTypes = {
       readonly installationId: CodecTypes['pg/text@1']['input'];
       readonly version: CodecTypes['pg/text@1']['input'];
       readonly command: CodecTypes['pg/text@1']['input'];
-      readonly flags: ReadonlyArray<CodecTypes['pg/text@1']['input']>;
+      readonly flags: CodecTypes['pg/jsonb@1']['input'];
       readonly runtimeName: CodecTypes['pg/text@1']['input'];
       readonly runtimeVersion: CodecTypes['pg/text@1']['input'];
       readonly os: CodecTypes['pg/text@1']['input'];
@@ -80,7 +80,7 @@ export type FieldInputTypes = {
       readonly databaseTarget: CodecTypes['pg/text@1']['input'] | null;
       readonly tsVersion: CodecTypes['pg/text@1']['input'] | null;
       readonly agent: CodecTypes['pg/text@1']['input'] | null;
-      readonly extensions: ReadonlyArray<CodecTypes['pg/text@1']['input']>;
+      readonly extensions: CodecTypes['pg/jsonb@1']['input'];
     };
   };
 };
@@ -91,8 +91,8 @@ export type StorageColumnTypes = {
       readonly arch: CodecTypes['pg/text@1']['output'];
       readonly command: CodecTypes['pg/text@1']['output'];
       readonly databaseTarget: CodecTypes['pg/text@1']['output'] | null;
-      readonly extensions: ReadonlyArray<CodecTypes['pg/text@1']['output']>;
-      readonly flags: ReadonlyArray<CodecTypes['pg/text@1']['output']>;
+      readonly extensions: CodecTypes['pg/jsonb@1']['output'];
+      readonly flags: CodecTypes['pg/jsonb@1']['output'];
       readonly id: CodecTypes['pg/int8@1']['output'];
       readonly ingestedAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly installationId: CodecTypes['pg/text@1']['output'];
@@ -112,8 +112,8 @@ export type StorageColumnInputTypes = {
       readonly arch: CodecTypes['pg/text@1']['input'];
       readonly command: CodecTypes['pg/text@1']['input'];
       readonly databaseTarget: CodecTypes['pg/text@1']['input'] | null;
-      readonly extensions: ReadonlyArray<CodecTypes['pg/text@1']['input']>;
-      readonly flags: ReadonlyArray<CodecTypes['pg/text@1']['input']>;
+      readonly extensions: CodecTypes['pg/jsonb@1']['input'];
+      readonly flags: CodecTypes['pg/jsonb@1']['input'];
       readonly id: CodecTypes['pg/int8@1']['input'];
       readonly ingestedAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly installationId: CodecTypes['pg/text@1']['input'];
@@ -176,8 +176,8 @@ type ContractBase = Omit<
                   readonly nullable: false;
                 };
                 readonly flags: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
                   readonly nullable: false;
                 };
                 readonly runtimeName: {
@@ -221,8 +221,8 @@ type ContractBase = Omit<
                   readonly nullable: true;
                 };
                 readonly extensions: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
                   readonly nullable: false;
                 };
               };
@@ -275,8 +275,7 @@ type ContractBase = Omit<
               };
               readonly flags: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-                readonly many: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
               };
               readonly runtimeName: {
                 readonly nullable: false;
@@ -312,8 +311,7 @@ type ContractBase = Omit<
               };
               readonly extensions: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-                readonly many: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
               };
             };
             readonly relations: Record<string, never>;
