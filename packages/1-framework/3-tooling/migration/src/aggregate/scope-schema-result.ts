@@ -105,7 +105,13 @@ function pruneTopLevelTables(
   };
 }
 
-function subtreeCounts(node: SchemaVerificationNode): Counts {
+/**
+ * Counts the pass/warn/fail statuses over a verification tree (root included),
+ * the way the verdict-relevant tally is derived. Used only when scoping actually
+ * dropped a node — the pruned tree is then self-consistent regardless of family,
+ * so the recomputed `fail` is the honest verdict signal.
+ */
+function countTree(node: SchemaVerificationNode): Counts {
   let pass = 0;
   let warn = 0;
   let fail = 0;
@@ -119,35 +125,6 @@ function subtreeCounts(node: SchemaVerificationNode): Counts {
   };
   visit(node);
   return { pass, warn, fail, totalNodes };
-}
-
-/**
- * The verify tree keeps only the first namespace's `root` on a multi-schema
- * database (the counts are summed across namespaces), so recomputing counts
- * from the root would undercount. Instead subtract the dropped top-level
- * subtrees from the authoritative incoming counts, and reconcile the root's own
- * status flip: if dropping the last failing/worst top-level node changes the
- * root's status, that node is no longer counted at its old status.
- */
-function countsAfterDrop(
-  original: Counts,
-  dropped: readonly SchemaVerificationNode[],
-  oldRootStatus: SchemaVerificationNode['status'],
-  newRootStatus: SchemaVerificationNode['status'],
-): Counts {
-  const next = { ...original };
-  for (const node of dropped) {
-    const c = subtreeCounts(node);
-    next.pass -= c.pass;
-    next.warn -= c.warn;
-    next.fail -= c.fail;
-    next.totalNodes -= c.totalNodes;
-  }
-  if (newRootStatus !== oldRootStatus) {
-    next[oldRootStatus] -= 1;
-    next[newRootStatus] += 1;
-  }
-  return next;
 }
 
 /**
@@ -178,12 +155,18 @@ export function scopeSchemaResultToSpace(
     return name === undefined || !ownedByOthers.has(name);
   });
   const { root, dropped } = pruneTopLevelTables(result.schema.root, ownedByOthers);
-  const counts = countsAfterDrop(
-    result.schema.counts,
-    dropped,
-    result.schema.root.status,
-    root.status,
-  );
+
+  // When nothing was dropped, keep the family's authoritative counts/verdict
+  // untouched (a multi-schema result keeps a first-namespace-only root but sums
+  // counts across namespaces, so recomputing from the root would undercount).
+  // When a node was dropped, the pruned tree is self-consistent, so recompute
+  // both counts and the verdict from it — family-agnostic, and free of any
+  // family-specific count arithmetic.
+  if (dropped.length === 0) {
+    return { ...result, schema: { ...result.schema, issues, schemaDiffIssues, root } };
+  }
+
+  const counts = countTree(root);
   const ok = counts.fail === 0;
 
   return {
