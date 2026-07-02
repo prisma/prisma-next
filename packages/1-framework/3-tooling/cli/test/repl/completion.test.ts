@@ -144,6 +144,45 @@ describe('complete: orm lane', () => {
   });
 });
 
+describe('complete: nested lambda contexts', () => {
+  it('treats the include callback param as a collection of the target model', () => {
+    const items = labels("db.orm.public.User.include('posts', (p) => p.");
+    expect(items).toEqual(expect.arrayContaining(['select', 'where', 'orderBy', 'take', 'skip']));
+    expect(items).not.toContain('email');
+  });
+
+  it('completes target-model fields inside the include callback select string', () => {
+    expect(labels("db.orm.public.User.include('posts', (p) => p.select('")).toEqual([
+      'id',
+      'title',
+      'userId',
+    ]);
+  });
+
+  it('completes target-model fields in relation predicate callbacks', () => {
+    expect(labels('db.orm.public.User.where((u) => u.posts.some((p) => p.')).toEqual([
+      'id',
+      'title',
+      'userId',
+      'user',
+    ]);
+  });
+
+  it('keeps outer params resolvable inside nested callbacks', () => {
+    const items = labels('db.orm.public.User.where((u) => u.posts.some((p) => p.title.');
+    expect(items).toEqual(expect.arrayContaining(['eq', 'ilike']));
+  });
+
+  it('completes where-callback fields inside an include callback chain', () => {
+    expect(labels("db.orm.public.User.include('posts', (p) => p.where((x) => x.")).toEqual([
+      'id',
+      'title',
+      'userId',
+      'user',
+    ]);
+  });
+});
+
 describe('complete: enums lane', () => {
   it('suggests namespaces then enum names', () => {
     expect(labels('db.enums.')).toEqual(['public']);

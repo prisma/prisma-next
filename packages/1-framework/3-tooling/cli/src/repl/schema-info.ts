@@ -19,6 +19,8 @@ export interface ReplTableInfo {
 export interface ReplModelInfo {
   readonly fields: readonly string[];
   readonly relations: readonly string[];
+  /** Relation name → target model name, for resolving callback params. */
+  readonly relationTargets: Readonly<Record<string, string>>;
   readonly table: string;
 }
 
@@ -68,9 +70,16 @@ function extractTable(tableJson: unknown): ReplTableInfo {
 
 function extractModel(modelJson: unknown): ReplModelInfo {
   const storage = recordAt(modelJson, 'storage');
+  const relationsJson = recordAt(modelJson, 'relations');
+  const relationTargets: Record<string, string> = {};
+  for (const [name, relation] of Object.entries(relationsJson)) {
+    const target = recordAt(relation, 'to')['model'];
+    if (typeof target === 'string') relationTargets[name] = target;
+  }
   return {
     fields: Object.keys(recordAt(modelJson, 'fields')),
-    relations: Object.keys(recordAt(modelJson, 'relations')),
+    relations: Object.keys(relationsJson),
+    relationTargets,
     table: typeof storage['table'] === 'string' ? storage['table'] : '',
   };
 }

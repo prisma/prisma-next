@@ -39,6 +39,15 @@ describe('extractReplSchemaInfo', () => {
     expect(user?.table).toBe('user');
   });
 
+  it('extracts relation target models', () => {
+    expect(schema.namespaces['public']?.models['User']?.relationTargets).toEqual({
+      posts: 'Post',
+    });
+    expect(schema.namespaces['public']?.models['Post']?.relationTargets).toEqual({
+      user: 'User',
+    });
+  });
+
   it('extracts enums with member names', () => {
     const enums = schema.namespaces['public']?.enums;
     expect(enums).toEqual({ Priority: ['Low', 'High'] });
