@@ -6,6 +6,10 @@ import type {
   AsyncIterableResult,
   RuntimeExecuteOptions,
 } from '@prisma-next/framework-components/runtime';
+import {
+  buildNamespacedNativeEnums,
+  type NamespacedNativeEnums,
+} from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -86,6 +90,7 @@ export interface RoleBoundDb<TContract extends Contract<SqlStorage>> {
 export interface SupabaseInternalDb {
   readonly sql: Db<SupabaseExtensionContract>;
   readonly orm: OrmClient<SupabaseExtensionContract>;
+  readonly native_enums: NamespacedNativeEnums<SupabaseExtensionContract>;
   execute<Row>(
     plan: (SqlExecutionPlan<Row> | SqlQueryPlan<Row>) & { readonly _row?: Row },
     options?: RuntimeExecuteOptions,
@@ -356,6 +361,11 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
       ...ifDefined('middleware', options.middleware),
     });
 
+  const extNativeEnums = blindCast<
+    NamespacedNativeEnums<SupabaseExtensionContract>,
+    'buildNamespacedNativeEnums returns the namespace-keyed accessor map this contract types'
+  >(Object.freeze(buildNamespacedNativeEnums(extContract.storage)));
+
   const supabaseInternal: SupabaseInternalDb = {
     sql: sql<SupabaseExtensionContract>({ context: extContext, rawCodecInferer }),
     orm: orm({
@@ -367,6 +377,7 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
       },
       context: extContext,
     }),
+    native_enums: extNativeEnums,
     execute<Row>(
       plan: (SqlExecutionPlan<Row> | SqlQueryPlan<Row>) & { readonly _row?: Row },
       execOptions?: RuntimeExecuteOptions,

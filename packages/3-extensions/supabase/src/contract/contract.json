@@ -16,6 +16,10 @@
       "model": "StorageObject",
       "namespace": "storage"
     },
+    "sessions": {
+      "model": "AuthSession",
+      "namespace": "auth"
+    },
     "users": {
       "model": "AuthUser",
       "namespace": "auth"
@@ -84,6 +88,57 @@
               },
               "namespaceId": "auth",
               "table": "identities"
+            }
+          },
+          "AuthSession": {
+            "fields": {
+              "aal": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/enum@1",
+                  "kind": "scalar"
+                }
+              },
+              "created_at": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "user_id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "aal": {
+                  "column": "aal"
+                },
+                "created_at": {
+                  "column": "created_at"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "user_id": {
+                  "column": "user_id"
+                }
+              },
+              "namespaceId": "auth",
+              "table": "sessions"
             }
           },
           "AuthUser": {
@@ -261,6 +316,26 @@
     "namespaces": {
       "auth": {
         "entries": {
+          "native_enum": {
+            "AalLevel": {
+              "kind": "postgres-enum",
+              "members": [
+                {
+                  "name": "aal1",
+                  "value": "aal1"
+                },
+                {
+                  "name": "aal2",
+                  "value": "aal2"
+                },
+                {
+                  "name": "aal3",
+                  "value": "aal3"
+                }
+              ],
+              "typeName": "aal_level"
+            }
+          },
           "table": {
             "identities": {
               "columns": {
@@ -286,6 +361,47 @@
                   "nativeType": "timestamptz",
                   "nullable": false,
                   "typeRef": "Timestamptz"
+                },
+                "user_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "sessions": {
+              "columns": {
+                "aal": {
+                  "codecId": "pg/enum@1",
+                  "nativeType": "auth.aal_level",
+                  "nullable": true,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "AalLevel",
+                    "namespaceId": "auth",
+                    "plane": "storage"
+                  }
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false,
+                  "typeRef": "Timestamptz"
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
                 },
                 "user_id": {
                   "codecId": "pg/uuid@1",
@@ -337,6 +453,16 @@
                 ]
               },
               "uniques": []
+            }
+          },
+          "valueSet": {
+            "AalLevel": {
+              "kind": "valueSet",
+              "values": [
+                "aal1",
+                "aal2",
+                "aal3"
+              ]
             }
           }
         },
@@ -433,7 +559,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:61dac13aa56bcb5b7f1c5441c2bd8fc07d88f6c870c80b4c1640fd0d180fb423",
+    "storageHash": "sha256:e0bc9b2307571fa31aa6f7cbe30e93c914decafb102c580811594dd1e76d648f",
     "types": {
       "Timestamptz": {
         "codecId": "pg/timestamptz@1",
