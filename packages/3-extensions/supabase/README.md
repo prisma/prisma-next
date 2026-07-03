@@ -6,23 +6,27 @@ Supabase extension pack for Prisma Next.
 
 This extension pack ships a Supabase-shaped contract — the `auth.*` and `storage.*` namespaces as `external` tables — so an application contract can compose them via `extensionPacks: [supabasePack]` and have the framework treat them correctly: the migration planner emits no DDL for them (they're Supabase-managed), and the verifier confirms they exist in the live database.
 
-This is **M1 of the Supabase integration** — the walking-skeleton starter. Later milestones add the role-binding runtime (`asUser()` / `asAnon()` / `asServiceRole()`); RLS, cross-contract foreign keys into `auth.users`, and explicit `auth.*` queries arrive with their respective sibling projects. See [`projects/supabase-integration/README.md`](../../../projects/supabase-integration/README.md) for the integration's full delivery plan.
+This is an early milestone of the Supabase integration. The package now includes the Supabase contract surface, exported handles for cross-contract relations, a role-bound runtime facade (`asUser()` / `asAnon()` / `asServiceRole()`), and a service-role-only internal root for `auth.*` and `storage.*` queries. The Postgres target provides PSL `policy_select` authoring, so the runnable example can define an RLS policy in the app contract and exercise it through the role-bound runtime. Direct merged `db.sql.auth.users` query surfaces and first-class Supabase role IR remain follow-up work. See [`projects/supabase-integration/README.md`](../../../projects/supabase-integration/README.md) for the integration's full delivery plan.
 
 ## Responsibilities
 
 - **Supabase contract**: ships a PSL-authored contract describing the `auth.*` (`AuthUser`, `AuthIdentity`) and `storage.*` (`StorageBucket`, `StorageObject`) tables with `defaultControlPolicy: 'external'`, so the framework verifies them as present without managing their DDL.
 - **`/pack` subpath**: an `ExtensionPack` value (`supabasePack` default + `supabasePackWith(options)` factory) that an app composes into its config via `extensionPacks`. Tree-shaking-clean — `/pack` imports no runtime code.
-- **`/runtime` subpath**: a minimal runtime descriptor so the stock Postgres runtime's pack-requirements check passes when an app composes this pack. This is **not** the role-binding `SupabaseRuntime` yet — that lands in M2.
-- **`/test/utils` subpath**: exports `bootstrapSupabaseShim(connectionString)` — the shared PGlite test fixture that seeds the external `auth`/`storage` schemas + their tables. Used by this package's classification e2e and by `examples/supabase`; downstream constituents (`postgres-rls`, `cross-contract-refs`) extend it.
+- **`/contract` subpath**: exports `AuthUser`, `AuthIdentity`, `StorageBucket`, and `StorageObject` handles so app contracts can declare relations and foreign keys that point into Supabase-managed schemas.
+- **`/runtime` subpath**: exports the runtime descriptor plus the `supabase()` facade. The facade verifies user JWTs, creates app-contract role-bound surfaces with `asUser(jwt)` and `asAnon()`, and exposes a `service_role` surface with `asServiceRole()`. The service-role surface also includes a `.supabase` secondary root for the extension-owned `auth.*` and `storage.*` contract.
+- **`/test/utils` subpath**: exports `bootstrapSupabaseShim(client)` — the shared Postgres/PGlite test fixture that seeds the external `auth`/`storage` schemas, their tables, Supabase platform roles, and `auth.uid()`. Used by this package's tests and by `examples/supabase`, including the RLS role-binding and cross-contract FK fixtures.
 
 ## Dependencies
 
 - **`@prisma-next/contract`**: contract types the `/pack` descriptor and emitted artefacts depend on.
 - **`@prisma-next/family-sql`**: SQL family pack ref + `SqlControlExtensionDescriptor` type the `/pack` descriptor satisfies.
-- **`@prisma-next/framework-components`**: shared component / pack-ref type shapes the descriptor consumes.
-- **`@prisma-next/sql-runtime`**: `SqlRuntimeExtensionDescriptor` the `/runtime` minimal descriptor satisfies.
+- **`@prisma-next/framework-components`**: shared component / pack-ref types plus execution-stack helpers the pack and runtime consume.
+- **`@prisma-next/postgres`, `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`, `@prisma-next/target-postgres`**: the Postgres runtime stack and contract serializer behind the Supabase facade.
+- **`@prisma-next/sql-builder` and `@prisma-next/sql-orm-client`**: the typed `.sql` and `.orm` query roots exposed by each role-bound surface.
+- **`@prisma-next/sql-runtime`**: runtime descriptor and middleware/execution types used by the facade.
 - **`@prisma-next/sql-contract-psl`**: `prismaContract` provider used by `prisma-next.config.ts` to emit the PSL-authored contract.
 - **`@prisma-next/utils`**: `blindCast` helper for narrowing the imported `contract.json` to the emitted `Contract` type.
+- **`jose` and `pg`**: JWT verification and PostgreSQL client/pool support.
 
 ## Installation
 
@@ -38,9 +42,11 @@ Compose the pack into your application contract via `extensionPacks`. The pack's
 // prisma-next.config.ts
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
 import postgresPackRef from '@prisma-next/target-postgres/pack';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import supabasePack from '@prisma-next/extension-supabase/pack';
 
@@ -48,23 +54,63 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  contract: prismaContract('./src/contract.prisma', { target: postgresPackRef }),
+  driver: postgresDriver,
   extensionPacks: [supabasePack],
+  contract: prismaContract('./src/contract.prisma', {
+    output: 'src/contract.json',
+    target: postgresPackRef,
+    createNamespace: postgresCreateNamespace,
+  }),
+  migrations: {
+    dir: 'migrations',
+  },
 });
 ```
 
 See [`examples/supabase`](../../../examples/supabase) for the full runnable walking-skeleton app.
 
-## What this pack does *not* ship (yet)
+## Runtime usage
+
+Use the `/runtime` facade when application code needs Supabase role binding:
+
+```ts
+import { supabase } from '@prisma-next/extension-supabase/runtime';
+import type { Contract } from './contract';
+import contractJson from './contract.json' with { type: 'json' };
+
+export const db = await supabase<Contract>({
+  contractJson,
+  url: process.env['DATABASE_URL']!,
+  jwtSecret: process.env['SUPABASE_JWT_SECRET']!,
+});
+```
+
+Then bind each request to the role that should execute it:
+
+```ts
+const userDb = await db.asUser(jwt);
+const profile = await userDb.orm.public.Profile.first({ userId });
+
+const anonDb = db.asAnon();
+const publicRows = await anonDb
+  .execute(anonDb.sql.public.profile.select('id', 'username').build())
+  .toArray();
+
+const serviceDb = db.asServiceRole();
+const authUsers = await serviceDb.supabase
+  .execute(serviceDb.supabase.sql.auth.users.select('id', 'email').build())
+  .toArray();
+```
+
+`asUser(jwt)` verifies the JWT using either `jwtSecret` or `jwksUrl` and derives the Supabase role from the token payload. `asAnon()` binds the `anon` role without a JWT. `asServiceRole()` binds `service_role`; its primary `.sql` and `.orm` roots stay scoped to the app contract, while `.supabase` exposes the Supabase-managed `auth` and `storage` namespaces.
+
+## What is still follow-up work
 
 These belong to sibling Supabase-integration projects:
 
-- **Role-binding runtime** (`asUser(jwt)` / `asAnon()` / `asServiceRole()`) — `extension-supabase` M2 (real `SupabaseRuntime` extends `PostgresRuntime`; issues `SET LOCAL role` below user middleware).
-- **RLS authoring + policies** — [`postgres-rls`](../../../projects/postgres-rls/spec.md) (`.rls(...)` builder, PSL `policy { … }` blocks, content-addressed wire names, `pg_policies` verifier).
-- **Cross-contract FK to `auth.users`** — [cross-contract FK references](../../../docs/architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20%26%20Packs.md) (`supabase:auth.AuthUser` PSL grammar; cross-space references in the TS builder). See also [ADR 226](../../../docs/architecture%20docs/adrs/ADR%20226%20-%20Cross-contract%20foreign-key%20references.md).
-- **Explicit namespace-qualified queries** (`db.sql.auth.users`) — [`explicit-namespace-dsl`](../../../projects/explicit-namespace-dsl/spec.md).
+- **Direct merged namespace-qualified queries** (`db.sql.auth.users`) — [`explicit-namespace-dsl`](../../../projects/explicit-namespace-dsl/spec.md). Today, use `db.asServiceRole().supabase.sql.auth.users` for Supabase-managed tables.
 - **Roles as first-class IR** (`anon` / `authenticated` / `service_role` / `authenticator`) — `postgres-rls` (`PostgresRole`).
-- **`auth.uid()` / `auth.jwt()` / `auth.role()` session-GUC functions** — `postgres-rls` extends `bootstrapSupabaseShim` to seed them when its RLS tests need them.
+- **Supabase helper functions as first-class IR** — `auth.uid()` is seeded by `bootstrapSupabaseShim` and can be used in opaque RLS predicate strings today. `auth.jwt()` / `auth.role()` and function introspection/verification remain follow-up work.
 
 ## References
 
