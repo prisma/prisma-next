@@ -461,11 +461,28 @@ function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value
   return { promise, resolve: resolvePromise };
 }
 
+function deferredSettleable<T>(): {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+  readonly reject: (reason: unknown) => void;
+} {
+  let resolvePromise: (value: T) => void = () => undefined;
+  let rejectPromise: (reason: unknown) => void = () => undefined;
+  const promise = new Promise<T>((resolve, reject) => {
+    resolvePromise = resolve;
+    rejectPromise = reject;
+  });
+  return { promise, resolve: resolvePromise, reject: rejectPromise };
+}
+
 let harness: Harness | undefined;
 
 afterEach(async () => {
-  // Let any in-flight JSON-RPC writes settle before tearing the streams down,
-  // so disposing the connections doesn't reject a notification mid-transmission.
+  // The server's `disposed` guard (see `createServer`) is what prevents an
+  // in-flight `publish` from sending on a disposed connection. This tick is a
+  // separate concern: it lets any in-flight JSON-RPC request/response write
+  // flush before the streams are torn down, so vscode-jsonrpc's own internal
+  // error logging doesn't reject a notification mid-transmission.
   await new Promise((resolve) => setTimeout(resolve, 0));
   harness?.dispose();
   harness = undefined;
@@ -1621,5 +1638,49 @@ describe('language server preserved artifacts', { timeout: timeouts.databaseOper
 
     expect(harness.getDocumentAst(schemaUri)).toBeUndefined();
     expect(harness.getProjectSymbolTable(schemaUri)).toBeUndefined();
+  });
+});
+
+describe('language server disposal', { timeout: timeouts.databaseOperation }, () => {
+  async function assertNoUnhandledRejection(
+    settle: (load: {
+      readonly resolve: (value: ConfigResolution) => void;
+      readonly reject: (reason: unknown) => void;
+    }) => void,
+  ): Promise<void> {
+    const load = deferredSettleable<ConfigResolution>();
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      harness = startHarness(async () => load.promise);
+      await harness.initialize();
+
+      openDocument(harness, schemaUri, duplicateModelSource);
+      await waitUntil(() => configResolutionMock.resolveConfigInputs.mock.calls.length > 0);
+
+      harness.dispose();
+      harness = undefined;
+
+      settle(load);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+  }
+
+  it('does not reject when an in-flight publish resolves after dispose', async () => {
+    await assertNoUnhandledRejection((load) => load.resolve(resolutionForInputs([schemaPath])));
+  });
+
+  it('does not reject when an in-flight publish rejects after dispose', async () => {
+    await assertNoUnhandledRejection((load) =>
+      load.reject(new Error('config load failed after dispose')),
+    );
   });
 });

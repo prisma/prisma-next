@@ -13,6 +13,7 @@ import {
   type InitializeParams,
   type InitializeResult,
   type Position,
+  type PublishDiagnosticsParams,
   type Range,
   RegistrationRequest,
   type SemanticTokens,
@@ -68,6 +69,21 @@ export function createServer(connection: Connection): LanguageServer {
   let watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
   let supportsWatchedFilesRegistration = false;
   let clientSupportsSnippets = false;
+  let disposed = false;
+
+  function sendDiagnostics(params: PublishDiagnosticsParams): void {
+    if (disposed) {
+      return;
+    }
+    void connection.sendDiagnostics(params);
+  }
+
+  function logWarn(message: string): void {
+    if (disposed) {
+      return;
+    }
+    connection.console.warn(message);
+  }
 
   async function publish(uri: string): Promise<void> {
     const project = await resolveProjectForDocument(uri);
@@ -86,7 +102,7 @@ export function createServer(connection: Connection): LanguageServer {
       project.controlStack,
     );
     if (computed === null) {
-      void connection.sendDiagnostics({ uri, diagnostics: [] });
+      sendDiagnostics({ uri, diagnostics: [] });
       return;
     }
     const diagnostics: Diagnostic[] = computed.map((diagnostic) => ({
@@ -96,7 +112,7 @@ export function createServer(connection: Connection): LanguageServer {
       severity: toLspSeverity(diagnostic.severity),
       source: 'prisma-next',
     }));
-    void connection.sendDiagnostics({ uri, diagnostics });
+    sendDiagnostics({ uri, diagnostics });
   }
 
   async function resolveProjectForDocument(uri: string): Promise<ProjectState | undefined> {
@@ -196,7 +212,7 @@ export function createServer(connection: Connection): LanguageServer {
       if (documentConfigPaths.get(document.uri) === configPath) {
         documentConfigPaths.delete(document.uri);
         if (hadProject) {
-          void connection.sendDiagnostics({ uri: document.uri, diagnostics: [] });
+          sendDiagnostics({ uri: document.uri, diagnostics: [] });
         }
       }
     }
@@ -224,6 +240,9 @@ export function createServer(connection: Connection): LanguageServer {
 
   function publishSafely(uri: string): void {
     void publish(uri).catch((error: unknown) => {
+      if (disposed) {
+        return;
+      }
       connection.console.error(error instanceof Error ? error.message : String(error));
     });
   }
@@ -389,7 +408,7 @@ export function createServer(connection: Connection): LanguageServer {
         })
         .catch(() => undefined);
     } else {
-      connection.console.warn(
+      logWarn(
         'Client does not support dynamic file-watcher registration; Prisma Next config changes will not be picked up without a restart.',
       );
     }
@@ -450,7 +469,7 @@ export function createServer(connection: Connection): LanguageServer {
       projects.get(configPath)?.artifacts.remove(uri);
     }
     documentConfigPaths.delete(uri);
-    void connection.sendDiagnostics({ uri, diagnostics: [] });
+    sendDiagnostics({ uri, diagnostics: [] });
   });
 
   documents.listen(connection);
@@ -463,6 +482,7 @@ export function createServer(connection: Connection): LanguageServer {
 
   return {
     dispose: () => {
+      disposed = true;
       connection.dispose();
     },
     getDocumentAst: (uri) => artifactsForDocument(uri)?.getDocument(uri),
