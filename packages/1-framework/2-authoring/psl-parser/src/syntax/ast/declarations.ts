@@ -1,4 +1,4 @@
-import type { AstNode } from '../ast-helpers';
+import type { AstNode, BracedBlock } from '../ast-helpers';
 import { filterChildren, findChildToken, findFirstChild } from '../ast-helpers';
 import { SyntaxNode, type SyntaxToken } from '../red';
 import { FieldAttributeAst, ModelAttributeAst } from './attributes';
@@ -50,7 +50,7 @@ export class DocumentAst implements AstNode {
   }
 }
 
-export class ModelDeclarationAst implements AstNode {
+export class ModelDeclarationAst implements BracedBlock {
   readonly syntax: SyntaxNode;
 
   constructor(syntax: SyntaxNode) {
@@ -93,7 +93,7 @@ export class ModelDeclarationAst implements AstNode {
   }
 }
 
-export class CompositeTypeDeclarationAst implements AstNode {
+export class CompositeTypeDeclarationAst implements BracedBlock {
   readonly syntax: SyntaxNode;
 
   constructor(syntax: SyntaxNode) {
@@ -138,7 +138,7 @@ export class CompositeTypeDeclarationAst implements AstNode {
   }
 }
 
-export class NamespaceDeclarationAst implements AstNode {
+export class NamespaceDeclarationAst implements BracedBlock {
   readonly syntax: SyntaxNode;
 
   constructor(syntax: SyntaxNode) {
@@ -170,7 +170,7 @@ export class NamespaceDeclarationAst implements AstNode {
   }
 }
 
-export class TypesBlockAst implements AstNode {
+export class TypesBlockAst implements BracedBlock {
   readonly syntax: SyntaxNode;
 
   constructor(syntax: SyntaxNode) {
@@ -198,7 +198,7 @@ export class TypesBlockAst implements AstNode {
   }
 }
 
-export class GenericBlockDeclarationAst implements AstNode {
+export class GenericBlockDeclarationAst implements BracedBlock {
   readonly syntax: SyntaxNode;
 
   constructor(syntax: SyntaxNode) {

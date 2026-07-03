@@ -5,6 +5,11 @@ export interface AstNode {
   readonly syntax: SyntaxNode;
 }
 
+export interface BracedBlock extends AstNode {
+  lbrace(): SyntaxToken | undefined;
+  rbrace(): SyntaxToken | undefined;
+}
+
 export function findChildToken(node: SyntaxNode, kind: TokenKind): SyntaxToken | undefined {
   for (const child of node.children()) {
     if (!(child instanceof SyntaxNode) && child.kind === kind) {
@@ -33,6 +38,25 @@ export function* filterChildren<T>(
     const result = cast(child);
     if (result !== undefined) yield result;
   }
+}
+
+type CastTarget<C> = C extends (node: SyntaxNode) => infer R ? Exclude<R, undefined> : never;
+
+export function any<Casts extends readonly ((node: SyntaxNode) => unknown)[]>(
+  ...casts: Casts
+): (node: SyntaxNode) => CastTarget<Casts[number]> | undefined;
+export function any(
+  ...casts: ReadonlyArray<(node: SyntaxNode) => unknown>
+): (node: SyntaxNode) => unknown {
+  return (node) => {
+    for (const cast of casts) {
+      const result = cast(node);
+      if (result !== undefined) {
+        return result;
+      }
+    }
+    return undefined;
+  };
 }
 
 /**

@@ -4,6 +4,7 @@ import { findNearestConfigPathForFile } from '@prisma-next/config-loader';
 import type { SymbolTable } from '@prisma-next/psl-parser';
 import { type FormatOptions, format } from '@prisma-next/psl-parser/format';
 import {
+  type CompletionItem,
   type Connection,
   type Diagnostic,
   DiagnosticSeverity,
@@ -11,6 +12,8 @@ import {
   type FoldingRange,
   type InitializeParams,
   type InitializeResult,
+  type Position,
+  type PublishDiagnosticsParams,
   type Range,
   RegistrationRequest,
   type SemanticTokens,
@@ -19,6 +22,8 @@ import {
   type TextEdit,
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
+import { classifyPslCompletionContext } from './completion-context';
+import { providePslCompletionItems } from './completion-provider';
 import { CONFIG_FILENAME, resolveConfigInputs } from './config-resolution';
 import { ParseDiagnosticSeverity } from './diagnostic-mapping';
 import { computeFoldingRanges } from './folding-ranges';
@@ -63,6 +68,22 @@ export function createServer(connection: Connection): LanguageServer {
   let rootPath = process.cwd();
   let watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
   let supportsWatchedFilesRegistration = false;
+  let clientSupportsSnippets = false;
+  let disposed = false;
+
+  function sendDiagnostics(params: PublishDiagnosticsParams): void {
+    if (disposed) {
+      return;
+    }
+    void connection.sendDiagnostics(params);
+  }
+
+  function logWarn(message: string): void {
+    if (disposed) {
+      return;
+    }
+    connection.console.warn(message);
+  }
 
   async function publish(uri: string): Promise<void> {
     const project = await resolveProjectForDocument(uri);
@@ -81,7 +102,7 @@ export function createServer(connection: Connection): LanguageServer {
       project.controlStack,
     );
     if (computed === null) {
-      void connection.sendDiagnostics({ uri, diagnostics: [] });
+      sendDiagnostics({ uri, diagnostics: [] });
       return;
     }
     const diagnostics: Diagnostic[] = computed.map((diagnostic) => ({
@@ -91,7 +112,7 @@ export function createServer(connection: Connection): LanguageServer {
       severity: toLspSeverity(diagnostic.severity),
       source: 'prisma-next',
     }));
-    void connection.sendDiagnostics({ uri, diagnostics });
+    sendDiagnostics({ uri, diagnostics });
   }
 
   async function resolveProjectForDocument(uri: string): Promise<ProjectState | undefined> {
@@ -191,7 +212,7 @@ export function createServer(connection: Connection): LanguageServer {
       if (documentConfigPaths.get(document.uri) === configPath) {
         documentConfigPaths.delete(document.uri);
         if (hadProject) {
-          void connection.sendDiagnostics({ uri: document.uri, diagnostics: [] });
+          sendDiagnostics({ uri: document.uri, diagnostics: [] });
         }
       }
     }
@@ -219,6 +240,9 @@ export function createServer(connection: Connection): LanguageServer {
 
   function publishSafely(uri: string): void {
     void publish(uri).catch((error: unknown) => {
+      if (disposed) {
+        return;
+      }
       connection.console.error(error instanceof Error ? error.message : String(error));
     });
   }
@@ -288,10 +312,72 @@ export function createServer(connection: Connection): LanguageServer {
     return buildSemanticTokens(source, range);
   }
 
+  async function completeDocument(uri: string, position: Position): Promise<CompletionItem[]> {
+    const document = documents.get(uri);
+    if (document === undefined) {
+      return [];
+    }
+
+    let project: ProjectState | undefined;
+    try {
+      project = await resolveProjectForDocument(uri);
+    } catch {
+      return [];
+    }
+    if (project === undefined || !project.inputs.includes(uri)) {
+      return [];
+    }
+
+    const cached = currentDocumentArtifact(project, uri, document.getText());
+    const symbolTable = project.artifacts.getSymbolTable();
+    if (cached === undefined || symbolTable === undefined) {
+      return [];
+    }
+
+    try {
+      const context = classifyPslCompletionContext({
+        document: cached.document,
+        sourceFile: cached.sourceFile,
+        position,
+      });
+      return [
+        ...providePslCompletionItems({
+          context,
+          sourceFile: cached.sourceFile,
+          candidates: {
+            scalarTypes: project.controlStack.scalarTypes,
+            pslBlockDescriptors: project.controlStack.pslBlockDescriptors,
+            symbolTable,
+          },
+          clientSupportsSnippets,
+        }),
+      ];
+    } catch {
+      return [];
+    }
+  }
+
+  function currentDocumentArtifact(
+    project: ProjectState,
+    uri: string,
+    text: string,
+  ): CachedDocument | undefined {
+    const cached = project.artifacts.getDocument(uri);
+    if (cached?.sourceFile.text === text) {
+      return cached;
+    }
+
+    if (project.artifacts.update(uri, text, project.inputs, project.controlStack) === null) {
+      return undefined;
+    }
+    return project.artifacts.getDocument(uri);
+  }
+
   connection.onInitialize(async (params): Promise<InitializeResult> => {
     rootPath = resolveRootPath(params.rootUri, params.rootPath);
     watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
     supportsWatchedFilesRegistration = clientSupportsWatchedFilesRegistration(params);
+    clientSupportsSnippets = clientSupportsCompletionSnippets(params);
 
     return {
       capabilities: {
@@ -303,6 +389,7 @@ export function createServer(connection: Connection): LanguageServer {
           full: true,
           range: true,
         },
+        completionProvider: { triggerCharacters: ['.'] },
       },
     };
   });
@@ -321,7 +408,7 @@ export function createServer(connection: Connection): LanguageServer {
         })
         .catch(() => undefined);
     } else {
-      connection.console.warn(
+      logWarn(
         'Client does not support dynamic file-watcher registration; Prisma Next config changes will not be picked up without a restart.',
       );
     }
@@ -343,6 +430,7 @@ export function createServer(connection: Connection): LanguageServer {
   });
 
   connection.onDocumentFormatting((params) => formatDocument(params.textDocument.uri));
+  connection.onCompletion((params) => completeDocument(params.textDocument.uri, params.position));
 
   connection.languages.semanticTokens.on((params) =>
     semanticTokensForDocument(params.textDocument.uri),
@@ -381,7 +469,7 @@ export function createServer(connection: Connection): LanguageServer {
       projects.get(configPath)?.artifacts.remove(uri);
     }
     documentConfigPaths.delete(uri);
-    void connection.sendDiagnostics({ uri, diagnostics: [] });
+    sendDiagnostics({ uri, diagnostics: [] });
   });
 
   documents.listen(connection);
@@ -394,6 +482,7 @@ export function createServer(connection: Connection): LanguageServer {
 
   return {
     dispose: () => {
+      disposed = true;
       connection.dispose();
     },
     getDocumentAst: (uri) => artifactsForDocument(uri)?.getDocument(uri),
@@ -420,6 +509,10 @@ function toLspSeverity(severity: number): DiagnosticSeverity {
 
 function clientSupportsWatchedFilesRegistration(params: InitializeParams): boolean {
   return params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration === true;
+}
+
+function clientSupportsCompletionSnippets(params: InitializeParams): boolean {
+  return params.capabilities.textDocument?.completion?.completionItem?.snippetSupport === true;
 }
 
 function resolveRootPath(
