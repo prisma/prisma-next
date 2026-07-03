@@ -1,7 +1,27 @@
 ---
 from: "0.14"
 to: "0.15"
-changes: []
+changes:
+  - id: mongo-fn-context-bound
+    summary: |
+      The Mongo aggregation expression helper `fn` is no longer a free-floating
+      import from `@prisma-next/mongo-query-builder` — it is minted from the
+      query builder's execution context, the same way SQL's builder is. Inside a
+      stage callback (`project`, `addFields`, `replaceRoot`, `sortByCount`,
+      `redact`, `match`), take `fn` as the callback's second parameter instead of
+      importing it: `.addFields((f, fn) => ({ ... }))`. Outside a stage callback,
+      use the query root's `fn` property (`db.query.fn.eq(...)`, or the value
+      returned by `mongoQuery(...)`). If you call `mongoQuery(...)` directly
+      (rather than through the `mongo(...)` facade or `mongoStatic(...)`), it now
+      requires an `operationCodecs` option: pass `mongoOperationOutputCodecs` from
+      `@prisma-next/adapter-mongo/runtime`. The `acc` accumulator helper is
+      unaffected by this change.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "from '@prisma-next/mongo-query-builder'"
+        - "mongoQuery("
+      anyMatch: true
 ---
 
 <!--
@@ -96,11 +116,72 @@ emitted contract are byte-identical. No consumer action — re-scaffold via
 
 # Upgrade 0.14 → 0.15
 
-No consumer-facing action is required for this transition.
+## `mongo-fn-context-bound`
 
-The diff under `examples/` (and the example migration snapshots) is incidental —
-emitted contract artefacts (`contract.json` / `contract.d.ts`) were regenerated
-for two internal substrate changes:
+The Mongo aggregation expression helper `fn` is no longer a free-floating module
+export — it is minted from the query builder's execution context, so it knows
+the real codec ids your Mongo adapter decodes with (previously it stamped
+hardcoded placeholder codec ids). The accumulator helper `acc` is unaffected.
+
+### Inside a stage callback
+
+Take `fn` as the callback's second parameter instead of importing it:
+
+```ts
+// Before
+import { fn } from '@prisma-next/mongo-query-builder';
+
+db.query.from('posts').addFields((f) => ({
+  titleUpper: fn.toUpper(f.title),
+}));
+
+// After
+db.query.from('posts').addFields((f, fn) => ({
+  titleUpper: fn.toUpper(f.title),
+}));
+```
+
+This applies to every stage callback that can build an expression: `project`,
+`addFields`, `replaceRoot`, `sortByCount`, `redact`, and `match`.
+
+### Outside a stage callback
+
+Use the query root's `fn` property — the value returned by `db.query` (the
+facade) or by `mongoQuery(...)` directly:
+
+```ts
+// Before
+import { fn } from '@prisma-next/mongo-query-builder';
+const filter = fn.eq(f._id, f.space);
+
+// After
+const filter = db.query.fn.eq(f._id, f.space);
+```
+
+### Calling `mongoQuery(...)` directly
+
+If you construct the query builder yourself (rather than through the
+`mongo(...)` facade or `mongoStatic(...)`, which already supply this), it now
+requires an `operationCodecs` option — your adapter's operation→output-codec
+table:
+
+```ts
+// Before
+const query = mongoQuery<Contract>({ contractJson });
+
+// After
+import { mongoOperationOutputCodecs } from '@prisma-next/adapter-mongo/runtime';
+
+const query = mongoQuery<Contract, typeof mongoOperationOutputCodecs>({
+  contractJson,
+  operationCodecs: mongoOperationOutputCodecs,
+});
+```
+
+Everything else in this transition is incidental. The rest of the diff under
+`examples/` (and the example migration snapshots) reflects contract artefacts
+(`contract.json` / `contract.d.ts`) that were regenerated for two internal
+substrate changes:
 
 - **Scalar-list storage machinery.** The emitted contracts now carry the
   adapter-reported `scalarList` capability marker and the bumped envelope

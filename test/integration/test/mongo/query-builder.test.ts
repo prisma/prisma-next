@@ -1,3 +1,7 @@
+import {
+  type MongoOperationOutputCodecs,
+  mongoOperationOutputCodecs,
+} from '@prisma-next/adapter-mongo/runtime';
 import { crossRef, type NamespaceId } from '@prisma-next/contract/types';
 import type {
   MongoContract,
@@ -18,8 +22,9 @@ import {
   MongoRedactStage,
   MongoSortStage,
 } from '@prisma-next/mongo-query-ast/execution';
-import { acc, fn, mongoQuery } from '@prisma-next/mongo-query-builder';
-import { describe, expect, it } from 'vitest';
+import { acc, mongoQuery } from '@prisma-next/mongo-query-builder';
+import { blindCast } from '@prisma-next/utils/casts';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { describeWithMongoDB } from './setup';
 
 // ---------------------------------------------------------------------------
@@ -163,7 +168,13 @@ const contractJson = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const query = mongoQuery<TContract>({ contractJson });
+const query = mongoQuery<TContract, MongoOperationOutputCodecs>({
+  contractJson: blindCast<
+    TContract,
+    'query-builder fixture JSON carries domain.namespaces envelope'
+  >(contractJson),
+  operationCodecs: mongoOperationOutputCodecs,
+});
 
 function products() {
   return query.from('products');
@@ -174,6 +185,7 @@ function orders() {
 }
 
 type Row = Record<string, unknown>;
+type PlanRow<TPlan> = TPlan extends MongoQueryPlan<infer R> ? R : never;
 
 const PRODUCTS = [
   {
@@ -316,7 +328,7 @@ describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
 
       const plan = products()
         .match((f) => f.name.eq('Laptop'))
-        .addFields((f) => ({
+        .addFields((f, fn) => ({
           discountedPrice: fn.multiply(f.price, fn.literal(0.9)),
         }))
         .build();
@@ -353,7 +365,7 @@ describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
 
       const plan = products()
         .match((f) => f.name.eq('Laptop'))
-        .project((f) => ({
+        .project((f, fn) => ({
           name: 1 as const,
           upperCategory: fn.toUpper(f.category),
         }))
@@ -739,22 +751,44 @@ describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
   // ---------- Named-args expression helpers ----------
 
   describe('named-args expression helpers', () => {
-    it('fn.dateToString formats a date field', async () => {
+    it('fn.dateToString formats a date field passed uncast', async () => {
       await seed();
 
       const plan = products()
         .match((f) => f.name.eq('Laptop'))
-        .addFields((f) => ({
+        .addFields((f, fn) => ({
           dateStr: fn.dateToString({
-            date: f['createdAt'] as Parameters<typeof fn.dateToString>[0]['date'],
+            date: f.createdAt,
             format: fn.literal('%Y-%m-%d'),
           }),
         }))
         .build();
 
+      expectTypeOf<PlanRow<typeof plan>['dateStr']>().toEqualTypeOf<string>();
+
       const results = await exec(plan);
       expect(results).toHaveLength(1);
       expect(results[0]!['dateStr']).toBe('2024-01-15');
+    });
+
+    it('fn.toDate decodes a computed date to a real Date', async () => {
+      await seed();
+
+      const plan = products()
+        .match((f) => f.name.eq('Laptop'))
+        .addFields((_f, fn) => ({
+          asOfDate: fn.toDate(fn.literal('2024-06-01T00:00:00Z')),
+        }))
+        .build();
+
+      expectTypeOf<PlanRow<typeof plan>['asOfDate']>().toEqualTypeOf<Date>();
+
+      const results = await exec(plan);
+      expect(results).toHaveLength(1);
+      const asOfDate = results[0]!['asOfDate'];
+      expect(asOfDate).toBeInstanceOf(Date);
+      expect(asOfDate).not.toHaveProperty('_bsontype');
+      expect((asOfDate as Date).toISOString()).toBe('2024-06-01T00:00:00.000Z');
     });
 
     it('fn.trim removes whitespace via named-args string operator', async () => {
@@ -762,7 +796,7 @@ describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
 
       const plan = products()
         .match((f) => f.name.eq('Laptop'))
-        .addFields((_f) => ({
+        .addFields((_f, fn) => ({
           trimmed: fn.trim({ input: fn.literal('  electronics  ') }),
         }))
         .build();
@@ -776,7 +810,7 @@ describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
       await seed();
 
       const plan = products()
-        .addFields((f) => ({
+        .addFields((f, fn) => ({
           priceLabel: fn.cond(
             fn.gt(f.price, fn.literal(500)).node,
             fn.literal('expensive'),
@@ -804,7 +838,7 @@ describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
         .sort({ name: 1 })
         .group((f) => ({
           _id: f.category,
-          firstTwo: acc.firstN({ input: f.name, n: fn.literal(2) }),
+          firstTwo: acc.firstN({ input: f.name, n: query.fn.literal(2) }),
         }))
         .sort({ _id: 1 })
         .build();

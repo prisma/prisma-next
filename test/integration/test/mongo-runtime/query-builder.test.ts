@@ -4,6 +4,10 @@
 // Tracked at https://linear.app/prisma-company/issue/TML-2633 — migrate to the facade form
 // once TML-2633 lands.
 
+import {
+  type MongoOperationOutputCodecs,
+  mongoOperationOutputCodecs,
+} from '@prisma-next/adapter-mongo/runtime';
 import { crossRef, type NamespaceId } from '@prisma-next/contract/types';
 import mongoFamilyPack from '@prisma-next/family-mongo/pack';
 import type {
@@ -13,9 +17,10 @@ import type {
 } from '@prisma-next/mongo-contract';
 import { defineContract, field, model, rel } from '@prisma-next/mongo-contract-ts/contract-builder';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
-import { acc, fn, mongoQuery } from '@prisma-next/mongo-query-builder';
+import { acc, mongoQuery } from '@prisma-next/mongo-query-builder';
 import mongoTargetPack from '@prisma-next/target-mongo/pack';
 import { timeouts } from '@prisma-next/test-utils';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ObjectId } from 'mongodb';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { withMongod } from '../mongo/setup';
@@ -147,7 +152,13 @@ const contract = defineContract({
 });
 
 describe('pipeline builder integration', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
-  const p = mongoQuery<TContract>({ contractJson });
+  const p = mongoQuery<TContract, MongoOperationOutputCodecs>({
+    contractJson: blindCast<
+      TContract,
+      'query-builder fixture JSON carries domain.namespaces envelope'
+    >(contractJson),
+    operationCodecs: mongoOperationOutputCodecs,
+  });
 
   it('match → group → sort → limit analytics query', async () => {
     await withMongod(async (ctx) => {
@@ -194,11 +205,11 @@ describe('pipeline builder integration', { timeout: timeouts.spinUpMongoMemorySe
 
       const plan = p
         .from('orders')
-        .addFields((f) => ({
+        .addFields((f, fn) => ({
           isHighValue: fn.cond(
             fn.add(f['amount']!, fn.literal(0)).node,
-            fn.literal<{ readonly codecId: 'mongo/bool@1'; readonly nullable: false }>(true),
-            fn.literal<{ readonly codecId: 'mongo/bool@1'; readonly nullable: false }>(false),
+            fn.literal(true),
+            fn.literal(false),
           ),
         }))
         .sort({ amount: -1 })
@@ -325,7 +336,10 @@ describe('pipeline builder integration', { timeout: timeouts.spinUpMongoMemorySe
         },
       ]);
 
-      const plan = mongoQuery<typeof contract>({ contractJson: contract })
+      const plan = mongoQuery<typeof contract, MongoOperationOutputCodecs>({
+        contractJson: contract,
+        operationCodecs: mongoOperationOutputCodecs,
+      })
         .from('tasks')
         .group((f) => ({
           _id: f.type,

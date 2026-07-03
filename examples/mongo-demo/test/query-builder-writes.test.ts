@@ -1,4 +1,6 @@
-import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
+import mongoRuntimeAdapter, {
+  type MongoOperationOutputCodecs,
+} from '@prisma-next/adapter-mongo/runtime';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
@@ -18,7 +20,10 @@ import contractJson from '../src/contract.json' with { type: 'json' };
 
 const contract = new MongoContractSerializer().deserializeContract<Contract>(contractJson);
 
-const q = mongoQuery<Contract>({ contractJson: contract });
+const q = mongoQuery<Contract, MongoOperationOutputCodecs>({
+  contractJson: contract,
+  operationCodecs: mongoRuntimeAdapter.operationOutputCodecs,
+});
 
 describe('query-builder write terminals (integration)', {
   timeout: timeouts.spinUpMongoMemoryServer,

@@ -11,7 +11,7 @@ import {
   MongoLimitStage,
   MongoSortStage,
 } from '@prisma-next/mongo-query-ast/execution';
-import { acc, fn } from '@prisma-next/mongo-query-builder';
+import { acc } from '@prisma-next/mongo-query-builder';
 import type { Db } from './db';
 import { createClient } from './db';
 import { seed } from './seed';
@@ -80,7 +80,7 @@ export async function getRecentPostSummaries(query: Db['query'], runtime: Db['ru
     .from('posts')
     .sort({ createdAt: -1 })
     .limit(3)
-    .addFields((f) => ({
+    .addFields((f, fn) => ({
       titleUpper: fn.toUpper(f.title),
     }))
     .project('title', 'titleUpper', 'authorId', 'createdAt')

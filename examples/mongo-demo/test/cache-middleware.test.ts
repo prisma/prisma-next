@@ -1,4 +1,6 @@
-import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
+import mongoRuntimeAdapter, {
+  type MongoOperationOutputCodecs,
+} from '@prisma-next/adapter-mongo/runtime';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import type { CachePayload } from '@prisma-next/middleware-cache';
@@ -77,7 +79,10 @@ describe('mongo-demo cache middleware integration', {
     const cache = createCacheMiddleware({ maxEntries: 100 });
     const runtime = createMongoRuntime({ context, driver, middleware: [cache] });
     const orm = mongoOrm({ contract, executor: runtime });
-    const query = mongoQuery<Contract>({ contractJson });
+    const query = mongoQuery<Contract, MongoOperationOutputCodecs>({
+      contractJson: contract,
+      operationCodecs: mongoRuntimeAdapter.operationOutputCodecs,
+    });
     return { runtime, orm, query, driver, driverExecuteSpy };
   }
 

@@ -72,6 +72,26 @@ changes:
         - "deriveJsonSchema"
         - "derivePolymorphicJsonSchema"
       anyMatch: true
+  - id: mongo-runtime-adapter-descriptor-operation-output-codecs
+    summary: |
+      `MongoRuntimeAdapterDescriptor` (from `@prisma-next/mongo-runtime`) gains a required
+      `operationOutputCodecs` field: a table mapping each aggregation operator with a fixed,
+      input-independent output type (e.g. `$toUpper`, `$eq`, `$toDate`, `$count`) to the codec id
+      your adapter decodes that operator's output with. This is the Mongo analog of the SQL
+      adapters' `queryOperationTypes`, and it is what lets the query builder's `fn` helpers stamp
+      real codec ids on computed expressions instead of a family-owned placeholder. If your
+      extension declares its own `MongoRuntimeAdapterDescriptor` (a custom Mongo adapter/target,
+      or a test double that satisfies the interface), add `operationOutputCodecs` — you can reuse
+      `mongoOperationOutputCodecs` from `@prisma-next/adapter-mongo/runtime` if your codec ids match
+      the standard Mongo codecs, or declare your own table shaped `Record<string, string>` keyed by
+      Mongo operator name. Extensions that only consume `mongo(...)` / `mongoStatic(...)` (rather
+      than declaring their own descriptor) need no change.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "MongoRuntimeAdapterDescriptor"
+        - "kind: 'adapter'"
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in
@@ -210,3 +230,62 @@ control stack always populates; extension authors do not construct them. The onl
 scalar-list contract shape. No extension-author action required. Incidental
 substrate diff only.
 -->
+
+# 0.14 → 0.15 — Extension-author upgrade instructions
+
+## `mongo-runtime-adapter-descriptor-operation-output-codecs`
+
+The Mongo query builder's `fn` expression helpers now stamp computed expressions with real
+codec ids sourced from the adapter, instead of a family-owned placeholder table. The source of
+those ids is a new required field on `MongoRuntimeAdapterDescriptor`:
+
+```ts
+export interface MongoRuntimeAdapterDescriptor<...> extends RuntimeAdapterDescriptor<...>, MongoStaticContributions {
+  readonly operationOutputCodecs: Readonly<Record<string, string>>;
+}
+```
+
+`operationOutputCodecs` maps each aggregation operator whose output type is fixed and
+input-independent (`$toUpper`, `$eq`, `$toDate`, `$count`, …) to the codec id your adapter
+decodes that operator's output with — the Mongo analog of the SQL adapters' `queryOperationTypes`.
+
+### Who needs to change code
+
+Extensions that declare their own `MongoRuntimeAdapterDescriptor` — a custom Mongo
+adapter/target, or a test double built to satisfy the interface (e.g. `{ kind: 'adapter', id:
+'mongo', ... }` passed to `createMongoExecutionStack`). Add the field:
+
+```ts
+// Before
+const adapterDescriptor: MongoRuntimeAdapterDescriptor<'mongo'> = {
+  kind: 'adapter',
+  id: 'mongo',
+  familyId: 'mongo',
+  targetId: 'mongo',
+  version: '0.0.1',
+  codecs: () => myCodecRegistry(),
+  create: (stack) => myAdapterInstance(stack),
+};
+
+// After
+import { mongoOperationOutputCodecs } from '@prisma-next/adapter-mongo/runtime';
+
+const adapterDescriptor: MongoRuntimeAdapterDescriptor<'mongo'> = {
+  kind: 'adapter',
+  id: 'mongo',
+  familyId: 'mongo',
+  targetId: 'mongo',
+  version: '0.0.1',
+  codecs: () => myCodecRegistry(),
+  operationOutputCodecs: mongoOperationOutputCodecs,
+  create: (stack) => myAdapterInstance(stack),
+};
+```
+
+Reuse `mongoOperationOutputCodecs` if your codecs match the standard Mongo adapter's ids;
+otherwise declare your own `Record<string, string>` table keyed by Mongo operator name.
+
+### Who does not need to change anything
+
+Extensions that only consume the built-in `mongo(...)` facade or `mongoStatic(...)` — those
+already thread the standard adapter's `operationOutputCodecs` internally.

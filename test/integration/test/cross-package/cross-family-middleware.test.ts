@@ -1,3 +1,4 @@
+import { mongoOperationOutputCodecs } from '@prisma-next/adapter-mongo/runtime';
 import type { PlanMeta } from '@prisma-next/contract/types';
 import type {
   AfterExecuteResult,
@@ -151,6 +152,7 @@ function mockAdapterDescriptor(adapter: MongoAdapter): MongoRuntimeAdapterDescri
     targetId: 'mongo',
     version: '0.0.1',
     codecs: () => mongoRuntimeTarget.codecs(),
+    operationOutputCodecs: mongoOperationOutputCodecs,
     create: () => ({
       familyId: 'mongo',
       targetId: 'mongo',
