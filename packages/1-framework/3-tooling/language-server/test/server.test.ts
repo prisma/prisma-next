@@ -22,6 +22,8 @@ import {
   DidOpenTextDocumentNotification,
   DocumentFormattingRequest,
   FileChangeType,
+  type FoldingRange,
+  FoldingRangeRequest,
   InitializedNotification,
   InitializeRequest,
   type InitializeResult,
@@ -57,6 +59,9 @@ const configLoaderMock = vi.hoisted(() => ({
 const configResolutionMock = vi.hoisted(() => ({
   resolveConfigInputs: vi.fn<ResolveInputs>(),
 }));
+const pipelineMock = vi.hoisted(() => ({
+  runPipeline: vi.fn<typeof import('../src/pipeline')['runPipeline']>(),
+}));
 
 vi.mock('@prisma-next/config-loader', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@prisma-next/config-loader')>();
@@ -69,6 +74,13 @@ vi.mock('@prisma-next/config-loader', async (importOriginal) => {
 vi.mock('../src/config-resolution', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/config-resolution')>();
   return { ...actual, resolveConfigInputs: configResolutionMock.resolveConfigInputs };
+});
+
+// Pass-through spy on the parse seam so tests can count materializations.
+vi.mock('../src/pipeline', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/pipeline')>();
+  pipelineMock.runPipeline.mockImplementation(actual.runPipeline);
+  return { ...actual, runPipeline: pipelineMock.runPipeline };
 });
 
 const root = tmpdir();
@@ -396,6 +408,12 @@ function requestSemanticTokens(harness: Harness, uri: string): Promise<SemanticT
   });
 }
 
+function requestFoldingRanges(harness: Harness, uri: string): Promise<FoldingRange[] | null> {
+  return harness.client.sendRequest(FoldingRangeRequest.type, {
+    textDocument: { uri },
+  });
+}
+
 function requestSemanticTokensRange(
   harness: Harness,
   uri: string,
@@ -488,6 +506,7 @@ afterEach(async () => {
   harness = undefined;
   configResolutionMock.resolveConfigInputs.mockReset();
   configLoaderMock.findNearestConfigPathForFile.mockReset();
+  pipelineMock.runPipeline.mockClear();
 });
 
 describe('language server', { timeout: timeouts.databaseOperation }, () => {
@@ -566,6 +585,53 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
       'User',
     ]);
     await republished;
+  });
+
+  it('serves reads at an unchanged version without reparsing', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const { source, position } = sourceWithCursor(
+      ['model User {', '  id Int @id', '}', '', 'model Post {', '  author |', '}'].join('\n'),
+    );
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnosticsCount(schemaUri, 2);
+
+    pipelineMock.runPipeline.mockClear();
+    const items = completionItems(await requestCompletion(harness, schemaUri, position));
+    expect(items.map((item) => item.label)).toContain('User');
+    await expect(requestSemanticTokens(harness, schemaUri)).resolves.not.toEqual({ data: [] });
+    await expect(requestFoldingRanges(harness, schemaUri)).resolves.not.toEqual([]);
+    expect(pipelineMock.runPipeline).not.toHaveBeenCalled();
+  });
+
+  it('parses once for an edit followed by an immediate completion', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const initial = ['model Post {', '  author ', '}'].join('\n');
+    const updated = sourceWithCursor(
+      ['model User {', '  id Int @id', '}', '', 'model Post {', '  author U|', '}'].join('\n'),
+    );
+    openDocument(harness, schemaUri, initial);
+    await harness.waitForDiagnosticsCount(schemaUri, 2);
+
+    pipelineMock.runPipeline.mockClear();
+    const republished = harness.waitForDiagnosticsCount(schemaUri, 3);
+    harness.client.sendNotification(DidChangeTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri, version: 2 },
+      contentChanges: [{ text: updated.source }],
+    });
+
+    const items = completionItems(await requestCompletion(harness, schemaUri, updated.position));
+    expect(items.map((item) => item.label)).toEqual([
+      'Boolean',
+      'DateTime',
+      'Int',
+      'String',
+      'Post',
+      'User',
+    ]);
+    await republished;
+    expect(pipelineMock.runPipeline).toHaveBeenCalledTimes(1);
   });
 
   it('returns generic block parameter completions for configured PSL descriptors', async () => {

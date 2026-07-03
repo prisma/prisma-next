@@ -21,37 +21,75 @@ const cleanSource = 'model User {\n  id Int @id\n}\n';
 const twoModelSource = 'model User {\n  id Int @id\n}\n\nmodel Post {\n  id Int @id\n}\n';
 
 describe('createProjectArtifacts', () => {
-  it('caches the parsed AST per URI', () => {
+  it('caches the parsed AST per URI with the parsed version', () => {
     const store = createProjectArtifacts();
-    store.update(schemaUri, cleanSource, inputs, controlStack);
+    store.update(schemaUri, cleanSource, 1, inputs, controlStack);
 
     const cached = store.getDocument(schemaUri);
     expect(cached?.document).toBeDefined();
     expect(cached?.sourceFile).toBeDefined();
+    expect(cached?.version).toBe(1);
   });
 
   it('replaces the AST entry on a later edit of the same URI', () => {
     const store = createProjectArtifacts();
-    store.update(schemaUri, cleanSource, inputs, controlStack);
+    store.update(schemaUri, cleanSource, 1, inputs, controlStack);
     const first = store.getDocument(schemaUri);
 
-    store.update(schemaUri, twoModelSource, inputs, controlStack);
+    store.update(schemaUri, twoModelSource, 2, inputs, controlStack);
     const second = store.getDocument(schemaUri);
 
     expect(second?.document).not.toBe(first?.document);
+    expect(second?.version).toBe(2);
+  });
+
+  it('returns the cached entry untouched for an update at an unchanged version', () => {
+    const store = createProjectArtifacts();
+    const firstDiagnostics = store.update(schemaUri, cleanSource, 1, inputs, controlStack);
+    const first = store.getDocument(schemaUri);
+
+    const secondDiagnostics = store.update(schemaUri, cleanSource, 1, inputs, controlStack);
+
+    expect(store.getDocument(schemaUri)).toBe(first);
+    expect(secondDiagnostics).toBe(firstDiagnostics);
+  });
+
+  it('recomputes after invalidate even at an unchanged version', () => {
+    const store = createProjectArtifacts();
+    store.update(schemaUri, cleanSource, 1, inputs, controlStack);
+    const first = store.getDocument(schemaUri);
+
+    store.invalidate();
+    store.update(schemaUri, twoModelSource, 1, inputs, controlStack);
+
+    const second = store.getDocument(schemaUri);
+    expect(second?.document).not.toBe(first?.document);
+    expect(Object.keys(store.getSymbolTable()?.topLevel.models ?? {})).toEqual(
+      expect.arrayContaining(['User', 'Post']),
+    );
+  });
+
+  it('re-checks configured inputs after invalidate at an unchanged version', () => {
+    const store = createProjectArtifacts();
+    store.update(schemaUri, cleanSource, 1, inputs, controlStack);
+
+    store.invalidate();
+    const emptyInputs = resolveSchemaInputs({});
+    expect(store.update(schemaUri, cleanSource, 1, emptyInputs, controlStack)).toBeNull();
+    expect(store.getDocument(schemaUri)).toBeUndefined();
   });
 
   it('builds one project symbol table from the open configured input', () => {
     const store = createProjectArtifacts();
-    store.update(schemaUri, cleanSource, inputs, controlStack);
+    store.update(schemaUri, cleanSource, 1, inputs, controlStack);
 
     expect(Object.keys(store.getSymbolTable()?.topLevel.models ?? {})).toContain('User');
   });
 
   it('rebuilds the project symbol table to reflect the latest edit', () => {
     const store = createProjectArtifacts();
-    store.update(schemaUri, cleanSource, inputs, controlStack);
-    store.update(schemaUri, twoModelSource, inputs, controlStack);
+    store.update(schemaUri, cleanSource, 1, inputs, controlStack);
+    store.update(schemaUri, twoModelSource, 2, inputs, controlStack);
 
     expect(Object.keys(store.getSymbolTable()?.topLevel.models ?? {})).toEqual(
       expect.arrayContaining(['User', 'Post']),
@@ -60,7 +98,7 @@ describe('createProjectArtifacts', () => {
 
   it('drops the AST and clears the symbol table when the document is removed', () => {
     const store = createProjectArtifacts();
-    store.update(schemaUri, cleanSource, inputs, controlStack);
+    store.update(schemaUri, cleanSource, 1, inputs, controlStack);
 
     store.remove(schemaUri);
 
@@ -72,16 +110,16 @@ describe('createProjectArtifacts', () => {
     const store = createProjectArtifacts();
     const otherUri = pathToFileURL('/abs/not-a-schema.psl').toString();
 
-    expect(store.update(otherUri, cleanSource, inputs, controlStack)).toBeNull();
+    expect(store.update(otherUri, cleanSource, 1, inputs, controlStack)).toBeNull();
     expect(store.getDocument(otherUri)).toBeUndefined();
   });
 
   it('drops a cached input when a config change removes it as an input', () => {
     const store = createProjectArtifacts();
-    store.update(schemaUri, cleanSource, inputs, controlStack);
+    store.update(schemaUri, cleanSource, 1, inputs, controlStack);
 
     const emptyInputs = resolveSchemaInputs({});
-    expect(store.update(schemaUri, cleanSource, emptyInputs, controlStack)).toBeNull();
+    expect(store.update(schemaUri, cleanSource, 2, emptyInputs, controlStack)).toBeNull();
     expect(store.getDocument(schemaUri)).toBeUndefined();
     expect(store.getSymbolTable()).toBeUndefined();
   });
@@ -97,7 +135,7 @@ describe('createProjectArtifacts', () => {
       pslBlockDescriptors: controlStack.pslBlockDescriptors,
     });
 
-    const diagnostics = store.update(schemaUri, source, inputs, controlStack);
+    const diagnostics = store.update(schemaUri, source, 1, inputs, controlStack);
 
     expect(diagnostics).toEqual(
       mapParseDiagnostics([...parseDiagnostics, ...symbolTableDiagnostics]),
@@ -107,7 +145,7 @@ describe('createProjectArtifacts', () => {
   it('does not throw on a malformed, half-typed buffer', () => {
     const store = createProjectArtifacts();
     expect(() =>
-      store.update(schemaUri, 'model User {\n  id ', inputs, controlStack),
+      store.update(schemaUri, 'model User {\n  id ', 1, inputs, controlStack),
     ).not.toThrow();
   });
 });

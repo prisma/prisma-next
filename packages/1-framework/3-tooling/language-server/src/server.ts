@@ -98,6 +98,7 @@ export function createServer(connection: Connection): LanguageServer {
     const computed = project.artifacts.update(
       uri,
       document.getText(),
+      document.version,
       project.inputs,
       project.controlStack,
     );
@@ -184,9 +185,11 @@ export function createServer(connection: Connection): LanguageServer {
 
   async function loadProject(configPath: string): Promise<ProjectState> {
     const resolution = await resolveConfigInputs(configPath);
-    // Preserve open-document ASTs across config reloads; the project symbol table
-    // refreshes on the next publish against the new stack.
+    // Preserve open-document ASTs across config reloads, but invalidate their
+    // parsed versions so the next update or read recomputes against the new
+    // stack instead of fast-pathing on an unchanged document version.
     const artifacts = projects.get(configPath)?.artifacts ?? createProjectArtifacts();
+    artifacts.invalidate();
     const project: ProjectState =
       resolution.formatter === undefined
         ? {
@@ -298,8 +301,8 @@ export function createServer(connection: Connection): LanguageServer {
       return emptySemanticTokens();
     }
 
-    const cached = project.artifacts.getDocument(uri);
-    if (cached === undefined || cached.text !== text) {
+    const cached = ensureCurrent(project, uri);
+    if (cached === undefined) {
       return emptySemanticTokens();
     }
 
@@ -324,11 +327,11 @@ export function createServer(connection: Connection): LanguageServer {
     } catch {
       return [];
     }
-    if (project === undefined || !project.inputs.includes(uri)) {
+    if (project === undefined) {
       return [];
     }
 
-    const cached = currentDocumentArtifact(project, uri, document.getText());
+    const cached = ensureCurrent(project, uri);
     const symbolTable = project.artifacts.getSymbolTable();
     if (cached === undefined || symbolTable === undefined) {
       return [];
@@ -357,20 +360,25 @@ export function createServer(connection: Connection): LanguageServer {
     }
   }
 
-  function currentDocumentArtifact(
-    project: ProjectState,
-    uri: string,
-    text: string,
-  ): CachedDocument | undefined {
-    const cached = project.artifacts.getDocument(uri);
-    if (cached?.sourceFile.text === text) {
-      return cached;
-    }
-
-    if (project.artifacts.update(uri, text, project.inputs, project.controlStack) === null) {
+  /**
+   * The single synchronous materialize-on-read seam: reads the live buffer
+   * from the `TextDocuments` mirror and reparses iff its version differs from
+   * the last-parsed version cached on the project's artifacts. Returns
+   * `undefined` for unmirrored documents and non-configured inputs.
+   */
+  function ensureCurrent(project: ProjectState, uri: string): CachedDocument | undefined {
+    const document = documents.get(uri);
+    if (document === undefined) {
       return undefined;
     }
-    return project.artifacts.getDocument(uri);
+    const updated = project.artifacts.update(
+      uri,
+      document.getText(),
+      document.version,
+      project.inputs,
+      project.controlStack,
+    );
+    return updated === null ? undefined : project.artifacts.getDocument(uri);
   }
 
   connection.onInitialize(async (params): Promise<InitializeResult> => {
@@ -449,7 +457,7 @@ export function createServer(connection: Connection): LanguageServer {
     if (project === undefined) {
       return [];
     }
-    const cached = project.artifacts.getDocument(params.textDocument.uri);
+    const cached = ensureCurrent(project, params.textDocument.uri);
     if (cached === undefined) {
       return [];
     }
