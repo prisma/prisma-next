@@ -203,7 +203,7 @@ describe.sequential('ORM scalar-list round-trip', () => {
   );
 
   it(
-    'filters rows through native array ops (containedBy <@, overlaps &&)',
+    'filters rows through native array ops (arrayContains @>, containedBy <@, overlaps &&)',
     async () => {
       if (!database) throw new Error('database not initialised');
 
@@ -264,6 +264,17 @@ describe.sequential('ORM scalar-list round-trip', () => {
         );
         expect(capturedSql.some((s) => s.includes('&&'))).toBe(true);
         expect(overlapping).toEqual([{ id: 1 }]);
+
+        const superset = await runtime.execute(
+          builder.public.item
+            .select('id')
+            .where((f, fns) => fns.arrayContains(f.tags, ['svelte']))
+            .orderBy((f) => f.id)
+            .build(),
+        );
+        expect(capturedSql.some((s) => s.includes('@>'))).toBe(true);
+        expect(capturedSql.some((s) => s.includes('ARRAY['))).toBe(true);
+        expect(superset).toEqual([{ id: 2 }, { id: 3 }]);
       });
     },
     timeouts.spinUpPpgDev,

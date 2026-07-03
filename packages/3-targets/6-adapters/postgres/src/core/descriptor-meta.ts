@@ -190,6 +190,20 @@ export function postgresQueryOperations<CT extends CodecTypesBase>(): QueryOpera
         });
       },
     },
+    arrayContains: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        other: readonly CodecValue<CodecId, false, CT>[] | ScalarListExpression<CodecId, false>,
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'arrayContains',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} @> {{arg0}}' },
+        });
+      },
+    },
     containedBy: {
       self: { many: true, elementTraits: ['equality'] },
       impl: <CodecId extends keyof CT & string>(

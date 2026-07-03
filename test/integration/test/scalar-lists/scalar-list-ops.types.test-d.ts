@@ -1,6 +1,7 @@
 /**
- * End-to-end type-test for the native list ops (`has`, `containedBy`,
- * `overlaps`, `length`, `index`), driven through the REAL emitted contract and
+ * End-to-end type-test for the native list ops (`has`, `arrayContains`,
+ * `containedBy`, `overlaps`, `length`, `index`), driven through the REAL emitted
+ * contract and
  * the REAL sql-builder `.where((f, fns) => …)` / `.select(alias, (f, fns) => …)`
  * surfaces — no synthetic scope. At the type level:
  *
@@ -44,17 +45,22 @@ test('has rejects a wrong-typed element', () => {
   );
 });
 
-test('array filters (containedBy/overlaps) resolve over a list column', () => {
+test('array filters (arrayContains/containedBy/overlaps) resolve over a list column', () => {
   db.public.item.select('id').where((f, fns) => {
     const contained = fns.containedBy(f.tags, ['react', 'vue']);
     expectTypeOf(contained).toExtend<Expression<BooleanCodecType>>();
+    const superset = fns.arrayContains(f.tags, ['react']);
+    expectTypeOf(superset).toExtend<Expression<BooleanCodecType>>();
     return fns.and(
       contained,
+      superset,
       fns.overlaps(f.tags, ['svelte']),
       // an Int[] list accepts an int array operand
       fns.containedBy(f.scores, [1, 2]),
+      fns.arrayContains(f.scores, [1]),
       // a list-typed operand (another list column) is accepted
       fns.overlaps(f.tags, f.tags),
+      fns.arrayContains(f.tags, f.tags),
     );
   });
 });
@@ -64,12 +70,20 @@ test('array filters reject a scalar receiver', () => {
     // @ts-expect-error -- id is a scalar column, not a list receiver
     fns.overlaps(f.id, [1]),
   );
+  db.public.item.select('id').where((f, fns) =>
+    // @ts-expect-error -- id is a scalar column, not a list receiver
+    fns.arrayContains(f.id, [1]),
+  );
 });
 
 test('array filters reject a wrong-typed array element', () => {
   db.public.item.select('id').where((f, fns) =>
     // @ts-expect-error -- tags is a text list; the array elements must be strings
     fns.containedBy(f.tags, [5]),
+  );
+  db.public.item.select('id').where((f, fns) =>
+    // @ts-expect-error -- tags is a text list; the array elements must be strings
+    fns.arrayContains(f.tags, [5]),
   );
 });
 

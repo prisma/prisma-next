@@ -26,6 +26,13 @@ export type QueryOperationTypes<CT extends CodecTypesBase> = SqlQueryOperationTy
         elem: CodecExpression<CodecId, false, CT>,
       ) => Expression<{ codecId: 'pg/bool@1'; nullable: false }>;
     };
+    readonly arrayContains: {
+      readonly self: { readonly many: true; readonly elementTraits: readonly ['equality'] };
+      readonly impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        other: readonly CodecValue<CodecId, false, CT>[] | ScalarListExpression<CodecId, false>,
+      ) => Expression<{ codecId: 'pg/bool@1'; nullable: false }>;
+    };
     readonly containedBy: {
       readonly self: { readonly many: true; readonly elementTraits: readonly ['equality'] };
       readonly impl: <CodecId extends keyof CT & string>(
