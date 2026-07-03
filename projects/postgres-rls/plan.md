@@ -24,6 +24,10 @@ Retire the conflated `PostgresSchemaIR` (it was a tree node, a schema, and the r
 
 **Landed:** verify, the planner, and the migration runner share one `diffDatabaseSchema` (returning `{ issues, schemaDiffIssues }` — the two issue types stay distinct until follow-on A); the expected-side projection builds per-namespace, so same-named tables across schemas (`public.thing` + `auth.thing`) now project instead of throwing; inference moved to the Postgres target descriptor. Residual: **D1** (PSL inference still gathers the tree to a flat document for today's single-namespace `contract infer`; a fail-loud throw guards the same-name collision — tree-walk tracked in [TML-2958](https://linear.app/prisma-company/issue/TML-2958)).
 
+### 2.5 — `one-differ-two-ir-planner`
+
+Behavior-neutral structural slice (promoted follow-on A + the planner reshape). Port the legacy relational verifier onto the generic node differ so there is **one differ and one node-typed issue type** (retiring the `SchemaIssue`/`SchemaDiffIssue` split and freeing the verify `root`/`counts` from the relational walk). On that substrate, reshape the planner to **`plan(start, end)` — two schema IRs in, ops out**: contract→expected derivation moves to the edge, and the `keepDiffIssue` predicate (and any issue-vocabulary in `plan()`'s input) is deleted; sibling-space scoping becomes principled because issues carry their introspected namespace. **No behavior change** — planner ops byte-identical, verify verdicts unchanged. Rationale: slices 3–4 stack planner behavior (rename post-pass, attribute diffs, leaves-first ordering) — restructure before building on the interim shape.
+
 ### 3 — `explicit-rls-control`
 
 - **`@@rls`** marks a model RLS-controlled independent of any policy → drives ENABLE/DISABLE. Removing the last policy leaves RLS **on** (deny-all, fail-closed); DISABLE only on marker removal. A policy on an unmarked model is an authoring error. First real table-attribute diff.
@@ -50,8 +54,8 @@ Top-level Postgres policy helpers taking the model handle (not a model-builder m
 ## Out of scope / follow-on projects
 
 - Role-ref **authoring** validation — roles are platform-provided; policies only reference them by name (slice 4 checks existence in the DB, nothing more).
-- **A** — port the legacy relational verifier onto the generic differ (merges the two issue types `SchemaIssue` + `SchemaDiffIssue` into one). **B** — dependency-aware planner ordering (slice 4's edges seed it). **C** — a generic project-from-contract / project-from-database registration surface, once a second node type needs the shared shape. **D1** ([TML-2958](https://linear.app/prisma-company/issue/TML-2958)) — walk the schema-node tree in PSL inference instead of gathering it to a flat document; a fail-loud throw guards the same-name collision until then. (No planned slice owns this — it is not the RLS slices 3–6.)
+- **A** — promoted to slice 2.5 (`one-differ-two-ir-planner`). **B** — dependency-aware planner ordering (slice 4's edges seed it). **C** — a generic project-from-contract / project-from-database registration surface, once a second node type needs the shared shape. **D1** ([TML-2958](https://linear.app/prisma-company/issue/TML-2958)) — walk the schema-node tree in PSL inference instead of gathering it to a flat document; a fail-loud throw guards the same-name collision until then. (No planned slice owns this — it is not the RLS slices 3–6.)
 
 ## Linear
 
-Tickets: slice 1 → TML-2868, 1.5 → TML-2931, 3 → TML-2869, 5 → TML-2870, 6 → TML-2883. **Slices 2 and 4 need new top-level tickets** (sibling issues with blocks/blockedBy relations, not sub-issues — [[no-linear-sub-issues]]). Blocking chain: 2931 → ⟨slice 2⟩ → TML-2869 → ⟨slice 4⟩ → TML-2870 → TML-2883. TML-2871 canceled (its contents folded into slices 1 and 4).
+Tickets: slice 1 → TML-2868, 1.5 → TML-2931, 3 → TML-2869, 5 → TML-2870, 6 → TML-2883. **Slices 2, 2.5, and 4 need new top-level tickets** (sibling issues with blocks/blockedBy relations, not sub-issues — [[no-linear-sub-issues]]). Blocking chain: 2931 → ⟨slice 2⟩ → ⟨slice 2.5⟩ → TML-2869 → ⟨slice 4⟩ → TML-2870 → TML-2883. TML-2871 canceled (its contents folded into slices 1 and 4).
