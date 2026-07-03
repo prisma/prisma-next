@@ -106,11 +106,13 @@ type ContractBase = Omit<
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
+                  readonly many: true;
                 };
                 readonly scores: {
                   readonly nativeType: 'int4';
                   readonly codecId: 'pg/int4@1';
                   readonly nullable: false;
+                  readonly many: true;
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };

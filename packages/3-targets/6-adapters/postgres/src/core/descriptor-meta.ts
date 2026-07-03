@@ -2,7 +2,9 @@ import type { CodecControlHooks, ExpandNativeTypeInput } from '@prisma-next/fami
 import {
   buildOperation,
   type CodecExpression,
+  codecOf,
   type Expression,
+  type ScalarListExpression,
   type TraitExpression,
   toExpr,
 } from '@prisma-next/sql-relational-core/expression';
@@ -146,6 +148,31 @@ export function postgresQueryOperations<CT extends CodecTypesBase>(): QueryOpera
           args: [toExpr(self), toExpr(pattern, { codecId: PG_TEXT_CODEC_ID })],
           returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
           lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} ILIKE {{arg0}}' },
+        });
+      },
+    },
+    has: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        elem: CodecExpression<CodecId, false, CT>,
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        const listCodec = codecOf(self);
+        const elementCodec =
+          listCodec === undefined
+            ? undefined
+            : listCodec.typeParams === undefined
+              ? { codecId: listCodec.codecId }
+              : { codecId: listCodec.codecId, typeParams: listCodec.typeParams };
+        return buildOperation({
+          method: 'has',
+          args: [toExpr(self), toExpr(elem, elementCodec)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'infix',
+            template: '{{arg0}} = ANY({{self}})',
+          },
         });
       },
     },

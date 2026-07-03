@@ -6,6 +6,7 @@
  * accessors fully typed: `db.public.Item` is a real `Item` collection rather
  * than an index signature.
  */
+import { postgresRawCodecInferer } from '@prisma-next/adapter-postgres/adapter';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresRuntimeAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract as FrameworkContract } from '@prisma-next/contract/types';
@@ -13,9 +14,14 @@ import postgresControlDriver from '@prisma-next/driver-postgres/control';
 import sql, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
 import { buildSynthMigrationEdge } from '@prisma-next/migration-tools/aggregate';
+import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { orm } from '@prisma-next/sql-orm-client';
-import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
+import {
+  createExecutionContext,
+  createSqlExecutionStack,
+  type SqlMiddleware,
+} from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
 import postgresRuntimeTarget, {
   PostgresContractSerializer,
@@ -135,6 +141,62 @@ describe.sequential('ORM scalar-list round-trip', () => {
         type Row = (typeof rows)[number];
         expectTypeOf<Row['tags']>().toEqualTypeOf<ReadonlyArray<string>>();
         expectTypeOf<Row['scores']>().toEqualTypeOf<ReadonlyArray<number>>();
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'filters rows through the native `has` membership op, lowering to `= ANY(...)`',
+    async () => {
+      if (!database) throw new Error('database not initialised');
+
+      await withClient(database.connectionString, async (client) => {
+        await client.query('DROP SCHEMA IF EXISTS public CASCADE');
+        await client.query('CREATE SCHEMA public');
+        await client.query('DROP SCHEMA IF EXISTS prisma_contract CASCADE');
+      });
+      await migrateContract(database.connectionString);
+
+      await withClient(database.connectionString, async (client) => {
+        const capturedSql: string[] = [];
+        const captureMiddleware: SqlMiddleware = {
+          name: 'capture-sql',
+          beforeExecute(plan) {
+            capturedSql.push(plan.sql);
+          },
+        };
+        const runtime = await createTestRuntimeFromClient(
+          contract as FrameworkContract<SqlStorage>,
+          client,
+          { verifyMarker: false, middleware: [captureMiddleware] },
+        );
+
+        const context = createExecutionContext<Contract>({
+          contract,
+          stack: createSqlExecutionStack({
+            target: postgresRuntimeTarget,
+            adapter: postgresRuntimeAdapter,
+            extensionPacks: [],
+          }),
+        });
+
+        const db = orm({ runtime, context });
+        await db.public.Item.create({ id: 1, tags: ['react', 'vue'], scores: [1] });
+        await db.public.Item.create({ id: 2, tags: ['vue', 'svelte'], scores: [2] });
+        await db.public.Item.create({ id: 3, tags: ['svelte'], scores: [3] });
+
+        const builder = sqlBuilder({ context, rawCodecInferer: postgresRawCodecInferer });
+        const rows = await runtime.execute(
+          builder.public.item
+            .select('id')
+            .where((f, fns) => fns.has(f.tags, 'vue'))
+            .orderBy((f) => f.id)
+            .build(),
+        );
+
+        expect(capturedSql.some((s) => /= ANY\(/.test(s))).toBe(true);
+        expect(rows).toEqual([{ id: 1 }, { id: 2 }]);
       });
     },
     timeouts.spinUpPpgDev,
