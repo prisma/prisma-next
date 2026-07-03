@@ -201,4 +201,134 @@ describe.sequential('ORM scalar-list round-trip', () => {
     },
     timeouts.spinUpPpgDev,
   );
+
+  it(
+    'filters rows through native array ops (containedBy <@, overlaps &&)',
+    async () => {
+      if (!database) throw new Error('database not initialised');
+
+      await withClient(database.connectionString, async (client) => {
+        await client.query('DROP SCHEMA IF EXISTS public CASCADE');
+        await client.query('CREATE SCHEMA public');
+        await client.query('DROP SCHEMA IF EXISTS prisma_contract CASCADE');
+      });
+      await migrateContract(database.connectionString);
+
+      await withClient(database.connectionString, async (client) => {
+        const capturedSql: string[] = [];
+        const captureMiddleware: SqlMiddleware = {
+          name: 'capture-sql',
+          beforeExecute(plan) {
+            capturedSql.push(plan.sql);
+          },
+        };
+        const runtime = await createTestRuntimeFromClient(
+          contract as FrameworkContract<SqlStorage>,
+          client,
+          { verifyMarker: false, middleware: [captureMiddleware] },
+        );
+
+        const context = createExecutionContext<Contract>({
+          contract,
+          stack: createSqlExecutionStack({
+            target: postgresRuntimeTarget,
+            adapter: postgresRuntimeAdapter,
+            extensionPacks: [],
+          }),
+        });
+
+        const db = orm({ runtime, context });
+        await db.public.Item.create({ id: 1, tags: ['react', 'vue'], scores: [1] });
+        await db.public.Item.create({ id: 2, tags: ['vue', 'svelte'], scores: [2] });
+        await db.public.Item.create({ id: 3, tags: ['svelte'], scores: [3] });
+
+        const builder = sqlBuilder({ context, rawCodecInferer: postgresRawCodecInferer });
+
+        const within = await runtime.execute(
+          builder.public.item
+            .select('id')
+            .where((f, fns) => fns.containedBy(f.tags, ['vue', 'svelte']))
+            .orderBy((f) => f.id)
+            .build(),
+        );
+        expect(capturedSql.some((s) => s.includes('<@'))).toBe(true);
+        expect(capturedSql.some((s) => s.includes('ARRAY['))).toBe(true);
+        expect(within).toEqual([{ id: 2 }, { id: 3 }]);
+
+        const overlapping = await runtime.execute(
+          builder.public.item
+            .select('id')
+            .where((f, fns) => fns.overlaps(f.tags, ['react']))
+            .orderBy((f) => f.id)
+            .build(),
+        );
+        expect(capturedSql.some((s) => s.includes('&&'))).toBe(true);
+        expect(overlapping).toEqual([{ id: 1 }]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'computes list length (cardinality) and 1-based nullable element access',
+    async () => {
+      if (!database) throw new Error('database not initialised');
+
+      await withClient(database.connectionString, async (client) => {
+        await client.query('DROP SCHEMA IF EXISTS public CASCADE');
+        await client.query('CREATE SCHEMA public');
+        await client.query('DROP SCHEMA IF EXISTS prisma_contract CASCADE');
+      });
+      await migrateContract(database.connectionString);
+
+      await withClient(database.connectionString, async (client) => {
+        const capturedSql: string[] = [];
+        const captureMiddleware: SqlMiddleware = {
+          name: 'capture-sql',
+          beforeExecute(plan) {
+            capturedSql.push(plan.sql);
+          },
+        };
+        const runtime = await createTestRuntimeFromClient(
+          contract as FrameworkContract<SqlStorage>,
+          client,
+          { verifyMarker: false, middleware: [captureMiddleware] },
+        );
+
+        const context = createExecutionContext<Contract>({
+          contract,
+          stack: createSqlExecutionStack({
+            target: postgresRuntimeTarget,
+            adapter: postgresRuntimeAdapter,
+            extensionPacks: [],
+          }),
+        });
+
+        const db = orm({ runtime, context });
+        await db.public.Item.create({ id: 1, tags: ['react', 'vue'], scores: [10, 20] });
+        await db.public.Item.create({ id: 2, tags: ['svelte'], scores: [30] });
+
+        const builder = sqlBuilder({ context, rawCodecInferer: postgresRawCodecInferer });
+        const rows = await runtime.execute(
+          builder.public.item
+            .select((f, fns) => ({
+              id: f.id,
+              len: fns.length(f.tags),
+              firstTag: fns.index(f.tags, 1),
+              secondScore: fns.index(f.scores, 2),
+            }))
+            .orderBy((f) => f.id)
+            .build(),
+        );
+
+        expect(capturedSql.some((s) => s.includes('cardinality('))).toBe(true);
+        expect(capturedSql.some((s) => /\[\$\d+/.test(s))).toBe(true);
+        expect(rows).toEqual([
+          { id: 1, len: 2, firstTag: 'react', secondScore: 20 },
+          { id: 2, len: 1, firstTag: 'svelte', secondScore: null },
+        ]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
 });
