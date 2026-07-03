@@ -128,3 +128,33 @@ test('index rejects a non-int index', () => {
     fns.index(f.scores, 'x'),
   );
 });
+
+test('arrayAppend/arrayRemove yield a list expression accepted in an update set map', () => {
+  db.public.item.update((f, fns) => {
+    const appended = fns.arrayAppend(f.tags, 'x');
+    expectTypeOf(appended).toExtend<
+      Expression<{ codecId: 'pg/text@1'; nullable: false; many: true }>
+    >();
+    return { tags: appended };
+  });
+  // nested compose: append then remove, both over the same text list
+  db.public.item.update((f, fns) => ({
+    tags: fns.arrayRemove(fns.arrayAppend(f.tags, 'x'), 'y'),
+  }));
+  // an Int[] list accepts an int element
+  db.public.item.update((f, fns) => ({ scores: fns.arrayAppend(f.scores, 1) }));
+});
+
+test('arrayAppend rejects a wrong-typed element', () => {
+  db.public.item.update((f, fns) => ({
+    // @ts-expect-error -- tags is a text list; the element must be a string
+    tags: fns.arrayAppend(f.tags, 5),
+  }));
+});
+
+test('a list mutator is rejected for a scalar column', () => {
+  // @ts-expect-error -- id is a scalar int column; a text list mutator is not assignable
+  db.public.item.update((f, fns) => ({
+    id: fns.arrayAppend(f.tags, 'x'),
+  }));
+});

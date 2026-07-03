@@ -60,5 +60,19 @@ export type QueryOperationTypes<CT extends CodecTypesBase> = SqlQueryOperationTy
         i: CodecExpression<'pg/int4@1', false, CT>,
       ) => Expression<{ codecId: CodecId; nullable: true }>;
     };
+    readonly arrayAppend: {
+      readonly self: { readonly many: true; readonly elementTraits: readonly ['equality'] };
+      readonly impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        elem: CodecExpression<CodecId, false, CT>,
+      ) => Expression<{ codecId: CodecId; nullable: false; many: true }>;
+    };
+    readonly arrayRemove: {
+      readonly self: { readonly many: true; readonly elementTraits: readonly ['equality'] };
+      readonly impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        elem: CodecExpression<CodecId, false, CT>,
+      ) => Expression<{ codecId: CodecId; nullable: false; many: true }>;
+    };
   }
 >;

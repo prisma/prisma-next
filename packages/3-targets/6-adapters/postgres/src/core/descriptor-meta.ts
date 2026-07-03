@@ -149,6 +149,15 @@ function arrayOperandToExpr(operand: unknown): AnyExpression {
   return Array.isArray(operand) ? LiteralExpr.of(operand) : toExpr(operand);
 }
 
+/** Element {@link CodecRef} for a list receiver, preserving type params when present. */
+function elementCodecOf(self: unknown) {
+  const listCodec = codecOf(self);
+  if (listCodec === undefined) return undefined;
+  return listCodec.typeParams === undefined
+    ? { codecId: listCodec.codecId }
+    : { codecId: listCodec.codecId, typeParams: listCodec.typeParams };
+}
+
 export function postgresQueryOperations<CT extends CodecTypesBase>(): QueryOperationTypes<CT> {
   return {
     ilike: {
@@ -274,6 +283,60 @@ export function postgresQueryOperations<CT extends CodecTypesBase>(): QueryOpera
             ...ifDefined('codec', elementCodec),
           },
           lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}}[{{arg0}}]' },
+        });
+      },
+    },
+    arrayAppend: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        elem: CodecExpression<CodecId, false, CT>,
+      ): Expression<{ codecId: CodecId; nullable: false; many: true }> => {
+        const elementCodec = elementCodecOf(self);
+        return buildOperation<{ codecId: CodecId; nullable: false; many: true }>({
+          method: 'arrayAppend',
+          args: [toExpr(self), toExpr(elem, elementCodec)],
+          returns: {
+            codecId: blindCast<
+              CodecId,
+              "the element codecId resolved from the list receiver's own codec is, by construction, this op's declared element CodecId; the runtime string can't be tied back to the generic"
+            >(codecOf(self)?.codecId),
+            nullable: false,
+            many: true,
+            ...ifDefined('codec', elementCodec),
+          },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: 'array_append({{self}}, {{arg0}})',
+          },
+        });
+      },
+    },
+    arrayRemove: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        elem: CodecExpression<CodecId, false, CT>,
+      ): Expression<{ codecId: CodecId; nullable: false; many: true }> => {
+        const elementCodec = elementCodecOf(self);
+        return buildOperation<{ codecId: CodecId; nullable: false; many: true }>({
+          method: 'arrayRemove',
+          args: [toExpr(self), toExpr(elem, elementCodec)],
+          returns: {
+            codecId: blindCast<
+              CodecId,
+              "the element codecId resolved from the list receiver's own codec is, by construction, this op's declared element CodecId; the runtime string can't be tied back to the generic"
+            >(codecOf(self)?.codecId),
+            nullable: false,
+            many: true,
+            ...ifDefined('codec', elementCodec),
+          },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: 'array_remove({{self}}, {{arg0}})',
+          },
         });
       },
     },
