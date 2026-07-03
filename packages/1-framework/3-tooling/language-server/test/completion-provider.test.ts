@@ -332,23 +332,10 @@ describe('providePslCompletionItems', () => {
     });
   });
 
-  it('returns the full contract-space-qualified namespace member set from visible namespace data', () => {
-    const { items, sourceFile, cursorOffset } = complete(
-      ['model Post {', '  owner supabase:auth.P|', '}'].join('\n'),
-    );
+  it('does not leak local namespace members into a foreign contract-space reference', () => {
+    const { items } = complete(['model Post {', '  owner supabase:auth.P|', '}'].join('\n'));
 
-    expect(items.map((item) => item.label)).toEqual(['Account', 'User', 'Profile']);
-    expect(items.find((item) => item.label === 'Profile')).toMatchObject({
-      filterText: 'Profile',
-      detail: 'Composite type in namespace auth',
-      textEdit: {
-        range: {
-          start: sourceFile.positionAt(cursorOffset - 'P'.length),
-          end: sourceFile.positionAt(cursorOffset),
-        },
-        newText: 'Profile',
-      },
-    });
+    expect(items).toEqual([]);
   });
 
   it('returns no completions for a contract-space-qualified position', () => {

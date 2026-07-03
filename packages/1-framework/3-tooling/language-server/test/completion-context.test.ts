@@ -174,13 +174,26 @@ describe('classifyPslCompletionContext', () => {
       kind: 'namespaceMember',
       fieldName: 'externalUser',
       namespace: 'auth',
+      space: 'supabase',
     });
 
     expect(classify(['model Post {', '  owner supabase:auth.U|', '}'].join('\n'))).toMatchObject({
       kind: 'namespaceMember',
       fieldName: 'owner',
       namespace: 'auth',
+      space: 'supabase',
     });
+  });
+
+  it('carries no space for a locally namespace-qualified prefix', () => {
+    const context = classify(['model Post {', '  owner auth.|', '}'].join('\n'));
+
+    expect(context).toMatchObject({
+      kind: 'namespaceMember',
+      fieldName: 'owner',
+      namespace: 'auth',
+    });
+    expect(context).not.toHaveProperty('space');
   });
 
   it('classifies a contract-space-qualified prefix without a namespace segment as a space member', () => {

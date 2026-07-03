@@ -284,6 +284,11 @@ function provideNamespaceMemberCompletionItems(
   sourceFile: SourceFile,
   source: PslCompletionCandidateSource,
 ): readonly CompletionItem[] {
+  // A foreign contract-space reference resolves against external symbols that no
+  // registry exposes yet; local namespace members must not stand in for them.
+  if (context.space !== undefined) {
+    return [];
+  }
   return modelTypeCompletionItems(
     context,
     sourceFile,

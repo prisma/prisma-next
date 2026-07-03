@@ -48,6 +48,7 @@ export interface NamespaceMemberCompletionContext {
   readonly fieldName: string;
   readonly replacementStartOffset: number;
   readonly namespace: string;
+  readonly space?: string;
 }
 
 export interface GenericBlockKeyCompletionContext {
@@ -238,7 +239,17 @@ function classifyTypePosition(
 ): ModelTypeCompletionContext | SpaceMemberCompletionContext | NamespaceMemberCompletionContext {
   const namespace = name.namespace()?.name();
   if (namespace !== undefined && namespace.length > 0) {
-    return { kind: 'namespaceMember', offset, fieldName, replacementStartOffset, namespace };
+    const namespaceSpace = name.space()?.name();
+    return {
+      kind: 'namespaceMember',
+      offset,
+      fieldName,
+      replacementStartOffset,
+      namespace,
+      ...(namespaceSpace !== undefined && namespaceSpace.length > 0
+        ? { space: namespaceSpace }
+        : {}),
+    };
   }
   const space = name.space()?.name();
   if (space !== undefined && space.length > 0) {
