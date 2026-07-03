@@ -281,6 +281,73 @@ describe.sequential('ORM scalar-list round-trip', () => {
   );
 
   it(
+    'compares whole lists through the eq/gt comparison builtins (FR16)',
+    async () => {
+      if (!database) throw new Error('database not initialised');
+
+      await withClient(database.connectionString, async (client) => {
+        await client.query('DROP SCHEMA IF EXISTS public CASCADE');
+        await client.query('CREATE SCHEMA public');
+        await client.query('DROP SCHEMA IF EXISTS prisma_contract CASCADE');
+      });
+      await migrateContract(database.connectionString);
+
+      await withClient(database.connectionString, async (client) => {
+        const capturedSql: string[] = [];
+        const captureMiddleware: SqlMiddleware = {
+          name: 'capture-sql',
+          beforeExecute(plan) {
+            capturedSql.push(plan.sql);
+          },
+        };
+        const runtime = await createTestRuntimeFromClient(
+          contract as FrameworkContract<SqlStorage>,
+          client,
+          { verifyMarker: false, middleware: [captureMiddleware] },
+        );
+
+        const context = createExecutionContext<Contract>({
+          contract,
+          stack: createSqlExecutionStack({
+            target: postgresRuntimeTarget,
+            adapter: postgresRuntimeAdapter,
+            extensionPacks: [],
+          }),
+        });
+
+        const db = orm({ runtime, context });
+        await db.public.Item.create({ id: 1, tags: ['react', 'vue'], scores: [1] });
+        await db.public.Item.create({ id: 2, tags: ['svelte'], scores: [2] });
+        await db.public.Item.create({ id: 3, tags: ['react', 'vue'], scores: [3] });
+
+        const builder = sqlBuilder({ context, rawCodecInferer: postgresRawCodecInferer });
+
+        const equal = await runtime.execute(
+          builder.public.item
+            .select('id')
+            .where((f, fns) => fns.eq(f.tags, ['react', 'vue']))
+            .orderBy((f) => f.id)
+            .build(),
+        );
+        expect(capturedSql.some((s) => /"tags" = \$\d+/.test(s))).toBe(true);
+        expect(equal).toEqual([{ id: 1 }, { id: 3 }]);
+
+        const greater = await runtime.execute(
+          builder.public.item
+            .select('id')
+            .where((f, fns) => fns.gt(f.tags, ['react']))
+            .orderBy((f) => f.id)
+            .build(),
+        );
+        expect(capturedSql.some((s) => /"tags" > \$\d+/.test(s))).toBe(true);
+        // ['react','vue'] and ['svelte'] both sort lexicographically after ['react']
+        expect(greater).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
     'computes list length (cardinality) and 1-based nullable element access',
     async () => {
       if (!database) throw new Error('database not initialised');

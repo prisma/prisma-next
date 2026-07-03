@@ -158,3 +158,29 @@ test('a list mutator is rejected for a scalar column', () => {
     id: fns.arrayAppend(f.tags, 'x'),
   }));
 });
+
+test('comparison builtins accept a whole-list operand (FR16)', () => {
+  db.public.item.select('id').where((f, fns) => {
+    const byLiteral = fns.eq(f.tags, ['a', 'b']);
+    expectTypeOf(byLiteral).toExtend<Expression<BooleanCodecType>>();
+    const byExpr = fns.eq(f.tags, f.tags);
+    expectTypeOf(byExpr).toExtend<Expression<BooleanCodecType>>();
+    // ordering compares lexicographically over an orderable element list
+    const ordered = fns.gt(f.tags, ['a']);
+    expectTypeOf(ordered).toExtend<Expression<BooleanCodecType>>();
+    return fns.and(byLiteral, byExpr, ordered, fns.eq(f.scores, [1, 2]));
+  });
+  // scalar comparison calls remain unchanged
+  db.public.item.select('id').where((f, fns) => fns.eq(f.id, 1));
+});
+
+test('comparison builtins reject a wrong-typed list element', () => {
+  db.public.item.select('id').where((f, fns) =>
+    // @ts-expect-error -- tags is a text list; the array elements must be strings
+    fns.eq(f.tags, [5]),
+  );
+  db.public.item.select('id').where((f, fns) =>
+    // @ts-expect-error -- tags is a text list; the array elements must be strings
+    fns.gt(f.tags, [5]),
+  );
+});

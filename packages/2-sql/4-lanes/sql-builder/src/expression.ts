@@ -1,13 +1,37 @@
 import type { QueryOperationTypesBase } from '@prisma-next/sql-contract/types';
 import type {
   CodecExpression,
+  CodecIdsWithTrait,
+  CodecValue,
   Expression,
   RawSqlTag,
+  ScalarListExpression,
   TraitExpression,
 } from '@prisma-next/sql-relational-core/expression';
 import type { Expand, QueryContext, Scope, ScopeField, ScopeTable, Subquery } from './scope';
 
 export type { CodecExpression, Expression, RawSqlTag, TraitExpression };
+
+/**
+ * List-operand call signature for a comparison builtin. Applies when the
+ * receiver is a whole-list expression (`ScalarListExpression`, `many: true`)
+ * whose element codec carries every trait in `RequiredTraits` — `['equality']`
+ * for `eq`/`ne`, `['order']` for `gt`/`gte`/`lt`/`lte`. The value side accepts a
+ * matching list expression or a literal `readonly ElementValue[]`, and the whole
+ * comparison lowers to the same boolean expression the scalar path returns.
+ *
+ * Kept disjoint from the scalar signature by the `many` discriminant: a
+ * `ScalarListExpression` (`many: true`) never satisfies the scalar
+ * `CodecExpression` slot (`many?: never`) and vice-versa, so scalar-call
+ * inference is untouched.
+ */
+type ListComparison<
+  CT extends Record<string, { readonly input: unknown }>,
+  RequiredTraits extends readonly string[],
+> = <CodecId extends CodecIdsWithTrait<CT, RequiredTraits>>(
+  a: ScalarListExpression<CodecId, boolean>,
+  b: ScalarListExpression<CodecId, boolean> | readonly CodecValue<CodecId, false, CT>[],
+) => Expression<BooleanCodecType>;
 
 export type BooleanCodecType = { codecId: 'pg/bool@1'; nullable: boolean };
 
@@ -61,30 +85,36 @@ type DeriveExtFunctions<OT extends QueryOperationTypesBase> = {
 };
 
 export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown }>> = {
-  eq: <CodecId extends string>(
-    a: CodecExpression<CodecId, boolean, CT> | null,
-    b: CodecExpression<CodecId, boolean, CT> | null,
-  ) => Expression<BooleanCodecType>;
-  ne: <CodecId extends string, N extends boolean>(
-    a: CodecExpression<CodecId, N, CT> | null,
-    b: CodecExpression<CodecId, N, CT> | null,
-  ) => Expression<BooleanCodecType>;
-  gt: <CodecId extends string, N extends boolean>(
-    a: CodecExpression<CodecId, N, CT>,
-    b: CodecExpression<CodecId, N, CT>,
-  ) => Expression<BooleanCodecType>;
-  gte: <CodecId extends string, N extends boolean>(
-    a: CodecExpression<CodecId, N, CT>,
-    b: CodecExpression<CodecId, N, CT>,
-  ) => Expression<BooleanCodecType>;
-  lt: <CodecId extends string, N extends boolean>(
-    a: CodecExpression<CodecId, N, CT>,
-    b: CodecExpression<CodecId, N, CT>,
-  ) => Expression<BooleanCodecType>;
-  lte: <CodecId extends string, N extends boolean>(
-    a: CodecExpression<CodecId, N, CT>,
-    b: CodecExpression<CodecId, N, CT>,
-  ) => Expression<BooleanCodecType>;
+  eq: ListComparison<CT, ['equality']> &
+    (<CodecId extends string>(
+      a: CodecExpression<CodecId, boolean, CT> | null,
+      b: CodecExpression<CodecId, boolean, CT> | null,
+    ) => Expression<BooleanCodecType>);
+  ne: ListComparison<CT, ['equality']> &
+    (<CodecId extends string, N extends boolean>(
+      a: CodecExpression<CodecId, N, CT> | null,
+      b: CodecExpression<CodecId, N, CT> | null,
+    ) => Expression<BooleanCodecType>);
+  gt: ListComparison<CT, ['order']> &
+    (<CodecId extends string, N extends boolean>(
+      a: CodecExpression<CodecId, N, CT>,
+      b: CodecExpression<CodecId, N, CT>,
+    ) => Expression<BooleanCodecType>);
+  gte: ListComparison<CT, ['order']> &
+    (<CodecId extends string, N extends boolean>(
+      a: CodecExpression<CodecId, N, CT>,
+      b: CodecExpression<CodecId, N, CT>,
+    ) => Expression<BooleanCodecType>);
+  lt: ListComparison<CT, ['order']> &
+    (<CodecId extends string, N extends boolean>(
+      a: CodecExpression<CodecId, N, CT>,
+      b: CodecExpression<CodecId, N, CT>,
+    ) => Expression<BooleanCodecType>);
+  lte: ListComparison<CT, ['order']> &
+    (<CodecId extends string, N extends boolean>(
+      a: CodecExpression<CodecId, N, CT>,
+      b: CodecExpression<CodecId, N, CT>,
+    ) => Expression<BooleanCodecType>);
   and: (...ands: CodecExpression<'pg/bool@1', boolean, CT>[]) => Expression<BooleanCodecType>;
   or: (...ors: CodecExpression<'pg/bool@1', boolean, CT>[]) => Expression<BooleanCodecType>;
 
