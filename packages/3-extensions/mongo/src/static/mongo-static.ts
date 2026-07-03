@@ -1,4 +1,6 @@
-import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
+import mongoRuntimeAdapter, {
+  type MongoOperationOutputCodecs,
+} from '@prisma-next/adapter-mongo/runtime';
 import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contract/enum-accessor';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -36,7 +38,7 @@ export interface MongoStaticContext<
   readonly context: MongoExecutionContext<TContract>;
   readonly contract: TContract;
   readonly enums: UnboundEnums<TContract>;
-  readonly query: ReturnType<typeof mongoQuery<TContract>>;
+  readonly query: ReturnType<typeof mongoQuery<TContract, MongoOperationOutputCodecs>>;
   readonly raw: MongoRawClient<TContract>;
 }
 
@@ -49,7 +51,10 @@ export function buildMongoStaticContext<
   });
   const context = createMongoExecutionContext<TContract>({ contract, stack });
   const enums = extractUnboundEnums(contract);
-  const query = mongoQuery<TContract>({ contractJson: contract });
+  const query = mongoQuery({
+    contractJson: contract,
+    operationCodecs: mongoRuntimeAdapter.operationOutputCodecs,
+  });
   const raw = mongoRaw<TContract>({ contract });
   return { context, contract, enums, query, raw };
 }

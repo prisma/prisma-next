@@ -5,8 +5,10 @@ export type {
   UpdateResult,
 } from '@prisma-next/mongo-query-ast/execution';
 export { acc } from '../accumulator-helpers';
+export type { StageFn } from '../builder';
 export { PipelineChain } from '../builder';
-export { fn } from '../expression-helpers';
+export type { MongoFn } from '../expression-helpers';
+export { createFn } from '../expression-helpers';
 export type {
   Expression,
   FieldAccessor,
@@ -40,25 +42,22 @@ export {
 } from '../result-shape';
 export { CollectionHandle, FilteredCollection } from '../state-classes';
 export type {
-  ArrayField,
-  BooleanField,
-  DateField,
+  CodecIdsWithOutput,
+  CodecTypesBase,
+  ComputedField,
   DocField,
   DocShape,
   ExtractDocShape,
   GroupedDocShape,
   GroupSpec,
-  LiteralValue,
   ModelToDocShape,
-  NullableDocField,
-  NullableNumericField,
-  NumericField,
+  MongoOperationCodecTable,
   ProjectedShape,
   ResolveRow,
   SortSpec,
-  StringField,
   TypedAccumulatorExpr,
   TypedAggExpr,
+  UnresolvedField,
   UnwoundShape,
 } from '../types';
 export type { TypedUpdateOp, UpdaterResult } from '../update-ops';

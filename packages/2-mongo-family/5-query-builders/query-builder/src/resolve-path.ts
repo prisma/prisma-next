@@ -1,6 +1,6 @@
 import type { ContractValueObjectDefinitions } from '@prisma-next/contract/types';
 import type { MongoContract, MongoModelsMap } from '@prisma-next/mongo-contract';
-import type { DocField } from './types';
+import type { DocField, UnresolvedField } from './types';
 
 /**
  * Marker `DocField` variant representing a non-leaf (value-object) path in
@@ -30,7 +30,7 @@ export interface ObjectField<N extends NestedDocShape> extends DocField {
  * typed `col` accessor. `ModelName` is the literal foreign model name
  * (e.g. `'User'`), preserved in the type so `ResolveRow` can resolve the
  * field to `ResolveRow<ModelToDocShape<TC, ModelName>, …>[]` rather than
- * the opaque `unknown[]` produced by the legacy `mongo/array@1` sentinel.
+ * the opaque `unknown[]` produced by the legacy array sentinel.
  *
  * Like `ObjectField`, the codec id is a purely type-level sentinel —
  * there is no runtime codec entry for `'prisma/modelArray@1'`. The
@@ -102,7 +102,7 @@ type FieldToLeaf<F> = F extends {
 }
   ? { readonly codecId: C; readonly nullable: N }
   : F extends { readonly many: true; readonly nullable: infer N extends boolean }
-    ? { readonly codecId: 'mongo/array@1'; readonly nullable: N }
+    ? UnresolvedField & { readonly nullable: N }
     : DocField;
 
 /**

@@ -6,7 +6,14 @@ import type {
 import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter } from '@prisma-next/mongo-lowering';
 import { buildStandardCodecRegistry } from '../core/codecs';
+import {
+  type MongoOperationOutputCodecs,
+  mongoOperationOutputCodecs,
+} from '../core/operation-output-codecs';
 import { createMongoAdapter } from '../mongo-adapter';
+
+export type { MongoOperationOutputCodecs } from '../core/operation-output-codecs';
+export { mongoOperationOutputCodecs } from '../core/operation-output-codecs';
 
 /**
  * adapter-mongo deliberately does NOT import the `MongoRuntimeAdapterDescriptor` type alias from `@prisma-next/mongo-runtime`. The adapter package is downstream of the Mongo runtime package only conceptually; introducing a hard import would create a workspace dependency cycle (`mongo-runtime` consumes the runtime descriptor's `create(stack)` factory; `adapter-mongo` would then need `mongo-runtime` to type the
@@ -23,6 +30,7 @@ const mongoRuntimeAdapterDescriptor: RuntimeAdapterDescriptor<
   MongoRuntimeAdapterInstance
 > & {
   readonly codecs: () => MongoCodecRegistry;
+  readonly operationOutputCodecs: MongoOperationOutputCodecs;
 } = {
   kind: 'adapter',
   id: 'mongo',
@@ -30,6 +38,7 @@ const mongoRuntimeAdapterDescriptor: RuntimeAdapterDescriptor<
   targetId: 'mongo',
   version: '0.0.1',
   codecs: buildStandardCodecRegistry,
+  operationOutputCodecs: mongoOperationOutputCodecs,
   create(_stack: ExecutionStack<'mongo', 'mongo'>): MongoRuntimeAdapterInstance {
     const adapter = createMongoAdapter();
     return {

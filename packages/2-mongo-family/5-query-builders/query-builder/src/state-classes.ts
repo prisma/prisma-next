@@ -31,10 +31,10 @@ import {
   UpdateOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
-import { PipelineChain } from './builder';
+import { PipelineChain, type StageFn } from './builder';
 import { createFieldAccessor, type FieldAccessor } from './field-accessor';
 import type { ModelNestedShape, NestedDocShape } from './resolve-path';
-import type { ModelToDocShape, ResolveRow } from './types';
+import type { ModelToDocShape, MongoOperationCodecTable, ResolveRow } from './types';
 import { resolveUpdaterResult, type UpdaterResult } from './update-ops';
 
 /**
@@ -96,24 +96,30 @@ function writeMeta(storageHash: string): PlanMeta {
 export class CollectionHandle<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends keyof MongoModelsMap<TContract> & string,
+  TOps extends MongoOperationCodecTable = MongoOperationCodecTable,
 > extends PipelineChain<
   TContract,
   ModelToDocShape<TContract, ModelName>,
   'update-cleared',
   'fam-cleared',
   'leading',
-  ModelNestedShape<TContract, ModelName>
+  ModelNestedShape<TContract, ModelName>,
+  TOps
 > {
-  readonly #ctx: BindingContext<TContract>;
+  readonly #ctx: BindingContext<TContract, TOps>;
   readonly #modelName: ModelName;
 
-  constructor(ctx: BindingContext<TContract>, modelName: ModelName) {
-    super(ctx.contract, {
-      collection: ctx.collection,
-      stages: [],
-      storageHash: ctx.storageHash,
-      modelName: modelName as string,
-    });
+  constructor(ctx: BindingContext<TContract, TOps>, modelName: ModelName) {
+    super(
+      ctx.contract,
+      {
+        collection: ctx.collection,
+        stages: [],
+        storageHash: ctx.storageHash,
+        modelName: modelName as string,
+      },
+      ctx.operationCodecs,
+    );
     this.#ctx = ctx;
     this.#modelName = modelName;
   }
@@ -135,15 +141,16 @@ export class CollectionHandle<
    * Mongo — but `FilteredCollection` makes the accumulated filter
    * addressable for the write/find-and-modify terminals landing in M2/M3.
    */
-  override match(filter: MongoFilterExpr): FilteredCollection<TContract, ModelName>;
+  override match(filter: MongoFilterExpr): FilteredCollection<TContract, ModelName, TOps>;
   override match(
     fn: (
       fields: FieldAccessor<
         ModelToDocShape<TContract, ModelName>,
         ModelNestedShape<TContract, ModelName>
       >,
+      helpers: StageFn<TContract, TOps>,
     ) => MongoFilterExpr,
-  ): FilteredCollection<TContract, ModelName>;
+  ): FilteredCollection<TContract, ModelName, TOps>;
   override match(
     filterOrFn:
       | MongoFilterExpr
@@ -152,8 +159,9 @@ export class CollectionHandle<
             ModelToDocShape<TContract, ModelName>,
             ModelNestedShape<TContract, ModelName>
           >,
+          helpers: StageFn<TContract, TOps>,
         ) => MongoFilterExpr),
-  ): FilteredCollection<TContract, ModelName> {
+  ): FilteredCollection<TContract, ModelName, TOps> {
     const resolved =
       typeof filterOrFn === 'function'
         ? filterOrFn(
@@ -161,9 +169,12 @@ export class CollectionHandle<
               ModelToDocShape<TContract, ModelName>,
               ModelNestedShape<TContract, ModelName>
             >(),
+            this.fn,
           )
         : filterOrFn;
-    return new FilteredCollection<TContract, ModelName>(this.#ctx, this.#modelName, [resolved]);
+    return new FilteredCollection<TContract, ModelName, TOps>(this.#ctx, this.#modelName, [
+      resolved,
+    ]);
   }
 
   // --- Inserts ---
@@ -320,20 +331,22 @@ export class CollectionHandle<
 export class FilteredCollection<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends keyof MongoModelsMap<TContract> & string,
+  TOps extends MongoOperationCodecTable = MongoOperationCodecTable,
 > extends PipelineChain<
   TContract,
   ModelToDocShape<TContract, ModelName>,
   'update-cleared',
   'fam-cleared',
   'leading',
-  ModelNestedShape<TContract, ModelName>
+  ModelNestedShape<TContract, ModelName>,
+  TOps
 > {
-  readonly #ctx: BindingContext<TContract>;
+  readonly #ctx: BindingContext<TContract, TOps>;
   readonly #modelName: ModelName;
   readonly #filters: ReadonlyArray<MongoFilterExpr>;
 
   constructor(
-    ctx: BindingContext<TContract>,
+    ctx: BindingContext<TContract, TOps>,
     modelName: ModelName,
     filters: ReadonlyArray<MongoFilterExpr>,
   ) {
@@ -345,12 +358,16 @@ export class FilteredCollection<
       throw new Error('FilteredCollection: unreachable empty-filters branch');
     }
     const leading = filters.length === 1 ? first : foldAnd(filters);
-    super(ctx.contract, {
-      collection: ctx.collection,
-      stages: [new MongoMatchStage(leading)],
-      storageHash: ctx.storageHash,
-      modelName: modelName as string,
-    });
+    super(
+      ctx.contract,
+      {
+        collection: ctx.collection,
+        stages: [new MongoMatchStage(leading)],
+        storageHash: ctx.storageHash,
+        modelName: modelName as string,
+      },
+      ctx.operationCodecs,
+    );
     this.#ctx = ctx;
     this.#modelName = modelName;
     this.#filters = filters;
@@ -376,15 +393,16 @@ export class FilteredCollection<
    * second `$match` stage), so the write/find-and-modify terminals see a
    * single authoritative filter expression.
    */
-  override match(filter: MongoFilterExpr): FilteredCollection<TContract, ModelName>;
+  override match(filter: MongoFilterExpr): FilteredCollection<TContract, ModelName, TOps>;
   override match(
     fn: (
       fields: FieldAccessor<
         ModelToDocShape<TContract, ModelName>,
         ModelNestedShape<TContract, ModelName>
       >,
+      helpers: StageFn<TContract, TOps>,
     ) => MongoFilterExpr,
-  ): FilteredCollection<TContract, ModelName>;
+  ): FilteredCollection<TContract, ModelName, TOps>;
   override match(
     filterOrFn:
       | MongoFilterExpr
@@ -393,8 +411,9 @@ export class FilteredCollection<
             ModelToDocShape<TContract, ModelName>,
             ModelNestedShape<TContract, ModelName>
           >,
+          helpers: StageFn<TContract, TOps>,
         ) => MongoFilterExpr),
-  ): FilteredCollection<TContract, ModelName> {
+  ): FilteredCollection<TContract, ModelName, TOps> {
     const resolved =
       typeof filterOrFn === 'function'
         ? filterOrFn(
@@ -402,9 +421,10 @@ export class FilteredCollection<
               ModelToDocShape<TContract, ModelName>,
               ModelNestedShape<TContract, ModelName>
             >(),
+            this.fn,
           )
         : filterOrFn;
-    return new FilteredCollection<TContract, ModelName>(this.#ctx, this.#modelName, [
+    return new FilteredCollection<TContract, ModelName, TOps>(this.#ctx, this.#modelName, [
       ...this.#filters,
       resolved,
     ]);
@@ -619,10 +639,12 @@ export function asMongoContract(
  */
 export interface BindingContext<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
+  TOps extends MongoOperationCodecTable = MongoOperationCodecTable,
 > {
   readonly contract: TContract;
   readonly collection: string;
   readonly storageHash: string;
+  readonly operationCodecs: TOps;
 }
 
 /**
@@ -632,10 +654,12 @@ export interface BindingContext<
 export function createCollectionHandle<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   RootName extends keyof TContract['roots'] & string,
+  TOps extends MongoOperationCodecTable = MongoOperationCodecTable,
 >(
   contract: TContract,
   rootName: RootName,
-): CollectionHandle<TContract, RootModelName<TContract, RootName>> {
+  operationCodecs: TOps,
+): CollectionHandle<TContract, RootModelName<TContract, RootName>, TOps> {
   const c = asMongoContract(contract);
   const modelName = c.roots[rootName]?.model;
   if (!modelName) {
@@ -659,6 +683,7 @@ export function createCollectionHandle<
       contract,
       collection: collectionName,
       storageHash: String(c.storage.storageHash),
+      operationCodecs,
     },
     modelName as RootModelName<TContract, RootName>,
   );

@@ -1,14 +1,11 @@
 import { expectTypeOf } from 'vitest';
 import { acc } from '../src/accumulator-helpers';
-import type {
-  ArrayField,
-  DocField,
-  NullableNumericField,
-  NumericField,
-  StringField,
-  TypedAccumulatorExpr,
-  TypedAggExpr,
-} from '../src/types';
+import type { DocField, TypedAccumulatorExpr, TypedAggExpr } from '../src/types';
+
+type NumericField = { readonly codecId: 'mongo/double@1'; readonly nullable: false };
+type NullableNumericField = { readonly codecId: 'mongo/double@1'; readonly nullable: true };
+type ArrayField = { readonly codecId: 'mongo/array@1'; readonly nullable: false };
+type StringField = { readonly codecId: 'mongo/string@1'; readonly nullable: false };
 
 const d = {} as TypedAggExpr<DocField>;
 const n = {} as TypedAggExpr<NumericField>;

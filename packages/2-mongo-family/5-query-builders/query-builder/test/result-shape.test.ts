@@ -7,7 +7,7 @@ import {
   contractModelToMongoResultShape,
 } from '../src/result-shape';
 import type { TContract } from './fixtures/test-contract';
-import { testContractJson } from './fixtures/test-contract';
+import { testContract, testContractJson, testOperationCodecs } from './fixtures/test-contract';
 
 describe('contractModelToMongoResultShape', () => {
   // Hand-authored fixture JSON; cast at the test-fixture seam (allowed by
@@ -65,12 +65,14 @@ describe('contractFieldToMongoFieldShape', () => {
 
 describe('PipelineChain build resultShape', () => {
   it('identity pipeline attaches document shape from bound model', () => {
-    const plan = mongoQuery<TContract>({ contractJson: testContractJson }).from('orders').build();
+    const plan = mongoQuery({ contractJson: testContract, operationCodecs: testOperationCodecs })
+      .from('orders')
+      .build();
     expect(plan.resultShape?.kind).toBe('document');
   });
 
   it('project stage reifies a document shape retaining _id and the projected field', () => {
-    const plan = mongoQuery<TContract>({ contractJson: testContractJson })
+    const plan = mongoQuery({ contractJson: testContract, operationCodecs: testOperationCodecs })
       .from('orders')
       .match(MongoFieldFilter.eq('status', 'x'))
       .project('status')
@@ -83,5 +85,45 @@ describe('PipelineChain build resultShape', () => {
         status: { kind: 'leaf', codecId: 'mongo/string@1', nullable: false },
       },
     });
+  });
+
+  it('computed table-covered scalar reifies to a leaf with the table codec', () => {
+    const plan = mongoQuery({ contractJson: testContract, operationCodecs: testOperationCodecs })
+      .from('orders')
+      .project((f, fn) => ({
+        asDate: fn.toDate(f.status),
+        rendered: fn.dateToString({ date: f.createdAt }),
+      }))
+      .build();
+    expect(plan.resultShape).toEqual({
+      kind: 'document',
+      fields: {
+        _id: { kind: 'leaf', codecId: 'mongo/objectId@1', nullable: false },
+        asDate: { kind: 'leaf', codecId: testOperationCodecs.$toDate, nullable: false },
+        rendered: { kind: 'leaf', codecId: testOperationCodecs.$dateToString, nullable: false },
+      },
+    });
+  });
+
+  it('computed operator outside the table reifies to unknown', () => {
+    const plan = mongoQuery({ contractJson: testContract, operationCodecs: testOperationCodecs })
+      .from('orders')
+      .project((f, fn) => ({
+        parts: fn.split(f.status, fn.literal('-')),
+      }))
+      .build();
+    expect(plan.resultShape).toEqual({
+      kind: 'document',
+      fields: {
+        _id: { kind: 'leaf', codecId: 'mongo/objectId@1', nullable: false },
+        parts: { kind: 'unknown' },
+      },
+    });
+  });
+
+  it('standalone fn from the query root builds the same expressions as callback fn', () => {
+    const root = mongoQuery({ contractJson: testContract, operationCodecs: testOperationCodecs });
+    const viaRoot = root.fn.toDate(root.fn.literal('2024-01-01'));
+    expect(viaRoot._field).toEqual({ codecId: testOperationCodecs.$toDate, nullable: false });
   });
 });

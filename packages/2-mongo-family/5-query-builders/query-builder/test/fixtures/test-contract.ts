@@ -9,6 +9,7 @@ import type {
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
+import { blindCast } from '@prisma-next/utils/casts';
 
 type TestModels = {
   readonly Order: {
@@ -37,6 +38,10 @@ type TestModels = {
         readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
         readonly nullable: false;
         readonly many: true;
+      };
+      readonly createdAt: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/date@1' };
+        readonly nullable: false;
       };
     };
     readonly relations: Record<string, never>;
@@ -203,6 +208,7 @@ type TestFieldOutputTypes = {
       readonly customerId: string;
       readonly notes: string | null;
       readonly tags: string[];
+      readonly createdAt: Date;
     };
     readonly User: {
       readonly _id: string;
@@ -262,6 +268,7 @@ export const testContractJson = {
                 nullable: false,
                 many: true,
               },
+              createdAt: { type: { kind: 'scalar', codecId: 'mongo/date@1' }, nullable: false },
             },
             relations: {},
             storage: { collection: 'orders' },
@@ -332,3 +339,72 @@ export const testContractJson = {
   profileHash: 'test-profile',
   meta: {},
 };
+
+export const testContract = blindCast<
+  TContract,
+  'query-builder fixture JSON carries domain.namespaces envelope'
+>(testContractJson);
+
+/**
+ * Test-local operation→output-codec table mirroring the Mongo adapter's
+ * declaration. Tests may name `mongo/*` codec ids; the family source may not.
+ */
+export const testOperationCodecs = {
+  $concat: 'mongo/string@1',
+  $toLower: 'mongo/string@1',
+  $toUpper: 'mongo/string@1',
+  $toString: 'mongo/string@1',
+  $substr: 'mongo/string@1',
+  $substrBytes: 'mongo/string@1',
+  $trim: 'mongo/string@1',
+  $ltrim: 'mongo/string@1',
+  $rtrim: 'mongo/string@1',
+  $replaceOne: 'mongo/string@1',
+  $replaceAll: 'mongo/string@1',
+  $dateToString: 'mongo/string@1',
+  $type: 'mongo/string@1',
+  $eq: 'mongo/bool@1',
+  $ne: 'mongo/bool@1',
+  $gt: 'mongo/bool@1',
+  $gte: 'mongo/bool@1',
+  $lt: 'mongo/bool@1',
+  $lte: 'mongo/bool@1',
+  $in: 'mongo/bool@1',
+  $regexMatch: 'mongo/bool@1',
+  $isArray: 'mongo/bool@1',
+  $toBool: 'mongo/bool@1',
+  $setEquals: 'mongo/bool@1',
+  $setIsSubset: 'mongo/bool@1',
+  $anyElementTrue: 'mongo/bool@1',
+  $allElementsTrue: 'mongo/bool@1',
+  $toDate: 'mongo/date@1',
+  $dateAdd: 'mongo/date@1',
+  $dateSubtract: 'mongo/date@1',
+  $dateTrunc: 'mongo/date@1',
+  $dateFromString: 'mongo/date@1',
+  $add: 'mongo/double@1',
+  $subtract: 'mongo/double@1',
+  $multiply: 'mongo/double@1',
+  $divide: 'mongo/double@1',
+  $size: 'mongo/double@1',
+  $year: 'mongo/double@1',
+  $month: 'mongo/double@1',
+  $dayOfMonth: 'mongo/double@1',
+  $hour: 'mongo/double@1',
+  $minute: 'mongo/double@1',
+  $second: 'mongo/double@1',
+  $millisecond: 'mongo/double@1',
+  $dateDiff: 'mongo/double@1',
+  $strLenCP: 'mongo/double@1',
+  $strLenBytes: 'mongo/double@1',
+  $cmp: 'mongo/double@1',
+  $indexOfArray: 'mongo/double@1',
+  $toInt: 'mongo/double@1',
+  $toLong: 'mongo/double@1',
+  $toDouble: 'mongo/double@1',
+  $toDecimal: 'mongo/double@1',
+  $count: 'mongo/double@1',
+  $toObjectId: 'mongo/objectId@1',
+} as const;
+
+export type TestOperationCodecs = typeof testOperationCodecs;

@@ -4,40 +4,72 @@ import {
   MongoAggOperator,
 } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
-import { fn } from '../src/expression-helpers';
-import type {
-  ArrayField,
-  DateField,
-  DocField,
-  NumericField,
-  StringField,
-  TypedAggExpr,
-} from '../src/types';
+import { createFn, type MongoFn } from '../src/expression-helpers';
+import type { DocField, TypedAggExpr } from '../src/types';
+import type { TestCodecTypes, TestOperationCodecs } from './fixtures/test-contract';
+import { testOperationCodecs } from './fixtures/test-contract';
+
+const fn: MongoFn<TestOperationCodecs, TestCodecTypes> = createFn<
+  TestOperationCodecs,
+  TestCodecTypes
+>(testOperationCodecs);
 
 const d: TypedAggExpr<DocField> = {
   _field: { codecId: 'mongo/string@1', nullable: false },
   node: MongoAggLiteral.of('x'),
 };
 
-const s: TypedAggExpr<StringField> = {
-  _field: { codecId: 'mongo/string@1', nullable: false } as StringField,
+const s: TypedAggExpr<{ readonly codecId: 'mongo/string@1'; readonly nullable: false }> = {
+  _field: { codecId: 'mongo/string@1', nullable: false },
   node: MongoAggLiteral.of('x'),
 };
 
-const n: TypedAggExpr<NumericField> = {
-  _field: { codecId: 'mongo/double@1', nullable: false } as NumericField,
+const n: TypedAggExpr<{ readonly codecId: 'mongo/double@1'; readonly nullable: false }> = {
+  _field: { codecId: 'mongo/double@1', nullable: false },
   node: MongoAggLiteral.of(1),
 };
 
-const dt: TypedAggExpr<DateField> = {
-  _field: { codecId: 'mongo/date@1', nullable: false } as DateField,
+const dt: TypedAggExpr<{ readonly codecId: 'mongo/date@1'; readonly nullable: false }> = {
+  _field: { codecId: 'mongo/date@1', nullable: false },
   node: MongoAggLiteral.of('2024-01-01'),
 };
 
-const arr: TypedAggExpr<ArrayField> = {
-  _field: { codecId: 'mongo/array@1', nullable: false } as ArrayField,
-  node: MongoAggLiteral.of([]),
-};
+const arr = fn.setUnion(d, d);
+
+describe('table-sourced codec stamps', () => {
+  it('role-fixed helpers stamp the codec id from the table, not a hardcode', () => {
+    expect(fn.concat(s, s)._field).toEqual({
+      codecId: testOperationCodecs.$concat,
+      nullable: false,
+    });
+    expect(fn.toDate(s)._field).toEqual({ codecId: testOperationCodecs.$toDate, nullable: false });
+    expect(fn.eq(d, d)._field).toEqual({ codecId: testOperationCodecs.$eq, nullable: false });
+    expect(fn.year(dt)._field).toEqual({ codecId: testOperationCodecs.$year, nullable: false });
+    expect(fn.toObjectId(s)._field).toEqual({
+      codecId: testOperationCodecs.$toObjectId,
+      nullable: false,
+    });
+  });
+
+  it('two different tables produce different stamps for the same helper', () => {
+    const altOps = { $concat: 'alt/text@9' } as const;
+    const altFn = createFn<typeof altOps, TestCodecTypes>(altOps);
+    expect(altFn.concat(d)._field.codecId).toBe('alt/text@9');
+    expect(fn.concat(d)._field.codecId).toBe('mongo/string@1');
+  });
+
+  it('array/document helpers stamp the unresolved structural marker', () => {
+    expect(fn.split(s, s)._field).toEqual({ codecId: '', nullable: false, unresolved: true });
+    expect(fn.arrayToObject(d)._field).toEqual({ codecId: '', nullable: false, unresolved: true });
+    expect(fn.arrayElemAt(arr, n)._field).toEqual({
+      codecId: '',
+      nullable: true,
+      unresolved: true,
+    });
+    expect(fn.firstElem(arr)._field).toEqual({ codecId: '', nullable: true, unresolved: true });
+    expect(fn.lastElem(arr)._field).toEqual({ codecId: '', nullable: true, unresolved: true });
+  });
+});
 
 describe('expression helpers — unary', () => {
   it.each([

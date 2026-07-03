@@ -44,7 +44,15 @@ export interface MongoRuntimeAdapterDescriptor<
     TTargetId
   > = MongoRuntimeAdapterInstance<TTargetId>,
 > extends RuntimeAdapterDescriptor<'mongo', TTargetId, TAdapterInstance>,
-    MongoStaticContributions {}
+    MongoStaticContributions {
+  /**
+   * Operation→output-codec table for aggregation operators with fixed,
+   * input-independent output types. Adapter-owned knowledge, threaded to
+   * the query builder via the execution context so computed expressions
+   * are stamped with real codec ids.
+   */
+  readonly operationOutputCodecs: Readonly<Record<string, string>>;
+}
 
 export interface MongoRuntimeExtensionInstance<TTargetId extends string = 'mongo'>
   extends RuntimeExtensionInstance<'mongo', TTargetId> {}
@@ -114,6 +122,7 @@ export interface MongoCodecLookup {
 export interface MongoExecutionContext<TContract = unknown, TTargetId extends string = 'mongo'> {
   readonly contract: TContract;
   readonly codecs: MongoCodecLookup;
+  readonly operationOutputCodecs: Readonly<Record<string, string>>;
   readonly stack: MongoExecutionStack<TTargetId>;
 }
 
@@ -152,6 +161,7 @@ export function createMongoExecutionContext<
   return Object.freeze({
     contract: options.contract,
     codecs: registry,
+    operationOutputCodecs: options.stack.adapter.operationOutputCodecs,
     stack: options.stack,
   });
 }

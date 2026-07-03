@@ -12,7 +12,7 @@ import {
   MongoAggOperator,
   type MongoQueryPlan,
 } from '@prisma-next/mongo-query-ast/execution';
-import { expr, fn } from '@prisma-next/mongo-query-builder';
+import { createFn, expr } from '@prisma-next/mongo-query-builder';
 import { collection } from '@prisma-next/mongo-query-builder/contract-free';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import type { MongoValue } from '@prisma-next/mongo-value';
@@ -27,7 +27,10 @@ import {
 } from './marker-ledger';
 import { MARKER_LEDGER_COLLECTION, type MarkerLedgerDocShape } from './marker-ledger-collection';
 import { isMongoControlDriver } from './mongo-control-driver';
+import { mongoOperationOutputCodecs } from './operation-output-codecs';
 import { extractDb } from './runner-deps';
+
+const fn = createFn(mongoOperationOutputCodecs);
 
 /**
  * Mongo control adapter for control-plane operations like introspection

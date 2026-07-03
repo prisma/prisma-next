@@ -11,6 +11,7 @@
  * `expectTypeOf`) and runtime values.
  */
 
+import { mongoOperationOutputCodecs } from '@prisma-next/adapter-mongo/runtime';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { acc, mongoQuery } from '@prisma-next/mongo-query-builder';
 import { MongoParamRef } from '@prisma-next/mongo-value';
@@ -22,7 +23,10 @@ import {
 } from './fixtures/decode-fixture-contract';
 import { withMongod } from './setup';
 
-const q = mongoQuery<TDecodeFixtureContract>({ contractJson: decodeFixtureContractJson });
+const q = mongoQuery({
+  contractJson: decodeFixtureContractJson as TDecodeFixtureContract,
+  operationCodecs: mongoOperationOutputCodecs,
+});
 
 describe('Mongo runtime decode integration via query-builder', () => {
   it('typed read: contract → query-builder → runtime decode end-to-end', async () => {
@@ -39,7 +43,10 @@ describe('Mongo runtime decode integration via query-builder', () => {
         embeddings: vec,
       });
 
-      const plan = mongoQuery<TDecodeFixtureContract>({ contractJson: contract })
+      const plan = mongoQuery({
+        contractJson: contract,
+        operationCodecs: mongoOperationOutputCodecs,
+      })
         .from('users')
         .match((f) =>
           f['_id']!.eq(MongoParamRef.of(insert.insertedId, { codecId: 'mongo/objectId@1' })),

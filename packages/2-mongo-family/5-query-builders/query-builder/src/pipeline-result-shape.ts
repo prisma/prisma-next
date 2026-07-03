@@ -8,8 +8,10 @@ import {
   freezeMongoResultShape,
   MongoAddFieldsStage,
   MongoAggFieldRef,
+  MongoAggOperator,
   MongoProjectStage,
 } from '@prisma-next/mongo-query-ast/execution';
+import type { MongoOperationCodecTable } from './types';
 
 const identityStageKinds = new Set(['match', 'sort', 'limit', 'skip', 'sample', 'vectorSearch']);
 
@@ -22,9 +24,19 @@ function fieldShapeAtPath(shape: MongoResultShape, path: string): MongoFieldShap
   return shape.fields[path] ?? unknownShape;
 }
 
-function shapeForExpr(currentShape: MongoResultShape, expr: MongoAggExpr): MongoFieldShape {
+function shapeForExpr(
+  currentShape: MongoResultShape,
+  expr: MongoAggExpr,
+  operationCodecs: MongoOperationCodecTable,
+): MongoFieldShape {
   if (expr instanceof MongoAggFieldRef) {
     return fieldShapeAtPath(currentShape, expr.path);
+  }
+  if (expr instanceof MongoAggOperator) {
+    const codecId = operationCodecs[expr.op];
+    if (codecId !== undefined) {
+      return { kind: 'leaf' as const, codecId, nullable: false };
+    }
   }
   return unknownShape;
 }
@@ -32,6 +44,7 @@ function shapeForExpr(currentShape: MongoResultShape, expr: MongoAggExpr): Mongo
 function resultShapeAfterProject(
   currentShape: MongoResultShape,
   stage: MongoProjectStage,
+  operationCodecs: MongoOperationCodecTable,
 ): MongoResultShape {
   if (currentShape.kind !== 'document') {
     return { kind: 'unknown' as const };
@@ -45,7 +58,7 @@ function resultShapeAfterProject(
       fields[key] = currentShape.fields[key] ?? unknownShape;
       continue;
     }
-    fields[key] = shapeForExpr(currentShape, value);
+    fields[key] = shapeForExpr(currentShape, value, operationCodecs);
   }
   if (!Object.hasOwn(stage.projection, '_id') && currentShape.fields['_id']) {
     fields['_id'] = currentShape.fields['_id'];
@@ -56,13 +69,14 @@ function resultShapeAfterProject(
 function resultShapeAfterAddFields(
   currentShape: MongoResultShape,
   stage: MongoAddFieldsStage,
+  operationCodecs: MongoOperationCodecTable,
 ): MongoResultShape {
   if (currentShape.kind !== 'document') {
     return { kind: 'unknown' as const };
   }
   const fields: Record<string, MongoFieldShape> = { ...currentShape.fields };
   for (const [key, expr] of Object.entries(stage.fields)) {
-    fields[key] = shapeForExpr(currentShape, expr);
+    fields[key] = shapeForExpr(currentShape, expr, operationCodecs);
   }
   return freezeMongoResultShape({ kind: 'document' as const, fields });
 }
@@ -70,6 +84,7 @@ function resultShapeAfterAddFields(
 export function computePipelineResultShape(
   stages: ReadonlyArray<MongoPipelineStage>,
   startShape: MongoResultShape,
+  operationCodecs: MongoOperationCodecTable,
 ): MongoResultShape {
   let shape = startShape;
   for (const stage of stages) {
@@ -80,11 +95,11 @@ export function computePipelineResultShape(
       continue;
     }
     if (stage instanceof MongoProjectStage) {
-      shape = resultShapeAfterProject(shape, stage);
+      shape = resultShapeAfterProject(shape, stage, operationCodecs);
       continue;
     }
     if (stage instanceof MongoAddFieldsStage) {
-      shape = resultShapeAfterAddFields(shape, stage);
+      shape = resultShapeAfterAddFields(shape, stage, operationCodecs);
       continue;
     }
     return { kind: 'unknown' as const };

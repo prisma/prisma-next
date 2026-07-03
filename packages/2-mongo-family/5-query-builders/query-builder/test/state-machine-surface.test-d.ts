@@ -2,9 +2,11 @@ import { MongoFieldFilter } from '@prisma-next/mongo-query-ast/execution';
 import { describe, it } from 'vitest';
 import { mongoQuery } from '../src/query';
 import type { TContract } from './fixtures/test-contract';
+import { testOperationCodecs } from './fixtures/test-contract';
 
-const contractJson = {} as unknown;
-const handle = () => mongoQuery<TContract>({ contractJson }).from('orders');
+const contractJson = {} as TContract;
+const handle = () =>
+  mongoQuery({ contractJson, operationCodecs: testOperationCodecs }).from('orders');
 const filtered = () => handle().match(MongoFieldFilter.eq('status', 'new'));
 
 /**

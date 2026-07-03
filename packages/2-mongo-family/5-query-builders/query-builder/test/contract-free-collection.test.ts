@@ -11,7 +11,10 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
 import { collection } from '../src/contract-free/collection';
-import { expr, fn } from '../src/exports/index';
+import { createFn, expr } from '../src/exports/index';
+import { testOperationCodecs } from './fixtures/test-contract';
+
+const fn = createFn(testOperationCodecs);
 
 type TestShape = {
   readonly _id: { readonly codecId: 'mongo/string@1'; readonly nullable: false };

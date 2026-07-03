@@ -1,3 +1,4 @@
+import { mongoOperationOutputCodecs } from '@prisma-next/adapter-mongo/runtime';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { isRuntimeError } from '@prisma-next/framework-components/runtime';
 import { mongoCodec } from '@prisma-next/mongo-codec';
@@ -33,7 +34,10 @@ describe('Mongo runtime decode integration', () => {
       });
 
       // User-facing path: build the plan through the query-builder so the Row type is contract-derived (no explicit annotation on execute).
-      const plan = mongoQuery<TDecodeFixtureContract>({ contractJson: contract })
+      const plan = mongoQuery({
+        contractJson: contract,
+        operationCodecs: mongoOperationOutputCodecs,
+      })
         .from('users')
         .match((f) =>
           f['_id']!.eq(MongoParamRef.of(insert.insertedId, { codecId: 'mongo/objectId@1' })),

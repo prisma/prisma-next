@@ -2,8 +2,6 @@ import type { MongoContract } from '@prisma-next/mongo-contract';
 import { expectTypeOf } from 'vitest';
 import type { ModelArrayField } from '../src/resolve-path';
 import type {
-  BooleanField,
-  DateField,
   DocField,
   DocShape,
   ExtractDocShape,
@@ -11,6 +9,10 @@ import type {
   ResolveRow,
   TypedAggExpr,
 } from '../src/types';
+
+type BooleanField = { readonly codecId: 'mongo/bool@1'; readonly nullable: false };
+type DateField = { readonly codecId: 'mongo/date@1'; readonly nullable: false };
+
 import type { TestCodecTypes, TestContract } from './fixtures/test-contract';
 
 describe('type machinery', () => {

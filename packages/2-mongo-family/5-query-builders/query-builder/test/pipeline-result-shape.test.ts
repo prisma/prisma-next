@@ -1,6 +1,7 @@
 import {
   MongoAddFieldsStage,
   MongoAggFieldRef,
+  MongoAggLiteral,
   MongoAggOperator,
   MongoGroupStage,
   MongoProjectStage,
@@ -12,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { computePipelineResultShape } from '../src/pipeline-result-shape';
 import { contractModelToMongoResultShape } from '../src/result-shape';
 import type { TContract } from './fixtures/test-contract';
-import { testContractJson } from './fixtures/test-contract';
+import { testContractJson, testOperationCodecs } from './fixtures/test-contract';
 
 const contract = blindCast<
   TContract,
@@ -21,6 +22,7 @@ const contract = blindCast<
 
 const orderModel = contract.domain.namespaces.__unbound__!.models['Order'];
 const orderShape = contractModelToMongoResultShape(orderModel);
+const ops = testOperationCodecs;
 
 describe('computePipelineResultShape', () => {
   it('vectorSearch stage carries the input shape through unchanged', () => {
@@ -32,7 +34,7 @@ describe('computePipelineResultShape', () => {
       limit: 1,
     });
 
-    const shape = computePipelineResultShape([stage], orderShape);
+    const shape = computePipelineResultShape([stage], orderShape, ops);
 
     expect(shape).toEqual(orderShape);
     if (shape.kind !== 'document') throw new Error('expected document');
@@ -46,7 +48,7 @@ describe('computePipelineResultShape', () => {
   it('project stage implicitly keeps _id and keeps a listed scalar field', () => {
     const stage = new MongoProjectStage({ status: 1 });
 
-    const shape = computePipelineResultShape([stage], orderShape);
+    const shape = computePipelineResultShape([stage], orderShape, ops);
 
     if (shape.kind !== 'document') throw new Error('expected document');
     expect(shape.fields['_id']).toEqual({
@@ -68,7 +70,7 @@ describe('computePipelineResultShape', () => {
       renamedId: MongoAggFieldRef.of('_id'),
     });
 
-    const shape = computePipelineResultShape([stage], orderShape);
+    const shape = computePipelineResultShape([stage], orderShape, ops);
 
     if (shape.kind !== 'document') throw new Error('expected document');
     expect(shape.fields['label']).toEqual({
@@ -84,16 +86,26 @@ describe('computePipelineResultShape', () => {
     expect(Object.keys(shape.fields).sort()).toEqual(['_id', 'label', 'renamedId']);
   });
 
-  it('project stage with a computed field yields unknown at that key', () => {
+  it('project stage resolves a table-covered computed field to a leaf with the table codec', () => {
     const stage = new MongoProjectStage({
       status: 1,
       shout: MongoAggOperator.toUpper(MongoAggFieldRef.of('status')),
+      asDate: MongoAggOperator.of('$toDate', MongoAggFieldRef.of('status')),
     });
 
-    const shape = computePipelineResultShape([stage], orderShape);
+    const shape = computePipelineResultShape([stage], orderShape, ops);
 
     if (shape.kind !== 'document') throw new Error('expected document');
-    expect(shape.fields['shout']).toEqual({ kind: 'unknown' });
+    expect(shape.fields['shout']).toEqual({
+      kind: 'leaf',
+      codecId: ops.$toUpper,
+      nullable: false,
+    });
+    expect(shape.fields['asDate']).toEqual({
+      kind: 'leaf',
+      codecId: ops.$toDate,
+      nullable: false,
+    });
     expect(shape.fields['status']).toEqual({
       kind: 'leaf',
       codecId: 'mongo/string@1',
@@ -101,13 +113,27 @@ describe('computePipelineResultShape', () => {
     });
   });
 
-  it('addFields stage copies a fieldRef source shape and marks computed fields unknown', () => {
+  it('project stage with an operator outside the table yields unknown at that key', () => {
+    const stage = new MongoProjectStage({
+      parts: MongoAggOperator.of('$split', [
+        MongoAggFieldRef.of('status'),
+        MongoAggLiteral.of('-'),
+      ]),
+    });
+
+    const shape = computePipelineResultShape([stage], orderShape, ops);
+
+    if (shape.kind !== 'document') throw new Error('expected document');
+    expect(shape.fields['parts']).toEqual({ kind: 'unknown' });
+  });
+
+  it('addFields stage copies a fieldRef source shape and resolves table-covered computed fields', () => {
     const stage = new MongoAddFieldsStage({
       statusCopy: MongoAggFieldRef.of('status'),
       shout: MongoAggOperator.toUpper(MongoAggFieldRef.of('status')),
     });
 
-    const shape = computePipelineResultShape([stage], orderShape);
+    const shape = computePipelineResultShape([stage], orderShape, ops);
 
     if (shape.kind !== 'document') throw new Error('expected document');
     expect(shape.fields['statusCopy']).toEqual({
@@ -115,7 +141,11 @@ describe('computePipelineResultShape', () => {
       codecId: 'mongo/string@1',
       nullable: false,
     });
-    expect(shape.fields['shout']).toEqual({ kind: 'unknown' });
+    expect(shape.fields['shout']).toEqual({
+      kind: 'leaf',
+      codecId: ops.$toUpper,
+      nullable: false,
+    });
     // original fields remain
     expect(shape.fields['_id']).toEqual({
       kind: 'leaf',
@@ -132,7 +162,7 @@ describe('computePipelineResultShape', () => {
   it('unhandled stage kind collapses the whole shape to unknown', () => {
     const stage = new MongoGroupStage(MongoAggFieldRef.of('status'), {});
 
-    const shape = computePipelineResultShape([stage], orderShape);
+    const shape = computePipelineResultShape([stage], orderShape, ops);
 
     expect(shape).toEqual({ kind: 'unknown' });
   });
@@ -140,7 +170,7 @@ describe('computePipelineResultShape', () => {
   it('unwind stage (also unhandled in this slice) collapses the whole shape to unknown', () => {
     const stage = new MongoUnwindStage('$tags', false);
 
-    const shape = computePipelineResultShape([stage], orderShape);
+    const shape = computePipelineResultShape([stage], orderShape, ops);
 
     expect(shape).toEqual({ kind: 'unknown' });
   });

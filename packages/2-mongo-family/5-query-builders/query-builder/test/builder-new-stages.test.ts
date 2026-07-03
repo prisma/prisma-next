@@ -24,11 +24,12 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
 import { mongoQuery } from '../src/query';
-import type { TContract } from './fixtures/test-contract';
-import { testContractJson } from './fixtures/test-contract';
+import { testContract, testOperationCodecs } from './fixtures/test-contract';
 
 function createOrdersBuilder() {
-  return mongoQuery<TContract>({ contractJson: testContractJson }).from('orders');
+  return mongoQuery({ contractJson: testContract, operationCodecs: testOperationCodecs }).from(
+    'orders',
+  );
 }
 
 describe('new stage builder methods', () => {

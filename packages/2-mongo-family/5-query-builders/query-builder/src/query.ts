@@ -1,18 +1,24 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import type {
   AnyMongoTypeMaps,
+  ExtractMongoCodecTypes,
   MongoContract,
   MongoContractWithTypeMaps,
   RootModelName,
 } from '@prisma-next/mongo-contract';
 import type { AnyMongoCommand, MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
-import { blindCast } from '@prisma-next/utils/casts';
+import { createFn, type MongoFn } from './expression-helpers';
 import { asMongoContract, type CollectionHandle, createCollectionHandle } from './state-classes';
+import type { MongoOperationCodecTable } from './types';
 
 /**
  * Public entry point of the query builder. `mongoQuery(...).from(rootName)`
  * yields the root state of the three-state machine
  * (`CollectionHandle` → `FilteredCollection` → `PipelineChain`).
+ *
+ * The root also exposes the context-bound `fn` expression helpers, minted
+ * from the adapter-declared `operationCodecs` table, for standalone
+ * expression construction outside stage callbacks.
  *
  * `rawCommand(cmd)` is the escape hatch for cases the typed surface does
  * not cover (yet) — it accepts any `AnyMongoCommand` (typed CRUD or a
@@ -22,23 +28,32 @@ import { asMongoContract, type CollectionHandle, createCollectionHandle } from '
  */
 export interface QueryRoot<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
+  TOps extends MongoOperationCodecTable = MongoOperationCodecTable,
 > {
   from<K extends keyof TContract['roots'] & string>(
     rootName: K,
-  ): CollectionHandle<TContract, RootModelName<TContract, K>>;
+  ): CollectionHandle<TContract, RootModelName<TContract, K>, TOps>;
   rawCommand<C extends AnyMongoCommand>(command: C): MongoQueryPlan<unknown, C>;
+  readonly fn: MongoFn<TOps, ExtractMongoCodecTypes<TContract>>;
 }
 
+/**
+ * Construct a query root from a validated contract and the adapter's
+ * operation→output-codec table. `operationCodecs` is required — a builder
+ * without codec knowledge cannot mint the `fn` helpers, and the family
+ * declares no fallback table of its own. The supported production surface
+ * threads it from the execution context (`mongoStatic()`); tests construct
+ * a local table.
+ */
 export function mongoQuery<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
->(options: { contractJson: unknown }): QueryRoot<TContract> {
-  const contract = blindCast<
-    TContract,
-    'mongoQuery accepts validated contract JSON with domain.namespaces'
-  >(options.contractJson);
+  TOps extends MongoOperationCodecTable,
+>(options: { contractJson: TContract; operationCodecs: TOps }): QueryRoot<TContract, TOps> {
+  const contract = options.contractJson;
+  const operationCodecs = options.operationCodecs;
   return {
     from<K extends keyof TContract['roots'] & string>(rootName: K) {
-      return createCollectionHandle(contract, rootName);
+      return createCollectionHandle(contract, rootName, operationCodecs);
     },
     rawCommand<C extends AnyMongoCommand>(command: C): MongoQueryPlan<unknown, C> {
       const c = asMongoContract(contract);
@@ -55,5 +70,6 @@ export function mongoQuery<
       };
       return { collection: command.collection, command, meta };
     },
+    fn: createFn<TOps, ExtractMongoCodecTypes<TContract>>(operationCodecs),
   };
 }

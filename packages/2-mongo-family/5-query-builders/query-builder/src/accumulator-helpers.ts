@@ -1,13 +1,13 @@
 import type { MongoAggExpr } from '@prisma-next/mongo-query-ast/execution';
 import { MongoAggAccumulator, MongoAggLiteral } from '@prisma-next/mongo-query-ast/execution';
-import type {
-  ArrayField,
-  DocField,
-  NullableNumericField,
-  NumericField,
-  TypedAccumulatorExpr,
-  TypedAggExpr,
-} from './types';
+import type { DocField, TypedAccumulatorExpr, TypedAggExpr } from './types';
+
+// TML-2964: `acc` still carries hardcoded codec-id literals; it becomes
+// context-bound like `fn`. Private aliases so the rest of the package
+// carries no codec-id literals.
+type NumericField = { readonly codecId: 'mongo/double@1'; readonly nullable: false };
+type NullableNumericField = { readonly codecId: 'mongo/double@1'; readonly nullable: true };
+type ArrayField = { readonly codecId: 'mongo/array@1'; readonly nullable: false };
 
 function namedAccumulatorArgs(
   args: Readonly<Record<string, TypedAggExpr<DocField> | undefined>>,

@@ -5,7 +5,9 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
 import { acc } from '../src/accumulator-helpers';
-import type { DocField, NumericField, TypedAggExpr } from '../src/types';
+import type { DocField, TypedAggExpr } from '../src/types';
+
+type NumericField = { readonly codecId: 'mongo/double@1'; readonly nullable: false };
 
 const d: TypedAggExpr<DocField> = {
   _field: { codecId: 'mongo/string@1', nullable: false },

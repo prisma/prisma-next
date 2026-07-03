@@ -1,3 +1,4 @@
+import { mongoOperationOutputCodecs } from '@prisma-next/adapter-mongo/runtime';
 import type { CrossReference, StorageHashBase } from '@prisma-next/contract/types';
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
@@ -81,8 +82,10 @@ type OrderRow = { readonly _id: string; readonly status: string; readonly amount
 
 describe('runtime type safety', () => {
   it('execute() returns AsyncIterableResult<Row> where Row matches build() row type', () => {
-    const contractJson = {} as unknown;
-    const plan = mongoQuery<TContract>({ contractJson }).from('orders').build();
+    const contractJson = {} as TContract;
+    const plan = mongoQuery({ contractJson, operationCodecs: mongoOperationOutputCodecs })
+      .from('orders')
+      .build();
     type Row = PlanRow<typeof plan>;
     expectTypeOf<Row>().toEqualTypeOf<OrderRow>();
 
@@ -92,8 +95,10 @@ describe('runtime type safety', () => {
   });
 
   it('execute() result awaits to Row[]', () => {
-    const contractJson = {} as unknown;
-    const plan = mongoQuery<TContract>({ contractJson }).from('orders').build();
+    const contractJson = {} as TContract;
+    const plan = mongoQuery({ contractJson, operationCodecs: mongoOperationOutputCodecs })
+      .from('orders')
+      .build();
     type Row = PlanRow<typeof plan>;
 
     const runtime = {} as MongoRuntime;

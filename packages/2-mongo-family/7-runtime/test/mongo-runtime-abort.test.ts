@@ -82,6 +82,7 @@ function makeContext(adapter: MongoAdapter): MongoExecutionContext {
     targetId: 'mongo',
     version: '0.0.1',
     codecs: () => newMongoCodecRegistry(),
+    operationOutputCodecs: {},
     create: () => adapterInstance,
   };
   const stack: MongoExecutionStack<'mongo'> = {
@@ -90,7 +91,7 @@ function makeContext(adapter: MongoAdapter): MongoExecutionContext {
     driver: undefined,
     extensionPacks: [],
   };
-  return Object.freeze({ contract: {}, codecs, stack });
+  return Object.freeze({ contract: {}, codecs, operationOutputCodecs: {}, stack });
 }
 
 function rowsDriver(rows: Record<string, unknown>[] = []): MongoDriver {

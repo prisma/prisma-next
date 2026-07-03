@@ -14,23 +14,41 @@ export interface DocField {
   readonly nullable: boolean;
 }
 
-export type NumericField = { readonly codecId: 'mongo/double@1'; readonly nullable: false };
-export type NullableNumericField = { readonly codecId: 'mongo/double@1'; readonly nullable: true };
-export type StringField = { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-export type ArrayField = { readonly codecId: 'mongo/array@1'; readonly nullable: false };
-export type BooleanField = { readonly codecId: 'mongo/bool@1'; readonly nullable: false };
-export type DateField = { readonly codecId: 'mongo/date@1'; readonly nullable: false };
-export type NullableDocField = { readonly codecId: string; readonly nullable: true };
+/**
+ * Structural placeholder for computed outputs the builder cannot yet
+ * resolve to a codec (array/document results become structural shapes under TML-2964).
+ * `ResolveFields` maps it to `unknown`. The `codecId` is a vestigial empty
+ * string at runtime — never a real codec id.
+ */
+export interface UnresolvedField extends DocField {
+  readonly unresolved: true;
+}
 
-export type LiteralValue<F extends DocField> = F extends StringField
-  ? string
-  : F extends NumericField
-    ? number
-    : F extends BooleanField
-      ? boolean
-      : F extends DateField
-        ? Date
-        : unknown;
+/**
+ * The operation→output-codec table the builder consumes. Declared by the
+ * adapter (which owns codec-id knowledge); the family only names operators.
+ */
+export type MongoOperationCodecTable = Readonly<Record<string, string>>;
+
+export type CodecTypesBase = Record<string, { readonly output: unknown }>;
+
+/**
+ * Codec ids from the contract's codec-type map whose decoded output extends
+ * `TOutput` — the Mongo analog of SQL's `CodecIdsWithTrait`, keyed on
+ * decoded output type instead of traits.
+ */
+export type CodecIdsWithOutput<CT extends CodecTypesBase, TOutput> = {
+  [K in keyof CT & string]: CT[K]['output'] extends TOutput ? K : never;
+}[keyof CT & string];
+
+/**
+ * Field stamped on a computed expression whose output codec is declared by
+ * the adapter table for `Op`.
+ */
+export type ComputedField<TOps extends MongoOperationCodecTable, Op extends string> = {
+  readonly codecId: TOps[Op & keyof TOps];
+  readonly nullable: false;
+};
 
 export type DocShape = Record<string, DocField>;
 
@@ -71,11 +89,13 @@ type ResolveFields<
           : unknown[]
         : unknown[]
       : unknown[]
-    : Shape[K]['codecId'] extends keyof CodecTypes
-      ? Shape[K]['nullable'] extends true
-        ? CodecTypes[Shape[K]['codecId']]['output'] | null
-        : CodecTypes[Shape[K]['codecId']]['output']
-      : unknown;
+    : Shape[K] extends { readonly unresolved: true }
+      ? unknown
+      : Shape[K]['codecId'] extends keyof CodecTypes
+        ? Shape[K]['nullable'] extends true
+          ? CodecTypes[Shape[K]['codecId']]['output'] | null
+          : CodecTypes[Shape[K]['codecId']]['output']
+        : unknown;
 };
 
 /**
@@ -189,7 +209,7 @@ export type GroupedDocShape<Spec extends GroupSpec> = {
     : Spec[K] extends TypedAccumulatorExpr<infer F>
       ? F
       : Spec[K] extends null
-        ? { readonly codecId: 'mongo/null@1'; readonly nullable: true }
+        ? UnresolvedField
         : DocField;
 };
 
