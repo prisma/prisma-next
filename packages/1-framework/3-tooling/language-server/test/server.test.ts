@@ -15,11 +15,15 @@ import {
   CompletionRequest,
   createConnection,
   type Diagnostic,
+  DiagnosticRefreshRequest,
   DiagnosticSeverity,
   DidChangeTextDocumentNotification,
   DidChangeWatchedFilesNotification,
   DidCloseTextDocumentNotification,
   DidOpenTextDocumentNotification,
+  type DocumentDiagnosticReport,
+  DocumentDiagnosticReportKind,
+  DocumentDiagnosticRequest,
   DocumentFormattingRequest,
   FileChangeType,
   type FoldingRange,
@@ -171,6 +175,15 @@ const snippetCompletionCapabilities: ClientCapabilities = {
   textDocument: { completion: { completionItem: { snippetSupport: true } } },
 };
 
+const pullDiagnosticsCapabilities: ClientCapabilities = {
+  textDocument: { diagnostic: {} },
+};
+
+const pullDiagnosticsWithRefreshCapabilities: ClientCapabilities = {
+  textDocument: { diagnostic: {} },
+  workspace: { diagnostics: { refreshSupport: true } },
+};
+
 interface Harness {
   readonly client: ReturnType<typeof createConnection>;
   readonly initialize: () => Promise<InitializeResult>;
@@ -184,6 +197,9 @@ interface Harness {
   readonly waitForWatchedFilesRegistration: (timeoutMs: number) => Promise<void>;
   readonly waitForWarning: (predicate: (message: string) => boolean) => Promise<string>;
   readonly latestDiagnostics: (uri: string) => readonly Diagnostic[] | undefined;
+  readonly publishCount: (uri: string) => number;
+  readonly diagnosticRefreshCount: () => number;
+  readonly waitForDiagnosticRefresh: () => Promise<void>;
   readonly notifyConfigChanged: (uri?: string) => void;
   readonly getDocumentAst: (uri: string) => CachedDocument | undefined;
   readonly getProjectSymbolTable: (uri: string) => SymbolTable | undefined;
@@ -272,6 +288,15 @@ function startHarness(
     }
   });
 
+  let diagnosticRefreshes = 0;
+  const diagnosticRefreshWaiters: (() => void)[] = [];
+  client.onRequest(DiagnosticRefreshRequest.type, () => {
+    diagnosticRefreshes += 1;
+    for (const waiter of diagnosticRefreshWaiters.splice(0)) {
+      waiter();
+    }
+  });
+
   const warnings: string[] = [];
   interface WarningWaiter {
     readonly predicate: (message: string) => boolean;
@@ -332,6 +357,16 @@ function startHarness(
         warningWaiters.push({ predicate, resolve });
       }),
     latestDiagnostics: (uri) => latest.get(uri),
+    publishCount: (uri) => publishCounts.get(uri) ?? 0,
+    diagnosticRefreshCount: () => diagnosticRefreshes,
+    waitForDiagnosticRefresh: () =>
+      new Promise((resolve) => {
+        if (diagnosticRefreshes > 0) {
+          resolve();
+          return;
+        }
+        diagnosticRefreshWaiters.push(resolve);
+      }),
     initialize: async () => {
       const result = await client.sendRequest(InitializeRequest.type, {
         processId: process.pid,
@@ -412,6 +447,21 @@ function requestFoldingRanges(harness: Harness, uri: string): Promise<FoldingRan
   return harness.client.sendRequest(FoldingRangeRequest.type, {
     textDocument: { uri },
   });
+}
+
+function requestPullDiagnostics(harness: Harness, uri: string): Promise<DocumentDiagnosticReport> {
+  return harness.client.sendRequest(DocumentDiagnosticRequest.type, {
+    textDocument: { uri },
+  });
+}
+
+function fullReportItems(report: DocumentDiagnosticReport): readonly Diagnostic[] {
+  return report.kind === DocumentDiagnosticReportKind.Full ? report.items : [];
+}
+
+// Lets any stray asynchronous publish flush before asserting its absence.
+function settle(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 25));
 }
 
 function requestSemanticTokensRange(
@@ -1581,6 +1631,115 @@ describe('language server config watching', { timeout: timeouts.databaseOperatio
     hook.set(resolveFails);
     harness.notifyConfigChanged();
     expect(await cleared).toEqual([]);
+  });
+});
+
+describe('language server pull diagnostics', { timeout: timeouts.databaseOperation }, () => {
+  it('advertises the diagnostic provider only to clients that support pull diagnostics', async () => {
+    harness = startHarness(resolveToSchema, pullDiagnosticsCapabilities);
+    const result = await harness.initialize();
+    expect(result.capabilities.diagnosticProvider).toEqual({
+      interFileDependencies: false,
+      workspaceDiagnostics: false,
+    });
+  });
+
+  it('does not advertise the diagnostic provider to push clients and serves them empty pull reports', async () => {
+    harness = startHarness(resolveToSchema);
+    const result = await harness.initialize();
+    expect(result.capabilities.diagnosticProvider).toBeUndefined();
+
+    openDocument(harness, schemaUri, duplicateModelSource);
+    await harness.waitForDiagnostics(schemaUri);
+    expect(await requestPullDiagnostics(harness, schemaUri)).toEqual({
+      kind: DocumentDiagnosticReportKind.Full,
+      items: [],
+    });
+  });
+
+  it('serves a full report through pull without pushing publishDiagnostics', async () => {
+    harness = startHarness(resolveToSchema, pullDiagnosticsCapabilities);
+    await harness.initialize();
+    openDocument(harness, schemaUri, duplicateModelSource);
+
+    const report = await requestPullDiagnostics(harness, schemaUri);
+    expect(report.kind).toBe(DocumentDiagnosticReportKind.Full);
+    expect(fullReportItems(report).map((diagnostic) => diagnostic.code)).toContain(
+      'PSL_DUPLICATE_DECLARATION',
+    );
+    expect(fullReportItems(report).every((diagnostic) => diagnostic.source === 'prisma-next')).toBe(
+      true,
+    );
+
+    await settle();
+    expect(harness.publishCount(schemaUri)).toBe(0);
+  });
+
+  it('returns an empty report for documents that are not configured inputs', async () => {
+    harness = startHarness(resolveToSchema, pullDiagnosticsCapabilities);
+    await harness.initialize();
+    const otherUri = pathToFileURL(join(root, 'not-a-schema.psl')).toString();
+    openDocument(harness, otherUri, duplicateModelSource);
+
+    expect(await requestPullDiagnostics(harness, otherUri)).toEqual({
+      kind: DocumentDiagnosticReportKind.Full,
+      items: [],
+    });
+  });
+
+  it('parses lazily on pull after an edit and never pushes to a pull client', async () => {
+    harness = startHarness(resolveToSchema, pullDiagnosticsCapabilities);
+    await harness.initialize();
+    openDocument(harness, schemaUri, 'model User {\n  id Int @id\n}\n');
+    expect(fullReportItems(await requestPullDiagnostics(harness, schemaUri))).toEqual([]);
+
+    pipelineMock.runPipeline.mockClear();
+    harness.client.sendNotification(DidChangeTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri, version: 2 },
+      contentChanges: [{ text: duplicateModelSource }],
+    });
+
+    const report = await requestPullDiagnostics(harness, schemaUri);
+    expect(fullReportItems(report).map((diagnostic) => diagnostic.code)).toContain(
+      'PSL_DUPLICATE_DECLARATION',
+    );
+    expect(pipelineMock.runPipeline).toHaveBeenCalledTimes(1);
+
+    closeDocument(harness, schemaUri);
+    await settle();
+    expect(harness.publishCount(schemaUri)).toBe(0);
+  });
+
+  it('requests a diagnostics refresh instead of republishing when a config changes', async () => {
+    const hook = mutableResolve(resolveToSchema);
+    harness = startHarness(hook.resolve, pullDiagnosticsWithRefreshCapabilities);
+    await harness.initialize();
+    openDocument(harness, schemaUri, duplicateModelSource);
+    expect(fullReportItems(await requestPullDiagnostics(harness, schemaUri))).not.toEqual([]);
+
+    const refreshed = harness.waitForDiagnosticRefresh();
+    hook.set(resolveToNothing);
+    harness.notifyConfigChanged();
+    await refreshed;
+
+    expect(fullReportItems(await requestPullDiagnostics(harness, schemaUri))).toEqual([]);
+    await settle();
+    expect(harness.publishCount(schemaUri)).toBe(0);
+  });
+
+  it('does not request a diagnostics refresh when the client lacks refresh support', async () => {
+    const hook = mutableResolve(resolveToSchema);
+    harness = startHarness(hook.resolve, pullDiagnosticsCapabilities);
+    await harness.initialize();
+    openDocument(harness, schemaUri, duplicateModelSource);
+    await requestPullDiagnostics(harness, schemaUri);
+
+    hook.set(resolveToNothing);
+    harness.notifyConfigChanged();
+    await settle();
+
+    expect(harness.diagnosticRefreshCount()).toBe(0);
+    expect(harness.publishCount(schemaUri)).toBe(0);
   });
 });
 

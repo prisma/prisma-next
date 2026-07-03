@@ -9,7 +9,10 @@ import {
   type Diagnostic,
   DiagnosticSeverity,
   DidChangeWatchedFilesNotification,
+  type DocumentDiagnosticReport,
+  DocumentDiagnosticReportKind,
   type FoldingRange,
+  type FullDocumentDiagnosticReport,
   type InitializeParams,
   type InitializeResult,
   type Position,
@@ -25,7 +28,7 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import { classifyPslCompletionContext } from './completion-context';
 import { providePslCompletionItems } from './completion-provider';
 import { CONFIG_FILENAME, resolveConfigInputs } from './config-resolution';
-import { ParseDiagnosticSeverity } from './diagnostic-mapping';
+import { type LspDiagnostic, ParseDiagnosticSeverity } from './diagnostic-mapping';
 import { computeFoldingRanges } from './folding-ranges';
 import type { PipelineInputs } from './pipeline';
 import {
@@ -69,6 +72,8 @@ export function createServer(connection: Connection): LanguageServer {
   let watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
   let supportsWatchedFilesRegistration = false;
   let clientSupportsSnippets = false;
+  let clientSupportsPullDiagnostics = false;
+  let clientSupportsDiagnosticsRefresh = false;
   let disposed = false;
 
   function sendDiagnostics(params: PublishDiagnosticsParams): void {
@@ -106,14 +111,23 @@ export function createServer(connection: Connection): LanguageServer {
       sendDiagnostics({ uri, diagnostics: [] });
       return;
     }
-    const diagnostics: Diagnostic[] = computed.map((diagnostic) => ({
-      range: diagnostic.range,
-      message: diagnostic.message,
-      code: diagnostic.code,
-      severity: toLspSeverity(diagnostic.severity),
-      source: 'prisma-next',
-    }));
-    sendDiagnostics({ uri, diagnostics });
+    sendDiagnostics({ uri, diagnostics: toDiagnostics(computed) });
+  }
+
+  /**
+   * Project-scoped so that a future multi-input symbol table can attach
+   * `relatedDocuments` for cross-file effects; today a report carries only the
+   * requested document's items.
+   */
+  function buildDocumentDiagnosticReport(
+    project: ProjectState,
+    uri: string,
+  ): FullDocumentDiagnosticReport {
+    const cached = ensureCurrent(project, uri);
+    return {
+      kind: DocumentDiagnosticReportKind.Full,
+      items: cached === undefined ? [] : toDiagnostics(cached.diagnostics),
+    };
   }
 
   async function resolveProjectForDocument(uri: string): Promise<ProjectState | undefined> {
@@ -214,7 +228,7 @@ export function createServer(connection: Connection): LanguageServer {
     for (const document of documents.all()) {
       if (documentConfigPaths.get(document.uri) === configPath) {
         documentConfigPaths.delete(document.uri);
-        if (hadProject) {
+        if (hadProject && !clientSupportsPullDiagnostics) {
           sendDiagnostics({ uri: document.uri, diagnostics: [] });
         }
       }
@@ -386,6 +400,9 @@ export function createServer(connection: Connection): LanguageServer {
     watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
     supportsWatchedFilesRegistration = clientSupportsWatchedFilesRegistration(params);
     clientSupportsSnippets = clientSupportsCompletionSnippets(params);
+    clientSupportsPullDiagnostics = params.capabilities.textDocument?.diagnostic !== undefined;
+    clientSupportsDiagnosticsRefresh =
+      params.capabilities.workspace?.diagnostics?.refreshSupport === true;
 
     return {
       capabilities: {
@@ -398,6 +415,18 @@ export function createServer(connection: Connection): LanguageServer {
           range: true,
         },
         completionProvider: { triggerCharacters: ['.'] },
+        // Both flags reflect the current single-input implementation scope —
+        // not a property of PSL. Once the project symbol table merges multiple
+        // inputs, an edit in one file can change diagnostics in another and
+        // these must flip alongside that work.
+        ...(clientSupportsPullDiagnostics
+          ? {
+              diagnosticProvider: {
+                interFileDependencies: false,
+                workspaceDiagnostics: false,
+              },
+            }
+          : {}),
       },
     };
   });
@@ -433,7 +462,17 @@ export function createServer(connection: Connection): LanguageServer {
         stopManagingProject(configPath);
         continue;
       }
-      await republishOpenDocumentsForConfig(configPath);
+      if (!clientSupportsPullDiagnostics) {
+        await republishOpenDocumentsForConfig(configPath);
+      }
+    }
+    if (
+      clientSupportsPullDiagnostics &&
+      clientSupportsDiagnosticsRefresh &&
+      changedConfigPaths.size > 0 &&
+      !disposed
+    ) {
+      void connection.languages.diagnostics.refresh().catch(() => undefined);
     }
   });
 
@@ -446,6 +485,22 @@ export function createServer(connection: Connection): LanguageServer {
   connection.languages.semanticTokens.onRange((params) =>
     semanticTokensForDocument(params.textDocument.uri, params.range),
   );
+
+  connection.languages.diagnostics.on(async (params): Promise<DocumentDiagnosticReport> => {
+    if (!clientSupportsPullDiagnostics) {
+      return { kind: DocumentDiagnosticReportKind.Full, items: [] };
+    }
+    let project: ProjectState | undefined;
+    try {
+      project = await resolveProjectForDocument(params.textDocument.uri);
+    } catch {
+      project = undefined;
+    }
+    if (project === undefined) {
+      return { kind: DocumentDiagnosticReportKind.Full, items: [] };
+    }
+    return buildDocumentDiagnosticReport(project, params.textDocument.uri);
+  });
 
   connection.onFoldingRanges(async (params): Promise<FoldingRange[]> => {
     let project: ProjectState | undefined;
@@ -464,10 +519,19 @@ export function createServer(connection: Connection): LanguageServer {
     return computeFoldingRanges(cached.document, cached.sourceFile);
   });
 
+  // For pull clients, open/change are invalidate-only: the `TextDocuments`
+  // version bump is the invalidation, and the next pull (or read) materializes
+  // through `ensureCurrent`. Eager publish remains for push clients.
   documents.onDidOpen((event) => {
+    if (clientSupportsPullDiagnostics) {
+      return;
+    }
     publishSafely(event.document.uri);
   });
   documents.onDidChangeContent((event) => {
+    if (clientSupportsPullDiagnostics) {
+      return;
+    }
     publishSafely(event.document.uri);
   });
   documents.onDidClose((event) => {
@@ -477,7 +541,9 @@ export function createServer(connection: Connection): LanguageServer {
       projects.get(configPath)?.artifacts.remove(uri);
     }
     documentConfigPaths.delete(uri);
-    sendDiagnostics({ uri, diagnostics: [] });
+    if (!clientSupportsPullDiagnostics) {
+      sendDiagnostics({ uri, diagnostics: [] });
+    }
   });
 
   documents.listen(connection);
@@ -500,6 +566,16 @@ export function createServer(connection: Connection): LanguageServer {
 
 function emptySemanticTokens(): SemanticTokens {
   return { data: [] };
+}
+
+function toDiagnostics(computed: readonly LspDiagnostic[]): Diagnostic[] {
+  return computed.map((diagnostic) => ({
+    range: diagnostic.range,
+    message: diagnostic.message,
+    code: diagnostic.code,
+    severity: toLspSeverity(diagnostic.severity),
+    source: 'prisma-next',
+  }));
 }
 
 function toLspSeverity(severity: number): DiagnosticSeverity {
