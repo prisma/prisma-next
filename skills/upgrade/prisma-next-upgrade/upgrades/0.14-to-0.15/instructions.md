@@ -316,3 +316,15 @@ vitest `retry` config that absorbs a known intermittent PGlite (WASM) abort. A
 re-emit picks up any contract shape. No user action required. Incidental
 substrate diff only.
 -->
+
+<!--
+PR #915 (middleware doc-comment lifecycle fixes): comments-only. The only
+`examples/` touches are doc comments in
+`examples/prisma-next-demo/src/prisma/db.ts` and
+`examples/prisma-next-demo/src/orm-client/find-user-by-id-cached.ts`,
+correcting stale claims about what runs on a cache-middleware hit (every
+`beforeExecute` has already run before `intercept` is consulted,
+`afterExecute` still fires with `source: 'middleware'`, and `decodeRow`
+still runs on the hit path). No code, contract, or emitted-artefact change.
+No user action required. Incidental substrate diff only.
+-->
